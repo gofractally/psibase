@@ -13,11 +13,32 @@ function meetCallSection(page: Page) {
     });
 }
 
-/** Status badge in CallView (Ringing / Connected / Ended), not lastFrame detail text. */
-function meetStatusBadge(page: Page, status: "Ringing" | "Connected" | "Ended") {
+/** Call-level status badge in CallView header (not participant tile/chip badges). */
+function meetCallHeaderStatusBadge(
+    page: Page,
+    status: "Ringing" | "Connected" | "Ended",
+) {
     return meetCallSection(page)
-        .locator("span.rounded-full")
+        .locator("span.rounded-full.px-2.py-0\\.5.text-xs.font-medium")
         .filter({ hasText: new RegExp(`^${status}$`) });
+}
+
+function meetGroupParticipantRingingTiles(page: Page) {
+    return meetCallSection(page)
+        .locator("span.rounded-full.text-\\[10px\\].font-medium")
+        .filter({ hasText: /^Ringing$/ });
+}
+
+async function isMeetOutboundRinging(page: Page): Promise<boolean> {
+    const headerRinging = meetCallHeaderStatusBadge(page, "Ringing");
+    if ((await headerRinging.count()) === 1) {
+        return headerRinging.isVisible();
+    }
+    // Group re-start may show Connected in the header while remotes are still ringing in the grid.
+    if (!(await meetCallHeaderStatusBadge(page, "Connected").isVisible())) {
+        return false;
+    }
+    return (await meetGroupParticipantRingingTiles(page).count()) > 0;
 }
 
 export function installMeetFsmGuard(page: Page, who: string): void {
@@ -49,6 +70,32 @@ export async function waitForIncomingMeetRing(
     ).toBeVisible({ timeout: options?.timeout ?? 90_000 });
 }
 
+/** Incoming ring dialog, or already in a connected group call (e.g. fast mesh re-start). */
+export async function waitForIncomingMeetRingOrConnected(
+    page: Page,
+    options?: { timeout?: number },
+): Promise<void> {
+    const timeout = options?.timeout ?? 90_000;
+    await expect
+        .poll(
+            async () => {
+                if (
+                    await page
+                        .getByRole("dialog", { name: INCOMING_DIALOG })
+                        .isVisible()
+                        .catch(() => false)
+                ) {
+                    return true;
+                }
+                return meetCallHeaderStatusBadge(page, "Connected")
+                    .isVisible()
+                    .catch(() => false);
+            },
+            { timeout },
+        )
+        .toBe(true);
+}
+
 export async function acceptIncomingMeet(page: Page): Promise<void> {
     const dialog = page.getByRole("dialog", { name: INCOMING_DIALOG });
     await expect(dialog).toBeVisible({ timeout: 90_000 });
@@ -67,8 +114,15 @@ export async function waitForMeetCallStatus(
     status: "Ringing" | "Connected",
     options?: { timeout?: number },
 ): Promise<void> {
-    await expect(meetStatusBadge(page, status)).toBeVisible({
-        timeout: options?.timeout ?? 180_000,
+    const timeout = options?.timeout ?? 180_000;
+    if (status === "Ringing") {
+        await expect
+            .poll(async () => isMeetOutboundRinging(page), { timeout })
+            .toBe(true);
+        return;
+    }
+    await expect(meetCallHeaderStatusBadge(page, status)).toBeVisible({
+        timeout,
     });
 }
 
@@ -94,7 +148,9 @@ export async function waitForMeetEnded(
             async () => {
                 const callSection = meetCallSection(page);
                 if ((await callSection.count()) === 0) return true;
-                return (await meetStatusBadge(page, "Ended").count()) > 0;
+                return (
+                    (await meetCallHeaderStatusBadge(page, "Ended").count()) > 0
+                );
             },
             { timeout },
         )
@@ -102,13 +158,42 @@ export async function waitForMeetEnded(
 }
 
 export async function leaveMeetCall(page: Page): Promise<void> {
+    await page.bringToFront();
     const section = meetCallSection(page);
     await expect(section).toBeVisible({ timeout: 60_000 });
-    const leaveButton = section.getByRole("button", {
-        name: /Leave call|Cancel call/,
-    });
-    await expect(leaveButton.first()).toBeVisible({ timeout: 60_000 });
-    await leaveButton.first().click();
+    const leaveButton = section
+        .getByRole("button", { name: /Leave call|Cancel call/ })
+        .first();
+    await expect(leaveButton).toBeVisible({ timeout: 10_000 });
+    await leaveButton.click({ force: true });
+    await waitForMeetCallPanelHidden(page);
+}
+
+/** After leaving, the in-call Connected panel should dismiss (rejoin banner may show). */
+export async function waitForMeetCallPanelHidden(
+    page: Page,
+    options?: { timeout?: number },
+): Promise<void> {
+    const timeout = options?.timeout ?? 30_000;
+    await expect
+        .poll(
+            async () => {
+                if (
+                    await page
+                        .getByText("Meet call in progress")
+                        .isVisible()
+                        .catch(() => false)
+                ) {
+                    return true;
+                }
+                if ((await meetCallSection(page).count()) === 0) return true;
+                return !(await meetCallHeaderStatusBadge(page, "Connected")
+                    .isVisible()
+                    .catch(() => false));
+            },
+            { timeout },
+        )
+        .toBe(true);
 }
 
 /** @deprecated use leaveMeetCall */
@@ -137,7 +222,7 @@ export async function waitForMeetVideoElements(
     options?: { timeout?: number },
 ): Promise<void> {
     await expect
-        .poll(async () => page.locator("video").count(), {
+        .poll(async () => meetCallSection(page).locator("video").count(), {
             timeout: options?.timeout ?? 180_000,
         })
         .toBeGreaterThanOrEqual(minCount);

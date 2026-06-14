@@ -1,5 +1,6 @@
 import type { ChatObjectiveCallEvent } from "./call-timeline-bridge";
 import {
+    closeAvCallSession,
     createAvCallSession,
     fetchActiveAvCallSession,
     waitForActiveAvCallSession,
@@ -13,6 +14,7 @@ import {
 import {
     avCallLog,
     avCallRecord,
+    avCallTeardownLog,
     shortSessionId,
     shortSpaceId,
 } from "./av-call-debug";
@@ -31,6 +33,7 @@ import {
     beginSignalingGroupAvCallSkipChecks,
     ensureGroupAvCallSession,
     reconcileGroupMeshMediaConnected,
+    syncMeshAvCallPeers,
     tearDownGroupLocalMedia,
     tearDownMeshSignalingPeer,
 } from "./av-call-group-orchestrator";
@@ -55,6 +58,12 @@ import {
     type DmAvCallRun,
     type GroupAvCallRun,
 } from "./av-call-session-types";
+import {
+    GroupMeetAttemptCoordinator,
+    type GroupMeetFrameDecision,
+    type GroupMeetRunContext,
+    type GroupMeetSessionEndedContext,
+} from "./group-meet-attempt-coordinator";
 import type { IceServerConfig } from "./protocol";
 import type { RealtimeClient } from "./realtime-client";
 import type { WebRtcSignalingClient } from "./webrtc-signaling-client";
@@ -93,12 +102,12 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
     private pendingInvite: AvCallIncomingInvite | null = null;
 
     /** Objective/signaling sessions the user explicitly left; ignore WS resurrection. */
-    private readonly retiredAvCallSessionIds = new Set<string>();
+    private readonly groupMeetAttempts = new GroupMeetAttemptCoordinator();
 
     /** Latest x-webrtcsig roster per objective av-call session (not pair sessions). */
     private readonly avCallSessionRosters = new Map<
         string,
-        { joined: string[]; pending: string[] }
+        { joined: string[]; pending: string[]; epoch: number }
     >();
 
     constructor(
@@ -132,7 +141,124 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
         ) => void,
         private readonly getSharedPeerRegistryFn?: () => PeerTransportRegistry | null,
         private readonly getSharedSignalingFn?: () => WebRtcSignalingClient | null,
+        private readonly isGroupMeetLeaveInProgressFn?: (
+            spaceUuid: string,
+        ) => boolean,
     ) {}
+
+    isGroupMeetLeaveInProgress(spaceUuid: string): boolean {
+        if (this.isGroupMeetLeaveInProgressFn?.(spaceUuid)) {
+            return true;
+        }
+        return this.groupMeetAttempts.isLeaveInProgress(spaceUuid);
+    }
+
+    beginGroupMeetFreshStart(spaceUuid: string): GroupMeetFrameDecision {
+        return this.groupMeetAttempts.beginOutgoingFresh(spaceUuid);
+    }
+
+    beginGroupMeetRejoin(
+        spaceUuid: string,
+        sessionId: string,
+        joinedCount: number,
+    ): GroupMeetFrameDecision {
+        return this.groupMeetAttempts.beginRejoin(
+            spaceUuid,
+            sessionId,
+            joinedCount,
+        );
+    }
+
+    beginGroupMeetLeave(spaceUuid: string): void {
+        this.groupMeetAttempts.beginLeave(spaceUuid);
+    }
+
+    completeGroupMeetLeave(
+        spaceUuid: string,
+        rejoinHint: { sessionId: string; joinedCount: number } | null,
+    ): void {
+        this.groupMeetAttempts.completeLeave(spaceUuid, rejoinHint);
+    }
+
+    markGroupMeetActive(spaceUuid: string): void {
+        const entry = this.groupMeetAttempts.getAttempt(spaceUuid);
+        if (entry?.kind === "leaving") {
+            return;
+        }
+        const sessionId = entry?.sessionId;
+        if (sessionId) {
+            this.groupMeetAttempts.markJoined(spaceUuid, sessionId);
+        } else if (entry?.kind === "leftRejoinable") {
+            // User clicked Meet to rejoin — lifecycle cleared before ensure runs.
+            return;
+        }
+    }
+
+    shouldBlockGroupMeetRearm(spaceUuid: string): boolean {
+        return this.groupMeetAttempts.shouldBlockUiRearm(spaceUuid);
+    }
+
+    rejoinHintFromGroupMeetAttempt(
+        spaceUuid: string,
+    ): { spaceUuid: string; sessionId: string; joinedCount: number } | null {
+        return this.groupMeetAttempts.rejoinHintFromLifecycle(spaceUuid);
+    }
+
+    isGroupMeetRejoinAttempt(spaceUuid: string): boolean {
+        return this.groupMeetAttempts.getAttempt(spaceUuid)?.role === "rejoiner";
+    }
+
+    isGroupMeetFreshHostAttempt(spaceUuid: string): boolean {
+        return (
+            this.groupMeetAttempts.getAttempt(spaceUuid)?.kind === "outgoingFresh"
+        );
+    }
+
+    getGroupMeetAttemptRole(
+        spaceUuid: string,
+    ): "host" | "callee" | "rejoiner" | null {
+        return this.groupMeetAttempts.getAttempt(spaceUuid)?.role ?? null;
+    }
+
+    classifyGroupMeetSessionInvite(
+        spaceUuid: string,
+        sessionId: string,
+        run: GroupMeetRunContext | null,
+    ): GroupMeetFrameDecision {
+        return this.groupMeetAttempts.classifySessionInvite(
+            spaceUuid,
+            sessionId,
+            run,
+            { leaveInProgress: this.isGroupMeetLeaveInProgress(spaceUuid) },
+        );
+    }
+
+    classifyGroupMeetParticipantJoined(
+        spaceUuid: string,
+        sessionId: string,
+        run: GroupMeetRunContext | null,
+    ): GroupMeetFrameDecision {
+        return this.groupMeetAttempts.classifyParticipantJoined(
+            spaceUuid,
+            sessionId,
+            run,
+        );
+    }
+
+    classifyGroupMeetSessionEnded(
+        sessionId: string,
+        ctx: GroupMeetSessionEndedContext,
+    ): GroupMeetFrameDecision {
+        return this.groupMeetAttempts.classifySessionEnded(sessionId, ctx);
+    }
+
+    bindGroupMeetSession(spaceUuid: string, sessionId: string): void {
+        this.groupMeetAttempts.bindSession(spaceUuid, sessionId);
+    }
+
+    markGroupMeetJoined(spaceUuid: string, sessionId: string): void {
+        this.groupMeetAttempts.markJoined(spaceUuid, sessionId);
+    }
 
     start(): void {
         this.wireRealtime();
@@ -217,6 +343,7 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
         const rt = this.getRealtime();
         if (!rt?.isSessionReady) return;
         const self = this.getSelf();
+        if (!self) return;
 
         avCallLog("av-call reconcileAfterReconnect", {
             runCount: this.runs.size,
@@ -235,34 +362,61 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
                 continue;
             }
 
-            // Drop transport-level state but keep the SM in a recoverable
-            // state. Mirror chat-data: dispatch transportTornDown, then
-            // either re-begin or defer based on presence.
-            this.dispatchRunEventForRun(run, {
-                type: "transportTornDown",
-                reason: "realtime reconnect",
-                sessionId,
-            });
+            void (async () => {
+                const hasLiveGroupMesh =
+                    run.kind === "group" &&
+                    [...run.meshPeers.values()].some(
+                        (p) => !p.isDisposed && p.isMediaConnected,
+                    );
 
-            const anyOnline =
-                !!self &&
-                (run.kind === "group"
-                    ? remoteMembers(run.members, self).some(
-                          (m) => this.getPeerPresence()[m] === "online",
-                      )
-                    : this.getPeerPresence()[run.peerAccount] === "online");
+                if (
+                    hasLiveGroupMesh &&
+                    (phase === "ready" || phase === "signaling")
+                ) {
+                    const signaling = this.signaling;
+                    if (signaling && sessionId) {
+                        signaling.joinSession(sessionId);
+                        run.hasJoined = true;
+                        run.snapshot = {
+                            ...run.snapshot,
+                            signalingJoined: true,
+                        };
+                    }
+                    syncMeshAvCallPeers(this, run, sessionId, self);
+                    reconcileGroupMeshMediaConnected(this, run);
+                    return;
+                }
 
-            if (anyOnline) {
-                this.dispatchRunEventForRun(run, {
-                    type: "beginSignaling",
+                await this.dispatchRunEventAndWait(run, {
+                    type: "transportTornDown",
+                    reason: "realtime reconnect",
                     sessionId,
                 });
-            } else {
-                this.dispatchRunEventForRun(run, {
-                    type: "signalingDeferred",
-                    sessionId,
-                });
-            }
+                run.hasJoined = false;
+
+                const anyOnline =
+                    run.kind === "group"
+                        ? remoteMembers(run.members, self).some(
+                              (m) => this.getPeerPresence()[m] === "online",
+                          )
+                        : this.getPeerPresence()[run.peerAccount] === "online";
+
+                if (anyOnline) {
+                    await this.dispatchRunEventAndWait(run, {
+                        type: "beginSignaling",
+                        sessionId,
+                    });
+                    if (run.kind === "group") {
+                        syncMeshAvCallPeers(this, run, sessionId, self);
+                        reconcileGroupMeshMediaConnected(this, run);
+                    }
+                } else {
+                    await this.dispatchRunEventAndWait(run, {
+                        type: "signalingDeferred",
+                        sessionId,
+                    });
+                }
+            })();
         }
     }
 
@@ -276,8 +430,71 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
     ensureGroupAvCallSession(
         spaceUuid: string,
         members: readonly string[],
+        options?: {
+            hostFreshStart?: boolean;
+            rejoinFreshStart?: boolean;
+        },
     ): void {
-        ensureGroupAvCallSession(this, spaceUuid, members);
+        if (options?.hostFreshStart) {
+            this.beginGroupMeetFreshStart(spaceUuid);
+        }
+        ensureGroupAvCallSession(this, spaceUuid, members, options);
+    }
+
+    /** Leaver clicked Rejoin — join the live session and mesh with survivors. */
+    rejoinGroupMeetSession(
+        spaceUuid: string,
+        members: readonly string[],
+    ): void {
+        const hint = this.rejoinHintFromGroupMeetAttempt(spaceUuid);
+        if (hint) {
+            this.beginGroupMeetRejoin(
+                spaceUuid,
+                hint.sessionId,
+                hint.joinedCount,
+            );
+        }
+        ensureGroupAvCallSession(this, spaceUuid, members, {
+            rejoinFreshStart: true,
+        });
+        this.runRejoinGroupMeetSession(spaceUuid, members);
+    }
+
+    private runRejoinGroupMeetSession(
+        spaceUuid: string,
+        members: readonly string[],
+    ): void {
+        const run = this.getRun(spaceUuid);
+        if (!run || run.kind !== "group") return;
+        void (async () => {
+            const self = this.getSelf();
+            if (!self) return;
+            let sessionId = run.snapshot.sessionId;
+            let activeSession: ChatSessionEntry | null = null;
+            if (!sessionId) {
+                for (let attempt = 0; attempt < 60; attempt++) {
+                    if (run.abort.signal.aborted) return;
+                    sessionId = run.snapshot.sessionId;
+                    if (sessionId) break;
+                    activeSession = await fetchActiveAvCallSession(spaceUuid);
+                    if (activeSession?.lifecycle === 1) {
+                        sessionId = activeSession.session_id;
+                        break;
+                    }
+                    await new Promise((resolve) =>
+                        globalThis.setTimeout(resolve, 100),
+                    );
+                }
+            }
+            if (!sessionId || run.abort.signal.aborted) return;
+            await this.beginSignaling(run, sessionId);
+            syncMeshAvCallPeers(this, run, sessionId, self);
+            reconcileGroupMeshMediaConnected(this, run);
+            await new Promise((resolve) => globalThis.setTimeout(resolve, 500));
+            if (run.abort.signal.aborted) return;
+            syncMeshAvCallPeers(this, run, sessionId, self);
+            reconcileGroupMeshMediaConnected(this, run);
+        })();
     }
 
     acceptIncomingInvite(): void {
@@ -319,12 +536,21 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
     }
 
     /** User hangup / cancel from Meet UI — routed through meetCall FSM. */
-    hangupAvCallSession(spaceUuid: string, reason = "ended"): void {
+    hangupAvCallSession(spaceUuid: string, reason = "ended"): Promise<void> {
         const run = this.getRun(spaceUuid);
-        if (!run) return;
+        if (!run) return Promise.resolve();
         const sessionId = run.snapshot.sessionId;
         const self = this.getSelf();
-        void this.dispatchRunEventAndWait(run, { type: "hangup", reason }).then(
+        avCallTeardownLog("orchestrator.hangupAvCallSession", {
+            space: shortSpaceId(spaceUuid),
+            sessionId: sessionId ? shortSpaceId(sessionId) : undefined,
+            reason,
+            self: self ?? undefined,
+            kind: run.kind,
+            phase: run.snapshot.phase,
+            hasJoined: run.hasJoined,
+        });
+        return this.dispatchRunEventAndWait(run, { type: "hangup", reason }).then(
             () => {
                 if (sessionId && self) {
                     this.removeParticipantFromAvCallSessionRoster(
@@ -543,14 +769,24 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
         this.deleteRun(spaceUuid);
     }
 
-    dispose(): void {
+    dispose(options?: { publishLeave?: boolean }): void {
+        const publishLeave = options?.publishLeave ?? false;
+        avCallTeardownLog("orchestrator.dispose", {
+            publishLeave,
+            runCount: this.runs.size,
+        });
         const signaling = this.signaling;
         for (const run of this.runs.values()) {
             run.abort.abort();
             if (run.kind === "dm") {
                 this.tearDownDmPeer(run, "client-disposed");
             }
-            if (signaling && run.hasJoined && run.snapshot.sessionId) {
+            if (
+                publishLeave &&
+                signaling &&
+                run.hasJoined &&
+                run.snapshot.sessionId
+            ) {
                 signaling.leaveSession(
                     run.snapshot.sessionId,
                     "client-disposed",
@@ -642,7 +878,9 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
     meshPeerSignalingReadyMap(run: GroupAvCallRun): Record<string, boolean> {
         const out: Record<string, boolean> = {};
         for (const [remote, peer] of run.meshPeers) {
-            out[remote] = peer.isMediaConnected;
+            out[remote] =
+                !peer.isDisposed &&
+                (peer.isMediaConnected || peer.getRemoteStream() != null);
         }
         return out;
     }
@@ -718,11 +956,12 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
     }
 
     tearDownSignaling(run: AvCallSpaceRun, reason: string): void {
-        avCallRecord("tearDownSignaling", {
+        avCallTeardownLog("orchestrator.tearDownSignaling", {
             space: shortSpaceId(run.spaceUuid),
             reason,
             hadJoined: run.hasJoined,
             kind: run.kind,
+            phase: run.snapshot.phase,
         });
         if (run.kind === "dm") {
             this.tearDownDmPeer(run, reason);
@@ -775,27 +1014,187 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
     }
 
     retireAvCallSession(sessionId: string): void {
-        this.retiredAvCallSessionIds.add(sessionId);
+        this.groupMeetAttempts.retireSession(sessionId);
     }
 
     unretireAvCallSession(sessionId: string): void {
-        this.retiredAvCallSessionIds.delete(sessionId);
+        this.groupMeetAttempts.unretireSession(sessionId);
     }
 
     isRetiredAvCallSession(sessionId: string): boolean {
-        return this.retiredAvCallSessionIds.has(sessionId);
+        return this.groupMeetAttempts.isRetiredSession(sessionId);
     }
 
     recordAvCallSessionSnapshot(
         sessionId: string,
         joinedParticipants: string[],
         pendingParticipants: string[],
+        epoch?: number,
     ): void {
         if (sessionId.startsWith("wrtc:pair:")) return;
+        const prev = this.avCallSessionRosters.get(sessionId);
+        const clearing =
+            joinedParticipants.length === 0 && pendingParticipants.length === 0;
+        if (
+            !clearing &&
+            epoch != null &&
+            prev != null &&
+            epoch <= prev.epoch
+        ) {
+            return;
+        }
+        if (prev) {
+            for (const participant of joinedParticipants) {
+                if (
+                    prev.pending.includes(participant) &&
+                    !prev.joined.includes(participant) &&
+                    !this.isAvCallRecentDeparture(sessionId, participant)
+                ) {
+                    this.clearAvCallPendingRejoin(sessionId, participant);
+                } else if (prev.joined.includes(participant)) {
+                    this.clearAvCallPendingRejoin(sessionId, participant);
+                }
+            }
+            for (const participant of pendingParticipants) {
+                if (prev.joined.includes(participant)) {
+                    this.markAvCallPendingRejoin(sessionId, participant);
+                }
+            }
+        }
         this.avCallSessionRosters.set(sessionId, {
             joined: [...joinedParticipants],
             pending: [...pendingParticipants],
+            epoch: epoch ?? (prev?.epoch ?? 0) + 1,
         });
+        if (clearing) {
+            this.groupMeetAttempts.clearSessionRejoinState(sessionId);
+        }
+    }
+
+    applyAvCallSessionSnapshotFromRealtime(
+        sessionId: string,
+        joinedParticipants: string[],
+        pendingParticipants: string[],
+        epoch?: number,
+    ): void {
+        if (sessionId.startsWith("wrtc:pair:")) return;
+        const prev = this.avCallSessionRosters.get(sessionId);
+        const clearing =
+            joinedParticipants.length === 0 && pendingParticipants.length === 0;
+        if (
+            !clearing &&
+            epoch != null &&
+            prev != null &&
+            epoch <= prev.epoch
+        ) {
+            if (epoch < prev.epoch) {
+                avCallLog("sessionSnapshot ignored (epoch regression)", {
+                    sessionId: shortSessionId(sessionId),
+                    epoch,
+                    prevEpoch: prev.epoch,
+                });
+            }
+            return;
+        }
+
+        const self = this.getSelf();
+        if (prev && self && !clearing) {
+            const joined = joinedParticipants;
+            const pending = pendingParticipants;
+            for (const participant of prev.joined) {
+                if (participant === self) continue;
+                if (joined.includes(participant)) continue;
+                if (pending.includes(participant)) {
+                    this.markAvCallPendingRejoin(sessionId, participant);
+                    const run = this.findRunBySessionId(sessionId);
+                    if (
+                        run &&
+                        this.dispatchRunEventAndWait &&
+                        !this.isAvCallRecentDeparture(sessionId, participant)
+                    ) {
+                        avCallLog("sessionSnapshot: roster moved to pending", {
+                            sessionId: shortSessionId(sessionId),
+                            participant,
+                        });
+                        void this.dispatchRunEventAndWait(run, {
+                            type: "sessionEnded",
+                            sessionId,
+                            reason: "left",
+                            by: participant,
+                        }).then(() => run.onUpdate());
+                    }
+                    continue;
+                }
+                const run = this.findRunBySessionId(sessionId);
+                if (run && this.dispatchRunEventAndWait) {
+                    avCallLog("sessionSnapshot: roster departure", {
+                        sessionId: shortSessionId(sessionId),
+                        participant,
+                    });
+                    void this.dispatchRunEventAndWait(run, {
+                        type: "sessionEnded",
+                        sessionId,
+                        reason: "left",
+                        by: participant,
+                    }).then(() => run.onUpdate());
+                }
+            }
+        }
+
+        this.recordAvCallSessionSnapshot(
+            sessionId,
+            joinedParticipants,
+            pendingParticipants,
+            epoch,
+        );
+    }
+
+    promoteAvCallParticipantToJoined(
+        sessionId: string,
+        participant: string,
+    ): void {
+        if (sessionId.startsWith("wrtc:pair:")) return;
+        const roster = this.avCallSessionRosters.get(sessionId);
+        if (!roster) {
+            this.avCallSessionRosters.set(sessionId, {
+                joined: [participant],
+                pending: [],
+                epoch: 1,
+            });
+            this.clearAvCallPendingRejoin(sessionId, participant);
+            return;
+        }
+        const joined = new Set(roster.joined);
+        joined.add(participant);
+        this.avCallSessionRosters.set(sessionId, {
+            joined: [...joined],
+            pending: roster.pending.filter((p) => p !== participant),
+            epoch: roster.epoch,
+        });
+        if (!this.isAvCallRecentDeparture(sessionId, participant)) {
+            this.clearAvCallPendingRejoin(sessionId, participant);
+        }
+        this.groupMeetAttempts.noteRosterPromotion(sessionId, participant);
+    }
+
+    markAvCallPendingRejoin(sessionId: string, participant: string): void {
+        if (sessionId.startsWith("wrtc:pair:")) return;
+        this.groupMeetAttempts.markPendingRejoin(sessionId, participant);
+    }
+
+    isAvCallPendingRejoin(sessionId: string, participant: string): boolean {
+        return this.groupMeetAttempts.isPendingRejoin(sessionId, participant);
+    }
+
+    clearAvCallPendingRejoin(sessionId: string, participant: string): void {
+        this.groupMeetAttempts.clearPendingRejoin(sessionId, participant);
+    }
+
+    isAvCallRecentDeparture(sessionId: string, participant: string): boolean {
+        return this.groupMeetAttempts.isRecentDeparture(
+            sessionId,
+            participant,
+        );
     }
 
     removeParticipantFromAvCallSessionRoster(
@@ -808,7 +1207,9 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
         this.avCallSessionRosters.set(sessionId, {
             joined: roster.joined.filter((p) => p !== participant),
             pending: roster.pending.filter((p) => p !== participant),
+            epoch: roster.epoch,
         });
+        this.groupMeetAttempts.markRecentDeparture(sessionId, participant);
     }
 
     private othersStillJoinedInAvCallSession(
@@ -827,6 +1228,14 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
 
     getAvCallSessionRosterJoinedCount(sessionId: string): number {
         return this.avCallSessionRosters.get(sessionId)?.joined.length ?? 0;
+    }
+
+    getAvCallSessionJoinedParticipants(sessionId: string): readonly string[] {
+        return this.avCallSessionRosters.get(sessionId)?.joined ?? [];
+    }
+
+    getAvCallSessionPendingParticipants(sessionId: string): readonly string[] {
+        return this.avCallSessionRosters.get(sessionId)?.pending ?? [];
     }
 
     /**
@@ -866,6 +1275,9 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
         };
 
         try {
+            await closeAvCallSession(staleSessionId, "stale-restart").catch(
+                () => {},
+            );
             await createAvCallSession(run.spaceUuid, run.members);
             const session = await waitForActiveAvCallSession(run.spaceUuid);
             if (signal.aborted) return;
@@ -895,6 +1307,9 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
                 sessionId: session.session_id,
                 anyPeerOnline,
             });
+            if (run.kind === "group") {
+                this.bindGroupMeetSession(run.spaceUuid, session.session_id);
+            }
         } catch (e) {
             if (signal.aborted) return;
             const detail =
@@ -927,11 +1342,13 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
                 existing?.lifecycle === 1 &&
                 !run.hasJoined &&
                 !run.snapshot.signalingJoined &&
-                !this.othersStillJoinedInAvCallSession(
-                    existing.session_id,
-                    self,
-                )
+                (this.isGroupMeetFreshHostAttempt(run.spaceUuid) ||
+                    !this.othersStillJoinedInAvCallSession(
+                        existing.session_id,
+                        self,
+                    ))
             ) {
+                run.hostFreshStart = false;
                 await this.recoverStaleAvCallSession(
                     run,
                     existing.session_id,
@@ -944,6 +1361,12 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
                 this.isRetiredAvCallSession(existing.session_id);
 
             if (!existing || existing.lifecycle !== 1 || retiredActive) {
+                if (existing?.lifecycle === 1 && retiredActive) {
+                    await closeAvCallSession(
+                        existing.session_id,
+                        "retired-restart",
+                    ).catch(() => {});
+                }
                 await createAvCallSession(run.spaceUuid, run.members);
             }
 
@@ -970,6 +1393,9 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
                 sessionId: session.session_id,
                 anyPeerOnline,
             });
+            if (run.kind === "group") {
+                this.bindGroupMeetSession(run.spaceUuid, session.session_id);
+            }
         } catch (e) {
             if (signal.aborted) return;
             const detail =

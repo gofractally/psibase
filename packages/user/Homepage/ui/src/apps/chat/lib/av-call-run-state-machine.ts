@@ -27,6 +27,8 @@ export type AvRunMachineState =
           /** True after joinSession + commitAvCallJoin succeeded. */
           signalingJoined: boolean;
           departedPeers?: AvDepartedPeers;
+          /** Remotes who rejoined from pending roster (ignore stale leave echo). */
+          rejoinedPeers?: AvDepartedPeers;
       }
     | {
           tag: "ready";
@@ -34,6 +36,7 @@ export type AvRunMachineState =
           peerSlots: Record<string, AvPeerSlotState>;
           signalingJoined: boolean;
           departedPeers?: AvDepartedPeers;
+          rejoinedPeers?: AvDepartedPeers;
       }
     | {
           tag: "pendingInvite";
@@ -60,6 +63,10 @@ export type AvRunContext = {
     hasLocalStream: boolean;
     /** Run snapshot session id — used when machine state has not caught up yet. */
     snapshotSessionId?: string;
+    /** Latest objective-session joined roster from signaling snapshots. */
+    sessionJoinedParticipants?: readonly string[];
+    /** Latest objective-session pending roster from signaling snapshots. */
+    sessionPendingParticipants?: readonly string[];
 };
 
 export type AvRunEvent =
@@ -282,6 +289,14 @@ function anyPeerMediaReady(ctx: AvRunContext): boolean {
     return Object.values(ctx.liveMediaReady).some(Boolean);
 }
 
+/** DM objective session: remote must be joined, not only pending, before "ready". */
+function dmRemoteJoinedSession(ctx: AvRunContext): boolean {
+    if (ctx.kind !== "dm") return true;
+    const peer = ctx.members.find((m) => m !== ctx.self);
+    if (!peer) return false;
+    return (ctx.sessionJoinedParticipants ?? []).includes(peer);
+}
+
 /**
  * Live readiness check for the "ready" snapshot derivation. Unlike
  * `allOnlineSlotsReady` (which falls back to recorded slot state), this only
@@ -380,6 +395,7 @@ export function deriveAvSnapshot(
         case "signaling": {
             const phase: AvCallSessionPhase =
                 state.signalingJoined &&
+                dmRemoteJoinedSession(ctx) &&
                 allOnlineSlotsReady(
                     ctx,
                     state.peerSlots,
@@ -404,13 +420,15 @@ export function deriveAvSnapshot(
         case "ready":
             return {
                 spaceUuid: ctx.spaceUuid,
-                phase: liveOnlineMediaReady(
-                    ctx,
-                    state.peerSlots,
-                    state.departedPeers,
-                )
-                    ? "ready"
-                    : "signaling",
+                phase:
+                    dmRemoteJoinedSession(ctx) &&
+                    liveOnlineMediaReady(
+                        ctx,
+                        state.peerSlots,
+                        state.departedPeers,
+                    )
+                        ? "ready"
+                        : "signaling",
                 sessionId: state.sessionId,
                 signalingJoined: state.signalingJoined,
                 mediaConnected,
@@ -475,11 +493,17 @@ function isGroupRemoteVoluntaryDeparture(
     ctx: AvRunContext,
     by: string | undefined,
 ): boolean {
+    if (ctx.kind !== "group" || !by || by === ctx.self) return false;
+    if (ctx.members.includes(by)) return true;
+    return ctx.sessionJoinedParticipants?.includes(by) === true;
+}
+
+function isGroupInCallPhase(state: AvRunMachineState): boolean {
     return (
-        ctx.kind === "group" &&
-        !!by &&
-        by !== ctx.self &&
-        ctx.members.includes(by)
+        state.tag === "signaling" ||
+        state.tag === "ready" ||
+        state.tag === "waitingPeer" ||
+        state.tag === "joining"
     );
 }
 
@@ -532,7 +556,10 @@ function fullTeardownCommands(
 }
 
 function handleGroupRemoteDeparture(
-    state: Extract<AvRunMachineState, { tag: "signaling" | "ready" }>,
+    state: Extract<
+        AvRunMachineState,
+        { tag: "signaling" | "ready" | "waitingPeer" | "joining" }
+    >,
     remote: string,
     reason: string,
     ctx: AvRunContext,
@@ -544,23 +571,50 @@ function handleGroupRemoteDeparture(
             "duplicate remote departure",
         );
     }
-    const peerSlots = { ...state.peerSlots, [remote]: "absent" as const };
-    const departedPeers = markDeparted(state.departedPeers, remote);
+    const peerSlots =
+        state.tag === "signaling" || state.tag === "ready"
+            ? { ...state.peerSlots, [remote]: "absent" as const }
+            : { [remote]: "absent" as const };
+    const departedPeers =
+        state.tag === "signaling" || state.tag === "ready"
+            ? markDeparted(state.departedPeers, remote)
+            : { [remote]: true as const };
+    const rejoinedPeers =
+        state.tag === "signaling" || state.tag === "ready"
+            ? (() => {
+                  if (!state.rejoinedPeers?.[remote]) return state.rejoinedPeers;
+                  const { [remote]: _removed, ...rest } = state.rejoinedPeers;
+                  return Object.keys(rest).length > 0 ? rest : undefined;
+              })()
+            : undefined;
     const active = participatingOnlineRemotes(ctx, peerSlots, departedPeers);
     const anyStillReady = active.some(
         (member) =>
             peerSlots[member] === "ready" ||
             ctx.liveMediaReady[member] === true,
     );
-    const nextTag = anyStillReady ? "ready" : "signaling";
+    const nextTag =
+        state.tag === "waitingPeer" || state.tag === "joining"
+            ? state.tag
+            : anyStillReady
+              ? "ready"
+              : "signaling";
+    const nextState =
+        state.tag === "signaling" || state.tag === "ready"
+            ? {
+                  tag: nextTag as "signaling" | "ready",
+                  sessionId: state.sessionId,
+                  peerSlots,
+                  signalingJoined: state.signalingJoined,
+                  departedPeers,
+                  rejoinedPeers,
+              }
+            : {
+                  tag: state.tag,
+                  sessionId: state.sessionId,
+              };
     return {
-        state: {
-            tag: nextTag,
-            sessionId: state.sessionId,
-            peerSlots,
-            signalingJoined: state.signalingJoined,
-            departedPeers,
-        },
+        state: nextState,
         commands: [{ type: "disposePeer", remoteAccount: remote }],
     };
 }
@@ -769,6 +823,35 @@ export function avTransition(
             if (state.tag === "pendingInvite") {
                 return ignore(state, event, "participantJoined while pending invite");
             }
+            if (
+                ctx.kind === "group" &&
+                ctx.liveMediaReady[event.participant] &&
+                (state.tag === "ready" || state.tag === "signaling")
+            ) {
+                const pendingRejoin =
+                    ctx.sessionPendingParticipants?.includes(
+                        event.participant,
+                    ) === true;
+                const departed =
+                    state.tag === "signaling" || state.tag === "ready"
+                        ? state.departedPeers?.[event.participant] === true
+                        : false;
+                const slot =
+                    state.tag === "signaling" || state.tag === "ready"
+                        ? state.peerSlots[event.participant]
+                        : undefined;
+                if (
+                    !pendingRejoin &&
+                    !departed &&
+                    slot !== "absent"
+                ) {
+                    return ignore(
+                        state,
+                        event,
+                        "participantJoined for connected peer",
+                    );
+                }
+            }
             // DM rejoin: peer already had a media connection but they re-joined.
             if (
                 ctx.kind === "dm" &&
@@ -792,6 +875,11 @@ export function avTransition(
                 ctx.kind === "group" &&
                 (state.tag === "signaling" || state.tag === "ready") &&
                 state.departedPeers?.[event.participant] === true;
+            const pendingRejoin =
+                ctx.kind === "group" &&
+                ctx.sessionPendingParticipants?.includes(
+                    event.participant,
+                ) === true;
 
             let peerSlots: Record<string, AvPeerSlotState> =
                 state.tag === "signaling" || state.tag === "ready"
@@ -801,9 +889,19 @@ export function avTransition(
                 state.tag === "signaling" || state.tag === "ready"
                     ? { ...state.departedPeers }
                     : undefined;
+            let rejoinedPeers: AvDepartedPeers | undefined =
+                state.tag === "signaling" || state.tag === "ready"
+                    ? { ...state.rejoinedPeers }
+                    : undefined;
             if (rejoiningAfterPartialLeave && departedPeers) {
                 const { [event.participant]: _removed, ...rest } = departedPeers;
                 departedPeers = Object.keys(rest).length > 0 ? rest : undefined;
+            }
+            if (pendingRejoin) {
+                rejoinedPeers = {
+                    ...rejoinedPeers,
+                    [event.participant]: true,
+                };
             }
             peerSlots[event.participant] = "connecting";
 
@@ -826,6 +924,7 @@ export function avTransition(
                 peerSlots,
                 signalingJoined,
                 departedPeers,
+                rejoinedPeers,
             };
 
             const commands: AvRunCommand[] = [
@@ -841,8 +940,11 @@ export function avTransition(
                     : false;
             const needsPeerRecycle =
                 rejoiningAfterPartialLeave ||
+                pendingRejoin ||
                 participantDeparted ||
-                peerSlot === "absent";
+                peerSlot === "absent" ||
+                (ctx.hasActivePeer?.[event.participant] !== true &&
+                    ctx.liveMediaReady[event.participant] !== true);
             if (ctx.kind === "group" && needsPeerRecycle) {
                 commands.unshift({
                     type: "disposePeer",
@@ -851,7 +953,8 @@ export function avTransition(
             }
             if (
                 ctx.kind === "group" &&
-                ctx.liveMediaReady[event.participant] !== true
+                (ctx.liveMediaReady[event.participant] !== true ||
+                    ctx.hasActivePeer?.[event.participant] !== true)
             ) {
                 commands.push({
                     type: "resendOffer",
@@ -1097,7 +1200,9 @@ export function avTransition(
                 };
             }
             if (
+                ctx.kind === "group" &&
                 ctx.liveMediaReady[event.account] &&
+                ctx.hasActivePeer?.[event.account] &&
                 (state.tag === "ready" || state.tag === "signaling")
             ) {
                 const departed =
@@ -1253,10 +1358,66 @@ export function avTransition(
             }
             if (
                 isGroupRemoteVoluntaryDeparture(ctx, event.by) &&
-                (state.tag === "signaling" || state.tag === "ready")
+                isGroupInCallPhase(state)
             ) {
+                const remote = event.by!;
+                if (
+                    (state.tag === "signaling" || state.tag === "ready") &&
+                    state.rejoinedPeers?.[remote] === true
+                ) {
+                    return ignore(
+                        state,
+                        event,
+                        "stale sessionEnded left (peer rejoined from pending)",
+                    );
+                }
+                if (
+                    (state.tag === "signaling" || state.tag === "ready") &&
+                    state.peerSlots[remote] === "connecting"
+                ) {
+                    return ignore(
+                        state,
+                        event,
+                        "stale sessionEnded for rejoining peer",
+                    );
+                }
+                // Voluntary leave is authoritative: delayed notifications must
+                // tear down stale mesh even when roster snapshots lag rejoin.
+                if (event.reason !== "left") {
+                    if (
+                        ctx.sessionJoinedParticipants?.includes(remote) &&
+                        (state.tag === "signaling" || state.tag === "ready") &&
+                        state.peerSlots[remote] !== "absent"
+                    ) {
+                        return ignore(
+                            state,
+                            event,
+                            "stale sessionEnded (participant in roster)",
+                        );
+                    }
+                    if (
+                        (state.tag === "signaling" || state.tag === "ready") &&
+                        state.peerSlots[remote] === "ready" &&
+                        ctx.hasActivePeer?.[remote]
+                    ) {
+                        return ignore(
+                            state,
+                            event,
+                            "stale sessionEnded (peer still connected)",
+                        );
+                    }
+                }
                 return handleGroupRemoteDeparture(
-                    state,
+                    state as Extract<
+                        AvRunMachineState,
+                        {
+                            tag:
+                                | "signaling"
+                                | "ready"
+                                | "waitingPeer"
+                                | "joining";
+                        }
+                    >,
                     event.by!,
                     event.reason,
                     ctx,

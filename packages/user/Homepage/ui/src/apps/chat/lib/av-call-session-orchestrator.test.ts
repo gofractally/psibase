@@ -6,6 +6,7 @@ import type { ServerRealtimeFrame } from "./realtime-protocol";
 vi.mock("./av-call-debug", () => ({
     avCallLog: () => {},
     avCallRecord: () => {},
+    avCallTeardownLog: () => {},
     shortSessionId: (id: string) => id,
     shortSpaceId: (id: string) => id,
 }));
@@ -680,6 +681,26 @@ describe("AvCallSessionOrchestrator — group lifecycle", () => {
         expect(run?.awaitingInviteAccept).toBe(false);
         expect(run?.hasJoined).toBe(true);
         expect(invites).toHaveLength(1);
+        orch.dispose();
+    });
+
+    it("ignores stale sessionSnapshot epoch on av-call roster", () => {
+        const { orch } = makeOrchestrator();
+        orch.recordAvCallSessionSnapshot(
+            SESSION_GROUP,
+            GROUP_MEMBERS,
+            [],
+            3,
+        );
+        orch.recordAvCallSessionSnapshot(
+            SESSION_GROUP,
+            [SELF, PEER],
+            [PEER2],
+            2,
+        );
+        expect(orch.getAvCallSessionJoinedParticipants(SESSION_GROUP)).toEqual(
+            GROUP_MEMBERS,
+        );
         orch.dispose();
     });
 });

@@ -1,4 +1,4 @@
-import { test } from "../fixtures/chain";
+import { expect, test } from "../fixtures/chain";
 
 import {
     bootstrapGroupMeshPeers,
@@ -16,18 +16,15 @@ import {
     leaveMeetCall,
     waitForGroupMeetRejoinBanner,
     waitForIncomingMeetRing,
+    waitForMeetCallPanelHidden,
     waitForMeetFullyConnected,
     waitForMeetVideoElements,
 } from "../lib/meet-ui";
-import {
-    installMeetSpecCleanup,
-    meetSpecTeardownBeforeClose,
-    trackMeetPage,
-} from "../lib/meet-spec-hooks";
+import { trackMeetPage } from "../lib/meet-spec-hooks";
 import { setupThreePartyAccounts } from "../lib/setup-three-party";
 
 test.describe("Meet group leave survivors", () => {
-    installMeetSpecCleanup(test);
+    // Cleanup only in `finally` — afterEach teardown races with voluntary leave steps.
 
     test("one participant leaving keeps others connected and offers rejoin", async ({
         chain,
@@ -90,12 +87,23 @@ test.describe("Meet group leave survivors", () => {
                 waitForIncomingMeetRing(party.carolPage),
             ]);
             await acceptIncomingMeet(party.bobPage);
+            await waitForMeetFullyConnected(party.bobPage);
             await acceptIncomingMeet(party.carolPage);
             await waitForMeetFullyConnected(alicePage);
-            await waitForMeetFullyConnected(party.bobPage);
             await waitForMeetFullyConnected(party.carolPage);
 
+            await party.carolPage.bringToFront();
+            const carolSelf = await party.carolPage.evaluate(
+                () =>
+                    (
+                        globalThis as typeof globalThis & {
+                            __psibaseMeetE2e?: { self: () => string | null };
+                        }
+                    ).__psibaseMeetE2e?.self() ?? null,
+            );
+            expect(carolSelf).toBe(party.carolAccount.name);
             await leaveMeetCall(party.carolPage);
+            await waitForMeetCallPanelHidden(party.carolPage);
             await waitForGroupMeetRejoinBanner(party.carolPage);
 
             await waitForMeetFullyConnected(alicePage);
@@ -109,11 +117,6 @@ test.describe("Meet group leave survivors", () => {
             await waitForMeetFullyConnected(party.carolPage);
             await waitForMeetVideoElements(party.carolPage, 2);
         } finally {
-            await meetSpecTeardownBeforeClose([
-                alicePage,
-                party.bobPage,
-                party.carolPage,
-            ]);
             await party.cleanup();
         }
     });

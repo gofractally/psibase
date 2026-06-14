@@ -151,6 +151,20 @@ export function startDmAvCallPeer(
             isInitiator,
             sharedPc: host.usesSharedTransport?.() ?? false,
         });
+        if (existing!.isMediaConnected) {
+            host.dispatchRunEventForRun?.(run, {
+                type: "mediaConnected",
+                remoteAccount: run.peerAccount,
+            });
+            const local = existing!.getLocalStream();
+            if (local) {
+                host.onAvCallMediaReady?.(run.spaceUuid, {
+                    peerAccount: run.peerAccount,
+                    localStream: local,
+                    remoteStream: existing!.getRemoteStream() ?? null,
+                });
+            }
+        }
         return;
     }
     host.tearDownDmPeer(run, "replacing peer");

@@ -12,6 +12,7 @@ import {
     clickStartMeet,
     endMeetCall,
     waitForIncomingMeetRing,
+    waitForIncomingMeetRingOrConnected,
     waitForMeetCallStatus,
     waitForMeetEnded,
 } from "../lib/meet-ui";
@@ -114,13 +115,18 @@ test.describe("Meet group six-party", () => {
             });
             await Promise.all(
                 OTHER_MEMBERS.map((key) =>
-                    waitForIncomingMeetRing(party.pages[key], {
+                    waitForIncomingMeetRingOrConnected(party.pages[key], {
                         timeout: 240_000,
                     }),
                 ),
             );
             for (const key of OTHER_MEMBERS) {
-                await acceptIncomingMeet(party.pages[key]);
+                const dialog = party.pages[key].getByRole("dialog", {
+                    name: "Incoming Meet call",
+                });
+                if (await dialog.isVisible().catch(() => false)) {
+                    await acceptIncomingMeet(party.pages[key]);
+                }
             }
             await waitForMeetCallStatus(alicePage, "Connected", {
                 timeout: 300_000,

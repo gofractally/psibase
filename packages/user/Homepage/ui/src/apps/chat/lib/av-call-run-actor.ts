@@ -51,7 +51,9 @@ export function buildAvRunContext(
             !!run.peer && !run.peer.isDisposed;
     } else {
         for (const [acct, peer] of run.meshPeers) {
-            liveMediaReady[acct] = peer.isMediaConnected;
+            liveMediaReady[acct] =
+                !peer.isDisposed &&
+                (peer.isMediaConnected || peer.getRemoteStream() != null);
             hasActivePeer[acct] = !peer.isDisposed;
         }
         hasLocalStream = !!run.localStream;
@@ -67,6 +69,12 @@ export function buildAvRunContext(
         hasJoined: run.hasJoined,
         hasLocalStream,
         snapshotSessionId: run.snapshot.sessionId,
+        sessionJoinedParticipants: run.snapshot.sessionId
+            ? host.getAvCallSessionJoinedParticipants?.(run.snapshot.sessionId)
+            : undefined,
+        sessionPendingParticipants: run.snapshot.sessionId
+            ? host.getAvCallSessionPendingParticipants?.(run.snapshot.sessionId)
+            : undefined,
     };
 }
 
@@ -128,7 +136,8 @@ export class AvCallRunCommandExecutor implements AvRunCommandExecutor {
 
             case "leaveSession": {
                 const signaling = this.host.getSignaling();
-                signaling?.leaveSession(command.sessionId, command.reason);
+                if (!signaling) return;
+                signaling.leaveSession(command.sessionId, command.reason);
                 run.hasJoined = false;
                 return;
             }

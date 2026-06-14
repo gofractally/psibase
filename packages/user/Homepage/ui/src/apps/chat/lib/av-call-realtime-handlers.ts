@@ -1,4 +1,6 @@
 import { avCallLog, shortSessionId, shortSpaceId } from "./av-call-debug";
+import { syncMeshAvCallPeers } from "./av-call-group-orchestrator";
+import type { GroupMeetRunContext } from "./group-meet-attempt-coordinator";
 import { normalizeAvCallTerminalReason } from "./av-call-terminal";
 import { closeAvCallSession } from "./chat-api";
 import {
@@ -20,6 +22,60 @@ function avCallTransportsWantAudio(transports: readonly string[]): boolean {
     return transports.includes("audio");
 }
 
+function groupMeetRunContext(
+    run: AvCallSpaceRun | undefined,
+    phase: string,
+): GroupMeetRunContext | null {
+    if (!run) return null;
+    return {
+        phase,
+        sessionId: run.snapshot.sessionId,
+        hasJoined: run.hasJoined,
+        awaitingInviteAccept: run.awaitingInviteAccept,
+        signalingJoined: run.snapshot.signalingJoined,
+    };
+}
+
+function applyGroupSessionInviteDecision(
+    host: AvCallOrchestratorHost,
+    frame: Extract<ServerRealtimeFrame, { t: "sessionInvite" }>,
+    existing: AvCallSpaceRun | undefined,
+    existingPhase: string,
+): boolean {
+    const spaceUuid = frame.appMetadata.spaceUuid;
+    const decision = host.classifyGroupMeetSessionInvite?.(
+        spaceUuid,
+        frame.sessionId,
+        groupMeetRunContext(existing, existingPhase),
+    );
+    if (!decision) return true;
+
+    if (decision.action === "ignore-stale") {
+        avCallLog("sessionInvite ignored (coordinator)", {
+            sessionId: shortSessionId(frame.sessionId),
+            space: shortSpaceId(spaceUuid),
+            reason: decision.reason,
+        });
+        return false;
+    }
+
+    if (decision.action === "refresh-pending-invite") {
+        const run = host.getRun(spaceUuid);
+        if (run && host.dispatchRunEventForRun) {
+            host.dispatchRunEventForRun(run, {
+                type: "sessionInvite",
+                sessionId: frame.sessionId,
+                from: frame.from,
+                wantVideo: avCallTransportsWantVideo(frame.transports),
+                wantAudio: avCallTransportsWantAudio(frame.transports),
+            });
+        }
+        return false;
+    }
+
+    return true;
+}
+
 function onSessionInvite(
     host: AvCallOrchestratorHost,
     frame: Extract<ServerRealtimeFrame, { t: "sessionInvite" }>,
@@ -29,9 +85,7 @@ function onSessionInvite(
     if (!self) return;
 
     const isGroup = isGroupMembers(frame.participants);
-    if (isGroup) {
-        host.unretireAvCallSession?.(frame.sessionId);
-    } else if (host.isRetiredAvCallSession?.(frame.sessionId)) {
+    if (!isGroup && host.isRetiredAvCallSession?.(frame.sessionId)) {
         return;
     }
 
@@ -49,27 +103,52 @@ function onSessionInvite(
         ? host.liveSnapshot(existing).phase
         : "idle";
 
-    if (
+    if (isGroup) {
+        if (
+            !applyGroupSessionInviteDecision(
+                host,
+                frame,
+                existing,
+                existingPhase,
+            )
+        ) {
+            return;
+        }
+    } else if (host.isGroupMeetLeaveInProgress?.(spaceUuid)) {
+        avCallLog("sessionInvite ignored (group leave in progress)", {
+            sessionId: shortSessionId(frame.sessionId),
+            space: shortSpaceId(spaceUuid),
+        });
+        return;
+    } else if (
         existing?.snapshot.sessionId &&
         existing.snapshot.sessionId !== frame.sessionId &&
         existingPhase !== "failed" &&
         existingPhase !== "idle"
     ) {
         return;
-    }
-
-    if (
+    } else if (
         existing?.snapshot.sessionId === frame.sessionId &&
         existingPhase !== "idle" &&
         existingPhase !== "failed"
     ) {
         const duplicateWhileActive =
-            existingPhase === "waiting-peer" ||
+            (existingPhase === "waiting-peer" && existing.hasJoined) ||
             existingPhase === "joining" ||
             existingPhase === "signaling" ||
             existingPhase === "ready" ||
             (existing.hasJoined && existing.snapshot.signalingJoined);
         if (duplicateWhileActive) {
+            if (existing.awaitingInviteAccept) {
+                host.dispatchRunEventForRun?.(existing, {
+                    type: "sessionInvite",
+                    sessionId: frame.sessionId,
+                    from: frame.from,
+                    wantVideo: avCallTransportsWantVideo(frame.transports),
+                    wantAudio: avCallTransportsWantAudio(frame.transports),
+                });
+                return;
+            }
             avCallLog("sessionInvite ignored (duplicate for active session)", {
                 phase: existingPhase,
                 hasJoined: existing.hasJoined,
@@ -227,27 +306,28 @@ function findRunForParticipantJoined(
     sessionId: string,
     participant: string,
 ): AvCallSpaceRun | undefined {
-    let run = host.findRunBySessionId(sessionId);
-    if (!run) {
-        for (const candidate of host.getRuns()) {
-            if (candidate.snapshot.phase === "failed") continue;
-            if (
-                candidate.kind === "dm" &&
-                candidate.peerAccount === participant
-            ) {
-                run = candidate;
-                break;
-            }
-            if (
-                candidate.kind === "group" &&
-                candidate.members.includes(participant)
-            ) {
-                run = candidate;
-                break;
-            }
+    const bySession = host.findRunBySessionId(sessionId);
+    if (bySession) return bySession;
+
+    for (const candidate of host.getRuns()) {
+        if (candidate.snapshot.phase === "failed") continue;
+        if (candidate.snapshot.sessionId && candidate.snapshot.sessionId !== sessionId) {
+            continue;
+        }
+        if (
+            candidate.kind === "dm" &&
+            candidate.peerAccount === participant
+        ) {
+            return candidate;
+        }
+        if (
+            candidate.kind === "group" &&
+            candidate.members.includes(participant)
+        ) {
+            return candidate;
         }
     }
-    return run;
+    return undefined;
 }
 
 function onParticipantJoined(
@@ -271,11 +351,92 @@ function onParticipantJoined(
     );
     if (!run) return;
 
+    if (run.kind === "group") {
+        const phase = host.liveSnapshot(run).phase;
+        const decision = host.classifyGroupMeetParticipantJoined?.(
+            run.spaceUuid,
+            frame.sessionId,
+            groupMeetRunContext(run, phase),
+        );
+        if (decision?.action === "ignore-stale") {
+            avCallLog("participantJoined ignored (coordinator)", {
+                sessionId: shortSessionId(frame.sessionId),
+                participant: frame.participant,
+                reason: decision.reason,
+            });
+            return;
+        }
+    } else if (run.awaitingInviteAccept) {
+        avCallLog("participantJoined deferred (pending invite accept)", {
+            sessionId: shortSessionId(frame.sessionId),
+            participant: frame.participant,
+        });
+        return;
+    }
+
+    const pending =
+        host.getAvCallSessionPendingParticipants?.(frame.sessionId) ?? [];
+    const joined =
+        host.getAvCallSessionJoinedParticipants?.(frame.sessionId) ?? [];
+    const pendingRejoin =
+        host.isAvCallPendingRejoin?.(frame.sessionId, frame.participant) ||
+        (pending.includes(frame.participant) &&
+            host.isAvCallRecentDeparture?.(
+                frame.sessionId,
+                frame.participant,
+            ) === true);
+    if (
+        pending.includes(frame.participant) &&
+        host.isAvCallRecentDeparture?.(frame.sessionId, frame.participant)
+    ) {
+        host.markAvCallPendingRejoin?.(frame.sessionId, frame.participant);
+    }
+
+    const meshPeer =
+        run.kind === "group" ? run.meshPeers.get(frame.participant) : undefined;
+    const establishedMesh =
+        run.kind === "group" &&
+        (run.snapshot.phase === "ready" || run.snapshot.phase === "signaling") &&
+        meshPeer !== undefined &&
+        !meshPeer.isDisposed &&
+        (meshPeer.isMediaConnected || meshPeer.getRemoteStream() != null);
+
+    if (establishedMesh && !pendingRejoin) {
+        avCallLog("participantJoined ignored (mesh already connected)", {
+            sessionId: shortSessionId(frame.sessionId),
+            participant: frame.participant,
+        });
+        return;
+    }
+
+    if (
+        joined.includes(frame.participant) &&
+        !pendingRejoin &&
+        !host.isAvCallRecentDeparture?.(frame.sessionId, frame.participant)
+    ) {
+        avCallLog("participantJoined ignored (already joined)", {
+            sessionId: shortSessionId(frame.sessionId),
+            participant: frame.participant,
+        });
+        return;
+    }
+
     host.dispatchRunEventForRun(run, {
         type: "participantJoined",
         sessionId: frame.sessionId,
         participant: frame.participant,
     });
+    if (
+        run.kind === "group" &&
+        self &&
+        (run.snapshot.phase === "ready" || run.snapshot.phase === "signaling")
+    ) {
+        const sessionId = run.snapshot.sessionId ?? frame.sessionId;
+        const peer = run.meshPeers.get(frame.participant);
+        if (sessionId && !peer?.isMediaConnected) {
+            syncMeshAvCallPeers(host, run, sessionId, self);
+        }
+    }
     host.onPeerOnline(frame.participant);
 }
 
@@ -287,6 +448,49 @@ function onSessionEnded(
     const run = host.findRunBySessionId(frame.sessionId);
     if (!run) return;
     if (!host.dispatchRunEventAndWait) return;
+
+    if (run.kind === "group") {
+        const joined =
+            host.getAvCallSessionJoinedParticipants?.(frame.sessionId) ?? [];
+        const pending =
+            host.getAvCallSessionPendingParticipants?.(frame.sessionId) ?? [];
+        const peer = frame.by ? run.meshPeers.get(frame.by) : undefined;
+        const peerMediaActive =
+            peer != null &&
+            !peer.isDisposed &&
+            (peer.isMediaConnected || peer.getRemoteStream() != null);
+        const decision = host.classifyGroupMeetSessionEnded?.(frame.sessionId, {
+            by: frame.by,
+            reason: frame.reason || "session ended",
+            joinedRoster: joined,
+            pendingRoster: pending,
+            peerMediaActive,
+        });
+        if (decision?.action === "ignore-stale") {
+            avCallLog("sessionEnded ignored (coordinator)", {
+                sessionId: shortSessionId(frame.sessionId),
+                by: frame.by,
+                reason: decision.reason,
+            });
+            if (frame.by) {
+                host.clearAvCallPendingRejoin?.(frame.sessionId, frame.by);
+            }
+            return;
+        }
+    } else if (
+        frame.reason === "left" &&
+        frame.by &&
+        host.isAvCallPendingRejoin?.(frame.sessionId, frame.by) &&
+        host.getAvCallSessionPendingParticipants?.(frame.sessionId)?.includes(
+            frame.by,
+        )
+    ) {
+        avCallLog("sessionEnded ignored (stale leave while rejoin pending)", {
+            sessionId: shortSessionId(frame.sessionId),
+            by: frame.by,
+        });
+        return;
+    }
 
     const terminalReason = normalizeAvCallTerminalReason(
         frame.reason || "session ended",
@@ -345,10 +549,11 @@ export function wireAvCallRealtimeHandlers(
     rt.registerHandlers({
         sessionInvite: (frame) => onSessionInvite(host, frame),
         sessionSnapshot: (frame) => {
-            host.recordAvCallSessionSnapshot?.(
+            host.applyAvCallSessionSnapshotFromRealtime?.(
                 frame.sessionId,
                 frame.joinedParticipants,
                 frame.pendingParticipants,
+                frame.epoch,
             );
         },
         participantJoined: (frame) => onParticipantJoined(host, frame),

@@ -21,7 +21,7 @@ export type AttachDiagnosticsOptions = {
 };
 
 const DEFAULT_CONSOLE_FILTER =
-    /chat-data|realtime|x-pslack|x-webrtcsig|websocket|auth|connect|reconnect|presence|signaling|peer/i;
+    /chat-data|realtime|x-pslack|x-webrtcsig|websocket|auth|connect|reconnect|presence|signaling|peer|teardown|leaveSession|endPlaceholderCall|\[av-call\]/i;
 
 /**
  * Stream filtered console, page errors, HTTP failures, and websocket frames from

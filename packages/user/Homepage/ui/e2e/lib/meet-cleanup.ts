@@ -25,6 +25,19 @@ export async function bestEffortEndActiveMeet(page: Page): Promise<void> {
     if (page.isClosed()) return;
     const section = meetCallSection(page);
     if ((await section.count()) === 0) return;
+    const leftViaHook = await page
+        .evaluate(() => {
+            const hook = (
+                globalThis as typeof globalThis & {
+                    __psibaseMeetE2e?: { leaveActiveCall: () => void };
+                }
+            ).__psibaseMeetE2e;
+            if (!hook?.leaveActiveCall) return false;
+            hook.leaveActiveCall();
+            return true;
+        })
+        .catch(() => false);
+    if (leftViaHook) return;
     const endButton = section.getByRole("button", {
         name: /Leave call|Cancel call/,
     });

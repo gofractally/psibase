@@ -33,3 +33,11 @@ export function avCallRecord(
 ): void {
     avCallLog(event, detail);
 }
+
+/** Structured teardown-source marker for leave / hangup triage (e2e + manual). */
+export function avCallTeardownLog(
+    source: string,
+    detail?: Record<string, unknown>,
+): void {
+    avCallLog(`teardown:${source}`, detail);
+}

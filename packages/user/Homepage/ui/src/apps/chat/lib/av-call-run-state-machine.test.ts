@@ -634,6 +634,31 @@ describe("av-call-run-state-machine", () => {
             ).toBe(false);
         });
 
+        it("remote voluntary leave in waitingPeer disposes peer only", () => {
+            const waitingPeer: AvRunMachineState = {
+                tag: "waitingPeer",
+                sessionId: SESSION,
+            };
+            const result = avTransition(
+                waitingPeer,
+                {
+                    type: "sessionEnded",
+                    sessionId: SESSION,
+                    reason: "left",
+                    by: BOB,
+                },
+                ctx({
+                    kind: "group",
+                    hasJoined: true,
+                    liveMediaReady: { [CAROL]: true },
+                }),
+            );
+            expect(result.state).toEqual(waitingPeer);
+            expect(result.commands).toEqual([
+                { type: "disposePeer", remoteAccount: BOB },
+            ]);
+        });
+
         it("duplicate sessionEnded from same remote is ignored", () => {
             const signaling: AvRunMachineState = {
                 tag: "signaling",
@@ -653,6 +678,259 @@ describe("av-call-run-state-machine", () => {
                 ctx({ kind: "group", hasJoined: true }),
             );
             expect(result.state).toEqual(signaling);
+            expect(result.commands[0]).toMatchObject({ type: "logIgnored" });
+        });
+
+        it("remote leave matches session roster when not in invite members", () => {
+            const ready: AvRunMachineState = {
+                tag: "ready",
+                sessionId: SESSION,
+                peerSlots: { [BOB]: "ready", [CAROL]: "ready" },
+                signalingJoined: true,
+            };
+            const result = avTransition(
+                ready,
+                {
+                    type: "sessionEnded",
+                    sessionId: SESSION,
+                    reason: "left",
+                    by: CAROL,
+                },
+                ctx({
+                    kind: "group",
+                    members: [SELF, BOB],
+                    sessionJoinedParticipants: [SELF, BOB, CAROL],
+                    hasJoined: true,
+                    liveMediaReady: { [BOB]: true, [CAROL]: true },
+                }),
+            );
+            expect(result.state.tag).toBe("ready");
+            expect(result.commands).toEqual([
+                { type: "disposePeer", remoteAccount: CAROL },
+            ]);
+        });
+
+        it("stale sessionEnded for rejoining peer is ignored", () => {
+            const signaling: AvRunMachineState = {
+                tag: "signaling",
+                sessionId: SESSION,
+                peerSlots: { [BOB]: "connecting", [CAROL]: "ready" },
+                signalingJoined: true,
+            };
+            const result = avTransition(
+                signaling,
+                {
+                    type: "sessionEnded",
+                    sessionId: SESSION,
+                    reason: "left",
+                    by: BOB,
+                },
+                ctx({
+                    kind: "group",
+                    hasJoined: true,
+                    liveMediaReady: { [CAROL]: true },
+                }),
+            );
+            expect(result.state).toEqual(signaling);
+            expect(result.commands[0]).toMatchObject({ type: "logIgnored" });
+        });
+
+        it("stale sessionEnded left after pending rejoin is ignored", () => {
+            const ready: AvRunMachineState = {
+                tag: "ready",
+                sessionId: SESSION,
+                peerSlots: { [BOB]: "ready", [CAROL]: "connecting" },
+                signalingJoined: true,
+                rejoinedPeers: { [CAROL]: true },
+            };
+            const result = avTransition(
+                ready,
+                {
+                    type: "sessionEnded",
+                    sessionId: SESSION,
+                    reason: "left",
+                    by: CAROL,
+                },
+                ctx({
+                    kind: "group",
+                    hasJoined: true,
+                    sessionJoinedParticipants: [SELF, BOB, CAROL],
+                }),
+            );
+            expect(result.state).toEqual(ready);
+            expect(result.commands[0]).toMatchObject({ type: "logIgnored" });
+        });
+
+        it("participantJoined for pending rejoin is not ignored when stale mesh exists", () => {
+            const ready: AvRunMachineState = {
+                tag: "ready",
+                sessionId: SESSION,
+                peerSlots: { [BOB]: "ready", [CAROL]: "ready" },
+                signalingJoined: true,
+            };
+            const result = avTransition(
+                ready,
+                {
+                    type: "participantJoined",
+                    sessionId: SESSION,
+                    participant: CAROL,
+                },
+                ctx({
+                    kind: "group",
+                    hasJoined: true,
+                    liveMediaReady: { [CAROL]: true },
+                    hasActivePeer: { [CAROL]: true },
+                    sessionPendingParticipants: [CAROL],
+                    sessionJoinedParticipants: [SELF, BOB],
+                }),
+            );
+            expect(result.state.tag).toBe("signaling");
+            expect(result.state).toMatchObject({
+                peerSlots: expect.objectContaining({ [CAROL]: "connecting" }),
+                rejoinedPeers: { [CAROL]: true },
+            });
+            expect(result.commands).toContainEqual({
+                type: "beginSignaling",
+                sessionId: SESSION,
+            });
+        });
+
+        it("sessionEnded reason left tears down mesh even when roster still lists peer", () => {
+            const ready: AvRunMachineState = {
+                tag: "ready",
+                sessionId: SESSION,
+                peerSlots: { [BOB]: "ready", [CAROL]: "ready" },
+                signalingJoined: true,
+            };
+            const result = avTransition(
+                ready,
+                {
+                    type: "sessionEnded",
+                    sessionId: SESSION,
+                    reason: "left",
+                    by: BOB,
+                },
+                ctx({
+                    kind: "group",
+                    hasJoined: true,
+                    liveMediaReady: { [BOB]: true, [CAROL]: true },
+                    hasActivePeer: { [BOB]: true, [CAROL]: true },
+                    sessionJoinedParticipants: [SELF, BOB, CAROL],
+                }),
+            );
+            expect(result.state.tag).toBe("ready");
+            expect(result.commands).toContainEqual({
+                type: "disposePeer",
+                remoteAccount: BOB,
+            });
+        });
+
+        it("stale sessionEnded ignored when participant is back in roster", () => {
+            const ready: AvRunMachineState = {
+                tag: "ready",
+                sessionId: SESSION,
+                peerSlots: { [BOB]: "ready", [CAROL]: "ready" },
+                signalingJoined: true,
+            };
+            const result = avTransition(
+                ready,
+                {
+                    type: "sessionEnded",
+                    sessionId: SESSION,
+                    reason: "timeout",
+                    by: BOB,
+                },
+                ctx({
+                    kind: "group",
+                    hasJoined: true,
+                    liveMediaReady: { [BOB]: true, [CAROL]: true },
+                    sessionJoinedParticipants: [SELF, BOB, CAROL],
+                }),
+            );
+            expect(result.state).toEqual(ready);
+            expect(result.commands[0]).toMatchObject({ type: "logIgnored" });
+        });
+
+        it("stale sessionEnded ignored when peer slot is ready with live media", () => {
+            const ready: AvRunMachineState = {
+                tag: "ready",
+                sessionId: SESSION,
+                peerSlots: { [BOB]: "ready", [CAROL]: "absent" },
+                signalingJoined: true,
+            };
+            const result = avTransition(
+                ready,
+                {
+                    type: "sessionEnded",
+                    sessionId: SESSION,
+                    reason: "timeout",
+                    by: BOB,
+                },
+                ctx({
+                    kind: "group",
+                    hasJoined: true,
+                    liveMediaReady: { [BOB]: true },
+                    hasActivePeer: { [BOB]: true },
+                    sessionJoinedParticipants: [SELF, CAROL],
+                }),
+            );
+            expect(result.state).toEqual(ready);
+            expect(result.commands[0]).toMatchObject({ type: "logIgnored" });
+        });
+
+        it("group participantJoined remeshes when media peer is gone", () => {
+            const ready: AvRunMachineState = {
+                tag: "ready",
+                sessionId: SESSION,
+                peerSlots: { [BOB]: "ready", [CAROL]: "ready" },
+                signalingJoined: true,
+            };
+            const result = avTransition(
+                ready,
+                {
+                    type: "participantJoined",
+                    sessionId: SESSION,
+                    participant: BOB,
+                },
+                ctx({
+                    kind: "group",
+                    hasJoined: true,
+                    liveMediaReady: { [CAROL]: true },
+                    hasActivePeer: { [BOB]: false, [CAROL]: true },
+                }),
+            );
+            expect(result.commands).toContainEqual({
+                type: "disposePeer",
+                remoteAccount: BOB,
+            });
+            expect(result.commands).toContainEqual({
+                type: "beginSignaling",
+                sessionId: SESSION,
+            });
+        });
+
+        it("group participantJoined ignores duplicate when peer still live", () => {
+            const ready: AvRunMachineState = {
+                tag: "ready",
+                sessionId: SESSION,
+                peerSlots: { [BOB]: "ready", [CAROL]: "ready" },
+                signalingJoined: true,
+            };
+            const result = avTransition(
+                ready,
+                {
+                    type: "participantJoined",
+                    sessionId: SESSION,
+                    participant: BOB,
+                },
+                ctx({
+                    kind: "group",
+                    hasJoined: true,
+                    liveMediaReady: { [BOB]: true, [CAROL]: true },
+                    hasActivePeer: { [BOB]: true, [CAROL]: true },
+                }),
+            );
+            expect(result.state).toEqual(ready);
             expect(result.commands[0]).toMatchObject({ type: "logIgnored" });
         });
 
@@ -880,6 +1158,7 @@ describe("av-call-run-state-machine", () => {
                     kind: "dm",
                     liveMediaReady: { [BOB]: true },
                     hasJoined: true,
+                    sessionJoinedParticipants: [SELF, BOB],
                 }),
             );
             expect(live.phase).toBe("ready");
@@ -934,6 +1213,27 @@ describe("av-call-run-state-machine", () => {
             });
             expect(snap.phase).toBe("waiting-peer");
             expect(snap.sessionId).toBe(SESSION);
+        });
+
+        it("DM outbound: local media before remote joins session stays signaling", () => {
+            const state: AvRunMachineState = {
+                tag: "signaling",
+                sessionId: SESSION,
+                peerSlots: { [BOB]: "ready" },
+                signalingJoined: true,
+            };
+            const snap = deriveAvSnapshot(
+                state,
+                ctx({
+                    kind: "dm",
+                    liveMediaReady: { [BOB]: true },
+                    hasJoined: true,
+                    sessionJoinedParticipants: [SELF],
+                    sessionPendingParticipants: [BOB],
+                }),
+            );
+            expect(snap.phase).toBe("signaling");
+            expect(snap.mediaConnected).toBe(true);
         });
     });
 
@@ -1029,6 +1329,28 @@ describe("av-call-run-state-machine", () => {
                 ctx({ kind: "group", hasJoined: false }),
             );
             expect(result.commands[0]).toMatchObject({ type: "logIgnored" });
+        });
+
+        it("presenceOnline on DM with live pair media still begins signaling", () => {
+            const result = avTransition(
+                {
+                    tag: "ready",
+                    sessionId: SESSION,
+                    signalingJoined: true,
+                    peerSlots: { [BOB]: "ready" },
+                },
+                { type: "presenceOnline", account: BOB },
+                ctx({
+                    kind: "dm",
+                    hasJoined: true,
+                    hasActivePeer: { [BOB]: true },
+                    liveMediaReady: { [BOB]: true },
+                }),
+            );
+            expect(result.commands).toContainEqual({
+                type: "beginSignaling",
+                sessionId: SESSION,
+            });
         });
     });
 

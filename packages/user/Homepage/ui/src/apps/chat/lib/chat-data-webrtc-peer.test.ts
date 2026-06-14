@@ -68,6 +68,18 @@ class FakePeerConnection {
     /** Mutable so tests can drive it through realistic transitions. */
     signalingState: RTCSignalingState = "stable";
 
+    receivers: Array<{ track: MediaStreamTrack | null }> = [];
+
+    senders: Array<{ track: MediaStreamTrack | null }> = [];
+
+    getReceivers = vi.fn(() => this.receivers as RTCRtpReceiver[]);
+
+    getSenders = vi.fn(() => this.senders as RTCRtpSender[]);
+
+    removeTrack = vi.fn((sender: RTCRtpSender) => {
+        this.senders = this.senders.filter((s) => s !== sender);
+    });
+
     localDescription: RTCSessionDescription | null = null;
 
     remoteDescription: RTCSessionDescription | null = null;
@@ -198,6 +210,29 @@ vi.mock("./webrtc-local-dev-ice", () => ({
     normalizeIceCandidateForEnvironment: (c: string | undefined) => c ?? "",
 }));
 
+vi.mock("./local-media", () => ({
+    acquireMeetLocalMedia: vi.fn(async () => {
+        const audioTrack = {
+            kind: "audio",
+            enabled: true,
+            readyState: "live",
+        } as MediaStreamTrack;
+        const videoTrack = {
+            kind: "video",
+            enabled: true,
+            readyState: "live",
+        } as MediaStreamTrack;
+        return {
+            stream: {
+                getAudioTracks: () => [audioTrack],
+                getVideoTracks: () => [videoTrack],
+                getTracks: () => [audioTrack, videoTrack],
+            } as unknown as MediaStream,
+            videoDisabled: false,
+        };
+    }),
+}));
+
 beforeEach(() => {
     FakePeerConnection.reset();
     vi.stubGlobal("RTCPeerConnection", FakePeerConnection);
@@ -205,6 +240,21 @@ beforeEach(() => {
         "RTCIceCandidate",
         class {
             constructor(public init: RTCIceCandidateInit) {}
+        },
+    );
+    vi.stubGlobal(
+        "MediaStream",
+        class MockMediaStream {
+            constructor(private readonly tracks: MediaStreamTrack[]) {}
+            getTracks(): MediaStreamTrack[] {
+                return this.tracks;
+            }
+            getAudioTracks(): MediaStreamTrack[] {
+                return this.tracks.filter((t) => t.kind === "audio");
+            }
+            getVideoTracks(): MediaStreamTrack[] {
+                return this.tracks.filter((t) => t.kind === "video");
+            }
         },
     );
 });
@@ -537,6 +587,65 @@ describe("ChatDataWebRtcPeer needsReconnect", () => {
         pc().connectionState = "failed";
         pc().iceConnectionState = "failed";
         expect(peer.needsReconnect).toBe(true);
+        peer.dispose();
+    });
+});
+
+describe("ChatDataWebRtcPeer Meet restart remote stream", () => {
+    it("rehydrates remote stream from PC receivers after stop/start", async () => {
+        const signaling = mockSignaling();
+        const onRemoteStream = vi.fn();
+        const peer = new ChatDataWebRtcPeer({
+            sessionId: "sess-meet-restart",
+            selfAccount: "carol",
+            peerAccount: "alice",
+            iceServers: null,
+            signaling,
+            isInitiator: false,
+        });
+
+        const fakePc = FakePeerConnection.instances[0]!;
+        fakePc.connectionState = "connected";
+        const remoteTrack = {
+            kind: "video",
+            readyState: "live",
+            enabled: true,
+        } as MediaStreamTrack;
+        fakePc.receivers = [{ track: remoteTrack }];
+        const localStream = {
+            getAudioTracks: () => [],
+            getVideoTracks: () => [],
+            getTracks: () => [],
+        } as unknown as MediaStream;
+
+        await peer.startMeetMedia({
+            wantVideo: true,
+            wantAudio: true,
+            sharedLocalStream: localStream,
+            onRemoteStream,
+        });
+
+        expect(onRemoteStream).toHaveBeenCalled();
+        const stream = onRemoteStream.mock.calls.at(-1)?.[0] as MediaStream;
+        expect(stream?.getTracks()).toContain(remoteTrack);
+        expect(peer.getMeetRemoteStream()?.getTracks()).toContain(remoteTrack);
+
+        peer.stopMeetMedia();
+        expect(peer.getMeetRemoteStream()).toBeNull();
+
+        const onRemoteStreamAfterRestart = vi.fn();
+        await peer.startMeetMedia({
+            wantVideo: true,
+            wantAudio: true,
+            sharedLocalStream: localStream,
+            onRemoteStream: onRemoteStreamAfterRestart,
+        });
+
+        expect(onRemoteStreamAfterRestart).toHaveBeenCalled();
+        const restarted = onRemoteStreamAfterRestart.mock.calls.at(-1)?.[0] as
+            | MediaStream
+            | null;
+        expect(restarted?.getTracks()).toContain(remoteTrack);
         peer.dispose();
     });
 });

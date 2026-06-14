@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+    allOnlineGroupMeetJoined,
+    allSessionGroupMeetJoined,
     anyGroupMeetJoined,
     buildGroupMeetParticipants,
     buildGroupMeetRemoteStreamMap,
     groupMeetDisplayPeer,
+    groupMeetFullyConnected,
     groupMeetStatusLabel,
 } from "./group-meet-ui-state";
 
@@ -59,6 +62,60 @@ describe("group-meet-ui-state", () => {
             groupMeetStatusLabel(participants, "ready", true),
         ).toBe("1 joined · 1 ringing");
         expect(anyGroupMeetJoined({ [BOB]: true })).toBe(true);
+    });
+
+    it("requires all session roster remotes for full group connection", () => {
+        expect(
+            allSessionGroupMeetJoined(SELF, [SELF, BOB, CAROL], {
+                [BOB]: true,
+                [CAROL]: false,
+            }),
+        ).toBe(false);
+        expect(
+            allSessionGroupMeetJoined(SELF, [SELF, BOB, CAROL], {
+                [BOB]: true,
+                [CAROL]: true,
+            }),
+        ).toBe(true);
+    });
+
+    it("uses roster when present, otherwise all online remotes", () => {
+        const presence = { [BOB]: "online", [CAROL]: "online" };
+        expect(
+            groupMeetFullyConnected(
+                [SELF, BOB, CAROL],
+                SELF,
+                presence,
+                [SELF, BOB],
+                { [BOB]: true, [CAROL]: true },
+            ),
+        ).toBe(true);
+        expect(
+            groupMeetFullyConnected(
+                [SELF, BOB, CAROL],
+                SELF,
+                { [BOB]: "online", [CAROL]: "offline" },
+                [SELF, BOB, CAROL],
+                { [BOB]: true, [CAROL]: false },
+            ),
+        ).toBe(true);
+        expect(
+            groupMeetFullyConnected(
+                [SELF, BOB, CAROL],
+                SELF,
+                presence,
+                [],
+                { [BOB]: true, [CAROL]: false },
+            ),
+        ).toBe(false);
+        expect(
+            allOnlineGroupMeetJoined(
+                [SELF, BOB, CAROL],
+                SELF,
+                presence,
+                { [BOB]: true, [CAROL]: true },
+            ),
+        ).toBe(true);
     });
 
     it("builds per-peer remote stream map from mesh peers", () => {

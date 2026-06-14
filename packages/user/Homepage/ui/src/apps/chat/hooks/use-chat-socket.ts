@@ -33,9 +33,36 @@ import {
     buildGroupMeetParticipants,
     buildGroupMeetRemoteStreamMap,
     groupMeetDisplayPeer,
+    groupMeetFullyConnected,
     groupMeetStatusLabel,
     type GroupMeetParticipant,
 } from "../lib/group-meet-ui-state";
+import {
+    markGroupMeetActive,
+    beginGroupMeetLeave,
+    clearGroupMeetLifecycle,
+    completeGroupMeetLeave,
+    getGroupMeetLifecycle,
+    isGroupMeetLeaveInProgress,
+    rejoinHintFromLifecycle,
+    shouldBlockGroupMeetRearm,
+    type GroupMeetLifecycleBySpace,
+} from "../lib/group-meet-lifecycle-ui";
+
+function shouldBlockGroupMeetUiRearm(
+    lifecycle: GroupMeetLifecycleBySpace,
+    spaceUuid: string,
+    orch?: AvCallSessionOrchestrator | null,
+): boolean {
+    if (shouldBlockGroupMeetRearm(lifecycle, spaceUuid)) return true;
+    return orch?.shouldBlockGroupMeetRearm?.(spaceUuid) ?? false;
+}
+import { avCallTeardownLog } from "../lib/av-call-debug";
+import {
+    consumeVoluntaryGroupMeetLeave,
+    markVoluntaryGroupMeetLeave,
+    peekVoluntaryGroupMeetLeave,
+} from "../lib/group-meet-voluntary-leave";
 import {
     chatDataLog,
     installChatDataDebugGlobal,
@@ -43,7 +70,7 @@ import {
 } from "../lib/chat-data-debug";
 import type { ChatDataMessageEnvelope, ChatHistorySyncEnvelope } from "../lib/chat-data-envelope";
 
-import { ensureDm, ensureGroup, fetchSpaceCallEvents } from "../lib/chat-api";
+import { ensureDm, ensureGroup, fetchActiveAvCallSession, fetchSpaceCallEvents } from "../lib/chat-api";
 
 import { useObjectiveSpaces } from "./chat/use-objective-spaces";
 import { useConversationSelection } from "./chat/use-conversation-selection";
@@ -397,6 +424,8 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         sessionId: string;
         joinedCount: number;
     } | null>(null);
+    const groupMeetRejoinHintRef = useRef(groupMeetRejoinHint);
+    groupMeetRejoinHintRef.current = groupMeetRejoinHint;
     const selfRef = useRef<string | null>(null);
 
     const shouldAcceptInboundFrom = (account: string): boolean =>
@@ -417,12 +446,18 @@ export function useChatSocket(options?: UseChatSocketOptions) {
     const ringOutTimerRef = useRef<ReturnType<
         typeof globalThis.setTimeout
     > | null>(null);
+    /** Group calls that have had at least one remote mesh join — suppress re-ring timeout. */
+    const groupMeetEverJoinedRef = useRef<Set<string>>(new Set());
     const terminalCallDismissTimerRef = useRef<ReturnType<
         typeof globalThis.setTimeout
     > | null>(null);
 
     const activeCallRef = useRef<PslackActiveCall | null>(null);
     const hangupInitiatedCallIdRef = useRef<string | null>(null);
+    /** Space whose av-call hangup is in flight — blocks snapshot UI re-arm. */
+    const hangupInProgressSpaceRef = useRef<string | null>(null);
+    /** Group Meet local UI lifecycle per space — blocks re-arm after voluntary leave. */
+    const groupMeetLifecycleRef = useRef<GroupMeetLifecycleBySpace>({});
     const avCallDirectionRef = useRef<"incoming" | "outgoing">("outgoing");
     const avCallUiArmedRef = useRef<string | null>(null);
     const syncAvCallUiRef = useRef<
@@ -557,7 +592,9 @@ export function useChatSocket(options?: UseChatSocketOptions) {
     pendingMessagesRef.current = pendingMessages;
 
     activeCallRef.current = activeCall;
-    if (!activeCall) hangupInitiatedCallIdRef.current = null;
+    if (!activeCall && !hangupInProgressSpaceRef.current) {
+        hangupInitiatedCallIdRef.current = null;
+    }
 
     const incomingCallRef = useRef<PslackIncomingCall | null>(null);
     incomingCallRef.current = incomingCall;
@@ -1797,6 +1834,22 @@ export function useChatSocket(options?: UseChatSocketOptions) {
     const scheduleTerminalCallDismissRef = useRef(scheduleTerminalCallDismiss);
     scheduleTerminalCallDismissRef.current = scheduleTerminalCallDismiss;
 
+    const hangupOnRingTimeout = useCallback((spaceUuid: string) => {
+        const orch = avCallOrchestratorRef.current;
+        if (!orch) return;
+        const run = orch.getRun(spaceUuid);
+        const self = selfRef.current;
+        if (
+            run?.kind === "group" &&
+            run.snapshot.sessionId &&
+            self &&
+            orch.othersStillJoinedInGroupMeet(run.snapshot.sessionId, self)
+        ) {
+            return;
+        }
+        orch.hangupAvCallSession(spaceUuid, "timeout");
+    }, []);
+
     const syncAvCallUiFromSnapshot = useCallback(
         (spaceUuid: string, snap: AvCallSessionSnapshot) => {
             const armed = avCallUiArmedRef.current;
@@ -1806,7 +1859,45 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 (active?.conversationId === spaceUuid &&
                     active.source === "av-call");
 
+            if (
+                hangupInProgressSpaceRef.current === spaceUuid &&
+                snap.phase !== "idle" &&
+                snap.phase !== "failed"
+            ) {
+                return;
+            }
+
+            if (
+                groupMeetRejoinHintRef.current?.spaceUuid === spaceUuid &&
+                !activeCallRef.current
+            ) {
+                return;
+            }
+
+            if (
+                shouldBlockGroupMeetUiRearm(
+                    groupMeetLifecycleRef.current,
+                    spaceUuid,
+                    avCallOrchestratorRef.current,
+                )
+            ) {
+                if (
+                    activeCallRef.current?.conversationId === spaceUuid &&
+                    activeCallRef.current.source === "av-call"
+                ) {
+                    setActiveCall(null);
+                    clearAvCallMedia();
+                }
+                if (
+                    snap.phase !== "idle" &&
+                    snap.phase !== "failed"
+                ) {
+                    return;
+                }
+            }
+
             if (snap.phase === "failed" || snap.phase === "idle") {
+                groupMeetEverJoinedRef.current.delete(spaceUuid);
                 if (ringOutTimerRef.current != null) {
                     globalThis.clearTimeout(ringOutTimerRef.current);
                     ringOutTimerRef.current = null;
@@ -1847,6 +1938,9 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     );
                     avCallOrchestratorRef.current?.clearRun(spaceUuid);
                 }
+                if (hangupInProgressSpaceRef.current === spaceUuid) {
+                    hangupInProgressSpaceRef.current = null;
+                }
                 return;
             }
 
@@ -1859,6 +1953,10 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             if (!conversation) return;
 
             const run = avCallOrchestratorRef.current?.getRun(spaceUuid);
+            if (run?.kind === "group" && ringOutTimerRef.current != null) {
+                globalThis.clearTimeout(ringOutTimerRef.current);
+                ringOutTimerRef.current = null;
+            }
             const wantVideo =
                 run?.kind === "dm" || run?.kind === "group"
                     ? run.wantVideo
@@ -1869,7 +1967,13 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     : true;
 
             const sessionId = snap.sessionId;
-            if (!sessionId) return;
+            const preSessionArmed =
+                armed === spaceUuid &&
+                !sessionId &&
+                (snap.phase === "ensuring" ||
+                    snap.phase === "creating" ||
+                    snap.phase === "joining");
+            if (!sessionId && !preSessionArmed) return;
 
             const isGroupSpace =
                 conversation.kind === "group" &&
@@ -1883,9 +1987,52 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     snap.meshPeerSignalingReady,
                     snap.phase,
                 );
+                const rosterJoined = sessionId
+                    ? (avCallOrchestratorRef.current?.getAvCallSessionJoinedParticipants(
+                          sessionId,
+                      ) ?? [])
+                    : [];
+                const allMembersJoined =
+                    conversation.members.length > 0 &&
+                    conversation.members.every(
+                        (member) =>
+                            member === self || rosterJoined.includes(member),
+                    );
+                const liveRemoteCount =
+                    run?.kind === "group"
+                        ? Object.values(
+                              buildGroupMeetRemoteStreamMap(run.meshPeers),
+                          ).filter((stream) => stream != null).length
+                        : 0;
+                const groupDirection =
+                    activeCallRef.current?.conversationId === spaceUuid &&
+                    activeCallRef.current.source === "av-call"
+                        ? activeCallRef.current.direction
+                        : avCallDirectionRef.current;
+                const remotesInSession = conversation.members.filter(
+                    (member) =>
+                        member !== self && rosterJoined.includes(member),
+                );
+                const groupMediaReady =
+                    allMembersJoined ||
+                    groupMeetFullyConnected(
+                        conversation.members,
+                        self,
+                        presenceByAccountRef.current,
+                        rosterJoined,
+                        snap.meshPeerSignalingReady,
+                    ) ||
+                    (groupDirection !== "outgoing" && liveRemoteCount > 0);
+                const outgoingPeersPresent =
+                    remotesInSession.length > 0 ||
+                    Object.values(snap.meshPeerSignalingReady ?? {}).some(
+                        (ready) => ready,
+                    );
                 const isConnected =
-                    snap.phase === "ready" &&
-                    anyGroupMeetJoined(snap.meshPeerSignalingReady);
+                    (snap.phase === "ready" || snap.phase === "signaling") &&
+                    (groupDirection !== "outgoing"
+                        ? groupMediaReady
+                        : outgoingPeersPresent && groupMediaReady);
                 if (isConnected) {
                     setGroupMeetRejoinHint((prev) =>
                         prev?.spaceUuid === spaceUuid ? null : prev,
@@ -1894,15 +2041,9 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 const anyParticipantJoined = groupParticipants.some(
                     (participant) => participant.status === "joined",
                 );
-                const isInProgress =
-                    snap.phase === "ensuring" ||
-                    snap.phase === "creating" ||
-                    snap.phase === "joining" ||
-                    snap.phase === "waiting-peer" ||
-                    snap.phase === "signaling" ||
-                    isConnected;
-
-                if (!isInProgress) return;
+                if (anyParticipantJoined) {
+                    groupMeetEverJoinedRef.current.add(spaceUuid);
+                }
 
                 if (run?.kind === "group") {
                     setAvCallRemoteStreamsByAccount(
@@ -1913,6 +2054,13 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     }
                 }
 
+                // Group calls use per-member sessionInvites; a host-side ring
+                // timeout must not cancel a call once signaling has started.
+                if (ringOutTimerRef.current != null) {
+                    globalThis.clearTimeout(ringOutTimerRef.current);
+                    ringOutTimerRef.current = null;
+                }
+
                 setActiveCall((prev) => {
                     const direction =
                         prev?.conversationId === spaceUuid &&
@@ -1920,7 +2068,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                             ? prev.direction
                             : avCallDirectionRef.current;
                     return {
-                        callId: sessionId,
+                        callId: sessionId ?? "",
                         conversationId: spaceUuid,
                         peerAccount: groupMeetDisplayPeer(groupParticipants),
                         direction,
@@ -1938,27 +2086,6 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                         groupParticipants,
                     };
                 });
-
-                if (
-                    !isConnected &&
-                    !anyParticipantJoined &&
-                    avCallDirectionRef.current === "outgoing" &&
-                    ringOutTimerRef.current == null
-                ) {
-                    ringOutTimerRef.current = globalThis.setTimeout(() => {
-                        ringOutTimerRef.current = null;
-                        avCallOrchestratorRef.current?.hangupAvCallSession(
-                            spaceUuid,
-                            "timeout",
-                        );
-                    }, 20_000);
-                } else if (
-                    (isConnected || anyParticipantJoined) &&
-                    ringOutTimerRef.current != null
-                ) {
-                    globalThis.clearTimeout(ringOutTimerRef.current);
-                    ringOutTimerRef.current = null;
-                }
                 return;
             }
 
@@ -1968,29 +2095,34 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     : null;
             if (!peerAccount) return;
 
+            const joinedParticipants = sessionId
+                ? (avCallOrchestratorRef.current?.getAvCallSessionJoinedParticipants(
+                      sessionId,
+                  ) ?? [])
+                : [];
+            const remoteJoined =
+                peerAccount != null &&
+                joinedParticipants.includes(peerAccount);
+            const direction =
+                activeCallRef.current?.conversationId === spaceUuid &&
+                activeCallRef.current.source === "av-call"
+                    ? activeCallRef.current.direction
+                    : avCallDirectionRef.current;
             const isConnected =
-                snap.phase === "ready" && snap.mediaConnected === true;
-            const isInProgress =
-                snap.phase === "ensuring" ||
-                snap.phase === "creating" ||
-                snap.phase === "joining" ||
-                snap.phase === "waiting-peer" ||
-                snap.phase === "signaling" ||
-                isConnected;
-
-            if (!isInProgress) return;
+                snap.mediaConnected === true &&
+                (direction !== "outgoing" || remoteJoined);
 
             setActiveCall((prev) => {
-                const direction =
+                const callDirection =
                     prev?.conversationId === spaceUuid &&
                     prev.source === "av-call"
                         ? prev.direction
                         : avCallDirectionRef.current;
                 return {
-                    callId: sessionId,
+                    callId: sessionId ?? "",
                     conversationId: spaceUuid,
                     peerAccount,
-                    direction,
+                    direction: callDirection,
                     wantVideo,
                     wantAudio,
                     startedAt: prev?.startedAt ?? Date.now(),
@@ -2005,22 +2137,20 @@ export function useChatSocket(options?: UseChatSocketOptions) {
 
             if (
                 !isConnected &&
-                avCallDirectionRef.current === "outgoing" &&
-                ringOutTimerRef.current == null
+                direction === "outgoing" &&
+                ringOutTimerRef.current == null &&
+                run?.kind !== "group"
             ) {
                 ringOutTimerRef.current = globalThis.setTimeout(() => {
                     ringOutTimerRef.current = null;
-                    avCallOrchestratorRef.current?.hangupAvCallSession(
-                        spaceUuid,
-                        "timeout",
-                    );
+                    hangupOnRingTimeout(spaceUuid);
                 }, 20_000);
             } else if (isConnected && ringOutTimerRef.current != null) {
                 globalThis.clearTimeout(ringOutTimerRef.current);
                 ringOutTimerRef.current = null;
             }
         },
-        [clearAvCallMedia],
+        [clearAvCallMedia, hangupOnRingTimeout],
     );
 
     const handleAvCallMediaReady = useCallback(
@@ -2028,11 +2158,25 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             spaceUuid: string,
             info: {
                 peerAccount: string;
-                localStream: MediaStream;
+                localStream: MediaStream | null;
                 remoteStream: MediaStream | null;
             },
         ) => {
-            if (avCallUiArmedRef.current !== spaceUuid) return;
+            if (hangupInProgressSpaceRef.current === spaceUuid) return;
+            if (
+                shouldBlockGroupMeetUiRearm(
+                    groupMeetLifecycleRef.current,
+                    spaceUuid,
+                    avCallOrchestratorRef.current,
+                )
+            ) {
+                return;
+            }
+            const showUi =
+                avCallUiArmedRef.current === spaceUuid ||
+                (activeCallRef.current?.conversationId === spaceUuid &&
+                    activeCallRef.current.source === "av-call");
+            if (!showUi) return;
             const run = avCallOrchestratorRef.current?.getRun(spaceUuid);
             if (run?.kind === "dm") {
                 setAvCallAudioOnlyFallback(
@@ -2045,13 +2189,22 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                         ?.getVideoActuallyDisabled() ?? false,
                 );
             }
-            setAvCallLocalStream(info.localStream);
+            const localStream =
+                info.localStream ??
+                (run?.kind === "group"
+                    ? run.localStream
+                    : run?.kind === "dm"
+                      ? (run.peer?.getLocalStream() ?? null)
+                      : null);
+            if (localStream) {
+                setAvCallLocalStream(localStream);
+            }
             if (run?.kind === "group") {
                 setAvCallRemoteStreamsByAccount(
                     buildGroupMeetRemoteStreamMap(run.meshPeers),
                 );
                 setAvCallRemoteStream(null);
-            } else {
+            } else if (info.remoteStream) {
                 setAvCallRemoteStream(info.remoteStream);
             }
             setActiveCall((prev) => {
@@ -2075,12 +2228,46 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                         meshReady,
                         run.snapshot.phase,
                     );
-                    const isConnected = anyGroupMeetJoined(meshReady);
+                    const sessionId = run.snapshot.sessionId;
+                    const remoteStreams = buildGroupMeetRemoteStreamMap(
+                        run.meshPeers,
+                    );
+                    const liveRemoteCount = Object.values(remoteStreams).filter(
+                        (stream) => stream != null,
+                    ).length;
+                    const rosterJoined =
+                        sessionId
+                            ? (avCallOrchestratorRef.current?.getAvCallSessionJoinedParticipants(
+                                  sessionId,
+                              ) ?? [])
+                            : [];
+                    const remotesInSession = conversation.members.filter(
+                        (member) =>
+                            member !== self && rosterJoined.includes(member),
+                    );
                     const direction =
                         prev?.conversationId === spaceUuid &&
                         prev.source === "av-call"
                             ? prev.direction
                             : avCallDirectionRef.current;
+                    const groupMediaReady =
+                        groupMeetFullyConnected(
+                            conversation.members,
+                            self,
+                            presenceByAccountRef.current,
+                            rosterJoined,
+                            meshReady,
+                        ) ||
+                        (direction !== "outgoing" && liveRemoteCount > 0);
+                    const outgoingPeersPresent =
+                        remotesInSession.length > 0 ||
+                        Object.values(meshReady).some((ready) => ready);
+                    const isConnected =
+                        (run.snapshot.phase === "ready" ||
+                            run.snapshot.phase === "signaling") &&
+                        (direction !== "outgoing"
+                            ? groupMediaReady
+                            : outgoingPeersPresent && groupMediaReady);
                     return {
                         callId: run.snapshot.sessionId ?? prev?.callId ?? "",
                         conversationId: spaceUuid,
@@ -2104,7 +2291,42 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     prev?.conversationId !== spaceUuid ||
                     prev.source !== "av-call"
                 ) {
-                    return prev;
+                    if (!showUi) return prev;
+                    const wantVideo =
+                        run?.kind === "dm" || run?.kind === "group"
+                            ? run.wantVideo
+                            : true;
+                    const wantAudio =
+                        run?.kind === "dm" || run?.kind === "group"
+                            ? run.wantAudio
+                            : true;
+                    const direction = avCallDirectionRef.current;
+                    const sessionId = run?.snapshot.sessionId;
+                    const remoteJoined =
+                        sessionId != null &&
+                        (avCallOrchestratorRef.current?.getAvCallSessionJoinedParticipants(
+                            sessionId,
+                        ) ?? []).includes(info.peerAccount);
+                    const dmConnected =
+                        direction !== "outgoing" ||
+                        remoteJoined ||
+                        (info.remoteStream != null &&
+                            run?.snapshot.mediaConnected === true);
+                    return {
+                        callId: sessionId ?? "",
+                        conversationId: spaceUuid,
+                        peerAccount: info.peerAccount,
+                        direction,
+                        wantVideo,
+                        wantAudio,
+                        startedAt: Date.now(),
+                        status: dmConnected ? "connected" : "ringing",
+                        source: "av-call",
+                        lastFrame: dmConnected
+                            ? "Connected"
+                            : "Ringing…",
+                        callKind: "dm",
+                    };
                 }
                 const wantVideo =
                     run?.kind === "dm" || run?.kind === "group"
@@ -2114,16 +2336,45 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     run?.kind === "dm" || run?.kind === "group"
                         ? run.wantAudio
                         : prev.wantAudio;
+                const direction =
+                    prev.direction ?? avCallDirectionRef.current;
+                const sessionId = run?.snapshot.sessionId;
+                const remoteJoined =
+                    sessionId != null &&
+                    (avCallOrchestratorRef.current?.getAvCallSessionJoinedParticipants(
+                        sessionId,
+                    ) ?? []).includes(info.peerAccount);
+                const dmConnected =
+                    direction !== "outgoing" ||
+                    remoteJoined ||
+                    (info.remoteStream != null &&
+                        run?.snapshot.mediaConnected === true);
                 return {
                     ...prev,
                     wantVideo,
                     wantAudio,
-                    status: "connected",
-                    lastFrame: "Connected",
+                    status: dmConnected ? "connected" : "ringing",
+                    lastFrame: dmConnected
+                        ? "Connected"
+                        : (prev.lastFrame ?? "Ringing…"),
                     callKind: "dm",
                 };
             });
-            if (ringOutTimerRef.current != null) {
+            const sessionId = run?.snapshot.sessionId;
+            const remoteJoined =
+                sessionId != null &&
+                (avCallOrchestratorRef.current?.getAvCallSessionJoinedParticipants(
+                    sessionId,
+                ) ?? []).includes(info.peerAccount);
+            const direction =
+                activeCallRef.current?.direction ?? avCallDirectionRef.current;
+            const dmConnected =
+                run?.kind !== "dm" ||
+                direction !== "outgoing" ||
+                remoteJoined ||
+                (info.remoteStream != null &&
+                    run.snapshot.mediaConnected === true);
+            if (dmConnected && ringOutTimerRef.current != null) {
                 globalThis.clearTimeout(ringOutTimerRef.current);
                 ringOutTimerRef.current = null;
             }
@@ -2682,6 +2933,11 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             },
             () => transportBridgeRef.current?.peerRegistry ?? null,
             () => transportBridgeRef.current?.signaling ?? null,
+            (spaceUuid) =>
+                isGroupMeetLeaveInProgress(
+                    groupMeetLifecycleRef.current,
+                    spaceUuid,
+                ),
         );
         avCallOrchestratorRef.current.start();
 
@@ -2697,7 +2953,9 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             }
             // Keep transport bridge alive across handler re-registration — disposing
             // here races with async chainId/space loads and drops in-flight sends.
-            avCallOrchestratorRef.current?.dispose();
+            // Handler re-registration must not publish leaveSession — only explicit
+            // user hangup (endPlaceholderCall) or chat navigation teardown may.
+            avCallOrchestratorRef.current?.dispose({ publishLeave: false });
             avCallOrchestratorRef.current = null;
             setIncomingAvCallInvite(null);
         };
@@ -2970,7 +3228,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             onChatRoute,
         });
         transportBridgeRef.current?.dropTransportStack();
-        avCallOrchestratorRef.current?.dispose();
+        avCallOrchestratorRef.current?.dispose({ publishLeave: true });
         avCallOrchestratorRef.current = null;
         recordChurnTrace("transport-drop-done", {
             transportBridge: Boolean(transportBridgeRef.current),
@@ -2990,7 +3248,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             pathname: location.pathname,
         });
         transportBridgeRef.current?.dropStackForNavigation();
-        avCallOrchestratorRef.current?.dispose();
+        avCallOrchestratorRef.current?.dispose({ publishLeave: true });
         avCallOrchestratorRef.current = null;
         webrtcClient?.close();
         recordChurnTrace("teardown-done", {
@@ -3570,10 +3828,78 @@ export function useChatSocket(options?: UseChatSocketOptions) {
 
             avCallDirectionRef.current = "outgoing";
             avCallUiArmedRef.current = convId;
+
+            const isGroupOutbound =
+                conversation.kind === "group" &&
+                conversation.members.length > 2;
+
+            if (isGroupOutbound) {
+                const lifecycle = getGroupMeetLifecycle(
+                    groupMeetLifecycleRef.current,
+                    convId,
+                );
+                const rejoinHint =
+                    groupMeetRejoinHintRef.current?.spaceUuid === convId
+                        ? groupMeetRejoinHintRef.current
+                        : rejoinHintFromLifecycle(
+                              groupMeetLifecycleRef.current,
+                              convId,
+                          );
+                if (
+                    lifecycle?.phase === "leftRejoinable" &&
+                    rejoinHint &&
+                    rejoinHint.joinedCount > 0 &&
+                    orch.getGroupMeetAttemptRole(convId) !== "host"
+                ) {
+                    rejoinGroupMeetCallRef.current(convId);
+                    return;
+                }
+                groupMeetLifecycleRef.current = markGroupMeetActive(
+                    groupMeetLifecycleRef.current,
+                    convId,
+                );
+                orch.markGroupMeetActive(convId);
+            }
+
             setGroupMeetRejoinHint((prev) =>
                 prev?.spaceUuid === convId ? null : prev,
             );
             setSelectedConversationId(convId);
+
+            const isGroupSpace =
+                conversation.kind === "group" &&
+                conversation.members.length > 2;
+            const peerAccount =
+                !isGroupSpace && conversation.members.length === 2
+                    ? (conversation.members.find((m) => m !== self) ?? null)
+                    : null;
+            if (peerAccount || isGroupSpace) {
+                setActiveCall({
+                    callId: "",
+                    conversationId: convId,
+                    peerAccount:
+                        peerAccount ??
+                        conversation.members.find((m) => m !== self) ??
+                        "",
+                    direction: "outgoing",
+                    wantVideo: true,
+                    wantAudio: true,
+                    startedAt: Date.now(),
+                    status: "ringing",
+                    source: "av-call",
+                    lastFrame: "Starting…",
+                    callKind: isGroupSpace ? "group" : "dm",
+                    groupParticipants: isGroupSpace
+                        ? buildGroupMeetParticipants(
+                              conversation.members,
+                              self,
+                              presenceByAccountRef.current,
+                              {},
+                              "ensuring",
+                          )
+                        : undefined,
+                });
+            }
 
             if (
                 conversation.kind === "dm" &&
@@ -3587,7 +3913,9 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 conversation.kind === "group" &&
                 conversation.members.length > 2
             ) {
-                orch.ensureGroupAvCallSession(convId, conversation.members);
+                orch.ensureGroupAvCallSession(convId, conversation.members, {
+                    hostFreshStart: true,
+                });
             }
         })();
     }, [
@@ -3634,6 +3962,11 @@ export function useChatSocket(options?: UseChatSocketOptions) {
     const acceptIncomingCall = useCallback(() => {
         const avInvite = avCallOrchestratorRef.current?.getPendingInvite();
         if (avInvite) {
+            // Dismiss the ring dialog immediately so a late onOpenChange/timeout
+            // cannot decline after accept begins (loadObjectiveSpaces can take seconds).
+            avCallDirectionRef.current = "incoming";
+            avCallUiArmedRef.current = avInvite.spaceUuid;
+            setIncomingAvCallInvite(null);
             void (async () => {
                 const self = selfRef.current;
                 if (
@@ -3653,10 +3986,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     }
                 }
 
-                avCallDirectionRef.current = "incoming";
-                avCallUiArmedRef.current = avInvite.spaceUuid;
                 avCallOrchestratorRef.current?.acceptIncomingInvite();
-                setIncomingAvCallInvite(null);
                 setSelectedConversationId(avInvite.spaceUuid);
                 const isGroupInvite =
                     (avInvite.participants?.length ?? 0) > 2 &&
@@ -3702,6 +4032,30 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         (reason: "user" | "timeout") => {
             const avInvite = avCallOrchestratorRef.current?.getPendingInvite();
             if (avInvite) {
+                if (avCallUiArmedRef.current === avInvite.spaceUuid) {
+                    setIncomingAvCallInvite(null);
+                    return;
+                }
+                const active = activeCallRef.current;
+                const run = avCallOrchestratorRef.current?.getRun(
+                    avInvite.spaceUuid,
+                );
+                if (
+                    active?.source === "av-call" &&
+                    active.conversationId === avInvite.spaceUuid
+                ) {
+                    setIncomingAvCallInvite(null);
+                    return;
+                }
+                if (
+                    run &&
+                    run.hasJoined &&
+                    run.snapshot.phase !== "idle" &&
+                    run.snapshot.phase !== "failed"
+                ) {
+                    setIncomingAvCallInvite(null);
+                    return;
+                }
                 avCallOrchestratorRef.current?.declineIncomingInvite(reason);
                 setIncomingAvCallInvite(null);
                 return;
@@ -3728,11 +4082,55 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         }
 
         setGroupMeetRejoinHint(null);
+        const rejoinHint =
+            groupMeetRejoinHintRef.current?.spaceUuid === spaceUuid
+                ? groupMeetRejoinHintRef.current
+                : rejoinHintFromLifecycle(
+                      groupMeetLifecycleRef.current,
+                      spaceUuid,
+                  );
+        if (rejoinHint) {
+            orch.beginGroupMeetRejoin(
+                spaceUuid,
+                rejoinHint.sessionId,
+                rejoinHint.joinedCount,
+            );
+        }
+        groupMeetLifecycleRef.current = markGroupMeetActive(
+            clearGroupMeetLifecycle(groupMeetLifecycleRef.current, spaceUuid),
+            spaceUuid,
+        );
+        orch.markGroupMeetActive(spaceUuid);
         avCallDirectionRef.current = "incoming";
         avCallUiArmedRef.current = spaceUuid;
         setSelectedConversationId(spaceUuid, "rejoinGroupMeet");
-        orch.ensureGroupAvCallSession(spaceUuid, conversation.members);
+        setActiveCall({
+            callId: "",
+            conversationId: spaceUuid,
+            peerAccount: conversation.members.find((m) => m !== self) ?? "",
+            direction: "incoming",
+            wantVideo: true,
+            wantAudio: true,
+            startedAt: Date.now(),
+            status: "ringing",
+            source: "av-call",
+            lastFrame: "Connecting…",
+            callKind: "group",
+            groupParticipants: buildGroupMeetParticipants(
+                conversation.members,
+                self,
+                presenceByAccountRef.current,
+                {},
+                "signaling",
+            ),
+        });
+        orch.rejoinGroupMeetSession(spaceUuid, conversation.members);
     }, [setSelectedConversationId]);
+
+    const rejoinGroupMeetCallRef = useRef(rejoinGroupMeetCall);
+    rejoinGroupMeetCallRef.current = rejoinGroupMeetCall;
+
+    const endPlaceholderCallRef = useRef<() => void>(() => {});
 
     const endPlaceholderCall = useCallback(() => {
         if (ringOutTimerRef.current != null) {
@@ -3740,51 +4138,262 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             ringOutTimerRef.current = null;
         }
         const ac = activeCallRef.current;
-        if (!ac) return;
-        if (hangupInitiatedCallIdRef.current === ac.callId) return;
+        const selfAtLeave = selfRef.current;
+        if (!ac) {
+            avCallTeardownLog("ui.endPlaceholderCall skipped", {
+                self: selfAtLeave ?? undefined,
+                reason: "no activeCall",
+            });
+            return;
+        }
+        const groupVoluntaryIntent =
+            ac.source === "av-call" &&
+            ac.callKind === "group" &&
+            !!selfAtLeave &&
+            peekVoluntaryGroupMeetLeave(selfAtLeave);
+        if (
+            ac.source === "av-call" &&
+            ac.callKind === "group" &&
+            !groupVoluntaryIntent
+        ) {
+            avCallTeardownLog("ui.endPlaceholderCall suppressed", {
+                self: selfAtLeave ?? undefined,
+                reason: "group leave without voluntary intent",
+                spaceUuid: ac.conversationId,
+            });
+            return;
+        }
+        const orch = avCallOrchestratorRef.current;
+        const run = orch?.getRun(ac.conversationId);
+        if (
+            ac.source === "av-call" &&
+            ac.callKind === "group" &&
+            run?.kind === "group" &&
+            run.hasJoined &&
+            ac.status !== "connected" &&
+            run.snapshot.phase !== "ready" &&
+            Date.now() - ac.startedAt < 10_000
+        ) {
+            avCallTeardownLog("ui.endPlaceholderCall skipped", {
+                self: selfAtLeave ?? undefined,
+                reason: "group join settling",
+                spaceUuid: ac.conversationId,
+            });
+            return;
+        }
+        if (
+            ac.source === "av-call" &&
+            ac.direction === "incoming" &&
+            ac.status !== "connected" &&
+            Date.now() - ac.startedAt < 5_000
+        ) {
+            avCallTeardownLog("ui.endPlaceholderCall skipped", {
+                self: selfAtLeave ?? undefined,
+                reason: "incoming accept settling",
+                spaceUuid: ac.conversationId,
+            });
+            return;
+        }
+        if (hangupInitiatedCallIdRef.current === ac.callId) {
+            avCallTeardownLog("ui.endPlaceholderCall skipped", {
+                self: selfAtLeave ?? undefined,
+                reason: "hangup already initiated",
+                callId: ac.callId,
+                spaceUuid: ac.conversationId,
+            });
+            return;
+        }
+        if (groupVoluntaryIntent && selfAtLeave) {
+            consumeVoluntaryGroupMeetLeave(selfAtLeave);
+            groupMeetLifecycleRef.current = beginGroupMeetLeave(
+                groupMeetLifecycleRef.current,
+                ac.conversationId,
+            );
+            orch?.beginGroupMeetLeave(ac.conversationId);
+        }
         hangupInitiatedCallIdRef.current = ac.callId;
+        hangupInProgressSpaceRef.current = ac.conversationId;
 
-        if (ac.source === "av-call") {
-            const orch = avCallOrchestratorRef.current;
-            const self = selfRef.current;
-            const run = orch?.getRun(ac.conversationId);
-            const sessionId = run?.snapshot.sessionId;
-            if (
+        const self = selfRef.current;
+        const sessionId = run?.snapshot.sessionId;
+        const conversation = conversationsRef.current.find(
+            (row) => row.conversationId === ac.conversationId,
+        );
+        let rejoinHint: {
+            spaceUuid: string;
+            sessionId: string;
+            joinedCount: number;
+        } | null = null;
+        if (
+            ac.source === "av-call" &&
+            ac.callKind === "group" &&
+            self &&
+            sessionId
+        ) {
+            const joinedCount =
+                orch?.getAvCallSessionRosterJoinedCount(sessionId) ?? 0;
+            const memberCount = conversation?.members.length ?? 0;
+            if (joinedCount > 1) {
+                rejoinHint = {
+                    spaceUuid: ac.conversationId,
+                    sessionId,
+                    joinedCount: joinedCount - 1,
+                };
+            } else if (orch?.othersStillJoinedInGroupMeet(sessionId, self)) {
+                rejoinHint = {
+                    spaceUuid: ac.conversationId,
+                    sessionId,
+                    joinedCount: Math.max(0, joinedCount - 1),
+                };
+            } else if (memberCount > 2) {
+                rejoinHint = {
+                    spaceUuid: ac.conversationId,
+                    sessionId,
+                    joinedCount: memberCount - 1,
+                };
+            }
+        }
+        const reason =
+            ac.source === "av-call" &&
+            ac.status === "ringing" &&
+            ac.direction === "outgoing" &&
+            !(
                 ac.callKind === "group" &&
                 sessionId &&
                 self &&
                 orch?.othersStillJoinedInGroupMeet(sessionId, self)
-            ) {
-                const joinedCount =
-                    orch.getAvCallSessionRosterJoinedCount(sessionId);
-                setGroupMeetRejoinHint({
-                    spaceUuid: ac.conversationId,
-                    sessionId,
-                    joinedCount: Math.max(0, joinedCount - 1),
-                });
-            } else if (ac.callKind === "group") {
-                setGroupMeetRejoinHint((prev) =>
-                    prev?.spaceUuid === ac.conversationId ? null : prev,
-                );
-            }
+            )
+                ? "cancelled"
+                : ac.callKind === "group"
+                  ? "left"
+                  : "ended";
 
-            const reason =
-                ac.status === "ringing" && ac.direction === "outgoing"
-                    ? "cancelled"
-                    : ac.callKind === "group"
-                      ? "left"
-                      : "ended";
-            orch?.hangupAvCallSession(ac.conversationId, reason);
+        avCallTeardownLog("ui.endPlaceholderCall", {
+            self: self ?? undefined,
+            spaceUuid: ac.conversationId,
+            sessionId,
+            reason,
+            callKind: ac.callKind,
+            status: ac.status,
+            phase: run?.snapshot.phase,
+            hasJoined: run?.hasJoined,
+            stack: new Error().stack?.split("\n").slice(1, 4).join(" | "),
+        });
+
+        if (ac.source === "av-call") {
+            if (ac.callKind === "group") {
+                groupMeetLifecycleRef.current = completeGroupMeetLeave(
+                    groupMeetLifecycleRef.current,
+                    ac.conversationId,
+                    rejoinHint,
+                );
+                orch?.completeGroupMeetLeave(ac.conversationId, rejoinHint);
+            }
             avCallUiArmedRef.current = null;
             clearAvCallMedia();
-            void refreshObjectiveCallEventsForSpaceRef.current(
-                ac.conversationId,
-            );
-        } else {
-            setLastInboundError(null);
+            setActiveCall(null);
+            if (rejoinHint) {
+                setGroupMeetRejoinHint(rejoinHint);
+            }
         }
-        setActiveCall(null);
+
+        void (async () => {
+            if (ac.source === "av-call") {
+                try {
+                    await orch?.hangupAvCallSession(ac.conversationId, reason);
+                } finally {
+                    hangupInitiatedCallIdRef.current = null;
+                    setActiveCall((prev) =>
+                        prev?.conversationId === ac.conversationId &&
+                        prev.source === "av-call"
+                            ? null
+                            : prev,
+                    );
+                    avCallOrchestratorRef.current?.clearRun(ac.conversationId);
+                    void refreshObjectiveCallEventsForSpaceRef.current(
+                        ac.conversationId,
+                    );
+                    hangupInProgressSpaceRef.current = null;
+                }
+
+                if (ac.callKind === "group" && self && sessionId) {
+                    try {
+                        const active = await fetchActiveAvCallSession(
+                            ac.conversationId,
+                        );
+                        if (!active || active.lifecycle !== 1) {
+                            rejoinHint = null;
+                        } else {
+                            const others = active.participants.filter(
+                                (p) => p !== self,
+                            );
+                            if (others.length === 0) {
+                                rejoinHint = null;
+                            } else {
+                                rejoinHint = {
+                                    spaceUuid: ac.conversationId,
+                                    sessionId: active.session_id,
+                                    joinedCount: others.length,
+                                };
+                            }
+                        }
+                    } catch {
+                        if (
+                            !orch?.othersStillJoinedInGroupMeet(sessionId, self)
+                        ) {
+                            rejoinHint = null;
+                        }
+                    }
+                }
+                if (rejoinHint) {
+                    setGroupMeetRejoinHint(rejoinHint);
+                } else if (ac.callKind === "group") {
+                    setGroupMeetRejoinHint((prev) =>
+                        prev?.spaceUuid === ac.conversationId ? null : prev,
+                    );
+                }
+                if (ac.callKind === "group") {
+                    groupMeetLifecycleRef.current = completeGroupMeetLeave(
+                        groupMeetLifecycleRef.current,
+                        ac.conversationId,
+                        rejoinHint,
+                    );
+                    orch?.completeGroupMeetLeave(ac.conversationId, rejoinHint);
+                }
+            } else {
+                hangupInProgressSpaceRef.current = null;
+                hangupInitiatedCallIdRef.current = null;
+                setLastInboundError(null);
+                setActiveCall(null);
+            }
+        })();
     }, [clearAvCallMedia, markSignalingTeardown]);
+    endPlaceholderCallRef.current = endPlaceholderCall;
+
+    const requestVoluntaryMeetLeave = useCallback(() => {
+        const self = selfRef.current;
+        if (self) markVoluntaryGroupMeetLeave(self);
+        endPlaceholderCallRef.current();
+    }, []);
+
+    useEffect(() => {
+        if (typeof globalThis.window === "undefined") return;
+        (
+            globalThis as typeof globalThis & {
+                __psibaseMeetE2e?: {
+                    leaveActiveCall: () => void;
+                    self: () => string | null;
+                };
+            }
+        ).__psibaseMeetE2e = {
+            leaveActiveCall: () => {
+                const self = selfRef.current;
+                if (self) markVoluntaryGroupMeetLeave(self);
+                endPlaceholderCallRef.current();
+            },
+            self: () => selfRef.current,
+        };
+    }, []);
 
     const toggleAvCallAudioMuted = useCallback(() => {
         const ac = activeCallRef.current;
@@ -4118,6 +4727,13 @@ export function useChatSocket(options?: UseChatSocketOptions) {
     const incomingCallForDialog = useMemo((): PslackIncomingCall | null => {
         if (incomingCall) return incomingCall;
         if (!incomingAvCallInvite || !selfAccount) return null;
+        const active = activeCallRef.current;
+        if (
+            active?.source === "av-call" &&
+            active.conversationId === incomingAvCallInvite.spaceUuid
+        ) {
+            return null;
+        }
         const participantCount = incomingAvCallInvite.participants?.length ?? 0;
         return {
             callId: incomingAvCallInvite.sessionId,
@@ -4131,7 +4747,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             groupParticipantCount:
                 participantCount > 2 ? participantCount : undefined,
         };
-    }, [incomingCall, incomingAvCallInvite, selfAccount]);
+    }, [incomingCall, incomingAvCallInvite, selfAccount, activeCall]);
 
     useEffect(() => {
         if (typeof window === "undefined") return;
@@ -4272,6 +4888,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         acceptIncomingCall,
         declineIncomingCall,
         endPlaceholderCall,
+        requestVoluntaryMeetLeave,
         groupMeetRejoinHint,
         rejoinGroupMeetCall,
 

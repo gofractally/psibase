@@ -164,6 +164,9 @@ export class ChatDataWebRtcPeer {
      */
     private ignoreOffer = false;
 
+    /** Suppress renegotiation while tearing down Meet tracks / closing the PC. */
+    private suppressNegotiation = false;
+
     constructor(params: {
         sessionId: string;
         selfAccount: string;
@@ -285,6 +288,10 @@ export class ChatDataWebRtcPeer {
         // to send an offer. Collisions are resolved on the receiving end
         // (see `applyRemoteSignal`).
         pc.onnegotiationneeded = () => {
+            if (this.suppressNegotiation) return;
+            // Meet tracks are already live; a second renegotiation here causes
+            // offer glare with concurrent mesh peer events (group Meet).
+            if (this.meetActive && this.meetMediaConnected) return;
             void this.driveNegotiation();
         };
 
@@ -513,6 +520,7 @@ export class ChatDataWebRtcPeer {
             this.meetHandlers = {};
             return;
         }
+        this.suppressNegotiation = true;
         this.meetActive = false;
         this.meetMediaConnected = false;
         this.meetStartPromise = null;
@@ -541,9 +549,33 @@ export class ChatDataWebRtcPeer {
         this.meetHandlers.onLocalStream?.(null);
         this.meetHandlers.onRemoteStream?.(null);
         this.meetHandlers = {};
+        this.suppressNegotiation = false;
         chatDataRecord("meet media stopped", {
             sessionId: shortSessionId(this.sessionId),
         });
+    }
+
+    /**
+     * After Meet stop/start the pair PC may still have live remote tracks in
+     * receivers while `meetRemoteStream` was cleared — `ontrack` does not
+     * re-fire for tracks that never left the connection.
+     */
+    private syncMeetRemoteStreamFromReceivers(): MediaStream | null {
+        if (this.meetRemoteStream) return this.meetRemoteStream;
+        const pc = this.pc;
+        if (!pc) return null;
+        const tracks = pc
+            .getReceivers()
+            .map((receiver) => receiver.track)
+            .filter(
+                (track): track is MediaStreamTrack =>
+                    track != null && track.readyState === "live",
+            );
+        if (tracks.length === 0) return null;
+        const stream = new MediaStream(tracks);
+        this.meetRemoteStream = stream;
+        this.handlers.onMeetRemoteStream?.(stream);
+        return stream;
     }
 
     private async doStartMeetMedia(params: {
@@ -552,9 +584,18 @@ export class ChatDataWebRtcPeer {
         sharedLocalStream?: MediaStream | null;
     }): Promise<void> {
         if (this.disposed || !this.pc) return;
+        if (this.meetActive && this.meetMediaConnected) {
+            const recovered = this.syncMeetRemoteStreamFromReceivers();
+            this.meetHandlers.onMediaConnected?.();
+            if (recovered) {
+                this.meetHandlers.onRemoteStream?.(recovered);
+            }
+            return;
+        }
         if (this.meetActive && this.meetLocalStream) return;
 
         try {
+            this.suppressNegotiation = false;
             let stream: MediaStream;
             let videoDisabled: boolean;
             if (params.sharedLocalStream) {
@@ -594,6 +635,11 @@ export class ChatDataWebRtcPeer {
                 audio: stream.getAudioTracks().length,
                 video: stream.getVideoTracks().length,
             });
+
+            const recoveredRemote = this.syncMeetRemoteStreamFromReceivers();
+            if (recoveredRemote) {
+                this.meetHandlers.onRemoteStream?.(recoveredRemote);
+            }
 
             if (
                 this.pc.connectionState === "connected" &&
@@ -744,6 +790,7 @@ export class ChatDataWebRtcPeer {
     }
 
     dispose(): void {
+        this.suppressNegotiation = true;
         this.stopMeetMedia();
         this.disposed = true;
         unregisterChatDataPeer(this.debugPeerId);

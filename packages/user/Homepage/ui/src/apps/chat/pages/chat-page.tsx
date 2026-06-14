@@ -184,7 +184,7 @@ export const ChatPage = () => {
         startMeetCall,
         acceptIncomingCall,
         declineIncomingCall,
-        endPlaceholderCall,
+        requestVoluntaryMeetLeave,
         groupMeetRejoinHint,
         rejoinGroupMeetCall,
         callLocalStream,
@@ -669,7 +669,7 @@ export const ChatPage = () => {
                                 {activeCallForSelected ? (
                                     <CallView
                                         call={activeCallForSelected}
-                                        onEnd={endPlaceholderCall}
+                                        onEnd={requestVoluntaryMeetLeave}
                                         localStream={callLocalStream}
                                         remoteStream={callRemoteStream}
                                         remoteStreamsByAccount={
