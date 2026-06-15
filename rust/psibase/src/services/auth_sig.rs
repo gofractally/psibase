@@ -107,7 +107,7 @@ mod service {
 
     /// Get the accounts this auth service delegates authority to for a sender.
     #[action]
-    fn getDelegations(sender: AccountNumber, method: Option<ServiceMethod>) -> Vec<AccountNumber> {
+    fn getDelegationsSys(sender: AccountNumber, method: Option<ServiceMethod>) -> Vec<AccountNumber> {
         unimplemented!()
     }
 

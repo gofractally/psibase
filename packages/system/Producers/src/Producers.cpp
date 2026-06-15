@@ -241,7 +241,7 @@ namespace SystemService
             "Can only authorize predefined accounts");
    }
 
-   std::vector<AccountNumber> Producers::getDelegations(AccountNumber              sender,
+   std::vector<AccountNumber> Producers::getDelegationsSys(AccountNumber              sender,
                                                         std::optional<ServiceMethod> method)
    {
       return ::getProducers()                          //

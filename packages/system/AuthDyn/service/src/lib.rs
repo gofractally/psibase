@@ -131,7 +131,7 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn getDelegations(sender: AccountNumber, method: Option<ServiceMethod>) -> Vec<AccountNumber> {
+    fn getDelegationsSys(sender: AccountNumber, method: Option<ServiceMethod>) -> Vec<AccountNumber> {
         Management::get_assert(sender)
             .dynamic_policy(method)
             .authorizers

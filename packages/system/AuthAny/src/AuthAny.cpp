@@ -30,17 +30,15 @@ namespace SystemService
          std::printf("canAuthUserSys\n");
    }
 
-   std::vector<AccountNumber> AuthAny::getDelegations(AccountNumber              sender,
+   std::vector<AccountNumber> AuthAny::getDelegationsSys(AccountNumber              sender,
                                                       std::optional<ServiceMethod> method)
    {
       if (enable_print)
-         std::printf("getDelegations\n");
+         std::printf("getDelegationsSys\n");
       return {};
    }
 
-   bool AuthAny::isAuthSys(AccountNumber              sender,
-                           std::vector<AccountNumber> authorizers,
-                           std::optional<ServiceMethod> method)
+   bool AuthAny::isAuthSys(AccountNumber sender, std::vector<AccountNumber> authorizers)
    {
       if (enable_print)
          std::printf("isAuthSys\n");
@@ -48,9 +46,7 @@ namespace SystemService
       return std::ranges::contains(authorizers, sender);
    }
 
-   bool AuthAny::isRejectSys(AccountNumber              sender,
-                             std::vector<AccountNumber> rejecters,
-                             std::optional<ServiceMethod> method)
+   bool AuthAny::isRejectSys(AccountNumber sender, std::vector<AccountNumber> rejecters)
    {
       if (enable_print)
          std::printf("isRejectSys\n");

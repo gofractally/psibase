@@ -165,7 +165,7 @@ pub mod auth_interface {
 
     /// Get the accounts this auth service delegates authority to for a sender.
     #[action]
-    fn getDelegations(
+    fn getDelegationsSys(
         sender: crate::AccountNumber,
         method: Option<ServiceMethod>,
     ) -> Vec<crate::AccountNumber> {

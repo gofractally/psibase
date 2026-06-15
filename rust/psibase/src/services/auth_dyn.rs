@@ -109,7 +109,7 @@ mod service {
     }
 
     #[action]
-    fn getDelegations(sender: AccountNumber, method: Option<ServiceMethod>) -> Vec<AccountNumber> {
+    fn getDelegationsSys(sender: AccountNumber, method: Option<ServiceMethod>) -> Vec<AccountNumber> {
         unimplemented!()
     }
 

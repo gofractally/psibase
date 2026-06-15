@@ -41,7 +41,7 @@ mod service {
 
     /// Get the accounts this auth service delegates authority to for a sender.
     #[action]
-    fn getDelegations(sender: AccountNumber, method: Option<ServiceMethod>) -> Vec<AccountNumber> {
+    fn getDelegationsSys(sender: AccountNumber, method: Option<ServiceMethod>) -> Vec<AccountNumber> {
         unimplemented!()
     }
 
@@ -49,7 +49,8 @@ mod service {
     /// transaction from a specified sender.
     ///
     /// * `sender`: The sender account for the transaction potentially being authorized.
-    /// * `authorizers`: Accounts that have already been authorized through their delegations.
+    /// * `authorizers`: Accounts that have already been authorized, either directly or through
+    ///                  their delegations.
     ///
     /// Returns:
     /// * `true`: If the sender's owner is among the authorizers
@@ -67,7 +68,8 @@ mod service {
     /// transaction from a specified sender.
     ///
     /// * `sender`: The sender account for the transaction potentially being rejected.
-    /// * `rejecters`: Accounts that have already been authorized to reject through their delegations.
+    /// * `rejecters`: Accounts that have already been authorized to reject, either directly or
+    ///                through their delegations.
     ///
     /// Returns:
     /// * `true`: If the sender's owner is among the rejecters

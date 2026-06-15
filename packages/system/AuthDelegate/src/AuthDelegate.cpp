@@ -33,7 +33,7 @@ namespace SystemService
       getOwner(user);
    }
 
-   std::vector<AccountNumber> AuthDelegate::getDelegations(psibase::AccountNumber      sender,
+   std::vector<AccountNumber> AuthDelegate::getDelegationsSys(psibase::AccountNumber      sender,
                                                            std::optional<ServiceMethod> method)
    {
       return {getOwner(sender)};
