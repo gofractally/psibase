@@ -294,7 +294,9 @@ function dmRemoteJoinedSession(ctx: AvRunContext): boolean {
     if (ctx.kind !== "dm") return true;
     const peer = ctx.members.find((m) => m !== ctx.self);
     if (!peer) return false;
-    return (ctx.sessionJoinedParticipants ?? []).includes(peer);
+    const joined = ctx.sessionJoinedParticipants;
+    if (joined === undefined) return true;
+    return joined.includes(peer);
 }
 
 /**
