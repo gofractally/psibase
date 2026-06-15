@@ -198,18 +198,6 @@ pub mod tables {
         pub billable_unit: u64,
     }
 
-    /// Tracks the token discrepancy between the relay curve state and the
-    /// actual relay reserve while billing is disabled. Using two u64s to ensure no
-    /// overflow can occur, but exposing a signed i128 interface to make it easier
-    /// to reason about.
-    #[derive(Default, Clone, Debug, Serialize, Deserialize, ToSchema, Fracpack)]
-    pub struct VirtualBalance {
-        /// Relay shortfall: tokens owed but not deposited while billing was disabled
-        pub shortfall: u64,
-        /// Relay excess: tokens in relay beyond what the curve expects
-        pub excess: u64,
-    }
-
     /// Capacity-limited pricing state
     #[table(name = "CapacityPricingTable", index = 7)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone, Default)]
@@ -232,8 +220,6 @@ pub mod tables {
         pub curve_d: u64,
         /// Fee on refunds, parts per million
         pub fee_ppm: u32,
-        /// Virtual balance tracking for billing-disabled periods
-        pub virtual_balance: VirtualBalance,
     }
 }
 

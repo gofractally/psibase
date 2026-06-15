@@ -37,8 +37,8 @@ fn consumption_details(
     let disk = get_disk_state(chain);
     let (left, shortfall, excess) = (
         disk.remaining_capacity,
-        disk.virtual_balance.shortfall.quantity.value,
-        disk.virtual_balance.excess.quantity.value,
+        disk.relay_shortfall.quantity.value,
+        disk.relay_excess.quantity.value,
     );
     println!("--- {} ---", label);
     println!("  consumed:      {} bytes", fmt_num(consumed as u64));
@@ -89,13 +89,13 @@ fn initial_setup(chain: &psibase::Chain) -> Result<(), psibase::Error> {
 
 // shortfall tracking after consumption, capacity increases, and supply reductions
 #[psibase::test_case(packages("VirtualServer", "StagedTx"))]
-fn virtual_balance_basics(chain: psibase::Chain) -> Result<(), psibase::Error> {
+fn relay_balance_basics(chain: psibase::Chain) -> Result<(), psibase::Error> {
     chain.finish_block();
 
     let token_prod = chain.login(PRODUCER_ACCOUNT, Wrapper::SERVICE)?;
 
     let initial_disk_state = get_disk_state(&chain);
-    let initial_shortfall = initial_disk_state.virtual_balance.shortfall.quantity.value;
+    let initial_shortfall = initial_disk_state.relay_shortfall.quantity.value;
     assert!(initial_shortfall > 0, "Expected nonzero initial shortfall");
 
     // Increase server storage to accommodate increased obj allocation
@@ -119,8 +119,8 @@ fn virtual_balance_basics(chain: psibase::Chain) -> Result<(), psibase::Error> {
         "Unexpected consumption"
     );
     assert!(
-        after_propose.virtual_balance.shortfall.quantity.value
-            >= new_disk_state.virtual_balance.shortfall.quantity.value,
+        after_propose.relay_shortfall.quantity.value
+            >= new_disk_state.relay_shortfall.quantity.value,
         "Unexpected consumption"
     );
 
@@ -134,7 +134,7 @@ fn virtual_balance_basics(chain: psibase::Chain) -> Result<(), psibase::Error> {
     )
     .pos_from_resources(initial_disk_state.remaining_capacity)
     .cost_of(cap_consumed);
-    let new_shortfall = new_disk_state.virtual_balance.shortfall.quantity.value;
+    let new_shortfall = new_disk_state.relay_shortfall.quantity.value;
     assert_eq!(new_shortfall, initial_shortfall + cost, "invalid increase");
 
     // Increase obj storage allocation
@@ -151,7 +151,7 @@ fn virtual_balance_basics(chain: psibase::Chain) -> Result<(), psibase::Error> {
         &token_prod,
     );
 
-    let shortfall_after_alloc = after_alloc.virtual_balance.shortfall.quantity.value;
+    let shortfall_after_alloc = after_alloc.relay_shortfall.quantity.value;
     assert!(
         shortfall_after_alloc < new_shortfall,
         "Shortfall should decrease after disk increase ({} >= {})",
@@ -171,11 +171,7 @@ fn virtual_balance_basics(chain: psibase::Chain) -> Result<(), psibase::Error> {
         PRODUCER_ACCOUNT,
         &token_prod,
     );
-    let shortfall_after_supply_decrease = after_supply_decrease
-        .virtual_balance
-        .shortfall
-        .quantity
-        .value;
+    let shortfall_after_supply_decrease = after_supply_decrease.relay_shortfall.quantity.value;
     assert!(
         shortfall_after_supply_decrease < shortfall_after_alloc,
         "Shortfall should decrease after supply reduction ({} >= {})",
@@ -350,13 +346,13 @@ fn metering(chain: psibase::Chain) -> Result<(), psibase::Error> {
 }
 
 #[psibase::test_case(packages("VirtualServer", "StagedTx"))]
-fn system_writes_accumulate_virtual_balance(chain: psibase::Chain) -> Result<(), psibase::Error> {
+fn system_writes_accumulate_shortfall(chain: psibase::Chain) -> Result<(), psibase::Error> {
     initial_setup(&chain)?;
     setup_enable_billing(&chain)?;
 
     let disk_before = get_disk_state(&chain);
-    let net_before = disk_before.virtual_balance.shortfall.quantity.value as i128
-        - disk_before.virtual_balance.excess.quantity.value as i128;
+    let net_before = disk_before.relay_shortfall.quantity.value as i128
+        - disk_before.relay_excess.quantity.value as i128;
 
     // finish_block triggers system writes (startBlock) with empty user.
     // Even while billing is enabled, these should accumulate to the virtual balance
@@ -364,12 +360,12 @@ fn system_writes_accumulate_virtual_balance(chain: psibase::Chain) -> Result<(),
     chain.finish_block();
 
     let disk_after = get_disk_state(&chain);
-    let net_after = disk_after.virtual_balance.shortfall.quantity.value as i128
-        - disk_after.virtual_balance.excess.quantity.value as i128;
+    let net_after = disk_after.relay_shortfall.quantity.value as i128
+        - disk_after.relay_excess.quantity.value as i128;
 
     assert!(
         net_after < net_before,
-        "Expected virtual_balance to indicate data was freed by system writes \
+        "Expected the relay net to indicate data was freed by system writes \
          (net before={}, after={})",
         net_before,
         net_after,

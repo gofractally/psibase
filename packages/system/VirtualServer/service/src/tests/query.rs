@@ -49,13 +49,8 @@ pub(super) struct DiskPricingState {
     pub max_capacity: u64,
     pub max_reserve: Decimal,
     pub curve_d: u64,
-    pub virtual_balance: VirtualBalanceState,
-}
-
-#[derive(Deserialize)]
-pub(super) struct VirtualBalanceState {
-    pub shortfall: Decimal,
-    pub excess: Decimal,
+    pub relay_shortfall: Decimal,
+    pub relay_excess: Decimal,
 }
 
 pub(super) fn get_billing_config(chain: &psibase::Chain) -> Result<BillingConfig, psibase::Error> {
@@ -135,7 +130,8 @@ const DISK_PRICING_QUERY: &str = r#"query {
         feePpm
         spotPrice
         utilizationPct
-        virtualBalance { shortfall excess }
+        relayShortfall
+        relayExcess
     }
 }"#;
 

@@ -50,7 +50,7 @@
 
 use crate::resource_type::ResourceType;
 use crate::tables::tables::*;
-use async_graphql::{ComplexObject, Object};
+use async_graphql::ComplexObject;
 use psibase::services::tokens::{Decimal, Precision, Quantity, Wrapper as Tokens};
 use psibase::*;
 use std::cell::Cell;
@@ -65,34 +65,6 @@ fn relay_sub(resource: ResourceType) -> String {
 
 fn is_billing_active() -> bool {
     BillingConfig::get().map(|c| c.enabled).unwrap_or(false)
-}
-
-impl VirtualBalance {
-    pub fn net(&self) -> i128 {
-        self.shortfall as i128 - self.excess as i128
-    }
-
-    pub fn add(&mut self, delta: i128) {
-        let current = self.net() + delta;
-        if current >= 0 {
-            self.shortfall = current as u64;
-            self.excess = 0;
-        } else {
-            self.shortfall = 0;
-            self.excess = (-current) as u64;
-        }
-    }
-
-    pub fn is_zero(&self) -> bool {
-        self.shortfall == 0 && self.excess == 0
-    }
-
-    pub fn settle(&mut self) -> i128 {
-        let net = self.net();
-        self.shortfall = 0;
-        self.excess = 0;
-        net
-    }
 }
 
 pub(crate) struct Curve {
@@ -302,7 +274,6 @@ impl CapacityPricing {
                 max_capacity,
                 curve_d,
                 fee_ppm,
-                virtual_balance: VirtualBalance::default(),
             })
             .unwrap();
     }
@@ -319,6 +290,27 @@ impl CapacityPricing {
 
     pub fn get_assert(resource: ResourceType) -> Self {
         check_some(Self::get(resource), "Capacity pricing not initialized")
+    }
+
+    /// Live reserve-token balance held in the relay sub-account
+    fn actual_relay_balance(&self) -> u64 {
+        match BillingConfig::get() {
+            Some(config) => Tokens::call()
+                .getSubBal(config.sys, relay_sub(self.resource()))
+                .unwrap_or(0.into())
+                .value,
+            None => 0,
+        }
+    }
+
+    /// Signed relay discrepancy: the curve `reserve` minus the actual relay
+    /// balance. 
+    /// 
+    /// Returns a positive value if there is a shortfall (tokens owed to the relay), 
+    /// or returns a negative value if there is an excess (tokens beyond what the 
+    /// curve expects).
+    pub(crate) fn relay_net(&self) -> i128 {
+        self.reserve as i128 - self.actual_relay_balance() as i128
     }
 
     pub fn get_cost(&self, amount_consumed: u64) -> Quantity {
@@ -351,10 +343,6 @@ impl CapacityPricing {
             p.reserve += c;
             p.remaining_capacity -= amount_consumed;
             cost.set(c);
-
-            if !billing_active || system_write {
-                p.virtual_balance.add(c as i128);
-            }
         });
 
         let cost = cost.get();
@@ -405,10 +393,6 @@ impl CapacityPricing {
             p.remaining_capacity += amount_freed;
             gross_refund.set(r);
             fee_ppm_val.set(p.fee_ppm);
-
-            if !billing_active || system_write {
-                p.virtual_balance.add(-(r as i128));
-            }
         });
 
         let gross_refund = gross_refund.get();
@@ -466,10 +450,6 @@ impl CapacityPricing {
 
             let dr = p.reserve as i64 - old_reserve as i64;
             delta_reserve.set(dr);
-
-            if !billing_active {
-                p.virtual_balance.add(dr as i128);
-            }
         });
         let delta_reserve = delta_reserve.get();
         if delta_reserve != 0 && billing_active {
@@ -504,10 +484,6 @@ impl CapacityPricing {
 
             let removed = old_reserve.saturating_sub(p.reserve);
             to_remove.set(removed);
-
-            if !billing_active && removed > 0 {
-                p.virtual_balance.add(-(removed as i128));
-            }
         });
         let to_remove = to_remove.get();
 
@@ -525,72 +501,59 @@ impl CapacityPricing {
         }
     }
 
-    /// Credits `fee_receiver`, settling any outstanding virtual balance first.
+    /// Credits `fee_receiver`, settling any outstanding relay balance first.
     ///
-    /// If the relay has a shortfall, redirects some/all of the fee payment into the
-    /// relay to cover it. If the relay has excess, pulls the extra out and adds it
-    /// to the fee_receiver payment.
-    ///
-    /// A virtual balance may accumulate while billing is enabled only if system services
-    /// write to databases outside of any user action/transaction contexts.
+    /// The relay balance drifts from the curve `reserve` only when:
+    /// 1. special system writes occur (no payer to charge), or
+    /// 2. billing is disabled
+    /// 
+    /// If the relay is short, part/all of the fee is redirected into it to cover the gap.
+    /// If the relay has excess, the surplus is pulled out and added to the fee payment.
     fn credit_fee_receiver(resource: ResourceType, amount: u64) {
         if amount == 0 {
             return;
         }
         let config = BillingConfig::get_assert();
         let sys = config.sys;
-        let to_relay = Cell::new(0u64);
-        let from_relay = Cell::new(0u64);
-        let to_fee = Cell::new(amount);
+        let net = Self::get_assert(resource).relay_net();
 
-        Self::update(resource, |p| {
-            let net = p.virtual_balance.net();
-            if net > 0 {
-                let settle = (net as u64).min(amount);
-                to_relay.set(settle);
-                to_fee.set(amount - settle);
-                p.virtual_balance.add(-(settle as i128));
-            } else if net < 0 {
-                let extra = (-net) as u64;
-                from_relay.set(extra);
-                to_fee.set(amount + extra);
-                p.virtual_balance.add(extra as i128);
-            }
-        });
+        let mut to_relay = 0u64;
+        let mut from_relay = 0u64;
+        let mut to_fee = amount;
+        if net > 0 {
+            let settle = (net as u64).min(amount);
+            to_relay = settle;
+            to_fee = amount - settle;
+        } else if net < 0 {
+            let extra = (-net) as u64;
+            from_relay = extra;
+            to_fee = amount + extra;
+        }
 
         let sub = relay_sub(resource);
-        if to_relay.get() > 0 {
-            Tokens::call().toSub(sys, sub, Quantity::new(to_relay.get()));
-        } else if from_relay.get() > 0 {
-            Tokens::call().fromSub(sys, sub, Quantity::new(from_relay.get()));
+        if to_relay > 0 {
+            Tokens::call().toSub(sys, sub, Quantity::new(to_relay));
+        } else if from_relay > 0 {
+            Tokens::call().fromSub(sys, sub, Quantity::new(from_relay));
         }
-        if to_fee.get() > 0 {
-            Tokens::call().credit(
-                sys,
-                config.fee_receiver,
-                Quantity::new(to_fee.get()),
-                "".into(),
-            );
+        if to_fee > 0 {
+            Tokens::call().credit(sys, config.fee_receiver, Quantity::new(to_fee), "".into());
         }
     }
 
-    /// Settles the virtual balance by moving real tokens to match the curve state.
+    /// Settles the relay balance by moving real tokens to match the curve `reserve`.
     ///
-    /// If the relay is short (net > 0), debits `payer` and deposits into relay sub.
-    /// If the relay has excess (net < 0), withdraws from relay sub to fee_receiver.
-    pub fn settle_virtual_balance(&self, payer: AccountNumber) {
-        let resource = self.resource();
-        let net = Cell::new(0i128);
-        Self::update(resource, |p| {
-            net.set(p.virtual_balance.settle());
-        });
-        let net = net.get();
+    /// If the relay is short (net > 0), debits `payer` and deposits into the
+    /// relay sub. If it has excess (net < 0), withdraws from the relay sub to
+    /// the fee_receiver.
+    pub fn settle_relay_balance(&self, payer: AccountNumber) {
+        let net = self.relay_net();
         if net == 0 {
             return;
         }
         let config = BillingConfig::get_assert();
         let sys = config.sys;
-        let sub = relay_sub(resource);
+        let sub = relay_sub(self.resource());
         if net > 0 {
             let amt = Quantity::new(net as u64);
             let service = get_service();
@@ -662,17 +625,16 @@ impl CapacityPricing {
         let ppm = self.fee_ppm as u64;
         Decimal::new(ppm.into(), Precision::new(4).unwrap()).to_string()
     }
-}
 
-#[Object]
-impl VirtualBalance {
-    /// Relay shortfall, denominated in the system token.
-    pub async fn shortfall(&self) -> Decimal {
-        sys_decimal(self.shortfall)
+    /// Reserve tokens owed to the relay but not yet deposited, 
+    /// denominated in the system token.
+    pub async fn relay_shortfall(&self) -> Decimal {
+        sys_decimal(self.relay_net().max(0) as u64)
     }
 
-    /// Relay excess, denominated in the system token.
-    pub async fn excess(&self) -> Decimal {
-        sys_decimal(self.excess)
+    /// Reserve tokens in the relay beyond what the curve expects, 
+    /// denominated in the system token.
+    pub async fn relay_excess(&self) -> Decimal {
+        sys_decimal((-self.relay_net()).max(0) as u64)
     }
 }

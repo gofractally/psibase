@@ -324,7 +324,7 @@ mod service {
 
         if enabled {
             let payer = check_some(payer, "payer is required when enabling billing");
-            CapacityPricing::get_assert(Disk).settle_virtual_balance(payer);
+            CapacityPricing::get_assert(Disk).settle_relay_balance(payer);
         }
 
         BillingConfig::enable(enabled);

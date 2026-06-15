@@ -282,7 +282,7 @@ impl Query {
     /// between query time and the time billing is enabled.
     async fn enable_billing_cost(&self) -> Decimal {
         let balance = CapacityPricing::get(ResourceType::Disk)
-            .map(|p| p.virtual_balance.net())
+            .map(|p| p.relay_net())
             .unwrap_or(0);
         let cost: u128 = balance.max(0) as u128;
         let cost = cost
