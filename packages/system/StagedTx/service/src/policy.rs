@@ -65,7 +65,14 @@ fn check_auth_recursive(
     method: Option<ServiceMethod>,
     responders: &[AccountNumber],
     check_fn: fn(&ServiceCaller, AccountNumber, Vec<AccountNumber>, Option<ServiceMethod>) -> bool,
+    path: &[AccountNumber],
 ) -> bool {
+    if path.contains(&user) {
+        return false;
+    }
+    let mut path = path.to_vec();
+    path.push(user);
+
     let Some(auth_service) = get_auth_service(user) else {
         return false;
     };
@@ -77,9 +84,7 @@ fn check_auth_recursive(
     } else {
         let authorized_delegates: Vec<AccountNumber> = delegations
             .into_iter()
-            .filter(|delegate| {
-                check_auth_recursive(*delegate, None, responders, check_fn)
-            })
+            .filter(|delegate| check_auth_recursive(*delegate, None, responders, check_fn, &path))
             .collect();
         check_fn(&caller, user, authorized_delegates, method)
     }
@@ -94,20 +99,10 @@ impl StagedTxPolicy {
     }
 
     pub fn does_auth(&self, accepters: Vec<AccountNumber>, method: ServiceMethod) -> bool {
-        check_auth_recursive(
-            self.user,
-            Some(method),
-            &accepters,
-            is_auth_sys,
-        )
+        check_auth_recursive(self.user, Some(method), &accepters, is_auth_sys, &[])
     }
 
     pub fn does_reject(&self, rejecters: Vec<AccountNumber>, method: ServiceMethod) -> bool {
-        check_auth_recursive(
-            self.user,
-            Some(method),
-            &rejecters,
-            is_reject_sys,
-        )
+        check_auth_recursive(self.user, Some(method), &rejecters, is_reject_sys, &[])
     }
 }
