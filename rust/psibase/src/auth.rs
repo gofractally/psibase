@@ -29,7 +29,6 @@ pub fn is_auth(
             sender,
             authorizers,
             method: service_method,
-            authSet: None,
         },
     )
 }

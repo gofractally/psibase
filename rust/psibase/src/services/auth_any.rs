@@ -21,12 +21,25 @@ mod service {
     }
 
     #[action]
-    fn isAuthSys(sender: AccountNumber, authorizers: Vec<AccountNumber>) -> bool {
+    fn getDelegations(sender: AccountNumber, method: Option<ServiceMethod>) -> Vec<AccountNumber> {
         unimplemented!()
     }
 
     #[action]
-    fn isRejectSys(sender: AccountNumber, rejecters: Vec<AccountNumber>) -> bool {
+    fn isAuthSys(
+        sender: AccountNumber,
+        authorizers: Vec<AccountNumber>,
+        method: Option<ServiceMethod>,
+    ) -> bool {
+        unimplemented!()
+    }
+
+    #[action]
+    fn isRejectSys(
+        sender: AccountNumber,
+        rejecters: Vec<AccountNumber>,
+        method: Option<ServiceMethod>,
+    ) -> bool {
         unimplemented!()
     }
 }

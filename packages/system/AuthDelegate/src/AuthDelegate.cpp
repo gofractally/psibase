@@ -33,50 +33,24 @@ namespace SystemService
       getOwner(user);
    }
 
-   bool AuthDelegate::isAuthSys(psibase::AccountNumber                             sender,
-                                std::vector<psibase::AccountNumber>                authorizers,
-                                std::optional<ServiceMethod>                       method,
-                                std::optional<std::vector<psibase::AccountNumber>> authSet_opt)
+   std::vector<AccountNumber> AuthDelegate::getDelegations(psibase::AccountNumber      sender,
+                                                           std::optional<ServiceMethod> method)
    {
-      auto authSet = authSet_opt ? std::move(*authSet_opt) : std::vector<AccountNumber>{};
-
-      // Base case to prevent infinite recursion
-      if (std::ranges::contains(authSet, sender))
-         return false;
-
-      authSet.push_back(sender);
-
-      auto owner = getOwner(sender);
-
-      if (std::ranges::contains(authorizers, owner))
-         return true;
-
-      auto _ = recurse();
-      return authServiceOf(owner).isAuthSys(owner, std::move(authorizers), std::nullopt,
-                                            std::optional(std::move(authSet)));
+      return {getOwner(sender)};
    }
 
-   bool AuthDelegate::isRejectSys(psibase::AccountNumber                             sender,
-                                  std::vector<psibase::AccountNumber>                rejecters,
-                                  std::optional<ServiceMethod>                       method,
-                                  std::optional<std::vector<psibase::AccountNumber>> authSet_opt)
+   bool AuthDelegate::isAuthSys(psibase::AccountNumber              sender,
+                                std::vector<psibase::AccountNumber> authorizers,
+                                std::optional<ServiceMethod>        method)
    {
-      auto authSet = authSet_opt ? std::move(*authSet_opt) : std::vector<AccountNumber>{};
+      return std::ranges::contains(authorizers, getOwner(sender));
+   }
 
-      // Base case to prevent infinite recursion
-      if (std::ranges::contains(authSet, sender))
-         return false;
-
-      authSet.push_back(sender);
-
-      auto owner = getOwner(sender);
-
-      if (std::ranges::contains(rejecters, owner))
-         return true;
-
-      auto _ = recurse();
-      return authServiceOf(owner).isRejectSys(owner, std::move(rejecters), std::nullopt,
-                                              std::make_optional(authSet));
+   bool AuthDelegate::isRejectSys(psibase::AccountNumber              sender,
+                                  std::vector<psibase::AccountNumber> rejecters,
+                                  std::optional<ServiceMethod>        method)
+   {
+      return std::ranges::contains(rejecters, getOwner(sender));
    }
 
    void AuthDelegate::setOwner(psibase::AccountNumber owner)

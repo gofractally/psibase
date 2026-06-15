@@ -105,6 +105,12 @@ mod service {
         unimplemented!()
     }
 
+    /// Get the accounts this auth service delegates authority to for a sender.
+    #[action]
+    fn getDelegations(sender: AccountNumber, method: Option<ServiceMethod>) -> Vec<AccountNumber> {
+        unimplemented!()
+    }
+
     /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
     /// transaction from a specified sender.
     ///
@@ -115,7 +121,11 @@ mod service {
     /// * `true`: If the sender is among the authorizers
     /// * `false`: If the sender is not among the authorizers
     #[action]
-    fn isAuthSys(sender: AccountNumber, authorizers: Vec<AccountNumber>) -> bool {
+    fn isAuthSys(
+        sender: AccountNumber,
+        authorizers: Vec<AccountNumber>,
+        method: Option<ServiceMethod>,
+    ) -> bool {
         unimplemented!()
     }
 
@@ -129,7 +139,11 @@ mod service {
     /// * `true`: If the sender is among the rejecters
     /// * `false`: If the sender is not among the rejecters
     #[action]
-    fn isRejectSys(sender: AccountNumber, authorizers: Vec<AccountNumber>) -> bool {
+    fn isRejectSys(
+        sender: AccountNumber,
+        rejecters: Vec<AccountNumber>,
+        method: Option<ServiceMethod>,
+    ) -> bool {
         unimplemented!()
     }
 

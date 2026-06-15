@@ -163,14 +163,21 @@ pub mod auth_interface {
         unimplemented!()
     }
 
+    /// Get the accounts this auth service delegates authority to for a sender.
+    #[action]
+    fn getDelegations(
+        sender: crate::AccountNumber,
+        method: Option<ServiceMethod>,
+    ) -> Vec<crate::AccountNumber> {
+        unimplemented!()
+    }
+
     /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
     /// transaction from a specified sender.
     ///
     /// * `sender`: The sender account for the transaction potentially being authorized.
-    /// * `authorizers`: The set of accounts that have already authorized the execution of the transaction.
+    /// * `authorizers`: Accounts that have already been authorized through their delegations.
     /// * `method`: The service and method being called.
-    /// * `authSet`: The set of accounts that are already being checked for authorization.
-    ///              If the sender is already in this set, then the function should return false.
     ///
     /// Returns:
     /// * `true`: The authorizers are sufficient to authorize a transaction from the sender.
@@ -180,7 +187,6 @@ pub mod auth_interface {
         sender: crate::AccountNumber,
         authorizers: Vec<crate::AccountNumber>,
         method: Option<ServiceMethod>,
-        authSet: Option<Vec<crate::AccountNumber>>,
     ) -> bool {
         unimplemented!()
     }
@@ -189,10 +195,8 @@ pub mod auth_interface {
     /// transaction from a specified sender.
     ///
     /// * `sender`: The sender account for the transaction potentially being rejected.
-    /// * `rejecters`: The set of accounts that have already authorized the rejection of the transaction.
+    /// * `rejecters`: Accounts that have already been authorized to reject through their delegations.
     /// * `method`: The service and method being called.
-    /// * `authSet`: The set of accounts that are already being checked for authorization.
-    ///              If the sender is already in this set, then the function should return false.
     ///
     /// Returns:
     /// * `true`: The rejecters are sufficient to reject a transaction from the sender.
@@ -202,7 +206,6 @@ pub mod auth_interface {
         sender: crate::AccountNumber,
         rejecters: Vec<crate::AccountNumber>,
         method: Option<ServiceMethod>,
-        authSet: Option<Vec<crate::AccountNumber>>,
     ) -> bool {
         unimplemented!()
     }

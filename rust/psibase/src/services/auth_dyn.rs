@@ -109,11 +109,15 @@ mod service {
     }
 
     #[action]
+    fn getDelegations(sender: AccountNumber, method: Option<ServiceMethod>) -> Vec<AccountNumber> {
+        unimplemented!()
+    }
+
+    #[action]
     fn isAuthSys(
         sender: AccountNumber,
         authorizers: Vec<AccountNumber>,
         method: Option<ServiceMethod>,
-        auth_set: Option<Vec<AccountNumber>>,
     ) -> bool {
         unimplemented!()
     }
@@ -121,9 +125,8 @@ mod service {
     #[action]
     fn isRejectSys(
         sender: AccountNumber,
-        authorizers: Vec<AccountNumber>,
+        rejecters: Vec<AccountNumber>,
         method: Option<ServiceMethod>,
-        auth_set: Option<Vec<AccountNumber>>,
     ) -> bool {
         unimplemented!()
     }

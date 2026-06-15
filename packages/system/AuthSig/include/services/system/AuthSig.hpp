@@ -72,6 +72,10 @@ namespace SystemService
          /// submits a transaction.
          void setKey(SubjectPublicKeyInfo key);
 
+         /// Get the accounts this auth service delegates authority to for a sender.
+         std::vector<psibase::AccountNumber> getDelegations(psibase::AccountNumber      sender,
+                                                            std::optional<ServiceMethod> method);
+
          /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
          /// transaction from a specified sender.
          ///
@@ -82,7 +86,8 @@ namespace SystemService
          /// * `true`: If the sender is among the authorizers
          /// * `false`: If the sender is not among the authorizers
          bool isAuthSys(psibase::AccountNumber              sender,
-                        std::vector<psibase::AccountNumber> authorizers);
+                        std::vector<psibase::AccountNumber> authorizers,
+                        std::optional<ServiceMethod>        method);
 
          /// Check whether a specified set of rejecter accounts are sufficient to reject (cancel) a
          /// transaction from a specified sender.
@@ -94,7 +99,8 @@ namespace SystemService
          /// * `true`: If the sender is among the rejecters
          /// * `false`: If the sender is not among the rejecters
          bool isRejectSys(psibase::AccountNumber              sender,
-                          std::vector<psibase::AccountNumber> rejecters);
+                          std::vector<psibase::AccountNumber> rejecters,
+                          std::optional<ServiceMethod>        method);
 
          /// Create a new account using this auth service configured with the specified public key.
          void newAccount(psibase::AccountNumber name, SubjectPublicKeyInfo key);
@@ -103,8 +109,9 @@ namespace SystemService
                    method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                    method(canAuthUserSys, user),
                    method(setKey, key),
-                   method(isAuthSys, sender, authorizers),
-                   method(isRejectSys, sender, rejecters),
+                   method(getDelegations, sender, method),
+                   method(isAuthSys, sender, authorizers, method),
+                   method(isRejectSys, sender, rejecters, method),
                    method(newAccount, name, key)
                    //
       )

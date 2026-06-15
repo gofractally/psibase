@@ -66,7 +66,7 @@ pub mod tables {
 pub mod service {
     use crate::tables::Management;
     use psibase::services::accounts::Wrapper as Accounts;
-    use psibase::services::auth_dyn::policy::WeightedAuthorizer;
+
     use psibase::services::transact::ServiceMethod;
     use psibase::*;
 
@@ -131,13 +131,23 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
+    fn getDelegations(sender: AccountNumber, method: Option<ServiceMethod>) -> Vec<AccountNumber> {
+        Management::get_assert(sender)
+            .dynamic_policy(method)
+            .authorizers
+            .into_iter()
+            .map(|authorizer| authorizer.account)
+            .collect()
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
     fn isAuthSys(
         sender: AccountNumber,
         authorizers: Vec<AccountNumber>,
         method: Option<ServiceMethod>,
-        authSet: Option<Vec<AccountNumber>>,
     ) -> bool {
-        is_auth(sender, authorizers, method, authSet, true)
+        is_auth(sender, authorizers, method, true)
     }
 
     #[action]
@@ -146,42 +156,16 @@ pub mod service {
         sender: AccountNumber,
         rejecters: Vec<AccountNumber>,
         method: Option<ServiceMethod>,
-        authSet: Option<Vec<AccountNumber>>,
     ) -> bool {
-        is_auth(sender, rejecters, method, authSet, false)
-    }
-
-    fn is_auth_other(
-        sender: AccountNumber,
-        authorizers: Vec<AccountNumber>,
-        auth_set: Vec<AccountNumber>,
-        is_approval: bool,
-    ) -> bool {
-        use psibase::services::transact::auth_interface::AuthWrapper;
-
-        let auth_service = AuthWrapper::call_to(Accounts::call().getAuthOf(sender));
-
-        if is_approval {
-            auth_service.isAuthSys(sender, authorizers, None, Some(auth_set))
-        } else {
-            auth_service.isRejectSys(sender, authorizers, None, Some(auth_set))
-        }
+        is_auth(sender, rejecters, method, false)
     }
 
     fn is_auth(
         sender: AccountNumber,
         authorizers: Vec<AccountNumber>,
         method: Option<ServiceMethod>,
-        auth_set: Option<Vec<AccountNumber>>,
         is_approval: bool,
     ) -> bool {
-        // Make sure we're not in a loop
-        let mut auth_set = auth_set.unwrap_or_default();
-        if auth_set.contains(&sender) {
-            return false;
-        }
-        auth_set.push(sender);
-
         let policy = Management::get_assert(sender).dynamic_policy(method);
         check(policy.threshold != 0, "multi auth threshold cannot be 0");
 
@@ -200,36 +184,13 @@ pub mod service {
             total_possible_weight - policy.threshold + 1
         };
 
-        let (already_approved, to_check): (Vec<WeightedAuthorizer>, Vec<WeightedAuthorizer>) =
-            policy
-                .authorizers
-                .into_iter()
-                .partition(|authorizer| authorizers.contains(&authorizer.account));
-
-        let mut total_weight_approved = already_approved
+        let total_weight_approved = policy
+            .authorizers
             .into_iter()
-            .fold(0, |acc, authorizer| authorizer.weight + acc);
+            .filter(|authorizer| authorizers.contains(&authorizer.account))
+            .fold(0, |acc, authorizer| acc + authorizer.weight);
 
-        if total_weight_approved >= required_weight {
-            return true;
-        }
-
-        for weight_authorizer in to_check {
-            let is_auth = is_auth_other(
-                weight_authorizer.account,
-                authorizers.clone(),
-                auth_set.clone(),
-                is_approval,
-            );
-            if is_auth {
-                total_weight_approved += weight_authorizer.weight;
-                if total_weight_approved >= required_weight {
-                    return true;
-                }
-            }
-        }
-
-        false
+        total_weight_approved >= required_weight
     }
 
     #[action]

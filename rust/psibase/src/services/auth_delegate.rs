@@ -39,22 +39,26 @@ mod service {
         unimplemented!()
     }
 
+    /// Get the accounts this auth service delegates authority to for a sender.
+    #[action]
+    fn getDelegations(sender: AccountNumber, method: Option<ServiceMethod>) -> Vec<AccountNumber> {
+        unimplemented!()
+    }
+
     /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
     /// transaction from a specified sender.
     ///
     /// * `sender`: The sender account for the transaction potentially being authorized.
-    /// * `authorizers`: The set of accounts that have already authorized the execution of the transaction.
+    /// * `authorizers`: Accounts that have already been authorized through their delegations.
     ///
     /// Returns:
-    /// * `true`: If the sender's owner is among the authorizers, or if the sender's owner's auth
-    /// service would authorize the transaction
-    /// * `false`: If not returning true, or on recursive checks for the same sender
+    /// * `true`: If the sender's owner is among the authorizers
+    /// * `false`: Otherwise
     #[action]
     fn isAuthSys(
         sender: AccountNumber,
         authorizers: Vec<AccountNumber>,
         method: Option<ServiceMethod>,
-        auth_set: Option<Vec<AccountNumber>>,
     ) -> bool {
         unimplemented!()
     }
@@ -63,18 +67,16 @@ mod service {
     /// transaction from a specified sender.
     ///
     /// * `sender`: The sender account for the transaction potentially being rejected.
-    /// * `rejecters`: The set of accounts that have already authorized the rejection of the transaction.
+    /// * `rejecters`: Accounts that have already been authorized to reject through their delegations.
     ///
     /// Returns:
-    /// * `true`: If the sender's owner is among the rejecters, or if the sender's owner's auth
-    /// service would reject the transaction
-    /// * `false`: If not returning true, or on recursive checks for the same sender
+    /// * `true`: If the sender's owner is among the rejecters
+    /// * `false`: Otherwise
     #[action]
     fn isRejectSys(
         sender: AccountNumber,
-        authorizers: Vec<AccountNumber>,
+        rejecters: Vec<AccountNumber>,
         method: Option<ServiceMethod>,
-        auth_set: Option<Vec<AccountNumber>>,
     ) -> bool {
         unimplemented!()
     }

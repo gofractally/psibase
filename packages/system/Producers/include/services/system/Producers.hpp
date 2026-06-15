@@ -79,37 +79,35 @@ namespace SystemService
                         std::vector<psibase::Claim> claims);
       void canAuthUserSys(psibase::AccountNumber user);
 
+      /// Get the accounts this auth service delegates authority to for a sender.
+      std::vector<psibase::AccountNumber> getDelegations(psibase::AccountNumber      sender,
+                                                         std::optional<ServiceMethod> method);
+
       /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
       /// transaction from a specified sender.
       ///
       /// * `sender`: The sender account for the transaction potentially being authorized.
-      /// * `authorizers`: The set of accounts that have already authorized the execution of the transaction.
-      /// * `authSet`: The set of accounts that are already being checked for authorization. If
-      ///              the sender is already in this set, then the function should return false.
+      /// * `authorizers`: Accounts that have already been authorized through their delegations.
       ///
       /// Returns:
-      /// * `true`: If the total authorizations from `authorizers` or their auth services meets sender's threshold
-      /// * `false`: If not returning true, or on recursive checks for the same sender
-      bool isAuthSys(psibase::AccountNumber                             sender,
-                     std::vector<psibase::AccountNumber>                authorizers,
-                     std::optional<ServiceMethod>                       method,
-                     std::optional<std::vector<psibase::AccountNumber>> authSet);
+      /// * `true`: If enough authorizers meet the sender's threshold
+      /// * `false`: Otherwise
+      bool isAuthSys(psibase::AccountNumber              sender,
+                     std::vector<psibase::AccountNumber> authorizers,
+                     std::optional<ServiceMethod>        method);
 
       /// Check whether a specified set of rejecter accounts are sufficient to reject (cancel) a
       /// transaction from a specified sender.
       ///
       /// * `sender`: The sender account for the transaction potentially being rejected.
-      /// * `rejecters`: The set of accounts that have already authorized the rejection of the transaction.
-      /// * `authSet`: The set of accounts that are already being checked for authorization. If
-      ///              the sender is already in this set, then the function should return false.
+      /// * `rejecters`: Accounts that have already been authorized to reject through their delegations.
       ///
       /// Returns:
-      /// * `true`: If the total authorizations from `rejecters` or their auth services meets sender's threshold
-      /// * `false`: If not returning true, or on recursive checks for the same sender
-      bool isRejectSys(psibase::AccountNumber                             sender,
-                       std::vector<psibase::AccountNumber>                rejecters,
-                       std::optional<ServiceMethod>                       method,
-                       std::optional<std::vector<psibase::AccountNumber>> authSet);
+      /// * `true`: If enough rejecters meet the sender's anti-threshold
+      /// * `false`: Otherwise
+      bool isRejectSys(psibase::AccountNumber              sender,
+                       std::vector<psibase::AccountNumber> rejecters,
+                       std::optional<ServiceMethod>        method);
    };
    PSIO_REFLECT(Producers,
                 method(setConsensus, consensus),
@@ -123,8 +121,9 @@ namespace SystemService
                 method(antiThreshold, account),
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                 method(canAuthUserSys, user),
-                method(isAuthSys, sender, authorizers, method, authSet),
-                method(isRejectSys, sender, rejecters, method, authSet)
+                method(getDelegations, sender, method),
+                method(isAuthSys, sender, authorizers, method),
+                method(isRejectSys, sender, rejecters, method)
                 //
    )
 

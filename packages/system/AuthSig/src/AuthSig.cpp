@@ -81,14 +81,22 @@ namespace SystemService
          authTable.put(AuthRecord{.account = getSender(), .pubkey = std::move(key)});
       }
 
+      std::vector<psibase::AccountNumber> AuthSig::getDelegations(
+          psibase::AccountNumber sender, std::optional<ServiceMethod> method)
+      {
+         return {};
+      }
+
       bool AuthSig::isAuthSys(psibase::AccountNumber              sender,
-                              std::vector<psibase::AccountNumber> authorizers)
+                              std::vector<psibase::AccountNumber> authorizers,
+                              std::optional<ServiceMethod>        method)
       {
          return std::ranges::contains(authorizers, sender);
       }
 
       bool AuthSig::isRejectSys(psibase::AccountNumber              sender,
-                                std::vector<psibase::AccountNumber> rejecters)
+                                std::vector<psibase::AccountNumber> rejecters,
+                                std::optional<ServiceMethod>        method)
       {
          return std::ranges::contains(rejecters, sender);
       }
