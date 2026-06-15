@@ -73,8 +73,8 @@ namespace SystemService
          void setKey(SubjectPublicKeyInfo key);
 
          /// Get the accounts this auth service delegates authority to for a sender.
-         std::vector<psibase::AccountNumber> getDelegationsSys(psibase::AccountNumber      sender,
-                                                            std::optional<ServiceMethod> method);
+         std::vector<psibase::AccountNumber> getDelegationsSys(psibase::AccountNumber       sender,
+                                                               std::optional<ServiceMethod> method);
 
          /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
          /// transaction from a specified sender.

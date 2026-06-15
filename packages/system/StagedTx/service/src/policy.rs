@@ -60,84 +60,137 @@ fn is_reject_sys(
     )
 }
 
-struct DelegationNode {
+type CheckFn = fn(&ServiceCaller, AccountNumber, Vec<AccountNumber>, Option<ServiceMethod>) -> bool;
+
+/// A single account in the delegation graph: the account's auth service and the
+/// deduped set of accounts it delegates authority to.
+struct Delegation {
     account: AccountNumber,
-    children: Vec<DelegationNode>,
+    auth_service: AccountNumber,
+    delegates: Vec<AccountNumber>,
 }
 
-fn dedupe_preserve_order(accounts: Vec<AccountNumber>) -> Vec<AccountNumber> {
-    let mut result = Vec::new();
-    for account in accounts {
-        if !result.contains(&account) {
-            result.push(account);
+#[derive(Clone, Copy)]
+enum AuthState {
+    /// The account is currently being evaluated higher up the call stack.
+    /// Treating it as unauthorized breaks cycles in the delegation graph.
+    Visiting,
+    Resolved(bool),
+}
+
+/// Builds the delegation graph reachable from `user`, querying each account's
+/// auth service for its delegations exactly once. Accounts reachable through
+/// multiple paths (e.g. a multisig whose signers delegate to a common owner)
+/// are therefore consolidated rather than expanded repeatedly.
+///
+/// `method` is only meaningful for `user`. Delegated accounts are queried with
+/// `None` because staged-tx (not the auth services) is responsible for wiping
+/// the method as authority propagates down the chain.
+fn build_delegation_graph(user: AccountNumber, method: Option<ServiceMethod>) -> Vec<Delegation> {
+    let mut graph: Vec<Delegation> = Vec::new();
+    let mut stack: Vec<(AccountNumber, Option<ServiceMethod>)> = vec![(user, method)];
+
+    while let Some((account, method)) = stack.pop() {
+        if graph.iter().any(|d| d.account == account) {
+            continue;
         }
+
+        let Some(auth_service) = get_auth_service(account) else {
+            continue;
+        };
+
+        let caller = auth_caller(auth_service);
+        let mut delegates: Vec<AccountNumber> = Vec::new();
+        for delegate in get_delegations(&caller, account, method) {
+            if !delegates.contains(&delegate) {
+                delegates.push(delegate);
+            }
+        }
+
+        for delegate in &delegates {
+            stack.push((*delegate, None));
+        }
+
+        graph.push(Delegation {
+            account,
+            auth_service,
+            delegates,
+        });
     }
-    result
+
+    graph
 }
 
-fn build_delegation_tree(
-    user: AccountNumber,
-    method: Option<ServiceMethod>,
-    path: &[AccountNumber],
-) -> Option<DelegationNode> {
-    if path.contains(&user) {
-        return None;
-    }
-
-    let mut path = path.to_vec();
-    path.push(user);
-
-    let auth_service = get_auth_service(user)?;
-    let caller = auth_caller(auth_service);
-    let delegations = dedupe_preserve_order(get_delegations(&caller, user, method));
-
-    let children = delegations
-        .into_iter()
-        .filter_map(|delegate| build_delegation_tree(delegate, None, &path))
-        .collect();
-
-    Some(DelegationNode {
-        account: user,
-        children,
-    })
-}
-
-fn check_delegation_node(
-    node: &DelegationNode,
-    responders: &[AccountNumber],
-    check_fn: fn(&ServiceCaller, AccountNumber, Vec<AccountNumber>, Option<ServiceMethod>) -> bool,
-    method: Option<ServiceMethod>,
-) -> bool {
-    let authorized_children: Vec<AccountNumber> = node
-        .children
-        .iter()
-        .filter(|child| check_delegation_node(child, responders, check_fn, None))
-        .map(|child| child.account)
-        .collect();
-
-    let auth_service = get_auth_service(node.account).expect("delegation tree node has auth service");
-    let caller = auth_caller(auth_service);
-    let authorizers = if node.children.is_empty() {
-        responders.to_vec()
+fn set_state(memo: &mut Vec<(AccountNumber, AuthState)>, account: AccountNumber, state: AuthState) {
+    if let Some(entry) = memo.iter_mut().find(|(a, _)| *a == account) {
+        entry.1 = state;
     } else {
-        authorized_children
+        memo.push((account, state));
+    }
+}
+
+/// Determines whether `account` is authorized given the accounts that actually
+/// responded (`responders`), memoizing results so each account's auth service
+/// is consulted at most once.
+///
+/// A leaf account (one that delegates to no one) is authorized if it is among
+/// the responders. Otherwise authority is derived from the delegated accounts
+/// that are themselves authorized.
+fn is_authorized(
+    account: AccountNumber,
+    user: AccountNumber,
+    graph: &[Delegation],
+    responders: &[AccountNumber],
+    method: ServiceMethod,
+    check_fn: CheckFn,
+    memo: &mut Vec<(AccountNumber, AuthState)>,
+) -> bool {
+    if let Some((_, state)) = memo.iter().find(|(a, _)| *a == account) {
+        return match state {
+            AuthState::Resolved(result) => *result,
+            AuthState::Visiting => false,
+        };
+    }
+
+    let Some(delegation) = graph.iter().find(|d| d.account == account) else {
+        set_state(memo, account, AuthState::Resolved(false));
+        return false;
     };
 
-    check_fn(&caller, node.account, authorizers, method)
+    set_state(memo, account, AuthState::Visiting);
+
+    let authorizers: Vec<AccountNumber> = if delegation.delegates.is_empty() {
+        responders.to_vec()
+    } else {
+        delegation
+            .delegates
+            .iter()
+            .copied()
+            .filter(|delegate| {
+                is_authorized(*delegate, user, graph, responders, method, check_fn, memo)
+            })
+            .collect()
+    };
+
+    // Only the originating account is checked against the requested method;
+    // delegated checks have the method wiped by staged-tx.
+    let method = if account == user { Some(method) } else { None };
+    let caller = auth_caller(delegation.auth_service);
+    let result = check_fn(&caller, account, authorizers, method);
+
+    set_state(memo, account, AuthState::Resolved(result));
+    result
 }
 
 fn check_delegation_auth(
     user: AccountNumber,
     method: ServiceMethod,
     responders: &[AccountNumber],
-    check_fn: fn(&ServiceCaller, AccountNumber, Vec<AccountNumber>, Option<ServiceMethod>) -> bool,
+    check_fn: CheckFn,
 ) -> bool {
-    let tree = match build_delegation_tree(user, Some(method), &[]) {
-        Some(tree) => tree,
-        None => return false,
-    };
-
-    check_delegation_node(&tree, responders, check_fn, Some(method))
+    let graph = build_delegation_graph(user, Some(method));
+    let mut memo: Vec<(AccountNumber, AuthState)> = Vec::new();
+    is_authorized(user, user, &graph, responders, method, check_fn, &mut memo)
 }
 
 pub struct StagedTxPolicy {

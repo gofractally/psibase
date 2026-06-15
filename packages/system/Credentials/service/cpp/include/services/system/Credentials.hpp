@@ -28,8 +28,8 @@ namespace SystemService
                         std::vector<ServiceMethod>  allowedActions,
                         std::vector<psibase::Claim> claims);
 
-      std::vector<psibase::AccountNumber> getDelegationsSys(psibase::AccountNumber      sender,
-                                                         std::optional<ServiceMethod> method);
+      std::vector<psibase::AccountNumber> getDelegationsSys(psibase::AccountNumber       sender,
+                                                            std::optional<ServiceMethod> method);
 
       bool isAuthSys(psibase::AccountNumber              sender,
                      std::vector<psibase::AccountNumber> authorizers,

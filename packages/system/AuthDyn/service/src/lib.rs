@@ -66,7 +66,6 @@ pub mod tables {
 pub mod service {
     use crate::tables::Management;
     use psibase::services::accounts::Wrapper as Accounts;
-
     use psibase::services::transact::ServiceMethod;
     use psibase::*;
 
@@ -131,7 +130,10 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn getDelegationsSys(sender: AccountNumber, method: Option<ServiceMethod>) -> Vec<AccountNumber> {
+    fn getDelegationsSys(
+        sender: AccountNumber,
+        method: Option<ServiceMethod>,
+    ) -> Vec<AccountNumber> {
         Management::get_assert(sender)
             .dynamic_policy(method)
             .authorizers

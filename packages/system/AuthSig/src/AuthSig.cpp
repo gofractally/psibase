@@ -82,7 +82,8 @@ namespace SystemService
       }
 
       std::vector<psibase::AccountNumber> AuthSig::getDelegationsSys(
-          psibase::AccountNumber sender, std::optional<ServiceMethod> method)
+          psibase::AccountNumber       sender,
+          std::optional<ServiceMethod> method)
       {
          return {};
       }

@@ -59,8 +59,8 @@ namespace
    std::size_t countOverlapping(const std::vector<AccountNumber>& producers,
                                 const std::vector<AccountNumber>& authorizers)
    {
-      return std::ranges::count_if(producers,
-                                   [&](const auto& p) { return std::ranges::contains(authorizers, p); });
+      return std::ranges::count_if(
+          producers, [&](const auto& p) { return std::ranges::contains(authorizers, p); });
    }
 
 }  // namespace
@@ -241,16 +241,16 @@ namespace SystemService
             "Can only authorize predefined accounts");
    }
 
-   std::vector<AccountNumber> Producers::getDelegationsSys(AccountNumber              sender,
-                                                        std::optional<ServiceMethod> method)
+   std::vector<AccountNumber> Producers::getDelegationsSys(AccountNumber                sender,
+                                                           std::optional<ServiceMethod> method)
    {
       return ::getProducers()                          //
              | std::views::transform(&Producer::name)  //
              | std::ranges::to<std::vector>();
    }
 
-   bool Producers::isAuthSys(AccountNumber              sender,
-                             std::vector<AccountNumber> authorizers,
+   bool Producers::isAuthSys(AccountNumber                sender,
+                             std::vector<AccountNumber>   authorizers,
                              std::optional<ServiceMethod> method)
    {
       auto producers = ::getProducers()                          //
@@ -261,8 +261,8 @@ namespace SystemService
       return countOverlapping(producers, authorizers) >= threshold;
    }
 
-   bool Producers::isRejectSys(AccountNumber              sender,
-                               std::vector<AccountNumber> rejecters,
+   bool Producers::isRejectSys(AccountNumber                sender,
+                               std::vector<AccountNumber>   rejecters,
                                std::optional<ServiceMethod> method)
    {
       auto producers = ::getProducers()                          //

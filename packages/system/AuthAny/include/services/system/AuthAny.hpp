@@ -17,8 +17,8 @@ namespace SystemService
 
       void canAuthUserSys(psibase::AccountNumber user);
 
-      std::vector<psibase::AccountNumber> getDelegationsSys(psibase::AccountNumber      sender,
-                                                         std::optional<ServiceMethod> method);
+      std::vector<psibase::AccountNumber> getDelegationsSys(psibase::AccountNumber       sender,
+                                                            std::optional<ServiceMethod> method);
 
       bool isAuthSys(psibase::AccountNumber              sender,
                      std::vector<psibase::AccountNumber> authorizers);
