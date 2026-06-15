@@ -176,7 +176,7 @@ pub mod auth_interface {
     /// transaction from a specified sender.
     ///
     /// * `sender`: The sender account for the transaction potentially being authorized.
-    /// * `authorizers`: Accounts that have already been authorized through their delegations.
+    /// * `authorizers`: The set of accounts that have already authorized the execution of the transaction.
     /// * `method`: The service and method being called.
     ///
     /// Returns:
@@ -195,7 +195,7 @@ pub mod auth_interface {
     /// transaction from a specified sender.
     ///
     /// * `sender`: The sender account for the transaction potentially being rejected.
-    /// * `rejecters`: Accounts that have already been authorized to reject through their delegations.
+    /// * `rejecters`: The set of accounts that have already authorized the rejection of the transaction.
     /// * `method`: The service and method being called.
     ///
     /// Returns:

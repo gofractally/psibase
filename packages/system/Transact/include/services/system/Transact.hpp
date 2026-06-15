@@ -145,15 +145,14 @@ namespace SystemService
       ///
       /// Returns the accounts that must be consulted before this sender can be authorized.
       /// An empty result means the sender does not delegate to other accounts.
-      std::vector<psibase::AccountNumber> getDelegationsSys(psibase::AccountNumber      sender,
-                                                         std::optional<ServiceMethod> method);
+      std::vector<psibase::AccountNumber> getDelegationsSys(psibase::AccountNumber       sender,
+                                                            std::optional<ServiceMethod> method);
 
       /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
       /// transaction from a specified sender.
       ///
       /// * `sender`: The sender account for the transaction potentially being authorized.
-      /// * `authorizers`: Accounts that have already been authorized, either directly or through
-      ///                  their delegations.
+      /// * `authorizers`: The set of accounts that have already authorized the execution of the transaction.
       /// * `method`: The service and method being authorized.
       ///
       /// Returns:
@@ -167,8 +166,8 @@ namespace SystemService
       /// transaction from a specified sender.
       ///
       /// * `sender`: The sender account for the transaction potentially being rejected.
-      /// * `rejecters`: Accounts that have already been authorized to reject, either directly or
-      ///                through their delegations.
+      /// * `rejecters`: The set of accounts that have already authorized the rejection of the
+      ///               transaction.
       /// * `method`: The service and method being rejected.
       ///
       /// Returns:
