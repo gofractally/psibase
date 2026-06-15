@@ -224,6 +224,11 @@ impl CapacityPricing {
         Curve::new(self.max_reserve, self.max_capacity, self.curve_d)
     }
 
+    /// Reserve token backing required in the relay for the current curve position.
+    pub(crate) fn required_reserve(&self) -> u64 {
+        self.curve().pos_from_resources(self.remaining_capacity).reserves
+    }
+
     fn cost_of(&self, amount_consumed: u64) -> u64 {
         if amount_consumed > self.remaining_capacity {
             abort_message(&format!("Insufficient {} capacity", self.resource().name()));
@@ -268,7 +273,6 @@ impl CapacityPricing {
         table
             .put(&CapacityPricing {
                 resource_id: id,
-                reserve: 0,
                 remaining_capacity: max_capacity,
                 max_reserve,
                 max_capacity,
@@ -303,14 +307,14 @@ impl CapacityPricing {
         }
     }
 
-    /// Signed relay discrepancy: the curve `reserve` minus the actual relay
-    /// balance. 
-    /// 
+    /// Signed relay discrepancy: the required reserve minus the actual relay
+    /// balance.
+    ///
     /// Returns a positive value if there is a shortfall (tokens owed to the relay), 
     /// or returns a negative value if there is an excess (tokens beyond what the 
     /// curve expects).
     pub(crate) fn relay_net(&self) -> i128 {
-        self.reserve as i128 - self.actual_relay_balance() as i128
+        self.required_reserve() as i128 - self.actual_relay_balance() as i128
     }
 
     pub fn get_cost(&self, amount_consumed: u64) -> Quantity {
@@ -340,7 +344,6 @@ impl CapacityPricing {
                 .curve()
                 .pos_from_resources(p.remaining_capacity)
                 .cost_of(amount_consumed);
-            p.reserve += c;
             p.remaining_capacity -= amount_consumed;
             cost.set(c);
         });
@@ -389,7 +392,6 @@ impl CapacityPricing {
                 .curve()
                 .pos_from_resources(p.remaining_capacity)
                 .refund_of(amount_freed);
-            p.reserve -= r;
             p.remaining_capacity += amount_freed;
             gross_refund.set(r);
             fee_ppm_val.set(p.fee_ppm);
@@ -441,14 +443,12 @@ impl CapacityPricing {
         let delta_reserve = Cell::new(0i64);
         let billing_active = is_billing_active();
         Self::update(resource, |p| {
-            let old_reserve = p.reserve;
+            let old_reserve = p.required_reserve();
 
             p.max_capacity += delta_bytes;
             p.remaining_capacity += delta_bytes;
 
-            p.reserve = p.curve().pos_from_resources(p.remaining_capacity).reserves;
-
-            let dr = p.reserve as i64 - old_reserve as i64;
+            let dr = p.required_reserve() as i64 - old_reserve as i64;
             delta_reserve.set(dr);
         });
         let delta_reserve = delta_reserve.get();
@@ -475,14 +475,12 @@ impl CapacityPricing {
                 delta_supply < p.max_reserve,
                 "Cannot reduce max_reserve to 0",
             );
-            let old_reserve = p.reserve;
+            let old_reserve = p.required_reserve();
 
             p.max_reserve -= delta_supply;
 
             // ceil so pool requires >= ideal reserve, meaning we remove less
-            p.reserve = p.curve().pos_from_resources(p.remaining_capacity).reserves;
-
-            let removed = old_reserve.saturating_sub(p.reserve);
+            let removed = old_reserve.saturating_sub(p.required_reserve());
             to_remove.set(removed);
         });
         let to_remove = to_remove.get();
@@ -597,9 +595,9 @@ fn sys_decimal(value: u64) -> Decimal {
 
 #[ComplexObject]
 impl CapacityPricing {
-    /// Reserve tokens held in relay, denominated in the system token.
+    /// Reserve tokens required by the current curve position, denominated in the system token.
     pub async fn reserve(&self) -> Decimal {
-        sys_decimal(self.reserve)
+        sys_decimal(self.required_reserve())
     }
 
     /// Max reserve tokens that may be sold into the relay, denominated in the system token.

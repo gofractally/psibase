@@ -206,9 +206,6 @@ pub mod tables {
         #[primary_key]
         pub resource_id: u8,
 
-        /// Reserve tokens held in relay
-        #[graphql(skip)]
-        pub reserve: u64,
         /// Remaining billable resource capacity
         pub remaining_capacity: u64,
         /// Max reserve tokens that may be sold into the relay (e.g. max issued supply)
