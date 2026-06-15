@@ -698,18 +698,6 @@ namespace SystemService
          }
          if (delta != 0)
          {
-            if constexpr (enable_print)
-            {
-               psibase::writeConsole(
-                   "kvNotify: service=" + service.str() +
-                   " db=" + std::to_string(static_cast<int>(db)) +
-                   " key=" + std::to_string(keyLen) + " old=" +
-                   (oldValueLen == DNE ? std::string("DNE") : std::to_string(oldValueLen)) +
-                   " new=" +
-                   (newValueLen == DNE ? std::string("DNE") : std::to_string(newValueLen)) +
-                   " delta=" + std::to_string(delta) + " user=" + trxSender.str() + "\n");
-            }
-
             recurse().to<VirtualServer>().useDiskSys(trxSender, db, delta);
          }
       }
