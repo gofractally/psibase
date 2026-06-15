@@ -8,6 +8,13 @@ from threading import Thread
 from psinode import Action, Transaction, TransactionError, PrivateKey
 from services import Accounts, AuthSig, Tokens, Transact
 
+FAUCET_DEBIT = {"token_id": 1, "creditor": "faucet-tok", "amount": {"value": 1000000000}, "memo": ""}
+
+def accept_faucet_tokens(node, *accounts, keys=[], wait_node=None):
+    for account in accounts:
+        node.push_action(account, 'tokens', 'debit', FAUCET_DEBIT, keys=keys)
+    (wait_node or getattr(node, 'api', node)).wait(new_block())
+
 class TestTransactionQueue(unittest.TestCase):
     @testutil.psinode_test
     def test_submit(self, cluster):
@@ -19,6 +26,7 @@ class TestTransactionQueue(unittest.TestCase):
         tokens = Tokens(a)
         txqueue = Transact(a)
         auth = txqueue.login('alice')
+        accept_faucet_tokens(txqueue, 'alice', 'bob')
         old_balance = tokens.balance('alice', token=1, token_auth=auth)
 
         txqueue.push_action('alice', 'tokens', 'credit', {"token_id":1,"debitor":"bob","amount":{"value":10000}, "memo":"test"})
@@ -66,9 +74,9 @@ class TestTransactionQueue(unittest.TestCase):
         tokens = Tokens(a)
         transact = Transact(a)
         auth = transact.login('alice')
-        old_balance = tokens.balance('alice', token=1, token_auth=auth)
-
         txqueue = Transact(prods[2])
+        accept_faucet_tokens(txqueue, 'alice', wait_node=a)
+        old_balance = tokens.balance('alice', token=1, token_auth=auth)
         txqueue.push_action('alice', 'tokens', 'credit', {"token_id":1,"debitor":"bob","amount":{"value":10000}, "memo":"test"})
 
         a.wait(new_block())
@@ -87,13 +95,15 @@ class TestTransactionQueue(unittest.TestCase):
         auth_d = Transact(d).login('alice')
 
         tokens = Tokens(a)
-        old_balance = tokens.balance('alice', token=1, token_auth=auth_a)
 
         key = PrivateKey()
         AuthSig(a).set_key('alice', key)
         a.wait(new_block())
 
         txqueue = Transact(c)
+        accept_faucet_tokens(txqueue, 'alice', keys=[key], wait_node=a)
+        accept_faucet_tokens(txqueue, 'bob', wait_node=a)
+        old_balance = tokens.balance('alice', token=1, token_auth=auth_a)
         txqueue.push_action('alice', 'tokens', 'credit', {"token_id":1,"debitor":"bob","amount":{"value":10000}, "memo":"test"}, keys=[key])
         pred = new_block()
         a.wait(pred)
@@ -114,6 +124,7 @@ class TestTransactionQueue(unittest.TestCase):
     def test_restart_node(self, cluster):
         (a, b) = cluster.complete(*testutil.generate_names(2))
         a.boot(packages=['Minimal', 'Explorer', 'TokenUsers'])
+        accept_faucet_tokens(a, 'alice', 'bob')
 
         # Make sure that b is ready
         b.wait(new_block())
