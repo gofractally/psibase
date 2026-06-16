@@ -177,16 +177,13 @@ export const PremiumNameMarketConfig = () => {
             </Card>
 
             {tokenMissingConfirmed ? (
-                <Alert variant="warning" className="max-w-2xl">
+                <Alert variant="warning">
                     <AlertCircle />
                     <AlertTitle variant="warning">
                         System token required
                     </AlertTitle>
                     <AlertDescription variant="warning">
-                        <p>
-                            No system token configured yet. All Premium name
-                            markets rely on a sys token for pricing.
-                        </p>
+                        <p>Set up a system token to use this feature</p>
                     </AlertDescription>
                 </Alert>
             ) : null}
