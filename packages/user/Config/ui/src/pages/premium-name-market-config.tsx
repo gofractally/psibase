@@ -10,6 +10,7 @@ import {
     getDirtyMarkets,
     validateDirtyMarkets,
 } from "@/lib/premium-name-market-form";
+import { scrollToFirstMarketFieldError } from "@/lib/premium-name-market-validation-ui";
 
 import { useAppForm } from "@shared/components/form/app-form";
 import { PageContainer } from "@shared/components/page-container";
@@ -25,6 +26,7 @@ import {
     Card,
     CardAction,
     CardContent,
+    CardDescription,
     CardHeader,
     CardTitle,
 } from "@shared/shadcn/ui/card";
@@ -68,7 +70,30 @@ export const PremiumNameMarketConfig = () => {
 
                 const defaults = formApi.options
                     .defaultValues as PremiumNameMarketsFormValues;
-                return validateDirtyMarkets(value, defaults, systemToken);
+                const validation = validateDirtyMarkets(
+                    value,
+                    defaults,
+                    systemToken,
+                );
+
+                if (validation?.fields) {
+                    window.requestAnimationFrame(() => {
+                        for (const fieldPath of Object.keys(
+                            validation.fields,
+                        )) {
+                            form.setFieldMeta(
+                                fieldPath as `markets[${number}].initialPrice`,
+                                (prev) => ({
+                                    ...prev,
+                                    isTouched: true,
+                                }),
+                            );
+                        }
+                        scrollToFirstMarketFieldError(validation.fields);
+                    });
+                }
+
+                return validation;
             },
         },
         onSubmit: async ({ value, formApi }) => {
@@ -100,37 +125,50 @@ export const PremiumNameMarketConfig = () => {
 
     return (
         <PageContainer className="space-y-6">
-            <div>
-                <h2 className="text-lg font-medium">
-                    Premium Name Market Config
-                </h2>
-                <ul className="text-muted-foreground list-disc space-y-1.5 pl-5 text-sm">
-                    <li>
-                        Each section is a premium account name length (
-                        {MIN_ACCOUNT_NAME_LENGTH}–{MAX_ACCOUNT_NAME_LENGTH}{" "}
-                        characters). Unconfigured lengths use defaults until you
-                        save them.
-                    </li>
-                    <li>
-                        Initial price applies only when creating a market and
-                        cannot be changed afterward.
-                    </li>
-                    <li>
-                        New markets start with purchases off. Use the switch on
-                        each row to enable or disable purchases. Changes apply
-                        when you save.
-                    </li>
-                    <li>
-                        Floor price, target sales per month, and increase/decrease
-                        percentages are editable below. Saving always uses a
-                        30-day DiffAdjust window.
-                    </li>
-                    <li>
-                        Disabling purchases blocks new buys for that length;
-                        existing purchases can still be claimed.
-                    </li>
-                </ul>
-            </div>
+            <Card className="gap-4 py-4 shadow-sm">
+                <CardHeader className="gap-1.5 px-4">
+                    <CardTitle className="text-lg font-medium">
+                        Premium Name Market Config
+                    </CardTitle>
+                    <CardDescription>
+                        Set pricing, targets, and purchase availability for
+                        each premium name length.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="px-4 pt-0">
+                    <ul className="text-muted-foreground list-disc space-y-1 pl-4 text-sm leading-relaxed marker:text-muted-foreground/50">
+                        <li>
+                            One card per premium name length (
+                            {MIN_ACCOUNT_NAME_LENGTH}–{MAX_ACCOUNT_NAME_LENGTH}{" "}
+                            characters). Dashed cards are not configured yet;
+                            saving creates them with the values you enter.
+                        </li>
+                        <li>
+                            Initial price is required when creating a market and
+                            cannot be changed afterward.
+                        </li>
+                        <li>
+                            Unconfigured markets default to purchases off. Use
+                            the Enabled switch on each card to allow or block
+                            new purchases.
+                        </li>
+                        <li>
+                            Floor price, target per month, and increase/decrease
+                            percentages can be edited on any card. The adjustment
+                            window is always 30 days and is not editable here.
+                        </li>
+                        <li>
+                            Nothing is staged until you click Save changes at
+                            the bottom of the page; only lengths you modified
+                            are submitted.
+                        </li>
+                        <li>
+                            Disabling purchases blocks new buys for that length;
+                            existing purchases can still be claimed.
+                        </li>
+                    </ul>
+                </CardContent>
+            </Card>
 
             {systemTokenLoading ? (
                 <p className="text-muted-foreground text-sm">
@@ -170,7 +208,7 @@ export const PremiumNameMarketConfig = () => {
                         e.stopPropagation();
                         void form.handleSubmit();
                     }}
-                    className="space-y-6"
+                    className="pb-20"
                 >
                     <div className="space-y-4">
                         {defaultValues.markets.map((market, index) => (
@@ -252,16 +290,26 @@ export const PremiumNameMarketConfig = () => {
                         ))}
                     </div>
 
-                    <div className="flex justify-end">
-                        <form.AppForm>
-                            <form.SubmitButton
-                                labels={["Save changes", "Saving…"]}
-                                disabled={
-                                    !isDirty || rowActionsDisabled || isSaving
-                                }
-                                loading={isSaving}
-                            />
-                        </form.AppForm>
+                    <div
+                        className={cn(
+                            "fixed inset-x-0 bottom-0 z-20 border-t bg-background/95 py-3 backdrop-blur supports-backdrop-filter:bg-background/80",
+                            "md:left-[var(--sidebar-width)]",
+                            "md:group-data-[collapsible=icon]/sidebar-wrapper:left-[calc(var(--sidebar-width-icon)+(--spacing(4)))]",
+                        )}
+                    >
+                        <div className="mx-auto flex w-full max-w-5xl justify-end px-6">
+                            <form.AppForm>
+                                <form.SubmitButton
+                                    labels={["Save changes", "Saving…"]}
+                                    disabled={
+                                        !isDirty ||
+                                        rowActionsDisabled ||
+                                        isSaving
+                                    }
+                                    loading={isSaving}
+                                />
+                            </form.AppForm>
+                        </div>
                     </div>
                 </form>
             )}

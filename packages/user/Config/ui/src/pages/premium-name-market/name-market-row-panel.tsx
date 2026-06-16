@@ -70,7 +70,7 @@ function CompactField({
                 inputMode={inputMode}
                 disabled={disabled}
                 placeholder={placeholder}
-                className="h-8 font-mono text-sm"
+                className="h-8 scroll-mt-28 font-mono text-sm"
                 aria-invalid={isError}
             />
             <FieldErrors meta={meta as AnyFieldMeta} />
