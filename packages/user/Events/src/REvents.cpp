@@ -559,25 +559,49 @@ struct IndexConstraints
    bool eq : 1;
    bool upper : 1;
    bool lower : 1;
+   int  limit = -1;
    int  estimatedCost() const
    {
       if (!usable)
          return 1000000;
+      int cost;
       if (eq && unique)
-         return 1;
-      if (eq && !unique)
-         return 10;
-      if (lower && upper)
-         return 300;
-      if (lower || upper)
-         return 500;
-      return 1000;
+         cost = 1;
+      else if (eq && !unique)
+         cost = 10;
+      else if (lower && upper)
+         cost = 300;
+      else if (lower || upper)
+         cost = 500;
+      else
+         cost = 1000;
+      if (limit >= 0 && limit < cost)
+         cost = limit;
+      return cost;
    }
    friend bool operator==(const IndexConstraints&, const IndexConstraints&) = default;
 };
 auto operator<=>(const IndexConstraints& lhs, const IndexConstraints& rhs)
 {
    return lhs.estimatedCost() <=> rhs.estimatedCost();
+}
+
+// A single-column ORDER BY can be satisfied by scanning that column's index.
+// If the query also has a LIMIT, the scan stops after that many rows, so lower
+// that column's cost accordingly.
+void applyOrderByLimitCost(sqlite3_index_info* info, IndexConstraints& orderByCol)
+{
+   auto constraintRange =
+       std::ranges::subrange(info->aConstraint, info->aConstraint + info->nConstraint);
+   auto limitConstraint = std::ranges::find_if(
+       constraintRange, [](auto& c) { return c.op == SQLITE_INDEX_CONSTRAINT_LIMIT; });
+   if (limitConstraint == constraintRange.end())
+      return;
+
+   const int      i     = static_cast<int>(limitConstraint - info->aConstraint);
+   sqlite3_value* value = nullptr;
+   if (sqlite3_vtab_rhs_value(info, i, &value) == SQLITE_OK)
+      orderByCol.limit = sqlite3_value_int64(value);
 }
 
 int event_best_index(sqlite3_vtab* base_vtab, sqlite3_index_info* info)
@@ -618,6 +642,10 @@ int event_best_index(sqlite3_vtab* base_vtab, sqlite3_index_info* info)
          }
       }
    }
+
+   if (info->nOrderBy == 1 && constraints[info->aOrderBy[0].iColumn + 1].usable)
+      applyOrderByLimitCost(info, constraints[info->aOrderBy[0].iColumn + 1]);
+
    int  best = std::ranges::min_element(constraints) - constraints.begin() - 1;
    bool desc = false;
    if (info->nOrderBy == 1 && best == info->aOrderBy[0].iColumn)
