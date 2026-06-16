@@ -130,6 +130,11 @@ export class Plugin {
         return this.pluginModule !== undefined;
     }
 
+    /** Used by session-race diagnostics only. */
+    hasLiveInstance(): boolean {
+        return this.isInstantiated;
+    }
+
     constructor(
         id: QualifiedPluginId,
         host: HostInterface,

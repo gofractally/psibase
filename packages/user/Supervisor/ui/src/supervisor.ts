@@ -25,6 +25,15 @@ import { getRecoverableError } from "./plugin/errors";
 import { PluginLoader } from "./plugin/plugin-loader";
 import { Plugins } from "./plugin/plugins";
 import {
+    beginSession,
+    endSession,
+    formatEntryLabel,
+    formatPluginLabel,
+    logDisposeAll,
+    logEntryCall,
+    sessionPhase,
+} from "./session-race-log";
+import {
     OriginationData,
     assert,
     chainIdPromise,
@@ -351,48 +360,68 @@ export class Supervisor implements AppInterface {
 
     // This is an entrypoint that returns the JSON interface for a plugin.
     async getJson(callerOrigin: string, id: string, plugin: QualifiedPluginId) {
+        const handle = beginSession("getJson", id, formatPluginLabel(plugin));
+        let outcome: "ok" | "error" = "ok";
+        let outcomeDetail: string | undefined;
         try {
             await networkNamePromise;
             this.setParentOrigination(callerOrigin);
+            sessionPhase(handle, "preload");
             await this.preload([plugin]);
+            sessionPhase(handle, "getJson");
             const json = this.plugins.getPlugin(plugin).plugin.getJson();
             this.replyToParent(id, json);
         } catch (e) {
+            outcome = "error";
+            outcomeDetail = String(e);
             this.replyToParent(id, e);
         } finally {
-            this.plugins.disposeAll();
+            const disposed = this.plugins.disposeAll();
+            logDisposeAll(handle, disposed);
+            endSession(handle, outcome, outcomeDetail);
+            this.cleanupSessionState();
         }
     }
 
-    // This is an entrypoint for apps to preload plugins.
-    // Intended to be used on pageload to prepare the plugins that an app requires,
-    //   which accelerates the responsiveness of the plugins for subsequent calls.
     async preloadPlugins(callerOrigin: string, plugins: QualifiedPluginId[]) {
+        const handle = beginSession(
+            "preloadPlugins",
+            `preload-${Date.now()}`,
+            plugins.map(formatPluginLabel).join(", ") || "(empty)",
+        );
+        let outcome: "ok" | "error" = "ok";
+        let outcomeDetail: string | undefined;
         try {
             await networkNamePromise;
             this.setParentOrigination(callerOrigin);
+            sessionPhase(handle, "preload");
             await this.preload(plugins);
         } catch (e) {
+            outcome = "error";
+            outcomeDetail = String(e);
             console.error("TODO: Return an error to the caller.");
             console.error(e);
         } finally {
-            this.plugins.disposeAll();
+            const disposed = this.plugins.disposeAll();
+            logDisposeAll(handle, disposed);
+            endSession(handle, outcome, outcomeDetail);
+            this.cleanupSessionState();
         }
     }
 
-    // This is an entrypoint for apps to call into plugins.
     async entry(
         callerOrigin: string,
         id: string,
         args: QualifiedFunctionCallArgs,
     ): Promise<any> {
+        const handle = beginSession("entry", id, formatEntryLabel(args));
+        let outcome: "ok" | "error" = "ok";
+        let outcomeDetail: string | undefined;
         try {
             await networkNamePromise;
             this.setParentOrigination(callerOrigin);
 
-            // This is the time-intensive step. It includes: downloading, parsing, and transpiling the
-            //   each plugin component. Everything needed to prepare for instantiation and execution.
-            // UIs can use `preloadPlugins` to decouple this task from the actual call to the plugin.
+            sessionPhase(handle, "preload");
             await this.preload([
                 {
                     service: args.service,
@@ -400,20 +429,25 @@ export class Supervisor implements AppInterface {
                 },
             ]);
 
+            sessionPhase(handle, "instantiateAll");
             await this.plugins.instantiateAll();
 
             this.context = this.getCallContext();
 
-            // Starts the tx context.
+            sessionPhase(handle, "start-tx");
             this.supervisorCall(
                 getCallArgs("transact", "plugin", "admin", "start-tx", []),
             );
 
-            // Make a *synchronous* call into the plugin. It can be fully synchronous since everything was
-            //   preloaded.
+            sessionPhase(handle, "call");
+            const targetPlugin = this.plugins.getAssertPlugin({
+                service: args.service,
+                plugin: args.plugin,
+            });
+            logEntryCall(handle, args, targetPlugin.hasLiveInstance());
             const result = this.call(args);
 
-            // Closes the current tx context. If actions were added, tx is submitted.
+            sessionPhase(handle, "finish-tx");
             const txResult = this.supervisorCall(
                 getCallArgs("transact", "plugin", "admin", "finish-tx", []),
             );
@@ -421,11 +455,10 @@ export class Supervisor implements AppInterface {
                 console.warn(txResult);
             }
 
-            // Send plugin result to parent window
             this.replyToParent(id, result);
-
             this.context = undefined;
         } catch (e) {
+            outcome = "error";
             const err = getRecoverableError(e);
             if (err) {
                 let newError;
@@ -438,13 +471,25 @@ export class Supervisor implements AppInterface {
                     newError = new PluginErrorObject(err.producer, err.message);
                 }
                 this.replyToParent(id, newError);
+                outcomeDetail = `[${err.producer.service}:${err.producer.plugin}] ${err.message}`;
             } else {
                 this.replyToParent(id, e);
+                outcomeDetail = String(e);
             }
 
             this.context = undefined;
         } finally {
-            this.plugins.disposeAll();
+            sessionPhase(handle, "disposeAll");
+            const disposed = this.plugins.disposeAll();
+            logDisposeAll(handle, disposed);
+            endSession(handle, outcome, outcomeDetail);
+            this.cleanupSessionState();
         }
+    }
+
+    private cleanupSessionState(): void {
+        this.context = undefined;
+        this.parentOrigination = undefined;
+        this.embedder = undefined;
     }
 }
