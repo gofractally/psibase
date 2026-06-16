@@ -58,7 +58,10 @@ use crate::math_utils::PPM;
 // Note: `pub(crate)` is used so the functions are available for the unit tests
 
 fn relay_sub(resource: ResourceType) -> String {
-    format!("{}.relay", resource.name().to_lowercase())
+    UserSettings::to_sub_account_key(
+        crate::Wrapper::SERVICE,
+        Some(format!("{}:relay", resource.name().to_lowercase())),
+    )
 }
 
 fn is_billing_active() -> bool {
