@@ -620,7 +620,7 @@ int event_best_index(sqlite3_vtab* base_vtab, sqlite3_index_info* info)
    }
    int  best = std::ranges::min_element(constraints) - constraints.begin() - 1;
    bool desc = false;
-   if (best == -1 && info->nOrderBy == 1 && info->aOrderBy[0].iColumn == -1)
+   if (info->nOrderBy == 1 && best == info->aOrderBy[0].iColumn)
    {
       info->orderByConsumed = 1;
       desc                  = info->aOrderBy[0].desc;
