@@ -74,13 +74,13 @@ fn update_average_usage(
     capacity: u64,
     diff_adjust_id: u32,
 ) -> u32 {
-    let n = num_blocks_to_average as u64;
+    let n = num_blocks_to_average as u128;
 
     // Exponential moving average (https://en.wikipedia.org/wiki/Exponential_smoothing):
     //   avg = α * sample + (1 − α) * avg_prev
     // Setting α = 1/N and multiplying through by N to keep everything in integer arithmetic:
     //   avg = (sample + (N − 1) * avg_prev) / N
-    *avg_usage = (*last_block_usage + (n - 1) * *avg_usage) / n;
+    *avg_usage = ((*last_block_usage as u128 + (n - 1) * *avg_usage as u128) / n) as u64;
 
     let ppm = ratio_to_ppm(*avg_usage, capacity);
 
