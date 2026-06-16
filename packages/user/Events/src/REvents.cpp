@@ -157,87 +157,87 @@ struct EventCursor : sqlite3_vtab_cursor
    void          load(std::uint32_t sz)
    {
       if (sz == 0xffffffffu)
-      {
-         setEof();
-         return;
-      }
-      auto key_size = psibase::raw::getKey(nullptr, 0);
-      key.resize(key_size);
-      psibase::raw::getKey(key.data(), key.size());
-      bool outOfRange =
-          descending ? compare_blob(key, end) < 0 : (!end.empty() && compare_blob(key, end) >= 0);
-      if (outOfRange)
          setEof();
       else
       {
-         sz = psibase::raw::getSequential(vtab()->index.db, eventId());
-         if (sz == 0xffffffffu)
+         auto key_size = psibase::raw::getKey(nullptr, 0);
+         key.resize(key_size);
+         psibase::raw::getKey(key.data(), key.size());
+         bool outOfRange = descending ? compare_blob(key, end) < 0
+                                      : (!end.empty() && compare_blob(key, end) >= 0);
+         if (outOfRange)
+            setEof();
+         else
          {
-            check(false, "Internal error: indexed event does not exist");
-         }
-         data.resize(sz);
-         psibase::raw::getResult(data.data(), data.size(), 0);
-         // Extract just the data
-         psio::FracStream stream{data};
-         std::uint16_t    fixed_size;
-         if (!stream.unpack<true, true>(&fixed_size))
-         {
-            check(false, "Internal error: malformed event");
-         }
-         std::uint32_t fixed_end = stream.pos + fixed_size;
-         if (fixed_end > stream.end_pos || fixed_end < stream.pos)
-         {
-            check(false, "Internal error: fixed size out-of-bounds");
-         }
-         std::uint32_t heap_end = stream.end_pos;
-         stream.end_pos         = fixed_end;
-         AccountNumber eventService;
-         if (!stream.unpack<true, true>(&eventService))
-         {
-            check(false, "Internal error: event missing service");
-         }
-         if (eventService != vtab()->index.service)
-         {
-            check(false, "Internal error: event service does not match index");
-         }
-         std::uint32_t typePtr;
-         if (!stream.unpack<true, true>(&typePtr) || typePtr == 1)
-         {
-            check(false, "Internal error: event missing type");
-         }
-         std::uint32_t valuePtr;
-         if (!stream.unpack<true, true>(&valuePtr) || typePtr == 1)
-         {
-            check(false, "Internal error: event mising data");
-         }
-         std::uint32_t valueStart = stream.pos - 4 + valuePtr;
-         if (valueStart < valuePtr || valueStart > heap_end)
-         {
-            check(false, "Internal error: event data out-of-bounds");
-         }
-         // Find the end of the event data (either the end of the wrapper,
-         // or the start of the next heap object)
-         std::uint32_t nextPtr;
-         while (true)
-         {
-            if (!stream.unpack<true, true>(&nextPtr))
+            sz = psibase::raw::getSequential(vtab()->index.db, eventId());
+            if (sz == 0xffffffffu)
             {
-               nextPtr = heap_end;
-               break;
+               check(false, "Internal error: indexed event does not exist");
             }
-            else if (nextPtr > 1)
+            data.resize(sz);
+            psibase::raw::getResult(data.data(), data.size(), 0);
+            // Extract just the data
+            psio::FracStream stream{data};
+            std::uint16_t    fixed_size;
+            if (!stream.unpack<true, true>(&fixed_size))
             {
-               nextPtr = stream.pos - 4 + nextPtr;
-               if (nextPtr > heap_end || nextPtr < stream.pos)
+               check(false, "Internal error: malformed event");
+            }
+            std::uint32_t fixed_end = stream.pos + fixed_size;
+            if (fixed_end > stream.end_pos || fixed_end < stream.pos)
+            {
+               check(false, "Internal error: fixed size out-of-bounds");
+            }
+            std::uint32_t heap_end = stream.end_pos;
+            stream.end_pos         = fixed_end;
+            AccountNumber eventService;
+            if (!stream.unpack<true, true>(&eventService))
+            {
+               check(false, "Internal error: event missing service");
+            }
+            if (eventService != vtab()->index.service)
+            {
+               check(false, "Internal error: event service does not match index");
+            }
+            std::uint32_t typePtr;
+            if (!stream.unpack<true, true>(&typePtr) || typePtr == 1)
+            {
+               check(false, "Internal error: event missing type");
+            }
+            std::uint32_t valuePtr;
+            if (!stream.unpack<true, true>(&valuePtr) || typePtr == 1)
+            {
+               check(false, "Internal error: event mising data");
+            }
+            std::uint32_t valueStart = stream.pos - 4 + valuePtr;
+            if (valueStart < valuePtr || valueStart > heap_end)
+            {
+               check(false, "Internal error: event data out-of-bounds");
+            }
+            // Find the end of the event data (either the end of the wrapper,
+            // or the start of the next heap object)
+            std::uint32_t nextPtr;
+            while (true)
+            {
+               if (!stream.unpack<true, true>(&nextPtr))
                {
-                  check(false, "extension out-of-bounds");
+                  nextPtr = heap_end;
+                  break;
                }
-               break;
+               else if (nextPtr > 1)
+               {
+                  nextPtr = stream.pos - 4 + nextPtr;
+                  if (nextPtr > heap_end || nextPtr < stream.pos)
+                  {
+                     check(false, "extension out-of-bounds");
+                  }
+                  break;
+               }
             }
-         }
 
-         data.erase(data.begin() + nextPtr, data.end());
-         data.erase(data.begin(), data.begin() + valueStart);
+            data.erase(data.begin() + nextPtr, data.end());
+            data.erase(data.begin(), data.begin() + valueStart);
+         }
       }
    }
    void seek() { load(psibase::raw::kvGreaterEqual(handle, key.data(), key.size(), prefixLen)); }
