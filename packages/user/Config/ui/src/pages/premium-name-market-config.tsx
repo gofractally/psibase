@@ -33,6 +33,7 @@ import {
 import { Label } from "@shared/shadcn/ui/label";
 import { Switch } from "@shared/shadcn/ui/switch";
 
+import { NameMarketCardsSkeleton } from "./premium-name-market/name-market-card-skeleton";
 import {
     NameMarketRowPanel,
     type NameMarketRowPanelProps,
@@ -116,6 +117,10 @@ export const PremiumNameMarketConfig = () => {
 
     const isDirty = useStore(form.store, (state) => state.isDirty);
 
+    const isMarketsLoading = systemTokenLoading || isLoading;
+    const marketCardCount =
+        MAX_ACCOUNT_NAME_LENGTH - MIN_ACCOUNT_NAME_LENGTH + 1;
+
     useEffect(() => {
         if (isLoading || isSaving || isDirty) {
             return;
@@ -131,12 +136,12 @@ export const PremiumNameMarketConfig = () => {
                         Premium Name Market Config
                     </CardTitle>
                     <CardDescription>
-                        Set pricing, targets, and purchase availability for
-                        each premium name length.
+                        Set pricing, targets, and purchase availability for each
+                        premium name length.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="px-4 pt-0">
-                    <ul className="text-muted-foreground list-disc space-y-1 pl-4 text-sm leading-relaxed marker:text-muted-foreground/50">
+                    <ul className="text-muted-foreground marker:text-muted-foreground/50 list-disc space-y-1 pl-4 text-sm leading-relaxed">
                         <li>
                             One card per premium name length (
                             {MIN_ACCOUNT_NAME_LENGTH}–{MAX_ACCOUNT_NAME_LENGTH}{" "}
@@ -154,8 +159,9 @@ export const PremiumNameMarketConfig = () => {
                         </li>
                         <li>
                             Floor price, target per month, and increase/decrease
-                            percentages can be edited on any card. The adjustment
-                            window is always 30 days and is not editable here.
+                            percentages can be edited on any card. The
+                            adjustment window is always 30 days and is not
+                            editable here.
                         </li>
                         <li>
                             Nothing is staged until you click Save changes at
@@ -169,12 +175,6 @@ export const PremiumNameMarketConfig = () => {
                     </ul>
                 </CardContent>
             </Card>
-
-            {systemTokenLoading ? (
-                <p className="text-muted-foreground text-sm">
-                    Checking system token…
-                </p>
-            ) : null}
 
             {tokenMissingConfirmed ? (
                 <Alert variant="warning" className="max-w-2xl">
@@ -199,8 +199,8 @@ export const PremiumNameMarketConfig = () => {
                 </p>
             ) : null}
 
-            {isLoading ? (
-                <p className="text-muted-foreground text-sm">Loading…</p>
+            {isMarketsLoading ? (
+                <NameMarketCardsSkeleton count={marketCardCount} />
             ) : (
                 <form
                     onSubmit={(e) => {
@@ -292,7 +292,7 @@ export const PremiumNameMarketConfig = () => {
 
                     <div
                         className={cn(
-                            "fixed inset-x-0 bottom-0 z-20 border-t bg-background/95 py-3 backdrop-blur supports-backdrop-filter:bg-background/80",
+                            "bg-background/95 supports-backdrop-filter:bg-background/80 fixed inset-x-0 bottom-0 z-20 border-t py-3 backdrop-blur",
                             "md:left-[var(--sidebar-width)]",
                             "md:group-data-[collapsible=icon]/sidebar-wrapper:left-[calc(var(--sidebar-width-icon)+(--spacing(4)))]",
                         )}
