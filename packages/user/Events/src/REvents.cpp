@@ -141,7 +141,6 @@ struct EventCursor : sqlite3_vtab_cursor
 {
    std::vector<char> key;
    std::vector<char> end;
-   std::vector<char> begin;
    std::vector<char> data;
    std::size_t       prefixLen;
    bool              descending = false;
@@ -165,8 +164,8 @@ struct EventCursor : sqlite3_vtab_cursor
       auto key_size = psibase::raw::getKey(nullptr, 0);
       key.resize(key_size);
       psibase::raw::getKey(key.data(), key.size());
-      bool outOfRange = descending ? compare_blob(key, begin) < 0
-                                   : (!end.empty() && compare_blob(key, end) >= 0);
+      bool outOfRange =
+          descending ? compare_blob(key, end) < 0 : (!end.empty() && compare_blob(key, end) >= 0);
       if (outOfRange)
          setEof();
       else
@@ -1019,15 +1018,16 @@ int event_filter(sqlite3_vtab_cursor* cursor,
    c->descending = (argTypes[0] == '-');
    if (c->descending)
    {
-      c->begin = c->key;
-      if (c->end.empty())
+      std::vector<char> upper = std::move(c->end);
+      c->end                  = std::move(c->key);
+      if (upper.empty())
       {
-         c->key.resize(c->prefixLen);
+         c->key.assign(c->end.begin(), c->end.begin() + c->prefixLen);
          c->seekLast();
       }
       else
       {
-         c->key = c->end;
+         c->key = std::move(upper);
          c->seekPrev();
       }
    }
