@@ -11,4 +11,8 @@ pub enum ErrorType {
     InvalidAccountName(String),
     #[error("Account names of this length are not currently available")]
     NameLengthUnavailable,
+    #[error("Increase and decrease percent must be greater than 0")]
+    InvalidAdjustPct,
+    #[error("initial_price is required when creating a premium name market for length {0}")]
+    InitialPriceRequired(u8),
 }

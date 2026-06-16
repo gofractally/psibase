@@ -17,6 +17,19 @@ use errors::ErrorType;
 
 use psibase_plugin::{trust::*, *};
 
+const PPM_PER_PCT: u32 = 10_000;
+
+fn pct_to_ppm(pct: u8) -> u32 {
+    (pct as u32) * PPM_PER_PCT
+}
+
+fn require_adjust_pcts(increase_pct: u8, decrease_pct: u8) -> Result<(), Error> {
+    if increase_pct == 0 || decrease_pct == 0 {
+        return Err(ErrorType::InvalidAdjustPct.into());
+    }
+    Ok(())
+}
+
 impl TrustConfig for PremAccountsPlugin {
     fn capabilities() -> Capabilities {
         Capabilities {
@@ -36,9 +49,10 @@ impl MarketAdmin for PremAccountsPlugin {
         initial_price: String,
         target: u32,
         floor_price: String,
-        increase_ppm: u32,
-        decrease_ppm: u32,
+        increase_pct: u8,
+        decrease_pct: u8,
     ) -> Result<(), Error> {
+        require_adjust_pcts(increase_pct, decrease_pct)?;
         let sys_token_id =
             TokensHelpers::fetch_network_token()?.ok_or(ErrorType::SystemTokenNotDefined)?;
         let initial_price = TokensHelpers::decimal_to_u64(sys_token_id, &initial_price)?;
@@ -48,8 +62,8 @@ impl MarketAdmin for PremAccountsPlugin {
             Quantity::from(initial_price),
             target,
             Quantity::from(floor_price),
-            increase_ppm,
-            decrease_ppm,
+            pct_to_ppm(increase_pct),
+            pct_to_ppm(decrease_pct),
         );
         Ok(())
     }
@@ -60,9 +74,10 @@ impl MarketAdmin for PremAccountsPlugin {
         window_seconds: u32,
         target: u32,
         floor_price: String,
-        increase_ppm: u32,
-        decrease_ppm: u32,
+        increase_pct: u8,
+        decrease_pct: u8,
     ) -> Result<(), Error> {
+        require_adjust_pcts(increase_pct, decrease_pct)?;
         let sys_token_id =
             TokensHelpers::fetch_network_token()?.ok_or(ErrorType::SystemTokenNotDefined)?;
         let floor_price = TokensHelpers::decimal_to_u64(sys_token_id, &floor_price)?;
@@ -71,8 +86,8 @@ impl MarketAdmin for PremAccountsPlugin {
             window_seconds,
             target,
             Quantity::from(floor_price),
-            increase_ppm,
-            decrease_ppm,
+            pct_to_ppm(increase_pct),
+            pct_to_ppm(decrease_pct),
         );
         Ok(())
     }
@@ -91,31 +106,61 @@ impl MarketAdmin for PremAccountsPlugin {
 
     #[psibase_plugin::authorized(Max, whitelist = ["config"])]
     fn configure_markets(configs: Vec<MarketConfig>) -> Result<(), Error> {
+        if configs.is_empty() {
+            return Ok(());
+        }
+
         let sys_token_id =
             TokensHelpers::fetch_network_token()?.ok_or(ErrorType::SystemTokenNotDefined)?;
-        let overview = markets_overview()?;
+        let current_params = fetch_market_params()?;
 
         for cfg in configs {
+            require_adjust_pcts(cfg.increase_pct, cfg.decrease_pct)?;
+
+            let current = current_params
+                .iter()
+                .find(|market| market.length == cfg.length);
+
+            if current.is_none() {
+                let initial_price_str = cfg
+                    .initial_price
+                    .clone()
+                    .filter(|s| !s.is_empty())
+                    .ok_or(ErrorType::InitialPriceRequired(cfg.length))?;
+                let initial_price =
+                    TokensHelpers::decimal_to_u64(sys_token_id, &initial_price_str)?;
+                let floor_price = TokensHelpers::decimal_to_u64(sys_token_id, &cfg.floor_price)?;
+                prem_accounts::Wrapper::add_to_tx().create(
+                    cfg.length,
+                    Quantity::from(initial_price),
+                    cfg.target,
+                    Quantity::from(floor_price),
+                    pct_to_ppm(cfg.increase_pct),
+                    pct_to_ppm(cfg.decrease_pct),
+                );
+
+                if !cfg.enabled {
+                    prem_accounts::Wrapper::add_to_tx().disable(cfg.length);
+                }
+                continue;
+            }
+
+            let current = current.unwrap();
+            if market_params_match(current, &cfg) {
+                continue;
+            }
+
             let floor_price = TokensHelpers::decimal_to_u64(sys_token_id, &cfg.floor_price)?;
             prem_accounts::Wrapper::add_to_tx().configure(
                 cfg.length,
                 cfg.window_seconds,
                 cfg.target,
                 Quantity::from(floor_price),
-                cfg.increase_ppm,
-                cfg.decrease_ppm,
+                pct_to_ppm(cfg.increase_pct),
+                pct_to_ppm(cfg.decrease_pct),
             );
 
-            let Some(current_enabled) = overview
-                .market_params
-                .iter()
-                .find(|market| market.length == cfg.length)
-                .map(|market| market.enabled)
-            else {
-                continue;
-            };
-
-            if current_enabled == cfg.enabled {
+            if current.enabled == cfg.enabled {
                 continue;
             }
 
@@ -230,6 +275,53 @@ fn markets_overview() -> Result<MarketsOverviewData, Error> {
     )?)
     .map_err(|err| ErrorType::QueryResponseParseError(err.to_string()).into())
     .map(|response| response.data)
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MarketParamsRow {
+    length: u8,
+    enabled: bool,
+    target: u32,
+    floor_price: String,
+    window_seconds: u32,
+    increase_ppm: u32,
+    decrease_ppm: u32,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MarketParamsData {
+    market_params: Vec<MarketParamsRow>,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MarketParamsResponse {
+    data: MarketParamsData,
+}
+
+fn fetch_market_params() -> Result<Vec<MarketParamsRow>, Error> {
+    let graphql_str =
+        "query { marketParams { length enabled target floorPrice windowSeconds increasePpm decreasePpm } }";
+    serde_json::from_str::<MarketParamsResponse>(&CommonServer::post_graphql_get_json(
+        graphql_str,
+    )?)
+    .map_err(|err| ErrorType::QueryResponseParseError(err.to_string()).into())
+    .map(|response| response.data.market_params)
+}
+
+fn market_params_match(current: &MarketParamsRow, requested: &MarketConfig) -> bool {
+    current.enabled == requested.enabled
+        && current.target == requested.target
+        && current.window_seconds == requested.window_seconds
+        && current.increase_ppm == pct_to_ppm(requested.increase_pct)
+        && current.decrease_ppm == pct_to_ppm(requested.decrease_pct)
+        && prices_match(&current.floor_price, &requested.floor_price)
+}
+
+fn prices_match(current: &str, requested: &str) -> bool {
+    current.trim() == requested.trim()
 }
 
 /// Resolves sparse configured markets: missing row means not offered; disabled means unavailable; else current ask

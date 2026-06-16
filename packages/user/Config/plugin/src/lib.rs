@@ -2,21 +2,21 @@
 mod bindings;
 use bindings::*;
 
+use host::types::types::Error;
+
 use exports::config::plugin::{
     branding::Guest as Branding,
     packaging::Guest as Packaging,
-    prem_accounts::{Guest as PremAccounts, MarketConfigInput},
+    prem_accounts::{Guest as PremAccounts, MarketConfig},
     producers::Guest as Producers,
     settings::Guest as Settings,
     symbol::Guest as Symbol,
     virtual_server::Guest as VirtualServer,
 };
-use host::types::types::{Error, PluginId};
 
 use exports::config::plugin::virtual_server::{
     CpuPricingParams, NetPricingParams, NetworkVariables, ServerSpecs,
 };
-use prem_accounts::plugin::market_admin::MarketConfig;
 
 use virtual_server::plugin::types::{
     CpuPricingParams as DestCpuPricingParams, NetPricingParams as DestNetPricingParams,
@@ -97,83 +97,14 @@ impl Packaging for ConfigPlugin {
 }
 
 impl PremAccounts for ConfigPlugin {
-    fn configure_markets(configs: Vec<MarketConfigInput>) -> Result<(), Error> {
-        let current_params = fetch_market_params()?;
-        let mut creates = Vec::new();
-        let mut updates = Vec::new();
-
-        for cfg in configs {
-            let current = current_params
-                .iter()
-                .find(|market| market.length == cfg.length);
-
-            if current.is_none() {
-                cfg.initial_price
-                    .as_deref()
-                    .filter(|s| !s.is_empty())
-                    .ok_or_else(|| {
-                        parse_error(format!(
-                            "initial_price is required when creating a premium name market for length {}",
-                            cfg.length
-                        ))
-                    })?;
-                creates.push(cfg);
-                continue;
-            }
-
-            let current = current.unwrap();
-            if market_params_match(current, &cfg) {
-                continue;
-            }
-
-            // initial_price is intentionally omitted — it cannot be changed after create.
-            updates.push(MarketConfig {
-                length: cfg.length,
-                window_seconds: cfg.window_seconds,
-                target: cfg.target,
-                floor_price: cfg.floor_price,
-                increase_ppm: cfg.increase_ppm,
-                decrease_ppm: cfg.decrease_ppm,
-                enabled: cfg.enabled,
-            });
-        }
-
-        if creates.is_empty() && updates.is_empty() {
+    fn configure_markets(configs: Vec<MarketConfig>) -> Result<(), Error> {
+        if configs.is_empty() {
             return Ok(());
         }
 
         set_propose_latch(Some("prem-accounts"))?;
 
-        for cfg in creates {
-            let initial_price = cfg
-                .initial_price
-                .as_deref()
-                .filter(|s| !s.is_empty())
-                .ok_or_else(|| {
-                    parse_error(format!(
-                        "initial_price is required when creating a premium name market for length {}",
-                        cfg.length
-                    ))
-                })?;
-            prem_accounts::plugin::market_admin::create(
-                cfg.length,
-                initial_price,
-                cfg.target,
-                &cfg.floor_price,
-                cfg.increase_ppm,
-                cfg.decrease_ppm,
-            )?;
-
-            if !cfg.enabled {
-                prem_accounts::plugin::market_admin::disable(cfg.length)?;
-            }
-        }
-
-        if !updates.is_empty() {
-            prem_accounts::plugin::market_admin::configure_markets(&updates)?;
-        }
-
-        Ok(())
+        prem_accounts::plugin::market_admin::configure_markets(&configs)
     }
 }
 
@@ -267,59 +198,3 @@ impl VirtualServer for ConfigPlugin {
 }
 
 bindings::export!(ConfigPlugin with_types_in bindings);
-
-#[derive(serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct MarketParamsRow {
-    length: u8,
-    enabled: bool,
-    target: u32,
-    floor_price: String,
-    window_seconds: u32,
-    increase_ppm: u32,
-    decrease_ppm: u32,
-}
-
-#[derive(serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct MarketParamsData {
-    market_params: Vec<MarketParamsRow>,
-}
-
-#[derive(serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct MarketParamsResponse {
-    data: MarketParamsData,
-}
-
-fn fetch_market_params() -> Result<Vec<MarketParamsRow>, Error> {
-    let graphql_str = "query { marketParams { length enabled target floorPrice windowSeconds increasePpm decreasePpm } }";
-    let response = prem_accounts::plugin::authorized::graphql(graphql_str)?;
-    serde_json::from_str::<MarketParamsResponse>(&response)
-        .map_err(|err| parse_error(err.to_string()))
-        .map(|parsed| parsed.data.market_params)
-}
-
-fn parse_error(message: String) -> Error {
-    Error {
-        code: 1,
-        producer: PluginId {
-            service: "config".to_string(),
-            plugin: "plugin".to_string(),
-        },
-        message,
-    }
-}
-
-fn market_params_match(current: &MarketParamsRow, requested: &MarketConfigInput) -> bool {
-    current.enabled == requested.enabled
-        && current.target == requested.target
-        && current.window_seconds == requested.window_seconds
-        && current.increase_ppm == requested.increase_ppm
-        && current.decrease_ppm == requested.decrease_ppm
-        && prices_match(&current.floor_price, &requested.floor_price)
-}
-
-fn prices_match(current: &str, requested: &str) -> bool {
-    current.trim() == requested.trim()
-}

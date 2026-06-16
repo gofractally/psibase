@@ -18,26 +18,13 @@ interface packaging {
 
 interface prem-accounts {
     use host:types/types.{error};
-
-    record market-config-input {
-        length: u8,
-        window-seconds: u32,
-        target: u32,
-        floor-price: string,
-        increase-ppm: u32,
-        decrease-ppm: u32,
-        enabled: bool,
-        /// Initial auction price for a new market (Quantity string).
-        /// Required when creating a market that does not yet exist; returns an error if absent or empty.
-        /// Ignored when updating an existing market — initial price is fixed at create time.
-        initial-price: option<string>,
-    }
+    use prem-accounts:plugin/market-admin.{market-config};
 
     /// Batch create or update premium name markets.
-    /// * For lengths with no existing market: calls create; `initial-price` must be set.
+    /// * For lengths with no existing market: creates the market; `initial-price` must be set.
     /// * For existing markets: updates params and enabled status; `initial-price` is ignored.
     /// * Skips entries whose params match current on-chain state (no-op).
-    configure-markets: func(configs: list<market-config-input>) -> result<_, error>;
+    configure-markets: func(configs: list<market-config>) -> result<_, error>;
 }
 
 interface settings {
