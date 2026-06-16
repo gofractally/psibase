@@ -121,9 +121,9 @@ export const PremiumNameMarketConfig = () => {
                         when you save.
                     </li>
                     <li>
-                        Floor price, target sales per 30-day window, and
-                        increase/decrease PPM are editable below. Saving always
-                        uses a 30-day DiffAdjust window.
+                        Floor price, target sales per month, and increase/decrease
+                        percentages are editable below. Saving always uses a
+                        30-day DiffAdjust window.
                     </li>
                     <li>
                         Disabling purchases blocks new buys for that length;

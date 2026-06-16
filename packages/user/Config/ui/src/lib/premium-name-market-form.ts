@@ -10,8 +10,9 @@ import {
 } from "@/lib/premium-name-market-defaults";
 import {
     parsePositiveInt,
-    parsePpm,
+    parsePercentToPpm,
     parseSystemTokenAmount,
+    ppmToPercentString,
 } from "@/lib/premium-name-market-parsers";
 
 import {
@@ -90,18 +91,18 @@ const zDirtyMarketRow = (systemToken: SystemTokenInfo) =>
                 });
             }
 
-            if (parsePpm(row.increasePpm) === null) {
+            if (parsePercentToPpm(row.increasePpm) === null) {
                 ctx.addIssue({
                     code: "custom",
-                    message: "Enter an integer from 1 to 999999",
+                    message: "Enter a valid percent greater than 0 and less than 100",
                     path: ["increasePpm"],
                 });
             }
 
-            if (parsePpm(row.decreasePpm) === null) {
+            if (parsePercentToPpm(row.decreasePpm) === null) {
                 ctx.addIssue({
                     code: "custom",
-                    message: "Enter an integer from 1 to 999999",
+                    message: "Enter a valid percent greater than 0 and less than 100",
                     path: ["decreasePpm"],
                 });
             }
@@ -129,12 +130,12 @@ export function buildPremiumNameMarketsFormValues(
             floorPrice:
                 row?.floorPrice ?? PREMIUM_MARKET_DEFAULT_PARAMS.floorPrice,
             target: String(row?.target ?? PREMIUM_MARKET_DEFAULT_PARAMS.target),
-            increasePpm: String(
-                row?.increasePpm ?? PREMIUM_MARKET_DEFAULT_PARAMS.increasePpm,
-            ),
-            decreasePpm: String(
-                row?.decreasePpm ?? PREMIUM_MARKET_DEFAULT_PARAMS.decreasePpm,
-            ),
+            increasePpm: row
+                ? ppmToPercentString(row.increasePpm)
+                : PREMIUM_MARKET_DEFAULT_PARAMS.increasePercent,
+            decreasePpm: row
+                ? ppmToPercentString(row.decreasePpm)
+                : PREMIUM_MARKET_DEFAULT_PARAMS.decreasePercent,
         });
     }
 
@@ -202,8 +203,8 @@ export function toMarketConfig(
     systemToken: SystemTokenInfo,
 ): MarketConfigParam {
     const target = parsePositiveInt(row.target);
-    const increasePpm = parsePpm(row.increasePpm);
-    const decreasePpm = parsePpm(row.decreasePpm);
+    const increasePpm = parsePercentToPpm(row.increasePpm);
+    const decreasePpm = parsePercentToPpm(row.decreasePpm);
     const floorPrice = parseSystemTokenAmount(row.floorPrice, systemToken);
 
     if (

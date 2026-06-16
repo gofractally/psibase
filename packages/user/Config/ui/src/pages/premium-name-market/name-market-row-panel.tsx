@@ -132,7 +132,7 @@ export function NameMarketRowPanel({
                 {(field) => (
                     <CompactField
                         id={`pm-target-${index}`}
-                        label="Target / window"
+                        label="Target sales / month"
                         value={field.state.value}
                         onChange={field.handleChange}
                         onBlur={field.handleBlur}
@@ -147,7 +147,7 @@ export function NameMarketRowPanel({
                 {(field) => (
                     <CompactField
                         id={`pm-inc-ppm-${index}`}
-                        label="Increase PPM"
+                        label="% increase"
                         value={field.state.value}
                         onChange={field.handleChange}
                         onBlur={field.handleBlur}
@@ -162,7 +162,7 @@ export function NameMarketRowPanel({
                 {(field) => (
                     <CompactField
                         id={`pm-dec-ppm-${index}`}
-                        label="Decrease PPM"
+                        label="% decrease"
                         value={field.state.value}
                         onChange={field.handleChange}
                         onBlur={field.handleBlur}
