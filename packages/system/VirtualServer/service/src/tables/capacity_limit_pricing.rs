@@ -53,8 +53,6 @@ use crate::tables::tables::*;
 use async_graphql::ComplexObject;
 use psibase::services::tokens::{Decimal, Precision, Quantity, Wrapper as Tokens};
 use psibase::*;
-use std::cell::Cell;
-
 use crate::math_utils::PPM;
 
 // Note: `pub(crate)` is used so the functions are available for the unit tests
@@ -332,7 +330,7 @@ impl CapacityPricing {
         sub_account: Option<String>,
     ) -> u64 {
         let resource = self.resource();
-        let cost = Cell::new(0u64);
+        let mut cost = 0u64;
         let billing_active = is_billing_active();
         let system_write = is_system(user);
         Self::update(resource, |p| {
@@ -340,15 +338,13 @@ impl CapacityPricing {
                 amount_consumed <= p.remaining_capacity,
                 &format!("Insufficient {} capacity", resource.name()),
             );
-            let c = p
+            cost = p
                 .curve()
                 .pos_from_resources(p.remaining_capacity)
                 .cost_of(amount_consumed);
             p.remaining_capacity -= amount_consumed;
-            cost.set(c);
         });
 
-        let cost = cost.get();
         if cost > 0 && billing_active && !system_write {
             let config = BillingConfig::get_assert();
             let sys = config.sys;
@@ -377,8 +373,8 @@ impl CapacityPricing {
 
     pub fn free(&self, amount_freed: u64, user: AccountNumber, sub_account: Option<String>) -> u64 {
         let resource = self.resource();
-        let gross_refund = Cell::new(0u64);
-        let fee_ppm_val = Cell::new(0u32);
+        let mut gross_refund = 0u64;
+        let mut fee_ppm_val = 0u32;
         let billing_active = is_billing_active();
         let system_write = is_system(user);
         Self::update(resource, |p| {
@@ -388,17 +384,15 @@ impl CapacityPricing {
             //   space was freed. Clamp to `consumed` to keep accounting consistent.
             let amount_freed = amount_freed.min(consumed);
 
-            let r = p
+            gross_refund = p
                 .curve()
                 .pos_from_resources(p.remaining_capacity)
                 .refund_of(amount_freed);
             p.remaining_capacity += amount_freed;
-            gross_refund.set(r);
-            fee_ppm_val.set(p.fee_ppm);
+            fee_ppm_val = p.fee_ppm;
         });
 
-        let gross_refund = gross_refund.get();
-        let fee = (gross_refund as u128 * fee_ppm_val.get() as u128 / PPM) as u64;
+        let fee = (gross_refund as u128 * fee_ppm_val as u128 / PPM) as u64;
         let user_refund = gross_refund - fee;
 
         if gross_refund > 0 && billing_active && !system_write {
@@ -440,7 +434,7 @@ impl CapacityPricing {
         check(delta_bytes > 0, "invalid capacity increase");
 
         let resource = self.resource();
-        let delta_reserve = Cell::new(0i64);
+        let mut delta_reserve = 0i64;
         let billing_active = is_billing_active();
         Self::update(resource, |p| {
             let old_reserve = p.required_reserve();
@@ -448,10 +442,8 @@ impl CapacityPricing {
             p.max_capacity += delta_bytes;
             p.remaining_capacity += delta_bytes;
 
-            let dr = p.required_reserve() as i64 - old_reserve as i64;
-            delta_reserve.set(dr);
+            delta_reserve = p.required_reserve() as i64 - old_reserve as i64;
         });
-        let delta_reserve = delta_reserve.get();
         if delta_reserve != 0 && billing_active {
             let config = BillingConfig::get_assert();
             let amt = Quantity::new(delta_reserve.unsigned_abs());
@@ -468,7 +460,7 @@ impl CapacityPricing {
         check(delta_supply > 0, "invalid reserve budget decrease");
 
         let resource = self.resource();
-        let to_remove = Cell::new(0u64);
+        let mut to_remove = 0u64;
         let billing_active = is_billing_active();
         Self::update(resource, |p| {
             check(
@@ -480,10 +472,8 @@ impl CapacityPricing {
             p.max_reserve -= delta_supply;
 
             // ceil so pool requires >= ideal reserve, meaning we remove less
-            let removed = old_reserve.saturating_sub(p.required_reserve());
-            to_remove.set(removed);
+            to_remove = old_reserve.saturating_sub(p.required_reserve());
         });
-        let to_remove = to_remove.get();
 
         let consumed = self.max_capacity - self.remaining_capacity;
         check(

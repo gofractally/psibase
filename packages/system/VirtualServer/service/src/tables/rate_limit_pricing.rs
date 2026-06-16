@@ -6,7 +6,6 @@ use psibase::services::diff_adjust::Wrapper as DiffAdjust;
 use psibase::services::nft::Wrapper as Nft;
 use psibase::services::tokens::{Quantity, Wrapper as Tokens};
 use psibase::*;
-use std::cell::Cell;
 
 // In DiffAdjust, we use the discrete compounding equation to relate total change to a rate of change
 //   over some interval.
@@ -185,17 +184,14 @@ impl RateLimitPricing {
         billing_enabled: bool,
     ) -> u64 {
         let resource = self.resource();
-        let price = Cell::new(0u64);
-        let billable_unit = Cell::new(0u64);
+        let mut price = 0u64;
+        let mut billable_unit = 0u64;
 
         Self::update(resource, |r| {
             r.current_usage += amount;
-            price.set(r.price());
-            billable_unit.set(r.billable_unit);
+            price = r.price();
+            billable_unit = r.billable_unit;
         });
-
-        let billable_unit = billable_unit.get();
-        let price = price.get();
 
         // Round up to the nearest billable unit
         let amount_units = amount.div_ceil(billable_unit);
@@ -216,19 +212,19 @@ impl RateLimitPricing {
 
     pub fn new_block(&self) -> u32 {
         let resource = self.resource();
-        let last_block_usage_ppm = Cell::new(0u32);
+        let mut last_block_usage_ppm = 0u32;
 
         Self::update(resource, |r| {
-            last_block_usage_ppm.set(update_average_usage(
+            last_block_usage_ppm = update_average_usage(
                 &mut r.avg_usage,
                 &mut r.current_usage,
                 r.num_blocks_to_average,
                 capacity(resource),
                 r.diff_adjust_id,
-            ));
+            );
         });
 
-        last_block_usage_ppm.get()
+        last_block_usage_ppm
     }
 
     pub fn price(&self) -> u64 {
