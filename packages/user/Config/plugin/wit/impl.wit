@@ -12,6 +12,7 @@ world impl {
     include sites:plugin/imports;
 
     import accounts:plugin/admin;
+    import prem-accounts:plugin/authorized;
     import prem-accounts:plugin/market-admin;
     import tokens:plugin/admin;
     import packages:plugin/private-api;
