@@ -130,7 +130,7 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn getDelegationsSys(
+    fn getDlgsSys(
         sender: AccountNumber,
         method: Option<ServiceMethod>,
     ) -> Vec<AccountNumber> {

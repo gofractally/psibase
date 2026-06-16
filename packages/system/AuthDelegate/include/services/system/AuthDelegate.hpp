@@ -58,8 +58,8 @@ namespace SystemService
       void canAuthUserSys(psibase::AccountNumber user);
 
       /// Get the accounts this auth service delegates authority to for a sender.
-      std::vector<psibase::AccountNumber> getDelegationsSys(psibase::AccountNumber       sender,
-                                                            std::optional<ServiceMethod> method);
+      std::vector<psibase::AccountNumber> getDlgsSys(psibase::AccountNumber       sender,
+                                                     std::optional<ServiceMethod> method);
 
       /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
       /// transaction from a specified sender.
@@ -110,7 +110,7 @@ namespace SystemService
    PSIO_REFLECT(AuthDelegate,  //
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                 method(canAuthUserSys, user),
-                method(getDelegationsSys, sender, method),
+                method(getDlgsSys, sender, method),
                 method(isAuthSys, sender, authorizers, method),
                 method(isRejectSys, sender, rejecters, method),
                 method(setOwner, owner),

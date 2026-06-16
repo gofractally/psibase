@@ -41,7 +41,7 @@ mod service {
 
     /// Get the accounts this auth service delegates authority to for a sender.
     #[action]
-    fn getDelegationsSys(
+    fn getDlgsSys(
         sender: AccountNumber,
         method: Option<ServiceMethod>,
     ) -> Vec<AccountNumber> {

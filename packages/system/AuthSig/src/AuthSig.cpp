@@ -81,9 +81,8 @@ namespace SystemService
          authTable.put(AuthRecord{.account = getSender(), .pubkey = std::move(key)});
       }
 
-      std::vector<psibase::AccountNumber> AuthSig::getDelegationsSys(
-          psibase::AccountNumber       sender,
-          std::optional<ServiceMethod> method)
+      std::vector<psibase::AccountNumber> AuthSig::getDlgsSys(psibase::AccountNumber       sender,
+                                                              std::optional<ServiceMethod> method)
       {
          return {};
       }

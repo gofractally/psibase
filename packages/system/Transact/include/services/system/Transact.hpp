@@ -145,8 +145,8 @@ namespace SystemService
       ///
       /// Returns the accounts that must be consulted before this sender can be authorized.
       /// An empty result means the sender does not delegate to other accounts.
-      std::vector<psibase::AccountNumber> getDelegationsSys(psibase::AccountNumber       sender,
-                                                            std::optional<ServiceMethod> method);
+      std::vector<psibase::AccountNumber> getDlgsSys(psibase::AccountNumber       sender,
+                                                     std::optional<ServiceMethod> method);
 
       /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
       /// transaction from a specified sender.
@@ -180,7 +180,7 @@ namespace SystemService
    PSIO_REFLECT(AuthInterface,
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                 method(canAuthUserSys, user),
-                method(getDelegationsSys, sender, method),
+                method(getDlgsSys, sender, method),
                 method(isAuthSys, sender, authorizers, method),
                 method(isRejectSys, sender, rejecters, method)
                 //

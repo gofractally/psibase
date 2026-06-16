@@ -28,8 +28,8 @@ namespace SystemService
                         std::vector<ServiceMethod>  allowedActions,
                         std::vector<psibase::Claim> claims);
 
-      std::vector<psibase::AccountNumber> getDelegationsSys(psibase::AccountNumber       sender,
-                                                            std::optional<ServiceMethod> method);
+      std::vector<psibase::AccountNumber> getDlgsSys(psibase::AccountNumber       sender,
+                                                     std::optional<ServiceMethod> method);
 
       bool isAuthSys(psibase::AccountNumber              sender,
                      std::vector<psibase::AccountNumber> authorizers,
@@ -80,7 +80,7 @@ namespace SystemService
       method(init),
       method(canAuthUserSys, user),
       method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
-      method(getDelegationsSys, sender, method),
+      method(getDlgsSys, sender, method),
       method(isAuthSys, sender, authorizers, method),
       method(isRejectSys, sender, rejecters, method),
       method(issue, pubkey_fingerprint, expires, allowed_actions),

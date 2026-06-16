@@ -23,8 +23,8 @@ fn get_delegations(
     method: Option<ServiceMethod>,
 ) -> Vec<AccountNumber> {
     caller.call(
-        MethodNumber::from(auth_action_structs::getDelegationsSys::ACTION_NAME),
-        auth_action_structs::getDelegationsSys { sender, method },
+        MethodNumber::from(auth_action_structs::getDlgsSys::ACTION_NAME),
+        auth_action_structs::getDlgsSys { sender, method },
     )
 }
 

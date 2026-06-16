@@ -34,7 +34,7 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn getDelegationsSys(sender: AccountNumber, method: Option<ServiceMethod>) -> Vec<AccountNumber> {
+    fn getDlgsSys(sender: AccountNumber, method: Option<ServiceMethod>) -> Vec<AccountNumber> {
         unimplemented!()
     }
 
