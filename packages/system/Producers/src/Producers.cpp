@@ -3,7 +3,6 @@
 #include <ranges>
 #include <services/system/Accounts.hpp>
 #include <services/system/Producers.hpp>
-#include <services/system/VirtualServer.hpp>
 #include "services/system/Transact.hpp"
 
 using namespace psibase;
@@ -21,13 +20,13 @@ namespace
    void skipBilling()
    {
       if (isResMonitoring())
-         to<VirtualServer>().skip_billing(1);
+         to<Transact>().skipBilling(1);
    }
 
    void endSkipBilling()
    {
       if (isResMonitoring())
-         to<VirtualServer>().end_skip_billing();
+         to<Transact>().endSkipBilling();
    }
 
    auto compare_claim = [](const Claim& lhs, const Claim& rhs)

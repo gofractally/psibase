@@ -165,7 +165,6 @@ mod service {
         accounts::Wrapper as Accounts,
         cpu_limit::Wrapper as CpuLimit,
         nft::{NftHolderFlags, Wrapper as Nft},
-        producers::SERVICE as PRODUCERS,
         tokens::{BalanceFlags, Quantity, Wrapper as Tokens},
         transact::Wrapper as Transact,
     };
@@ -718,10 +717,10 @@ mod service {
     /// be billed. The caller is expected to perform exactly `num_writes`
     /// writes/frees and then call `end_skip_billing`.
     ///
-    /// Only callable by privileged services.
+    /// Only callable by Transact
     #[action]
     fn skip_billing(num_writes: u32) {
-        check(get_sender() == PRODUCERS, "Unauthorized");
+        check(get_sender() == Transact::SERVICE, "Unauthorized");
         check(
             tx_cache::get_skip_count() == 0,
             "skip_billing already active",
@@ -731,10 +730,10 @@ mod service {
 
     /// Asserts that all writes promised by `skip_billing` were consumed.
     ///
-    /// Only callable by privileged services.
+    /// Only callable by Transact
     #[action]
     fn end_skip_billing() {
-        check(get_sender() == PRODUCERS, "Unauthorized");
+        check(get_sender() == Transact::SERVICE, "Unauthorized");
         check(
             tx_cache::get_skip_count() == 0,
             "end_skip_billing called before all skipped writes occurred",

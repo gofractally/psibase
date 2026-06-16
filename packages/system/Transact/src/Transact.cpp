@@ -31,6 +31,20 @@ namespace SystemService
          auto config = table.get({});
          return config && config->enabled;
       }
+
+      // When set, kv writes are attributed to the system account (`{}`) instead of `trxSender`
+      bool systemWrite = false;
+
+      // RAII guard that marks the enclosing scope as performing authorized system
+      // writes. Restores the previous value on destruction so nesting is safe.
+      struct SystemWriteGuard
+      {
+         bool prev;
+         SystemWriteGuard() : prev(systemWrite) { systemWrite = true; }
+         ~SystemWriteGuard() { systemWrite = prev; }
+         SystemWriteGuard(const SystemWriteGuard&)            = delete;
+         SystemWriteGuard& operator=(const SystemWriteGuard&) = delete;
+      };
    }  // namespace
 
    void Transact::startBoot(psio::view<const std::vector<Checksum256>> bootTransactions)
@@ -82,14 +96,15 @@ namespace SystemService
    //          If you're tempted to do anything application-specific in startBlock,
    //          or are considering adding new features to startBlock, then consider
    //          the risk of it halting the chain if a bug or exploit appears.
-   //
-   // This function is executed outside the context of any action/transaction context.
-   //          Therefore, any database write operations are treated as system writes
-   //          and their cost is socialized.
    void Transact::startBlock()
    {
       check(getSender().value == 0, "Only native code may call startBlock");
       auto _ = recurse();
+
+      // This function is executed outside the context of any action/transaction context.
+      // Therefore, any database write operations are treated as system writes, and their
+      // cost is socialized.
+      SystemWriteGuard sysWrite;
 
       Tables tables(Transact::service);
 
@@ -538,8 +553,20 @@ namespace SystemService
 
       namespace
       {
-         AccountNumber trxSender = {};
-      }
+         // Asserts that the sender is a privileged service.
+         void checkPrivilegedSender()
+         {
+            auto code = Native::tables(KvMode::read).open<CodeTable>().get(getSender());
+            check(code && (code->flags & CodeRow::isPrivileged),
+                  "operation requires a privileged service");
+         }
+
+         // The sender of the currently executing transaction.
+         //
+         // It is set to the sender of the first action at the start of a transaction, unset when
+         // processing is complete.
+         std::optional<AccountNumber> trxSender;
+      }  // namespace
 
    }  // namespace
    bool Transact::checkFirstAuth(Checksum256 id, psio::view<const psibase::Transaction> trx)
@@ -560,6 +587,20 @@ namespace SystemService
       Transact::Tables(Transact::service)
           .open<ResMonitoringConfigTable>()  //
           .put({.enabled = enable});
+   }
+
+   void Transact::skipBilling(uint32_t numWrites)
+   {
+      checkPrivilegedSender();
+      systemWrite = true;
+      to<VirtualServer>().skip_billing(numWrites);
+   }
+
+   void Transact::endSkipBilling()
+   {
+      checkPrivilegedSender();
+      to<VirtualServer>().end_skip_billing();
+      systemWrite = false;
    }
 
    static void processTransactionImpl(
@@ -658,6 +699,7 @@ namespace SystemService
       }
 
       trxData = std::span<const char>{};
+      trxSender.reset();
    }
 
    void Transact::execTrx(psio::view<const psio::shared_view_ptr<psibase::Transaction>> trx,
@@ -698,7 +740,19 @@ namespace SystemService
          }
          if (delta != 0)
          {
-            recurse().to<VirtualServer>().useDiskSys(trxSender, db, delta);
+            AccountNumber user;
+
+            if (systemWrite)
+            {
+               user = AccountNumber{};
+            }
+            else
+            {
+               check(trxSender.has_value(), "unauthorized db write: trxSender not set");
+               user = *trxSender;
+            }
+
+            recurse().to<VirtualServer>().useDiskSys(user, db, delta);
          }
       }
    }
