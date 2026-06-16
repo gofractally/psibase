@@ -254,7 +254,6 @@ impl CapacityPricing {
 
         check(max_capacity > 0, "max_capacity must be > 0");
         check(curve_d > 0, "curve_d must be > 0");
-        check(fee_ppm > 0, "fee_ppm must be > 0");
         check(fee_ppm <= PPM as u32, "fee_ppm must be <= 1,000,000");
         check_curve_params(max_capacity, curve_d);
 
