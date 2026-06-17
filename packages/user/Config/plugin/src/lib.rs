@@ -104,7 +104,7 @@ impl PremAccounts for ConfigPlugin {
             return Ok(());
         }
 
-        set_propose_latch(Some("prem-accounts"))?;
+        set_propose_latch(Some("prem-accts"))?;
 
         prem_accounts::plugin::market_admin::configure_markets(&configs)
     }
