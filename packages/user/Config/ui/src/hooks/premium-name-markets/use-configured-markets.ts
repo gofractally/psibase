@@ -44,7 +44,7 @@ export const useConfiguredPremiumNameMarkets = () =>
                     }
                 }
             `;
-            const raw = await graphql(query, { service: "prem-accounts" });
+            const raw = await graphql(query, { service: "namemarket" });
             const parsed = zData.parse(raw);
             return parsed.marketParams;
         },

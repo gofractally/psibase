@@ -1,7 +1,7 @@
 import { createBrowserRouter } from "react-router-dom";
 
 import { Layout } from "@/components/layout";
-import { PremAccountsMain } from "@/components/prem-accounts-main";
+import { NameMarketMain } from "@/components/name-market-main";
 
 import { ProtectedRoute } from "@shared/components/protected-route";
 
@@ -16,7 +16,7 @@ export const router = createBrowserRouter([
             {
                 element: (
                     <ProtectedRoute>
-                        <PremAccountsMain />
+                        <NameMarketMain />
                     </ProtectedRoute>
                 ),
                 children: [

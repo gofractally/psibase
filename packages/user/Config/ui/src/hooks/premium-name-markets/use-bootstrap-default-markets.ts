@@ -1,5 +1,5 @@
 import { usePluginMutation } from "@/hooks/use-plugin-mutation";
-import { PREMIUM_MARKET_DEFAULT_PARAMS } from "@/lib/premium-name-market-defaults";
+import { defaultMarketConfigForLength } from "@/lib/name-market-config";
 import QueryKey from "@/lib/query-keys";
 import { CONFIG } from "@/lib/services";
 
@@ -16,35 +16,30 @@ export const useBootstrapDefaultPremiumNameMarkets = () => {
     return usePluginMutation<void>(
         {
             service: CONFIG,
-            intf: "premAccounts",
-            method: "create",
+            intf: "nameMarket",
+            method: "configureMarkets",
         },
         {
             mutationKey: [
                 CONFIG,
-                "premAccounts",
+                "nameMarket",
                 "bootstrapDefaultPremiumNameMarkets",
             ] as const,
             customMutationFn: async () => {
+                const configs = [];
                 for (
                     let len = MIN_ACCOUNT_NAME_LENGTH;
                     len <= MAX_ACCOUNT_NAME_LENGTH;
                     len++
                 ) {
-                    await supervisor.functionCall({
-                        service: CONFIG,
-                        intf: "premAccounts",
-                        method: "create",
-                        params: [
-                            len,
-                            PREMIUM_MARKET_DEFAULT_PARAMS.initialPrice,
-                            PREMIUM_MARKET_DEFAULT_PARAMS.target,
-                            PREMIUM_MARKET_DEFAULT_PARAMS.floorPrice,
-                            PREMIUM_MARKET_DEFAULT_PARAMS.increasePpm,
-                            PREMIUM_MARKET_DEFAULT_PARAMS.decreasePpm,
-                        ],
-                    });
+                    configs.push(defaultMarketConfigForLength(len));
                 }
+                await supervisor.functionCall({
+                    service: CONFIG,
+                    intf: "nameMarket",
+                    method: "configureMarkets",
+                    params: [configs],
+                });
             },
             error: "Failed to configure default premium name markets",
             loading: `Configuring premium name markets ${nameLengthRangeStr}…`,

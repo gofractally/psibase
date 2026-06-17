@@ -1,4 +1,4 @@
-import type { PremAccountsOutletContext } from "@/components/prem-accounts-main";
+import type { NameMarketOutletContext } from "@/components/name-market-main";
 
 import { useEffect, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
@@ -6,8 +6,8 @@ import { useOutletContext } from "react-router-dom";
 import {
     zCurrentPricesData,
     zTokenQueryData,
-} from "@/lib/graphql/prem-accounts.schemas";
-import { PREM_ACCOUNTS_SERVICE } from "@/lib/prem-service";
+} from "@/lib/graphql/name-market.schemas";
+import { NAME_MARKET_SERVICE } from "@/lib/name-market-service";
 
 import { isAccountAvailable } from "@shared/lib/get-account";
 import { graphql } from "@shared/lib/graphql";
@@ -48,7 +48,7 @@ function formatCanonicalPrice(
 }
 
 export function BuyPage() {
-    const { bumpHistory } = useOutletContext<PremAccountsOutletContext>();
+    const { bumpHistory } = useOutletContext<NameMarketOutletContext>();
     const maxCostDefaultSynced = useRef(false);
     const [accountName, setAccountName] = useState("");
     const [accountExists, setAccountExists] = useState<boolean | null>(null);
@@ -140,7 +140,7 @@ export function BuyPage() {
                         }
                     }
                 `,
-                { service: PREM_ACCOUNTS_SERVICE },
+                { service: NAME_MARKET_SERVICE },
             );
             const { currentPrices: rows } = zCurrentPricesData.parse(raw);
 
@@ -274,7 +274,7 @@ export function BuyPage() {
 
         try {
             await supervisor.functionCall({
-                service: PREM_ACCOUNTS_SERVICE,
+                service: NAME_MARKET_SERVICE,
                 intf: "api",
                 method: "buy",
                 params: [trimmed, maxCostForTx],

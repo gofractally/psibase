@@ -5,11 +5,11 @@ import { HistorySection } from "./history-section";
 
 import { supervisor } from "@shared/lib/supervisor";
 
-export type PremAccountsOutletContext = {
+export type NameMarketOutletContext = {
     bumpHistory: () => void;
 };
 
-export function PremAccountsMain() {
+export function NameMarketMain() {
     const [historyNonce, setHistoryNonce] = useState(0);
 
     const bumpHistory = useCallback(() => {
@@ -23,7 +23,7 @@ export function PremAccountsMain() {
     return (
         <div className="mx-auto w-full max-w-screen-md px-4 pb-8">
             <Outlet
-                context={{ bumpHistory } satisfies PremAccountsOutletContext}
+                context={{ bumpHistory } satisfies NameMarketOutletContext}
             />
             <HistorySection historyNonce={historyNonce} />
         </div>

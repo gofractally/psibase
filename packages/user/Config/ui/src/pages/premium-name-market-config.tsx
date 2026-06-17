@@ -67,11 +67,13 @@ export const PremiumNameMarketConfig = () => {
         useBootstrapDefaultPremiumNameMarkets();
 
     const savingLength =
-        savingConfig && saveVars !== undefined ? saveVars[0] : null;
+        savingConfig && saveVars !== undefined ? saveVars.row.length : null;
     const disablingLength =
-        disablingPurchases && disableVars !== undefined ? disableVars[0] : null;
+        disablingPurchases && disableVars !== undefined
+            ? disableVars.length
+            : null;
     const enablingLength =
-        enablingPurchases && enableVars !== undefined ? enableVars[0] : null;
+        enablingPurchases && enableVars !== undefined ? enableVars.length : null;
 
     const [showAdd, setShowAdd] = useState(false);
 
@@ -247,13 +249,9 @@ export const PremiumNameMarketConfig = () => {
                                                 aria-label={`Purchases for length-${row.length} names`}
                                                 onCheckedChange={(enable) => {
                                                     if (enable) {
-                                                        enablePurchases([
-                                                            row.length,
-                                                        ]);
+                                                        enablePurchases(row);
                                                     } else {
-                                                        disablePurchases([
-                                                            row.length,
-                                                        ]);
+                                                        disablePurchases(row);
                                                     }
                                                 }}
                                             />

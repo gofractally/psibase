@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
-import { zNameEventsPageData } from "@/lib/graphql/prem-accounts.schemas";
-import { PREM_ACCOUNTS_SERVICE } from "@/lib/prem-service";
+import { zNameEventsPageData } from "@/lib/graphql/name-market.schemas";
+import { NAME_MARKET_SERVICE } from "@/lib/name-market-service";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { graphql } from "@shared/lib/graphql";
@@ -61,7 +61,7 @@ export function HistorySection({ historyNonce = 0 }: Props) {
                                 }
                             `,
                             {
-                                service: PREM_ACCOUNTS_SERVICE,
+                                service: NAME_MARKET_SERVICE,
                             },
                         ),
                     );

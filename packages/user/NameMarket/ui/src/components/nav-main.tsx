@@ -10,14 +10,14 @@ import {
     SidebarMenuItem,
 } from "@shared/shadcn/ui/sidebar";
 
-export type PremAccountNavItem = {
+export type NameMarketNavItem = {
     title: string;
     path: string;
     end?: boolean;
     icon: LucideIcon;
 };
 
-export const premAccountNavItems: PremAccountNavItem[] = [
+export const nameMarketNavItems: NameMarketNavItem[] = [
     { title: "Buy name", path: "/", end: true, icon: ShoppingCart },
     { title: "Claim name", path: "/purchased", end: true, icon: Package },
 ];
@@ -27,7 +27,7 @@ export function NavMain() {
         <SidebarGroup>
             <SidebarGroupLabel>Premium accounts</SidebarGroupLabel>
             <SidebarMenu>
-                {premAccountNavItems.map((item) => {
+                {nameMarketNavItems.map((item) => {
                     const Icon = item.icon;
                     return (
                         <SidebarMenuItem key={item.path}>

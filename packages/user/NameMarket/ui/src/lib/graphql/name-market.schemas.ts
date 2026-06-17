@@ -14,7 +14,7 @@ export const zCurrentPriceRow = z.object({
     price: z.string(),
 });
 
-/** `currentPrices` query (prem-accounts GraphQL). */
+/** `currentPrices` query (namemarket GraphQL). */
 export const zCurrentPricesData = z.object({
     currentPrices: z
         .array(zCurrentPriceRow)

@@ -1,7 +1,7 @@
 import { matchPath, Outlet, useLocation } from "react-router-dom";
 
 import { AppSidebar } from "@/components/app-sidebar";
-import { premAccountNavItems } from "@/components/nav-main";
+import { nameMarketNavItems } from "@/components/nav-main";
 
 import {
     Breadcrumb,
@@ -16,9 +16,9 @@ import {
     SidebarTrigger,
 } from "@shared/shadcn/ui/sidebar";
 
-function usePremAccountsPageTitle(): string | undefined {
+function useNameMarketPageTitle(): string | undefined {
     const { pathname } = useLocation();
-    const ordered = [...premAccountNavItems].sort(
+    const ordered = [...nameMarketNavItems].sort(
         (a, b) => b.path.length - a.path.length,
     );
     for (const item of ordered) {
@@ -35,7 +35,7 @@ function usePremAccountsPageTitle(): string | undefined {
 }
 
 export const Layout = () => {
-    const pageTitle = usePremAccountsPageTitle();
+    const pageTitle = useNameMarketPageTitle();
 
     return (
         <SidebarProvider>

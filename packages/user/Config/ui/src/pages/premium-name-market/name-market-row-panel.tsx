@@ -1,8 +1,7 @@
+import type { ConfiguredPremiumNameMarketRow } from "@/hooks/premium-name-markets/use-configured-markets";
+import type { SavePremiumNameMarketConfigInput } from "@/hooks/premium-name-markets/use-config-market";
 import type { UseMutateFunction } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-
-import type { ConfiguredPremiumNameMarketRow } from "@/hooks/premium-name-markets/use-configured-markets";
-import { PREMIUM_MARKET_DEFAULT_WINDOW_SECONDS } from "@/lib/premium-name-market-defaults";
 
 import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
@@ -10,21 +9,12 @@ import { Label } from "@shared/shadcn/ui/label";
 
 import { parsePpm, parsePositiveInt } from "./parsers";
 
-type SaveMarketConfigParams = [
-    number,
-    number,
-    number,
-    string,
-    number,
-    number,
-];
-
 export type NameMarketRowPanelProps = {
     row: ConfiguredPremiumNameMarketRow;
     saveConfig: UseMutateFunction<
         unknown,
         Error,
-        SaveMarketConfigParams,
+        SavePremiumNameMarketConfigInput,
         unknown
     >;
     savingLength: number | null;
@@ -140,14 +130,13 @@ export function NameMarketRowPanel({
                     ) {
                         return;
                     }
-                    saveConfig([
-                        row.length,
-                        PREMIUM_MARKET_DEFAULT_WINDOW_SECONDS,
+                    saveConfig({
+                        row,
                         target,
-                        floorPrice.trim(),
+                        floorPrice: floorPrice.trim(),
                         increasePpm,
                         decreasePpm,
-                    ]);
+                    });
                 }}
             >
                 {savingLength === row.length ? "Saving…" : "Save parameters"}
