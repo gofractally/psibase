@@ -1,5 +1,5 @@
 [package]
-name = "prem-accounts-pkg"          # Crate name
+name = "prem-accts-pkg"          # Crate name
 description = "Premium name market"
 version.workspace = true
 rust-version.workspace = true
@@ -9,8 +9,8 @@ homepage.workspace = true
 publish.workspace = true
 
 [package.metadata.psibase]
-package-name = "PremAccounts"
-services = ["prem-accounts"]
+package-name = "PremAccts"
+services = ["prem-accts"]
 
 [package.metadata.psibase.dependencies]
 HttpServer = "0.23.0"
@@ -27,7 +27,7 @@ AuthSig = "0.23.0"
 crate-type = ["rlib"]
 
 [dependencies]
-prem-accounts = { path = "service", version = "0.23.0" }
+prem-accts = { path = "service", version = "0.23.0" }
 r-prem-accts = { path = "query-service", version = "0.23.0" }
-prem-accounts-plugin = { path = "plugin", version = "0.23.0" }
+prem-accts-plugin = { path = "plugin", version = "0.23.0" }
 psibase-user-workspace-hack.workspace = true

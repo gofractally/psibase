@@ -20,6 +20,7 @@ pub mod tables {
         pub length: u8,
         pub nft_id: u32,
         pub enabled: bool,
+        pub initial_price: u64,
     }
 
     #[table(name = "PurchasedAccountsTable", index = 2)]
@@ -60,7 +61,7 @@ pub mod service {
     fn require_caller_is_self() {
         check(
             get_sender() == get_service(),
-            "caller must be PremAccounts service",
+            "caller must be PremAccts service",
         );
     }
 
@@ -241,6 +242,7 @@ pub mod service {
                 length,
                 nft_id,
                 enabled: true,
+                initial_price: initial_price.value,
             })
             .unwrap();
     }

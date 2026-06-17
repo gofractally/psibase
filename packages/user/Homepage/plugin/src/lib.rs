@@ -11,7 +11,7 @@ struct HomepagePlugin;
 
 impl PremiumAccountsApi for HomepagePlugin {
     fn claim_and_set_key(account: String) -> Result<String, Error> {
-        prem_accounts::plugin::api::claim(&account)?;
+        prem_accts::plugin::api::claim(&account)?;
 
         let keypair = host::crypto::keyvault::generate_unmanaged_keypair()?;
 

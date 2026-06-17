@@ -8,7 +8,7 @@ use crate::bindings::host::{
     types::types::Error,
 };
 use crate::bindings::invite::plugin::redemption as Invites;
-use crate::bindings::prem_accounts::plugin::api as PremAccounts;
+use crate::bindings::prem_accts::plugin::api as PremAccts;
 use crate::bindings::transact::plugin::intf as Transact;
 use crate::db::{apps_table::AppsTable, user_table::UserTable};
 use crate::errors::ErrorType;
@@ -109,12 +109,12 @@ impl Prompt for AccountsPlugin {
             return Self::create_account(account_name);
         }
 
-        if !PremAccounts::can_create_premium_account() {
+        if !PremAccts::can_create_premium_account() {
             return Err(ErrorType::CannotCreatePremiumAccount().into());
         }
 
-        PremAccounts::buy(&account_name, &max_cost)?;
-        PremAccounts::claim(&account_name)?;
+        PremAccts::buy(&account_name, &max_cost)?;
+        PremAccts::claim(&account_name)?;
 
         let keypair = HostCrypto::generate_unmanaged_keypair()?;
 

@@ -5,7 +5,7 @@ mod tests {
     /// Matches Config UI default `PREMIUM_MARKET_DEFAULT_PPM` for `create` actions.
     const DEFAULT_CREATE_PPM: u32 = 50_000;
 
-    use crate::Wrapper as PremAccounts;
+    use crate::Wrapper as PremAccts;
     use psibase::services::tokens::{Precision, Quantity, Wrapper as Tokens, TID};
     use psibase::*;
     use psibase::{MAX_ACCOUNT_NAME_LENGTH, MIN_ACCOUNT_NAME_LENGTH};
@@ -72,7 +72,7 @@ mod tests {
         const FLOOR: u64 = 100;
         const TARGET: u32 = 10;
         for len in 1u8..=MAX_ACCOUNT_NAME_LENGTH {
-            PremAccounts::push_from(chain, admin)
+            PremAccts::push_from(chain, admin)
                 .create(
                     len,
                     Quantity::from(INITIAL),
@@ -86,9 +86,9 @@ mod tests {
         Ok(())
     }
 
-    /// Full PremAccounts integration on one chain (serial steps; avoids parallel `psitest` races).
-    #[psibase::test_case(packages("Tokens", "Nft", "PremAccounts"))]
-    fn prem_accounts_service_integration_serial(
+    /// Full PremAccts integration on one chain (serial steps; avoids parallel `psitest` races).
+    #[psibase::test_case(packages("Tokens", "Nft", "PremAccts"))]
+    fn prem_accts_service_integration_serial(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
         let alice = AccountNumber::from("alice");
@@ -99,7 +99,7 @@ mod tests {
         bootstrap_markets_1_7(&chain, alice)?;
 
         let raw: serde_json::Value = chain.graphql(
-            PremAccounts::SERVICE,
+            PremAccts::SERVICE,
             "query { marketParams { length enabled target } }",
         )?;
         let listed = raw
@@ -110,17 +110,17 @@ mod tests {
 
         // --- disable + buy rules + claim ---
         Tokens::push_from(&chain, alice)
-            .credit(1, PremAccounts::SERVICE, 1000_0000u64.into(), "".into())
+            .credit(1, PremAccts::SERVICE, 1000_0000u64.into(), "".into())
             .get()?;
 
-        PremAccounts::push_from(&chain, alice)
+        PremAccts::push_from(&chain, alice)
             .buy(account!("test"))
             .get()?;
 
-        PremAccounts::push_from(&chain, alice).disable(4).get()?;
+        PremAccts::push_from(&chain, alice).disable(4).get()?;
 
         let raw_after_disable: serde_json::Value = chain.graphql(
-            PremAccounts::SERVICE,
+            PremAccts::SERVICE,
             "query { marketParams { length enabled } }",
         )?;
         let mp_rows = raw_after_disable
@@ -137,7 +137,7 @@ mod tests {
             "expected length-4 market disabled: {raw_after_disable:?}"
         );
 
-        let err = PremAccounts::push_from(&chain, alice)
+        let err = PremAccts::push_from(&chain, alice)
             .buy(account!("abcd"))
             .trace
             .error
@@ -152,14 +152,14 @@ mod tests {
             .map_err(|e| anyhow::anyhow!(e))?
             .into_contents();
 
-        PremAccounts::push_from(&chain, alice)
+        PremAccts::push_from(&chain, alice)
             .claim(account!("test"))
             .get()?;
 
         // --- marketParams + configure ---
         let fetch = |c: &psibase::Chain| -> Result<serde_json::Value, psibase::Error> {
             c.graphql(
-                PremAccounts::SERVICE,
+                PremAccts::SERVICE,
                 "query { marketParams { length enabled } }",
             )
         };
@@ -175,7 +175,7 @@ mod tests {
             "sparse row per configured market after bootstrap"
         );
 
-        PremAccounts::push_from(&chain, alice).disable(6).get()?;
+        PremAccts::push_from(&chain, alice).disable(6).get()?;
 
         let raw = fetch(&chain)?;
         let status = raw
@@ -190,7 +190,7 @@ mod tests {
 
         // --- currentPrices includes length-7 market ---
         let raw: serde_json::Value = chain.graphql(
-            PremAccounts::SERVICE,
+            PremAccts::SERVICE,
             "query { currentPrices { length price } }",
         )?;
         let rows = raw
@@ -204,7 +204,7 @@ mod tests {
         );
 
         // --- duplicate create(7) with matching params is idempotent ---
-        PremAccounts::push_from(&chain, alice)
+        PremAccts::push_from(&chain, alice)
             .create(
                 7,
                 Quantity::from(1000u64),
@@ -216,7 +216,7 @@ mod tests {
             .get()?;
 
         // --- duplicate create(7) with different params fails ---
-        let err = PremAccounts::push_from(&chain, alice)
+        let err = PremAccts::push_from(&chain, alice)
             .create(
                 7,
                 Quantity::from(2000u64),
@@ -234,7 +234,7 @@ mod tests {
         );
 
         // --- create(3) with matching params is idempotent ---
-        PremAccounts::push_from(&chain, alice)
+        PremAccts::push_from(&chain, alice)
             .create(
                 3,
                 Quantity::from(1000u64),
@@ -246,7 +246,7 @@ mod tests {
             .get()?;
 
         // --- create(8) succeeds: valid on-chain name length, no market yet (bootstrap is 1..=7) ---
-        PremAccounts::push_from(&chain, alice)
+        PremAccts::push_from(&chain, alice)
             .create(
                 8,
                 Quantity::from(1000u64),
@@ -259,7 +259,7 @@ mod tests {
 
         // --- invalid lengths: must be a valid on-chain account name length (1..=10) ---
         for length in [0u8, MAX_ACCOUNT_NAME_LENGTH + 1] {
-            let err = PremAccounts::push_from(&chain, alice)
+            let err = PremAccts::push_from(&chain, alice)
                 .create(
                     length,
                     Quantity::from(1000u64),
@@ -283,10 +283,10 @@ mod tests {
 
         // --- buy on max premium length (7) ---
         Tokens::push_from(&chain, alice)
-            .credit(1, PremAccounts::SERVICE, 1000_0000u64.into(), "".into())
+            .credit(1, PremAccts::SERVICE, 1000_0000u64.into(), "".into())
             .get()?;
 
-        PremAccounts::push_from(&chain, alice)
+        PremAccts::push_from(&chain, alice)
             .buy(account!("abcdefg"))
             .get()?;
 
@@ -294,7 +294,7 @@ mod tests {
         const TEST_WINDOW_SECS: u32 = 30 * 86400;
         const TEST_INCREASE_PPM: u32 = 48_000;
         const TEST_DECREASE_PPM: u32 = 52_000;
-        PremAccounts::push_from(&chain, alice)
+        PremAccts::push_from(&chain, alice)
             .configure(
                 5,
                 TEST_WINDOW_SECS,
@@ -306,8 +306,8 @@ mod tests {
             .get()?;
 
         let raw: serde_json::Value = chain.graphql(
-            PremAccounts::SERVICE,
-            "query { marketParams { length enabled target floorPrice windowSeconds increasePpm decreasePpm } }",
+            PremAccts::SERVICE,
+            "query { marketParams { length enabled initialPrice target floorPrice windowSeconds increasePpm decreasePpm } }",
         )?;
         let markets = raw
             .pointer("/data/marketParams")
@@ -318,6 +318,7 @@ mod tests {
             .find(|v| v.get("length") == Some(&serde_json::json!(5)))
             .expect("marketParams row for length 5");
         assert_eq!(cfg.get("enabled"), Some(&serde_json::json!(true)));
+        assert_eq!(cfg.get("initialPrice"), Some(&serde_json::json!("0.1000")));
         assert_eq!(cfg.get("target"), Some(&serde_json::json!(8)));
         assert_eq!(cfg.get("floorPrice"), Some(&serde_json::json!("0.0150")));
         assert_eq!(
@@ -336,13 +337,13 @@ mod tests {
         Ok(())
     }
 
-    #[psibase::test_case(packages("Tokens", "Nft", "PremAccounts"))]
-    fn prem_accounts_starts_with_no_configured_markets(
+    #[psibase::test_case(packages("Tokens", "Nft", "PremAccts"))]
+    fn prem_accts_starts_with_no_configured_markets(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
         setup_tokens(&chain)?;
         let raw: serde_json::Value =
-            chain.graphql(PremAccounts::SERVICE, "query { marketParams { length } }")?;
+            chain.graphql(PremAccts::SERVICE, "query { marketParams { length } }")?;
         let cfg = raw
             .pointer("/data/marketParams")
             .and_then(|v| v.as_array())

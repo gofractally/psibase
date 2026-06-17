@@ -2,8 +2,8 @@
 #[allow(non_snake_case)]
 mod service {
     use async_graphql::{connection::Connection, *};
-    use prem_accounts::tables::{AuctionsTable, PurchasedAccount, PurchasedAccountsTable};
-    use prem_accounts::Wrapper as PremAccountsService;
+    use prem_accts::tables::{AuctionsTable, PurchasedAccount, PurchasedAccountsTable};
+    use prem_accts::Wrapper as PremAcctsService;
     use psibase::services::diff_adjust::{RateLimitTable, Wrapper as DiffAdjust};
     use psibase::services::tokens::{Decimal, Quantity, Wrapper as TokensWrapper};
     use psibase::*;
@@ -14,6 +14,8 @@ mod service {
     struct MarketParams {
         length: u8,
         enabled: bool,
+        #[graphql(name = "initialPrice")]
+        initial_price: Decimal,
         target: u32,
         #[graphql(name = "floorPrice")]
         floor_price: Decimal,
@@ -45,8 +47,8 @@ mod service {
     impl PremiumAccountEvent {
         pub async fn action(&self) -> String {
             match self.action {
-                prem_accounts::service::BOUGHT => "bought".to_string(),
-                prem_accounts::service::CLAIMED => "claimed".to_string(),
+                prem_accts::service::BOUGHT => "bought".to_string(),
+                prem_accts::service::CLAIMED => "claimed".to_string(),
                 _ => "unknown".to_string(),
             }
         }
@@ -124,6 +126,10 @@ mod service {
                     Some(MarketParams {
                         length: auction.length,
                         enabled: auction.enabled,
+                        initial_price: Decimal::new(
+                            Quantity::from(auction.initial_price),
+                            precision,
+                        ),
                         target: rate_limit.target_min, // target_min == target_max in our usage
                         floor_price: Decimal::new(
                             Quantity::from(rate_limit.floor_difficulty),
@@ -172,7 +178,7 @@ mod service {
 
             EventQuery::new(format!(
                 "history.{}.premAcctEvent",
-                PremAccountsService::SERVICE
+                PremAcctsService::SERVICE
             ))
             .condition(format!("owner = '{}'", user))
             .first(first)

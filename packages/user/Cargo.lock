@@ -2583,12 +2583,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "prem-accounts"
+name = "prem-accts"
 version = "0.23.0"
 dependencies = [
  "async-graphql",
  "pem",
- "prem-accounts-pkg",
+ "prem-accts-pkg",
  "psibase",
  "psibase-user-workspace-hack",
  "psibase_macros",
@@ -2598,21 +2598,21 @@ dependencies = [
 ]
 
 [[package]]
-name = "prem-accounts-pkg"
+name = "prem-accts-pkg"
 version = "0.23.0"
 dependencies = [
- "prem-accounts",
- "prem-accounts-plugin",
+ "prem-accts",
+ "prem-accts-plugin",
  "psibase-user-workspace-hack",
  "r-prem-accts",
 ]
 
 [[package]]
-name = "prem-accounts-plugin"
+name = "prem-accts-plugin"
 version = "0.23.0"
 dependencies = [
  "pem",
- "prem-accounts",
+ "prem-accts",
  "psibase",
  "psibase-user-workspace-hack",
  "psibase_plugin",
@@ -3018,7 +3018,7 @@ name = "r-prem-accts"
 version = "0.23.0"
 dependencies = [
  "async-graphql",
- "prem-accounts",
+ "prem-accts",
  "psibase",
  "psibase-user-workspace-hack",
  "psibase_service",

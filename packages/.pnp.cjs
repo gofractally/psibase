@@ -72,7 +72,7 @@ const RAW_RUNTIME_STATE =
     },\
     {\
       "name": "prem-accounts",\
-      "reference": "workspace:user/PremAccounts/ui"\
+      "reference": "workspace:user/PremAccts/ui"\
     },\
     {\
       "name": "@psibase/supervisor-ui",\
@@ -106,7 +106,7 @@ const RAW_RUNTIME_STATE =
     ["@psibase/workshop-ui", ["workspace:user/Workshop/ui"]],\
     ["@psibase/xadmin-ui", ["workspace:local/XAdmin/ui"]],\
     ["@psibase/xproxy-ui", ["workspace:local/XProxy/ui"]],\
-    ["prem-accounts", ["workspace:user/PremAccounts/ui"]],\
+    ["prem-accounts", ["workspace:user/PremAccts/ui"]],\
     ["root-workspace-0b6124", ["workspace:."]],\
     ["token-stream", ["workspace:user/TokenStream/ui"]],\
     ["wasm-transpiled", ["workspace:local/XAdmin/ui/wasm"]]\
@@ -14256,8 +14256,8 @@ const RAW_RUNTIME_STATE =
       }]\
     ]],\
     ["prem-accounts", [\
-      ["workspace:user/PremAccounts/ui", {\
-        "packageLocation": "./user/PremAccounts/ui/",\
+      ["workspace:user/PremAccts/ui", {\
+        "packageLocation": "./user/PremAccts/ui/",\
         "packageDependencies": [\
           ["@tanstack/react-query", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:5.90.16"],\
           ["@types/node", "npm:22.19.6"],\
@@ -14265,7 +14265,7 @@ const RAW_RUNTIME_STATE =
           ["@types/react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.2.3"],\
           ["eslint", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:9.39.2"],\
           ["lucide-react", "virtual:529da78ee9bbad35b13439475ca33f5401b9121f799d4c60e9de66600b411c43755e83652b7a77638cfb7619392b8f0665243a01d9aeed8d87cb42d3382284db#npm:0.475.0"],\
-          ["prem-accounts", "workspace:user/PremAccounts/ui"],\
+          ["prem-accounts", "workspace:user/PremAccts/ui"],\
           ["react", "npm:19.2.3"],\
           ["react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.2.3"],\
           ["react-router-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:6.30.3"],\

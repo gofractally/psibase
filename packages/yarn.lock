@@ -10966,9 +10966,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"prem-accounts@workspace:user/PremAccounts/ui":
+"prem-accounts@workspace:user/PremAccts/ui":
   version: 0.0.0-use.local
-  resolution: "prem-accounts@workspace:user/PremAccounts/ui"
+  resolution: "prem-accounts@workspace:user/PremAccts/ui"
   dependencies:
     "@tanstack/react-query": "npm:^5.90.6"
     "@types/node": "npm:^22.15.0"

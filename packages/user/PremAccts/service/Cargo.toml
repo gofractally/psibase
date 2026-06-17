@@ -1,5 +1,5 @@
 [package]
-name = "prem-accounts"
+name = "prem-accts"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
@@ -7,7 +7,7 @@ publish.workspace = true
 
 [package.metadata.psibase]
 server = "r-prem-accts"
-plugin = "prem-accounts-plugin"
+plugin = "prem-accts-plugin"
 data = [{ src = "../ui/dist", dst = "/" }]
 postinstall = [
     { sender = "prem-accts", service = "prem-accts", method = "init", data = {} },
@@ -25,4 +25,4 @@ psibase-user-workspace-hack.workspace = true
 
 [dev-dependencies]
 pem = "3.0"
-prem-accounts-pkg = { path = "..", version = "0.23.0" }
+prem-accts-pkg = { path = "..", version = "0.23.0" }

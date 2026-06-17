@@ -1,4 +1,4 @@
-package prem-accounts:plugin;
+package prem-accts:plugin;
 
 world impl {
     include host:common/imports;

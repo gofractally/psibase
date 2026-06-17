@@ -1,5 +1,5 @@
 [package]
-name = "prem-accounts-plugin"
+name = "prem-accts-plugin"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
@@ -7,7 +7,7 @@ publish.workspace = true
 
 [dependencies]
 psibase_plugin.workspace = true
-prem-accounts = { path = "../service/", version = "0.23.0" }
+prem-accts = { path = "../service/", version = "0.23.0" }
 psibase.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -20,7 +20,7 @@ thiserror.workspace = true
 crate-type = ["cdylib"]
 
 [package.metadata.component]
-package = "prem-accounts:plugin"
+package = "prem-accts:plugin"
 
 [package.metadata.component.target]
 world = "impl"
