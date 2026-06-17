@@ -417,7 +417,7 @@ void psibase::TestChain::startBlock(BlockTime tp)
    {
       tester::raw::startBlock(id, (tp - Seconds(1)).time_since_epoch().count(), producer.value,
                               term, commitNum);
-      tester::pushTransaction(id, makeStartBlock(tp));
+      expect(tester::pushTransaction(id, makeStartBlock(tp)));
       finishBlock();
       commitNum = status->head.value().header.blockNum;
    }
@@ -425,7 +425,7 @@ void psibase::TestChain::startBlock(BlockTime tp)
    status = kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
    if (status && status->head)
    {
-      tester::pushTransaction(id, makeStartBlock(tp + Seconds(1)));
+      expect(tester::pushTransaction(id, makeStartBlock(tp + Seconds(1))));
    }
    producing = true;
 }
