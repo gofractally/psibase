@@ -45,6 +45,25 @@ export function parsePercentToPpm(raw: string): number | null {
     return ppm;
 }
 
+/** Parses a whole-number percent for the plugin API (u8, 1–255). */
+export function parsePercentToPct(raw: string): number | null {
+    const t = raw.trim().replace(/%$/, "").trim();
+    if (!t || !/^\d+$/.test(t)) {
+        return null;
+    }
+
+    const percent = Number.parseInt(t, 10);
+    if (!Number.isFinite(percent) || percent <= 0 || percent > 255) {
+        return null;
+    }
+
+    return percent;
+}
+
+export function ppmToWholePercentString(ppm: number): string {
+    return String(Math.round(ppm / PPM_PER_PERCENT));
+}
+
 export function formatSystemTokenAmount(
     amount: string,
     systemToken: SystemTokenInfo,

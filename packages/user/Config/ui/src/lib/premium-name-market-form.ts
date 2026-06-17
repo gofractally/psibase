@@ -9,10 +9,10 @@ import {
     PREMIUM_MARKET_DEFAULT_WINDOW_SECONDS,
 } from "@/lib/premium-name-market-defaults";
 import {
+    parsePercentToPct,
     parsePositiveInt,
-    parsePercentToPpm,
     parseSystemTokenAmount,
-    ppmToPercentString,
+    ppmToWholePercentString,
 } from "@/lib/premium-name-market-parsers";
 
 import {
@@ -91,18 +91,18 @@ const zDirtyMarketRow = (systemToken: SystemTokenInfo) =>
                 });
             }
 
-            if (parsePercentToPpm(row.increasePpm) === null) {
+            if (parsePercentToPct(row.increasePpm) === null) {
                 ctx.addIssue({
                     code: "custom",
-                    message: "Enter a valid percent greater than 0 and less than 100",
+                    message: "Enter a whole-number percent from 1 to 255",
                     path: ["increasePpm"],
                 });
             }
 
-            if (parsePercentToPpm(row.decreasePpm) === null) {
+            if (parsePercentToPct(row.decreasePpm) === null) {
                 ctx.addIssue({
                     code: "custom",
-                    message: "Enter a valid percent greater than 0 and less than 100",
+                    message: "Enter a whole-number percent from 1 to 255",
                     path: ["decreasePpm"],
                 });
             }
@@ -131,10 +131,10 @@ export function buildPremiumNameMarketsFormValues(
                 row?.floorPrice ?? PREMIUM_MARKET_DEFAULT_PARAMS.floorPrice,
             target: String(row?.target ?? PREMIUM_MARKET_DEFAULT_PARAMS.target),
             increasePpm: row
-                ? ppmToPercentString(row.increasePpm)
+                ? ppmToWholePercentString(row.increasePpm)
                 : PREMIUM_MARKET_DEFAULT_PARAMS.increasePercent,
             decreasePpm: row
-                ? ppmToPercentString(row.decreasePpm)
+                ? ppmToWholePercentString(row.decreasePpm)
                 : PREMIUM_MARKET_DEFAULT_PARAMS.decreasePercent,
         });
     }
@@ -203,14 +203,14 @@ export function toMarketConfig(
     systemToken: SystemTokenInfo,
 ): MarketConfigParam {
     const target = parsePositiveInt(row.target);
-    const increasePpm = parsePercentToPpm(row.increasePpm);
-    const decreasePpm = parsePercentToPpm(row.decreasePpm);
+    const increasePct = parsePercentToPct(row.increasePpm);
+    const decreasePct = parsePercentToPct(row.decreasePpm);
     const floorPrice = parseSystemTokenAmount(row.floorPrice, systemToken);
 
     if (
         target === null ||
-        increasePpm === null ||
-        decreasePpm === null ||
+        increasePct === null ||
+        decreasePct === null ||
         floorPrice === null
     ) {
         throw new Error(`Invalid market config for length ${row.length}`);
@@ -229,8 +229,8 @@ export function toMarketConfig(
         windowSeconds: PREMIUM_MARKET_DEFAULT_WINDOW_SECONDS,
         target,
         floorPrice,
-        increasePpm,
-        decreasePpm,
+        increasePct,
+        decreasePct,
         enabled: row.enabled,
         initialPrice,
     };
