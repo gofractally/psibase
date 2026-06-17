@@ -82,6 +82,7 @@ pub(crate) struct CurvePosition {
     X: u128,
     Y: u128,
     k: u128,
+    max_reserve: u64,
 }
 
 /// This is a constant product curve, where the fundamental equation is XY = k. In this case,
@@ -110,8 +111,8 @@ impl Curve {
         let d = curve_d as u128;
 
         // `xm * ym * (d + 1)` stays within u128 because `check_curve_params`
-        // bounds `max_capacity * (curve_d + 1)` against the largest possible
-        // reserve (`u64::MAX`) whenever those inputs are set.
+        // bounds `max_reserve * max_capacity * (curve_d + 1)` whenever those
+        // inputs are set.
         //
         // Flooring x0/y0 and ceiling k all bias `pos_from_resources`'
         // `ceil(k / (resources + y0)) - x0` upward, keeping the pool capitalized.
@@ -137,6 +138,7 @@ impl Curve {
             X: reserves as u128 + self.x0 as u128,
             Y,
             k: self.k,
+            max_reserve: self.max_reserve,
         }
     }
 }
@@ -157,8 +159,12 @@ impl CurvePosition {
         let required_X = self.k.div_ceil(new_Y);
         let dx = check_some(required_X.checked_sub(self.X), "Excess reserve detected");
 
-        // Avoid silently truncating: `dx` exceeds `u64::MAX` only when
-        // `new_Y` drops below `y0` (resources driven negative).
+        // Cap the charge at the remaining reserve budget. Without this, cost 
+        // overflows u64 when `max_reserve == u64::MAX` and remaining capacity 
+        // is near zero (due to ceil(k) bias).
+        let dx = dx.min((self.max_reserve - self.reserves) as u128);
+
+        // `dx <= max_reserve <= u64::MAX` after the cap so this cannot fail
         check_some(u64::try_from(dx).ok(), "Insufficient capacity")
     }
 
@@ -190,19 +196,49 @@ fn is_system(user: AccountNumber) -> bool {
     user == AccountNumber::new(0)
 }
 
-/// Rejects `max_capacity`/`curve_d` combinations that would overflow `Curve::new`'s
-/// `k` computation (`xm * ym * (d + 1)`).
-///
-/// `max_reserve` starts at `u64::MAX` and only ever decreases, so validating against
-/// `u64::MAX` guarantees no overflow for any reachable reserve value.
-fn check_curve_params(max_capacity: u64, curve_d: u64) {
-    let max_xm = u64::MAX as u128;
-    let ym = max_capacity as u128;
-    let d_plus_1 = curve_d as u128 + 1;
-    check(
-        (max_xm * ym).checked_mul(d_plus_1).is_some(),
-        "max_capacity and curve_d too large: pricing math would overflow",
-    );
+/// Ensures a valid curve parameterization 
+pub(crate) fn validate_curve_params(
+    max_reserve: u64,
+    max_capacity: u64,
+    curve_d: u64,
+) -> Result<(), &'static str> {
+    if max_reserve == 0 {
+        return Err("max_reserve must be > 0");
+    }
+    if max_capacity == 0 {
+        return Err("max_capacity must be > 0");
+    }
+    // `curve_d` divides into the offsets; zero would divide by zero in `Curve::new`.
+    if curve_d == 0 {
+        return Err("curve_d must be > 0");
+    }
+    // Keeps `x0 = max_reserve / curve_d >= 1`; with `x0 = 0` the curve never reaches
+    // `reserves = 0` at full capacity
+    if max_reserve < curve_d {
+        return Err("max_reserve must be >= curve_d");
+    }
+    // Keeps `y0 = max_capacity / curve_d >= 1`; with `y0 = 0`, `Y` reaches 0 at the
+    // full-consumption endpoint and `k / Y` divides by zero.
+    if max_capacity < curve_d {
+        return Err("max_capacity must be >= curve_d");
+    }
+    // `Curve::new`'s `k` numerator `max_reserve * max_capacity * (curve_d + 1)` must fit
+    // u128, otherwise the constant-product computation silently overflows.
+    let fits_u128 = (max_reserve as u128)
+        .checked_mul(max_capacity as u128)
+        .and_then(|v| v.checked_mul(curve_d as u128 + 1))
+        .is_some();
+    if !fits_u128 {
+        return Err("curve parameters too large: pricing math would overflow");
+    }
+
+    Ok(())
+}
+
+pub(crate) fn check_curve_params(max_reserve: u64, max_capacity: u64, curve_d: u64) {
+    if let Err(msg) = validate_curve_params(max_reserve, max_capacity, curve_d) {
+        abort_message(msg);
+    }
 }
 
 impl CapacityPricing {
@@ -255,10 +291,8 @@ impl CapacityPricing {
         //   the total system token supply is known.
         let max_reserve = u64::MAX;
 
-        check(max_capacity > 0, "max_capacity must be > 0");
-        check(curve_d > 0, "curve_d must be > 0");
         check(fee_ppm <= PPM as u32, "fee_ppm must be <= 1,000,000");
-        check_curve_params(max_capacity, curve_d);
+        check_curve_params(max_reserve, max_capacity, curve_d);
 
         let id = resource.as_id();
         let table = CapacityPricingTable::read_write();
@@ -425,7 +459,7 @@ impl CapacityPricing {
             new_max_capacity >= self.max_capacity,
             "Capacity can only increase",
         );
-        check_curve_params(new_max_capacity, self.curve_d);
+        check_curve_params(self.max_reserve, new_max_capacity, self.curve_d);
         let delta = new_max_capacity - self.max_capacity;
         if delta > 0 {
             self.increase_capacity(delta);
@@ -460,15 +494,16 @@ impl CapacityPricing {
 
     pub fn reduce_reserve_budget(&self, delta_supply: u64) {
         check(delta_supply > 0, "invalid reserve budget decrease");
+        let new_max_reserve = check_some(
+            self.max_reserve.checked_sub(delta_supply),
+            "reserve budget decrease exceeds max_reserve",
+        );
+        check_curve_params(new_max_reserve, self.max_capacity, self.curve_d);
 
         let resource = self.resource();
         let mut to_remove = 0u64;
         let billing_active = is_billing_active();
         Self::update(resource, |p| {
-            check(
-                delta_supply < p.max_reserve,
-                "Cannot reduce max_reserve to 0",
-            );
             let old_reserve = p.required_reserve();
 
             p.max_reserve -= delta_supply;
