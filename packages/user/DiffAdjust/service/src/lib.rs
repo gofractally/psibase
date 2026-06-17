@@ -254,7 +254,7 @@ pub mod tables {
     }
 }
 
-#[psibase::service(name = "diff-adjust", tables = "tables")]
+#[psibase::service(name = "diff-adj", tables = "tables")]
 pub mod service {
     use crate::tables::RateLimit;
 

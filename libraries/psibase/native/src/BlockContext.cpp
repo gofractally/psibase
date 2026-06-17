@@ -142,32 +142,23 @@ namespace psibase
       if (current.header.blockNum == 2)
          return;
 
-      checkActive();
-      active = false;
-
-      Action action{
-          .sender  = {},
-          .service = transactionServiceNum,
-          .method  = MethodNumber("startBlock"),
-          .rawData = psio::to_frac(std::tuple()),
-      };
-      SignedTransaction  trx;
-      TransactionTrace   trace;
-      TransactionContext tc{*this, trx, trace, DbMode::transaction()};
-      auto&              atrace = trace.actionTraces.emplace_back();
+      SignedTransaction trx{.transaction{Transaction{
+          .tapos   = {.expiration = std::chrono::ceil<Seconds>(current.header.time + Seconds(1))},
+          .actions = {{
+              .sender  = {},
+              .service = transactionServiceNum,
+              .method  = MethodNumber("startBlock"),
+              .rawData = psio::to_frac(std::tuple()),
+          }},
+      }}};
+      TransactionTrace  trace;
 
       // Failure here aborts the block since Transact relies on startBlock
       // functioning correctly. Fixing this type of failure requires forking
       // the chain, just like fixing bugs which block transactions within
       // Transact's processTransaction may require forking the chain.
       //
-      // TODO: log failure
-      tc.execNonTrxAction(0, action, atrace);
-      BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
-      PSIBASE_LOG(trxLogger, debug) << "startBlock succeeded";
-      // printf("%s\n", prettyTrace(atrace).c_str());
-
-      active = true;
+      pushTransaction(std::move(trx), trace, std::nullopt, false, true);
    }
 
    void BlockContext::callOnBlock()

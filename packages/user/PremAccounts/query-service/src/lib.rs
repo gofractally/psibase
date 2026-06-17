@@ -1,4 +1,4 @@
-#[psibase::service]
+#[psibase::service(name = "prem-accts+1")]
 #[allow(non_snake_case)]
 mod service {
     use async_graphql::{connection::Connection, *};
@@ -202,7 +202,7 @@ mod service {
         user: Option<AccountNumber>,
     ) -> Option<HttpReply> {
         check(
-            get_sender() == AccountNumber::from("http-server"),
+            get_sender() == services::http_server::SERVICE,
             "permission denied: serveSys only callable by 'http-server'",
         );
 

@@ -77,7 +77,7 @@ class TestWebSocket(unittest.TestCase):
 
                 # There should be one unix and one http websocket
 
-                sockets = a.graphql(service='x-sock-list', query='''
+                sockets = a.graphql(service='x-socklist', query='''
                 query {
                     sockets {
                         edges {

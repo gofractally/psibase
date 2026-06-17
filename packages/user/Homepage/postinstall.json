@@ -9,7 +9,7 @@
     },
     {
         "sender": "homepage",
-        "service": "http-server",
+        "service": "http",
         "method": "setRedirect",
         "data": {
             "destination": "network"

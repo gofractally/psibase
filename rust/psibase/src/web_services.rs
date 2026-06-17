@@ -6,7 +6,7 @@
 /// To implement this interface, add a [serveSys](ServerActions::serveSys) action to
 /// your service.
 #[crate::service(
-    name = "example-server",
+    name = "i-server",
     actions = "ServerActions",
     wrapper = "ServerWrapper",
     structs = "server_action_structs",
