@@ -158,7 +158,7 @@ TEST_CASE("events")
          std::vector<TestEvent>{{42}, {72}, {42}, {91}});
 
    constexpr std::string_view descendingSql =
-       R"""(SELECT i FROM "history.test-service.testevent" ORDER BY ROWID DESC)""";
+       R"""(SELECT i FROM "history.test-svc.testevent" ORDER BY ROWID DESC)""";
    CHECK(query<TestEvent>(chain, descendingSql) ==
          std::vector<TestEvent>{{91}, {42}, {72}, {42}});
 
