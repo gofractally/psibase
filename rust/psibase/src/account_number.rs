@@ -166,7 +166,7 @@ mod tests {
     }
 
     #[test]
-    fn name_longer_than_limit_of_18_is_zero() {
+    fn name_longer_than_limit_of_10_is_zero() {
         assert_eq!(
             AccountNumber::from_str("abcdefghijklmnopqrstuvwxyz").unwrap(),
             AccountNumber::new(0)

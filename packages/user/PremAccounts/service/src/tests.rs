@@ -6,9 +6,9 @@ mod tests {
     const DEFAULT_CREATE_PPM: u32 = 50_000;
 
     use crate::Wrapper as PremAccounts;
-    use psibase::{MAX_ACCOUNT_NAME_LENGTH, MIN_ACCOUNT_NAME_LENGTH};
     use psibase::services::tokens::{Precision, Quantity, Wrapper as Tokens, TID};
     use psibase::*;
+    use psibase::{MAX_ACCOUNT_NAME_LENGTH, MIN_ACCOUNT_NAME_LENGTH};
 
     fn initial_setup(chain: &psibase::Chain) -> Result<TID, psibase::Error> {
         let tokens_service = Tokens::SERVICE;
@@ -257,7 +257,7 @@ mod tests {
             )
             .get()?;
 
-        // --- invalid lengths: must be a valid on-chain account name length (1..=18) ---
+        // --- invalid lengths: must be a valid on-chain account name length (1..=10) ---
         for length in [0u8, MAX_ACCOUNT_NAME_LENGTH + 1] {
             let err = PremAccounts::push_from(&chain, alice)
                 .create(

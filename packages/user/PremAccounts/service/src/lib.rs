@@ -44,7 +44,6 @@ pub mod service {
         Auction, AuctionsTable, InitRow, InitTable, PurchasedAccount, PurchasedAccountsTable,
     };
     use psibase::services::accounts as Accounts;
-    use psibase::services::accounts::{MAX_ACCOUNT_NAME_LENGTH, MIN_ACCOUNT_NAME_LENGTH};
     use psibase::services::auth_delegate as AuthDelegate;
     use psibase::services::diff_adjust::{RateLimitTable, Wrapper as DiffAdjust};
     use psibase::services::events;

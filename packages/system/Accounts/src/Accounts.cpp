@@ -161,6 +161,17 @@ namespace SystemService
       return accountRow->authService;
    }
 
+   void Accounts::incAuthSeq(psibase::AccountNumber name)
+   {
+      auto accountTable = open<AccountTable>();
+      auto accountRow   = accountTable.getIndex<0>().get(name);
+      if (accountRow && accountRow->authService == getSender())
+      {
+         ++accountRow->authSequence;
+         accountTable.put(*accountRow);
+      }
+   }
+
    bool Accounts::exists(AccountNumber name)
    {
       return getAccount(name) != std::nullopt;
