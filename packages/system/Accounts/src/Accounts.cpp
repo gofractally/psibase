@@ -62,7 +62,7 @@ namespace SystemService
       }
       else
       {
-         check(getSender() == getReceiver() || getSender() == AccountNumber("prem-accts"),
+         check(getSender() == getReceiver() || getSender() == AccountNumber("namemarket"),
                "unauthorized");
       }
 

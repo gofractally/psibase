@@ -16,9 +16,9 @@ interface packaging {
     set-account-sources: func(accounts: list<string>) -> result<_, error>;
 }
 
-interface prem-accts {
+interface name-market {
     use host:types/types.{error};
-    use prem-accts:plugin/market-admin.{market-config};
+    use name-market:plugin/market-admin.{market-config};
 
     /// Batch create or update premium name markets.
     /// * For lengths with no existing market: creates the market; `initial-price` must be set.
@@ -130,7 +130,7 @@ interface virtual-server {
 }
 
 world imports {
-    import prem-accts;
+    import name-market;
     import producers;
     import branding;
     import packaging;

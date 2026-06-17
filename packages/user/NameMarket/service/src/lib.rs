@@ -39,7 +39,7 @@ pub mod tables {
     }
 }
 
-#[psibase::service(name = "prem-accts", tables = "tables")]
+#[psibase::service(name = "namemarket", tables = "tables")]
 pub mod service {
     use crate::tables::{
         Auction, AuctionsTable, InitRow, InitTable, PurchasedAccount, PurchasedAccountsTable,
@@ -61,7 +61,7 @@ pub mod service {
     fn require_caller_is_self() {
         check(
             get_sender() == get_service(),
-            "caller must be PremAccts service",
+            "caller must be NameMarket service",
         );
     }
 

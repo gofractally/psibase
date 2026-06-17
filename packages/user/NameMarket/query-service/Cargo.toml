@@ -1,6 +1,6 @@
 [package]
-name = "r-prem-accts"
-description = "RPC service for prem-accts"
+name = "r-name-market"
+description = "RPC service for name-market"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
@@ -12,6 +12,6 @@ psibase_service.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde-aux.workspace = true
-prem-accts = { path = "../service", version = "0.23.0" }
+name-market = { path = "../service", version = "0.23.0" }
 async-graphql.workspace = true
 psibase-user-workspace-hack.workspace = true

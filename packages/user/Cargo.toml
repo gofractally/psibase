@@ -64,10 +64,10 @@ members = [
     "TokenSwap/service",
     "TokenSwap/query-service",
     "TokenSwap/plugin",
-    "PremAccts",
-    "PremAccts/service",
-    "PremAccts/query-service",
-    "PremAccts/plugin",
+    "NameMarket",
+    "NameMarket/service",
+    "NameMarket/query-service",
+    "NameMarket/plugin",
 ]
 
 exclude = [

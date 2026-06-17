@@ -7,7 +7,7 @@ use host::types::types::Error;
 use exports::config::plugin::{
     branding::Guest as Branding,
     packaging::Guest as Packaging,
-    prem_accts::{Guest as PremAccts, MarketConfig},
+    name_market::{Guest as NameMarket, MarketConfig},
     producers::Guest as Producers,
     settings::Guest as Settings,
     symbol::Guest as Symbol,
@@ -98,15 +98,15 @@ impl Packaging for ConfigPlugin {
     }
 }
 
-impl PremAccts for ConfigPlugin {
+impl NameMarket for ConfigPlugin {
     fn configure_markets(configs: Vec<MarketConfig>) -> Result<(), Error> {
         if configs.is_empty() {
             return Ok(());
         }
 
-        set_propose_latch(Some("prem-accts"))?;
+        set_propose_latch(Some("namemarket"))?;
 
-        prem_accts::plugin::market_admin::configure_markets(&configs)
+        name_market::plugin::market_admin::configure_markets(&configs)
     }
 }
 

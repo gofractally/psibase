@@ -2,10 +2,10 @@
 mod bindings;
 
 use bindings::accounts::plugin::api as AccountsApi;
-use bindings::exports::prem_accts::plugin::api::Guest as Api;
-use bindings::exports::prem_accts::plugin::authorized::Guest as Authorized;
-use bindings::exports::prem_accts::plugin::market_admin::Guest as MarketAdmin;
-use bindings::exports::prem_accts::plugin::market_admin::MarketConfig;
+use bindings::exports::name_market::plugin::api::Guest as Api;
+use bindings::exports::name_market::plugin::authorized::Guest as Authorized;
+use bindings::exports::name_market::plugin::market_admin::Guest as MarketAdmin;
+use bindings::exports::name_market::plugin::market_admin::MarketConfig;
 use bindings::host::common::server as CommonServer;
 use bindings::tokens::plugin::helpers as TokensHelpers;
 use bindings::tokens::plugin::user as TokensUser;
@@ -30,7 +30,7 @@ fn require_adjust_pcts(increase_pct: u8, decrease_pct: u8) -> Result<(), Error> 
     Ok(())
 }
 
-impl TrustConfig for PremAcctsPlugin {
+impl TrustConfig for NameMarketPlugin {
     fn capabilities() -> Capabilities {
         Capabilities {
             low: &[],
@@ -40,9 +40,9 @@ impl TrustConfig for PremAcctsPlugin {
     }
 }
 
-struct PremAcctsPlugin;
+struct NameMarketPlugin;
 
-impl MarketAdmin for PremAcctsPlugin {
+impl MarketAdmin for NameMarketPlugin {
     #[psibase_plugin::authorized(Max, whitelist = ["config"])]
     fn create(
         length: u8,
@@ -57,7 +57,7 @@ impl MarketAdmin for PremAcctsPlugin {
             TokensHelpers::fetch_network_token()?.ok_or(ErrorType::SystemTokenNotDefined)?;
         let initial_price = TokensHelpers::decimal_to_u64(sys_token_id, &initial_price)?;
         let floor_price = TokensHelpers::decimal_to_u64(sys_token_id, &floor_price)?;
-        prem_accts::Wrapper::add_to_tx().create(
+        name_market::Wrapper::add_to_tx().create(
             length,
             Quantity::from(initial_price),
             target,
@@ -81,7 +81,7 @@ impl MarketAdmin for PremAcctsPlugin {
         let sys_token_id =
             TokensHelpers::fetch_network_token()?.ok_or(ErrorType::SystemTokenNotDefined)?;
         let floor_price = TokensHelpers::decimal_to_u64(sys_token_id, &floor_price)?;
-        prem_accts::Wrapper::add_to_tx().configure(
+        name_market::Wrapper::add_to_tx().configure(
             length,
             window_seconds,
             target,
@@ -94,13 +94,13 @@ impl MarketAdmin for PremAcctsPlugin {
 
     #[psibase_plugin::authorized(Max, whitelist = ["config"])]
     fn enable(length: u8) -> Result<(), Error> {
-        prem_accts::Wrapper::add_to_tx().enable(length);
+        name_market::Wrapper::add_to_tx().enable(length);
         Ok(())
     }
 
     #[psibase_plugin::authorized(Max, whitelist = ["config"])]
     fn disable(length: u8) -> Result<(), Error> {
-        prem_accts::Wrapper::add_to_tx().disable(length);
+        name_market::Wrapper::add_to_tx().disable(length);
         Ok(())
     }
 
@@ -130,7 +130,7 @@ impl MarketAdmin for PremAcctsPlugin {
                 let initial_price =
                     TokensHelpers::decimal_to_u64(sys_token_id, &initial_price_str)?;
                 let floor_price = TokensHelpers::decimal_to_u64(sys_token_id, &cfg.floor_price)?;
-                prem_accts::Wrapper::add_to_tx().create(
+                name_market::Wrapper::add_to_tx().create(
                     cfg.length,
                     Quantity::from(initial_price),
                     cfg.target,
@@ -140,7 +140,7 @@ impl MarketAdmin for PremAcctsPlugin {
                 );
 
                 if !cfg.enabled {
-                    prem_accts::Wrapper::add_to_tx().disable(cfg.length);
+                    name_market::Wrapper::add_to_tx().disable(cfg.length);
                 }
                 continue;
             }
@@ -151,7 +151,7 @@ impl MarketAdmin for PremAcctsPlugin {
             }
 
             let floor_price = TokensHelpers::decimal_to_u64(sys_token_id, &cfg.floor_price)?;
-            prem_accts::Wrapper::add_to_tx().configure(
+            name_market::Wrapper::add_to_tx().configure(
                 cfg.length,
                 cfg.window_seconds,
                 cfg.target,
@@ -165,9 +165,9 @@ impl MarketAdmin for PremAcctsPlugin {
             }
 
             if cfg.enabled {
-                prem_accts::Wrapper::add_to_tx().enable(cfg.length);
+                name_market::Wrapper::add_to_tx().enable(cfg.length);
             } else {
-                prem_accts::Wrapper::add_to_tx().disable(cfg.length);
+                name_market::Wrapper::add_to_tx().disable(cfg.length);
             }
         }
 
@@ -175,7 +175,7 @@ impl MarketAdmin for PremAcctsPlugin {
     }
 }
 
-impl Api for PremAcctsPlugin {
+impl Api for NameMarketPlugin {
     #[psibase_plugin::authorized(Medium, whitelist = ["accounts", "homepage"])]
     fn can_create_premium_account() -> bool {
         if !AccountsApi::is_logged_in() {
@@ -206,7 +206,7 @@ impl Api for PremAcctsPlugin {
         let acct_name = AccountNumber::from_exact(&account)
             .map_err(|err| ErrorType::InvalidAccountName(err.to_string()))?;
 
-        let service_account = prem_accts::SERVICE.to_string();
+        let service_account = name_market::SERVICE.to_string();
 
         let sys_token_id =
             TokensHelpers::fetch_network_token()?.ok_or(ErrorType::SystemTokenNotDefined)?;
@@ -225,7 +225,7 @@ impl Api for PremAcctsPlugin {
             "premium account purchase",
         )?;
 
-        prem_accts::Wrapper::add_to_tx().buy(acct_name);
+        name_market::Wrapper::add_to_tx().buy(acct_name);
 
         Ok(())
     }
@@ -235,7 +235,7 @@ impl Api for PremAcctsPlugin {
         let account = AccountNumber::from_exact(&account)
             .map_err(|_| ErrorType::InvalidAccountName(account))?;
 
-        prem_accts::Wrapper::add_to_tx().claim(account);
+        name_market::Wrapper::add_to_tx().claim(account);
 
         Ok(())
     }
@@ -354,11 +354,11 @@ fn require_active_premium_market_ask(length: u8, sys_token_id: u32) -> Result<u6
         .map_err(|_| ErrorType::QueryResponseParseError("invalid price".into()).into())
 }
 
-impl Authorized for PremAcctsPlugin {
+impl Authorized for NameMarketPlugin {
     #[psibase_plugin::authorized(Medium, whitelist = ["accounts", "homepage"])]
     fn graphql(query: String) -> Result<String, Error> {
         CommonServer::post_graphql_get_json(&query)
     }
 }
 
-bindings::export!(PremAcctsPlugin with_types_in bindings);
+bindings::export!(NameMarketPlugin with_types_in bindings);

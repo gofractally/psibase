@@ -114,7 +114,7 @@ impl KeyVault for AuthSig {
                 "accounts".into(),
                 "x-admin".into(),
                 "invite".into(),
-                "prem-accts".into(),
+                "namemarket".into(),
             ],
         )?;
         HostCrypto::import_key(&private_key)
@@ -125,7 +125,7 @@ impl Actions for AuthSig {
     fn set_key(public_key: Pem) -> Result<(), HostTypes::Error> {
         assert_authorized_with_whitelist(
             FunctionName::set_key,
-            vec!["accounts".into(), "prem-accts".into()],
+            vec!["accounts".into(), "namemarket".into()],
         )?;
 
         Transact::add_action_to_transaction(

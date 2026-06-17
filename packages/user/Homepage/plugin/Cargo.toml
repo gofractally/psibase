@@ -24,5 +24,5 @@ world = "impl"
 "host:crypto" = { path = "../../Host/plugin/crypto/wit/world.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
 "auth-sig:plugin" = { path = "../../../system/AuthSig/plugin/wit/world.wit" }
-"prem-accts:plugin" = { path = "../../PremAccts/plugin/wit/world.wit" }
+"name-market:plugin" = { path = "../../NameMarket/plugin/wit/world.wit" }
 "accounts:plugin" = { path = "wit/deps/accounts-homepage.wit" }

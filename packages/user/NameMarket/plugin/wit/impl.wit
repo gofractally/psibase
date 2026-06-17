@@ -1,4 +1,4 @@
-package prem-accts:plugin;
+package name-market:plugin;
 
 world impl {
     include host:common/imports;

@@ -1,9 +1,9 @@
-#[psibase::service(name = "prem-accts+1")]
+#[psibase::service(name = "namemarket+1")]
 #[allow(non_snake_case)]
 mod service {
     use async_graphql::{connection::Connection, *};
-    use prem_accts::tables::{AuctionsTable, PurchasedAccount, PurchasedAccountsTable};
-    use prem_accts::Wrapper as PremAcctsService;
+    use name_market::tables::{AuctionsTable, PurchasedAccount, PurchasedAccountsTable};
+    use name_market::Wrapper as NameMarketService;
     use psibase::services::diff_adjust::{RateLimitTable, Wrapper as DiffAdjust};
     use psibase::services::tokens::{Decimal, Quantity, Wrapper as TokensWrapper};
     use psibase::*;
@@ -47,8 +47,8 @@ mod service {
     impl PremiumAccountEvent {
         pub async fn action(&self) -> String {
             match self.action {
-                prem_accts::service::BOUGHT => "bought".to_string(),
-                prem_accts::service::CLAIMED => "claimed".to_string(),
+                name_market::service::BOUGHT => "bought".to_string(),
+                name_market::service::CLAIMED => "claimed".to_string(),
                 _ => "unknown".to_string(),
             }
         }
@@ -178,7 +178,7 @@ mod service {
 
             EventQuery::new(format!(
                 "history.{}.premAcctEvent",
-                PremAcctsService::SERVICE
+                NameMarketService::SERVICE
             ))
             .condition(format!("owner = '{}'", user))
             .first(first)

@@ -1,4 +1,4 @@
-package prem-accts:plugin;
+package name-market:plugin;
 
 interface market-admin {
     use host:types/types.{error};
