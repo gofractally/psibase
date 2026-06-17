@@ -419,7 +419,12 @@ impl Chain {
             subjectiveData: None,
         }
         .packed();
-        unsafe { tester_raw::pushTransaction(self.chain_handle, strx.as_ptr(), strx.len()) };
+        let size =
+            unsafe { tester_raw::pushTransaction(self.chain_handle, strx.as_ptr(), strx.len()) };
+        let trace = TransactionTrace::unpacked(&get_result_bytes(size)).unwrap();
+        if let Some(error) = &trace.error {
+            panic!("startBlock failed: {error}");
+        }
     }
 
     /// Start a new block
@@ -477,7 +482,9 @@ impl Chain {
                 commit_num,
             )
         }
-        self.push_start_block(time + Seconds::new(1));
+        if status.is_some() {
+            self.push_start_block(time + Seconds::new(1));
+        }
         *status = self
             .kv_get::<StatusRow, _>(StatusRow::DB, &status_key())
             .unwrap();
