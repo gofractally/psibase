@@ -7,7 +7,7 @@
 #include <services/system/AuthDelegate.hpp>
 #include <services/system/Transact.hpp>
 
-static constexpr bool enable_print = false;
+static constexpr bool        enable_print               = false;
 static constexpr std::size_t MIN_ALLOWED_ACCOUNT_LENGTH = 8;
 
 using namespace psibase;
@@ -52,8 +52,19 @@ namespace SystemService
 
    void Accounts::preapproveAcc(AccountNumber name)
    {
-      check(getSender() == getReceiver() || getSender() == AccountNumber("prem-accounts"),
-            "unauthorized");
+      if (name.subaccount())
+      {
+         if (getSender() != name.base())
+         {
+            abortMessage(std::format("subaccount {} can only be created by {}", name.str(),
+                                     name.base().str()));
+         }
+      }
+      else
+      {
+         check(getSender() == getReceiver() || getSender() == AccountNumber("prem-accounts"),
+               "unauthorized");
+      }
 
       preapprovedAccounts.push_back(name);
    }
@@ -80,13 +91,21 @@ namespace SystemService
 
       check(name.value, "invalid account name");
       check(strName.back() != '-', "account name must not end in a hyphen");
-      if (getSender() != service && !std::ranges::contains(preapprovedAccounts, name))
+      if (!std::ranges::contains(preapprovedAccounts, name))
       {
-         check(!strName.starts_with("x-"),
-               "The 'x-' account prefix is reserved for infrastructure providers");
-         check(strName.length() >= MIN_ALLOWED_ACCOUNT_LENGTH,
-               "account name must be at least " +
-                   std::to_string(MIN_ALLOWED_ACCOUNT_LENGTH) + " characters: " + strName);
+         if (name.subaccount())
+         {
+            check(getSender() == name.base(),
+                  "Subaccounts can only be created by the primary account");
+         }
+         else if (getSender() != service)
+         {
+            check(!strName.starts_with("x-"),
+                  "The 'x-' account prefix is reserved for infrastructure providers");
+            check(strName.length() >= MIN_ALLOWED_ACCOUNT_LENGTH,
+                  "account name must be at least " + std::to_string(MIN_ALLOWED_ACCOUNT_LENGTH) +
+                      " characters: " + strName);
+         }
       }
 
       // Check compression roundtrip
@@ -140,17 +159,6 @@ namespace SystemService
       auto accountRow = getAccount(account);
       check(accountRow.has_value(), "account " + account.str() + " does not exist");
       return accountRow->authService;
-   }
-
-   void Accounts::incAuthSeq(psibase::AccountNumber name)
-   {
-      auto accountTable = open<AccountTable>();
-      auto accountRow   = accountTable.getIndex<0>().get(name);
-      if (accountRow && accountRow->authService == getSender())
-      {
-         ++accountRow->authSequence;
-         accountTable.put(*accountRow);
-      }
    }
 
    bool Accounts::exists(AccountNumber name)

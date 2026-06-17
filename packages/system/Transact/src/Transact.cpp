@@ -321,7 +321,7 @@ namespace SystemService
          if (!account)
             abortMessage("unknown sender \"" + action.sender.str() + "\"");
 
-         if (requester != account->authService)
+         if (requester != account->authService && requester != action.sender.base())
          {
             uint32_t flags = 0;
             if (requester == action.sender)

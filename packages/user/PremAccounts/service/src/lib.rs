@@ -38,12 +38,13 @@ pub mod tables {
     }
 }
 
-#[psibase::service(name = "prem-accounts", tables = "tables")]
+#[psibase::service(name = "prem-accts", tables = "tables")]
 pub mod service {
     use crate::tables::{
         Auction, AuctionsTable, InitRow, InitTable, PurchasedAccount, PurchasedAccountsTable,
     };
     use psibase::services::accounts as Accounts;
+    use psibase::services::accounts::{MAX_ACCOUNT_NAME_LENGTH, MIN_ACCOUNT_NAME_LENGTH};
     use psibase::services::auth_delegate as AuthDelegate;
     use psibase::services::diff_adjust::{RateLimitTable, Wrapper as DiffAdjust};
     use psibase::services::events;
@@ -204,12 +205,12 @@ pub mod service {
         require_caller_is_self();
 
         check_market_length(length);
+
         check_some(
             Tokens::Wrapper::call().getSysToken(),
             "system token must be defined",
         );
 
-        // if market already exists and its config is identical, return
         let auctions_table = AuctionsTable::new();
         if let Some(auction) = auctions_table.get_index_pk().get(&length) {
             if let Some(rate_limit) = RateLimitTable::read().get_index_pk().get(&auction.nft_id) {

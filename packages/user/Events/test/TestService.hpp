@@ -4,7 +4,7 @@
 
 struct TestService : psibase::Service
 {
-   static constexpr auto service = psibase::AccountNumber{"test-service"};
+   static constexpr auto service = psibase::AccountNumber{"test-svc"};
    //
    void send(int i, double d, std::vector<int32_t> v, std::string s);
    void sendOptional(std::optional<std::int32_t> opt);
