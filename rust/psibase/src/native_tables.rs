@@ -420,7 +420,7 @@ pub type RunToken = Vec<u8>;
     SimpleObject,
     InputObject,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
+#[fracpack(fracpack_mod = "fracpack", custom = "ServiceMethod")]
 #[to_key(psibase_mod = "crate")]
 #[graphql(input_name = "ServiceMethodInput")]
 pub struct ServiceMethod {

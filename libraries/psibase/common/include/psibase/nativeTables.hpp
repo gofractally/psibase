@@ -358,6 +358,10 @@ namespace psibase
       MethodNumber  method;
       PSIO_REFLECT(ServiceMethod, service, method)
    };
+   inline constexpr bool psio_custom_schema(ServiceMethod*)
+   {
+      return true;
+   }
 
    using RunKeyType = std::tuple<std::uint16_t, std::uint8_t, std::uint64_t>;
    auto runPrefix() -> KeyPrefixType;
