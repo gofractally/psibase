@@ -207,7 +207,7 @@ mod tests {
         let vserver = Wrapper::SERVICE;
         let tokens = tokens::Wrapper::SERVICE;
         let sys: tokens::TID = 1;
-        let alice = AccountNumber::from("alice");
+        let alice = account!("alice");
 
         initial_setup(&chain)?;
 
@@ -427,7 +427,7 @@ mod tests {
         let mut trx = Transaction {
             tapos: Default::default(),
             actions: vec![Action {
-                sender: AccountNumber::from(credentials::CREDENTIAL_SENDER),
+                sender: credentials::CREDENTIAL_SENDER,
                 service: invite,
                 method: MethodNumber::new(method_raw!("createAccount")),
                 rawData: (

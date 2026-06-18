@@ -9,10 +9,10 @@
 #![cfg_attr(not(target_family = "wasm"), allow(unused_imports, dead_code))]
 
 use crate::{
-    actions::login_action, check, create_boot_transactions, fetch_packages,
-    get_optional_result_bytes, get_result_bytes, services, status_key, tester_raw, AccountNumber,
-    Action, ActionFormatter, BlockTime, Caller, Checksum256, CodeByHashRow, CodeRow, DbId,
-    DirectoryRegistry, Error, HostConfigRow, HttpBody, HttpHeader, HttpReply, HttpRequest,
+    self as psibase, account, actions::login_action, check, create_boot_transactions,
+    fetch_packages, get_optional_result_bytes, get_result_bytes, services, status_key, tester_raw,
+    AccountNumber, Action, ActionFormatter, BlockTime, Caller, Checksum256, CodeByHashRow, CodeRow,
+    DbId, DirectoryRegistry, Error, HostConfigRow, HttpBody, HttpHeader, HttpReply, HttpRequest,
     InnerTraceEnum, JointRegistry, KvHandle, KvMode, PackageOpFull, PackageRegistry,
     PackagedService, RunMode, Schema, SchemaFetcher, SchemaMap, Seconds, SignedTransaction,
     StatusRow, Table, TableRecord, Tapos, TimePointSec, TimePointUSec, ToKey, Transaction,
@@ -446,7 +446,7 @@ impl Chain {
             };
             (
                 if producers.is_empty() {
-                    AccountNumber::from("firstproducer")
+                    account!("firstprod")
                 } else {
                     producers[0].name
                 },
@@ -454,7 +454,7 @@ impl Chain {
                 status.head.as_ref().map_or(0, |head| head.header.blockNum),
             )
         } else {
-            (AccountNumber::from("firstproducer"), 0, 0)
+            (account!("firstprod"), 0, 0)
         };
 
         // Guarantee that there is a recent block for fillTapos to use.
