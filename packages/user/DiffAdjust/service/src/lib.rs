@@ -68,6 +68,11 @@ pub mod tables {
             check(seconds > 0, "window seconds must be above 0");
         }
 
+        /// Decrease rate is capped at 100% per window; increase remains unclamped.
+        fn clamp_decrease_ppm(decrease_ppm: u32) -> u32 {
+            decrease_ppm.min(ONE_MILLION)
+        }
+
         pub fn add(
             initial_difficulty: u64,
             window_seconds: u32,
@@ -97,7 +102,7 @@ pub mod tables {
                 floor_difficulty,
                 last_updated,
                 increase_ppm,
-                decrease_ppm,
+                Self::clamp_decrease_ppm(decrease_ppm),
             );
             new_instance.save();
 
@@ -112,6 +117,37 @@ pub mod tables {
             self.decrease_ppm as f64 / ONE_MILLION as f64
         }
 
+        fn f64_to_u64(value: f64) -> u64 {
+            if !value.is_finite() || value <= 0.0 {
+                0
+            } else if value >= u64::MAX as f64 {
+                u64::MAX
+            } else {
+                value as u64
+            }
+        }
+
+        fn apply_increase(difficulty: u64, factor: f64, times: u32) -> u64 {
+            if times == 0 || difficulty == u64::MAX || factor <= 1.0 {
+                return difficulty;
+            }
+            Self::f64_to_u64(difficulty as f64 * factor.powf(times as f64))
+        }
+
+        fn apply_decrease(difficulty: u64, factor: f64, times: u32, floor: u64) -> u64 {
+            if times == 0 {
+                return difficulty;
+            }
+            let factor = factor.max(0.0);
+            if factor == 0.0 {
+                return floor;
+            }
+            if factor == 1.0 {
+                return difficulty;
+            }
+            Self::f64_to_u64(difficulty as f64 * factor.powf(times as f64)).max(floor)
+        }
+
         pub fn check_difficulty_decrease(&mut self) -> u64 {
             let now = TransactSvc::call().currentBlock().time.seconds();
             let seconds_elapsed = (now.seconds - self.last_update.seconds).max(0) as u32;
@@ -122,13 +158,9 @@ pub mod tables {
                 self.counter = 0;
                 self.last_update = TimePointSec::from(now.seconds - seconds_remainder as i64);
                 if below_target {
-                    let mut new_difficulty = self.active_difficulty;
                     let factor = 1.0 - self.ratio_decrease();
-                    for _ in 0..windows_elapsed {
-                        let temp = new_difficulty as f64 * factor;
-                        new_difficulty = (temp as u64).max(self.floor_difficulty);
-                    }
-                    self.active_difficulty = new_difficulty;
+                    self.active_difficulty =
+                        Self::apply_decrease(self.active_difficulty, factor, windows_elapsed, self.floor_difficulty);
                 }
             }
             self.active_difficulty
@@ -144,11 +176,8 @@ pub mod tables {
                 if clamp_increase {
                     times_over_target = times_over_target.min(1);
                 }
-                let mut difficulty = self.active_difficulty as f64;
-                for _ in 0..times_over_target {
-                    difficulty = difficulty * factor;
-                }
-                self.active_difficulty = difficulty.min(u64::MAX as f64) as u64;
+                self.active_difficulty =
+                    Self::apply_increase(self.active_difficulty, factor, times_over_target);
                 self.counter = 0;
                 // The update is happening "mid block", so we round up to the next second. In other words,
                 // updates happens at the "end" of the block. Without this, a one-second block window would
@@ -175,7 +204,7 @@ pub mod tables {
         pub fn increment(&mut self, increment_amount: u32) -> u64 {
             self.check_sender_is_consumer();
             let difficulty = self.check_difficulty_decrease();
-            self.counter += increment_amount;
+            self.counter = self.counter.saturating_add(increment_amount);
             self.check_difficulty_increase(false);
             self.save();
             difficulty
@@ -204,7 +233,7 @@ pub mod tables {
             self.check_sender_has_nft();
             self.check_difficulty_decrease();
             self.increase_ppm = increase_ppm;
-            self.decrease_ppm = decrease_ppm;
+            self.decrease_ppm = Self::clamp_decrease_ppm(decrease_ppm);
             self.save();
         }
 
