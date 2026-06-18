@@ -219,33 +219,30 @@ export const CreatePrompt = () => {
             console.error(
                 error instanceof Error ? error.message : "Unknown error",
             );
+            let message = "An unknown error occurred";
             if (
                 error instanceof Error &&
                 error.message.includes("Invalid account name")
             ) {
-                createForm.fieldInfo.account.instance?.setErrorMap({
-                    onSubmit: "This account name is not available",
-                });
+                message = "This account name is not available";
             } else if (
                 error instanceof Error &&
                 error.message.includes("has insufficient balance")
             ) {
-                createForm.fieldInfo.account.instance?.setErrorMap({
-                    onSubmit: "Insufficient balance",
-                });
+                message = "Insufficient balance";
             } else if (
                 error instanceof Error &&
                 error.message.includes("Max cost below current ask")
             ) {
-                createForm.fieldInfo.account.instance?.setErrorMap({
-                    onSubmit:
-                        "Market price changed; check new price and try again",
-                });
-            } else {
-                createForm.fieldInfo.account.instance?.setErrorMap({
-                    onSubmit: "An unknown error occurred",
-                });
+                message =
+                    "Market price changed; check new price and try again";
             }
+            createForm.setFieldMeta("account", (prev) => ({
+                ...prev,
+                isTouched: true,
+                errors: [message],
+                errorMap: { onSubmit: message },
+            }));
         }
     };
 

@@ -16,7 +16,7 @@ export type MarketConfigInput = {
 };
 
 class PremAccounts extends PluginInterface {
-    protected override readonly _intf = "premAccounts" as const;
+    protected override readonly _intf = "name-market" as const;
 
     get configureMarkets() {
         return this._call<[configs: MarketConfigInput[]]>("configureMarkets");

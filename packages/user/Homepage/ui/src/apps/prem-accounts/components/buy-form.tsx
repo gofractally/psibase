@@ -84,10 +84,14 @@ export function BuyForm({
         onSubmit: async ({ value }) => {
             const priceAtSubmit = resolveLivePrice(value.accountName);
             if (!priceAtSubmit) {
-                form.fieldInfo.accountName.instance?.setErrorMap({
-                    onSubmit:
-                        "Market price is not available. Check the account name and try again.",
-                });
+                const message =
+                    "Market price is not available. Check the account name and try again.";
+                form.setFieldMeta("accountName", (prev) => ({
+                    ...prev,
+                    isTouched: true,
+                    errors: [message],
+                    errorMap: { onSubmit: message },
+                }));
                 return;
             }
 
@@ -175,19 +179,22 @@ export function BuyForm({
             const errorMessage =
                 error instanceof Error ? error.message : "Unknown error";
 
+            let message: string | undefined;
             if (errorMessage.includes("has insufficient balance")) {
-                form.fieldInfo.accountName.instance?.setErrorMap({
-                    onSubmit: "Insufficient balance",
-                });
+                message = "Insufficient balance";
             } else if (errorMessage.includes("Max cost below current ask")) {
-                form.fieldInfo.accountName.instance?.setErrorMap({
-                    onSubmit:
-                        "Market price changed; check new price and try again",
-                });
+                message =
+                    "Market price changed; check new price and try again";
             } else if (!errorMessage.includes("Transaction error:")) {
-                form.fieldInfo.accountName.instance?.setErrorMap({
-                    onSubmit: errorMessage,
-                });
+                message = errorMessage;
+            }
+            if (message) {
+                form.setFieldMeta("accountName", (prev) => ({
+                    ...prev,
+                    isTouched: true,
+                    errors: [message],
+                    errorMap: { onSubmit: message },
+                }));
             }
         }
     };

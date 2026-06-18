@@ -106,9 +106,12 @@ export const ConfirmKeyStep = ({
         } catch (e) {
             console.error("Import and login failed");
             console.error(e);
-            form.fieldInfo.privateKey.instance?.setErrorMap({
-                onSubmit: importErrorMessage,
-            });
+            form.setFieldMeta("privateKey", (prev) => ({
+                ...prev,
+                isTouched: true,
+                errors: [importErrorMessage],
+                errorMap: { onSubmit: importErrorMessage },
+            }));
         }
     };
 

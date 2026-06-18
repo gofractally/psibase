@@ -132,10 +132,10 @@ export function buildPremiumNameMarketsFormValues(
             target: String(row?.target ?? PREMIUM_MARKET_DEFAULT_PARAMS.target),
             increasePpm: row
                 ? ppmToWholePercentString(row.increasePpm)
-                : PREMIUM_MARKET_DEFAULT_PARAMS.increasePercent,
+                : String(PREMIUM_MARKET_DEFAULT_PARAMS.increasePercent),
             decreasePpm: row
                 ? ppmToWholePercentString(row.decreasePpm)
-                : PREMIUM_MARKET_DEFAULT_PARAMS.decreasePercent,
+                : String(PREMIUM_MARKET_DEFAULT_PARAMS.decreasePercent),
         });
     }
 
