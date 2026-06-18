@@ -56,9 +56,6 @@ pub mod service {
     use psibase::*;
     use psibase::{MAX_ACCOUNT_NAME_LENGTH, MIN_ACCOUNT_NAME_LENGTH};
 
-    /// DiffAdjust window for target semantics (30-day period).
-    const MARKET_WINDOW_SECONDS: u32 = 30 * 86400;
-
     fn require_caller_is_self() {
         check(
             get_sender() == get_service(),
@@ -194,10 +191,21 @@ pub mod service {
             .premAcctEvent(get_sender(), account.clone(), CLAIMED);
     }
 
+    /// Create a new name-length market.
+    ///
+    /// # Arguments
+    /// * `length` - The length of the name-length market
+    /// * `initial_price` - The initial price for the name-length market
+    /// * `window_seconds` - The window seconds for the name-length market
+    /// * `target` - The target for the name-length market
+    /// * `floor_price` - The floor price for the name-length market
+    /// * `increase_ppm` - The increase ppm for the name-length market
+    /// * `decrease_ppm` - The decrease ppm for the name-length market
     #[action]
     fn create(
         length: u8,
         initial_price: Quantity,
+        window_seconds: u32,
         target: u32,
         floor_price: Quantity,
         increase_ppm: u32,
@@ -215,7 +223,7 @@ pub mod service {
         let auctions_table = AuctionsTable::new();
         if let Some(auction) = auctions_table.get_index_pk().get(&length) {
             if let Some(rate_limit) = RateLimitTable::read().get_index_pk().get(&auction.nft_id) {
-                if rate_limit.window_seconds == MARKET_WINDOW_SECONDS
+                if rate_limit.window_seconds == window_seconds
                     && rate_limit.target_min == target
                     && rate_limit.target_max == target
                     && rate_limit.floor_difficulty == floor_price.value
@@ -230,7 +238,7 @@ pub mod service {
 
         let nft_id = DiffAdjust::call().create(
             initial_price.value,
-            MARKET_WINDOW_SECONDS,
+            window_seconds,
             target,
             target,
             floor_price.value,

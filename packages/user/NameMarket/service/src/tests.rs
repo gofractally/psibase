@@ -4,8 +4,11 @@
 mod tests {
     /// Matches Config UI default `PREMIUM_MARKET_DEFAULT_PPM` for `create` actions.
     const DEFAULT_CREATE_PPM: u32 = 50_000;
+    /// Matches Config UI default `PREMIUM_MARKET_DEFAULT_WINDOW_SECONDS`.
+    const DEFAULT_WINDOW_SECONDS: u32 = 30 * 86400;
 
     use crate::Wrapper as NameMarket;
+    use psibase::services::nft::Wrapper as Nfts;
     use psibase::services::tokens::{Precision, Quantity, Wrapper as Tokens, TID};
     use psibase::*;
     use psibase::{MAX_ACCOUNT_NAME_LENGTH, MIN_ACCOUNT_NAME_LENGTH};
@@ -64,18 +67,17 @@ mod tests {
     }
 
     /// One market per premium name length 1..=7 (matches Config default bootstrap range).
-    fn bootstrap_markets_1_7(
-        chain: &psibase::Chain,
-        admin: AccountNumber,
-    ) -> Result<(), psibase::Error> {
+    fn bootstrap_markets_1_7(chain: &psibase::Chain) -> Result<(), psibase::Error> {
         const INITIAL: u64 = 1000;
         const FLOOR: u64 = 100;
         const TARGET: u32 = 10;
-        for len in 1u8..=MAX_ACCOUNT_NAME_LENGTH {
-            NameMarket::push_from(chain, admin)
+        const BOOTSTRAP_MAX_LENGTH: u8 = 7;
+        for len in 1u8..=BOOTSTRAP_MAX_LENGTH {
+            NameMarket::push(chain)
                 .create(
                     len,
                     Quantity::from(INITIAL),
+                    DEFAULT_WINDOW_SECONDS,
                     TARGET,
                     Quantity::from(FLOOR),
                     DEFAULT_CREATE_PPM,
@@ -86,6 +88,26 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn create_tuple_unpacks_as_action_struct() {
+        use crate::service::action_structs::create;
+        use psibase::fracpack::{Pack, Unpack};
+        use psibase::services::tokens::Quantity;
+
+        let tuple = (
+            1u8,
+            1000.into(),
+            DEFAULT_WINDOW_SECONDS,
+            10u32,
+            100.into(),
+            DEFAULT_CREATE_PPM,
+            DEFAULT_CREATE_PPM,
+        );
+        let packed = tuple.packed();
+        let unpacked = create::unpacked(&packed).expect("create struct unpack");
+        assert_eq!(unpacked.window_seconds, DEFAULT_WINDOW_SECONDS);
+    }
+
     /// Full NameMarket integration on one chain (serial steps; avoids parallel `psitest` races).
     #[psibase::test_case(packages("Tokens", "Nft", "NameMarket"))]
     fn name_market_service_integration_serial(chain: psibase::Chain) -> Result<(), psibase::Error> {
@@ -94,7 +116,7 @@ mod tests {
         // --- setup_tokens ---
         setup_tokens(&chain)?;
 
-        bootstrap_markets_1_7(&chain, alice)?;
+        bootstrap_markets_1_7(&chain)?;
 
         let raw: serde_json::Value = chain.graphql(
             NameMarket::SERVICE,
@@ -115,7 +137,7 @@ mod tests {
             .buy(account!("test"))
             .get()?;
 
-        NameMarket::push_from(&chain, alice).disable(4).get()?;
+        NameMarket::push(&chain).disable(4).get()?;
 
         let raw_after_disable: serde_json::Value = chain.graphql(
             NameMarket::SERVICE,
@@ -173,7 +195,7 @@ mod tests {
             "sparse row per configured market after bootstrap"
         );
 
-        NameMarket::push_from(&chain, alice).disable(6).get()?;
+        NameMarket::push(&chain).disable(6).get()?;
 
         let raw = fetch(&chain)?;
         let status = raw
@@ -202,24 +224,26 @@ mod tests {
         );
 
         // --- duplicate create(7) with matching params is idempotent ---
-        NameMarket::push_from(&chain, alice)
+        NameMarket::push(&chain)
             .create(
                 7,
-                Quantity::from(1000u64),
+                1000.into(),
+                DEFAULT_WINDOW_SECONDS,
                 10,
-                Quantity::from(100u64),
+                100.into(),
                 DEFAULT_CREATE_PPM,
                 DEFAULT_CREATE_PPM,
             )
             .get()?;
 
         // --- duplicate create(7) with different params fails ---
-        let err = NameMarket::push_from(&chain, alice)
+        let err = NameMarket::push(&chain)
             .create(
                 7,
-                2000.into(),
-                10,
-                100.into(),
+                Quantity::from(1000u64),
+                DEFAULT_WINDOW_SECONDS,
+                20,
+                Quantity::from(100u64),
                 DEFAULT_CREATE_PPM,
                 DEFAULT_CREATE_PPM,
             )
@@ -232,10 +256,11 @@ mod tests {
         );
 
         // --- create(3) with matching params is idempotent ---
-        NameMarket::push_from(&chain, alice)
+        NameMarket::push(&chain)
             .create(
                 3,
                 Quantity::from(1000u64),
+                DEFAULT_WINDOW_SECONDS,
                 10,
                 Quantity::from(100u64),
                 DEFAULT_CREATE_PPM,
@@ -244,10 +269,11 @@ mod tests {
             .get()?;
 
         // --- create(8) succeeds: valid on-chain name length, no market yet (bootstrap is 1..=7) ---
-        NameMarket::push_from(&chain, alice)
+        NameMarket::push(&chain)
             .create(
                 8,
                 Quantity::from(1000u64),
+                DEFAULT_WINDOW_SECONDS,
                 10,
                 Quantity::from(100u64),
                 DEFAULT_CREATE_PPM,
@@ -257,10 +283,11 @@ mod tests {
 
         // --- invalid lengths: must be a valid on-chain account name length (1..=10) ---
         for length in [0u8, MAX_ACCOUNT_NAME_LENGTH + 1] {
-            let err = NameMarket::push_from(&chain, alice)
+            let err = NameMarket::push(&chain)
                 .create(
                     length,
                     Quantity::from(1000u64),
+                    DEFAULT_WINDOW_SECONDS,
                     10,
                     Quantity::from(100u64),
                     DEFAULT_CREATE_PPM,
@@ -292,7 +319,7 @@ mod tests {
         const TEST_WINDOW_SECS: u32 = 30 * 86400;
         const TEST_INCREASE_PPM: u32 = 48_000;
         const TEST_DECREASE_PPM: u32 = 52_000;
-        NameMarket::push_from(&chain, alice)
+        NameMarket::push(&chain)
             .configure(
                 5,
                 TEST_WINDOW_SECS,

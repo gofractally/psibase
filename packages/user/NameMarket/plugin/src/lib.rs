@@ -47,6 +47,7 @@ impl MarketAdmin for NameMarketPlugin {
     fn create(
         length: u8,
         initial_price: String,
+        window_seconds: u32,
         target: u32,
         floor_price: String,
         increase_pct: u8,
@@ -60,6 +61,7 @@ impl MarketAdmin for NameMarketPlugin {
         name_market::Wrapper::add_to_tx().create(
             length,
             Quantity::from(initial_price),
+            window_seconds,
             target,
             Quantity::from(floor_price),
             pct_to_ppm(increase_pct),
@@ -133,6 +135,7 @@ impl MarketAdmin for NameMarketPlugin {
                 name_market::Wrapper::add_to_tx().create(
                     cfg.length,
                     Quantity::from(initial_price),
+                    cfg.window_seconds,
                     cfg.target,
                     Quantity::from(floor_price),
                     pct_to_ppm(cfg.increase_pct),
