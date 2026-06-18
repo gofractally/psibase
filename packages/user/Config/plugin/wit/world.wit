@@ -20,7 +20,7 @@ interface name-market {
     use host:types/types.{error};
     use name-market:plugin/market-admin.{market-config};
 
-    /// Batch create or update premium name markets.
+    /// Batch create or update name markets.
     /// * For lengths with no existing market: creates the market; `initial-price` must be set.
     /// * For existing markets: updates params and enabled status; `initial-price` is ignored.
     /// * Skips entries whose params match current on-chain state (no-op).

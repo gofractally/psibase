@@ -177,7 +177,7 @@ impl MarketAdmin for NameMarketPlugin {
 
 impl Api for NameMarketPlugin {
     #[psibase_plugin::authorized(Medium, whitelist = ["accounts", "homepage"])]
-    fn can_create_premium_account() -> bool {
+    fn can_create_account() -> bool {
         if !AccountsApi::is_logged_in() {
             return false;
         }
@@ -306,11 +306,9 @@ struct MarketParamsResponse {
 fn fetch_market_params() -> Result<Vec<MarketParamsRow>, Error> {
     let graphql_str =
         "query { marketParams { length enabled initialPrice target floorPrice windowSeconds increasePpm decreasePpm } }";
-    serde_json::from_str::<MarketParamsResponse>(&CommonServer::post_graphql_get_json(
-        graphql_str,
-    )?)
-    .map_err(|err| ErrorType::QueryResponseParseError(err.to_string()).into())
-    .map(|response| response.data.market_params)
+    serde_json::from_str::<MarketParamsResponse>(&CommonServer::post_graphql_get_json(graphql_str)?)
+        .map_err(|err| ErrorType::QueryResponseParseError(err.to_string()).into())
+        .map(|response| response.data.market_params)
 }
 
 fn market_params_match(current: &MarketParamsRow, requested: &MarketConfig) -> bool {

@@ -2,9 +2,7 @@ use crate::bindings::auth_sig::plugin as AuthSig;
 use crate::bindings::exports::accounts::plugin::api::Guest;
 use crate::bindings::exports::accounts::plugin::prompt::{Credential, Guest as Prompt};
 use crate::bindings::host::{
-    auth::api as HostAuth,
-    common::client as Client,
-    crypto::keyvault as HostCrypto,
+    auth::api as HostAuth, common::client as Client, crypto::keyvault as HostCrypto,
     types::types::Error,
 };
 use crate::bindings::invite::plugin::redemption as Invites;
@@ -109,7 +107,7 @@ impl Prompt for AccountsPlugin {
             return Self::create_account(account_name);
         }
 
-        if !NameMarket::can_create_premium_account() {
+        if !NameMarket::can_create_account() {
             return Err(ErrorType::CannotCreatePremiumAccount().into());
         }
 

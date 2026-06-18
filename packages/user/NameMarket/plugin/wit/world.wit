@@ -60,7 +60,7 @@ interface api {
     ///
     /// Returns true when the user is logged in, the network token is defined,
     /// and at least one premium name market is enabled with a live price row.
-    can-create-premium-account: func() -> bool;
+    can-create-account: func() -> bool;
 
     /// Purchase a premium name
     /// * `account`: the account to purchase the name for

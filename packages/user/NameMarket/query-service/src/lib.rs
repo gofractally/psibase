@@ -15,7 +15,7 @@ mod service {
         length: u8,
         enabled: bool,
         #[graphql(name = "initialPrice")]
-        initial_price: Decimal,
+        initial_price: Quantity,
         target: u32,
         #[graphql(name = "floorPrice")]
         floor_price: Decimal,
@@ -126,10 +126,7 @@ mod service {
                     Some(MarketParams {
                         length: auction.length,
                         enabled: auction.enabled,
-                        initial_price: Decimal::new(
-                            Quantity::from(auction.initial_price),
-                            precision,
-                        ),
+                        initial_price: auction.initial_price,
                         target: rate_limit.target_min, // target_min == target_max in our usage
                         floor_price: Decimal::new(
                             Quantity::from(rate_limit.floor_difficulty),

@@ -1,6 +1,7 @@
 #[psibase::service_tables]
 pub mod tables {
     use async_graphql::SimpleObject;
+    use psibase::services::tokens::Quantity;
     use psibase::AccountNumber;
     use psibase::{Fracpack, ToSchema};
     use serde::{Deserialize, Serialize};
@@ -20,7 +21,7 @@ pub mod tables {
         pub length: u8,
         pub nft_id: u32,
         pub enabled: bool,
-        pub initial_price: u64,
+        pub initial_price: Quantity,
     }
 
     #[table(name = "PurchasedAccountsTable", index = 2)]
@@ -242,7 +243,7 @@ pub mod service {
                 length,
                 nft_id,
                 enabled: true,
-                initial_price: initial_price.value,
+                initial_price,
             })
             .unwrap();
     }

@@ -88,9 +88,7 @@ mod tests {
 
     /// Full NameMarket integration on one chain (serial steps; avoids parallel `psitest` races).
     #[psibase::test_case(packages("Tokens", "Nft", "NameMarket"))]
-    fn name_market_service_integration_serial(
-        chain: psibase::Chain,
-    ) -> Result<(), psibase::Error> {
+    fn name_market_service_integration_serial(chain: psibase::Chain) -> Result<(), psibase::Error> {
         let alice = AccountNumber::from("alice");
 
         // --- setup_tokens ---
@@ -219,9 +217,9 @@ mod tests {
         let err = NameMarket::push_from(&chain, alice)
             .create(
                 7,
-                Quantity::from(2000u64),
+                2000.into(),
                 10,
-                Quantity::from(100u64),
+                100.into(),
                 DEFAULT_CREATE_PPM,
                 DEFAULT_CREATE_PPM,
             )
