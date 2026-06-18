@@ -83,6 +83,6 @@ pub mod fractal {
     }
 
     pub fn get_fractal(fractal: String) -> Result<Fractal, Error> {
-        fetch_fractal(fractal.as_str().into()).map(|data| Fractal::from(data))
+        fetch_fractal(fractal.parse().unwrap()).map(|data| Fractal::from(data))
     }
 }

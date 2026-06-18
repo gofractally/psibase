@@ -39,7 +39,7 @@ mod service {
 
         /// Fetch symbol information, returns null if it does not exist
         async fn symbol(&self, symbol: String) -> Option<Symbol> {
-            Symbol::get(symbol.as_str().into())
+            Symbol::get(symbol.parse().unwrap())
         }
 
         /// Fetch a mapping of a symbol by token ID
