@@ -289,7 +289,7 @@ struct test_chain
       sys    = std::make_unique<psibase::SystemContext>(
           psibase::SystemContext{this->db,
                                  state.shared_wasm_cache,
-                                    {},
+                                 {},
                                  state.watchdogManager,
                                  std::make_shared<psibase::Sockets>(this->db)});
       state.shared_memory_cache.init(*sys);
@@ -371,7 +371,6 @@ struct test_chain
           std::make_unique<psibase::BlockContext>(*sys, revisionAtBlockStart, writer, true);
 
       blockContext->start(time, producer, term, commitNum);
-      blockContext->callStartBlock();
    }
 
    void start_if_needed()

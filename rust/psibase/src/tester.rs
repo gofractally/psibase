@@ -400,6 +400,33 @@ impl Chain {
         self.start_block_at(current_time + micro_seconds);
     }
 
+    fn push_start_block(&self, expiration: TimePointUSec) {
+        let trx = Transaction {
+            tapos: Tapos {
+                expiration: expiration.ceil_seconds(),
+                refBlockSuffix: 0,
+                flags: 0,
+                refBlockIndex: 0,
+            },
+            actions: vec![
+                services::transact::Wrapper::pack_from(AccountNumber::new(0)).startBlock(),
+            ],
+            claims: vec![],
+        };
+        let strx = SignedTransaction {
+            transaction: trx.packed().into(),
+            proofs: vec![],
+            subjectiveData: None,
+        }
+        .packed();
+        let size =
+            unsafe { tester_raw::pushTransaction(self.chain_handle, strx.as_ptr(), strx.len()) };
+        let trace = TransactionTrace::unpacked(&get_result_bytes(size)).unwrap();
+        if let Some(error) = &trace.error {
+            panic!("startBlock failed: {error}");
+        }
+    }
+
     /// Start a new block
     ///
     /// Starts a new block at `time`. If `time.seconds` is 0,
@@ -442,6 +469,7 @@ impl Chain {
                         commit_num,
                     )
                 }
+                self.push_start_block(time);
                 commit_num += 1;
             }
         }
@@ -453,6 +481,9 @@ impl Chain {
                 term,
                 commit_num,
             )
+        }
+        if status.is_some() {
+            self.push_start_block(time + Seconds::new(1));
         }
         *status = self
             .kv_get::<StatusRow, _>(StatusRow::DB, &status_key())

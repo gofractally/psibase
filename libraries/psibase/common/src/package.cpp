@@ -59,7 +59,7 @@ namespace psibase
       struct PrettyAction
       {
          AccountNumber                    sender;
-         AccountNumber                    service;
+         std::string                      service;
          MethodNumber                     method;
          std::optional<std::vector<char>> rawData;
          std::optional<psio::json::any>   data;
@@ -100,13 +100,16 @@ namespace psibase
 
       Action to_action(PrettyAction&& act, std::span<const PackagedService> packages)
       {
+         auto service = AccountNumber{act.service};
+         if (service == AccountNumber{})
+            abortMessage("Invalid service account " + act.service);
          if (act.rawData)
          {
-            return Action{act.sender, act.service, act.method, std::move(*act.rawData)};
+            return Action{act.sender, service, act.method, std::move(*act.rawData)};
          }
-         auto* schema = getSchema(packages, act.service);
+         auto* schema = getSchema(packages, service);
          if (!schema)
-            abortMessage("Cannot find schema for " + act.service.str());
+            abortMessage("Cannot find schema for " + act.service);
          auto pos = schema->actions.find(act.method.str());
          check(pos != schema->actions.end(), "Action not found");
          const auto&                        ty = pos->second.params;
@@ -114,7 +117,7 @@ namespace psibase
          auto*                              cty = cschema.get(ty.resolve(schema->types));
          if (!act.data)
             act.data = psio::json::any_object{};
-         Action              result{act.sender, act.service, act.method};
+         Action              result{act.sender, service, act.method};
          psio::vector_stream stream{result.rawData};
          to_frac(*cty, *act.data, stream, cschema.builtin);
          return result;
@@ -153,7 +156,7 @@ namespace psibase
             for (const auto& act : readPostinstall(package))
             {
                accounts.push_back(act.sender);
-               services.push_back(act.service);
+               services.push_back(AccountNumber{act.service});
             }
 
             std::ranges::sort(accounts);
@@ -277,12 +280,12 @@ namespace psibase
             if (name.ends_with(".wasm"))
             {
                name.remove_suffix(5);
-               service_files.push_back({AccountNumber{name}, file});
+               service_files.push_back({AccountNumber::withSeparator(name, "/"), file});
             }
             else if (name.ends_with(".json"))
             {
                name.remove_suffix(5);
-               info_files.insert({AccountNumber{name}, file});
+               info_files.insert({AccountNumber::withSeparator(name, "/"), file});
             }
          }
          else if (file.filename.starts_with("data/") && file.isFile())
@@ -431,7 +434,7 @@ namespace psibase
    {
       for (const auto& action : readPostinstall(*this))
       {
-         if (action.service == Sites::service)
+         if (AccountNumber{action.service} == Sites::service)
          {
             return true;
          }

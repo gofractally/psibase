@@ -103,7 +103,7 @@ impl Fractal {
         create_role(recruitment, Recruitment);
 
         create_managed_account(fractal, || {
-            sites::Wrapper::call_as(fractal).setProxy(account!("fractal-core"));
+            sites::Wrapper::call_as(fractal).setProxy(account!("fractal-cr"));
         });
 
         FractalMember::add(fractal, get_sender(), None);

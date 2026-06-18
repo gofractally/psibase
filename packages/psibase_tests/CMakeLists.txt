@@ -28,6 +28,7 @@ function(add suffix)
     service(XSudo "${suffix}" src/XSudo.cpp)
     service(AsRpc "${suffix}" src/AsRpc.cpp)
     service(MockTransact "${suffix}" src/MockTransact.cpp)
+    service(AuthNone "${suffix}" src/AuthNone.cpp)
 
     set(TEST_GENERATE_SCHEMA 1)
     service(MockCpuLimit "${suffix}" src/MockCpuLimit.cpp)
