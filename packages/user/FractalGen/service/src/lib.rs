@@ -50,10 +50,10 @@ mod service {
         let prods = Producers::call().getProducers();
         let producer = prods.first().unwrap();
 
-        let legislature = account!("legislature");
-        let judiciary = account!("judiciary-a");
-        let executive = account!("executive-a");
-        let recruitment = account!("recruitment-a");
+        let legislature = account!("legislatur");
+        let judiciary = account!("judiciar-a");
+        let executive = account!("executiv-a");
+        let recruitment = account!("recruitm-a");
 
         Fractals::call_from(*producer).create_frac(
             SYS_FRACTAL,

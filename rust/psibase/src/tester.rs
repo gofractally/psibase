@@ -446,7 +446,7 @@ impl Chain {
             };
             (
                 if producers.is_empty() {
-                    account!("firstproducer")
+                    account!("firstprod")
                 } else {
                     producers[0].name
                 },
@@ -454,7 +454,7 @@ impl Chain {
                 status.head.as_ref().map_or(0, |head| head.header.blockNum),
             )
         } else {
-            (account!("firstproducer"), 0, 0)
+            (account!("firstprod"), 0, 0)
         };
 
         // Guarantee that there is a recent block for fillTapos to use.
