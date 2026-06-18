@@ -57,16 +57,7 @@ pub mod tables {
             }
         }
 
-        fn check_ppm_change(ppm: u32) {
-            check(
-                ppm > 0 && ppm < ONE_MILLION,
-                "ppm must be between 0 - 1,000,000",
-            );
-        }
-
         fn check_targets(target_min: u32, target_max: u32) {
-            check(target_min > 0, "target_min must be above 0");
-            check(target_max > 0, "target_max must be above 0");
             check(
                 target_min <= target_max,
                 "target_min must not exceed target_max",
@@ -94,8 +85,6 @@ pub mod tables {
                 TransactSvc::call().currentBlock().time.seconds() + psibase::Seconds::new(1); // See comment in check_difficulty_increase
 
             Self::check_targets(target_min, target_max);
-            Self::check_ppm_change(increase_ppm);
-            Self::check_ppm_change(decrease_ppm);
             Self::check_window_seconds(window_seconds);
 
             let new_instance = Self::new(
@@ -148,7 +137,10 @@ pub mod tables {
         fn check_difficulty_increase(&mut self, clamp_increase: bool) -> u64 {
             if self.counter > self.target_max {
                 let factor = 1.0 + self.ratio_increase();
-                let mut times_over_target = self.counter / self.target_max;
+                let mut times_over_target = match self.target_max {
+                    0 => self.counter,
+                    _ => self.counter / self.target_max,
+                };
                 if clamp_increase {
                     times_over_target = times_over_target.min(1);
                 }
@@ -211,8 +203,6 @@ pub mod tables {
         pub fn set_ppm(&mut self, increase_ppm: u32, decrease_ppm: u32) {
             self.check_sender_has_nft();
             self.check_difficulty_decrease();
-            Self::check_ppm_change(increase_ppm);
-            Self::check_ppm_change(decrease_ppm);
             self.increase_ppm = increase_ppm;
             self.decrease_ppm = decrease_ppm;
             self.save();
