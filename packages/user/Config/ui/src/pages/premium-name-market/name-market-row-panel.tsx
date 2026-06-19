@@ -8,17 +8,37 @@ import type { ReactNode } from "react";
 import { PREMIUM_MARKET_DEFAULT_PARAMS } from "@/lib/premium-name-market-defaults";
 
 import { FieldErrors } from "@shared/components/form/internal/field-errors";
+import {
+    type DurationUnit,
+    zDurationUnit,
+} from "@shared/lib/schemas/duration-unit";
 import { cn } from "@shared/lib/utils";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@shared/shadcn/ui/select";
 
 const MARKET_FIELD_PLACEHOLDERS = {
     initialPrice: PREMIUM_MARKET_DEFAULT_PARAMS.initialPrice,
     floorPrice: PREMIUM_MARKET_DEFAULT_PARAMS.floorPrice,
+    windowAmount: PREMIUM_MARKET_DEFAULT_PARAMS.windowAmount,
     target: String(PREMIUM_MARKET_DEFAULT_PARAMS.target),
     increasePpm: String(PREMIUM_MARKET_DEFAULT_PARAMS.increasePercent),
     decreasePpm: String(PREMIUM_MARKET_DEFAULT_PARAMS.decreasePercent),
 } as const;
+
+const FIELD_LABEL_CLASS = "text-xs font-medium leading-none min-h-3.5";
+
+const WINDOW_UNIT_LABELS: Record<DurationUnit, string> = {
+    Minutes: "Min",
+    Hours: "Hours",
+    Days: "Days",
+};
 
 type MarketFormApi = {
     Field: (props: {
@@ -74,8 +94,8 @@ function CompactField({
     const isError = meta.errors.length > 0 && meta.isTouched;
 
     return (
-        <div className="grid gap-1">
-            <Label htmlFor={id} className="text-xs font-medium leading-none">
+        <div className="grid min-w-0 gap-1">
+            <Label htmlFor={id} className={FIELD_LABEL_CLASS}>
                 {label}
             </Label>
             <Input
@@ -100,6 +120,87 @@ function CompactField({
     );
 }
 
+function WindowLengthField({
+    id,
+    amount,
+    unit,
+    onAmountChange,
+    onUnitChange,
+    onAmountBlur,
+    disabled,
+    meta,
+    isDirty,
+}: {
+    id: string;
+    amount: string;
+    unit: DurationUnit;
+    onAmountChange: (value: string) => void;
+    onUnitChange: (value: DurationUnit) => void;
+    onAmountBlur: () => void;
+    disabled?: boolean;
+    meta: { errors: unknown[]; isTouched: boolean };
+    isDirty?: boolean;
+}) {
+    const isError = meta.errors.length > 0 && meta.isTouched;
+    const dirtyRingClass =
+        isDirty && !isError
+            ? "border-amber-300 ring-2 ring-amber-400/50 dark:border-amber-700 dark:ring-amber-500/40"
+            : undefined;
+
+    return (
+        <div className="grid min-w-0 gap-1">
+            <Label htmlFor={id} className={FIELD_LABEL_CLASS}>
+                Window length
+            </Label>
+            <div className="flex items-center gap-2">
+                <Input
+                    id={id}
+                    value={amount}
+                    onChange={(e) => onAmountChange(e.target.value)}
+                    onBlur={onAmountBlur}
+                    autoComplete="off"
+                    inputMode="numeric"
+                    disabled={disabled}
+                    placeholder={MARKET_FIELD_PLACEHOLDERS.windowAmount}
+                    className={cn(
+                        "h-8 min-w-0 flex-1 scroll-mt-28 font-mono text-sm",
+                        dirtyRingClass,
+                    )}
+                    aria-invalid={isError}
+                />
+                <Select
+                    value={unit}
+                    onValueChange={(value) =>
+                        onUnitChange(value as DurationUnit)
+                    }
+                    disabled={disabled}
+                >
+                    <SelectTrigger
+                        size="sm"
+                        className={cn(
+                            "w-24 shrink-0 font-mono text-sm",
+                            dirtyRingClass,
+                        )}
+                        aria-label="Window length unit"
+                    >
+                        <SelectValue placeholder="Days">
+                            {WINDOW_UNIT_LABELS[unit]}
+                        </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                        {zDurationUnit.options.map((option) => (
+                            <SelectItem key={option} value={option}>
+                                {WINDOW_UNIT_LABELS[option]}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+            <FieldErrors meta={meta as AnyFieldMeta} />
+        </div>
+    );
+}
+
 export function NameMarketRowPanel({
     form,
     index,
@@ -113,7 +214,7 @@ export function NameMarketRowPanel({
             selector={(state) => state.values.markets[index]?.configured}
         >
             {(configured) => (
-                <div className="grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                <div className="grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.45fr)_minmax(0,1fr)_4.75rem_4.75rem]">
                     <form.Field name={`${baseName}.initialPrice`}>
                         {(field) => (
                             <CompactField
@@ -158,11 +259,41 @@ export function NameMarketRowPanel({
                         )}
                     </form.Field>
 
+                    <form.Field name={`${baseName}.windowAmount`}>
+                        {(amountField) => (
+                            <form.Field name={`${baseName}.windowUnit`}>
+                                {(unitField) => (
+                                    <WindowLengthField
+                                        id={`pm-window-${index}`}
+                                        amount={amountField.state.value}
+                                        unit={
+                                            unitField.state
+                                                .value as DurationUnit
+                                        }
+                                        onAmountChange={
+                                            amountField.handleChange
+                                        }
+                                        onUnitChange={unitField.handleChange}
+                                        onAmountBlur={amountField.handleBlur}
+                                        disabled={actionsDisabled}
+                                        meta={amountField.state.meta}
+                                        isDirty={
+                                            amountField.state.value !==
+                                                baseline.windowAmount ||
+                                            unitField.state.value !==
+                                                baseline.windowUnit
+                                        }
+                                    />
+                                )}
+                            </form.Field>
+                        )}
+                    </form.Field>
+
                     <form.Field name={`${baseName}.target`}>
                         {(field) => (
                             <CompactField
                                 id={`pm-target-${index}`}
-                                label="Target sales / month"
+                                label="Target sales / window"
                                 value={field.state.value}
                                 onChange={field.handleChange}
                                 onBlur={field.handleBlur}

@@ -4,21 +4,21 @@ import type { MarketConfigInput } from "@shared/lib/plugins/config";
 
 import { z } from "zod";
 
-import {
-    PREMIUM_MARKET_DEFAULT_PARAMS,
-    PREMIUM_MARKET_DEFAULT_WINDOW_SECONDS,
-} from "@/lib/premium-name-market-defaults";
+import { PREMIUM_MARKET_DEFAULT_PARAMS } from "@/lib/premium-name-market-defaults";
 import {
     parsePercentToPct,
     parsePositiveInt,
     parseSystemTokenAmount,
+    parseWindowSeconds,
     ppmToWholePercentString,
+    secondsToWindowForm,
 } from "@/lib/premium-name-market-parsers";
 
 import {
     MAX_ACCOUNT_NAME_LENGTH,
     MIN_ACCOUNT_NAME_LENGTH,
 } from "@shared/lib/schemas/account";
+import { zDurationUnit } from "@shared/lib/schemas/duration-unit";
 
 export type PremiumNameMarketFormRow = {
     length: number;
@@ -26,6 +26,8 @@ export type PremiumNameMarketFormRow = {
     enabled: boolean;
     initialPrice: string;
     floorPrice: string;
+    windowAmount: string;
+    windowUnit: z.infer<typeof zDurationUnit>;
     target: string;
     increasePpm: string;
     decreasePpm: string;
@@ -45,6 +47,8 @@ const zDirtyMarketRow = (systemToken: SystemTokenInfo) =>
             enabled: z.boolean(),
             initialPrice: z.string(),
             floorPrice: z.string(),
+            windowAmount: z.string(),
+            windowUnit: zDurationUnit,
             target: z.string(),
             increasePpm: z.string(),
             decreasePpm: z.string(),
@@ -80,6 +84,14 @@ const zDirtyMarketRow = (systemToken: SystemTokenInfo) =>
                     code: "custom",
                     message: "Enter a valid token amount",
                     path: ["floorPrice"],
+                });
+            }
+
+            if (parseWindowSeconds(row.windowAmount, row.windowUnit) === null) {
+                ctx.addIssue({
+                    code: "custom",
+                    message: "Window length is required",
+                    path: ["windowAmount"],
                 });
             }
 
@@ -123,6 +135,12 @@ export function buildPremiumNameMarketsFormValues(
     ) {
         const row = byLength.get(length);
         const configured = row !== undefined;
+        const windowForm = configured
+            ? secondsToWindowForm(row!.windowSeconds)
+            : {
+                  amount: "",
+                  unit: PREMIUM_MARKET_DEFAULT_PARAMS.windowUnit,
+              };
         markets.push({
             length,
             configured,
@@ -131,6 +149,8 @@ export function buildPremiumNameMarketsFormValues(
                 ? PREMIUM_MARKET_DEFAULT_PARAMS.initialPrice
                 : "",
             floorPrice: row?.floorPrice ?? "",
+            windowAmount: windowForm.amount,
+            windowUnit: windowForm.unit,
             target: configured ? String(row!.target) : "",
             increasePpm: configured
                 ? ppmToWholePercentString(row!.increasePpm)
@@ -152,6 +172,8 @@ export function marketRowsEqual(
         a.enabled === b.enabled &&
         a.initialPrice === b.initialPrice &&
         a.floorPrice === b.floorPrice &&
+        a.windowAmount === b.windowAmount &&
+        a.windowUnit === b.windowUnit &&
         a.target === b.target &&
         a.increasePpm === b.increasePpm &&
         a.decreasePpm === b.decreasePpm
@@ -208,12 +230,14 @@ export function toMarketConfig(
     const increasePct = parsePercentToPct(row.increasePpm);
     const decreasePct = parsePercentToPct(row.decreasePpm);
     const floorPrice = parseSystemTokenAmount(row.floorPrice, systemToken);
+    const windowSeconds = parseWindowSeconds(row.windowAmount, row.windowUnit);
 
     if (
         target === null ||
         increasePct === null ||
         decreasePct === null ||
-        floorPrice === null
+        floorPrice === null ||
+        windowSeconds === null
     ) {
         throw new Error(`Invalid market config for length ${row.length}`);
     }
@@ -228,7 +252,7 @@ export function toMarketConfig(
 
     return {
         length: row.length,
-        windowSeconds: PREMIUM_MARKET_DEFAULT_WINDOW_SECONDS,
+        windowSeconds,
         target,
         floorPrice,
         increasePct,

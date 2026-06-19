@@ -45,6 +45,8 @@ const MARKET_EDITABLE_FIELDS: Array<keyof PremiumNameMarketFormRow> = [
     "enabled",
     "initialPrice",
     "floorPrice",
+    "windowAmount",
+    "windowUnit",
     "target",
     "increasePpm",
     "decreasePpm",
@@ -190,10 +192,9 @@ export const PremiumNameMarketConfig = () => {
                             new purchases.
                         </li>
                         <li>
-                            Floor price, target per month, and increase/decrease
-                            percentages can be edited on any card. The
-                            adjustment window is always 30 days and is not
-                            editable here.
+                            Floor price, window length, target per window, and
+                            increase/decrease percentages can be edited on any
+                            card.
                         </li>
                         <li>
                             Nothing is staged until you click Save changes at
