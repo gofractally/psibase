@@ -1007,7 +1007,6 @@ psibase_package(
         "VirtualServer(^${PSIBASE_VERSION})"
         "Chainmail(^${PSIBASE_VERSION})"
         "ClientData(^${PSIBASE_VERSION})"
-        "NameMarket(^${PSIBASE_VERSION})"
     SERVICE config
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Config/ui/dist/* /
         DATA ${Plugins_OUTPUT_FILE_config} /plugin.wasm
@@ -1053,7 +1052,7 @@ psibase_package(
     OUTPUT ${SERVICE_DIR}/DevNameMarkets.psi
     NAME DevNameMarkets
     VERSION ${PSIBASE_VERSION}.0
-    DESCRIPTION "Creates the default premium account markets. Not for production use."
+    DESCRIPTION "Creates the default name markets. Not for production use."
     PACKAGE_DEPENDS "NameMarket(^${PSIBASE_VERSION}.0)" "FaucetTok(^${PSIBASE_VERSION}.0)"
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/NameMarket/src/DevNameMarkets.json
 )

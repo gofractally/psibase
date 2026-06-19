@@ -10,6 +10,12 @@ mod service {
     use serde::Deserialize;
     use serde_aux::field_attributes::deserialize_number_from_string;
 
+    const PPM_PER_PCT: u32 = 10_000;
+
+    fn ppm_to_pct(ppm: u32) -> u8 {
+        ((ppm + PPM_PER_PCT / 2) / PPM_PER_PCT) as u8
+    }
+
     #[derive(SimpleObject)]
     struct MarketParams {
         length: u8,
@@ -21,10 +27,10 @@ mod service {
         floor_price: Decimal,
         #[graphql(name = "windowSeconds")]
         window_seconds: u32,
-        #[graphql(name = "increasePpm")]
-        increase_ppm: u32,
-        #[graphql(name = "decreasePpm")]
-        decrease_ppm: u32,
+        #[graphql(name = "increasePct")]
+        increase_pct: u8,
+        #[graphql(name = "decreasePct")]
+        decrease_pct: u8,
     }
 
     #[derive(SimpleObject)]
@@ -133,8 +139,8 @@ mod service {
                             precision,
                         ),
                         window_seconds: rate_limit.window_seconds,
-                        increase_ppm: rate_limit.increase_ppm,
-                        decrease_ppm: rate_limit.decrease_ppm,
+                        increase_pct: ppm_to_pct(rate_limit.increase_ppm),
+                        decrease_pct: ppm_to_pct(rate_limit.decrease_ppm),
                     })
                 })
                 .collect();

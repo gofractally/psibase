@@ -17,16 +17,6 @@ export type NameMarketConfigInput = {
     initialPrice?: string | null;
 };
 
-export const PPM_PER_PCT = 10_000;
-
-export function ppmToPct(ppm: number): number {
-    const pct = Math.round(ppm / PPM_PER_PCT);
-    if (!Number.isFinite(pct) || pct < 1 || pct > 255) {
-        throw new Error(`Adjust rate must map to 1–255% (got PPM ${ppm})`);
-    }
-    return pct;
-}
-
 export function rowToMarketConfig(
     row: ConfiguredPremiumNameMarketRow,
     overrides: Partial<
@@ -38,8 +28,8 @@ export function rowToMarketConfig(
         windowSeconds: PREMIUM_MARKET_DEFAULT_WINDOW_SECONDS,
         target: overrides.target ?? row.target,
         floorPrice: overrides.floorPrice ?? row.floorPrice,
-        increasePct: overrides.increasePct ?? ppmToPct(row.increasePpm),
-        decreasePct: overrides.decreasePct ?? ppmToPct(row.decreasePpm),
+        increasePct: overrides.increasePct ?? row.increasePct,
+        decreasePct: overrides.decreasePct ?? row.decreasePct,
         enabled: overrides.enabled ?? row.enabled,
         initialPrice: overrides.initialPrice ?? null,
     };
@@ -53,8 +43,8 @@ export function defaultMarketConfigForLength(
         windowSeconds: PREMIUM_MARKET_DEFAULT_WINDOW_SECONDS,
         target: PREMIUM_MARKET_DEFAULT_PARAMS.target,
         floorPrice: PREMIUM_MARKET_DEFAULT_PARAMS.floorPrice,
-        increasePct: ppmToPct(PREMIUM_MARKET_DEFAULT_PARAMS.increasePpm),
-        decreasePct: ppmToPct(PREMIUM_MARKET_DEFAULT_PARAMS.decreasePpm),
+        increasePct: PREMIUM_MARKET_DEFAULT_PARAMS.increasePct,
+        decreasePct: PREMIUM_MARKET_DEFAULT_PARAMS.decreasePct,
         enabled: true,
         initialPrice: PREMIUM_MARKET_DEFAULT_PARAMS.initialPrice,
     };

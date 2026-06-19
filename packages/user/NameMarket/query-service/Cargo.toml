@@ -1,6 +1,6 @@
 [package]
 name = "r-name-market"
-description = "RPC service for name-market"
+description = "RPC service for namemarket"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true

@@ -1,21 +1,20 @@
 import type { ConfiguredPremiumNameMarketRow } from "@/hooks/premium-name-markets/use-configured-markets";
 
+import { usePluginMutation } from "@/hooks/use-plugin-mutation";
+import { rowToMarketConfig } from "@/lib/name-market-config";
+import { CONFIG } from "@/lib/services";
+
 import { queryClient } from "@shared/lib/query-client";
 import { supervisor } from "@shared/lib/supervisor";
 
 import QueryKey from "../../lib/query-keys";
 
-import { ppmToPct, rowToMarketConfig } from "@/lib/name-market-config";
-import { CONFIG } from "@/lib/services";
-
-import { usePluginMutation } from "@/hooks/use-plugin-mutation";
-
 export type SavePremiumNameMarketConfigInput = {
     row: ConfiguredPremiumNameMarketRow;
     target: number;
     floorPrice: string;
-    increasePpm: number;
-    decreasePpm: number;
+    increasePct: number;
+    decreasePct: number;
 };
 
 export const useConfigurePremiumNameMarket = () =>
@@ -34,8 +33,8 @@ export const useConfigurePremiumNameMarket = () =>
                 row,
                 target,
                 floorPrice,
-                increasePpm,
-                decreasePpm,
+                increasePct,
+                decreasePct,
             }) => {
                 await supervisor.functionCall({
                     service: CONFIG,
@@ -46,8 +45,8 @@ export const useConfigurePremiumNameMarket = () =>
                             rowToMarketConfig(row, {
                                 target,
                                 floorPrice,
-                                increasePct: ppmToPct(increasePpm),
-                                decreasePct: ppmToPct(decreasePpm),
+                                increasePct,
+                                decreasePct,
                             }),
                         ],
                     ],

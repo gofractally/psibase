@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    /// Matches Config UI default `PREMIUM_MARKET_DEFAULT_PPM` for `create` actions.
+    /// Matches Config UI default `PREMIUM_MARKET_DEFAULT_PCT` (5%) for `create` actions.
     const DEFAULT_CREATE_PPM: u32 = 50_000;
     /// Matches Config UI default `PREMIUM_MARKET_DEFAULT_WINDOW_SECONDS`.
     const DEFAULT_WINDOW_SECONDS: u32 = 30 * 86400;
@@ -332,7 +332,7 @@ mod tests {
 
         let raw: serde_json::Value = chain.graphql(
             NameMarket::SERVICE,
-            "query { marketParams { length enabled initialPrice target floorPrice windowSeconds increasePpm decreasePpm } }",
+            "query { marketParams { length enabled initialPrice target floorPrice windowSeconds increasePct decreasePct } }",
         )?;
         let markets = raw
             .pointer("/data/marketParams")
@@ -350,14 +350,8 @@ mod tests {
             cfg.get("windowSeconds"),
             Some(&serde_json::json!(TEST_WINDOW_SECS))
         );
-        assert_eq!(
-            cfg.get("increasePpm"),
-            Some(&serde_json::json!(TEST_INCREASE_PPM))
-        );
-        assert_eq!(
-            cfg.get("decreasePpm"),
-            Some(&serde_json::json!(TEST_DECREASE_PPM))
-        );
+        assert_eq!(cfg.get("increasePct"), Some(&serde_json::json!(5)));
+        assert_eq!(cfg.get("decreasePct"), Some(&serde_json::json!(5)));
 
         Ok(())
     }

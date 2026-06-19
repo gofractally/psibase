@@ -6,10 +6,3 @@ interface api {
     /// Sets the auth service used to authenticate the currently logged-in user
     set-auth-service: func(service-name: string) -> result<_, error>;
 }
-
-interface prompt {
-    use host:types/types.{error, pem};
-
-    /// Creates a new account, returns the private key used to authorize it.
-    create-account: func(account-name: string) -> result<string, error>;
-}

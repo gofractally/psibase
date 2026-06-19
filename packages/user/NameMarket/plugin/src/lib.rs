@@ -15,7 +15,10 @@ use psibase::AccountNumber;
 mod errors;
 use errors::ErrorType;
 
-use psibase_plugin::{trust::*, *};
+use psibase_plugin::{
+    trust::{Capabilities, TrustConfig},
+    Error, Transact,
+};
 
 const PPM_PER_PCT: u32 = 10_000;
 
@@ -23,7 +26,7 @@ fn pct_to_ppm(pct: u8) -> u32 {
     (pct as u32) * PPM_PER_PCT
 }
 
-fn require_adjust_pcts(increase_pct: u8, decrease_pct: u8) -> Result<(), Error> {
+fn validate_adjust_pcts(increase_pct: u8, decrease_pct: u8) -> Result<(), Error> {
     if increase_pct == 0 || decrease_pct == 0 {
         return Err(ErrorType::InvalidAdjustPct.into());
     }
@@ -53,7 +56,7 @@ impl MarketAdmin for NameMarketPlugin {
         increase_pct: u8,
         decrease_pct: u8,
     ) -> Result<(), Error> {
-        require_adjust_pcts(increase_pct, decrease_pct)?;
+        validate_adjust_pcts(increase_pct, decrease_pct)?;
         let sys_token_id =
             TokensHelpers::fetch_network_token()?.ok_or(ErrorType::SystemTokenNotDefined)?;
         let initial_price = TokensHelpers::decimal_to_u64(sys_token_id, &initial_price)?;
@@ -79,7 +82,7 @@ impl MarketAdmin for NameMarketPlugin {
         increase_pct: u8,
         decrease_pct: u8,
     ) -> Result<(), Error> {
-        require_adjust_pcts(increase_pct, decrease_pct)?;
+        validate_adjust_pcts(increase_pct, decrease_pct)?;
         let sys_token_id =
             TokensHelpers::fetch_network_token()?.ok_or(ErrorType::SystemTokenNotDefined)?;
         let floor_price = TokensHelpers::decimal_to_u64(sys_token_id, &floor_price)?;
@@ -117,7 +120,7 @@ impl MarketAdmin for NameMarketPlugin {
         let current_params = fetch_market_params()?;
 
         for cfg in configs {
-            require_adjust_pcts(cfg.increase_pct, cfg.decrease_pct)?;
+            validate_adjust_pcts(cfg.increase_pct, cfg.decrease_pct)?;
 
             let current = current_params
                 .iter()
@@ -179,7 +182,7 @@ impl MarketAdmin for NameMarketPlugin {
 }
 
 impl Api for NameMarketPlugin {
-    #[psibase_plugin::authorized(Medium, whitelist = ["accounts", "homepage"])]
+    #[psibase_plugin::authorized(None)]
     fn can_create_account() -> bool {
         if !AccountsApi::is_logged_in() {
             return false;
@@ -290,8 +293,8 @@ struct MarketParamsRow {
     target: u32,
     floor_price: String,
     window_seconds: u32,
-    increase_ppm: u32,
-    decrease_ppm: u32,
+    increase_pct: u8,
+    decrease_pct: u8,
 }
 
 #[derive(serde::Deserialize)]
@@ -308,7 +311,7 @@ struct MarketParamsResponse {
 
 fn fetch_market_params() -> Result<Vec<MarketParamsRow>, Error> {
     let graphql_str =
-        "query { marketParams { length enabled initialPrice target floorPrice windowSeconds increasePpm decreasePpm } }";
+        "query { marketParams { length enabled initialPrice target floorPrice windowSeconds increasePct decreasePct } }";
     serde_json::from_str::<MarketParamsResponse>(&CommonServer::post_graphql_get_json(graphql_str)?)
         .map_err(|err| ErrorType::QueryResponseParseError(err.to_string()).into())
         .map(|response| response.data.market_params)
@@ -318,8 +321,8 @@ fn market_params_match(current: &MarketParamsRow, requested: &MarketConfig) -> b
     current.enabled == requested.enabled
         && current.target == requested.target
         && current.window_seconds == requested.window_seconds
-        && current.increase_ppm == pct_to_ppm(requested.increase_pct)
-        && current.decrease_ppm == pct_to_ppm(requested.decrease_pct)
+        && current.increase_pct == requested.increase_pct
+        && current.decrease_pct == requested.decrease_pct
         && prices_match(&current.floor_price, &requested.floor_price)
 }
 
@@ -356,7 +359,7 @@ fn require_active_premium_market_ask(length: u8, sys_token_id: u32) -> Result<u6
 }
 
 impl Authorized for NameMarketPlugin {
-    #[psibase_plugin::authorized(Medium, whitelist = ["accounts", "homepage"])]
+    #[psibase_plugin::authorized(None)]
     fn graphql(query: String) -> Result<String, Error> {
         CommonServer::post_graphql_get_json(&query)
     }

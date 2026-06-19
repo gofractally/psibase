@@ -1,14 +1,13 @@
 package homepage:plugin;
 
 world impl {
-    include host:common/imports;
     include host:crypto/imports;
-    include transact:plugin/imports;
-    include auth-sig:plugin/imports;
-    include name-market:plugin/imports;
+    import transact:plugin/intf;
+    import auth-sig:plugin/keyvault;
+    import auth-sig:plugin/actions;
+    import name-market:plugin/api;
 
     import accounts:plugin/api;
-    import accounts:plugin/prompt;
 
     export premium-accounts;
 }

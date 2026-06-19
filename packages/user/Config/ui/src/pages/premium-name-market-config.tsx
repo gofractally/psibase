@@ -73,7 +73,9 @@ export const PremiumNameMarketConfig = () => {
             ? disableVars.length
             : null;
     const enablingLength =
-        enablingPurchases && enableVars !== undefined ? enableVars.length : null;
+        enablingPurchases && enableVars !== undefined
+            ? enableVars.length
+            : null;
 
     const [showAdd, setShowAdd] = useState(false);
 
@@ -104,8 +106,8 @@ export const PremiumNameMarketConfig = () => {
                     <li>
                         Each row is a premium account name length (
                         {MIN_ACCOUNT_NAME_LENGTH}–{MAX_ACCOUNT_NAME_LENGTH}{" "}
-                        characters). When you add a market, you set the initial price; it
-                        cannot be changed later.
+                        characters). When you add a market, you set the initial
+                        price; it cannot be changed later.
                     </li>
                     <li>
                         Use the switch on each row to turn purchases on or off
@@ -113,8 +115,8 @@ export const PremiumNameMarketConfig = () => {
                     </li>
                     <li>
                         Expand a row to edit floor price, target sales per
-                        30-day window, and increase/decrease PPM (Save). Saving
-                        always uses a 30-day DiffAdjust window.
+                        30-day window, and increase/decrease percent (Save).
+                        Saving always uses a 30-day DiffAdjust window.
                     </li>
                     <li>
                         Disabling purchases blocks new buys for that length;

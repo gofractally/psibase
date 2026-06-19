@@ -1,13 +1,14 @@
-import type { ConfiguredPremiumNameMarketRow } from "@/hooks/premium-name-markets/use-configured-markets";
 import type { SavePremiumNameMarketConfigInput } from "@/hooks/premium-name-markets/use-config-market";
+import type { ConfiguredPremiumNameMarketRow } from "@/hooks/premium-name-markets/use-configured-markets";
 import type { UseMutateFunction } from "@tanstack/react-query";
+
 import { useEffect, useState } from "react";
 
 import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 
-import { parsePpm, parsePositiveInt } from "./parsers";
+import { parsePct, parsePositiveInt } from "./parsers";
 
 export type NameMarketRowPanelProps = {
     row: ConfiguredPremiumNameMarketRow;
@@ -33,34 +34,34 @@ export function NameMarketRowPanel({
 }: NameMarketRowPanelProps) {
     const [floorPrice, setFloorPrice] = useState(row.floorPrice);
     const [targetRaw, setTargetRaw] = useState(String(row.target));
-    const [increasePpmRaw, setIncreasePpmRaw] = useState(
-        String(row.increasePpm),
+    const [increasePctRaw, setIncreasePctRaw] = useState(
+        String(row.increasePct),
     );
-    const [decreasePpmRaw, setDecreasePpmRaw] = useState(
-        String(row.decreasePpm),
+    const [decreasePctRaw, setDecreasePctRaw] = useState(
+        String(row.decreasePct),
     );
 
     useEffect(() => {
         setFloorPrice(row.floorPrice);
         setTargetRaw(String(row.target));
-        setIncreasePpmRaw(String(row.increasePpm));
-        setDecreasePpmRaw(String(row.decreasePpm));
+        setIncreasePctRaw(String(row.increasePct));
+        setDecreasePctRaw(String(row.decreasePct));
     }, [
         row.length,
         row.floorPrice,
         row.target,
-        row.increasePpm,
-        row.decreasePpm,
+        row.increasePct,
+        row.decreasePct,
     ]);
 
     const target = parsePositiveInt(targetRaw);
-    const increasePpm = parsePpm(increasePpmRaw);
-    const decreasePpm = parsePpm(decreasePpmRaw);
+    const increasePct = parsePct(increasePctRaw);
+    const decreasePct = parsePct(decreasePctRaw);
     const pricesOk =
         floorPrice.trim() !== "" &&
         target !== null &&
-        increasePpm !== null &&
-        decreasePpm !== null;
+        increasePct !== null &&
+        decreasePct !== null;
 
     return (
         <div className="flex max-w-lg flex-col gap-4 pt-2">
@@ -90,24 +91,28 @@ export function NameMarketRowPanel({
                 />
             </div>
             <div className="grid gap-2">
-                <Label htmlFor={`pm-inc-ppm-${row.length}`}>Increase PPM</Label>
+                <Label htmlFor={`pm-inc-pct-${row.length}`}>
+                    Increase percent
+                </Label>
                 <Input
-                    id={`pm-inc-ppm-${row.length}`}
+                    id={`pm-inc-pct-${row.length}`}
                     inputMode="numeric"
-                    value={increasePpmRaw}
-                    onChange={(e) => setIncreasePpmRaw(e.target.value)}
+                    value={increasePctRaw}
+                    onChange={(e) => setIncreasePctRaw(e.target.value)}
                     autoComplete="off"
                     className="font-mono"
                     disabled={actionsDisabled}
                 />
             </div>
             <div className="grid gap-2">
-                <Label htmlFor={`pm-dec-ppm-${row.length}`}>Decrease PPM</Label>
+                <Label htmlFor={`pm-dec-pct-${row.length}`}>
+                    Decrease percent
+                </Label>
                 <Input
-                    id={`pm-dec-ppm-${row.length}`}
+                    id={`pm-dec-pct-${row.length}`}
                     inputMode="numeric"
-                    value={decreasePpmRaw}
-                    onChange={(e) => setDecreasePpmRaw(e.target.value)}
+                    value={decreasePctRaw}
+                    onChange={(e) => setDecreasePctRaw(e.target.value)}
                     autoComplete="off"
                     className="font-mono"
                     disabled={actionsDisabled}
@@ -125,8 +130,8 @@ export function NameMarketRowPanel({
                 onClick={() => {
                     if (
                         target === null ||
-                        increasePpm === null ||
-                        decreasePpm === null
+                        increasePct === null ||
+                        decreasePct === null
                     ) {
                         return;
                     }
@@ -134,8 +139,8 @@ export function NameMarketRowPanel({
                         row,
                         target,
                         floorPrice: floorPrice.trim(),
-                        increasePpm,
-                        decreasePpm,
+                        increasePct,
+                        decreasePct,
                     });
                 }}
             >
