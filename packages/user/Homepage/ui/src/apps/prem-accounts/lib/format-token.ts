@@ -7,16 +7,3 @@ export function unitTokenDecimal(precision: number): string {
         showThousandsSeparator: false,
     });
 }
-
-export function formatCanonicalPrice(
-    canonical: string,
-    precision: number,
-    tokenId: number,
-    symbol?: string | null,
-): string {
-    return new Quantity(canonical, precision, tokenId, symbol).format({
-        fullPrecision: true,
-        includeLabel: true,
-        showThousandsSeparator: false,
-    });
-}

@@ -2,8 +2,6 @@ import { useStore } from "@tanstack/react-form";
 import { AlertCircle, Undo2 } from "lucide-react";
 import { useCallback, useEffect, useMemo } from "react";
 
-import { LiveMarketPrice } from "@/pages/premium-name-market/live-market-price";
-
 import { useConfiguredPremiumNameMarkets } from "@/hooks/premium-name-markets/use-configured-markets";
 import { useSavePremiumNameMarkets } from "@/hooks/premium-name-markets/use-save-premium-name-markets";
 import {
@@ -17,6 +15,7 @@ import {
 import { scrollToFirstMarketFieldError } from "@/lib/premium-name-market-validation-ui";
 
 import { useAppForm } from "@shared/components/form/app-form";
+import { LivePrice } from "@shared/components/live-price";
 import { PageContainer } from "@shared/components/page-container";
 import {
     PREM_MARKETS_REFETCH_INTERVAL_MS,
@@ -301,13 +300,14 @@ export const PremiumNameMarketConfig = () => {
                                                         {market.configured &&
                                                         enabled &&
                                                         systemToken ? (
-                                                            <LiveMarketPrice
+                                                            <LivePrice
                                                                 price={livePriceByLength.get(
                                                                     market.length,
                                                                 )}
                                                                 systemToken={
                                                                     systemToken
                                                                 }
+                                                                className="text-muted-foreground px-1 py-0.5 text-xs"
                                                             />
                                                         ) : null}
                                                     </div>

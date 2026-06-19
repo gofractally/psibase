@@ -23,28 +23,16 @@ function comparePrices(
     return "down";
 }
 
-function formatLivePrice(
-    canonical: string,
-    systemToken: SystemTokenInfo,
-): string {
-    return new Quantity(
-        canonical,
-        systemToken.precision,
-        Number(systemToken.id),
-        systemToken.symbol,
-    ).format({
-        fullPrecision: true,
-        includeLabel: true,
-        showThousandsSeparator: false,
-    });
-}
-
-export function LiveMarketPrice({
+export function LivePrice({
     price,
     systemToken,
+    className,
+    emptyClassName,
 }: {
     price: string | null | undefined;
     systemToken: SystemTokenInfo;
+    className?: string;
+    emptyClassName?: string;
 }) {
     const previousPriceRef = useRef<string | null>(null);
     const [flash, setFlash] = useState<PriceFlash | null>(null);
@@ -82,7 +70,12 @@ export function LiveMarketPrice({
 
     if (price == null) {
         return (
-            <span className="text-muted-foreground font-mono text-xs tabular-nums">
+            <span
+                className={cn(
+                    "font-mono tabular-nums",
+                    emptyClassName ?? className ?? "text-muted-foreground",
+                )}
+            >
                 —
             </span>
         );
@@ -92,12 +85,22 @@ export function LiveMarketPrice({
         <span
             key={flashKey}
             className={cn(
-                "text-muted-foreground rounded px-1 py-0.5 font-mono text-xs tabular-nums",
+                "rounded px-1.5 py-0.5 font-mono tabular-nums",
+                className,
                 flash === "up" && "animate-price-flash-up",
                 flash === "down" && "animate-price-flash-down",
             )}
         >
-            {formatLivePrice(price, systemToken)}
+            {new Quantity(
+                price,
+                systemToken.precision,
+                Number(systemToken.id),
+                systemToken.symbol,
+            ).format({
+                fullPrecision: true,
+                includeLabel: true,
+                showThousandsSeparator: false,
+            })}
         </span>
     );
 }
