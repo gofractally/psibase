@@ -21,6 +21,7 @@ const zRow = z.object({
     floorPrice: z.string(),
     increasePct: z.number().int().min(1).max(255),
     decreasePct: z.number().int().min(1).max(255),
+    initialPrice: z.string(),
     windowSeconds: z.number().int().min(1),
 });
 
@@ -40,6 +41,7 @@ export const useConfiguredPremiumNameMarkets = () =>
                         length
                         enabled
                         target
+                        initialPrice
                         floorPrice
                         increasePct
                         decreasePct

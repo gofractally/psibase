@@ -145,9 +145,7 @@ export function buildPremiumNameMarketsFormValues(
             length,
             configured,
             enabled: row?.enabled ?? false,
-            initialPrice: configured
-                ? PREMIUM_MARKET_DEFAULT_PARAMS.initialPrice
-                : "",
+            initialPrice: configured ? row!.initialPrice : "",
             floorPrice: row?.floorPrice ?? "",
             windowAmount: windowForm.amount,
             windowUnit: windowForm.unit,
