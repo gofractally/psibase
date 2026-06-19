@@ -117,13 +117,21 @@ pub mod tables {
             self.decrease_ppm as f64 / ONE_MILLION as f64
         }
 
-        fn f64_to_u64(value: f64) -> u64 {
-            if !value.is_finite() || value <= 0.0 {
-                0
-            } else if value >= u64::MAX as f64 {
+        /// Caller must ensure the value is finite and positive.
+        fn f64_to_u64_saturating(value: f64) -> u64 {
+            if value >= u64::MAX as f64 {
                 u64::MAX
             } else {
                 value as u64
+            }
+        }
+
+        /// Decay compound math may underflow or yield NaN; treat those as zero (floor applied by caller).
+        fn decay_f64_to_u64(value: f64) -> u64 {
+            if !value.is_finite() || value <= 0.0 {
+                0
+            } else {
+                Self::f64_to_u64_saturating(value)
             }
         }
 
@@ -132,10 +140,11 @@ pub mod tables {
                 return difficulty;
             }
             let powered = factor.powf(times as f64);
+            // Large exponents can overflow to inf or NaN on wasm; increases saturate, never collapse to zero.
             if !powered.is_finite() || powered >= u64::MAX as f64 {
                 return u64::MAX;
             }
-            Self::f64_to_u64(difficulty as f64 * powered)
+            Self::f64_to_u64_saturating(difficulty as f64 * powered)
         }
 
         fn apply_decrease(difficulty: u64, factor: f64, times: u32, floor: u64) -> u64 {
@@ -149,7 +158,7 @@ pub mod tables {
             if factor == 1.0 {
                 return difficulty;
             }
-            Self::f64_to_u64(difficulty as f64 * factor.powf(times as f64)).max(floor)
+            Self::decay_f64_to_u64(difficulty as f64 * factor.powf(times as f64)).max(floor)
         }
 
         pub fn check_difficulty_decrease(&mut self) -> u64 {
@@ -163,8 +172,12 @@ pub mod tables {
                 self.last_update = TimePointSec::from(now.seconds - seconds_remainder as i64);
                 if below_target {
                     let factor = 1.0 - self.ratio_decrease();
-                    self.active_difficulty =
-                        Self::apply_decrease(self.active_difficulty, factor, windows_elapsed, self.floor_difficulty);
+                    self.active_difficulty = Self::apply_decrease(
+                        self.active_difficulty,
+                        factor,
+                        windows_elapsed,
+                        self.floor_difficulty,
+                    );
                 }
             }
             self.active_difficulty
