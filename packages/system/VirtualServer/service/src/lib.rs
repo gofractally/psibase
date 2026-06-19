@@ -187,8 +187,19 @@ mod service {
         total
     }
 
+    fn status_row_bytes() -> u64 {
+        let native = KvHandle::new(DbId::Native, &[], KvMode::Read);
+        let key = status_key().to_key();
+        kv_get_bytes(&native, &key)
+            .map(|value| key.len() as u64 + value.len() as u64)
+            .unwrap_or(0)
+    }
+
     fn get_prealloc() -> u64 {
-        db_used_bytes(DbId::Native) + db_used_bytes(DbId::Service)
+        let native = db_used_bytes(DbId::Native);
+        let service = db_used_bytes(DbId::Service);
+        let status = status_row_bytes();
+        native + service - status
     }
 
     /// Exact on-disk footprint (`key + value`) of a single fixed-width table row.

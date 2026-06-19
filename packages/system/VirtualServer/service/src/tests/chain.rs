@@ -389,24 +389,39 @@ fn disk_consumed(chain: &psibase::Chain) -> u64 {
     disk.max_capacity - disk.remaining_capacity
 }
 
+fn status_row_bytes(chain: &psibase::Chain) -> u64 {
+    let key = status_key().to_key();
+    chain
+        .kv_get_bytes(DbId::Native, &key)
+        .map(|value| key.len() as u64 + value.len() as u64)
+        .unwrap_or(0)
+}
+
 fn check_disk_invariant(label: &str, chain: &psibase::Chain) -> bool {
     let native = chain.database_usage(DbId::Native);
     let service = chain.database_usage(DbId::Service);
-    let scanned = native + service;
-    let prealloc = get_db_prealloc(chain);
-    let consumed = disk_consumed(chain);
-    let accounted = prealloc + consumed;
-    let delta = scanned as i128 - accounted as i128;
-    println!(
-        "[{label}] scanned={} (native={}, service={}) = prealloc={} + consumed={} ({}), delta={}",
-        fmt_num(scanned),
-        fmt_num(native),
-        fmt_num(service),
-        fmt_num(prealloc),
-        fmt_num(consumed),
-        fmt_num(accounted),
-        delta,
-    );
+    let status = status_row_bytes(chain);
+
+    let scanned_bytes = native + service - status;
+
+    let svc_prealloc = get_db_prealloc(chain);
+    let svc_consumed = disk_consumed(chain);
+    let svc_accounting = svc_prealloc + svc_consumed;
+
+    let delta = scanned_bytes as i128 - svc_accounting as i128;
+    if delta != 0 {
+        println!(
+            "[{label}] total={} (native={} + service={} - status={}) == prealloc={} + consumed={} ({}), delta={}",
+            fmt_num(scanned_bytes),
+            fmt_num(native),
+            fmt_num(service),
+            fmt_num(status),
+            fmt_num(svc_prealloc),
+            fmt_num(svc_consumed),
+            fmt_num(svc_accounting),
+            delta,
+        );
+    }
     delta == 0
 }
 
