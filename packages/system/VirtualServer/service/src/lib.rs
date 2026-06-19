@@ -156,7 +156,7 @@ mod tx_cache {
 /// After each of the above steps, the billing service will be enabled, and users will be
 /// required to buy resources to transact with the network. Use the other actions in this
 /// service to manage server specs, network variables, and billing parameters, as needed.
-#[psibase::service(name = "virtual-server", recursive = "true", tables = "tables::tables")]
+#[psibase::service(name = "vserver", recursive = "true", tables = "tables::tables")]
 mod service {
     use crate::tables::tables::{UserSettings, *};
     use crate::tx_cache;
@@ -885,8 +885,8 @@ mod service {
         user: Option<AccountNumber>,
     ) -> Option<HttpReply> {
         check(
-            get_sender() == AccountNumber::from("http-server"),
-            "permission denied: serveSys only callable by 'http-server'",
+            get_sender() == psibase::services::http_server::SERVICE,
+            "permission denied: serveSys only callable by http-server service",
         );
 
         None.or_else(|| serve_graphql(&request, crate::rpc::Query { user }))

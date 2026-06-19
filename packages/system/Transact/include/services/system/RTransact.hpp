@@ -246,7 +246,7 @@ namespace SystemService
    class RTransact : public psibase::Service
    {
      public:
-      static constexpr auto service = psibase::AccountNumber{"r-transact"};
+      static constexpr auto service = psibase::AccountNumber{"transact+1"};
       using Subjective              = psibase::SubjectiveTables<PendingTransactionTable,
                                                                 TransactionDataTable,
                                                                 AvailableSequenceTable,

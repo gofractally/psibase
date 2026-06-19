@@ -121,7 +121,7 @@ async fn lookup_token(
 
 fn random_account_name() -> psibase::AccountNumber {
     let bytes: Vec<u8> = (0..7).map(|_| b'a' + (rand::random::<u8>() % 26)).collect();
-    psibase::AccountNumber::from(std::str::from_utf8(&bytes).unwrap())
+    std::str::from_utf8(&bytes).unwrap().parse().unwrap()
 }
 
 fn account_names(accounts: &[psibase::AccountNumber]) -> String {

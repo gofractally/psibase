@@ -281,6 +281,19 @@ namespace
       expect(tester::runAction(self.nativeHandle(), RunMode::rpc, true, xhttp.startSession()));
    }
 
+   psibase::SignedTransaction makeStartBlock(psibase::TimePointUSec expiration)
+   {
+      return {.transaction{{
+          .tapos   = {.expiration = std::chrono::ceil<psibase::Seconds>(expiration)},
+          .actions = {{
+              .sender  = {},
+              .service = psibase::transactionServiceNum,
+              .method  = psibase::MethodNumber("startBlock"),
+              .rawData = psio::to_frac(std::tuple()),
+          }},
+      }}};
+   }
+
 }  // namespace
 
 psibase::TestChain::TestChain(uint32_t chain_id, bool clone, bool pub, bool init, bool writable)
@@ -404,11 +417,16 @@ void psibase::TestChain::startBlock(BlockTime tp)
    {
       tester::raw::startBlock(id, (tp - Seconds(1)).time_since_epoch().count(), producer.value,
                               term, commitNum);
+      expect(tester::pushTransaction(id, makeStartBlock(tp)));
       finishBlock();
       commitNum = status->head.value().header.blockNum;
    }
    tester::raw::startBlock(id, tp.time_since_epoch().count(), producer.value, term, commitNum);
-   status    = kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
+   status = kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
+   if (status && status->head)
+   {
+      expect(tester::pushTransaction(id, makeStartBlock(tp + Seconds(1))));
+   }
    producing = true;
 }
 
@@ -762,9 +780,9 @@ std::string psibase::TestChain::login(AccountNumber user, AccountNumber service)
 {
    transactor<LoginInterface> loginTransactor{user, service};
    Tapos             tapos{.expiration = std::chrono::time_point_cast<std::chrono::seconds>(
-                                 std::chrono::system_clock::now()) +
-                             std::chrono::seconds(10),
-                           .flags = Tapos::do_not_broadcast_flag};
+                                             std::chrono::system_clock::now()) +
+                                         std::chrono::seconds(10),
+                           .flags      = Tapos::do_not_broadcast_flag};
    Transaction       trx{.tapos = tapos, .actions = {loginTransactor.loginSys("psibase.io")}};
    SignedTransaction strx{trx};
    auto reply = post<SystemService::LoginReply>(SystemService::Transact::service, "/login",

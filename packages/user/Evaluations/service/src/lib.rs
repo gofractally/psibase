@@ -1,7 +1,7 @@
 mod db;
 mod helpers;
 
-#[psibase::service(tables = "db::tables", recursive = true)]
+#[psibase::service(name = "evaluation", tables = "db::tables", recursive = true)]
 #[allow(non_snake_case)]
 pub mod service {
     pub use crate::db::tables::*;

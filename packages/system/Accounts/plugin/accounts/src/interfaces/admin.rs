@@ -133,7 +133,7 @@ impl Admin for AccountsPlugin {
         Transact::add_action_to_transaction(
             Accounts::action_structs::preapproveAcc::ACTION_NAME,
             &Accounts::action_structs::preapproveAcc {
-                name: account.as_str().into(),
+                name: account.parse().unwrap(),
             }
             .packed(),
         )

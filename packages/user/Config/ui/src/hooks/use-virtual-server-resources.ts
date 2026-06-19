@@ -77,7 +77,7 @@ export const useVirtualServerResources = () => {
                 }
             `;
 
-            const res = await graphql(query, { service: "virtual-server" });
+            const res = await graphql(query, { service: "vserver" });
             const parsed = zResourcesResponse.parse(res);
             return {
                 serverSpecs: parsed.getServerSpecs,

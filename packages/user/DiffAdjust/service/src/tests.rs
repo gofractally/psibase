@@ -9,7 +9,7 @@ mod tests {
     fn test_diff_adjust_basic(mut chain: psibase::Chain) -> Result<(), psibase::Error> {
         chain.set_auto_block_start(false);
 
-        let alice = AccountNumber::from("alice");
+        let alice = account!("alice");
         chain.new_account(alice).unwrap();
 
         let nft_id = Wrapper::push_from(&chain, alice)
@@ -52,7 +52,7 @@ mod tests {
     fn test_asymmetric_ppm(mut chain: psibase::Chain) -> Result<(), psibase::Error> {
         chain.set_auto_block_start(false);
 
-        let alice = AccountNumber::from("alice");
+        let alice = account!("alice");
         chain.new_account(alice).unwrap();
 
         let nft_id = Wrapper::push_from(&chain, alice)
@@ -79,7 +79,7 @@ mod tests {
     fn test_one_second_window(mut chain: psibase::Chain) -> Result<(), psibase::Error> {
         chain.set_auto_block_start(false);
 
-        let alice = AccountNumber::from("alice");
+        let alice = account!("alice");
         chain.new_account(alice).unwrap();
 
         let get_diff = |nft_id: u32| -> Result<u64, psibase::Error> {

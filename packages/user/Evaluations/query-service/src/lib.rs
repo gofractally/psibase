@@ -1,4 +1,4 @@
-#[psibase::service]
+#[psibase::service(name = "evaluation+1")]
 #[allow(non_snake_case)]
 mod service {
     use async_graphql::connection::Connection;
@@ -40,7 +40,6 @@ mod service {
         evaluation_id: u32,
     }
 
-
     #[derive(Deserialize, SimpleObject)]
     struct NewGroup {
         owner: AccountNumber,
@@ -55,7 +54,6 @@ mod service {
 
     #[Object]
     impl Query {
-
         async fn get_groups_created(
             &self,
             evaluation_owner: AccountNumber,

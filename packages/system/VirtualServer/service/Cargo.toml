@@ -9,7 +9,7 @@ publish.workspace = true
 flags = ["isPrivileged"]
 server = "virtual-server"
 plugin = "virtual-server-plugin"
-postinstall = [{ sender = "virtual-server", service = "virtual-server", method = "init" }]
+postinstall = [{ sender = "vserver", service = "vserver", method = "init" }]
 
 [dependencies]
 psibase.workspace = true

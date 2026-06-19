@@ -1,4 +1,4 @@
-#[psibase::service]
+#[psibase::service(name = "diff-adj+1")]
 #[allow(non_snake_case)]
 mod service {
     use async_graphql::*;

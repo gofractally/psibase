@@ -32,7 +32,7 @@ pub mod tables {
     }
 }
 
-#[psibase::service(name = "frac-tester", tables = "tables")]
+#[psibase::service(name = "fractester", tables = "tables")]
 mod service {
     use crate::tables::ConfigRow;
     use psibase::services::{

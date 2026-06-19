@@ -80,7 +80,7 @@ namespace SystemService
    /// service to manage server specs, network variables, and billing parameters, as needed.
    struct VirtualServer : public psibase::Service
    {
-      static constexpr auto service = psibase::AccountNumber("virtual-server");
+      static constexpr auto service = psibase::AccountNumber("vserver");
 
       void init();
 

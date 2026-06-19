@@ -2,7 +2,7 @@ mod tables;
 
 pub const CRED_SYS: psibase::AccountNumber = psibase::account!("cred-sys");
 
-#[psibase::service(name = "credentials", tables = "tables::tables")]
+#[psibase::service(name = "credential", tables = "tables::tables")]
 pub mod service {
     use crate::tables::tables::*;
     use crate::CRED_SYS;
