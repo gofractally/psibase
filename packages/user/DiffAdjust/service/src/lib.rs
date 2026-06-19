@@ -131,7 +131,11 @@ pub mod tables {
             if times == 0 || difficulty == u64::MAX || factor <= 1.0 {
                 return difficulty;
             }
-            Self::f64_to_u64(difficulty as f64 * factor.powf(times as f64))
+            let powered = factor.powf(times as f64);
+            if !powered.is_finite() || powered >= u64::MAX as f64 {
+                return u64::MAX;
+            }
+            Self::f64_to_u64(difficulty as f64 * powered)
         }
 
         fn apply_decrease(difficulty: u64, factor: f64, times: u32, floor: u64) -> u64 {
