@@ -2,6 +2,8 @@ import { useStore } from "@tanstack/react-form";
 import { AlertCircle, Undo2 } from "lucide-react";
 import { useCallback, useEffect, useMemo } from "react";
 
+import { LiveMarketPrice } from "@/pages/premium-name-market/live-market-price";
+
 import { useConfiguredPremiumNameMarkets } from "@/hooks/premium-name-markets/use-configured-markets";
 import { useSavePremiumNameMarkets } from "@/hooks/premium-name-markets/use-save-premium-name-markets";
 import {
@@ -16,6 +18,10 @@ import { scrollToFirstMarketFieldError } from "@/lib/premium-name-market-validat
 
 import { useAppForm } from "@shared/components/form/app-form";
 import { PageContainer } from "@shared/components/page-container";
+import {
+    PREM_MARKETS_REFETCH_INTERVAL_MS,
+    usePremMarkets,
+} from "@shared/hooks/use-prem-markets";
 import { useSystemToken } from "@shared/hooks/use-system-token";
 import {
     MAX_ACCOUNT_NAME_LENGTH,
@@ -65,6 +71,16 @@ export const PremiumNameMarketConfig = () => {
         error,
         refetch,
     } = useConfiguredPremiumNameMarkets();
+
+    const { data: liveMarkets } = usePremMarkets({
+        refetchInterval: PREM_MARKETS_REFETCH_INTERVAL_MS,
+        enabled: !systemTokenLoading && systemToken !== undefined,
+    });
+
+    const livePriceByLength = useMemo(
+        () => new Map(liveMarkets?.map((row) => [row.length, row.price]) ?? []),
+        [liveMarkets],
+    );
 
     const { mutateAsync: saveMarkets, isPending: isSaving } =
         useSavePremiumNameMarkets();
@@ -276,10 +292,25 @@ export const PremiumNameMarketConfig = () => {
                                                         "[.border-b]:pb-3 border-b",
                                                 )}
                                             >
-                                                <div className="flex flex-1 flex-wrap items-center justify-between">
-                                                    <CardTitle className="font-mono text-sm font-medium">
-                                                        Length {market.length}
-                                                    </CardTitle>
+                                                <div className="flex flex-1 flex-wrap items-center justify-between gap-2">
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <CardTitle className="font-mono text-sm font-medium">
+                                                            Length{" "}
+                                                            {market.length}
+                                                        </CardTitle>
+                                                        {market.configured &&
+                                                        enabled &&
+                                                        systemToken ? (
+                                                            <LiveMarketPrice
+                                                                price={livePriceByLength.get(
+                                                                    market.length,
+                                                                )}
+                                                                systemToken={
+                                                                    systemToken
+                                                                }
+                                                            />
+                                                        ) : null}
+                                                    </div>
                                                     <div
                                                         className={cn(
                                                             "flex items-center gap-1.5",
