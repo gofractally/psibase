@@ -1,6 +1,7 @@
 use p256::ecdsa::{signature::hazmat::PrehashSigner, Signature, SigningKey};
 use p256::pkcs8::DecodePrivateKey;
 use psibase::{
+    account,
     fracpack::Pack,
     services::{
         auth_sig::SubjectPublicKeyInfo,
@@ -239,7 +240,7 @@ fn metering(chain: psibase::Chain) -> Result<(), psibase::Error> {
     let vserver = Wrapper::SERVICE;
     let tokens = tokens::Wrapper::SERVICE;
     let sys: tokens::TID = 1;
-    let alice = AccountNumber::from("alice");
+    let alice = account!("alice");
 
     initial_setup(&chain)?;
 

@@ -85,7 +85,7 @@ impl Admin for VirtualServerPlugin {
     fn enable_billing(enabled: bool, payer: Option<String>) -> Result<(), Error> {
         assert_caller(&["config"], "enable_billing");
 
-        let payer = payer.map(|p| AccountNumber::from(p.as_str()));
+        let payer = payer.map(|p| p.as_str().parse().unwrap());
         VirtualServer::add_to_tx().enable_billing(enabled, payer);
         Ok(())
     }
