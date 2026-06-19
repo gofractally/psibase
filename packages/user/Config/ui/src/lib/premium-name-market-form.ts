@@ -122,20 +122,22 @@ export function buildPremiumNameMarketsFormValues(
         length++
     ) {
         const row = byLength.get(length);
+        const configured = row !== undefined;
         markets.push({
             length,
-            configured: row !== undefined,
+            configured,
             enabled: row?.enabled ?? false,
-            initialPrice: PREMIUM_MARKET_DEFAULT_PARAMS.initialPrice,
-            floorPrice:
-                row?.floorPrice ?? PREMIUM_MARKET_DEFAULT_PARAMS.floorPrice,
-            target: String(row?.target ?? PREMIUM_MARKET_DEFAULT_PARAMS.target),
-            increasePpm: row
-                ? ppmToWholePercentString(row.increasePpm)
-                : String(PREMIUM_MARKET_DEFAULT_PARAMS.increasePercent),
-            decreasePpm: row
-                ? ppmToWholePercentString(row.decreasePpm)
-                : String(PREMIUM_MARKET_DEFAULT_PARAMS.decreasePercent),
+            initialPrice: configured
+                ? PREMIUM_MARKET_DEFAULT_PARAMS.initialPrice
+                : "",
+            floorPrice: row?.floorPrice ?? "",
+            target: configured ? String(row!.target) : "",
+            increasePpm: configured
+                ? ppmToWholePercentString(row!.increasePpm)
+                : "",
+            decreasePpm: configured
+                ? ppmToWholePercentString(row!.decreasePpm)
+                : "",
         });
     }
 

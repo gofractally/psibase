@@ -1,10 +1,24 @@
-import type { PremiumNameMarketsFormValues } from "@/lib/premium-name-market-form";
+import type {
+    PremiumNameMarketFormRow,
+    PremiumNameMarketsFormValues,
+} from "@/lib/premium-name-market-form";
 import type { AnyFieldMeta } from "@tanstack/react-form";
 import type { ReactNode } from "react";
 
+import { PREMIUM_MARKET_DEFAULT_PARAMS } from "@/lib/premium-name-market-defaults";
+
 import { FieldErrors } from "@shared/components/form/internal/field-errors";
+import { cn } from "@shared/lib/utils";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
+
+const MARKET_FIELD_PLACEHOLDERS = {
+    initialPrice: PREMIUM_MARKET_DEFAULT_PARAMS.initialPrice,
+    floorPrice: PREMIUM_MARKET_DEFAULT_PARAMS.floorPrice,
+    target: String(PREMIUM_MARKET_DEFAULT_PARAMS.target),
+    increasePpm: String(PREMIUM_MARKET_DEFAULT_PARAMS.increasePercent),
+    decreasePpm: String(PREMIUM_MARKET_DEFAULT_PARAMS.decreasePercent),
+} as const;
 
 type MarketFormApi = {
     Field: (props: {
@@ -30,6 +44,7 @@ type MarketFormApi = {
 export type NameMarketRowPanelProps = {
     form: MarketFormApi;
     index: number;
+    baseline: PremiumNameMarketFormRow;
     actionsDisabled: boolean;
 };
 
@@ -43,6 +58,7 @@ function CompactField({
     placeholder,
     inputMode,
     meta,
+    isDirty,
 }: {
     id: string;
     label: string;
@@ -53,6 +69,7 @@ function CompactField({
     placeholder?: string;
     inputMode?: "numeric" | "text";
     meta: { errors: unknown[]; isTouched: boolean };
+    isDirty?: boolean;
 }) {
     const isError = meta.errors.length > 0 && meta.isTouched;
 
@@ -70,7 +87,12 @@ function CompactField({
                 inputMode={inputMode}
                 disabled={disabled}
                 placeholder={placeholder}
-                className="h-8 scroll-mt-28 font-mono text-sm"
+                className={cn(
+                    "h-8 scroll-mt-28 font-mono text-sm",
+                    isDirty &&
+                        !isError &&
+                        "border-amber-300 ring-2 ring-amber-400/50 dark:border-amber-700 dark:ring-amber-500/40",
+                )}
                 aria-invalid={isError}
             />
             <FieldErrors meta={meta as AnyFieldMeta} />
@@ -81,16 +103,17 @@ function CompactField({
 export function NameMarketRowPanel({
     form,
     index,
+    baseline,
     actionsDisabled,
 }: NameMarketRowPanelProps) {
     const baseName = `markets[${index}]` as const;
 
     return (
-        <div className="grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-            <form.Subscribe
-                selector={(state) => state.values.markets[index]?.configured}
-            >
-                {(configured) => (
+        <form.Subscribe
+            selector={(state) => state.values.markets[index]?.configured}
+        >
+            {(configured) => (
+                <div className="grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                     <form.Field name={`${baseName}.initialPrice`}>
                         {(field) => (
                             <CompactField
@@ -103,75 +126,98 @@ export function NameMarketRowPanel({
                                     actionsDisabled || configured === true
                                 }
                                 placeholder={
-                                    configured === true
+                                    configured
                                         ? "Fixed at creation"
-                                        : undefined
+                                        : MARKET_FIELD_PLACEHOLDERS.initialPrice
                                 }
                                 meta={field.state.meta}
+                                isDirty={
+                                    field.state.value !== baseline.initialPrice
+                                }
                             />
                         )}
                     </form.Field>
-                )}
-            </form.Subscribe>
 
-            <form.Field name={`${baseName}.floorPrice`}>
-                {(field) => (
-                    <CompactField
-                        id={`pm-floor-${index}`}
-                        label="Floor price"
-                        value={field.state.value}
-                        onChange={field.handleChange}
-                        onBlur={field.handleBlur}
-                        disabled={actionsDisabled}
-                        meta={field.state.meta}
-                    />
-                )}
-            </form.Field>
+                    <form.Field name={`${baseName}.floorPrice`}>
+                        {(field) => (
+                            <CompactField
+                                id={`pm-floor-${index}`}
+                                label="Floor price"
+                                value={field.state.value}
+                                onChange={field.handleChange}
+                                onBlur={field.handleBlur}
+                                disabled={actionsDisabled}
+                                placeholder={
+                                    MARKET_FIELD_PLACEHOLDERS.floorPrice
+                                }
+                                meta={field.state.meta}
+                                isDirty={
+                                    field.state.value !== baseline.floorPrice
+                                }
+                            />
+                        )}
+                    </form.Field>
 
-            <form.Field name={`${baseName}.target`}>
-                {(field) => (
-                    <CompactField
-                        id={`pm-target-${index}`}
-                        label="Target sales / month"
-                        value={field.state.value}
-                        onChange={field.handleChange}
-                        onBlur={field.handleBlur}
-                        disabled={actionsDisabled}
-                        inputMode="numeric"
-                        meta={field.state.meta}
-                    />
-                )}
-            </form.Field>
+                    <form.Field name={`${baseName}.target`}>
+                        {(field) => (
+                            <CompactField
+                                id={`pm-target-${index}`}
+                                label="Target sales / month"
+                                value={field.state.value}
+                                onChange={field.handleChange}
+                                onBlur={field.handleBlur}
+                                disabled={actionsDisabled}
+                                inputMode="numeric"
+                                placeholder={MARKET_FIELD_PLACEHOLDERS.target}
+                                meta={field.state.meta}
+                                isDirty={field.state.value !== baseline.target}
+                            />
+                        )}
+                    </form.Field>
 
-            <form.Field name={`${baseName}.increasePpm`}>
-                {(field) => (
-                    <CompactField
-                        id={`pm-inc-ppm-${index}`}
-                        label="% increase"
-                        value={field.state.value}
-                        onChange={field.handleChange}
-                        onBlur={field.handleBlur}
-                        disabled={actionsDisabled}
-                        inputMode="numeric"
-                        meta={field.state.meta}
-                    />
-                )}
-            </form.Field>
+                    <form.Field name={`${baseName}.increasePpm`}>
+                        {(field) => (
+                            <CompactField
+                                id={`pm-inc-ppm-${index}`}
+                                label="% increase"
+                                value={field.state.value}
+                                onChange={field.handleChange}
+                                onBlur={field.handleBlur}
+                                disabled={actionsDisabled}
+                                inputMode="numeric"
+                                placeholder={
+                                    MARKET_FIELD_PLACEHOLDERS.increasePpm
+                                }
+                                meta={field.state.meta}
+                                isDirty={
+                                    field.state.value !== baseline.increasePpm
+                                }
+                            />
+                        )}
+                    </form.Field>
 
-            <form.Field name={`${baseName}.decreasePpm`}>
-                {(field) => (
-                    <CompactField
-                        id={`pm-dec-ppm-${index}`}
-                        label="% decrease"
-                        value={field.state.value}
-                        onChange={field.handleChange}
-                        onBlur={field.handleBlur}
-                        disabled={actionsDisabled}
-                        inputMode="numeric"
-                        meta={field.state.meta}
-                    />
-                )}
-            </form.Field>
-        </div>
+                    <form.Field name={`${baseName}.decreasePpm`}>
+                        {(field) => (
+                            <CompactField
+                                id={`pm-dec-ppm-${index}`}
+                                label="% decrease"
+                                value={field.state.value}
+                                onChange={field.handleChange}
+                                onBlur={field.handleBlur}
+                                disabled={actionsDisabled}
+                                inputMode="numeric"
+                                placeholder={
+                                    MARKET_FIELD_PLACEHOLDERS.decreasePpm
+                                }
+                                meta={field.state.meta}
+                                isDirty={
+                                    field.state.value !== baseline.decreasePpm
+                                }
+                            />
+                        )}
+                    </form.Field>
+                </div>
+            )}
+        </form.Subscribe>
     );
 }
