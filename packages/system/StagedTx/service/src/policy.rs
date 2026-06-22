@@ -167,7 +167,8 @@ fn is_authorized(
             .iter()
             .copied()
             .filter(|delegate| {
-                is_authorized(*delegate, user, graph, responders, method, check_fn, memo)
+                responders.contains(delegate)
+                    || is_authorized(*delegate, user, graph, responders, method, check_fn, memo)
             })
             .collect()
     };
