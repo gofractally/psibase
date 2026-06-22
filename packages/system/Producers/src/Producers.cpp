@@ -244,9 +244,7 @@ namespace SystemService
    std::vector<AccountNumber> Producers::getDlgsSys(AccountNumber                sender,
                                                     std::optional<ServiceMethod> method)
    {
-      return ::getProducers()                          //
-             | std::views::transform(&Producer::name)  //
-             | std::ranges::to<std::vector>();
+      return getProducers();
    }
 
    bool Producers::isAuthSys(AccountNumber                sender,
