@@ -135,19 +135,33 @@ pub mod tables {
             }
         }
 
+        /// Increase compound math may overflow to inf or NaN; saturate rather than collapse to zero.
+        fn increase_f64_to_u64(value: f64) -> u64 {
+            if !value.is_finite() {
+                u64::MAX
+            } else {
+                Self::f64_to_u64_saturating(value)
+            }
+        }
+
         fn apply_increase(difficulty: u64, factor: f64, times: u32) -> u64 {
             if times == 0 || difficulty == u64::MAX || factor <= 1.0 {
                 return difficulty;
             }
-            let powered = factor.powf(times as f64);
+            // ensure no cast safety of `times` from u32 to i32
+            let powered = if times > i32::MAX as u32 {
+                f64::INFINITY
+            } else {
+                factor.powi(times as i32)
+            };
             // Large exponents can overflow to inf or NaN on wasm; increases saturate, never collapse to zero.
             if !powered.is_finite() || powered >= u64::MAX as f64 {
                 return u64::MAX;
             }
-            Self::f64_to_u64_saturating(difficulty as f64 * powered)
+            Self::increase_f64_to_u64(difficulty as f64 * powered)
         }
 
-        fn apply_decrease(difficulty: u64, factor: f64, times: u32, floor: u64) -> u64 {
+        fn apply_decrease(mut difficulty: u64, factor: f64, times: u32, floor: u64) -> u64 {
             if times == 0 {
                 return difficulty;
             }
@@ -158,7 +172,11 @@ pub mod tables {
             if factor == 1.0 {
                 return difficulty;
             }
-            Self::decay_f64_to_u64(difficulty as f64 * factor.powf(times as f64)).max(floor)
+            // Per-window truncate + floor so batching N windows matches N single-window steps.
+            for _ in 0..times {
+                difficulty = Self::decay_f64_to_u64(difficulty as f64 * factor).max(floor);
+            }
+            difficulty
         }
 
         pub fn check_difficulty_decrease(&mut self) -> u64 {
