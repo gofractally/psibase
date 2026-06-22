@@ -30,8 +30,7 @@ namespace SystemService
          std::printf("canAuthUserSys\n");
    }
 
-   std::vector<AccountNumber> AuthAny::getDlgsSys(AccountNumber                sender,
-                                                  std::optional<ServiceMethod> method)
+   std::vector<AccountNumber> AuthAny::getDlgsSys(AccountNumber sender)
    {
       if (enable_print)
          std::printf("getDlgsSys\n");

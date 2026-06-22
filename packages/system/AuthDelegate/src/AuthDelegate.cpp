@@ -33,22 +33,19 @@ namespace SystemService
       getOwner(user);
    }
 
-   std::vector<AccountNumber> AuthDelegate::getDlgsSys(psibase::AccountNumber       sender,
-                                                       std::optional<ServiceMethod> method)
+   std::vector<AccountNumber> AuthDelegate::getDlgsSys(psibase::AccountNumber sender)
    {
       return {getOwner(sender)};
    }
 
    bool AuthDelegate::isAuthSys(psibase::AccountNumber              sender,
-                                std::vector<psibase::AccountNumber> authorizers,
-                                std::optional<ServiceMethod>        method)
+                                std::vector<psibase::AccountNumber> authorizers)
    {
       return std::ranges::contains(authorizers, getOwner(sender));
    }
 
    bool AuthDelegate::isRejectSys(psibase::AccountNumber              sender,
-                                  std::vector<psibase::AccountNumber> rejecters,
-                                  std::optional<ServiceMethod>        method)
+                                  std::vector<psibase::AccountNumber> rejecters)
    {
       return std::ranges::contains(rejecters, getOwner(sender));
    }

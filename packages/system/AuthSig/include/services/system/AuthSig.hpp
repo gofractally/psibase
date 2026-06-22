@@ -73,8 +73,7 @@ namespace SystemService
          void setKey(SubjectPublicKeyInfo key);
 
          /// Get the accounts this auth service delegates authority to for a sender.
-         std::vector<psibase::AccountNumber> getDlgsSys(psibase::AccountNumber       sender,
-                                                        std::optional<ServiceMethod> method);
+         std::vector<psibase::AccountNumber> getDlgsSys(psibase::AccountNumber sender);
 
          /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
          /// transaction from a specified sender.
@@ -86,8 +85,7 @@ namespace SystemService
          /// * `true`: If the sender is among the authorizers
          /// * `false`: If the sender is not among the authorizers
          bool isAuthSys(psibase::AccountNumber              sender,
-                        std::vector<psibase::AccountNumber> authorizers,
-                        std::optional<ServiceMethod>        method);
+                        std::vector<psibase::AccountNumber> authorizers);
 
          /// Check whether a specified set of rejecter accounts are sufficient to reject (cancel) a
          /// transaction from a specified sender.
@@ -99,8 +97,7 @@ namespace SystemService
          /// * `true`: If the sender is among the rejecters
          /// * `false`: If the sender is not among the rejecters
          bool isRejectSys(psibase::AccountNumber              sender,
-                          std::vector<psibase::AccountNumber> rejecters,
-                          std::optional<ServiceMethod>        method);
+                          std::vector<psibase::AccountNumber> rejecters);
 
          /// Create a new account using this auth service configured with the specified public key.
          void newAccount(psibase::AccountNumber name, SubjectPublicKeyInfo key);
@@ -109,9 +106,9 @@ namespace SystemService
                    method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                    method(canAuthUserSys, user),
                    method(setKey, key),
-                   method(getDlgsSys, sender, method),
-                   method(isAuthSys, sender, authorizers, method),
-                   method(isRejectSys, sender, rejecters, method),
+                   method(getDlgsSys, sender),
+                   method(isAuthSys, sender, authorizers),
+                   method(isRejectSys, sender, rejecters),
                    method(newAccount, name, key)
                    //
       )

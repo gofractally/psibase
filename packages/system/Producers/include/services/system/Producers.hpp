@@ -80,8 +80,7 @@ namespace SystemService
       void canAuthUserSys(psibase::AccountNumber user);
 
       /// Get the accounts this auth service delegates authority to for a sender.
-      std::vector<psibase::AccountNumber> getDlgsSys(psibase::AccountNumber       sender,
-                                                     std::optional<ServiceMethod> method);
+      std::vector<psibase::AccountNumber> getDlgsSys(psibase::AccountNumber sender);
 
       /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
       /// transaction from a specified sender.
@@ -93,8 +92,7 @@ namespace SystemService
       /// * `true`: If enough authorizers meet the sender's threshold
       /// * `false`: Otherwise
       bool isAuthSys(psibase::AccountNumber              sender,
-                     std::vector<psibase::AccountNumber> authorizers,
-                     std::optional<ServiceMethod>        method);
+                     std::vector<psibase::AccountNumber> authorizers);
 
       /// Check whether a specified set of rejecter accounts are sufficient to reject (cancel) a
       /// transaction from a specified sender.
@@ -107,8 +105,7 @@ namespace SystemService
       /// * `true`: If enough rejecters meet the sender's anti-threshold
       /// * `false`: Otherwise
       bool isRejectSys(psibase::AccountNumber              sender,
-                       std::vector<psibase::AccountNumber> rejecters,
-                       std::optional<ServiceMethod>        method);
+                       std::vector<psibase::AccountNumber> rejecters);
    };
    PSIO_REFLECT(Producers,
                 method(setConsensus, consensus),
@@ -122,9 +119,9 @@ namespace SystemService
                 method(antiThreshold, account),
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                 method(canAuthUserSys, user),
-                method(getDlgsSys, sender, method),
-                method(isAuthSys, sender, authorizers, method),
-                method(isRejectSys, sender, rejecters, method)
+                method(getDlgsSys, sender),
+                method(isAuthSys, sender, authorizers),
+                method(isRejectSys, sender, rejecters)
                 //
    )
 

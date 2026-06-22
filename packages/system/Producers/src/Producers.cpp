@@ -241,15 +241,13 @@ namespace SystemService
             "Can only authorize predefined accounts");
    }
 
-   std::vector<AccountNumber> Producers::getDlgsSys(AccountNumber                sender,
-                                                    std::optional<ServiceMethod> method)
+   std::vector<AccountNumber> Producers::getDlgsSys(AccountNumber sender)
    {
       return getProducers();
    }
 
    bool Producers::isAuthSys(AccountNumber                sender,
-                             std::vector<AccountNumber>   authorizers,
-                             std::optional<ServiceMethod> method)
+                             std::vector<AccountNumber>   authorizers)
    {
       auto producers = ::getProducers()                          //
                        | std::views::transform(&Producer::name)  //
@@ -260,8 +258,7 @@ namespace SystemService
    }
 
    bool Producers::isRejectSys(AccountNumber                sender,
-                               std::vector<AccountNumber>   rejecters,
-                               std::optional<ServiceMethod> method)
+                               std::vector<AccountNumber>   rejecters)
    {
       auto producers = ::getProducers()                          //
                        | std::views::transform(&Producer::name)  //

@@ -28,16 +28,13 @@ namespace SystemService
                         std::vector<ServiceMethod>  allowedActions,
                         std::vector<psibase::Claim> claims);
 
-      std::vector<psibase::AccountNumber> getDlgsSys(psibase::AccountNumber       sender,
-                                                     std::optional<ServiceMethod> method);
+      std::vector<psibase::AccountNumber> getDlgsSys(psibase::AccountNumber sender);
 
       bool isAuthSys(psibase::AccountNumber              sender,
-                     std::vector<psibase::AccountNumber> authorizers,
-                     std::optional<ServiceMethod>        method);
+                     std::vector<psibase::AccountNumber> authorizers);
 
       bool isRejectSys(psibase::AccountNumber              sender,
-                       std::vector<psibase::AccountNumber> rejecters,
-                       std::optional<ServiceMethod>        method);
+                       std::vector<psibase::AccountNumber> rejecters);
 
       /// Issues a credential
       ///
@@ -80,9 +77,9 @@ namespace SystemService
       method(init),
       method(canAuthUserSys, user),
       method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
-      method(getDlgsSys, sender, method),
-      method(isAuthSys, sender, authorizers, method),
-      method(isRejectSys, sender, rejecters, method),
+      method(getDlgsSys, sender),
+      method(isAuthSys, sender, authorizers),
+      method(isRejectSys, sender, rejecters),
       method(issue, pubkey_fingerprint, expires, allowed_actions),
       method(resource, id, amount),
       method(get_active),

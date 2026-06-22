@@ -58,8 +58,7 @@ namespace SystemService
       void canAuthUserSys(psibase::AccountNumber user);
 
       /// Get the accounts this auth service delegates authority to for a sender.
-      std::vector<psibase::AccountNumber> getDlgsSys(psibase::AccountNumber       sender,
-                                                     std::optional<ServiceMethod> method);
+      std::vector<psibase::AccountNumber> getDlgsSys(psibase::AccountNumber sender);
 
       /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
       /// transaction from a specified sender.
@@ -71,8 +70,7 @@ namespace SystemService
       /// * `true`: If the sender's owner is among the authorizers
       /// * `false`: Otherwise
       bool isAuthSys(psibase::AccountNumber              sender,
-                     std::vector<psibase::AccountNumber> authorizers,
-                     std::optional<ServiceMethod>        method);
+                     std::vector<psibase::AccountNumber> authorizers);
 
       /// Check whether a specified set of rejecter accounts are sufficient to reject (cancel) a
       /// transaction from a specified sender.
@@ -85,8 +83,7 @@ namespace SystemService
       /// * `true`: If the sender's owner is among the rejecters
       /// * `false`: Otherwise
       bool isRejectSys(psibase::AccountNumber              sender,
-                       std::vector<psibase::AccountNumber> rejecters,
-                       std::optional<ServiceMethod>        method);
+                       std::vector<psibase::AccountNumber> rejecters);
 
       /// Set the owner of the sender account
       ///
@@ -110,9 +107,9 @@ namespace SystemService
    PSIO_REFLECT(AuthDelegate,  //
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                 method(canAuthUserSys, user),
-                method(getDlgsSys, sender, method),
-                method(isAuthSys, sender, authorizers, method),
-                method(isRejectSys, sender, rejecters, method),
+                method(getDlgsSys, sender),
+                method(isAuthSys, sender, authorizers),
+                method(isRejectSys, sender, rejecters),
                 method(setOwner, owner),
                 method(newAccount, name, owner, requireMatch),
                 method(getOwner, owner)
