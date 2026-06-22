@@ -584,10 +584,13 @@ impl CapacityPricing {
             let service = get_service();
             let shared = Tokens::call().getSharedBal(sys, payer, service);
             if shared < amt {
-                let required = Decimal::new(amt, BillingConfig::get_sys_token().precision);
+                let precision = BillingConfig::get_sys_token().precision;
+                let paid = Decimal::new(shared, precision);
+                let required = Decimal::new(amt, precision);
                 abort_message(&format!(
-                    "Enabling billing requires a payment of {required} tokens"
+                    "Account {payer} has paid {paid} tokens, but enabling billing requires {required} tokens"
                 ));
+           
             }
             Tokens::call().debit(sys, payer, amt, "".into());
             Tokens::call().toSub(sys, sub, amt);

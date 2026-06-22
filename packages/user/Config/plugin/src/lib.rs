@@ -227,7 +227,7 @@ impl VirtualServer for ConfigPlugin {
                     .expect("Network token not found");
                 tokens::plugin::user::credit(
                     sys_id,
-                    "virtual-server",
+                    VIRTUAL_SERVER,
                     &cost_str.to_string(),
                     "Settle disk consumption that occurred while billing was disabled",
                 )?;
