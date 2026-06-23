@@ -2,8 +2,8 @@ const MARKET_FIELD_ORDER = [
     "initialPrice",
     "floorPrice",
     "target",
-    "increasePpm",
-    "decreasePpm",
+    "increasePct",
+    "decreasePct",
 ] as const;
 
 type MarketFieldName = (typeof MARKET_FIELD_ORDER)[number];
@@ -12,8 +12,8 @@ const MARKET_FIELD_INPUT_ID: Record<MarketFieldName, string> = {
     initialPrice: "pm-initial",
     floorPrice: "pm-floor",
     target: "pm-target",
-    increasePpm: "pm-inc-ppm",
-    decreasePpm: "pm-dec-ppm",
+    increasePct: "pm-inc-pct",
+    decreasePct: "pm-dec-pct",
 };
 
 function parseMarketFieldPath(fieldPath: string): {
@@ -27,10 +27,7 @@ function parseMarketFieldPath(fieldPath: string): {
 
     const index = Number(match[1]);
     const field = match[2] as MarketFieldName;
-    if (
-        !Number.isInteger(index) ||
-        !MARKET_FIELD_ORDER.includes(field)
-    ) {
+    if (!Number.isInteger(index) || !MARKET_FIELD_ORDER.includes(field)) {
         return null;
     }
 

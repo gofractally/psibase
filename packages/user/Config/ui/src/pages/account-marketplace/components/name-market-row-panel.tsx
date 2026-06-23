@@ -28,8 +28,8 @@ const MARKET_FIELD_PLACEHOLDERS = {
     floorPrice: NAME_MARKET_DEFAULT_PARAMS.floorPrice,
     windowAmount: NAME_MARKET_DEFAULT_PARAMS.windowAmount,
     target: String(NAME_MARKET_DEFAULT_PARAMS.target),
-    increasePpm: String(NAME_MARKET_DEFAULT_PARAMS.increasePercent),
-    decreasePpm: String(NAME_MARKET_DEFAULT_PARAMS.decreasePercent),
+    increasePct: String(NAME_MARKET_DEFAULT_PARAMS.increasePercent),
+    decreasePct: String(NAME_MARKET_DEFAULT_PARAMS.decreasePercent),
 } as const;
 
 const FIELD_LABEL_CLASS = "text-xs font-medium leading-none min-h-3.5";
@@ -306,10 +306,10 @@ export function NameMarketRowPanel({
                         )}
                     </form.Field>
 
-                    <form.Field name={`${baseName}.increasePpm`}>
+                    <form.Field name={`${baseName}.increasePct`}>
                         {(field) => (
                             <CompactField
-                                id={`pm-inc-ppm-${index}`}
+                                id={`pm-inc-pct-${index}`}
                                 label="% increase"
                                 value={field.state.value}
                                 onChange={field.handleChange}
@@ -317,20 +317,20 @@ export function NameMarketRowPanel({
                                 disabled={actionsDisabled}
                                 inputMode="numeric"
                                 placeholder={
-                                    MARKET_FIELD_PLACEHOLDERS.increasePpm
+                                    MARKET_FIELD_PLACEHOLDERS.increasePct
                                 }
                                 meta={field.state.meta}
                                 isDirty={
-                                    field.state.value !== baseline.increasePpm
+                                    field.state.value !== baseline.increasePct
                                 }
                             />
                         )}
                     </form.Field>
 
-                    <form.Field name={`${baseName}.decreasePpm`}>
+                    <form.Field name={`${baseName}.decreasePct`}>
                         {(field) => (
                             <CompactField
-                                id={`pm-dec-ppm-${index}`}
+                                id={`pm-dec-pct-${index}`}
                                 label="% decrease"
                                 value={field.state.value}
                                 onChange={field.handleChange}
@@ -338,11 +338,11 @@ export function NameMarketRowPanel({
                                 disabled={actionsDisabled}
                                 inputMode="numeric"
                                 placeholder={
-                                    MARKET_FIELD_PLACEHOLDERS.decreasePpm
+                                    MARKET_FIELD_PLACEHOLDERS.decreasePct
                                 }
                                 meta={field.state.meta}
                                 isDirty={
-                                    field.state.value !== baseline.decreasePpm
+                                    field.state.value !== baseline.decreasePct
                                 }
                             />
                         )}

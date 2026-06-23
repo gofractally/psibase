@@ -59,40 +59,6 @@ export function parsePositiveInt(raw: string): number | null {
     return n;
 }
 
-export function parsePpm(raw: string): number | null {
-    const t = raw.trim();
-    if (!t || !/^\d+$/.test(t)) return null;
-    const n = Number.parseInt(t, 10);
-    if (!Number.isFinite(n) || n < 1 || n >= 1_000_000) return null;
-    return n;
-}
-
-const PPM_PER_PERCENT = 10_000;
-
-export function ppmToPercentString(ppm: number): string {
-    const percent = ppm / PPM_PER_PERCENT;
-    return percent.toFixed(4).replace(/\.?0+$/, "");
-}
-
-export function parsePercentToPpm(raw: string): number | null {
-    const t = raw.trim().replace(/%$/, "").trim();
-    if (!t || !/^\d+(\.\d+)?$/.test(t)) {
-        return null;
-    }
-
-    const percent = Number(t);
-    if (!Number.isFinite(percent) || percent <= 0 || percent >= 100) {
-        return null;
-    }
-
-    const ppm = Math.round(percent * PPM_PER_PERCENT);
-    if (ppm < 1 || ppm >= 1_000_000) {
-        return null;
-    }
-
-    return ppm;
-}
-
 /** Parses a whole-number percent for the plugin API (u8, 1–255). */
 export function parsePercentToPct(raw: string): number | null {
     const t = raw.trim().replace(/%$/, "").trim();
@@ -106,10 +72,6 @@ export function parsePercentToPct(raw: string): number | null {
     }
 
     return percent;
-}
-
-export function ppmToWholePercentString(ppm: number): string {
-    return String(Math.round(ppm / PPM_PER_PERCENT));
 }
 
 export function formatSystemTokenAmount(

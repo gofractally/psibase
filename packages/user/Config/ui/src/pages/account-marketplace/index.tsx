@@ -53,8 +53,8 @@ const MARKET_EDITABLE_FIELDS: Array<keyof NameMarketFormRow> = [
     "windowAmount",
     "windowUnit",
     "target",
-    "increasePpm",
-    "decreasePpm",
+    "increasePct",
+    "decreasePct",
 ];
 
 export const NameMarketConfig = () => {

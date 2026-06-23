@@ -10,7 +10,6 @@ import {
     parsePositiveInt,
     parseSystemTokenAmount,
     parseWindowSeconds,
-    ppmToWholePercentString,
     secondsToWindowForm,
 } from "@/lib/name-market-parsers";
 
@@ -29,8 +28,8 @@ export type NameMarketFormRow = {
     windowAmount: string;
     windowUnit: z.infer<typeof zDurationUnit>;
     target: string;
-    increasePpm: string;
-    decreasePpm: string;
+    increasePct: string;
+    decreasePct: string;
 };
 
 export type NameMarketsFormValues = {
@@ -50,8 +49,8 @@ const zDirtyMarketRow = (systemToken: SystemTokenInfo) =>
             windowAmount: z.string(),
             windowUnit: zDurationUnit,
             target: z.string(),
-            increasePpm: z.string(),
-            decreasePpm: z.string(),
+            increasePct: z.string(),
+            decreasePct: z.string(),
         })
         .superRefine((row, ctx) => {
             if (!row.configured && row.initialPrice.trim() === "") {
@@ -103,19 +102,19 @@ const zDirtyMarketRow = (systemToken: SystemTokenInfo) =>
                 });
             }
 
-            if (parsePercentToPct(row.increasePpm) === null) {
+            if (parsePercentToPct(row.increasePct) === null) {
                 ctx.addIssue({
                     code: "custom",
                     message: "Enter a whole-number percent from 1 to 255",
-                    path: ["increasePpm"],
+                    path: ["increasePct"],
                 });
             }
 
-            if (parsePercentToPct(row.decreasePpm) === null) {
+            if (parsePercentToPct(row.decreasePct) === null) {
                 ctx.addIssue({
                     code: "custom",
                     message: "Enter a whole-number percent from 1 to 255",
-                    path: ["decreasePpm"],
+                    path: ["decreasePct"],
                 });
             }
         });
@@ -150,12 +149,8 @@ export function buildNameMarketsFormValues(
             windowAmount: windowForm.amount,
             windowUnit: windowForm.unit,
             target: configured ? String(row!.target) : "",
-            increasePpm: configured
-                ? ppmToWholePercentString(row!.increasePpm)
-                : "",
-            decreasePpm: configured
-                ? ppmToWholePercentString(row!.decreasePpm)
-                : "",
+            increasePct: configured ? String(row!.increasePct) : "",
+            decreasePct: configured ? String(row!.decreasePct) : "",
         });
     }
 
@@ -173,8 +168,8 @@ export function marketRowsEqual(
         a.windowAmount === b.windowAmount &&
         a.windowUnit === b.windowUnit &&
         a.target === b.target &&
-        a.increasePpm === b.increasePpm &&
-        a.decreasePpm === b.decreasePpm
+        a.increasePct === b.increasePct &&
+        a.decreasePct === b.decreasePct
     );
 }
 
@@ -225,8 +220,8 @@ export function toMarketConfig(
     systemToken: SystemTokenInfo,
 ): MarketConfigParam {
     const target = parsePositiveInt(row.target);
-    const increasePct = parsePercentToPct(row.increasePpm);
-    const decreasePct = parsePercentToPct(row.decreasePpm);
+    const increasePct = parsePercentToPct(row.increasePct);
+    const decreasePct = parsePercentToPct(row.decreasePct);
     const floorPrice = parseSystemTokenAmount(row.floorPrice, systemToken);
     const windowSeconds = parseWindowSeconds(row.windowAmount, row.windowUnit);
 
