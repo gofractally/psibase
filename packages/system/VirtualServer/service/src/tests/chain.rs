@@ -180,6 +180,12 @@ fn relay_balance_basics(chain: psibase::Chain) -> Result<(), psibase::Error> {
         fmt_num(shortfall_after_alloc),
     );
 
+    chain.finish_block();
+    assert!(
+        check_disk_invariant("end of relay_balance_basics", &chain),
+        "disk accounting invariant violated"
+    );
+
     Ok(())
 }
 
@@ -230,6 +236,12 @@ fn server_storage(chain: psibase::Chain) -> Result<(), psibase::Error> {
     assert_error(
         Wrapper::propose(&chain, PRODUCER_ACCOUNT).set_network_variables(vars),
         "Total storage allocation must not exceed available server storage",
+    );
+
+    chain.finish_block();
+    assert!(
+        check_disk_invariant("end of server_storage", &chain),
+        "disk accounting invariant violated"
     );
 
     Ok(())
@@ -343,6 +355,12 @@ fn metering(chain: psibase::Chain) -> Result<(), psibase::Error> {
 
     println!("alice resource balance: {}", fmt_sys(balance));
 
+    chain.finish_block();
+    assert!(
+        check_disk_invariant("end of metering", &chain),
+        "disk accounting invariant violated"
+    );
+
     Ok(())
 }
 
@@ -379,6 +397,12 @@ fn system_writes_accumulate_shortfall(chain: psibase::Chain) -> Result<(), psiba
         freed_bytes, 93,
         "Expected exactly 93 bytes freed by startBlock system writes, got {}",
         freed_bytes,
+    );
+
+    chain.finish_block();
+    assert!(
+        check_disk_invariant("end of system_writes_accumulate_shortfall", &chain),
+        "disk accounting invariant violated"
     );
 
     Ok(())
@@ -561,6 +585,12 @@ fn invites(chain: psibase::Chain) -> Result<(), psibase::Error> {
         println!("{}", trace.error.unwrap());
         assert!(false, "Invite create acc fail");
     }
+
+    chain.finish_block();
+    assert!(
+        check_disk_invariant("end of invites", &chain),
+        "disk accounting invariant violated"
+    );
 
     Ok(())
 }
