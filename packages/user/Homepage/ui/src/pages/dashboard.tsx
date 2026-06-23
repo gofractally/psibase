@@ -13,6 +13,7 @@ import { z } from "zod";
 
 import { siblingUrl } from "@psibase/common-lib";
 
+import { useAccountMarketplaceVisibility } from "@/apps/accounts-marketplace/hooks/use-account-marketplace-visibility";
 import { ACCOUNT_MARKETPLACE_PATH } from "@/apps/accounts-marketplace/route";
 
 import { zAccount } from "@shared/lib/schemas/account";
@@ -74,6 +75,17 @@ const apps: App[] = [
 
 const App = () => {
     const navigate = useNavigate();
+    const {
+        visible: isAccountMarketplaceVisible,
+        isLoading: isAccountMarketplaceLoading,
+    } = useAccountMarketplaceVisibility();
+
+    const visibleApps = apps.filter((app) => {
+        if ("path" in app && app.path === ACCOUNT_MARKETPLACE_PATH) {
+            return isAccountMarketplaceVisible && !isAccountMarketplaceLoading;
+        }
+        return true;
+    });
 
     const handleNavigation = (app: App) => {
         if ("href" in app) {
@@ -88,7 +100,7 @@ const App = () => {
     return (
         <main className="container mx-auto p-6">
             <div className="grid gap-8 md:grid-cols-2">
-                {apps.map((app, i) => (
+                {visibleApps.map((app, i) => (
                     <motion.div
                         key={app.title}
                         initial={{ opacity: 0, y: 20 }}
