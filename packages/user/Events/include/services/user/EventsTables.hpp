@@ -14,6 +14,29 @@ namespace UserService
 {
    using psibase::ServiceSchema;
 
+   // TODO: create a separate enum
+   using EventDb = psibase::DbId;
+
+   struct EventNumberRecord
+   {
+      EventDb              type;
+      psibase::EventNumber nextEventNumber;
+      PSIO_REFLECT(EventNumberRecord, type, nextEventNumber)
+   };
+   using EventNumberTable = psibase::Table<EventNumberRecord, &EventNumberRecord::type>;
+   PSIO_REFLECT_TYPENAME(EventNumberTable)
+
+   struct EventRecord
+   {
+      psibase::EventNumber   id;
+      psibase::AccountNumber service;
+      psibase::MethodNumber  type;
+      std::vector<char>      rawData;
+      PSIO_REFLECT(EventRecord, id, service, type, rawData);
+   };
+   using EventTable = psibase::Table<EventRecord, &EventRecord::id>;
+   PSIO_REFLECT_TYPENAME(EventTable)
+
    struct SecondaryIndexInfo
    {
       std::uint8_t indexNum = 0xff;

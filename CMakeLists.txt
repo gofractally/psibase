@@ -329,7 +329,7 @@ psibase_package(
         FLAGS isPrivileged
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Transact/src/postinstall.json
     DEPENDS wasm
-    PACKAGE_DEPENDS "AccountsService(^${PSIBASE_VERSION}.0)" "CpuLimit(^${PSIBASE_VERSION}.0)" "Db(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "AccountsService(^${PSIBASE_VERSION}.0)" "CpuLimit(^${PSIBASE_VERSION}.0)" "Db(^${PSIBASE_VERSION}.0)" "EventsService(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -863,8 +863,8 @@ psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/Events.psi
-    NAME Events
+    OUTPUT ${SERVICE_DIR}/EventsService.psi
+    NAME EventsService
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Indexes events and provides querying"
     SERVICE events
@@ -877,9 +877,18 @@ psibase_package(
     SERVICE events+1
         WASM ${CMAKE_CURRENT_BINARY_DIR}/REvents.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/REvents-schema.json
-        POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Events/src/postinstall.json
     DEPENDS wasm
-    PACKAGE_DEPENDS "Transact(^${PSIBASE_VERSION}.0)" "TransactService(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/Events.psi
+    NAME Events
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Indexes events and provides querying"
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Events/src/postinstall.json
+    DEPENDS wasm
+    PACKAGE_DEPENDS "EventsService" "Transact(^${PSIBASE_VERSION}.0)" "TransactService(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -1281,7 +1290,7 @@ endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
     Accounts AccountsService Aes AuthAny AuthDyn AuthDelegate AuthDelegateService AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
-    Docs DiffAdjust DynLd Events Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry
+    Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap PremAccounts Transact TransactService Homepage VirtualServer WebCrypto Workshop Config
     XAdmin XBasic XDb XDefault XHttp XPackages XPeers XProxy XRun XSites XTimer XTransact)
 
@@ -1313,6 +1322,7 @@ install(
           ${SERVICE_DIR}/Docs.psi
           ${SERVICE_DIR}/DynLd.psi
           ${SERVICE_DIR}/Events.psi
+          ${SERVICE_DIR}/EventsService.psi
           ${SERVICE_DIR}/Evaluations.psi
           ${SERVICE_DIR}/Explorer.psi
           ${SERVICE_DIR}/FaucetTok.psi

@@ -28,16 +28,13 @@ namespace
 {
    std::uint64_t getNextEventNumber(const DatabaseStatusRow& status, DbId db)
    {
-      switch (db)
+      if (auto row = EventConfig{}.open<EventNumberTable>(KvMode::read).get(db))
       {
-         case DbId::historyEvent:
-            return status.nextHistoryEventNumber;
-         case DbId::uiEvent:
-            return status.nextUIEventNumber;
-         case DbId::merkleEvent:
-            return status.nextMerkleEventNumber;
-         default:
-            abortMessage("Not an event db");
+         return row->nextEventNumber;
+      }
+      else
+      {
+         return 1;
       }
    }
 
@@ -66,28 +63,19 @@ namespace
           psio::convert_to_key(std::tuple(EventIndex::service, secondaryIndexTableNum))};
       EventWrapper     wrapper{nullptr};
       EventIndexHandle handle{KvMode::write};
+      EventTable       events{EventConfig{}.open<EventTable>(KvMode::read)};
       bool             operator()(psibase::DbId db, std::uint64_t eventNum)
       {
-         std::uint32_t sz = psibase::raw::getSequential(db, eventNum);
-         if (sz == -1)
+         auto row = events.getView(eventNum);
+         if (!row)
             return false;
-         data.resize(sz);
-         psibase::raw::getResult(data.data(), sz, 0);
-         if (!psio::fracpack_validate<SequentialRecord<MethodNumber>>(data))
-            return true;
-         auto [service, type] = psio::from_frac<SequentialRecord<MethodNumber>>(data);
-         if (!type)
-            return true;
-         const CompiledType* ctype = cache.getSchemaType(db, service, *type);
+
+         const CompiledType* ctype = cache.getSchemaType(db, row->service(), row->type());
          if (!ctype)
             return true;
-         wrapper.set(ctype);
 
-         FracParser parser(psio::FracStream{data}, wrapper.get(), psibase_builtins, false);
-         check(parser.next().kind == FracParser::start, "expected start");        // start
-         check(parser.next().kind == FracParser::scalar, "expected service");     // service
-         check(parser.next().kind == FracParser::scalar, "expected event type");  // type
-         auto saved = parser.in;
+         FracParser parser(psio::FracStream{row->rawData()}, ctype, psibase_builtins, false);
+
          // validate remaining data
          while (auto item = parser.next())
          {
@@ -95,17 +83,18 @@ namespace
                return true;
          }
 
-         auto indexes = secondary.getIndex<0>().get(std::tuple(db, service, *type));
+         auto indexes = secondary.getIndex<0>().get(
+             std::tuple(db, row->service().unpack(), row->type().unpack()));
          if (!indexes)
             indexes.emplace(SecondaryIndexRecord{.indexes = std::vector{SecondaryIndexInfo{}}});
          for (const auto& index : indexes->indexes)
          {
             psio::vector_stream stream{key};
-            to_key(EventIndexTable{db, service, *type}, stream);
+            to_key(EventIndexTable{db, row->service(), row->type()}, stream);
             to_key(index.indexNum, stream);
             for (const auto& column : index.columns())
             {
-               parser.in = saved;
+               parser.set_pos(0);
                parser.parse(ctype);
                parser.push(parser.select_child(column));
                to_key(parser, stream);
@@ -173,6 +162,7 @@ namespace
       {
          auto&               cache = SchemaCache::instance();
          EventWrapper        wrapper;
+         auto                events = EventConfig{}.open<EventTable>(KvMode::read);
          std::vector<char>   data;
          const CompiledType* ctype = cache.getSchemaType(item.db, item.service, item.event);
          wrapper.set(ctype);
@@ -184,17 +174,15 @@ namespace
                 auto eventNum = keyToEventId(key, prefixLen);
                 if (eventNum >= item.endKey)
                    return false;
-                auto sz = psibase::raw::getSequential(item.db, eventNum);
-                if (sz == -1)
+                auto event = events.getView(eventNum);
+                if (!event)
                    return true;
-                data.resize(sz);
-                psibase::raw::getResult(data.data(), data.size(), 0);
-                FracParser parser{psio::FracStream{data}, wrapper.get(), psibase_builtins, false};
-                auto       saved = parser.get_pos(parser.select_child(2));
+                FracParser parser{psio::FracStream{event->rawData()}, ctype, psibase_builtins,
+                                  false};
                 psio::vector_stream stream{subkey};
                 for (const auto& column : item.info.columns())
                 {
-                   parser.set_pos(saved);
+                   parser.set_pos(0);
                    parser.parse(ctype);
                    parser.push(parser.select_child(column));
                    to_key(parser, stream);
@@ -263,19 +251,8 @@ namespace
 
       auto queue = EventIndex{}.open<PendingIndexTable>();
 
-      auto queueRow = PendingIndexRecord{.seq = 0, .db = db, .endKey = 0};
-      // Look up the current event number
-      switch (db)
-      {
-         case DbId::historyEvent:
-            queueRow.endKey = dbStatus.nextHistoryEventNumber;
-            break;
-         case DbId::merkleEvent:
-            queueRow.endKey = dbStatus.nextMerkleEventNumber;
-            break;
-         default:
-            abortMessage("Unsupported db");
-      }
+      auto queueRow =
+          PendingIndexRecord{.seq = 0, .db = db, .endKey = getNextEventNumber(dbStatus, db)};
       // Find the first available sequence number
       {
          if (auto last = queue.getIndex<0>().last())

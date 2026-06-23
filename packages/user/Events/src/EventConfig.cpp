@@ -32,6 +32,21 @@ void Events::addIndex(psibase::DbId          db,
    to<EventIndex>().withFlags(CallFlags::runModeCallback).update(db, service, event);
 }
 
+EventNumber Events::event(EventDb db, psibase::MethodNumber type, std::vector<char> rawData)
+{
+   check(db == EventDb::historyEvent && db != EventDb::merkleEvent, "Wrong event type");
+   // TODO: Create a table for merkle events
+   if (db != EventDb::historyEvent)
+      return 0;
+   auto table = open<EventNumberTable>();
+   auto row   = table.get(db).value_or(EventNumberRecord{db, 1});
+   auto id    = row.nextEventNumber++;
+   table.put(row);
+   auto events = open<EventTable>(KvMode::write);
+   events.put({id, getSender(), type, std::move(rawData)});
+   return id;
+}
+
 void Events::sync()
 {
    to<EventIndex>().withFlags(CallFlags::runModeCallback).sync();

@@ -48,7 +48,8 @@ namespace UserService
    {
       static constexpr psibase::AccountNumber service{"events"};
 
-      using Tables = psibase::ServiceTables<SecondaryIndexTable>;
+      using Tables    = psibase::ServiceTables<SecondaryIndexTable, EventNumberTable>;
+      using WriteOnly = psibase::WriteOnlyTables<EventTable>;
 
       /// Requests an index. Indexes can improve the performance of queries involving
       /// the column. The indexes are subjective and MAY be adjusted by individual nodes.
@@ -60,11 +61,17 @@ namespace UserService
                     psibase::MethodNumber  event,
                     std::uint8_t           column);
 
+      /// Writes an event to the event log
+      psibase::EventNumber event(EventDb db, psibase::MethodNumber type, std::vector<char> rawData);
+
       /// Forwards to event-index::sync
       void sync();
    };
-   PSIO_REFLECT(EventConfig, method(addIndex, db, service, event, column), method(sync))
-   PSIBASE_REFLECT_TABLES(EventConfig, EventConfig::Tables)
+   PSIO_REFLECT(EventConfig,
+                method(addIndex, db, service, event, column),
+                method(event, db, type, rawData),
+                method(sync))
+   PSIBASE_REFLECT_TABLES(EventConfig, EventConfig::Tables, EventConfig::WriteOnly)
 
    using Events = EventConfig;
 

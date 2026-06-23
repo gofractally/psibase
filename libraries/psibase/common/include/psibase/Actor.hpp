@@ -175,8 +175,8 @@ namespace psibase
       template <uint32_t idx, auto MemberPtr, typename... Args>
       auto call(Args&&... args) const
       {
-         auto act = ActionViewProxy(sender, receiver)
-                        .call<idx, MemberPtr, Args...>(std::forward<Args>(args)...);
+         auto act          = ActionViewProxy(sender, receiver)
+                                 .call<idx, MemberPtr, Args...>(std::forward<Args>(args)...);
          using result_type = decltype(psio::result_of(MemberPtr));
          return psibase::fraccall<std::remove_cv_t<psio::remove_view_t<result_type>>>(
              act.data_without_size_prefix(), flags);
@@ -197,8 +197,8 @@ namespace psibase
       template <uint32_t idx, auto MemberPtr, typename... Args>
       auto call(Args&&... args) const
       {
-         auto act = ActionViewProxy(sender, receiver)
-                        .call<idx, MemberPtr, Args...>(std::forward<Args>(args)...);
+         auto act          = ActionViewProxy(sender, receiver)
+                                 .call<idx, MemberPtr, Args...>(std::forward<Args>(args)...);
          using result_type = decltype(psio::result_of(MemberPtr));
          if constexpr (not std::is_same_v<void, result_type>)
             return psibase::fraccall<std::remove_cv_t<psio::remove_view_t<result_type>>>(
@@ -230,10 +230,15 @@ namespace psibase
          static_assert(std::tuple_size<param_tuple>() == sizeof...(Args),
                        "insufficient arguments passed to method");
 
-         return psibase::putSequential(
-             event_log, sender,
-             MethodNumber{*psio::reflect<member_class>::member_function_names[idx].begin()},
-             param_tuple(std::forward<Args>(args)...));
+         auto type = MethodNumber{*psio::reflect<member_class>::member_function_names[idx].begin()};
+         auto action = TypedAction{
+             .sender  = sender,
+             .service = AccountNumber{"events"},
+             .method  = MethodNumber{"event"},
+             .rawData =
+                 psio::nested{std::tuple(event_log, type, psio::nested{param_tuple(args...)})},
+         };
+         return fraccall<EventNumber>(psio::to_frac(action)).unpack();
       }
    };
 
