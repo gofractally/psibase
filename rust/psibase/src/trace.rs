@@ -336,19 +336,10 @@ fn collect_direct_disk<'a>(
     }
 }
 
-fn format_signed_bytes(amount: i64, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    if amount >= 0 {
-        write!(f, "+{}", amount)
-    } else {
-        write!(f, "{}", amount)
-    }
-}
-
 fn format_signed_col(amount: Option<i64>, width: usize) -> String {
     match amount {
         None => " ".repeat(width),
-        Some(n) if n >= 0 => format!("{:>width$}", format!("+{}", n), width = width),
-        Some(n) => format!("{:>width$}", n, width = width),
+        Some(n) => format!("{:>+width$}", n, width = width),
     }
 }
 
@@ -406,7 +397,7 @@ fn format_disk_usage_action(
             if i != 0 {
                 write!(f, " ")?;
             }
-            format_signed_bytes(*d, f)?;
+            write!(f, "{:+}", d)?;
         }
         writeln!(f)?;
     }
@@ -426,7 +417,7 @@ fn format_transaction_disk_usage_trace(
 ) -> fmt::Result {
     let total: i64 = ttrace.action_traces.iter().map(subtree_disk_net).sum();
     write!(f, "Total disk usage: ")?;
-    format_signed_bytes(total, f)?;
+    write!(f, "{:+}", total)?;
     writeln!(f, " bytes")?;
     writeln!(
         f,
