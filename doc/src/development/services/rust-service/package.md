@@ -66,293 +66,47 @@ postinstall = [{sender="service1", service="service1", method="init", rawData="0
 
 ## Package naming
 
-A psibase app uses **many different names** for the same project. Most are **build-time**
+A psibase app uses **many different names** to define components within the same project. Most are **build-time**
 (Cargo, WIT, CMake). A smaller set are **on-chain** (account names used by actions,
 GraphQL, plugins, and trust/permissions).
 
-These layers are easy to conflate because:
+These layers are easy to conflate because the various names are generated from a single project name at the time of package template instantiation. The entities being named:
 
 - Cargo and WIT prefer **kebab-case** (`name-market`, `token-swap`).
 - On-chain accounts are **short strings** (max **10 characters**) and often omit
   hyphens when a hyphenated name would not fit.
-- The `[package.metadata.psibase] services` field is named misleadingly: it lists
+- The `[package.metadata.psibase] services` field is a bit misleading, in that it lists
   **Cargo crate names**, not on-chain account names.
 
-The sections below explain what each name is, where it is defined, and what it must
-correlate with.
+The quick reference table lists what each name is, where it is defined, and **what it
+must correlate with** for the package to build. Any of these names can be changed, but
+correlated references to the entity being renamed must match. Examples follow common
+conventions or actual requirements; any valid name in the relevant namespace works.
 
 ### Quick reference
 
-| Identifier | Example (NameMarket) | Example (TokenSwap) | Namespace | Must correlate with |
-|------------|----------------------|---------------------|-----------|---------------------|
-| Repo directory | `NameMarket/` | `TokenSwap/` | Filesystem | CMake `PATH`, workspace member path (convention: PascalCase) |
-| Published package | `NameMarket` | `TokenSwap` | `.psi` artifact | `package-name` in root `Cargo.toml`; output `NameMarket.psi` |
-| Package crate | `name-market-pkg` | `token-swap-pkg` | Cargo | Root `[package].name`; suffix `-pkg` (convention) |
-| Service crate | `name-market` | `token-swap` | Cargo | Root `[dependencies]` key; `services = ["…"]` entry |
-| On-chain service account | `namemarket` | `token-swap` | Chain | `#[psibase::service(name = "…")]`; `postinstall` sender/service; GraphQL `service:`; trust whitelists |
-| Query crate | `r-name-market` | `r-token-swap` | Cargo | Service `server = "r-…"`; prefix `r-` (convention) |
-| On-chain query account | `namemarket+1` | `token-swap+1` | Chain | `#[psibase::service(name = "…+1")]` in query-service |
-| Plugin crate | `name-market-plugin` | `token-swap-plugin` | Cargo | Service `plugin = "…-plugin"` |
-| WIT component package | `name-market:plugin` | `token-swap:plugin` | WIT / WASM | `package` in `plugin/wit/*.wit` and `[package.metadata.component]` |
-| Rust service module | `name_market` | `token_swap` | Rust source | Crate name with `-` → `_` (Cargo + `use` in plugin/tests) |
-| WIT bindings module | `name_market::plugin` | `token_swap::plugin` | Generated Rust | WIT package before `:plugin`, `-` → `_` |
-| Package dependency | `HttpServer` | `Tokens` | Published `.psi` | `[package.metadata.psibase.dependencies]` keys |
-| Cross-plugin WIT dep key | `name-market:plugin` | `transact:plugin` | WIT imports | `[package.metadata.component.target.dependencies]` in consumer plugin |
+<div markdown="1">
 
-### Build time vs on-chain
+| Identifier, Namespace, Convention vs *Requirement, Example | Location(s) (Build-time; must match) | Location(s) (Run-time) |
+|------------------------------------------------------------|--------------------------------------|------------------------|
+| Repo directory<br><br>Filesystem<br><br>PascalCase<br><br>`NameMarket/` | CMake: `PATH`<br><br>Cargo workspace member path in `packages/{user,system,local}/Cargo.toml` | — |
+| Published package<br><br>`.psi` artifact<br><br>PascalCase; *output filename is case-sensitive<br><br>`NameMarket` | Package root `Cargo.toml`: `package-name`<br><br>CMake: `cargo_psibase_package OUTPUT` basename (or `psibase_package NAME`); `write_package_index` arg; `install FILES`; `PACKAGE_DEPENDS` refs<br><br>Dependent packages' dep lists: `[package.metadata.psibase.dependencies]` keys | Built artifact `{package-name}.psi` (`Meta.name` inside)<br><br>`packages` service: `InstalledPackage.name` (after install) |
+| Package crate<br><br>Cargo<br><br>`{service-crate-name}-pkg` suffix<br><br>`name-market-pkg` | Package root `Cargo.toml`: `[package].name`<br><br>Package root `[dependencies]`: key | — |
+| Service crate<br><br>Cargo<br><br>kebab-case<br><br>`name-market` | Service `Cargo.toml`: `[package].name`<br><br>Package root `[dependencies]`: key<br><br>Package root `[package.metadata.psibase]`: `services = ["…"]` | — |
+| On-chain service account<br><br>Chain<br><br>*≤10 chars (and >=8 if non-premium acct); `a-z`, `0-9`, `-`; no leading/trailing/double hyphen<br><br>`namemarket` | Service `lib.rs`: `#[psibase::service(name = "…")]`<br><br>Service `Cargo.toml`: `postinstall` sender/service<br><br>UI / tests: hardcoded service strings | Service subdomain / HTTP routing<br><br>GraphQL: `service` parameter<br><br>Plugin trust: whitelist entries<br><br>Cross-service calls; event indexes |
+| Query crate<br><br>Cargo<br><br>`r-{service-crate-name}` prefix<br><br>`r-name-market` | Query-service `Cargo.toml`: `[package].name`<br><br>Service `Cargo.toml`: `[package.metadata.psibase]`: `server` | — |
+| On-chain query account<br><br>Chain<br><br>*`{base-account}+N` subaccount format; `+1` is usual<br><br>`namemarket+1` | Query-service `lib.rs`: `#[psibase::service(name = "…+1")]` | GraphQL / HTTP routing to query WASM<br><br>`http-server` dispatch to `{account}+1` |
+| Plugin crate<br><br>Cargo<br><br>`{service-crate-name}-plugin` suffix<br><br>`name-market-plugin` | Plugin `Cargo.toml`: `[package].name`<br><br>Service `Cargo.toml`: `[package.metadata.psibase]`: `plugin` | Service subdomain: `/plugin.wasm` |
+| WIT component package<br><br>WIT / WASM<br><br>`{service-crate-name}:plugin`; independent of on-chain account<br><br>`name-market:plugin` | Plugin `wit/*.wit`: `package …;`<br><br>Plugin `Cargo.toml`: `[package.metadata.component] package` | WASM module namespace (`{name}:plugin/{intf}#{fn}`) |
+| Rust service module<br><br>Rust source<br><br>*kebab-case crate name → snake_case (Cargo)<br><br>`name_market` | Plugin / tests: `use {snake}::…` (from service crate name) | — |
+| WIT bindings module<br><br>Generated Rust<br><br>*WIT package name → snake_case before `:plugin` (wit-bindgen)<br><br>`name_market::plugin` | Plugin `src/bindings.rs`: module path (generated) | — |
+| Package dependency<br><br>Published `.psi`<br><br>PascalCase<br><br>`HttpServer` | Consumer package root `[package.metadata.psibase.dependencies]`: key<br><br>Referenced package: `package-name` | `packages` service: install dependency resolution by `Meta.name` / `InstalledPackage.name` |
+| Cross-plugin WIT dep key<br><br>WIT imports<br><br>*must match provider WIT package name<br><br>`name-market:plugin` | Consumer plugin `Cargo.toml`: `[package.metadata.component.target.dependencies]` key<br><br>Consumer plugin `wit/impl.wit`: `import …` | WASM linker: import module string |
 
-```text
-BUILD TIME (Cargo / WIT / CMake)          RUNTIME (on-chain)
-────────────────────────────────          ────────────────────
-name-market-pkg                           (not deployed)
-  ├─ name-market        ───────────────►  namemarket
-  ├─ r-name-market      ───────────────►  namemarket+1
-  └─ name-market-plugin ──WIT──────────►  /plugin.wasm on namemarket subdomain
-       name-market:plugin
-```
+</div>
 
-- **Left side** names are how `cargo-psibase`, `cargo component`, and the workspace
-  wire crates together.
-- **Right side** names are what the chain, HTTP server, GraphQL, and other plugins
-  actually call.
-
-When a kebab-case name fits in 10 characters, build-time and on-chain names can
-match (TokenSwap). When it does not, they intentionally diverge (NameMarket).
-
-### On-chain account names (requirements)
-
-Defined by `#[psibase::service(name = "…")]` and used in:
-
-- `postinstall` actions (`sender`, `service` fields)
-- GraphQL routing (`graphql(…, { service: "…" })`)
-- Plugin trust whitelists (`whitelist = ["accounts", "homepage"]` — these are
-  **service account names**, not WIT package names)
-- Cross-service calls and event indexes
-
-**Rules** (see `rust/psibase_names/src/account_number.rs`):
-
-- Length **0–10 characters** (empty string is valid but unused for services).
-- Characters: `a–z`, `0–9`, `-` (hyphen allowed).
-- Must not start or end with `-`, and must not contain `--`.
-- Query / RPC sibling: base name + `+N` (convention is `+1`), e.g. `namemarket+1`.
-
-Hyphens are **allowed** on-chain (`token-swap` is 9 characters). They are not
-required. Choose a name that fits the 10-character limit; abbreviate or concatenate
-when a readable hyphenated form does not fit (`namemarket` vs `name-market`).
-
-### Build-time names (by artifact)
-
-#### Published package name
-
-```toml
-# <App>/Cargo.toml
-[package.metadata.psibase]
-package-name = "NameMarket"
-```
-
-- **Produces** `NameMarket.psi` (case-sensitive).
-- **Correlates with** CMake package `NAME`, `cargo psibase install` package
-  references, and `[package.metadata.psibase.dependencies]` keys in *other*
-  packages (`NameMarket = "0.23.0"`).
-- **Convention**: PascalCase matching the repo directory (`NameMarket/`).
-
-#### Package crate (`*-pkg`)
-
-```toml
-# <App>/Cargo.toml
-[package]
-name = "name-market-pkg"
-```
-
-- Root library crate that aggregates service, query, and plugin workspace members.
-- **Convention**: `{service-crate-name}-pkg`.
-- Not deployed; only used for packaging and tests.
-
-#### Service crate
-
-```toml
-# <App>/Cargo.toml
-services = ["name-market"]
-
-[dependencies]
-name-market = { path = "service", version = "0.23.0" }
-```
-
-```toml
-# <App>/service/Cargo.toml
-[package]
-name = "name-market"
-```
-
-**Critical:** `services = ["name-market"]` lists **Cargo dependency keys**, not
-on-chain account names. `cargo-psibase` resolves each entry via `get_dep()` against
-the package's `[dependencies]` table.
-
-- **Must match** the service crate's `[package].name` and the dependency key in
-  the root `Cargo.toml`.
-- **Does not need to match** the on-chain `#[psibase::service(name = "…")]` value.
-
-#### On-chain service account
-
-```rust
-// service/src/lib.rs
-#[psibase::service(name = "namemarket", tables = "tables")]
-```
-
-```toml
-# service/Cargo.toml — postinstall uses on-chain names
-postinstall = [
-    { sender = "namemarket", service = "namemarket", method = "init", data = {} },
-]
-```
-
-- **Must match** across service macro, postinstall, UI `service` constants, and
-  anywhere else you refer to the live account.
-- **Independent of** service crate name, WIT package name, and `services = […]`.
-
-#### Query-service crate
-
-```toml
-# service/Cargo.toml
-[package.metadata.psibase]
-server = "r-name-market"
-```
-
-```toml
-# query-service/Cargo.toml
-[package]
-name = "r-name-market"
-```
-
-- **`server`** must equal the query crate's `[package].name`.
-- **Convention**: `r-{service-crate-name}`.
-
-#### On-chain query account
-
-```rust
-// query-service/src/lib.rs
-#[psibase::service(name = "namemarket+1")]
-```
-
-- **Convention**: `{on-chain-service-account}+1`.
-- **Must match** the base service account prefix (`namemarket` → `namemarket+1`).
-- **Independent of** the `r-name-market` Cargo crate name.
-
-#### Plugin crate
-
-```toml
-# service/Cargo.toml
-plugin = "name-market-plugin"
-```
-
-```toml
-# plugin/Cargo.toml
-[package]
-name = "name-market-plugin"
-```
-
-- **`plugin`** must equal the plugin crate's `[package].name`.
-- **Convention**: `{service-crate-name}-plugin`.
-- Built with `cargo component`; deployed as `/plugin.wasm` on the service subdomain.
-
-#### WIT component package
-
-```wit
-// plugin/wit/world.wit
-package name-market:plugin;
-```
-
-```toml
-# plugin/Cargo.toml
-[package.metadata.component]
-package = "name-market:plugin"
-```
-
-- **`package` in Cargo.toml** must match the `package …;` line in WIT.
-- Used in WASM import/export strings (`name-market:plugin/api#claim`) and in
-  **other plugins** that import this plugin:
-
-  ```toml
-  # Consumer plugin/Cargo.toml
-  "name-market:plugin" = { path = "../../NameMarket/plugin/wit/world.wit" }
-  ```
-
-- **Convention**: `{service-crate-name}:plugin` (kebab-case + `:plugin` suffix).
-- **Not required** to match the on-chain account name. Hyphens are a WIT/Cargo
-  readability convention, not a runtime requirement (`homepage:plugin`, `nft:plugin`
-  have no hyphens).
-- Other plugins import by **WIT package name**, not by on-chain account name.
-
-#### Rust module names (from crates and WIT)
-
-| Source | Form | Example |
-|--------|------|---------|
-| Service crate dependency | `-` → `_` | `use name_market::Wrapper` |
-| WIT package in bindings | `-` → `_` | `name_market::plugin::api` |
-| Published package in tests | `packages("NameMarket")` | PascalCase `package-name` |
-
-#### Package dependencies (`[package.metadata.psibase.dependencies]`)
-
-```toml
-[package.metadata.psibase.dependencies]
-HttpServer = "0.23.0"
-Tokens = "0.23.0"
-```
-
-- Keys are **published package names** (`package-name` of other apps), not crate
-  names and not on-chain accounts.
-- Values are semver constraints for install order / compatibility.
-
-### `cargo-generate` template defaults
-
-The [package-templates](../../../../../package-templates/README.md) `basic-01` template
-keeps all build-time names aligned when the chosen `project-name` fits constraints:
-
-| Field | Template value |
-|-------|----------------|
-| Directory | `{{project-name \| upper_camel_case}}/` |
-| `package-name` | `{{project-name \| upper_camel_case}}` |
-| Package crate | `{{project-name}}-pkg` |
-| Service crate | `{{project-name}}` |
-| `services` | `["{{project-name}}"]` |
-| On-chain service | `{{project-name}}` |
-| Query crate | `r-{{project-name}}` |
-| On-chain query | `{{project-name \| kebab_case}}+1` |
-| Plugin crate | `{{project-name}}-plugin` |
-| WIT package | `{{project-name}}:plugin` |
-
-Template validation requires lowercase kebab-case, no digits, and length ≤ 12.
-**On-chain accounts allow at most 10 characters.** When scaffolding a new app,
-ensure the **on-chain** name (and `+1` query sibling) fits 10 characters; shorten
-or concatenate if needed, while keeping longer kebab-case names for Cargo/WIT.
-
-### Worked examples
-
-#### Aligned: TokenSwap
-
-| Layer | Value |
-|-------|-------|
-| Service crate | `token-swap` |
-| On-chain account | `token-swap` |
-| Query crate | `r-token-swap` |
-| On-chain query | `token-swap+1` |
-| WIT package | `token-swap:plugin` |
-
-`token-swap` is 9 characters — hyphenated on-chain name works.
-
-#### Split: NameMarket
-
-| Layer | Value | Why |
-|-------|-------|-----|
-| Service crate | `name-market` | Cargo kebab-case |
-| On-chain account | `namemarket` | `name-market` is 11 chars (> 10) |
-| Query crate | `r-name-market` | Follows service crate |
-| On-chain query | `namemarket+1` | Follows on-chain service |
-| WIT package | `name-market:plugin` | Follows service crate, not chain account |
-| `services = ["name-market"]` | Cargo key | **Not** `namemarket` |
-
-Trust whitelists and GraphQL use `namemarket`. Cross-plugin WIT imports use
-`name-market:plugin`.
+On-chain service and query account names must follow the [account number
+rules](../../../specifications/data-formats/account-numbers.md).
 
 ### Common mistakes
 
@@ -364,13 +118,14 @@ Trust whitelists and GraphQL use `namemarket`. Cross-plugin WIT imports use
 | Renaming only the on-chain account | Update service macro, postinstall, GraphQL callers, whitelists, and UI constants together |
 | Renaming only the WIT package | Update `world.wit`, `impl.wit`, `[package.metadata.component]`, and every consumer's WIT deps |
 
-### Checklist for a new package
+### For manually-built packages
 
 1. Pick a **repo directory** name (PascalCase, e.g. `MyApp/`).
 2. Pick a **published `package-name`** (usually same PascalCase).
 3. Pick a **service crate** name (kebab-case, e.g. `my-app`).
-4. Verify an **on-chain account** name ≤ 10 chars; abbreviate if the kebab-case
-   name is too long.
+4. Pick an **on-chain account** name that satisfies the [account number
+   rules](../../../specifications/data-formats/account-numbers.md); abbreviate if
+   the kebab-case crate name is too long.
 5. Set **`services = ["<service-crate>"]`** and matching `[dependencies]` key.
 6. Set **`server = "r-<service-crate>"`** and create `r-<service-crate>` query crate.
 7. Set **`plugin = "<service-crate>-plugin"`** and WIT `package <service-crate>:plugin`.
