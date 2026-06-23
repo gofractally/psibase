@@ -176,7 +176,7 @@ fn format_string(mut s: &str, indent: usize, f: &mut fmt::Formatter<'_>) -> fmt:
 
 fn format_console(c: &ConsoleTrace, indent: usize, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "{:indent$}console:    ", "")?;
-    format_string(c.console.trim_end_matches('\n'), indent + 12, f)?;
+    format_string(&c.console, indent + 12, f)?;
     writeln!(f)
 }
 
