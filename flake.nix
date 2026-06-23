@@ -11,15 +11,33 @@
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # Fragile cargo tools, each pinned to the exact nixpkgs revision that packages
+    # the required version (chosen for Rust 1.86.0 / psibase compatibility). These
+    # MUST stay at their pinned versions, so they deliberately do NOT `follow`
+    # nixpkgs — the frozen revision is the whole point. No single nixpkgs rev
+    # carries all three versions at once, hence one input per tool.
+    #   cargo-component 0.15.0
+    nixpkgs-cargo-component.url = "github:NixOS/nixpkgs/b1e27a8646234340ea2c8b4e3f73e9e2b2bca505";
+    #   cargo-generate 0.23.5
+    nixpkgs-cargo-generate.url = "github:NixOS/nixpkgs/1d0bb7b61b251a261b0963aacf4b141e770a4f1d";
+    #   cargo-edit 0.13.0
+    nixpkgs-cargo-edit.url = "github:NixOS/nixpkgs/30bae272ac6c85ea58c05501e3a8cb41b8dcfa0a";
   };
 
-  outputs = { self, nixpkgs, flake-utils, fenix }:
+  outputs = { self, nixpkgs, flake-utils, fenix, nixpkgs-cargo-component, nixpkgs-cargo-generate, nixpkgs-cargo-edit }:
     flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (system:
       let
         pkgs = import nixpkgs {
           inherit system;
           config.allowUnfree = true;
         };
+
+        # Fragile cargo tools, each from its own pinned nixpkgs revision (see inputs).
+        # cargo-edit ships the cargo-set-version binary used by the build.
+        cargoComponent = (import nixpkgs-cargo-component { inherit system; }).cargo-component;
+        cargoGenerate = (import nixpkgs-cargo-generate { inherit system; }).cargo-generate;
+        cargoEdit = (import nixpkgs-cargo-edit { inherit system; }).cargo-edit;
 
         # Rust 1.86.0 toolchain with WASM targets (see nix/rust-toolchain.toml)
         rustToolchain = fenix.packages.${system}.fromToolchainFile {
@@ -136,6 +154,9 @@
           zlib
           zstd
           rustToolchain
+          cargoComponent
+          cargoGenerate
+          cargoEdit
           binaryen
           wabt
           wasm-pack
@@ -265,23 +286,9 @@
               fi
             fi
 
-            export CARGO_INSTALL_ROOT="$HOME/.cache/psibase-nix-cargo"
-            export PATH="$CARGO_INSTALL_ROOT/bin:$PATH:$HOME/.cargo/bin"
-
-            _check_cargo_tools() {
-              local cargo_bin="$CARGO_INSTALL_ROOT/bin"
-              local missing=""
-              [ -x "$cargo_bin/cargo-component" ] || missing="$missing cargo-component"
-              [ -x "$cargo_bin/cargo-generate" ] || missing="$missing cargo-generate"
-              [ -x "$cargo_bin/cargo-set-version" ] || missing="$missing cargo-set-version"
-              if [ -n "$missing" ]; then
-                echo ""
-                echo "Note: Some cargo tools need to be installed (one-time setup)."
-                echo "Missing:$missing"
-                echo "Run: ./nix/scripts/setup_prereqs.sh"
-                echo ""
-              fi
-            }
+            # cargo-component / cargo-generate / cargo-set-version are provided by the
+            # flake at pinned versions; keep any user-installed cargo tools available too.
+            export PATH="$PATH:$HOME/.cargo/bin"
 
             if [ "$NIX_SHELL_DEPTH" -eq 1 ]; then
               echo ""
@@ -291,8 +298,9 @@
               echo "  Node:  $(node --version)"
               echo "  Yarn:  $(yarn --version)"
               echo "  WASI SDK: ${wasiSdk}"
+              echo "  cargo-component: $(cargo-component --version 2>/dev/null | head -1)"
+              echo "  cargo-generate:  $(cargo-generate --version 2>/dev/null | head -1)"
               echo ""
-              _check_cargo_tools
               echo "To build psibase (clean build required on first run):"
               echo "  rm -rf build && mkdir build && cd build"
               echo "cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release -DBUILD_DEBUG_WASM=ON -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_INSTALL_PREFIX="psidk" .."

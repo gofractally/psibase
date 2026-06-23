@@ -15,7 +15,7 @@ The Nix configuration, emulating the current psibase-contributor config provides
 - **Tools**: clangd, gdb, direnv, mkcert, SoftHSM2
 - **Docs**: mdbook with mermaid plugin
 
-You do **not** need to pre-install Rust, Node, or other dev tools; `nix develop` provides everything. Some cargo extensions are installed once via `./nix/scripts/setup_prereqs.sh`.
+You do **not** need to pre-install Rust, Node, or other dev tools; `nix develop` provides everything, including the version-pinned cargo extensions (`cargo-component`, `cargo-generate`, `cargo-set-version`). No one-time cargo setup step is required.
 
 ## Prerequisites
 
@@ -72,18 +72,10 @@ nix develop
 
 ### 2. One-time Setup
 
-#### 2.1 Setup cargo things
-Inside the `nix develop` shell:
-
-```bash
-# Installs cargo-component, cargo-generate, and cargo-edit (pinned for Rust 1.86.0) into `$CARGO_INSTALL_ROOT`.
-./nix/scripts/setup_prereqs.sh
-```
-
-#### 2.2 For VS Code and forks: run .vscode/scripts/env-setup.sh
+#### 2.1 For VS Code and forks: run .vscode/scripts/env-setup.sh
 This will ensure your build and dev envs can find everything they need
 
-#### 2.3 Initializing/Configuring the Environment (using direnv,
+#### 2.2 Initializing/Configuring the Environment (using direnv,
 which activates the environment automatically when you `cd` into the repo)
 
 From the psibase repo root:
@@ -102,7 +94,7 @@ EOF
 direnv allow
 ```
 
-#### 2.4 extensions
+#### 2.3 extensions
 Copy nix/docs/extensions.json.example to .vscode/extensions.json to pick up the standard dev extensions.
 
 ### 3. Verify environment (optional)
@@ -162,7 +154,7 @@ Recommended extensions: clangd, rust-analyzer, wit-idl, ESLint, Prettier, direnv
 
 ## Troubleshooting
 
-- **Cargo tools fail to install**: Use the pinned versions and run `./nix/scripts/setup_prereqs.sh` from inside `nix develop`.
+- **Wrong cargo tool versions**: `cargo-component`, `cargo-generate`, and `cargo-set-version` are pinned and provided by the flake. If `which cargo-component` does not point into `/nix/store`, a host-installed copy is shadowing it on `PATH` (check `$HOME/.cargo/bin`).
 - **"command not found"**: Ensure you're in a `nix develop` shell or that direnv has run (`direnv allow`).
 - **ICU / ABI errors**: Ensure you're in the Nix shell and do a clean build (`rm -rf build && mkdir build`). The flake sets `ICU_ROOT` and `CMAKE_IGNORE_PATH` to avoid picking up system ICU from `/usr/lib`.
 - **Rust analyzer not finding deps**: Run the editor from inside the Nix shell or use the direnv extension.
@@ -179,7 +171,6 @@ nix develop
 
 - `flake.nix` / `flake.lock` — Nix flake at repo root
 - `nix/rust-toolchain.toml` — Rust version and targets
-- `nix/scripts/setup_prereqs.sh` — One-time cargo tool install
 - `nix/scripts/verify_env.sh` — Environment verification
 
 ## Relationship to Docker
