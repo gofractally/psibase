@@ -57,7 +57,7 @@ export const premAccountsConfig = defineAppConfig({
     service: premAccounts.service,
     path: ACCOUNT_MARKETPLACE_PATH,
     name: "Account Marketplace",
-    description: "Buy and claim premium account names.",
+    description: "Buy and claim account names.",
     icon: <Store className="h-6 w-6" />,
     isMore: false,
     isLoginRequired: true,

@@ -5,7 +5,7 @@ class PremiumAccounts extends PluginInterface {
     protected override readonly _intf = "premiumAccounts" as const;
 
     /**
-     * Claims a previously purchased premium account name, configures auth-sig, and
+     * Claims a previously purchased account name, configures auth-sig, and
      * returns the new account's private key in PEM format.
      */
     get claimAndSetKey() {

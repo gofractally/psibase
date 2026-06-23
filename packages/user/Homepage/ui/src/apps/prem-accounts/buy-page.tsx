@@ -43,9 +43,7 @@ export const BuyPage = () => {
     } = useCanCreatePremiumAccount();
 
     const isLoading =
-        isPendingToken ||
-        isPendingMarkets ||
-        isPendingCanCreatePremiumAccount;
+        isPendingToken || isPendingMarkets || isPendingCanCreatePremiumAccount;
 
     if (canCreatePremiumAccount === false) {
         return (
@@ -64,7 +62,7 @@ export const BuyPage = () => {
         <div className="space-y-6">
             <GlowingCard>
                 <CardHeader>
-                    <CardTitle>Buy a premium account name</CardTitle>
+                    <CardTitle>Buy an account name</CardTitle>
                     <CardDescription>
                         Account names can be up to {MAX_ACCOUNT_NAME_LENGTH}{" "}
                         characters long, must start with a letter, and can only

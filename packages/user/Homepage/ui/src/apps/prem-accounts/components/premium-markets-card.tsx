@@ -61,7 +61,7 @@ export function PremiumMarketsCard({
     return (
         <GlowingCard>
             <CardHeader>
-                <CardTitle>Premium name markets</CardTitle>
+                <CardTitle>Account markets</CardTitle>
                 <CardDescription>Live prices by name length.</CardDescription>
             </CardHeader>
             <CardContent>

@@ -2,7 +2,7 @@ import { usePluginFunctionMutation } from "@shared/hooks/plugin-function/use-plu
 import { homepage } from "@shared/lib/plugins";
 
 /**
- * Claims a purchased premium account name, configures auth-sig on it, and
+ * Claims a purchased account name, configures auth-sig on it, and
  * returns the new account's private key (PEM format).
  */
 export const useClaimAndSetKey = () => {

@@ -60,7 +60,7 @@ const apps: App[] = [
     },
     {
         title: "Account marketplace",
-        description: "Buy and claim premium account names.",
+        description: "Buy and claim account names.",
         icon: <Store className="h-6 w-6" />,
         path: ACCOUNT_MARKETPLACE_PATH,
     },

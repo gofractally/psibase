@@ -43,9 +43,9 @@ export const useSavePremiumNameMarkets = () =>
                     configs,
                 ]);
             },
-            error: "Failed to update premium name markets",
-            loading: "Updating premium name markets…",
-            success: "Premium name markets updated",
+            error: "Failed to update account markets",
+            loading: "Updating account markets…",
+            success: "Account markets updated",
             isStagable: true,
             onSuccess: () => {
                 void queryClient.invalidateQueries({

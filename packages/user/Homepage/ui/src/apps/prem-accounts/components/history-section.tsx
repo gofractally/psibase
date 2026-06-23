@@ -147,7 +147,7 @@ export function HistorySection({
         return (
             <GlowingCard>
                 <CardContent className="text-muted-foreground py-8 text-center">
-                    Log in to see your premium account history.
+                    Log in to see your account marketplace history.
                 </CardContent>
             </GlowingCard>
         );
@@ -166,7 +166,8 @@ export function HistorySection({
             <GlowingCard>
                 <ErrorCard
                     error={
-                        error ?? new Error("Failed to load account history.")
+                        error ??
+                        new Error("Failed to load account marketplace history.")
                     }
                 />
             </GlowingCard>
@@ -201,7 +202,7 @@ export function HistorySection({
                 <DataTable
                     columns={columns}
                     data={events}
-                    caption="Your premium account activity."
+                    caption="Your account marketplace activity."
                     emptyMessage="You don't have any history yet."
                     serverPagination={{
                         pageIndex,

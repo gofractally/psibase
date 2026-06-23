@@ -182,17 +182,17 @@ export const PremiumNameMarketConfig = () => {
             <Card className="gap-4 py-4 shadow-sm">
                 <CardHeader className="gap-1.5 px-4">
                     <CardTitle className="text-lg font-medium">
-                        Premium Name Market Config
+                        Account Marketplace Config
                     </CardTitle>
                     <CardDescription>
                         Set pricing, targets, and purchase availability for each
-                        premium name length.
+                        account name length.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="px-4 pt-0">
                     <ul className="text-muted-foreground marker:text-muted-foreground/50 list-disc space-y-1 pl-4 text-sm leading-relaxed">
                         <li>
-                            One card per premium name length (
+                            One card per account name length (
                             {MIN_ACCOUNT_NAME_LENGTH}–{MAX_ACCOUNT_NAME_LENGTH}{" "}
                             characters). Dashed cards are not configured yet;
                             saving creates them with the values you enter.
@@ -240,7 +240,7 @@ export const PremiumNameMarketConfig = () => {
                 <p className="text-destructive text-sm">
                     {error instanceof Error
                         ? error.message
-                        : "Could not load premium name markets."}
+                        : "Could not load account markets."}
                 </p>
             ) : null}
 
