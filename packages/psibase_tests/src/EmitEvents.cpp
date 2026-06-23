@@ -62,7 +62,7 @@ struct Query
                    std::optional<std::string> before,
                    std::optional<std::string> after) const
    {
-      return EventQuery<FooEventRecord>("history.event-service.e")
+      return EventQuery<FooEventRecord>("history.event-svc.e")
           .first(first)
           .last(last)
           .before(before)
@@ -75,7 +75,7 @@ struct Query
                        std::optional<std::string> before,
                        std::optional<std::string> after) const
    {
-      return EventQuery<ExampleRecordQuery>("history.event-service.e2")
+      return EventQuery<ExampleRecordQuery>("history.event-svc.e2")
           .first(first)
           .last(last)
           .before(before)

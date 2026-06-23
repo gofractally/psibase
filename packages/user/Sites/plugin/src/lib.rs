@@ -189,7 +189,7 @@ impl Sites for SitesPlugin {
     fn set_proxy(proxy: String) {
         assert_authorized_with_whitelist(FunctionName::set_proxy, vec!["workshop".into()]).unwrap();
 
-        let proxy = psibase::AccountNumber::from(proxy.as_str());
+        let proxy = proxy.parse().unwrap();
         Transact::add_action_to_transaction("setProxy", &Actions::setProxy { proxy }.packed())
             .unwrap();
     }
@@ -201,7 +201,6 @@ impl Sites for SitesPlugin {
         Transact::add_action_to_transaction("clearProxy", &Actions::clearProxy {}.packed())
             .unwrap();
     }
-
 }
 
 bindings::export!(SitesPlugin with_types_in bindings);

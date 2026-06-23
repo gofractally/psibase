@@ -17,8 +17,8 @@ pub struct PartialAttestation {
 impl PartialAttestation {
     pub fn new(attester: &str, subject: &str, value: u8) -> Self {
         Self {
-            attester: attester.into(),
-            subject: subject.into(),
+            attester: attester.parse().unwrap(),
+            subject: subject.parse().unwrap(),
             value,
         }
     }
@@ -37,7 +37,7 @@ pub struct PartialAttestationStats {
 impl PartialAttestationStats {
     pub fn new(subject: &str, unique_attesters: u16, num_high_conf_attestations: u16) -> Self {
         Self {
-            subject: subject.into(),
+            subject: subject.parse().unwrap(),
             uniqueAttesters: unique_attesters,
             numHighConfAttestations: num_high_conf_attestations,
         }
@@ -81,7 +81,7 @@ impl<'a, T: IsServiceWrapper> ChainPusher<'a, T> {
 
     /// Push an action from the specified account
     pub fn from(&self, account: &str) -> crate::Actions<psibase::ChainPusher> {
-        T::push_from(self.chain, account.into())
+        T::push_from(self.chain, account.parse().unwrap())
     }
 
     /// Make the specified graphql query on this service.

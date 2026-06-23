@@ -321,7 +321,7 @@ namespace SystemService
          if (!account)
             abortMessage("unknown sender \"" + action.sender.str() + "\"");
 
-         if (requester != account->authService)
+         if (requester != account->authService && requester != action.sender.base())
          {
             uint32_t flags = 0;
             if (requester == action.sender)
@@ -423,7 +423,10 @@ namespace SystemService
 
    namespace
    {
-      bool checkTapos(const Checksum256& id, const Tapos& tapos, bool speculative)
+      bool checkTapos(const Checksum256& id,
+                      const Tapos&       tapos,
+                      bool               speculative,
+                      bool               isStartBlock)
       {
          auto statusTable =
              Transact{}.open<TransactStatusTable>(speculative ? KvMode::read : KvMode::readWrite);
@@ -437,7 +440,6 @@ namespace SystemService
          check(stat.current.time < tapos.expiration, "transaction has expired");
          check(tapos.expiration < stat.current.time + maxTrxLifetime,
                "transaction was submitted too early");
-
          auto transactStatus = statusIdx.get(std::tuple{});
 
          std::optional<BlockSummary> summary;
@@ -446,6 +448,31 @@ namespace SystemService
          else
             summary = summaryIdx.get(std::tuple<>{});
 
+         if (isStartBlock)
+         {
+            if (summary)
+            {
+               check(summary->blockNum + 1 >= getStatus().current.blockNum,
+                     "startBlock was not run in the previous block");
+               check(summary->blockNum + 1 == getStatus().current.blockNum,
+                     "startBlock has already been run");
+            }
+            check(!tapos.refBlockIndex && !tapos.refBlockSuffix,
+                  "tapos must be zero for startBlock");
+            return false;
+         }
+         else
+         {
+            if (!summary)
+            {
+               check(!getStatus().head, "startBlock has not been run");
+            }
+            else
+            {
+               check(summary->blockNum == getStatus().current.blockNum,
+                     "startBlock has not been run");
+            }
+         }
          if (transactStatus && transactStatus->bootTransactions)
          {
             auto& bootTransactions = *transactStatus->bootTransactions;
@@ -536,7 +563,7 @@ namespace SystemService
    {
       check(trx.actions().size() > 0, "transaction has no actions");
       auto _           = recurse();
-      bool enforceAuth = checkTapos(id, trx.tapos(), true);
+      bool enforceAuth = checkTapos(id, trx.tapos(), true, false);
       if (enforceAuth)
          checkAuth(trx.actions().front(), trx.claims(), true, true);
       return enforceAuth;
@@ -575,7 +602,7 @@ namespace SystemService
       check(!includedIdx.get(std::tuple{tapos.expiration, id}), "duplicate transaction");
       includedTable.put({tapos.expiration, id});
 
-      bool enforceAuth = checkTapos(id, tapos, speculative);
+      bool enforceAuth = checkTapos(id, tapos, speculative, isStartBlock(trx));
 
       Actor<CpuLimit> cpuLimit(Transact::service, CpuLimit::service, CallFlags::runModeRpc);
       Actor<Accounts> accounts(Transact::service, Accounts::service);

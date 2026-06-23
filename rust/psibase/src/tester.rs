@@ -9,10 +9,10 @@
 #![cfg_attr(not(target_family = "wasm"), allow(unused_imports, dead_code))]
 
 use crate::{
-    actions::login_action, check, create_boot_transactions, fetch_packages,
-    get_optional_result_bytes, get_result_bytes, services, status_key, tester_raw, AccountNumber,
-    Action, ActionFormatter, BlockTime, Caller, Checksum256, CodeByHashRow, CodeRow, DbId,
-    DirectoryRegistry, Error, HostConfigRow, HttpBody, HttpHeader, HttpReply, HttpRequest,
+    self as psibase, account, actions::login_action, check, create_boot_transactions,
+    fetch_packages, get_optional_result_bytes, get_result_bytes, services, status_key, tester_raw,
+    AccountNumber, Action, ActionFormatter, BlockTime, Caller, Checksum256, CodeByHashRow, CodeRow,
+    DbId, DirectoryRegistry, Error, HostConfigRow, HttpBody, HttpHeader, HttpReply, HttpRequest,
     InnerTraceEnum, JointRegistry, KvHandle, KvMode, PackageOpFull, PackageRegistry,
     PackagedService, RunMode, Schema, SchemaFetcher, SchemaMap, Seconds, SignedTransaction,
     StatusRow, Table, TableRecord, Tapos, TimePointSec, TimePointUSec, ToKey, Transaction,
@@ -400,6 +400,33 @@ impl Chain {
         self.start_block_at(current_time + micro_seconds);
     }
 
+    fn push_start_block(&self, expiration: TimePointUSec) {
+        let trx = Transaction {
+            tapos: Tapos {
+                expiration: expiration.ceil_seconds(),
+                refBlockSuffix: 0,
+                flags: 0,
+                refBlockIndex: 0,
+            },
+            actions: vec![
+                services::transact::Wrapper::pack_from(AccountNumber::new(0)).startBlock(),
+            ],
+            claims: vec![],
+        };
+        let strx = SignedTransaction {
+            transaction: trx.packed().into(),
+            proofs: vec![],
+            subjectiveData: None,
+        }
+        .packed();
+        let size =
+            unsafe { tester_raw::pushTransaction(self.chain_handle, strx.as_ptr(), strx.len()) };
+        let trace = TransactionTrace::unpacked(&get_result_bytes(size)).unwrap();
+        if let Some(error) = &trace.error {
+            panic!("startBlock failed: {error}");
+        }
+    }
+
     /// Start a new block
     ///
     /// Starts a new block at `time`. If `time.seconds` is 0,
@@ -419,7 +446,7 @@ impl Chain {
             };
             (
                 if producers.is_empty() {
-                    AccountNumber::from("firstproducer")
+                    account!("firstprod")
                 } else {
                     producers[0].name
                 },
@@ -427,7 +454,7 @@ impl Chain {
                 status.head.as_ref().map_or(0, |head| head.header.blockNum),
             )
         } else {
-            (AccountNumber::from("firstproducer"), 0, 0)
+            (account!("firstprod"), 0, 0)
         };
 
         // Guarantee that there is a recent block for fillTapos to use.
@@ -442,6 +469,7 @@ impl Chain {
                         commit_num,
                     )
                 }
+                self.push_start_block(time);
                 commit_num += 1;
             }
         }
@@ -453,6 +481,9 @@ impl Chain {
                 term,
                 commit_num,
             )
+        }
+        if status.is_some() {
+            self.push_start_block(time + Seconds::new(1));
         }
         *status = self
             .kv_get::<StatusRow, _>(StatusRow::DB, &status_key())

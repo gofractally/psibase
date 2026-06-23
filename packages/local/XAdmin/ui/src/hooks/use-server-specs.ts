@@ -41,7 +41,7 @@ export const useServerSpecs = () => {
                     recommendedMinMemoryBytes
                 }
             }`;
-            const res = await graphql(query, { service: "virtual-server" });
+            const res = await graphql(query, { service: "vserver" });
 
             if (res && typeof res === "object" && "errors" in res) {
                 console.error("GraphQL errors:", res.errors);

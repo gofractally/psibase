@@ -7,7 +7,7 @@ mod tests {
 
     #[psibase::test_case(packages("Subgroups"))]
     fn test_subgroup_partitions(chain: psibase::Chain) -> Result<(), psibase::Error> {
-        let alice = AccountNumber::from("alice");
+        let alice = account!("alice");
         chain.new_account(alice).unwrap();
 
         let allowed_groups = vec![4, 5, 6];
@@ -76,7 +76,7 @@ mod tests {
     fn test_subgroup_partitions_specific_cases(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
-        let alice = AccountNumber::from("alice");
+        let alice = account!("alice");
         chain.new_account(alice).unwrap();
 
         let get_parts = |n: u32, allowed_groups: &[u32]| -> Option<Vec<u32>> {

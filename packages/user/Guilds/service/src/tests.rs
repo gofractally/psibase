@@ -7,7 +7,7 @@ mod tests {
     fn test_set_thing(_chain: psibase::Chain) -> Result<(), psibase::Error> {
         // Wrapper::push(&chain).init();
 
-        // let alice = AccountNumber::from("alice");
+        // let alice = account!("alice");
         // chain.new_account(alice).unwrap();
 
         // Wrapper::push_from(&chain, alice)

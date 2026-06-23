@@ -33,11 +33,11 @@ export const PermissionPrompt = ({ permissionRequest }: Props) => {
     const [duration, setDuration] = useState<ApprovalDuration>("session");
 
     const approveMutation = useMutation({
-        mutationKey: ["permissions", "approve"],
+        mutationKey: ["perms", "approve"],
         mutationFn: async (duration: ApprovalDuration) => {
             zApprovalDuration.parse(duration);
             await supervisor.functionCall({
-                service: "permissions",
+                service: "perms",
                 intf: "admin",
                 method: "approve",
                 params: [duration],

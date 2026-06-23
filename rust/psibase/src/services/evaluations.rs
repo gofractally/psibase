@@ -37,7 +37,7 @@ pub mod Hooks {
     }
 }
 
-#[crate::service(name = "evaluations", dispatch = false, psibase_mod = "crate")]
+#[crate::service(name = "evaluation", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 pub mod Service {
     use crate::AccountNumber;
