@@ -430,12 +430,10 @@ pub mod tables {
                 format!("Sender {} cannot also be receiver", creditor).as_str(),
             );
 
-            if !Accounts::call().exists(debitor) {
-                abort_message(&format!(
-                    "debitor account '{}' does not exist",
-                    debitor.to_string()
-                ));
-            }
+            check(
+                Accounts::call().exists(debitor),
+                format!("debitor account '{}' does not exist", debitor.to_string()).as_str(),
+            );
 
             Self {
                 shared_bal_id: InitRow::next_shared_bal_id(),
