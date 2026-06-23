@@ -108,7 +108,7 @@ impl Prompt for AccountsPlugin {
         }
 
         if !NameMarket::can_create_account() {
-            return Err(ErrorType::CannotCreatePremiumAccount().into());
+            return Err(ErrorType::CannotCreateAccount().into());
         }
 
         NameMarket::buy(&account_name, &max_cost)?;
