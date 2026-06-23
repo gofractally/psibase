@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Run with 
 #   `./scripts/set-version.sh x.y.z`
