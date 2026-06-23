@@ -32,13 +32,11 @@ fn endpoints() {
             x * big_y,
             c.k,
         );
-        if pos.reserves > 0 {
-            assert!(
-                (x - 1) * big_y < c.k,
-                "reserve not minimal at empty endpoint: reserves={} keeps X*Y >= k after -1",
-                pos.reserves,
-            );
-        }
+        assert!(
+            (x - 1) * big_y < c.k,
+            "reserve not minimal at empty endpoint: reserves={} keeps X*Y >= k after -1",
+            pos.reserves,
+        );
     }
 }
 
