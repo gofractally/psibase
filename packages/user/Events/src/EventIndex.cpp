@@ -63,8 +63,7 @@ namespace
           psio::convert_to_key(std::tuple(EventIndex::service, secondaryIndexTableNum))};
       EventWrapper     wrapper{nullptr};
       EventIndexHandle handle{KvMode::write};
-      EventTable       events{EventConfig{}.open<EventTable>(KvMode::read)};
-      bool             operator()(psibase::DbId db, std::uint64_t eventNum)
+      bool             operator()(EventTable& events, psibase::DbId db, std::uint64_t eventNum)
       {
          auto row = events.getView(eventNum);
          if (!row)
@@ -110,13 +109,14 @@ namespace
    bool processInit(DbId db, std::uint32_t& max_steps, std::uint64_t& end)
    {
       IndexWriter writer;
+      auto        events = Events{}.openEvents(db, KvMode::read);
       for (; max_steps; --max_steps)
       {
          if (--end == 0)
          {
             return false;
          }
-         if (!writer(db, end))
+         if (!writer(events, db, end))
             return false;
       }
       return true;
@@ -162,7 +162,7 @@ namespace
       {
          auto&               cache = SchemaCache::instance();
          EventWrapper        wrapper;
-         auto                events = EventConfig{}.open<EventTable>(KvMode::read);
+         auto                events = EventConfig{}.openEvents(item.db, KvMode::read);
          std::vector<char>   data;
          const CompiledType* ctype = cache.getSchemaType(item.db, item.service, item.event);
          wrapper.set(ctype);
@@ -389,13 +389,14 @@ void EventIndex::sync()
    IndexWriter writer;
    for (auto db : {DbId::historyEvent, DbId::merkleEvent})
    {
+      auto events = Events{}.openEvents(db, KvMode::read);
       auto status = initStatus(*dbStatus, table, db);
 
       auto eventNum = status.nextEventNumber;
       auto eventEnd = getNextEventNumber(*dbStatus, db);
       for (; eventNum != eventEnd; ++eventNum)
       {
-         if (!writer(db, eventNum))
+         if (!writer(events, db, eventNum))
             abortMessage(std::format("Missing event {}", eventNum));
       }
       if (eventNum != status.nextEventNumber)

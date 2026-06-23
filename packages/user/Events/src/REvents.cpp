@@ -146,8 +146,13 @@ struct EventCursor : sqlite3_vtab_cursor
    std::size_t       prefixLen;
    bool              descending = false;
    EventIndexHandle  handle{KvMode::read};
-   EventTable        events{EventConfig{}.open<EventTable>(KvMode::read)};
-   EventCursor(const EventVTab& vtab) : key(vtab.key()), prefixLen(key.size() + 1) {}
+   EventTable        events;
+   EventCursor(const EventVTab& vtab)
+       : key(vtab.key()),
+         prefixLen(key.size() + 1),
+         events(EventConfig{}.openEvents(vtab.index.db, KvMode::read))
+   {
+   }
    EventVTab* vtab() { return static_cast<EventVTab*>(pVtab); }
    int        setEof()
    {
@@ -171,7 +176,6 @@ struct EventCursor : sqlite3_vtab_cursor
             setEof();
          else
          {
-            // vtab()->index.db
             auto row = events.getView(eventId());
             if (!row)
             {
