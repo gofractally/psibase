@@ -58,7 +58,7 @@ impl From<types::PackageExport> for psibase::PackageExport {
     fn from(value: types::PackageExport) -> psibase::PackageExport {
         psibase::PackageExport {
             name: value.name,
-            service: value.service.as_str().into(),
+            service: value.service.parse().unwrap(),
         }
     }
 }
@@ -83,12 +83,12 @@ impl From<types::PackageInfo> for psibase::PackageInfo {
             accounts: value
                 .accounts
                 .into_iter()
-                .map(|a| a.as_str().into())
+                .map(|a| a.parse().unwrap())
                 .collect(),
             services: value
                 .services
                 .into_iter()
-                .map(|a| a.as_str().into())
+                .map(|a| a.parse().unwrap())
                 .collect(),
             exports: value.exports.into_iter().map(|e| e.into()).collect(),
             sha256: value.sha256.parse().unwrap(),
@@ -589,7 +589,7 @@ impl PrivateApi for PackagesPlugin {
             sources: accounts
                 .into_iter()
                 .map(|account| PackageSource {
-                    account: Some(AccountNumber::from(account.as_str())),
+                    account: Some(account.parse().unwrap()),
                     url: None,
                 })
                 .collect(),

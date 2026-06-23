@@ -58,7 +58,7 @@ TEST_CASE("import/export handles")
    t.http(HttpRequest{
        .host        = "x-admin.psibase.io",
        .method      = "PUT",
-       .target      = "/services/" + TestExport::service.str(),
+       .target      = "/services/" + TestExport::service.str() + "?isPrivileged=1",
        .contentType = "application/wasm",
        .body        = readWholeFile("TestExport.wasm"),
    });

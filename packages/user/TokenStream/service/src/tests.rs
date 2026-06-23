@@ -11,7 +11,7 @@ mod tests {
     static ALICE: AccountNumber = account!("alice");
     static BOB: AccountNumber = account!("bob");
     static CHARLIE: AccountNumber = account!("charlie");
-    static TOKEN_STREAM: AccountNumber = account!("token-stream");
+    static TOKEN_STREAM: AccountNumber = TokenStream::SERVICE;
 
     fn get_balance(chain: &psibase::Chain, token_id: u32, account: AccountNumber) -> Quantity {
         Tokens::push(&chain)

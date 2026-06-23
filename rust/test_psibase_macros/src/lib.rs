@@ -1,9 +1,10 @@
-#[psibase::service]
+#[psibase::service(name = "psimacro-t")]
 #[allow(non_snake_case)]
 mod service {}
 
 #[cfg(test)]
 mod tests {
+    use psibase::account;
     use psibase::services::http_server;
     use serde_json::{json, Value};
 
@@ -11,12 +12,11 @@ mod tests {
     // Chain is inited with default service + whatever is listed in attribute ^^^ (comma-delimited list (case-sensitive))
     fn test_macro_generated_wrapper(chain: psibase::Chain) -> Result<(), psibase::Error> {
         use basicwquery::Wrapper;
-        use psibase::AccountNumber;
 
         println!("{}", Wrapper::SERVICE);
         http_server::Wrapper::push_from(&chain, Wrapper::SERVICE).registerServer(Wrapper::SERVICE);
 
-        assert_eq!(Wrapper::SERVICE, AccountNumber::from("basicwquery"));
+        assert_eq!(Wrapper::SERVICE, account!("basicquery"));
 
         assert_eq!(Wrapper::push(&chain).add(3, 4).get()?, 7);
 
@@ -35,9 +35,8 @@ mod tests {
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
         use addcheckinit::Wrapper;
-        use psibase::AccountNumber;
 
-        assert_eq!(Wrapper::SERVICE, AccountNumber::from("addcheckinit"));
+        assert_eq!(Wrapper::SERVICE, account!("addckinit"));
 
         // call action to trigger the pre_action() which is there and should find service not inited
         let _retval = Wrapper::push(&chain).add(3, 4).get();
@@ -50,9 +49,8 @@ mod tests {
     // Verifies pre_action() calls get inserted as designed
     fn test_pre_action_inserted(chain: psibase::Chain) -> Result<(), psibase::Error> {
         use addcheckinit::Wrapper;
-        use psibase::AccountNumber;
 
-        assert_eq!(Wrapper::SERVICE, AccountNumber::from("addcheckinit"));
+        assert_eq!(Wrapper::SERVICE, account!("addckinit"));
 
         // init service
         let _retval = Wrapper::push(&chain).init();

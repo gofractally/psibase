@@ -4,7 +4,7 @@
 #include <psibase/Table.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
-#include <services/system/AuthAny.hpp>
+#include <services/system/AuthDelegate.hpp>
 #include <services/system/Transact.hpp>
 
 static constexpr bool enable_print = false;
@@ -36,7 +36,7 @@ namespace SystemService
          }
          accountTable.put({
              .accountNum  = code.codeNum,
-             .authService = AuthAny::service,
+             .authService = AuthDelegate::service,
          });
          ++totalAccounts;
       }
@@ -51,8 +51,19 @@ namespace SystemService
 
    void Accounts::preapproveAcc(AccountNumber name)
    {
-      check(getSender() == getReceiver() || getSender() == AccountNumber("prem-accounts"),
-            "unauthorized");
+      if (name.subaccount())
+      {
+         if (getSender() != name.base())
+         {
+            abortMessage(std::format("subaccount {} can only be created by {}", name.str(),
+                                     name.base().str()));
+         }
+      }
+      else
+      {
+         check(getSender() == getReceiver() || getSender() == AccountNumber("prem-accounts"),
+               "unauthorized");
+      }
 
       preapprovedAccounts.push_back(name);
    }
@@ -79,11 +90,20 @@ namespace SystemService
 
       check(name.value, "invalid account name");
       check(strName.back() != '-', "account name must not end in a hyphen");
-      if (getSender() != service && !std::ranges::contains(preapprovedAccounts, name))
+      if (!std::ranges::contains(preapprovedAccounts, name))
       {
-         check(!strName.starts_with("x-"),
-               "The 'x-' account prefix is reserved for infrastructure providers");
-         check(strName.length() >= 10, "account name must be at least 10 characters: " + strName);
+         if (name.subaccount())
+         {
+            check(getSender() == name.base(),
+                  "Subaccounts can only be created by the primary account");
+         }
+         else if (getSender() != service)
+         {
+            check(!strName.starts_with("x-"),
+                  "The 'x-' account prefix is reserved for infrastructure providers");
+            check(strName.length() >= 10,
+                  "account name must be at least 10 characters: " + strName);
+         }
       }
 
       // Check compression roundtrip
