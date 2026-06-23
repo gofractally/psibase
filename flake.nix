@@ -89,6 +89,19 @@
           paths = [ boost boost.dev ];
         };
 
+        # Bash init for inner shells (e.g. Cursor/VS Code terminal via psibase-nix-bash).
+        nixDevelopBashrc = pkgs.writeText "nix-develop-bashrc" ''
+          set -o vi
+          if [[ -n "$BASH_VERSION" ]] && shopt -s progcomp 2>/dev/null; then
+            [[ -r ${pkgs.bash-completion}/share/bash-completion/bash_completion ]] && source ${pkgs.bash-completion}/share/bash-completion/bash_completion
+          fi
+          [[ -f "$HOME/.bashrc" ]] && . "$HOME/.bashrc"
+        '';
+
+        nixDevelopBash = pkgs.writeShellScriptBin "psibase-nix-bash" ''
+          exec ${pkgs.bashInteractive}/bin/bash --init-file ${nixDevelopBashrc} "$@"
+        '';
+
         yarnBerry = pkgs.stdenv.mkDerivation rec {
           pname = "yarn-berry";
           version = "4.9.1";
@@ -166,6 +179,7 @@
           vim
           bashInteractive
           bash-completion
+          nixDevelopBash
         ];
 
         linuxPackages = with pkgs; [
@@ -247,19 +261,7 @@
               if shopt -s progcomp 2>/dev/null && [[ -r ${pkgs.bash-completion}/share/bash-completion/bash_completion ]]; then
                 source ${pkgs.bash-completion}/share/bash-completion/bash_completion
               fi
-              # Init file for inner bash (e.g. Cursor terminal) so vi mode and completions
-              # are applied even when bash is started with custom args.
-              _nix_bash_init="$PSIBASE_ROOT/nix/.nix-develop-bashrc"
-              if [[ -d "$PSIBASE_ROOT/nix" ]] && [[ -w "$PSIBASE_ROOT/nix" ]]; then
-                cat > "$_nix_bash_init" << 'NIX_BASH_INIT_EOF'
-            set -o vi
-            if [[ -n "$BASH_VERSION" ]] && shopt -s progcomp 2>/dev/null; then
-              [[ -r __BASH_COMPLETION__ ]] && source __BASH_COMPLETION__
-            fi
-            [[ -f "$HOME/.bashrc" ]] && . "$HOME/.bashrc"
-            NIX_BASH_INIT_EOF
-                sed -i "s|__BASH_COMPLETION__|${pkgs.bash-completion}/share/bash-completion/bash_completion|g" "$_nix_bash_init"
-              fi
+              export NIX_BASH_INIT="${nixDevelopBashrc}"
               if command -v direnv &> /dev/null; then
                 eval "$(direnv hook bash)"
               fi
