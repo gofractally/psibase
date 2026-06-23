@@ -102,7 +102,7 @@ fn relay_balance_basics(chain: psibase::Chain) -> Result<(), psibase::Error> {
     // Increase server storage to accommodate increased obj allocation
     let mut specs = get_server_specs(&chain);
     specs.storage_bytes *= 2;
-    Wrapper::propose(&chain, PRODUCER_ACCOUNT)
+    chain.propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
         .set_specs(specs)
         .get()?;
     let after_propose = consumption_details("After propose", &chain, PRODUCER_ACCOUNT, &token_prod);
@@ -141,7 +141,7 @@ fn relay_balance_basics(chain: psibase::Chain) -> Result<(), psibase::Error> {
     // Increase obj storage allocation
     let mut vars = get_network_vars(&chain);
     vars.obj_storage_bytes *= 2;
-    Wrapper::propose(&chain, PRODUCER_ACCOUNT)
+    chain.propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
         .set_network_variables(vars)
         .get()?;
 
@@ -162,7 +162,7 @@ fn relay_balance_basics(chain: psibase::Chain) -> Result<(), psibase::Error> {
 
     // Reduce system token supply → shortfall should decrease further
     let decrease = initial_disk_state.max_reserve.quantity.value / 2;
-    Wrapper::propose(&chain, PRODUCER_ACCOUNT)
+    chain.propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
         .reduce_disk_budget(Quantity::from(decrease))
         .get()?;
 
@@ -198,7 +198,7 @@ fn server_storage(chain: psibase::Chain) -> Result<(), psibase::Error> {
 
     let mut specs = get_server_specs(&chain);
     specs.storage_bytes *= 2;
-    Wrapper::propose(&chain, PRODUCER_ACCOUNT)
+    chain.propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
         .set_specs(specs.clone())
         .get()?;
 
@@ -211,30 +211,30 @@ fn server_storage(chain: psibase::Chain) -> Result<(), psibase::Error> {
 
     // Should be able to drop server storage since nothing extra was allocated
     specs.storage_bytes /= 2;
-    Wrapper::propose(&chain, PRODUCER_ACCOUNT)
+    chain.propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
         .set_specs(specs.clone())
         .get()?;
 
     // Grow it again, allocate some, and then reducing should fail
     specs.storage_bytes *= 2;
-    Wrapper::propose(&chain, PRODUCER_ACCOUNT)
+    chain.propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
         .set_specs(specs.clone())
         .get()?;
     let mut vars = get_network_vars(&chain);
     vars.obj_storage_bytes *= 3;
-    Wrapper::propose(&chain, PRODUCER_ACCOUNT)
+    chain.propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
         .set_network_variables(vars.clone())
         .get()?;
     specs.storage_bytes /= 2;
     assert_error(
-        Wrapper::propose(&chain, PRODUCER_ACCOUNT).set_specs(specs.clone()),
+        chain.propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE).set_specs(specs.clone()),
         "Storage space cannot be decreased below what has already been allocated to the network",
     );
 
     // Can't allocate above what is available according to the server specs
     vars.obj_storage_bytes *= 2;
     assert_error(
-        Wrapper::propose(&chain, PRODUCER_ACCOUNT).set_network_variables(vars),
+        chain.propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE).set_network_variables(vars),
         "Total storage allocation must not exceed available server storage",
     );
 
@@ -259,7 +259,7 @@ fn metering(chain: psibase::Chain) -> Result<(), psibase::Error> {
     let auth_prod = chain.login(PRODUCER_ACCOUNT, Wrapper::SERVICE)?;
     let auth_alice = chain.login(alice, Wrapper::SERVICE)?;
 
-    Wrapper::propose(&chain, PRODUCER_ACCOUNT)
+    chain.propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
         .init_billing(tokens)
         .get()?;
 
@@ -313,7 +313,7 @@ fn metering(chain: psibase::Chain) -> Result<(), psibase::Error> {
     }
 
     // Verify enable billing
-    Wrapper::propose(&chain, PRODUCER_ACCOUNT)
+    chain.propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
         .enable_billing(true, Some(PRODUCER_ACCOUNT))
         .get()?;
 

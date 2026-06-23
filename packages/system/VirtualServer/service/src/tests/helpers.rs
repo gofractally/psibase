@@ -2,13 +2,11 @@ use crate::Wrapper;
 use psibase::{
     account,
     services::{http_server, tokens},
-    tester::{ProposeExt, PRODUCER_ACCOUNT},
+    tester::PRODUCER_ACCOUNT,
     AccountNumber, ChainEmptyResult,
 };
 
 use super::query::{get_enable_billing_cost, get_user_resources};
-
-impl ProposeExt for Wrapper {}
 
 pub(super) fn assert_error(result: ChainEmptyResult, message: &str) {
     let err = result.trace.error.unwrap();
@@ -48,7 +46,7 @@ pub(super) fn enable_billing(chain: &psibase::Chain) -> Result<(), psibase::Erro
         .get()?;
     chain.finish_block();
 
-    Wrapper::propose(&chain, PRODUCER_ACCOUNT)
+    chain.propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
         .init_billing(tokens)
         .get()?;
 
@@ -83,7 +81,7 @@ pub(super) fn enable_billing(chain: &psibase::Chain) -> Result<(), psibase::Erro
         .credit(sys, PRODUCER_ACCOUNT, 50_000_0000.into(), "".into())
         .get()?;
 
-    Wrapper::propose(&chain, PRODUCER_ACCOUNT)
+    chain.propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
         .enable_billing(true, Some(PRODUCER_ACCOUNT))
         .get()?;
 
