@@ -133,10 +133,12 @@ TEST_CASE("test merkle events")
    t.addService(EmitEvents::service, "EmitEvents.wasm");
    auto event_service = t.from(EmitEvents::service).to<EmitEvents>();
    t.setAutoBlockStart(false);
+   auto getSequentialRaw = [](auto&&...) -> std::optional<std::vector<char>>
+   { abortMessage("Merkle events not implemented"); };
    t.startBlock();
    {
       auto id   = event_service.emitMerkle("a").returnVal();
-      auto data = getSequentialRaw(DbId::merkleEvent, id);
+      auto data = getSequentialRaw(EventDb::merkleEvent, id);
       REQUIRE(!!data);
       Merkle merkle;
       merkle.push(EventInfo{id, *data});
@@ -148,8 +150,8 @@ TEST_CASE("test merkle events")
    {
       auto id1   = event_service.emitMerkle("a").returnVal();
       auto id2   = event_service.emitMerkle("b").returnVal();
-      auto data1 = getSequentialRaw(DbId::merkleEvent, id1);
-      auto data2 = getSequentialRaw(DbId::merkleEvent, id2);
+      auto data1 = getSequentialRaw(EventDb::merkleEvent, id1);
+      auto data2 = getSequentialRaw(EventDb::merkleEvent, id2);
       REQUIRE(!!data1);
       REQUIRE(!!data2);
       Merkle merkle;

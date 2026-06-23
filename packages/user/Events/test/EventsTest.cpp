@@ -284,9 +284,6 @@ TEST_CASE("events snapshot")
 
    // Wipe writeOnly and event databases to simulate the state after loading a snapshot
    clearDb(DbId::writeOnly);
-   clearDb(DbId::historyEvent);
-   clearDb(DbId::uiEvent);
-   clearDb(DbId::merkleEvent);
    tester::raw::commitState(chain.nativeHandle());
 
    chain.startBlock();

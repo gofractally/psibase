@@ -1545,9 +1545,6 @@ struct callbacks
          case uint32_t(psibase::DbId::native):
          case uint32_t(psibase::DbId::writeOnly):
          case uint32_t(psibase::DbId::blockLog):
-         case uint32_t(psibase::DbId::historyEvent):
-         case uint32_t(psibase::DbId::uiEvent):
-         case uint32_t(psibase::DbId::merkleEvent):
          case uint32_t(psibase::DbId::blockProof):
          case uint32_t(psibase::DbId::prevAuthServices):
             return (psibase::DbId)db;
@@ -1577,25 +1574,11 @@ struct callbacks
             return {chain, (psibase::DbId)db};
          case uint32_t(psibase::DbId::writeOnly):
          case uint32_t(psibase::DbId::blockLog):
-         case uint32_t(psibase::DbId::historyEvent):
-         case uint32_t(psibase::DbId::uiEvent):
-         case uint32_t(psibase::DbId::merkleEvent):
          case uint32_t(psibase::DbId::blockProof):
             return (psibase::DbId)db;
          default:
             throw std::runtime_error("may not write this db, or must use another intrinsic");
       }
-   }
-
-   psibase::DbId getDbReadSequential(std::uint32_t db)
-   {
-      if (db == uint32_t(psibase::DbId::historyEvent))
-         return (psibase::DbId)db;
-      if (db == uint32_t(psibase::DbId::uiEvent))
-         return (psibase::DbId)db;
-      if (db == uint32_t(psibase::DbId::merkleEvent))
-         return (psibase::DbId)db;
-      throw std::runtime_error("may not read this db, or must use another intrinsic");
    }
 
    uint32_t getResult(eosio::vm::span<char> dest, uint32_t offset)
@@ -1619,12 +1602,6 @@ struct callbacks
       auto& chain = assert_chain(chain_index);
       return setResult(
           chain.database().kvGetRaw(getDbRead(chain, db).db, {key.data(), key.size()}));
-   }
-
-   uint32_t getSequential(std::uint32_t chain_index, uint32_t db, uint64_t indexNumber)
-   {
-      return setResult(database(chain_index)
-                           .kvGetRaw(getDbReadSequential(db), psio::convert_to_key(indexNumber)));
    }
 
    uint32_t kvGreaterEqual(std::uint32_t               chain_index,
@@ -1715,7 +1692,6 @@ void register_callbacks()
    rhf_t::add<&callbacks::getResult>("psibase", "getResult");
    rhf_t::add<&callbacks::getKey>("psibase", "getKey");
    rhf_t::add<&callbacks::kvGet>("psibase", "kvGet");
-   rhf_t::add<&callbacks::getSequential>("psibase", "getSequential");
    rhf_t::add<&callbacks::kvGreaterEqual>("psibase", "kvGreaterEqual");
    rhf_t::add<&callbacks::kvLessThan>("psibase", "kvLessThan");
    rhf_t::add<&callbacks::kvMax>("psibase", "kvMax");
