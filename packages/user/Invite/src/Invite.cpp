@@ -75,8 +75,8 @@ void Invite::init()
    to<Tokens>().setUserConf(Tokens::manualDebit, true);
 
    // Register event indices
-   to<EventConfig>().addIndex(DbId::historyEvent, Invite::service, "updated"_m, 0);
-   to<EventConfig>().addIndex(DbId::historyEvent, Invite::service, "updated"_m, 1);
+   to<EventConfig>().addIndex(EventDb::historyEvent, Invite::service, "updated"_m, 0);
+   to<EventConfig>().addIndex(EventDb::historyEvent, Invite::service, "updated"_m, 1);
 }
 
 namespace

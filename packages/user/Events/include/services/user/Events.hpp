@@ -56,7 +56,7 @@ namespace UserService
       /// Indexes increase the CPU cost of transactions that create events.
       /// Block producers SHOULD use exactly the indexes requested by services
       /// to ensure consistent billing.
-      void addIndex(psibase::DbId          db,
+      void addIndex(EventDb                db,
                     psibase::AccountNumber service,
                     psibase::MethodNumber  event,
                     std::uint8_t           column);

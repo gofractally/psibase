@@ -112,7 +112,7 @@ void getColumns(const CompiledType* type, auto& stream)
 
 struct EventVTab : sqlite3_vtab
 {
-   EventVTab(DbId db, AccountNumber service, MethodNumber event, const CompiledType* type)
+   EventVTab(EventDb db, AccountNumber service, MethodNumber event, const CompiledType* type)
        : index{db, service, event}, rowType(type)
    {
       auto secondary = SecondaryIndexTable(
@@ -444,7 +444,7 @@ int event_connect(sqlite3*           db,
 {
    AccountNumber service  = {};
    MethodNumber  event    = {};
-   DbId          event_db = DbId::historyEvent;
+   EventDb       event_db = EventDb::historyEvent;
    for (int i = 3; i < args; ++i)
    {
       std::string_view arg = argv[i];
@@ -456,15 +456,11 @@ int event_connect(sqlite3*           db,
       {
          if (arg == "db=history")
          {
-            event_db = DbId::historyEvent;
-         }
-         else if (arg == "db=ui")
-         {
-            event_db = DbId::uiEvent;
+            event_db = EventDb::historyEvent;
          }
          else if (arg == "db=merkle")
          {
-            event_db = DbId::merkleEvent;
+            event_db = EventDb::merkleEvent;
          }
          else
          {

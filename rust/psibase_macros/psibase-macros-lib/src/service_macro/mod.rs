@@ -555,7 +555,7 @@ fn process_mod(
         items.push(parse_quote! {
             #[automatically_derived]
             pub struct #history_events {
-                event_log: #psibase_mod::DbId,
+                event_log: #psibase_mod::EventDb,
                 sender: #psibase_mod::AccountNumber,
             }
         });
@@ -563,7 +563,7 @@ fn process_mod(
         items.push(parse_quote! {
             #[automatically_derived]
             pub struct #ui_events {
-                event_log: #psibase_mod::DbId,
+                event_log: #psibase_mod::EventDb,
                 sender: #psibase_mod::AccountNumber,
             }
         });
@@ -571,7 +571,7 @@ fn process_mod(
         items.push(parse_quote! {
             #[automatically_derived]
             pub struct #merkle_events {
-                event_log: #psibase_mod::DbId,
+                event_log: #psibase_mod::EventDb,
                 sender: #psibase_mod::AccountNumber,
             }
         });
@@ -601,13 +601,10 @@ fn process_mod(
         items.push(parse_quote! {
             impl EmitEvent {
                 pub fn history(&self) -> #history_events {
-                    #history_events { event_log: #psibase_mod::DbId::HistoryEvent, sender: self.sender }
-                }
-                pub fn ui(&self) -> #ui_events {
-                    #ui_events { event_log: #psibase_mod::DbId::UiEvent, sender: self.sender }
+                    #history_events { event_log: #psibase_mod::EventDb::HistoryEvent, sender: self.sender }
                 }
                 pub fn merkle(&self) -> #merkle_events {
-                    #merkle_events { event_log: #psibase_mod::DbId::MerkleEvent, sender: self.sender }
+                    #merkle_events { event_log: #psibase_mod::EventDb::MerkleEvent, sender: self.sender }
                 }
             }
         });

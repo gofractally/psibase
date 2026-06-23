@@ -15,9 +15,7 @@ using namespace psibase;
 using namespace psio::schema_types;
 using namespace UserService;
 
-void EventIndex::update(psibase::DbId          db,
-                        psibase::AccountNumber service,
-                        psibase::MethodNumber  event)
+void EventIndex::update(EventDb db, psibase::AccountNumber service, psibase::MethodNumber event)
 {
    // mark the table as dirty
    auto dirtyTable = EventIndex{}.open<IndexDirtyTable>();
@@ -26,7 +24,7 @@ void EventIndex::update(psibase::DbId          db,
 
 namespace
 {
-   std::uint64_t getNextEventNumber(const DatabaseStatusRow& status, DbId db)
+   std::uint64_t getNextEventNumber(const DatabaseStatusRow& status, EventDb db)
    {
       if (auto row = EventConfig{}.open<EventNumberTable>(KvMode::read).get(db))
       {
@@ -63,7 +61,7 @@ namespace
           psio::convert_to_key(std::tuple(EventIndex::service, secondaryIndexTableNum))};
       EventWrapper     wrapper{nullptr};
       EventIndexHandle handle{KvMode::write};
-      bool             operator()(EventTable& events, psibase::DbId db, std::uint64_t eventNum)
+      bool             operator()(EventTable& events, EventDb db, std::uint64_t eventNum)
       {
          auto row = events.getView(eventNum);
          if (!row)
@@ -106,7 +104,7 @@ namespace
       }
    };
 
-   bool processInit(DbId db, std::uint32_t& max_steps, std::uint64_t& end)
+   bool processInit(EventDb db, std::uint32_t& max_steps, std::uint64_t& end)
    {
       IndexWriter writer;
       auto        events = Events{}.openEvents(db, KvMode::read);
@@ -244,7 +242,7 @@ namespace
 
    DbIndexStatus initStatus(const psibase::DatabaseStatusRow& dbStatus,
                             DbIndexStatusTable&               table,
-                            DbId                              db)
+                            EventDb                           db)
    {
       if (auto result = table.get(db))
          return *result;
@@ -270,7 +268,7 @@ namespace
 void queueIndexChanges()
 {
    auto status          = EventIndex{}.open<DbIndexStatusTable>().getIndex<0>();
-   auto getNextEventNum = [&](DbId db)
+   auto getNextEventNum = [&](EventDb db)
    {
       if (auto result = status.get(db))
          return result->nextEventNumber;
@@ -387,7 +385,7 @@ void EventIndex::sync()
 
    auto        table = EventIndex{}.open<DbIndexStatusTable>();
    IndexWriter writer;
-   for (auto db : {DbId::historyEvent, DbId::merkleEvent})
+   for (auto db : {EventDb::historyEvent, EventDb::merkleEvent})
    {
       auto events = Events{}.openEvents(db, KvMode::read);
       auto status = initStatus(*dbStatus, table, db);

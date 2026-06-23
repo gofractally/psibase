@@ -1,6 +1,8 @@
 use fracpack::{FracInputStream, Pack, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
 
+pub use crate::services::events::EventDb;
+
 /// Identify database to operate on
 ///
 /// Native functions expose a set of databases which serve

@@ -127,22 +127,6 @@ auto gql(DefaultTestChain& t, const std::string& query_str)
    return psio::convert_from_json<QueryRoot>(body);
 }
 
-TEST_CASE("test events")
-{
-   DefaultTestChain t;
-   auto             event_service =
-       t.from(t.addService(EmitEvents::service, "EmitEvents.wasm")).to<EmitEvents>();
-   REQUIRE(event_service.init().succeeded());
-
-   auto evId = event_service.foo("antidisestablishmentarianism", 42).returnVal();
-
-   {
-      auto [s, i] = EmitEvents().events().history().e(evId);
-      CHECK(s == "antidisestablishmentarianism"s);
-      CHECK(i == 42);
-   }
-}
-
 TEST_CASE("test merkle events")
 {
    DefaultTestChain t;

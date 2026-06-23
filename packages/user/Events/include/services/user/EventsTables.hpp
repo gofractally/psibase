@@ -12,10 +12,8 @@
 
 namespace UserService
 {
+   using psibase::EventDb;
    using psibase::ServiceSchema;
-
-   // TODO: create a separate enum
-   using EventDb = psibase::DbId;
 
    struct EventNumberRecord
    {
@@ -61,7 +59,7 @@ namespace UserService
 
    struct SecondaryIndexRecord
    {
-      psibase::DbId                   db;
+      EventDb                         db;
       psibase::AccountNumber          service;
       psibase::MethodNumber           event;
       std::vector<SecondaryIndexInfo> indexes;
@@ -75,7 +73,7 @@ namespace UserService
    struct PendingIndexRecord
    {
       std::uint64_t          seq;
-      psibase::DbId          db;
+      EventDb                db;
       psibase::AccountNumber service;
       psibase::MethodNumber  event;
       SecondaryIndexInfo     info;
@@ -96,7 +94,7 @@ namespace UserService
    // For each db, tracks the lowest event number that has not been indexed.
    struct DbIndexStatus
    {
-      psibase::DbId db;
+      EventDb       db;
       std::uint64_t nextEventNumber;
    };
    PSIO_REFLECT(DbIndexStatus, db, nextEventNumber);
@@ -107,7 +105,7 @@ namespace UserService
    // onBlock will clear entries as it processes them.
    struct IndexDirtyRecord
    {
-      psibase::DbId          db;
+      EventDb                db;
       psibase::AccountNumber service;
       psibase::MethodNumber  event;
       using PrimaryKey = psibase::

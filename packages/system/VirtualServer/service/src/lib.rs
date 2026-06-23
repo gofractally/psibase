@@ -135,9 +135,9 @@ mod service {
         BandwidthPricing::initialize(CPU, 5, 600, 1800, 1_000_000);
 
         // Event indexes
-        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("consumed"), 0);
-        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("subsidized"), 0);
-        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("subsidized"), 1);
+        events::Wrapper::call().addIndex(EventDb::HistoryEvent, SERVICE, method!("consumed"), 0);
+        events::Wrapper::call().addIndex(EventDb::HistoryEvent, SERVICE, method!("subsidized"), 0);
+        events::Wrapper::call().addIndex(EventDb::HistoryEvent, SERVICE, method!("subsidized"), 1);
 
         // TODO: Iterate over the system service tables and aggregate code rows as pre-allocated objective disk space
         // (the accounts service init already does such iterating, use as reference.)

@@ -205,4 +205,10 @@ namespace psibase
       KvResourcePair(KvResourceKey first, KvResourceDelta second) : first{first}, second{second} {}
       PSIO_REFLECT(KvResourcePair, definitionWillNotChange(), first, second)
    };
+
+   enum class EventDb : std::uint8_t
+   {
+      historyEvent,
+      merkleEvent,
+   };
 }  // namespace psibase

@@ -8,7 +8,7 @@ using namespace psibase;
 using namespace psio::schema_types;
 using namespace UserService;
 
-void Events::addIndex(psibase::DbId          db,
+void Events::addIndex(psibase::EventDb       db,
                       psibase::AccountNumber service,
                       psibase::MethodNumber  event,
                       std::uint8_t           column)
