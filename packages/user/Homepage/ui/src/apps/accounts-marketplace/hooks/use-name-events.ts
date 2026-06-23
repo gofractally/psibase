@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
     type FetchNameEventsPageParams,
     fetchNameEventsPage,
-} from "@/apps/prem-accounts/lib/graphql/namemarket-api";
+} from "@/apps/accounts-marketplace/lib/graphql/namemarket-api";
 
 import QueryKey from "@/lib/query-keys";
 

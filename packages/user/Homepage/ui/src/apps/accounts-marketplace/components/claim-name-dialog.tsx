@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { useClaimAndSetKey } from "@/apps/prem-accounts/hooks/use-claim-and-set-key";
+import { useClaimAndSetKey } from "@/apps/accounts-marketplace/hooks/use-claim-and-set-key";
 
 import QueryKey from "@/lib/query-keys";
 

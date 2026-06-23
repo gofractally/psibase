@@ -1,7 +1,7 @@
 import { PluginInterface } from "@shared/hooks/plugin-function";
 import { Account } from "@shared/lib/schemas/account";
 
-class PremiumAccounts extends PluginInterface {
+class AccountsMarketplace extends PluginInterface {
     protected override readonly _intf = "premiumAccounts" as const;
 
     /**
@@ -14,10 +14,10 @@ class PremiumAccounts extends PluginInterface {
 }
 
 export class Plugin {
-    readonly premiumAccounts: PremiumAccounts;
+    readonly accountsMarketplace: AccountsMarketplace;
 
     constructor(readonly service: Account) {
-        this.premiumAccounts = new PremiumAccounts();
-        Object.assign(this.premiumAccounts, { _service: service });
+        this.accountsMarketplace = new AccountsMarketplace();
+        Object.assign(this.accountsMarketplace, { _service: service });
     }
 }

@@ -1,5 +1,5 @@
-import { HistorySection } from "@/apps/prem-accounts/components/history-section";
-import { usePaginatedNameEvents } from "@/apps/prem-accounts/hooks/use-paginated-name-events";
+import { HistorySection } from "@/apps/accounts-marketplace/components/history-section";
+import { usePaginatedNameEvents } from "@/apps/accounts-marketplace/hooks/use-paginated-name-events";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 

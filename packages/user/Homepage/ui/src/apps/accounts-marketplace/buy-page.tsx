@@ -1,18 +1,18 @@
 import { useMemo } from "react";
 
-import { BuyForm } from "@/apps/prem-accounts/components/buy-form";
-import { AccountMarketsCard } from "@/apps/prem-accounts/components/premium-markets-card";
+import { AccountMarketsCard } from "@/apps/accounts-marketplace/components/account-markets-card";
+import { BuyForm } from "@/apps/accounts-marketplace/components/buy-form";
 
 import { ErrorCard } from "@shared/components/error-card";
 import { GlowingCard } from "@shared/components/glowing-card";
-import { useCanBuyAccount } from "@shared/hooks/use-can-create-premium-account";
 import {
     ACCOUNT_MARKETS_REFETCH_INTERVAL_MS,
     useAccountMarkets,
-} from "@shared/hooks/use-prem-markets";
+} from "@shared/hooks/use-account-markets";
+import { useCanBuyAccount } from "@shared/hooks/use-can-buy-account";
 import { useSystemToken } from "@shared/hooks/use-system-token";
 import { MAX_ACCOUNT_NAME_LENGTH } from "@shared/lib/schemas/account";
-import { accountMarketPricesFromOverview } from "@shared/lib/schemas/prem-accounts";
+import { accountMarketPricesFromOverview } from "@shared/lib/schemas/account-markets";
 import {
     CardContent,
     CardDescription,

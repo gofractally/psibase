@@ -60,7 +60,7 @@ export const appMenus: Menu[] = [
     {
         title: "Account Marketplace",
         icon: Store,
-        path: "premium-name-market-config",
+        path: "account-marketplace",
     },
     {
         title: "Settings",

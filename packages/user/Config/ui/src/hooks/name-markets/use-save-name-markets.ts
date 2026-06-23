@@ -1,10 +1,7 @@
 import type { SystemTokenInfo } from "@shared/hooks/use-system-token";
 
 import { usePluginMutation } from "@/hooks/use-plugin-mutation";
-import {
-    type NameMarketFormRow,
-    toMarketConfig,
-} from "@/lib/premium-name-market-form";
+import { type NameMarketFormRow, toMarketConfig } from "@/lib/name-market-form";
 
 import { callPluginFunction, config } from "@shared/lib/plugins";
 import { queryClient } from "@shared/lib/query-client";

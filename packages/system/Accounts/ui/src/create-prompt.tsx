@@ -7,17 +7,17 @@ import { prompt } from "@psibase/common-lib";
 
 import { ConfirmKeyStep } from "@shared/components/account-key/confirm-key-step";
 import { SaveKeyStep } from "@shared/components/account-key/save-key-step";
+import { AvailableBalanceLabel } from "@shared/components/accounts-marketplace/available-balance-label";
+import { BuyNameConfirmationDialog } from "@shared/components/accounts-marketplace/buy-name-confirmation-dialog";
 import { BrandedGlowingCard } from "@shared/components/branded-glowing-card";
 import { useAppForm } from "@shared/components/form/app-form";
-import { AvailableBalanceLabel } from "@shared/components/premium-accounts/available-balance-label";
-import { BuyNameConfirmationDialog } from "@shared/components/premium-accounts/buy-name-confirmation-dialog";
-import { useBranding } from "@shared/hooks/use-branding";
-import { useCanBuyAccount } from "@shared/hooks/use-can-create-premium-account";
-import { useCurrentUser } from "@shared/hooks/use-current-user";
 import {
     ACCOUNT_MARKETS_REFETCH_INTERVAL_MS,
     useAccountMarkets,
-} from "@shared/hooks/use-prem-markets";
+} from "@shared/hooks/use-account-markets";
+import { useBranding } from "@shared/hooks/use-branding";
+import { useCanBuyAccount } from "@shared/hooks/use-can-buy-account";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { useSystemToken } from "@shared/hooks/use-system-token";
 import {
     getSystemTokenBalance,
@@ -33,7 +33,7 @@ import {
     zAccount,
     zAccountFree,
 } from "@shared/lib/schemas/account";
-import { accountMarketPricesFromOverview } from "@shared/lib/schemas/prem-accounts";
+import { accountMarketPricesFromOverview } from "@shared/lib/schemas/account-markets";
 import {
     CardContent,
     CardDescription,

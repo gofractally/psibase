@@ -1,5 +1,5 @@
 import type { SystemTokenInfo } from "@shared/hooks/use-system-token";
-import type { AccountMarketOverviewRow } from "@shared/lib/schemas/prem-accounts";
+import type { AccountMarketOverviewRow } from "@shared/lib/schemas/account-markets";
 
 import { GlowingCard } from "@shared/components/glowing-card";
 import { LivePrice } from "@shared/components/live-price";

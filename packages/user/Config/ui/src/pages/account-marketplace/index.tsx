@@ -2,8 +2,8 @@ import { useStore } from "@tanstack/react-form";
 import { AlertCircle, Undo2 } from "lucide-react";
 import { useCallback, useEffect, useMemo } from "react";
 
-import { useConfiguredNameMarkets } from "@/hooks/premium-name-markets/use-configured-markets";
-import { useSaveNameMarkets } from "@/hooks/premium-name-markets/use-save-premium-name-markets";
+import { useConfiguredNameMarkets } from "@/hooks/name-markets/use-configured-markets";
+import { useSaveNameMarkets } from "@/hooks/name-markets/use-save-name-markets";
 import {
     type NameMarketFormRow,
     type NameMarketsFormValues,
@@ -11,8 +11,8 @@ import {
     getDirtyMarkets,
     marketRowsEqual,
     validateDirtyMarkets,
-} from "@/lib/premium-name-market-form";
-import { scrollToFirstMarketFieldError } from "@/lib/premium-name-market-validation-ui";
+} from "@/lib/name-market-form";
+import { scrollToFirstMarketFieldError } from "@/lib/name-market-validation-ui";
 
 import { useAppForm } from "@shared/components/form/app-form";
 import { LivePrice } from "@shared/components/live-price";
@@ -20,7 +20,7 @@ import { PageContainer } from "@shared/components/page-container";
 import {
     ACCOUNT_MARKETS_REFETCH_INTERVAL_MS,
     useAccountMarkets,
-} from "@shared/hooks/use-prem-markets";
+} from "@shared/hooks/use-account-markets";
 import { useSystemToken } from "@shared/hooks/use-system-token";
 import {
     MAX_ACCOUNT_NAME_LENGTH,
@@ -40,11 +40,11 @@ import {
 import { Label } from "@shared/shadcn/ui/label";
 import { Switch } from "@shared/shadcn/ui/switch";
 
-import { NameMarketCardsSkeleton } from "./premium-name-market/name-market-card-skeleton";
+import { NameMarketCardsSkeleton } from "./components/name-market-card-skeleton";
 import {
     NameMarketRowPanel,
     type NameMarketRowPanelProps,
-} from "./premium-name-market/name-market-row-panel";
+} from "./components/name-market-row-panel";
 
 const MARKET_EDITABLE_FIELDS: Array<keyof NameMarketFormRow> = [
     "enabled",

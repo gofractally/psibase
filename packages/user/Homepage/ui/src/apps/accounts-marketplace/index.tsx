@@ -1,13 +1,13 @@
 import { type SidebarVisibility, defineAppConfig } from "@/app-config";
 import { History, Package, ShoppingCart, Store } from "lucide-react";
 
-import { useNameEvents } from "@/apps/prem-accounts/hooks/use-name-events";
-import { NAME_EVENTS_EXISTENCE_PAGE_SIZE } from "@/apps/prem-accounts/lib/graphql/namemarket-api";
+import { useNameEvents } from "@/apps/accounts-marketplace/hooks/use-name-events";
+import { NAME_EVENTS_EXISTENCE_PAGE_SIZE } from "@/apps/accounts-marketplace/lib/graphql/namemarket-api";
 
+import { useAccountMarkets } from "@shared/hooks/use-account-markets";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
-import { useAccountMarkets } from "@shared/hooks/use-prem-markets";
 import { nameMarket } from "@shared/lib/plugins";
-import { hasActiveAccountMarket } from "@shared/lib/schemas/prem-accounts";
+import { hasActiveAccountMarket } from "@shared/lib/schemas/account-markets";
 
 import { BuyPage } from "./buy-page";
 import { ClaimPage } from "./claim-page";

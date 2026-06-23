@@ -1,11 +1,11 @@
 import type {
     NameMarketFormRow,
     NameMarketsFormValues,
-} from "@/lib/premium-name-market-form";
+} from "@/lib/name-market-form";
 import type { AnyFieldMeta } from "@tanstack/react-form";
 import type { ReactNode } from "react";
 
-import { NAME_MARKET_DEFAULT_PARAMS } from "@/lib/premium-name-market-defaults";
+import { NAME_MARKET_DEFAULT_PARAMS } from "@/lib/name-market-defaults";
 
 import { FieldErrors } from "@shared/components/form/internal/field-errors";
 import {

@@ -6,11 +6,14 @@ import { homepage } from "@shared/lib/plugins";
  * returns the new account's private key (PEM format).
  */
 export const useClaimAndSetKey = () => {
-    return usePluginFunctionMutation(homepage.premiumAccounts.claimAndSetKey, {
-        toast: {
-            loading: "Claiming account...",
-            error: "Failed to claim account",
-            success: "Account claimed",
+    return usePluginFunctionMutation(
+        homepage.accountsMarketplace.claimAndSetKey,
+        {
+            toast: {
+                loading: "Claiming account...",
+                error: "Failed to claim account",
+                success: "Account claimed",
+            },
         },
-    });
+    );
 };

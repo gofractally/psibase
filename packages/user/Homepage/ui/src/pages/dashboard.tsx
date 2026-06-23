@@ -13,7 +13,7 @@ import { z } from "zod";
 
 import { siblingUrl } from "@psibase/common-lib";
 
-import { ACCOUNT_MARKETPLACE_PATH } from "@/apps/prem-accounts/route";
+import { ACCOUNT_MARKETPLACE_PATH } from "@/apps/accounts-marketplace/route";
 
 import { zAccount } from "@shared/lib/schemas/account";
 

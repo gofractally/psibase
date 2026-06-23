@@ -1,5 +1,5 @@
-import { UnclaimedNamesTable } from "@/apps/prem-accounts/components/unclaimed-names-table";
-import { useUnclaimedNames } from "@/apps/prem-accounts/hooks/use-unclaimed-names";
+import { UnclaimedNamesTable } from "@/apps/accounts-marketplace/components/unclaimed-names-table";
+import { useUnclaimedNames } from "@/apps/accounts-marketplace/hooks/use-unclaimed-names";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 

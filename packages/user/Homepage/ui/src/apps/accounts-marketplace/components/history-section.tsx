@@ -3,7 +3,7 @@ import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { useMemo } from "react";
 
-import { NameEvent } from "@/apps/prem-accounts/lib/graphql/namemarket.schemas";
+import { NameEvent } from "@/apps/accounts-marketplace/lib/graphql/namemarket.schemas";
 
 import { Loading } from "@/components/loading";
 

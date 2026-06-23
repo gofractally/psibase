@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
 import { type ColumnDef } from "@tanstack/react-table";
+import { useMemo, useState } from "react";
 
-import { ClaimNameDialog } from "@/apps/prem-accounts/components/claim-name-dialog";
+import { ClaimNameDialog } from "@/apps/accounts-marketplace/components/claim-name-dialog";
 
 import { Loading } from "@/components/loading";
 
@@ -35,10 +35,7 @@ export function UnclaimedNamesTable({
 }: Props) {
     const [accountToClaim, setAccountToClaim] = useState<string | null>(null);
 
-    const data = useMemo(
-        () => names.map((account) => ({ account })),
-        [names],
-    );
+    const data = useMemo(() => names.map((account) => ({ account })), [names]);
 
     const columns = useMemo<ColumnDef<UnclaimedNameRow>[]>(
         () => [

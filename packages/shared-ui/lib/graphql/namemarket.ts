@@ -5,7 +5,7 @@ import {
     buildAccountMarketOverviewRows,
     zAccountMarketsOverviewData,
     zCurrentPricesData,
-} from "@shared/lib/schemas/prem-accounts";
+} from "@shared/lib/schemas/account-markets";
 
 export async function fetchCurrentPrices() {
     const raw = await graphql(

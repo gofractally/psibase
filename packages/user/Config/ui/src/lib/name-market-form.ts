@@ -1,10 +1,10 @@
-import type { ConfiguredNameMarketRow } from "@/hooks/premium-name-markets/use-configured-markets";
+import type { ConfiguredNameMarketRow } from "@/hooks/name-markets/use-configured-markets";
 import type { SystemTokenInfo } from "@shared/hooks/use-system-token";
 import type { MarketConfigInput } from "@shared/lib/plugins/config";
 
 import { z } from "zod";
 
-import { NAME_MARKET_DEFAULT_PARAMS } from "@/lib/premium-name-market-defaults";
+import { NAME_MARKET_DEFAULT_PARAMS } from "@/lib/name-market-defaults";
 import {
     parsePercentToPct,
     parsePositiveInt,
@@ -12,7 +12,7 @@ import {
     parseWindowSeconds,
     ppmToWholePercentString,
     secondsToWindowForm,
-} from "@/lib/premium-name-market-parsers";
+} from "@/lib/name-market-parsers";
 
 import {
     MAX_ACCOUNT_NAME_LENGTH,

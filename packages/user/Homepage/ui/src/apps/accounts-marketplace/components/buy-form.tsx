@@ -4,14 +4,17 @@ import { useStore } from "@tanstack/react-form";
 import { useCallback, useMemo, useRef, useState } from "react";
 import z from "zod";
 
-import { useBuyName } from "@/apps/prem-accounts/hooks/use-buy-name";
-import { ACCOUNT_MARKETPLACE_PATH } from "@/apps/prem-accounts/route";
+import { useBuyName } from "@/apps/accounts-marketplace/hooks/use-buy-name";
+import { ACCOUNT_MARKETPLACE_PATH } from "@/apps/accounts-marketplace/route";
 
+import { AvailableBalanceLabel } from "@shared/components/accounts-marketplace/available-balance-label";
+import { BuyNameConfirmationDialog } from "@shared/components/accounts-marketplace/buy-name-confirmation-dialog";
 import { useAppForm } from "@shared/components/form/app-form";
-import { AvailableBalanceLabel } from "@shared/components/premium-accounts/available-balance-label";
-import { BuyNameConfirmationDialog } from "@shared/components/premium-accounts/buy-name-confirmation-dialog";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
-import { useUserTokenBalances, getSystemTokenBalance } from "@shared/hooks/use-user-token-balances";
+import {
+    getSystemTokenBalance,
+    useUserTokenBalances,
+} from "@shared/hooks/use-user-token-balances";
 import { getAccount } from "@shared/lib/get-account";
 import { Quantity } from "@shared/lib/quantity";
 import { zAccount } from "@shared/lib/schemas/account";
@@ -183,8 +186,7 @@ export function BuyForm({
             if (errorMessage.includes("has insufficient balance")) {
                 message = "Insufficient balance";
             } else if (errorMessage.includes("Max cost below current ask")) {
-                message =
-                    "Market price changed; check new price and try again";
+                message = "Market price changed; check new price and try again";
             } else if (!errorMessage.includes("Transaction error:")) {
                 message = errorMessage;
             }
