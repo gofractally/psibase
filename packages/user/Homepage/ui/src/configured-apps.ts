@@ -1,6 +1,6 @@
 import { chainMailConfig } from "./apps/chainmail";
 import { contactsConfig } from "./apps/contacts";
-import { premAccountsConfig } from "./apps/prem-accounts";
+import { accountMarketplaceConfig } from "./apps/prem-accounts";
 import { tokenSwapConfig } from "./apps/token-swap";
 import { tokensConfig } from "./apps/tokens";
 
@@ -12,5 +12,5 @@ export const configuredApps = [
     tokenSwapConfig,
     chainMailConfig,
     contactsConfig,
-    premAccountsConfig,
+    accountMarketplaceConfig,
 ];

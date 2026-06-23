@@ -4,4 +4,4 @@ import { accounts } from "@shared/lib/plugins";
 
 export const usePurchaseAccount = (
     options: MutationOptions<[string, string], string> = {},
-) => usePluginFunctionMutation(accounts.prompt.createPremium, options);
+) => usePluginFunctionMutation(accounts.prompt.purchaseAccount, options);

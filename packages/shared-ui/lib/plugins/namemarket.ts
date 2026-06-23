@@ -12,7 +12,7 @@ class Authorized extends PluginInterface {
 class Api extends PluginInterface {
     protected override readonly _intf = "api" as const;
 
-    get canCreatePremiumAccount() {
+    get canCreateAccount() {
         return this._call<[], boolean>("canCreateAccount");
     }
 }

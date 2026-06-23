@@ -1,10 +1,10 @@
 import { graphql } from "@shared/lib/graphql";
-import { premAccounts } from "@shared/lib/plugins";
+import { nameMarket } from "@shared/lib/plugins";
 import {
-    buildPremiumMarketOverviewRows,
+    type AccountMarketOverviewRow,
+    buildAccountMarketOverviewRows,
+    zAccountMarketsOverviewData,
     zCurrentPricesData,
-    zPremiumMarketsOverviewData,
-    type PremiumMarketOverviewRow,
 } from "@shared/lib/schemas/prem-accounts";
 
 export async function fetchCurrentPrices() {
@@ -17,7 +17,7 @@ export async function fetchCurrentPrices() {
                 }
             }
         `,
-        { service: premAccounts.service },
+        { service: nameMarket.service },
     );
 
     const { currentPrices } = zCurrentPricesData.parse(raw);
@@ -29,8 +29,8 @@ export const fetchCurrentPriceForLength = async (length: number) => {
     return currentPrices.get(length);
 };
 
-export async function fetchPremiumMarketsOverview(): Promise<
-    PremiumMarketOverviewRow[]
+export async function fetchAccountMarketsOverview(): Promise<
+    AccountMarketOverviewRow[]
 > {
     const raw = await graphql(
         `
@@ -45,10 +45,10 @@ export async function fetchPremiumMarketsOverview(): Promise<
                 }
             }
         `,
-        { service: premAccounts.service },
+        { service: nameMarket.service },
     );
 
     const { marketParams, currentPrices } =
-        zPremiumMarketsOverviewData.parse(raw);
-    return buildPremiumMarketOverviewRows(marketParams, currentPrices);
+        zAccountMarketsOverviewData.parse(raw);
+    return buildAccountMarketOverviewRows(marketParams, currentPrices);
 }

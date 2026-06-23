@@ -1,12 +1,13 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { useQueryClient } from "@tanstack/react-query";
-
 import { useClaimAndSetKey } from "@/apps/prem-accounts/hooks/use-claim-and-set-key";
+
 import QueryKey from "@/lib/query-keys";
 
 import { ConfirmKeyStep } from "@shared/components/account-key/confirm-key-step";
 import { SaveKeyStep } from "@shared/components/account-key/save-key-step";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { pemToB64 } from "@shared/lib/b64-key-utils";
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -18,7 +19,6 @@ import {
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
 import { Progress } from "@shared/shadcn/ui/progress";
-import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 type Step = "1_EXPLAIN" | "2_SAVE" | "3_CONFIRM";
@@ -46,10 +46,10 @@ export const ClaimNameDialog = ({ account, open, onClose }: Props) => {
 
     const invalidateClaimQueries = () => {
         void queryClient.invalidateQueries({
-            queryKey: QueryKey.premUnclaimedNames(currentUser),
+            queryKey: QueryKey.nameMarketUnclaimedNames(currentUser),
         });
         void queryClient.invalidateQueries({
-            queryKey: QueryKey.premNameEvents(currentUser),
+            queryKey: QueryKey.nameMarketEvents(currentUser),
         });
     };
 

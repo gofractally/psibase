@@ -2,24 +2,22 @@ import type { SystemTokenInfo } from "@shared/hooks/use-system-token";
 
 import { usePluginMutation } from "@/hooks/use-plugin-mutation";
 import {
-    type PremiumNameMarketFormRow,
+    type NameMarketFormRow,
     toMarketConfig,
 } from "@/lib/premium-name-market-form";
 
 import { callPluginFunction, config } from "@shared/lib/plugins";
 import { queryClient } from "@shared/lib/query-client";
 
-import QueryKey from "../../lib/query-keys";
-
-export type SavePremiumNameMarketsInput = {
-    dirtyRows: PremiumNameMarketFormRow[];
+export type SaveNameMarketsInput = {
+    dirtyRows: NameMarketFormRow[];
     systemToken: SystemTokenInfo;
 };
 
-const configureMarketsCall = config.premAccounts.configureMarkets;
+const configureMarketsCall = config.nameMarket.configureMarkets;
 
-export const useSavePremiumNameMarkets = () =>
-    usePluginMutation<SavePremiumNameMarketsInput>(
+export const useSaveNameMarkets = () =>
+    usePluginMutation<SaveNameMarketsInput>(
         {
             service: configureMarketsCall.service,
             intf: configureMarketsCall.intf,
@@ -29,7 +27,7 @@ export const useSavePremiumNameMarkets = () =>
             mutationKey: [
                 configureMarketsCall.service,
                 configureMarketsCall.intf,
-                "savePremiumNameMarkets",
+                "saveNameMarkets",
             ] as const,
             customMutationFn: async ({ dirtyRows, systemToken }) => {
                 const configs = dirtyRows.map((row) =>
@@ -39,7 +37,7 @@ export const useSavePremiumNameMarkets = () =>
                     return;
                 }
 
-                await callPluginFunction(config.premAccounts.configureMarkets, [
+                await callPluginFunction(config.nameMarket.configureMarkets, [
                     configs,
                 ]);
             },
@@ -49,7 +47,7 @@ export const useSavePremiumNameMarkets = () =>
             isStagable: true,
             onSuccess: () => {
                 void queryClient.invalidateQueries({
-                    queryKey: QueryKey.premiumNameMarkets(),
+                    queryKey: ["nameMarkets"],
                 });
             },
         },

@@ -1,10 +1,10 @@
-import type { ConfiguredPremiumNameMarketRow } from "@/hooks/premium-name-markets/use-configured-markets";
+import type { ConfiguredNameMarketRow } from "@/hooks/premium-name-markets/use-configured-markets";
 import type { SystemTokenInfo } from "@shared/hooks/use-system-token";
 import type { MarketConfigInput } from "@shared/lib/plugins/config";
 
 import { z } from "zod";
 
-import { PREMIUM_MARKET_DEFAULT_PARAMS } from "@/lib/premium-name-market-defaults";
+import { NAME_MARKET_DEFAULT_PARAMS } from "@/lib/premium-name-market-defaults";
 import {
     parsePercentToPct,
     parsePositiveInt,
@@ -20,7 +20,7 @@ import {
 } from "@shared/lib/schemas/account";
 import { zDurationUnit } from "@shared/lib/schemas/duration-unit";
 
-export type PremiumNameMarketFormRow = {
+export type NameMarketFormRow = {
     length: number;
     configured: boolean;
     enabled: boolean;
@@ -33,8 +33,8 @@ export type PremiumNameMarketFormRow = {
     decreasePpm: string;
 };
 
-export type PremiumNameMarketsFormValues = {
-    markets: PremiumNameMarketFormRow[];
+export type NameMarketsFormValues = {
+    markets: NameMarketFormRow[];
 };
 
 export type MarketConfigParam = MarketConfigInput;
@@ -120,13 +120,13 @@ const zDirtyMarketRow = (systemToken: SystemTokenInfo) =>
             }
         });
 
-export function buildPremiumNameMarketsFormValues(
-    configuredRows: ConfiguredPremiumNameMarketRow[] | undefined,
-): PremiumNameMarketsFormValues {
+export function buildNameMarketsFormValues(
+    configuredRows: ConfiguredNameMarketRow[] | undefined,
+): NameMarketsFormValues {
     const byLength = new Map(
         configuredRows?.map((row) => [row.length, row]) ?? [],
     );
-    const markets: PremiumNameMarketFormRow[] = [];
+    const markets: NameMarketFormRow[] = [];
 
     for (
         let length = MIN_ACCOUNT_NAME_LENGTH;
@@ -139,7 +139,7 @@ export function buildPremiumNameMarketsFormValues(
             ? secondsToWindowForm(row!.windowSeconds)
             : {
                   amount: "",
-                  unit: PREMIUM_MARKET_DEFAULT_PARAMS.windowUnit,
+                  unit: NAME_MARKET_DEFAULT_PARAMS.windowUnit,
               };
         markets.push({
             length,
@@ -163,8 +163,8 @@ export function buildPremiumNameMarketsFormValues(
 }
 
 export function marketRowsEqual(
-    a: PremiumNameMarketFormRow,
-    b: PremiumNameMarketFormRow,
+    a: NameMarketFormRow,
+    b: NameMarketFormRow,
 ): boolean {
     return (
         a.enabled === b.enabled &&
@@ -179,17 +179,17 @@ export function marketRowsEqual(
 }
 
 export function getDirtyMarkets(
-    values: PremiumNameMarketsFormValues,
-    defaults: PremiumNameMarketsFormValues,
-): PremiumNameMarketFormRow[] {
+    values: NameMarketsFormValues,
+    defaults: NameMarketsFormValues,
+): NameMarketFormRow[] {
     return values.markets.filter(
         (row, index) => !marketRowsEqual(row, defaults.markets[index]!),
     );
 }
 
 export function validateDirtyMarkets(
-    values: PremiumNameMarketsFormValues,
-    defaults: PremiumNameMarketsFormValues,
+    values: NameMarketsFormValues,
+    defaults: NameMarketsFormValues,
     systemToken: SystemTokenInfo,
 ): { fields: Record<string, string> } | undefined {
     const fieldErrors: Record<string, string> = {};
@@ -221,7 +221,7 @@ export function validateDirtyMarkets(
 }
 
 export function toMarketConfig(
-    row: PremiumNameMarketFormRow,
+    row: NameMarketFormRow,
     systemToken: SystemTokenInfo,
 ): MarketConfigParam {
     const target = parsePositiveInt(row.target);

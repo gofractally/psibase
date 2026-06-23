@@ -2,27 +2,27 @@ import { type SidebarVisibility, defineAppConfig } from "@/app-config";
 import { History, Package, ShoppingCart, Store } from "lucide-react";
 
 import { useNameEvents } from "@/apps/prem-accounts/hooks/use-name-events";
-import { NAME_EVENTS_EXISTENCE_PAGE_SIZE } from "@/apps/prem-accounts/lib/graphql/prem-accounts-api";
+import { NAME_EVENTS_EXISTENCE_PAGE_SIZE } from "@/apps/prem-accounts/lib/graphql/namemarket-api";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
-import { usePremMarkets } from "@shared/hooks/use-prem-markets";
-import { premAccounts } from "@shared/lib/plugins";
-import { hasActivePremMarket } from "@shared/lib/schemas/prem-accounts";
+import { useAccountMarkets } from "@shared/hooks/use-prem-markets";
+import { nameMarket } from "@shared/lib/plugins";
+import { hasActiveAccountMarket } from "@shared/lib/schemas/prem-accounts";
 
 import { BuyPage } from "./buy-page";
 import { ClaimPage } from "./claim-page";
 import { HistoryPage } from "./history-page";
-import { PremAccountsLayout } from "./layout";
+import { AccountMarketplaceLayout } from "./layout";
 import { ACCOUNT_MARKETPLACE_PATH } from "./route";
 
-function usePremAccountsSidebarVisibility(): SidebarVisibility {
+function useAccountMarketplaceSidebarVisibility(): SidebarVisibility {
     const { data: currentUser, isPending: isPendingUser } = useCurrentUser();
     const {
         data: markets,
         isPending: isPendingMarkets,
         isSuccess: isSuccessMarkets,
-    } = usePremMarkets();
-    const isMarketEnabled = hasActivePremMarket(markets);
+    } = useAccountMarkets();
+    const isMarketEnabled = hasActiveAccountMarket(markets);
 
     const { data: history, isLoading: isLoadingHistory } = useNameEvents(
         currentUser,
@@ -53,8 +53,8 @@ function usePremAccountsSidebarVisibility(): SidebarVisibility {
     return { visible: false, isLoading: false };
 }
 
-export const premAccountsConfig = defineAppConfig({
-    service: premAccounts.service,
+export const accountMarketplaceConfig = defineAppConfig({
+    service: nameMarket.service,
     path: ACCOUNT_MARKETPLACE_PATH,
     name: "Account Marketplace",
     description: "Buy and claim account names.",
@@ -62,8 +62,8 @@ export const premAccountsConfig = defineAppConfig({
     isMore: false,
     isLoginRequired: true,
     showLoginLoadingSpinner: true,
-    useSidebarVisibility: usePremAccountsSidebarVisibility,
-    element: <PremAccountsLayout />,
+    useSidebarVisibility: useAccountMarketplaceSidebarVisibility,
+    element: <AccountMarketplaceLayout />,
     children: [
         {
             path: "",

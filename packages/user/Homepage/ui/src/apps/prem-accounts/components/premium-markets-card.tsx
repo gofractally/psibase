@@ -1,5 +1,5 @@
 import type { SystemTokenInfo } from "@shared/hooks/use-system-token";
-import type { PremiumMarketOverviewRow } from "@shared/lib/schemas/prem-accounts";
+import type { AccountMarketOverviewRow } from "@shared/lib/schemas/prem-accounts";
 
 import { GlowingCard } from "@shared/components/glowing-card";
 import { LivePrice } from "@shared/components/live-price";
@@ -24,7 +24,7 @@ function PriceCell({
     row,
     systemToken,
 }: {
-    row: PremiumMarketOverviewRow;
+    row: AccountMarketOverviewRow;
     systemToken: SystemTokenInfo;
 }) {
     if (!row.configured) {
@@ -43,21 +43,21 @@ function PriceCell({
     );
 }
 
-type PremiumMarketsCardProps = {
-    markets: PremiumMarketOverviewRow[] | undefined;
+type AccountMarketsCardProps = {
+    markets: AccountMarketOverviewRow[] | undefined;
     systemToken: SystemTokenInfo | null | undefined;
     isPending: boolean;
     isError: boolean;
     error: Error | null;
 };
 
-export function PremiumMarketsCard({
+export function AccountMarketsCard({
     markets,
     systemToken,
     isPending,
     isError,
     error,
-}: PremiumMarketsCardProps) {
+}: AccountMarketsCardProps) {
     return (
         <GlowingCard>
             <CardHeader>

@@ -5,8 +5,8 @@ import { Plugin as Accounts } from "./accounts";
 import { Plugin as Config } from "./config";
 import { Plugin as Homepage } from "./homepage";
 import { callPluginFunction } from "./lib/call-plugin-function";
+import { Plugin as NameMarket } from "./namemarket";
 import { Plugin as Packages } from "./packages";
-import { Plugin as PremAccounts } from "./prem-accounts";
 import { Plugin as Profiles } from "./profiles";
 import { Plugin as TokenSwap } from "./token-swap";
 import { Plugin as Tokens } from "./tokens";
@@ -15,7 +15,7 @@ const accounts = new Accounts("accounts");
 const config = new Config("config");
 const homepage = new Homepage("homepage");
 const packages = new Packages("packages");
-const premAccounts = new PremAccounts("namemarket");
+const nameMarket = new NameMarket("namemarket");
 const tokenSwap = new TokenSwap("token-swap");
 const tokens = new Tokens("tokens");
 const profiles = new Profiles("profiles");
@@ -25,7 +25,7 @@ export {
     config,
     homepage,
     packages,
-    premAccounts,
+    nameMarket,
     tokenSwap,
     tokens,
     profiles,

@@ -4,7 +4,7 @@ import { Outlet } from "react-router-dom";
 import { PageContainer } from "@shared/components/page-container";
 import { supervisor } from "@shared/lib/supervisor";
 
-export function PremAccountsLayout() {
+export function AccountMarketplaceLayout() {
     useEffect(() => {
         void supervisor.onLoaded();
     }, []);

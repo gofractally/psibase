@@ -1,11 +1,11 @@
 import type {
-    PremiumNameMarketFormRow,
-    PremiumNameMarketsFormValues,
+    NameMarketFormRow,
+    NameMarketsFormValues,
 } from "@/lib/premium-name-market-form";
 import type { AnyFieldMeta } from "@tanstack/react-form";
 import type { ReactNode } from "react";
 
-import { PREMIUM_MARKET_DEFAULT_PARAMS } from "@/lib/premium-name-market-defaults";
+import { NAME_MARKET_DEFAULT_PARAMS } from "@/lib/premium-name-market-defaults";
 
 import { FieldErrors } from "@shared/components/form/internal/field-errors";
 import {
@@ -24,12 +24,12 @@ import {
 } from "@shared/shadcn/ui/select";
 
 const MARKET_FIELD_PLACEHOLDERS = {
-    initialPrice: PREMIUM_MARKET_DEFAULT_PARAMS.initialPrice,
-    floorPrice: PREMIUM_MARKET_DEFAULT_PARAMS.floorPrice,
-    windowAmount: PREMIUM_MARKET_DEFAULT_PARAMS.windowAmount,
-    target: String(PREMIUM_MARKET_DEFAULT_PARAMS.target),
-    increasePpm: String(PREMIUM_MARKET_DEFAULT_PARAMS.increasePercent),
-    decreasePpm: String(PREMIUM_MARKET_DEFAULT_PARAMS.decreasePercent),
+    initialPrice: NAME_MARKET_DEFAULT_PARAMS.initialPrice,
+    floorPrice: NAME_MARKET_DEFAULT_PARAMS.floorPrice,
+    windowAmount: NAME_MARKET_DEFAULT_PARAMS.windowAmount,
+    target: String(NAME_MARKET_DEFAULT_PARAMS.target),
+    increasePpm: String(NAME_MARKET_DEFAULT_PARAMS.increasePercent),
+    decreasePpm: String(NAME_MARKET_DEFAULT_PARAMS.decreasePercent),
 } as const;
 
 const FIELD_LABEL_CLASS = "text-xs font-medium leading-none min-h-3.5";
@@ -56,7 +56,7 @@ type MarketFormApi = {
         }) => ReactNode;
     }) => ReactNode;
     Subscribe: (props: {
-        selector: (state: { values: PremiumNameMarketsFormValues }) => unknown;
+        selector: (state: { values: NameMarketsFormValues }) => unknown;
         children: (value: unknown) => ReactNode;
     }) => ReactNode;
 };
@@ -64,7 +64,7 @@ type MarketFormApi = {
 export type NameMarketRowPanelProps = {
     form: MarketFormApi;
     index: number;
-    baseline: PremiumNameMarketFormRow;
+    baseline: NameMarketFormRow;
     actionsDisabled: boolean;
 };
 

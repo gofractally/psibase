@@ -19,13 +19,9 @@ const QueryKey = {
         ["userTokenBalances", user] as const,
     userTokenBalanceChanges: (user?: string | null, tokenId?: number) =>
         ["userTokenBalanceChanges", user, tokenId] as const,
-    premAccountAvailability: (accountName: string) =>
-        ["premAccountAvailability", accountName] as const,
-    premValidatedMaxCost: (tokenId: number | undefined, maxCost: string) =>
-        ["premValidatedMaxCost", tokenId, maxCost] as const,
-    premUnclaimedNames: (user?: string | null) =>
-        ["premUnclaimedNames", user] as const,
-    premNameEvents: (
+    nameMarketUnclaimedNames: (user?: string | null) =>
+        ["nameMarketUnclaimedNames", user] as const,
+    nameMarketEvents: (
         user?: string | null,
         {
             first,
@@ -40,7 +36,7 @@ const QueryKey = {
         } = {},
     ) =>
         [
-            "premNameEvents",
+            "nameMarketEvents",
             user,
             first ?? null,
             after ?? null,

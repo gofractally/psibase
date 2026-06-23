@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { useNameEvents } from "@/apps/prem-accounts/hooks/use-name-events";
-import { NAME_EVENTS_HISTORY_PAGE_SIZE } from "@/apps/prem-accounts/lib/graphql/prem-accounts-api";
+import { NAME_EVENTS_HISTORY_PAGE_SIZE } from "@/apps/prem-accounts/lib/graphql/namemarket-api";
 
 import { Account } from "@shared/lib/schemas/account";
 

@@ -1,4 +1,4 @@
-import { callPluginFunction, premAccounts } from "@shared/lib/plugins";
+import { callPluginFunction, nameMarket } from "@shared/lib/plugins";
 
 import {
     zNameEvent,
@@ -6,7 +6,7 @@ import {
     zNameEventsPage,
     zNameEventsPageData,
     zUnclaimedNamesPageData,
-} from "./prem-accounts.schemas";
+} from "./namemarket.schemas";
 
 const FETCH_BATCH_SIZE = 50;
 
@@ -17,8 +17,8 @@ export type FetchNameEventsPageParams =
     | { first: number; after?: string }
     | { last: number; before?: string };
 
-async function premAccountsAuthorizedGraphql<T>(query: string): Promise<T> {
-    const result = await callPluginFunction(premAccounts.authorized.graphql, [
+async function nameMarketAuthorizedGraphql<T>(query: string): Promise<T> {
+    const result = await callPluginFunction(nameMarket.authorized.graphql, [
         query,
     ]);
 
@@ -57,7 +57,7 @@ export async function fetchAllUnclaimedNames() {
 
     while (hasNextPage) {
         const page = zUnclaimedNamesPageData.parse(
-            await premAccountsAuthorizedGraphql(
+            await nameMarketAuthorizedGraphql(
                 `
                     {
                         unclaimedNames(first: ${FETCH_BATCH_SIZE}${cursorArg}) {
@@ -114,7 +114,7 @@ export async function fetchNameEventsPage(params: FetchNameEventsPageParams) {
           }`;
 
     const page = zNameEventsPageData.parse(
-        await premAccountsAuthorizedGraphql(
+        await nameMarketAuthorizedGraphql(
             `
                 {
                     nameEvents(${paginationArg}) {

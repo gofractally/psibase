@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
 import { graphql } from "@shared/lib/graphql";
-import { premAccounts } from "@shared/lib/plugins";
+import { nameMarket } from "@shared/lib/plugins";
 import {
     MAX_ACCOUNT_NAME_LENGTH,
     MIN_ACCOUNT_NAME_LENGTH,
@@ -29,12 +29,12 @@ const zData = z.object({
     marketParams: z.array(zRow),
 });
 
-export type ConfiguredPremiumNameMarketRow = z.infer<typeof zRow>;
+export type ConfiguredNameMarketRow = z.infer<typeof zRow>;
 
-export const useConfiguredPremiumNameMarkets = () =>
+export const useConfiguredNameMarkets = () =>
     useQuery({
-        queryKey: QueryKey.premiumNameMarkets(),
-        queryFn: async (): Promise<ConfiguredPremiumNameMarketRow[]> => {
+        queryKey: QueryKey.nameMarketParams(),
+        queryFn: async (): Promise<ConfiguredNameMarketRow[]> => {
             const query = `
                 query {
                     marketParams {
@@ -49,7 +49,7 @@ export const useConfiguredPremiumNameMarkets = () =>
                     }
                 }
             `;
-            const raw = await graphql(query, { service: premAccounts.service });
+            const raw = await graphql(query, { service: nameMarket.service });
             const parsed = zData.parse(raw);
             return parsed.marketParams;
         },

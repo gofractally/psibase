@@ -4,7 +4,7 @@ import { Account } from "@shared/lib/schemas/account";
 class Prompt extends PluginInterface {
     protected override readonly _intf = "prompt" as const;
 
-    get createPremium() {
+    get purchaseAccount() {
         return this._call<[accountName: string, maxCost: string], string>(
             "createPremium",
         );

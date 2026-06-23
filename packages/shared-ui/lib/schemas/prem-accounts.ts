@@ -30,7 +30,7 @@ export const zMarketParamRow = z.object({
     enabled: z.boolean(),
 });
 
-export const zPremiumMarketsOverviewData = z.object({
+export const zAccountMarketsOverviewData = z.object({
     marketParams: z
         .array(zMarketParamRow)
         .nullable()
@@ -41,7 +41,7 @@ export const zPremiumMarketsOverviewData = z.object({
         .transform((rows) => rows ?? []),
 });
 
-export type PremiumMarketOverviewRow = {
+export type AccountMarketOverviewRow = {
     length: number;
     /** Whether a market exists for this name length. */
     configured: boolean;
@@ -50,10 +50,10 @@ export type PremiumMarketOverviewRow = {
     price: string | null;
 };
 
-export function buildPremiumMarketOverviewRows(
+export function buildAccountMarketOverviewRows(
     marketParams: z.infer<typeof zMarketParamRow>[],
     currentPrices: z.infer<typeof zCurrentPriceRow>[],
-): PremiumMarketOverviewRow[] {
+): AccountMarketOverviewRow[] {
     const paramsByLength = new Map(
         marketParams.map((row) => [row.length, row]),
     );
@@ -61,7 +61,7 @@ export function buildPremiumMarketOverviewRows(
         currentPrices.map((row) => [row.length, row.price]),
     );
 
-    const rows: PremiumMarketOverviewRow[] = [];
+    const rows: AccountMarketOverviewRow[] = [];
     for (
         let length = MIN_ACCOUNT_NAME_LENGTH;
         length <= MAX_ACCOUNT_NAME_LENGTH;
@@ -79,8 +79,8 @@ export function buildPremiumMarketOverviewRows(
 }
 
 /** Sparse map of name length → current ask (enabled markets only). */
-export function premMarketPricesFromOverview(
-    markets: PremiumMarketOverviewRow[],
+export function accountMarketPricesFromOverview(
+    markets: AccountMarketOverviewRow[],
 ): Map<number, string> {
     const prices = new Map<number, string>();
     for (const row of markets) {
@@ -91,8 +91,8 @@ export function premMarketPricesFromOverview(
     return prices;
 }
 
-export function hasActivePremMarket(
-    markets: PremiumMarketOverviewRow[] | undefined,
+export function hasActiveAccountMarket(
+    markets: AccountMarketOverviewRow[] | undefined,
 ): boolean {
     return markets?.some((row) => row.price !== null) ?? false;
 }

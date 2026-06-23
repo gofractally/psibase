@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
     type FetchNameEventsPageParams,
     fetchNameEventsPage,
-} from "@/apps/prem-accounts/lib/graphql/prem-accounts-api";
+} from "@/apps/prem-accounts/lib/graphql/namemarket-api";
 
 import QueryKey from "@/lib/query-keys";
 
@@ -20,7 +20,7 @@ export const useNameEvents = (
     const { enabled = true, ...params } = options;
 
     return useQuery({
-        queryKey: QueryKey.premNameEvents(user, params),
+        queryKey: QueryKey.nameMarketEvents(user, params),
         queryFn: () => fetchNameEventsPage(params),
         enabled: !!user && enabled,
     });

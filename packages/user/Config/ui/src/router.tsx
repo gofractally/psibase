@@ -9,7 +9,7 @@ import { Loader } from "./pages/loader";
 import { Packages } from "./pages/packages";
 import { PendingTransaction } from "./pages/pending-transaction";
 import { PendingTransactions } from "./pages/pending-transactions";
-import { PremiumNameMarketConfig } from "./pages/premium-name-market-config";
+import { NameMarketConfig } from "./pages/premium-name-market-config";
 import { ResourcePricing } from "./pages/resource-pricing";
 import { Resources } from "./pages/resources";
 import { Settings } from "./pages/settings";
@@ -83,7 +83,7 @@ export const router = createBrowserRouter([
                 path: "premium-name-market-config",
                 element: (
                     <ProtectedRoute>
-                        <PremiumNameMarketConfig />
+                        <NameMarketConfig />
                     </ProtectedRoute>
                 ),
             },

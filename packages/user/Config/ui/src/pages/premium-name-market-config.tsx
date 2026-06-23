@@ -2,12 +2,12 @@ import { useStore } from "@tanstack/react-form";
 import { AlertCircle, Undo2 } from "lucide-react";
 import { useCallback, useEffect, useMemo } from "react";
 
-import { useConfiguredPremiumNameMarkets } from "@/hooks/premium-name-markets/use-configured-markets";
-import { useSavePremiumNameMarkets } from "@/hooks/premium-name-markets/use-save-premium-name-markets";
+import { useConfiguredNameMarkets } from "@/hooks/premium-name-markets/use-configured-markets";
+import { useSaveNameMarkets } from "@/hooks/premium-name-markets/use-save-premium-name-markets";
 import {
-    type PremiumNameMarketFormRow,
-    type PremiumNameMarketsFormValues,
-    buildPremiumNameMarketsFormValues,
+    type NameMarketFormRow,
+    type NameMarketsFormValues,
+    buildNameMarketsFormValues,
     getDirtyMarkets,
     marketRowsEqual,
     validateDirtyMarkets,
@@ -18,8 +18,8 @@ import { useAppForm } from "@shared/components/form/app-form";
 import { LivePrice } from "@shared/components/live-price";
 import { PageContainer } from "@shared/components/page-container";
 import {
-    PREM_MARKETS_REFETCH_INTERVAL_MS,
-    usePremMarkets,
+    ACCOUNT_MARKETS_REFETCH_INTERVAL_MS,
+    useAccountMarkets,
 } from "@shared/hooks/use-prem-markets";
 import { useSystemToken } from "@shared/hooks/use-system-token";
 import {
@@ -46,7 +46,7 @@ import {
     type NameMarketRowPanelProps,
 } from "./premium-name-market/name-market-row-panel";
 
-const MARKET_EDITABLE_FIELDS: Array<keyof PremiumNameMarketFormRow> = [
+const MARKET_EDITABLE_FIELDS: Array<keyof NameMarketFormRow> = [
     "enabled",
     "initialPrice",
     "floorPrice",
@@ -57,7 +57,7 @@ const MARKET_EDITABLE_FIELDS: Array<keyof PremiumNameMarketFormRow> = [
     "decreasePpm",
 ];
 
-export const PremiumNameMarketConfig = () => {
+export const NameMarketConfig = () => {
     const { data: systemToken, isLoading: systemTokenLoading } =
         useSystemToken();
     const rowActionsDisabled = !systemToken;
@@ -69,10 +69,10 @@ export const PremiumNameMarketConfig = () => {
         isError,
         error,
         refetch,
-    } = useConfiguredPremiumNameMarkets();
+    } = useConfiguredNameMarkets();
 
-    const { data: liveMarkets } = usePremMarkets({
-        refetchInterval: PREM_MARKETS_REFETCH_INTERVAL_MS,
+    const { data: liveMarkets } = useAccountMarkets({
+        refetchInterval: ACCOUNT_MARKETS_REFETCH_INTERVAL_MS,
         enabled: !systemTokenLoading && systemToken !== undefined,
     });
 
@@ -82,10 +82,10 @@ export const PremiumNameMarketConfig = () => {
     );
 
     const { mutateAsync: saveMarkets, isPending: isSaving } =
-        useSavePremiumNameMarkets();
+        useSaveNameMarkets();
 
     const defaultValues = useMemo(
-        () => buildPremiumNameMarketsFormValues(rows),
+        () => buildNameMarketsFormValues(rows),
         [rows],
     );
 
@@ -98,7 +98,7 @@ export const PremiumNameMarketConfig = () => {
                 }
 
                 const defaults = formApi.options
-                    .defaultValues as PremiumNameMarketsFormValues;
+                    .defaultValues as NameMarketsFormValues;
                 const validation = validateDirtyMarkets(
                     value,
                     defaults,
@@ -131,7 +131,7 @@ export const PremiumNameMarketConfig = () => {
             }
 
             const defaults = formApi.options
-                .defaultValues as PremiumNameMarketsFormValues;
+                .defaultValues as NameMarketsFormValues;
             const dirtyRows = getDirtyMarkets(value, defaults);
             if (dirtyRows.length === 0) {
                 return;
@@ -139,7 +139,7 @@ export const PremiumNameMarketConfig = () => {
 
             await saveMarkets({ dirtyRows, systemToken });
             const { data: freshRows } = await refetch();
-            formApi.reset(buildPremiumNameMarketsFormValues(freshRows));
+            formApi.reset(buildNameMarketsFormValues(freshRows));
         },
     });
 

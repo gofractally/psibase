@@ -1,19 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { fetchPremiumMarketsOverview } from "@shared/lib/graphql/prem-accounts";
+import { fetchAccountMarketsOverview } from "@shared/lib/graphql/prem-accounts";
 import QueryKey from "@shared/lib/query-keys";
 
-export const PREM_MARKETS_REFETCH_INTERVAL_MS = 1000;
+export const ACCOUNT_MARKETS_REFETCH_INTERVAL_MS = 1000;
 
-export type UsePremMarketsOptions = {
+export type UseAccountMarketsOptions = {
     refetchInterval?: number | false;
     enabled?: boolean;
 };
 
-export const usePremMarkets = (options?: UsePremMarketsOptions) =>
+export const useAccountMarkets = (options?: UseAccountMarketsOptions) =>
     useQuery({
-        queryKey: QueryKey.premMarkets(),
-        queryFn: fetchPremiumMarketsOverview,
+        queryKey: QueryKey.nameMarketsOverview(),
+        queryFn: fetchAccountMarketsOverview,
         refetchInterval: options?.refetchInterval ?? false,
         enabled: options?.enabled ?? true,
     });

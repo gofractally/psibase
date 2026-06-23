@@ -15,7 +15,7 @@ export type MarketConfigInput = {
     initialPrice: string | null;
 };
 
-class PremAccounts extends PluginInterface {
+class NameMarket extends PluginInterface {
     protected override readonly _intf = "name-market" as const;
 
     get configureMarkets() {
@@ -24,10 +24,10 @@ class PremAccounts extends PluginInterface {
 }
 
 export class Plugin {
-    readonly premAccounts: PremAccounts;
+    readonly nameMarket: NameMarket;
 
     constructor(readonly service: Account) {
-        this.premAccounts = new PremAccounts();
-        Object.assign(this.premAccounts, { _service: service });
+        this.nameMarket = new NameMarket();
+        Object.assign(this.nameMarket, { _service: service });
     }
 }

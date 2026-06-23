@@ -1,18 +1,18 @@
 import { useMemo } from "react";
 
 import { BuyForm } from "@/apps/prem-accounts/components/buy-form";
-import { PremiumMarketsCard } from "@/apps/prem-accounts/components/premium-markets-card";
+import { AccountMarketsCard } from "@/apps/prem-accounts/components/premium-markets-card";
 
 import { ErrorCard } from "@shared/components/error-card";
 import { GlowingCard } from "@shared/components/glowing-card";
-import { useCanCreatePremiumAccount } from "@shared/hooks/use-can-create-premium-account";
+import { useCanBuyAccount } from "@shared/hooks/use-can-create-premium-account";
 import {
-    PREM_MARKETS_REFETCH_INTERVAL_MS,
-    usePremMarkets,
+    ACCOUNT_MARKETS_REFETCH_INTERVAL_MS,
+    useAccountMarkets,
 } from "@shared/hooks/use-prem-markets";
 import { useSystemToken } from "@shared/hooks/use-system-token";
 import { MAX_ACCOUNT_NAME_LENGTH } from "@shared/lib/schemas/account";
-import { premMarketPricesFromOverview } from "@shared/lib/schemas/prem-accounts";
+import { accountMarketPricesFromOverview } from "@shared/lib/schemas/prem-accounts";
 import {
     CardContent,
     CardDescription,
@@ -28,24 +28,22 @@ export const BuyPage = () => {
         isPending: isPendingMarkets,
         isError: isMarketsError,
         error: marketsError,
-    } = usePremMarkets({
-        refetchInterval: PREM_MARKETS_REFETCH_INTERVAL_MS,
+    } = useAccountMarkets({
+        refetchInterval: ACCOUNT_MARKETS_REFETCH_INTERVAL_MS,
     });
 
     const prices = useMemo(
-        () => (markets ? premMarketPricesFromOverview(markets) : undefined),
+        () => (markets ? accountMarketPricesFromOverview(markets) : undefined),
         [markets],
     );
 
-    const {
-        data: canCreatePremiumAccount,
-        isPending: isPendingCanCreatePremiumAccount,
-    } = useCanCreatePremiumAccount();
+    const { data: canBuyAccount, isPending: isPendingCanBuyAccount } =
+        useCanBuyAccount();
 
     const isLoading =
-        isPendingToken || isPendingMarkets || isPendingCanCreatePremiumAccount;
+        isPendingToken || isPendingMarkets || isPendingCanBuyAccount;
 
-    if (canCreatePremiumAccount === false) {
+    if (canBuyAccount === false) {
         return (
             <ErrorCard
                 title="Not available"
@@ -71,11 +69,11 @@ export const BuyPage = () => {
                 </CardHeader>
                 {isLoading ? (
                     <Loader />
-                ) : canCreatePremiumAccount && systemToken && prices ? (
+                ) : canBuyAccount && systemToken && prices ? (
                     <BuyForm systemToken={systemToken} prices={prices} />
                 ) : null}
             </GlowingCard>
-            <PremiumMarketsCard
+            <AccountMarketsCard
                 markets={markets}
                 systemToken={systemToken}
                 isPending={isPendingToken || isPendingMarkets}
