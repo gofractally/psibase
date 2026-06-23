@@ -130,8 +130,14 @@ pub mod service {
     /// * `role_id` - Role ID.
     /// * `guild` - Guild account to map to
     #[action]
-    fn set_role_map(role_id: u8, guild: AccountNumber) {
-        RoleMap::set(get_sender(), role_id, guild);
+    fn set_role_map(guild: AccountNumber) {
+        // Rather than just check the fractal is the sendewr
+        // we will verify the auth of the Fractal And the ROLE account with the
+        // sub account?
+        let root_account = get_sender().root_account;
+        let role_id = get_sender().sub_account_id as u8;
+
+        RoleMap::set(root_account, role_id, guild);
     }
 
     /// Set guild bio

@@ -21,7 +21,7 @@ mod service {
     }
 
     #[action]
-    fn getDlgsSys(sender: AccountNumber, method: Option<ServiceMethod>) -> Vec<AccountNumber> {
+    fn getDlgsSys(sender: AccountNumber) -> Vec<AccountNumber> {
         unimplemented!()
     }
 
