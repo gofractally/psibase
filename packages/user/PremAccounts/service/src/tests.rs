@@ -95,7 +95,7 @@ mod tests {
     fn prem_accounts_service_integration_serial(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
-        let alice = AccountNumber::from("alice");
+        let alice = account!("alice");
 
         // --- setup_tokens ---
         setup_tokens(&chain)?;

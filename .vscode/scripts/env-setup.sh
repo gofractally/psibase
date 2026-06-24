@@ -2,12 +2,6 @@
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 WORKSPACE_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
-BOOTSTRAP_MARKER="$WORKSPACE_ROOT/.vscode/.workspace-bootstrapped"
-
-if [ -f "$BOOTSTRAP_MARKER" ]; then
-    echo "Workspace already bootstrapped; skipping. Remove $BOOTSTRAP_MARKER to rerun."
-    exit 0
-fi
 
 # Copy sample VSCode configuration files
 for file in "$WORKSPACE_ROOT/.vscode"/*.sample; do
@@ -23,9 +17,6 @@ done
 cd "$WORKSPACE_ROOT/packages"
 yarn
 yarn dlx @yarnpkg/sdks vscode
-
-mkdir -p "$(dirname "$BOOTSTRAP_MARKER")"
-touch "$BOOTSTRAP_MARKER"
 
 # Update submodules
 git submodule update --init --recursive

@@ -168,7 +168,7 @@ pub mod tables {
     }
 }
 
-#[psibase::service(name = "token-stream", tables = "tables")]
+#[psibase::service(name = "tok-stream", tables = "tables")]
 pub mod service {
     use psibase::services::tokens::{Decimal, Quantity};
 

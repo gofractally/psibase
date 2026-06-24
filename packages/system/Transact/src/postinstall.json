@@ -1,1 +1,47 @@
-[{"sender":"transact","service":"transact","method":"addCallback","data":{"type":0,"objective":false,"action":{"sender":"","service":"r-transact","method":"onTrx","rawData":""}}},{"sender":"transact","service":"transact","method":"addCallback","data":{"type":2,"objective":false,"action":{"sender":"","service":"r-transact","method":"onTrx","rawData":""}}},{"sender":"transact","service":"transact","method":"addCallback","data":{"type":1,"objective":false,"action":{"sender":"","service":"r-transact","method":"onBlock","rawData":"0000"}}}]
+[
+  {
+    "sender": "transact",
+    "service": "transact",
+    "method": "addCallback",
+    "data": {
+      "type": 0,
+      "objective": false,
+      "action": {
+        "sender": "",
+        "service": "transact+1",
+        "method": "onTrx",
+        "rawData": ""
+      }
+    }
+  },
+  {
+    "sender": "transact",
+    "service": "transact",
+    "method": "addCallback",
+    "data": {
+      "type": 2,
+      "objective": false,
+      "action": {
+        "sender": "",
+        "service": "transact+1",
+        "method": "onTrx",
+        "rawData": ""
+      }
+    }
+  },
+  {
+    "sender": "transact",
+    "service": "transact",
+    "method": "addCallback",
+    "data": {
+      "type": 1,
+      "objective": false,
+      "action": {
+        "sender": "",
+        "service": "transact+1",
+        "method": "onBlock",
+        "rawData": "0000"
+      }
+    }
+  }
+]

@@ -95,7 +95,7 @@ namespace
             }
             if (!s.hasService(account))
             {
-               actions.push_back(asys.newAccount(account, AuthAny::service, true));
+               actions.push_back(asys.newAccount(account, AuthDelegate::service, true));
             }
          }
 
@@ -110,7 +110,7 @@ namespace
       }
 
       transactor<Producers> psys{Producers::service, Producers::service};
-      std::vector<Producer> producerConfig = {{"firstproducer"_a, {}}};
+      std::vector<Producer> producerConfig = {{"firstprod"_a, {}}};
       actions.push_back(psys.setProducers(producerConfig));
 
       auto root = AccountNumber{"root"};
@@ -135,7 +135,6 @@ namespace
             {
                actions.push_back(
                    transactor<AuthDelegate>{account, AuthDelegate::service}.setOwner(root));
-               actions.push_back(asys.from(account).setAuthServ(AuthDelegate::service));
             }
          }
       }
