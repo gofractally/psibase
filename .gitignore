@@ -40,3 +40,4 @@ bindings.rs
 target/
 **/install-state.gz
 .clangd
+AGENTS.md
