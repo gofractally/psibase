@@ -9,5 +9,5 @@ world impl {
 
     import accounts:plugin/api;
 
-    export premium-accounts;
+    export name-market;
 }

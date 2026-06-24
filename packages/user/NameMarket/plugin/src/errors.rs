@@ -13,6 +13,6 @@ pub enum ErrorType {
     NameLengthUnavailable,
     #[error("Increase and decrease percent must be greater than 0")]
     InvalidAdjustPct,
-    #[error("initial_price is required when creating a premium name market for length {0}")]
+    #[error("initial_price is required when creating a name market for length {0}")]
     InitialPriceRequired(u8),
 }

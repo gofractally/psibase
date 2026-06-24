@@ -2,9 +2,9 @@
 
 #[cfg(test)]
 mod tests {
-    /// Matches Config UI default `PREMIUM_MARKET_DEFAULT_PCT` (5%) for `create` actions.
+    /// Matches Config UI default `NAME_MARKET_DEFAULT_PCT` (5%) for `create` actions.
     const DEFAULT_CREATE_PPM: u32 = 50_000;
-    /// Matches Config UI default `PREMIUM_MARKET_DEFAULT_WINDOW_SECONDS`.
+    /// Matches Config UI default `NAME_MARKET_DEFAULT_WINDOW_SECONDS`.
     const DEFAULT_WINDOW_SECONDS: u32 = 30 * 86400;
 
     use crate::Wrapper as NameMarket;
@@ -66,7 +66,7 @@ mod tests {
         }
     }
 
-    /// One market per premium name length 1..=7 (matches Config default bootstrap range).
+    /// One market per name length 1..=7 (matches Config default bootstrap range).
     fn bootstrap_markets_1_7(chain: &psibase::Chain) -> Result<(), psibase::Error> {
         const INITIAL: u64 = 1000;
         const FLOOR: u64 = 100;
@@ -306,7 +306,7 @@ mod tests {
             );
         }
 
-        // --- buy on max premium length (7) ---
+        // --- buy on max allowed account length (7) ---
         Tokens::push_from(&chain, alice)
             .credit(1, NameMarket::SERVICE, 1000_0000u64.into(), "".into())
             .get()?;

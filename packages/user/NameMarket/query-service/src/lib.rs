@@ -41,7 +41,7 @@ mod service {
 
     #[derive(Deserialize, SimpleObject)]
     #[graphql(complex)]
-    struct PremiumAccountEvent {
+    struct AccountEvent {
         owner: AccountNumber,
         account: AccountNumber,
         #[serde(deserialize_with = "deserialize_number_from_string")]
@@ -50,7 +50,7 @@ mod service {
     }
 
     #[ComplexObject]
-    impl PremiumAccountEvent {
+    impl AccountEvent {
         pub async fn action(&self) -> String {
             match self.action {
                 name_market::service::BOUGHT => "bought".to_string(),
@@ -116,7 +116,7 @@ mod service {
             rows
         }
 
-        /// All configured premium name markets (sparse list): status plus pricing parameters.
+        /// All configured name markets (sparse list): status plus pricing parameters.
         async fn market_params(&self) -> Vec<MarketParams> {
             let Some(token) = TokensWrapper::call().getSysToken() else {
                 return vec![];
@@ -169,18 +169,18 @@ mod service {
             .await
         }
 
-        /// Events: premium **name** history for `owner`
+        /// Events: account **name** history for `owner`
         async fn name_events(
             &self,
             first: Option<i32>,
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<EventConnection<PremiumAccountEvent>> {
+        ) -> async_graphql::Result<EventConnection<AccountEvent>> {
             let user = self.require_authenticated()?;
 
             EventQuery::new(format!(
-                "history.{}.premAcctEvent",
+                "history.{}.nameMktEvent",
                 NameMarketService::SERVICE
             ))
             .condition(format!("owner = '{}'", user))

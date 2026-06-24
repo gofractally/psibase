@@ -1,6 +1,6 @@
 [package]
-name = "name-market-pkg"          # Crate name
-description = "Premium name market"
+name = "name-market-pkg"            # Crate name
+description = "Account Name market"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true

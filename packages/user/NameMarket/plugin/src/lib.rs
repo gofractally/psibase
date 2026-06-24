@@ -37,8 +37,8 @@ impl TrustConfig for NameMarketPlugin {
     fn capabilities() -> Capabilities {
         Capabilities {
             low: &[],
-            medium: &["Claim premium account names"],
-            high: &["Purchase premium account names"],
+            medium: &["Claim account names"],
+            high: &["Purchase account names"],
         }
     }
 }
@@ -218,7 +218,7 @@ impl Api for NameMarketPlugin {
             TokensHelpers::fetch_network_token()?.ok_or(ErrorType::SystemTokenNotDefined)?;
 
         let length = account.len() as u8;
-        let ask_u64 = require_active_premium_market_ask(length, sys_token_id)?;
+        let ask_u64 = require_active_market_ask(length, sys_token_id)?;
         let max_cost_u64 = TokensHelpers::decimal_to_u64(sys_token_id, &max_cost)?;
         if max_cost_u64 < ask_u64 {
             return Err(ErrorType::MaxCostBelowCurrentAsk.into());
@@ -228,7 +228,7 @@ impl Api for NameMarketPlugin {
             sys_token_id,
             &service_account,
             &max_cost,
-            "premium account purchase",
+            "account purchase",
         )?;
 
         name_market::Wrapper::add_to_tx().buy(acct_name);
@@ -331,7 +331,7 @@ fn prices_match(current: &str, requested: &str) -> bool {
 }
 
 /// Resolves sparse configured markets: missing row means not offered; disabled means unavailable; else current ask
-fn require_active_premium_market_ask(length: u8, sys_token_id: u32) -> Result<u64, Error> {
+fn require_active_market_ask(length: u8, sys_token_id: u32) -> Result<u64, Error> {
     let overview = markets_overview()?;
 
     let status = overview.market_params.iter().find(|s| s.length == length);
@@ -348,7 +348,7 @@ fn require_active_premium_market_ask(length: u8, sys_token_id: u32) -> Result<u6
 
     let Some(row) = row else {
         return Err(ErrorType::QueryResponseParseError(
-            "missing price row for configured premium name market".into(),
+            "missing price row for configured name market".into(),
         )
         .into());
     };

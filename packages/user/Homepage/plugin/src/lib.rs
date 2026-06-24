@@ -2,14 +2,14 @@
 mod bindings;
 use bindings::*;
 
-use exports::homepage::plugin::premium_accounts::Guest as PremiumAccountsApi;
+use exports::homepage::plugin::name_market::Guest as NameMarketApi;
 use host::types::types::Error;
 
 const AUTH_SIG_SERVICE: &str = "auth-sig";
 
 struct HomepagePlugin;
 
-impl PremiumAccountsApi for HomepagePlugin {
+impl NameMarketApi for HomepagePlugin {
     fn claim_and_set_key(account: String) -> Result<String, Error> {
         name_market::plugin::api::claim(&account)?;
 
