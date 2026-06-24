@@ -48,12 +48,12 @@
 //! - Full consumption corresponds to $(x, y) = (x_{\max}, 0)$.
 //!
 
+use crate::math_utils::PPM;
 use crate::resource_type::ResourceType;
 use crate::tables::tables::*;
 use async_graphql::ComplexObject;
 use psibase::services::tokens::{Decimal, Precision, Quantity, Wrapper as Tokens};
 use psibase::*;
-use crate::math_utils::PPM;
 
 // Note: `pub(crate)` is used so the functions are available for the unit tests
 
@@ -196,7 +196,7 @@ fn is_system(user: AccountNumber) -> bool {
     user == AccountNumber::new(0)
 }
 
-/// Ensures a valid curve parameterization 
+/// Ensures a valid curve parameterization
 pub(crate) fn validate_curve_params(
     max_reserve: u64,
     max_capacity: u64,
@@ -263,7 +263,9 @@ impl CapacityPricing {
 
     /// Reserve token backing required in the relay for the current curve position.
     pub(crate) fn required_reserve(&self) -> u64 {
-        self.curve().pos_from_resources(self.remaining_capacity).reserves
+        self.curve()
+            .pos_from_resources(self.remaining_capacity)
+            .reserves
     }
 
     fn cost_of(&self, amount_consumed: u64) -> u64 {
@@ -334,10 +336,12 @@ impl CapacityPricing {
     /// Live reserve-token balance held in the relay sub-account
     fn actual_relay_balance(&self) -> u64 {
         match BillingConfig::get() {
-            Some(config) => Tokens::call()
-                .getSubBal(config.sys, relay_sub(self.resource()))
-                .unwrap_or(0.into())
-                .value,
+            Some(config) => {
+                Tokens::call()
+                    .getSubBal(config.sys, relay_sub(self.resource()))
+                    .unwrap_or(0.into())
+                    .value
+            }
             None => 0,
         }
     }
@@ -345,8 +349,8 @@ impl CapacityPricing {
     /// Signed relay discrepancy: the required reserve minus the actual relay
     /// balance.
     ///
-    /// Returns a positive value if there is a shortfall (tokens owed to the relay), 
-    /// or returns a negative value if there is an excess (tokens beyond what the 
+    /// Returns a positive value if there is a shortfall (tokens owed to the relay),
+    /// or returns a negative value if there is an excess (tokens beyond what the
     /// curve expects).
     pub(crate) fn relay_net(&self) -> i128 {
         self.required_reserve() as i128 - self.actual_relay_balance() as i128
@@ -538,7 +542,7 @@ impl CapacityPricing {
     /// The relay balance drifts from the curve `reserve` only when:
     /// 1. special system writes occur (no payer to charge), or
     /// 2. billing is disabled
-    /// 
+    ///
     /// If the relay is short, part/all of the fee is redirected into it to cover the gap.
     /// If the relay has excess, the surplus is pulled out and added to the fee payment.
     fn credit_fee_receiver(resource: ResourceType, amount: u64) {
@@ -597,7 +601,6 @@ impl CapacityPricing {
                 abort_message(&format!(
                     "Account {payer} has paid {paid} tokens, but enabling billing requires {required} tokens"
                 ));
-           
             }
             Tokens::call().debit(sys, payer, amt, "".into());
             Tokens::call().toSub(sys, sub, amt);
@@ -661,13 +664,13 @@ impl CapacityPricing {
         Decimal::new(ppm.into(), Precision::new(4).unwrap()).to_string()
     }
 
-    /// Reserve tokens owed to the relay but not yet deposited, 
+    /// Reserve tokens owed to the relay but not yet deposited,
     /// denominated in the system token.
     pub async fn relay_shortfall(&self) -> Decimal {
         sys_decimal(self.relay_net().max(0) as u64)
     }
 
-    /// Reserve tokens in the relay beyond what the curve expects, 
+    /// Reserve tokens in the relay beyond what the curve expects,
     /// denominated in the system token.
     pub async fn relay_excess(&self) -> Decimal {
         sys_decimal((-self.relay_net()).max(0) as u64)
