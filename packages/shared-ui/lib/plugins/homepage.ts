@@ -2,7 +2,7 @@ import { PluginInterface } from "@shared/hooks/plugin-function";
 import { Account } from "@shared/lib/schemas/account";
 
 class AccountsMarketplace extends PluginInterface {
-    protected override readonly _intf = "premiumAccounts" as const;
+    protected override readonly _intf = "nameMarket" as const;
 
     /**
      * Claims a previously purchased account name, configures auth-sig, and
