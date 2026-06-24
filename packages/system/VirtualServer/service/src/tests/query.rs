@@ -1,6 +1,9 @@
 use std::str::FromStr;
 
-use psibase::{services::tokens::Decimal, AccountNumber};
+use psibase::{
+    services::tokens::{self, Decimal, TID},
+    AccountNumber,
+};
 use serde::{de::DeserializeOwned, Deserialize};
 
 use crate::tables::tables::{NetworkVariables, ServerSpecs};
@@ -51,6 +54,7 @@ pub(super) struct DiskPricingState {
     pub curve_d: u64,
     pub relay_shortfall: Decimal,
     pub relay_excess: Decimal,
+    pub prealloc_deficit: u64,
 }
 
 pub(super) fn get_billing_config(chain: &psibase::Chain) -> Result<BillingConfig, psibase::Error> {
@@ -132,6 +136,7 @@ const DISK_PRICING_QUERY: &str = r#"query {
         utilizationPct
         relayShortfall
         relayExcess
+        preallocDeficit
     }
 }"#;
 
@@ -140,7 +145,34 @@ pub(super) fn get_disk_state(chain: &psibase::Chain) -> DiskPricingState {
 }
 
 pub(super) fn get_db_prealloc(chain: &psibase::Chain) -> u64 {
-    query(chain, Wrapper::SERVICE, "dbPrealloc", r#"query { dbPrealloc }"#).unwrap()
+    query(
+        chain,
+        Wrapper::SERVICE,
+        "dbPrealloc",
+        r#"query { dbPrealloc }"#,
+    )
+    .unwrap()
+}
+
+/// Lists every path of `sites`-hosted content owned by `account`.
+pub(super) fn get_site_paths(chain: &psibase::Chain, account: AccountNumber) -> Vec<String> {
+    let result: serde_json::Value = chain
+        .graphql(
+            psibase::services::sites::SERVICE,
+            &format!(
+                r#"query {{ getContent(account: "{account}", first: 100000) {{ edges {{ node {{ path }} }} }} }}"#
+            ),
+        )
+        .unwrap();
+    result["data"]["getContent"]["edges"]
+        .as_array()
+        .map(|edges| {
+            edges
+                .iter()
+                .filter_map(|e| e["node"]["path"].as_str().map(String::from))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 pub(super) fn get_total_consumed_disk(
@@ -178,6 +210,24 @@ pub(super) fn get_total_consumed_disk(
                 .sum()
         })
         .unwrap_or(0)
+}
+
+pub(super) fn get_sub_balance(
+    chain: &psibase::Chain,
+    holder: AccountNumber,
+    sub_account: &str,
+    token_id: TID,
+    auth_token: &str,
+) -> Result<u64, psibase::Error> {
+    #[derive(Deserialize)]
+    struct SubBal {
+        balance: Decimal,
+    }
+    let q = format!(
+        r#"query {{ subaccountBalance(user: "{holder}", subAccount: "{sub_account}", tokenId: {token_id}) {{ balance }} }}"#
+    );
+    let b: SubBal = query_auth(chain, tokens::SERVICE, "subaccountBalance", &q, auth_token)?;
+    Ok(b.balance.quantity.value)
 }
 
 pub(super) fn get_enable_billing_cost(chain: &psibase::Chain) -> Result<u64, psibase::Error> {

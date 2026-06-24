@@ -8,6 +8,8 @@ use psibase::{
         credentials,
         invite::{self, InvPayload},
         nft::Wrapper as Nft,
+        sites::Wrapper as Sites,
+        staged_tx::Wrapper as StagedTx,
         tokens::{self, Decimal, Precision, Quantity, Wrapper as Tokens},
         verify_sig,
     },
@@ -24,8 +26,8 @@ use super::utils::{fmt_mb, fmt_num, fmt_sys};
 use super::helpers::{assert_error, check_balance, enable_billing as setup_enable_billing};
 use super::query::{
     get_billing_config, get_db_prealloc, get_disk_state, get_enable_billing_cost, get_invite_cost,
-    get_network_vars, get_server_specs, get_total_consumed_disk, get_user_resources,
-    DiskPricingState,
+    get_network_vars, get_server_specs, get_site_paths, get_sub_balance, get_total_consumed_disk,
+    get_user_resources, DiskPricingState,
 };
 
 fn consumption_details(
@@ -102,7 +104,8 @@ fn relay_balance_basics(chain: psibase::Chain) -> Result<(), psibase::Error> {
     // Increase server storage to accommodate increased obj allocation
     let mut specs = get_server_specs(&chain);
     specs.storage_bytes *= 2;
-    chain.propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
+    chain
+        .propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
         .set_specs(specs)
         .get()?;
     let after_propose = consumption_details("After propose", &chain, PRODUCER_ACCOUNT, &token_prod);
@@ -141,7 +144,8 @@ fn relay_balance_basics(chain: psibase::Chain) -> Result<(), psibase::Error> {
     // Increase obj storage allocation
     let mut vars = get_network_vars(&chain);
     vars.obj_storage_bytes *= 2;
-    chain.propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
+    chain
+        .propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
         .set_network_variables(vars)
         .get()?;
 
@@ -162,7 +166,8 @@ fn relay_balance_basics(chain: psibase::Chain) -> Result<(), psibase::Error> {
 
     // Reduce system token supply → shortfall should decrease further
     let decrease = initial_disk_state.max_reserve.quantity.value / 2;
-    chain.propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
+    chain
+        .propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
         .reduce_disk_budget(Quantity::from(decrease))
         .get()?;
 
@@ -198,7 +203,8 @@ fn server_storage(chain: psibase::Chain) -> Result<(), psibase::Error> {
 
     let mut specs = get_server_specs(&chain);
     specs.storage_bytes *= 2;
-    chain.propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
+    chain
+        .propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
         .set_specs(specs.clone())
         .get()?;
 
@@ -211,30 +217,37 @@ fn server_storage(chain: psibase::Chain) -> Result<(), psibase::Error> {
 
     // Should be able to drop server storage since nothing extra was allocated
     specs.storage_bytes /= 2;
-    chain.propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
+    chain
+        .propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
         .set_specs(specs.clone())
         .get()?;
 
     // Grow it again, allocate some, and then reducing should fail
     specs.storage_bytes *= 2;
-    chain.propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
+    chain
+        .propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
         .set_specs(specs.clone())
         .get()?;
     let mut vars = get_network_vars(&chain);
     vars.obj_storage_bytes *= 3;
-    chain.propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
+    chain
+        .propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
         .set_network_variables(vars.clone())
         .get()?;
     specs.storage_bytes /= 2;
     assert_error(
-        chain.propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE).set_specs(specs.clone()),
+        chain
+            .propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
+            .set_specs(specs.clone()),
         "Storage space cannot be decreased below what has already been allocated to the network",
     );
 
     // Can't allocate above what is available according to the server specs
     vars.obj_storage_bytes *= 2;
     assert_error(
-        chain.propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE).set_network_variables(vars),
+        chain
+            .propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
+            .set_network_variables(vars),
         "Total storage allocation must not exceed available server storage",
     );
 
@@ -259,7 +272,8 @@ fn metering(chain: psibase::Chain) -> Result<(), psibase::Error> {
     let auth_prod = chain.login(PRODUCER_ACCOUNT, Wrapper::SERVICE)?;
     let auth_alice = chain.login(alice, Wrapper::SERVICE)?;
 
-    chain.propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
+    chain
+        .propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
         .init_billing(tokens)
         .get()?;
 
@@ -313,7 +327,8 @@ fn metering(chain: psibase::Chain) -> Result<(), psibase::Error> {
     }
 
     // Verify enable billing
-    chain.propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
+    chain
+        .propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
         .enable_billing(true, Some(PRODUCER_ACCOUNT))
         .get()?;
 
@@ -431,17 +446,19 @@ fn check_disk_invariant(label: &str, chain: &psibase::Chain) -> bool {
 
     let svc_prealloc = get_db_prealloc(chain);
     let svc_consumed = disk_consumed(chain);
-    let svc_accounting = svc_prealloc + svc_consumed;
+    let svc_deficit = get_disk_state(chain).prealloc_deficit;
+    let svc_accounting = svc_prealloc - svc_deficit + svc_consumed;
 
     let delta = scanned_bytes as i128 - svc_accounting as i128;
     if delta != 0 {
         println!(
-            "[{label}] total={} (native={} + service={} - status={}) == prealloc={} + consumed={} ({}), delta={}",
+            "[{label}] total={} (native={} + service={} - status={}) == prealloc={} - deficit={} + consumed={} ({}), delta={}",
             fmt_num(scanned_bytes),
             fmt_num(native),
             fmt_num(service),
             fmt_num(status),
             fmt_num(svc_prealloc),
+            fmt_num(svc_deficit),
             fmt_num(svc_consumed),
             fmt_num(svc_accounting),
             delta,
@@ -591,6 +608,214 @@ fn invites(chain: psibase::Chain) -> Result<(), psibase::Error> {
         check_disk_invariant("end of invites", &chain),
         "disk accounting invariant violated"
     );
+
+    Ok(())
+}
+
+fn scanned_bytes(chain: &psibase::Chain) -> u64 {
+    chain.database_usage(DbId::Native) + chain.database_usage(DbId::Service)
+        - status_row_bytes(chain)
+}
+fn disk_consumed_now(chain: &psibase::Chain) -> u64 {
+    let d = get_disk_state(chain);
+    d.max_capacity - d.remaining_capacity
+}
+
+// Stores `total` bytes of site content at `/blob{tag}`
+fn write(chain: &psibase::Chain, tag: u8, total: usize) -> Result<(), psibase::Error> {
+    Sites::push_from(chain, PRODUCER_ACCOUNT)
+        .storeSys(
+            format!("/blob{tag}"),
+            "application/octet-stream".to_string(),
+            None,
+            Hex(vec![tag; total]),
+        )
+        .get()?;
+    chain.finish_block();
+    Ok(())
+}
+
+fn free(chain: &psibase::Chain, tag: u8) -> Result<(), psibase::Error> {
+    Sites::push_from(chain, PRODUCER_ACCOUNT)
+        .remove(format!("/blob{tag}"))
+        .get()?;
+    chain.finish_block();
+    Ok(())
+}
+
+// Frees all site content uploaded at boot, freeing far more than has been
+// consumed since init and so dipping into the prealloc baseline. Returns the
+// resulting prealloc deficit.
+fn free_boot_content(chain: &psibase::Chain) -> Result<u64, psibase::Error> {
+    let consumed_before = disk_consumed_now(chain);
+    let scanned_before = scanned_bytes(chain);
+
+    let accounts = [
+        account!("common-api"),
+        account!("supervisor"),
+        account!("accounts"),
+        account!("perms"),
+        account!("clientdata"),
+        account!("aes"),
+        account!("kdf"),
+        account!("base64"),
+        account!("transact"),
+        account!("sites"),
+        account!("auth-sig"),
+        account!("nft"),
+        account!("tokens"),
+        account!("symbol"),
+        account!("invite"),
+        account!("producers"),
+    ];
+    let actions: Vec<Action> = accounts
+        .into_iter()
+        .flat_map(|acct| {
+            get_site_paths(chain, acct)
+                .into_iter()
+                .map(move |path| Sites::pack_from(acct).remove(path))
+        })
+        .collect();
+    StagedTx::push_from(chain, PRODUCER_ACCOUNT)
+        .propose(actions, true)
+        .get()?;
+    chain.finish_block();
+
+    let physically_freed = scanned_before as i128 - scanned_bytes(chain) as i128;
+    assert!(
+        physically_freed > consumed_before as i128,
+        "expected to free more than consumed: freed={physically_freed} consumed={consumed_before}",
+    );
+
+    let dipped = get_disk_state(chain);
+    assert!(
+        dipped.prealloc_deficit > 0,
+        "expected freeing past consumed to record a deficit"
+    );
+    assert!(
+        check_disk_invariant("after freeing prealloc bytes", chain),
+        "invariant violated after freeing prealloc bytes"
+    );
+
+    println!(
+        "freed {} MB > consumed {} MB; remaining {} / max {} MB; deficit {} MB",
+        fmt_mb(physically_freed as u64),
+        fmt_mb(consumed_before),
+        fmt_mb(dipped.remaining_capacity),
+        fmt_mb(dipped.max_capacity),
+        fmt_mb(dipped.prealloc_deficit),
+    );
+    Ok(dipped.prealloc_deficit)
+}
+
+// Exercises the prealloc-deficit accounting
+#[psibase::test_case(packages("VirtualServer", "StagedTx"))]
+fn free_into_prealloc(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    initial_setup(&chain)?;
+    setup_enable_billing(&chain)?;
+    chain.finish_block();
+
+    let sys: tokens::TID = 1;
+    let vserver = Wrapper::SERVICE;
+    let vserver_token = chain.login(vserver, tokens::Wrapper::SERVICE)?;
+
+    // Reserve tokens backing the disk pool live in this relay sub-account; refunds
+    // are paid out of it and consumption charges flow into it.
+    let relay_sub = format!("{vserver}.disk:relay");
+    let relay_balance = |chain: &psibase::Chain| {
+        get_sub_balance(chain, vserver, &relay_sub, sys, &vserver_token).unwrap()
+    };
+
+    let deficit = free_boot_content(&chain)?;
+
+    {
+        // a write within the deficit is free: no reserve tokens move
+        let consumed_pre_write = disk_consumed_now(&chain);
+        let relay_pre_write = relay_balance(&chain);
+
+        write(&chain, 1, (deficit / 4) as usize)?;
+
+        let after_write = get_disk_state(&chain);
+        let consumed_after_write = after_write.max_capacity - after_write.remaining_capacity;
+        assert_eq!(
+            consumed_after_write, consumed_pre_write,
+            "a write within the deficit must not change consumed",
+        );
+
+        assert!(
+            after_write.prealloc_deficit < deficit,
+            "the write should shrink the deficit"
+        );
+        assert_eq!(
+            relay_balance(&chain),
+            relay_pre_write,
+            "an in-deficit write must not move reserve tokens into the relay",
+        );
+        assert!(
+            check_disk_invariant("after in-deficit write", &chain),
+            "invariant violated after in-deficit write"
+        );
+    }
+
+    {
+        // freeing into the prealloc pays no refund: no reserve tokens move
+        let deficit_pre_free = get_disk_state(&chain).prealloc_deficit;
+        let relay_pre_free = relay_balance(&chain);
+
+        free(&chain, 1)?;
+
+        let after_free = get_disk_state(&chain);
+        let consumed_after_free = after_free.max_capacity - after_free.remaining_capacity;
+        assert_eq!(
+            consumed_after_free, 0,
+            "a free within the deficit must not change consumed",
+        );
+        assert!(
+            after_free.prealloc_deficit > deficit_pre_free,
+            "the free should grow the deficit"
+        );
+        assert_eq!(
+            relay_balance(&chain),
+            relay_pre_free,
+            "a free within the deficit must not refund reserve tokens",
+        );
+        assert!(
+            check_disk_invariant("after in-deficit free", &chain),
+            "invariant violated after in-deficit free"
+        );
+    }
+
+    {
+        // a write crossing the deficit boundary bills the excess into the relay
+        let deficit_pre_cross = get_disk_state(&chain).prealloc_deficit;
+        let consumed_pre_cross = disk_consumed_now(&chain);
+        let scanned_pre_cross = scanned_bytes(&chain);
+        let relay_pre_cross = relay_balance(&chain);
+
+        write(&chain, 2, deficit_pre_cross as usize + 64 * 1024)?;
+
+        let after_cross = get_disk_state(&chain);
+        let consumed_after_cross = after_cross.max_capacity - after_cross.remaining_capacity;
+        let scanned_after_cross = scanned_bytes(&chain);
+
+        assert_eq!(
+            after_cross.prealloc_deficit, 0,
+            "crossing the boundary should drain the deficit"
+        );
+        assert_eq!(
+            consumed_after_cross - consumed_pre_cross,
+            scanned_after_cross - (scanned_pre_cross + deficit_pre_cross),
+            "billed amount must equal bytes written above the prealloc",
+        );
+        assert!(
+            relay_balance(&chain) > relay_pre_cross,
+            "more reserve tokens should be in the relay",
+        );
+        assert!(
+            check_disk_invariant("after writing past the prealloc deficit boundary", &chain),
+            "invariant violated after writing past the prealloc deficit boundary"
+        );
+    }
 
     Ok(())
 }
