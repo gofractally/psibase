@@ -94,18 +94,6 @@ EOF
 direnv allow
 ```
 
-#### 2.3 extensions
-Copy nix/docs/extensions.json.example to .vscode/extensions.json to pick up the standard dev extensions.
-
-### 3. Verify environment (optional)
-
-```bash
-./nix/scripts/verify_env.sh
-```
-
-Checks compilers, Rust, Node, WASI SDK, ICU paths, and cargo tools.
-All should be green checkmarks. Yellow warnings are likely OK, but rare. Red Xs mean something's wrong.
-
 ### 4. Build psibase
 #### Clean build required on first run (or after shell changes):
 You should, at this point, see the standard tasks.json buttons. Manually wipe your build dir, then click the Build button (manual steps below)
