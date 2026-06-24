@@ -82,8 +82,8 @@ pub mod service {
                 column,
             );
         };
-        add_index("premAcctEvent", 0);
-        add_index("premAcctEvent", 1);
+        add_index("nameMktEvent", 0);
+        add_index("nameMktEvent", 1);
     }
 
     /// Apply full DiffAdjust admin params from `configure`.
@@ -165,7 +165,7 @@ pub mod service {
 
         crate::Wrapper::emit()
             .history()
-            .premAcctEvent(sender, account, BOUGHT);
+            .nameMktEvent(sender, account, BOUGHT);
     }
 
     #[action]
@@ -188,7 +188,7 @@ pub mod service {
 
         crate::Wrapper::emit()
             .history()
-            .premAcctEvent(get_sender(), account.clone(), CLAIMED);
+            .nameMktEvent(get_sender(), account.clone(), CLAIMED);
     }
 
     /// Create a new name-length market.
@@ -324,7 +324,7 @@ pub mod service {
     pub const BOUGHT: u8 = 0;
     pub const CLAIMED: u8 = 1;
     #[event(history)]
-    fn premAcctEvent(owner: AccountNumber, account: AccountNumber, action: u8) {}
+    fn nameMktEvent(owner: AccountNumber, account: AccountNumber, action: u8) {}
 }
 
 #[cfg(test)]
