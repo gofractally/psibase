@@ -4,6 +4,7 @@
 #include <psibase/AccountNumber.hpp>
 #include <psibase/MethodNumber.hpp>
 #include <psibase/Table.hpp>
+#include <psibase/crypto.hpp>
 #include <psibase/db.hpp>
 #include <psibase/schema.hpp>
 #include <psio/reflect.hpp>
@@ -34,6 +35,14 @@ namespace UserService
    };
    using EventTable = psibase::Table<EventRecord, &EventRecord::id>;
    PSIO_REFLECT_TYPENAME(EventTable)
+
+   struct EventMerkleRecord
+   {
+      psibase::Merkle merkle;
+      PSIO_REFLECT(EventMerkleRecord, merkle)
+   };
+   using EventMerkleTable = psibase::Table<EventMerkleRecord, psibase::SingletonKey{}>;
+   PSIO_REFLECT_TYPENAME(EventMerkleTable)
 
    struct SecondaryIndexInfo
    {

@@ -743,6 +743,7 @@ namespace psibase
 
       status->current.consensusState = current.header.consensusState = sha256(status->consensus);
       status->current.trxMerkleRoot = current.header.trxMerkleRoot = makeTransactionMerkle();
+      current.header.eventMerkleRoot = status->current.eventMerkleRoot;
 
       status->head = current;  // Also calculates blockId
       // authCode can be loaded from the database. We don't need an

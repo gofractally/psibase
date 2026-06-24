@@ -16,7 +16,12 @@ impl EventDb {
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use super::EventDb;
-    use crate::{AccountNumber, MethodNumber};
+    use crate::{AccountNumber, Checksum256, MethodNumber};
+
+    #[action]
+    fn init() {
+        unimplemented!()
+    }
 
     #[action]
     fn addIndex(db_id: EventDb, service: AccountNumber, event: MethodNumber, column: u8) {
@@ -26,6 +31,16 @@ mod service {
     /// Writes an event to the event log
     #[action]
     fn event(db: EventDb, type_: MethodNumber, rawData: Vec<u8>) -> u64 {
+        unimplemented!()
+    }
+
+    #[action]
+    fn saveMerkle() -> Checksum256 {
+        unimplemented!();
+    }
+
+    #[action]
+    fn startBlock() {
         unimplemented!()
     }
 

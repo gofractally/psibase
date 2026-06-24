@@ -48,8 +48,11 @@ namespace UserService
    {
       static constexpr psibase::AccountNumber service{"events"};
 
-      using Tables    = psibase::ServiceTables<SecondaryIndexTable, EventNumberTable>;
+      using Tables =
+          psibase::ServiceTables<SecondaryIndexTable, EventNumberTable, EventMerkleTable>;
       using WriteOnly = psibase::WriteOnlyTables<EventTable, EventTable>;
+
+      void init();
 
       /// Requests an index. Indexes can improve the performance of queries involving
       /// the column. The indexes are subjective and MAY be adjusted by individual nodes.
@@ -63,6 +66,14 @@ namespace UserService
 
       /// Writes an event to the event log
       psibase::EventNumber event(EventDb db, psibase::MethodNumber type, std::vector<char> rawData);
+
+      /// Returns the current event merkle root
+      ///
+      /// This must be called by transact in every transaction that
+      /// sends merkle events. After it is called, no more merkle events
+      /// can be sent. transact is responsible for storing the merkle
+      /// root in the block header.
+      psibase::Checksum256 saveMerkle();
 
       EventTable openEvents(EventDb db, psibase::KvMode mode)
       {
@@ -78,12 +89,18 @@ namespace UserService
          }
       }
 
+      /// Resets merkle state for a new block
+      void startBlock();
+
       /// Forwards to event-index::sync
       void sync();
    };
    PSIO_REFLECT(EventConfig,
+                method(init),
                 method(addIndex, db, service, event, column),
                 method(event, db, type, rawData),
+                method(saveMerkle),
+                method(startBlock),
                 method(sync))
    PSIBASE_REFLECT_TABLES(EventConfig, EventConfig::Tables, EventConfig::WriteOnly)
 

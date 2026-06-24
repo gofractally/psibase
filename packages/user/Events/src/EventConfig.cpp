@@ -1,12 +1,41 @@
 #include <services/user/Events.hpp>
 
 #include <psibase/dispatch.hpp>
+#include <services/system/Transact.hpp>
 #include <services/user/EventIndex.hpp>
 #include "SchemaCache.hpp"
 
 using namespace psibase;
 using namespace psio::schema_types;
 using namespace UserService;
+using namespace SystemService;
+
+namespace
+{
+   bool    merkleSaved = false;
+   Merkle& getMerkle()
+   {
+      check(!merkleSaved,
+            "Merkle events cannot be published after the state has already been saved");
+      auto fn = []
+      {
+         if (auto row = Events{}.open<EventMerkleTable>().get({}))
+            return std::move(row->merkle);
+         else
+            abortMessage(
+                "Merkle events cannot be published before the events service is initialized");
+      };
+      static Merkle result = fn();
+      return result;
+   }
+}  // namespace
+
+void Events::init()
+{
+   auto table = open<EventMerkleTable>();
+   if (!table.get({}))
+      table.put({});
+}
 
 void Events::addIndex(psibase::EventDb       db,
                       psibase::AccountNumber service,
@@ -39,8 +68,28 @@ EventNumber Events::event(EventDb db, psibase::MethodNumber type, std::vector<ch
    auto id    = row.nextEventNumber++;
    table.put(row);
    auto events = openEvents(db, KvMode::write);
-   events.put({id, getSender(), type, std::move(rawData)});
+   auto value  = EventRecord{id, getSender(), type, std::move(rawData)};
+   events.put(value);
+   if (db == EventDb::merkleEvent)
+   {
+      getMerkle().push(value);
+   }
    return id;
+}
+
+Checksum256 Events::saveMerkle()
+{
+   check(getSender() == Transact::service, "wrong sender");
+   auto& m = getMerkle();
+   open<EventMerkleTable>().put({m});
+   merkleSaved = true;
+   return m.root();
+}
+
+void Events::startBlock()
+{
+   check(getSender() == Transact::service, "wrong sender");
+   open<EventMerkleTable>().put({});
 }
 
 void Events::sync()

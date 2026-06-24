@@ -888,6 +888,12 @@ psibase_package(
     DESCRIPTION "Indexes events and provides querying"
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Events/src/postinstall.json
     DEPENDS wasm
+    # FIXME: The existence of this service forces anything that depends
+    # on Events to be installed after it. Figure out a way to represent
+    # this constraint more directly.
+    SERVICE events+3
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/Nop.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Nop-schema.json
     PACKAGE_DEPENDS "EventsService" "Transact(^${PSIBASE_VERSION}.0)" "TransactService(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)"
 )
 
