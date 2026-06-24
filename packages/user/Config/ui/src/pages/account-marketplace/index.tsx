@@ -185,40 +185,34 @@ export const NameMarketConfig = () => {
                         Account Marketplace Config
                     </CardTitle>
                     <CardDescription>
-                        Set pricing, targets, and purchase availability for each
-                        account name length.
+                        Account name markets are configured by name length (
+                        {MIN_ACCOUNT_NAME_LENGTH}–{MAX_ACCOUNT_NAME_LENGTH}{" "}
+                        characters). Below, you can enable or disable individual
+                        markets and set pricing parameters.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="px-4 pt-0">
                     <ul className="text-muted-foreground marker:text-muted-foreground/50 list-disc space-y-1 pl-4 text-sm leading-relaxed">
                         <li>
-                            One card per account name length (
-                            {MIN_ACCOUNT_NAME_LENGTH}–{MAX_ACCOUNT_NAME_LENGTH}{" "}
-                            characters). Dashed cards are not configured yet;
-                            saving creates them with the values you enter.
+                            Initial price is required when you first enable a
+                            market; it cannot be changed later.
                         </li>
                         <li>
-                            Initial price is required when creating a market and
-                            cannot be changed afterward.
+                            Changes are staged when you click the "Save changes"
+                            button at the bottom of the page.
                         </li>
                         <li>
-                            Unconfigured markets default to purchases off. Use
-                            the Enabled switch on each card to allow or block
-                            new purchases.
+                            Disabling a market blocks new purchases for that
+                            length; existing, unclaimed purchases can still be
+                            claimed.
                         </li>
                         <li>
-                            Floor price, window length, target per window, and
-                            increase/decrease percentages can be edited on any
-                            card.
-                        </li>
-                        <li>
-                            Nothing is staged until you click Save changes at
-                            the bottom of the page; only lengths you modified
-                            are submitted.
-                        </li>
-                        <li>
-                            Disabling purchases blocks new buys for that length;
-                            existing purchases can still be claimed.
+                            Each window ends when its time expires or sales
+                            exceed the target. Exceeding the target raises price
+                            by the increase % and starts a new window; falling
+                            short at expiry lowers price by the decrease %;
+                            meeting the target exactly starts a new window at
+                            the same price.
                         </li>
                     </ul>
                 </CardContent>
