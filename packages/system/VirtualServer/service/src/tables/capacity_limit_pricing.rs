@@ -146,7 +146,6 @@ impl Curve {
 impl CurvePosition {
     // Cost of consuming `amount` units of resource.
     // delta_x = ceil(k / (Y - delta_y)) - X
-    // Rounds UP (user pays more).
     pub(crate) fn cost_of(&self, amount_consumed: u64) -> u64 {
         if amount_consumed == 0 {
             return 0;
@@ -159,8 +158,8 @@ impl CurvePosition {
         let required_X = self.k.div_ceil(new_Y);
         let dx = check_some(required_X.checked_sub(self.X), "Excess reserve detected");
 
-        // Cap the charge at the remaining reserve budget. Without this, cost 
-        // overflows u64 when `max_reserve == u64::MAX` and remaining capacity 
+        // Cap the charge at the remaining reserve budget. Without this, cost
+        // overflows u64 when `max_reserve == u64::MAX` and remaining capacity
         // is near zero (due to ceil(k) bias).
         let dx = dx.min((self.max_reserve - self.reserves) as u128);
 
@@ -170,7 +169,6 @@ impl CurvePosition {
 
     // Gross refund for freeing `amount` units of resource.
     // delta_x = X - ceil(k / (Y + delta_y))
-    // Rounds down (user receives less).
     pub(crate) fn refund_of(&self, amount_freed: u64) -> u64 {
         if amount_freed == 0 {
             return 0;
@@ -179,7 +177,7 @@ impl CurvePosition {
 
         let new_Y = self.Y + dy;
 
-        // ceil division here makes the subtracted term larger, so dx is smaller
+        // Required reserve at the higher (freed) capacity level
         let new_X = self.k.div_ceil(new_Y);
         let dx = self.X.saturating_sub(new_X);
 

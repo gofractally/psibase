@@ -115,16 +115,15 @@ fn no_arbitrage() {
         let partial = c.pos_from_resources(max_resources - partial_amount);
         let empty = c.pos_from_resources(0);
 
-        // No-arbitrage: a buy then sell of the same amount never refunds more
-        // than it cost (rounding/clamping can make the refund strictly less).
+        // No-arbitrage: a buy then sell of the same amount round-trips exactly.
         let cost_all = full.cost_of(max_resources);
         let cost_partial = full.cost_of(partial_amount);
         let refund_all = empty.refund_of(max_resources);
         let refund_partial = partial.refund_of(partial_amount);
         assert!(cost_all > 0);
         assert!(cost_partial > 0);
-        assert!(cost_all >= refund_all);
-        assert!(cost_partial >= refund_partial);
+        assert_eq!(cost_all, refund_all);
+        assert_eq!(cost_partial, refund_partial);
     }
 }
 
