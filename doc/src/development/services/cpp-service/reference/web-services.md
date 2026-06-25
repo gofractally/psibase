@@ -72,7 +72,6 @@ These help implement basic functionality:
   - [psibase::PageInfo]
   - [psibase::Edge]
   - [psibase::Connection]
-- [psibase::EventDecoder]
 - [psibase::EventQuery]
 
 Here's a common pattern for using these functions:
@@ -107,5 +106,4 @@ std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request)
 {{#cpp-doc ::psibase::PageInfo}}
 {{#cpp-doc ::psibase::Edge}}
 {{#cpp-doc ::psibase::Connection}}
-{{#cpp-doc ::psibase::EventDecoder}}
 {{#cpp-doc ::psibase::EventQuery}}
