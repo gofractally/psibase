@@ -79,11 +79,13 @@ fn test_one_second_window(mut chain: psibase::Chain) -> Result<(), psibase::Erro
     //                                      ^current_block
     //                                      ^last_update
 
-    Wrapper::push_from(&chain, alice).increment(nft_id, 3);
+    // The 6 + 7 events above leave a carried counter of 3 (8 % 5 == 3, +... -> 3), so a
+    // single extra event keeps the cumulative count below the next step threshold.
+    Wrapper::push_from(&chain, alice).increment(nft_id, 1);
     // Blocks: [0] [1] [2] [3] [4] [5] [6] [7] [8]
     //                                      ^current_block
-    //                                      ^last_update - window not reset because increment was below target
-    assert_eq!(get_diff(nft_id)?, 108); // difficulty also not changed because increment was below target
+    //                                      ^last_update - window not reset because the counter stayed below target
+    assert_eq!(get_diff(nft_id)?, 108); // difficulty also not changed: counter (4) did not exceed target
     chain.start_block();
     // Blocks: [0] [1] [2] [3] [4] [5] [6] [7] [8]
     //                                          ^current_block
