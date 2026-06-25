@@ -7,4 +7,5 @@ plugin_error! {
     PackageFormatError(msg: String) => "{msg}",
     JsonError(msg: String) => "{msg}",
     NoLoggedInUser => "No logged in user",
+    UnpackActionError(msg: String) => "{msg}",
 }
