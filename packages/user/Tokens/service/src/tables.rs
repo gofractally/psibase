@@ -2,6 +2,7 @@
 pub mod tables {
     use crate::service::{fmt_amount, TID};
     use async_graphql::{ComplexObject, SimpleObject};
+    use psibase::services::accounts::Wrapper as Accounts;
     use psibase::services::nft::{Wrapper as Nfts, NID};
     use psibase::services::tokens::{Decimal, Precision, Quantity};
     use psibase::{
@@ -428,6 +429,13 @@ pub mod tables {
                 creditor != debitor,
                 format!("Sender {} cannot also be receiver", creditor).as_str(),
             );
+
+            if !Accounts::call().exists(debitor) {
+                abort_message(&format!(
+                    "debitor account '{}' does not exist",
+                    debitor.to_string()
+                ));
+            }
 
             Self {
                 shared_bal_id: InitRow::next_shared_bal_id(),
