@@ -94,8 +94,14 @@ function CompactField({
     const isError = meta.errors.length > 0 && meta.isTouched;
 
     return (
-        <div className="grid min-w-0 gap-1">
-            <Label htmlFor={id} className={FIELD_LABEL_CLASS}>
+        <div className="grid min-w-0 grid-rows-[auto_auto_2rem] gap-1">
+            <Label
+                htmlFor={id}
+                className={cn(
+                    FIELD_LABEL_CLASS,
+                    isError && "text-destructive",
+                )}
+            >
                 {label}
             </Label>
             <Input
@@ -115,7 +121,11 @@ function CompactField({
                 )}
                 aria-invalid={isError}
             />
-            <FieldErrors meta={meta as AnyFieldMeta} />
+            <FieldErrors
+                meta={meta as AnyFieldMeta}
+                reserveSpace
+                compact
+            />
         </div>
     );
 }
@@ -148,8 +158,14 @@ function WindowLengthField({
             : undefined;
 
     return (
-        <div className="grid min-w-0 gap-1">
-            <Label htmlFor={id} className={FIELD_LABEL_CLASS}>
+        <div className="grid min-w-0 grid-rows-[auto_auto_2rem] gap-1">
+            <Label
+                htmlFor={id}
+                className={cn(
+                    FIELD_LABEL_CLASS,
+                    isError && "text-destructive",
+                )}
+            >
                 Window length
             </Label>
             <div className="flex items-center gap-2">
@@ -196,7 +212,11 @@ function WindowLengthField({
                     </SelectContent>
                 </Select>
             </div>
-            <FieldErrors meta={meta as AnyFieldMeta} />
+            <FieldErrors
+                meta={meta as AnyFieldMeta}
+                reserveSpace
+                compact
+            />
         </div>
     );
 }
