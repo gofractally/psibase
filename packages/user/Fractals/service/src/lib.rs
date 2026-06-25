@@ -48,17 +48,6 @@ pub mod service {
         account: AccountNumber,
         method: Option<ServiceMethod>,
     ) -> Option<DynamicAuthPolicy> {
-        // #1. Root sub account #1
-        //   #2. Legislative child account
-        //   #3. Judiciary child account
-        //   #4. Executive child account
-        //      #5. Recruitment child account
-
-        // All the sub accounts you want
-        // But initially legislature gets to set a vector for a fractal
-        // Each account in the vector has a weight of 1, inside of a 2/3+1 vote
-        // which authorises role account 1, which has all the undelegated actions.
-
         let method = method?;
 
         let is_banned = BANNED.iter().any(|&(svc, name)| {
@@ -122,9 +111,7 @@ pub mod service {
     /// * `fractal` - The account number of the fractal.
     #[action]
     fn init_token() {
-        // StagedTX execution check
-        // Action execution check
-        Fractal::by_sender_root().init_token();
+        Fractal::by_sender().init_token();
     }
 
     /// Set Fractal distribution interval
