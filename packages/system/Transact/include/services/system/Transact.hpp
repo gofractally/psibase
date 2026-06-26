@@ -8,12 +8,7 @@ namespace SystemService
    /// Identify a service and method
    ///
    /// An empty `service` or `method` indicates a wildcard.
-   struct ServiceMethod
-   {
-      psibase::AccountNumber service;
-      psibase::MethodNumber  method;
-   };
-   PSIO_REFLECT(ServiceMethod, service, method)
+   using psibase::ServiceMethod;
 
    /// Authenticate actions
    ///

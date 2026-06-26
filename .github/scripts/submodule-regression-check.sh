@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -eo pipefail
 declare -A PR_MAP
 declare -A BASE_MAP
