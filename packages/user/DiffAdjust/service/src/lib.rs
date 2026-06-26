@@ -144,6 +144,7 @@ pub mod tables {
             }
         }
 
+        // PRECONDITION: `factor` is based on an increase specified in PPM
         fn apply_increase(difficulty: u64, factor: f64, times: u32) -> u64 {
             if times == 0 || difficulty == u64::MAX || factor <= 1.0 {
                 return difficulty;
