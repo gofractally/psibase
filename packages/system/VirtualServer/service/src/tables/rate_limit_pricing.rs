@@ -4,7 +4,6 @@ use crate::tables::tables::*;
 use async_graphql::{ComplexObject, SimpleObject};
 use psibase::services::diff_adjust::Wrapper as DiffAdjust;
 use psibase::services::nft::Wrapper as Nft;
-use psibase::services::tokens::{Quantity, Wrapper as Tokens};
 use psibase::*;
 
 // In DiffAdjust, we use the discrete compounding equation to relate total change to a rate of change
@@ -95,26 +94,6 @@ fn update_average_usage(
     ppm
 }
 
-pub fn bill_user(user: AccountNumber, cost: u64, sub_account: Option<String>) {
-    if cost == 0 {
-        return;
-    }
-    let config = BillingConfig::get_assert();
-    let sys = config.sys;
-
-    let balance = UserSettings::get_resource_balance(user, sub_account.clone());
-    let amt = Quantity::new(cost);
-
-    if balance < amt {
-        abort_message(&format!("{} has insufficient resource balance", user));
-    }
-
-    let user_key = UserSettings::to_sub_account_key(user, sub_account);
-
-    Tokens::call().fromSub(sys, user_key, amt);
-    Tokens::call().credit(sys, config.fee_receiver, amt, "".into());
-}
-
 fn capacity(resource: ResourceType) -> u64 {
     let specs = NetworkSpecs::get_assert();
     match resource {
@@ -176,13 +155,7 @@ impl RateLimitPricing {
         Self::update(self.resource(), |r| r.num_blocks_to_average = num_blocks);
     }
 
-    pub fn consume(
-        &self,
-        amount: u64,
-        user: AccountNumber,
-        sub_account: Option<String>,
-        billing_enabled: bool,
-    ) -> u64 {
+    pub fn consume(&self, amount: u64) -> u64 {
         let resource = self.resource();
         let mut price = 0u64;
         let mut billable_unit = 0u64;
@@ -196,18 +169,10 @@ impl RateLimitPricing {
         // Round up to the nearest billable unit
         let amount_units = amount.div_ceil(billable_unit);
 
-        let mut cost = check_some(
+        check_some(
             amount_units.checked_mul(price),
             &format!("{} usage overflow", resource.name()),
-        );
-
-        if !billing_enabled {
-            cost = 0;
-        }
-
-        bill_user(user, cost, sub_account);
-
-        cost
+        )
     }
 
     pub fn new_block(&self) -> u32 {

@@ -5,12 +5,25 @@ pub mod rpc;
 pub mod tables;
 pub use crate::tables::DEFAULT_AUTO_FILL_THRESHOLD_PERCENT;
 
+mod billing;
 mod math_utils;
 
 mod tx_cache {
     use psibase::{abort_message, AccountNumber};
     use std::cell::{Cell, RefCell};
     use std::collections::HashMap;
+    use std::thread::LocalKey;
+
+    pub fn check_lock(lock: &'static LocalKey<Cell<bool>>) {
+        if lock.with(Cell::get) {
+            abort_message("resource billing attempted during end-of-tx settlement");
+        }
+    }
+
+    pub fn lock_billing(lock: &'static LocalKey<Cell<bool>>) {
+        check_lock(lock);
+        lock.with(|l| l.set(true));
+    }
 
     thread_local! {
         static BILLABLE_ACCOUNT: Cell<Option<AccountNumber>> = const { Cell::new(None) };
@@ -81,6 +94,212 @@ mod tx_cache {
                 .map(|m| m.into_iter().map(|(k, (a, c))| (k, a, c)).collect())
                 .unwrap_or_default()
         })
+    }
+
+    /// Cache of account resource balances.
+    /// We track updates to user resources in the cache so we can do a settlement of the actual token
+    /// balances once at the end of the transaction.
+    pub mod balance_cache {
+        use crate::tables::tables::UserSettings;
+        use psibase::{abort_message, AccountNumber};
+        use std::cell::{Cell, RefCell};
+        use std::collections::HashMap;
+
+        type Payer = (AccountNumber, Option<String>);
+
+        #[derive(Clone, Copy)]
+        struct Balance {
+            available: i128,
+            initial: i128,
+        }
+
+        impl Balance {
+            fn from_live((account, sub): &Payer) -> Self {
+                let value = UserSettings::get_resource_balance(*account, sub.clone()).value as i128;
+                Balance {
+                    available: value,
+                    initial: value,
+                }
+            }
+
+            // The amount to settle
+            fn delta(self) -> i128 {
+                self.available - self.initial
+            }
+        }
+
+        thread_local! {
+            static BALANCES: RefCell<HashMap<Payer, Balance>> = RefCell::new(HashMap::new());
+            static LOCKED: Cell<bool> = const { Cell::new(false) };
+        }
+
+        fn with<R>(f: impl FnOnce(&mut HashMap<Payer, Balance>) -> R) -> R {
+            BALANCES.with_borrow_mut(f)
+        }
+
+        /// Applies `delta` to the payer's balance, aborts on overdraft.
+        fn adjust(account: AccountNumber, sub: Option<String>, delta: i128) {
+            crate::tx_cache::check_lock(&LOCKED);
+            with(|m| {
+                let bal = m
+                    .entry((account, sub.clone()))
+                    .or_insert_with_key(Balance::from_live);
+                bal.available += delta;
+                if bal.available < 0 {
+                    let who = UserSettings::to_sub_account_key(account, sub);
+                    abort_message(&format!("{} has insufficient resource balance", who));
+                }
+            });
+        }
+
+        pub fn charge(account: AccountNumber, sub: Option<String>, cost: u64) {
+            adjust(account, sub, -(cost as i128));
+        }
+
+        pub fn refund(account: AccountNumber, sub: Option<String>, amount: u64) {
+            adjust(account, sub, amount as i128);
+        }
+
+        /// Handles mid-tx resource purchase/deletion.
+        /// Shifts available+initial together so the delta is unchanged but the new balance is spendable.
+        /// No-op if the account hasn't yet been touched for billing.
+        pub fn update_balance(account: AccountNumber, sub: Option<String>, delta: i128) {
+            crate::tx_cache::check_lock(&LOCKED);
+            with(|m| {
+                if let Some(bal) = m.get_mut(&(account, sub)) {
+                    bal.available += delta;
+                    bal.initial += delta;
+                }
+            });
+        }
+
+        pub fn drain_balances() -> Vec<(Payer, i128)> {
+            crate::tx_cache::lock_billing(&LOCKED);
+            with(|m| {
+                std::mem::take(m)
+                    .into_iter()
+                    .map(|(payer, b)| (payer, b.delta()))
+                    .collect()
+            })
+        }
+    }
+
+    /// Per-tx billing accrual, settled at end of tx
+    pub mod accrual {
+        fn is_system_user(user: psibase::AccountNumber) -> bool {
+            user == psibase::AccountNumber::new(0)
+        }
+
+        /// Rate-limited resources: consumption cost is directly credited to the fee receiver.
+        pub mod rate_limited {
+            use super::is_system_user;
+            use crate::resource_type::ResourceType;
+            use crate::tx_cache::balance_cache;
+            use psibase::AccountNumber;
+            use std::cell::{Cell, RefCell};
+            use std::collections::HashMap;
+
+            #[derive(Default)]
+            pub struct Accrual {
+                pub fee: u64,
+            }
+
+            thread_local! {
+                static STATE: RefCell<HashMap<ResourceType, Accrual>> = RefCell::new(HashMap::new());
+                static LOCKED: Cell<bool> = const { Cell::new(false) };
+            }
+
+            pub fn consume(
+                resource: ResourceType,
+                user: AccountNumber,
+                sub: Option<String>,
+                cost: u64,
+            ) {
+                crate::tx_cache::check_lock(&LOCKED);
+                if cost == 0 {
+                    return;
+                }
+                if is_system_user(user) {
+                    psibase::abort_message("System user consumes rate-limited resources!");
+                }
+                balance_cache::charge(user, sub, cost);
+                STATE.with_borrow_mut(|m| m.entry(resource).or_default().fee += cost);
+            }
+
+            pub fn drain() -> Vec<(ResourceType, Accrual)> {
+                crate::tx_cache::lock_billing(&LOCKED);
+                STATE.with_borrow_mut(|m| std::mem::take(m).into_iter().collect())
+            }
+        }
+
+        /// Capacity-limited resources: consumption cost is sent as a reserve into a relay. When freed, relay refund is split between
+        /// the user and the fee receiver.
+        ///
+        /// In rare cases (system writes or writes when billing is disabled), the relay may become under-collateralized. In such cases,
+        /// tokens that would be sent to the fee receiver are instead used to recollateralize the relay.
+        pub mod capacity_limited {
+            use super::is_system_user;
+            use crate::resource_type::ResourceType;
+            use crate::tx_cache::balance_cache;
+            use psibase::AccountNumber;
+            use std::cell::{Cell, RefCell};
+            use std::collections::HashMap;
+
+            #[derive(Default)]
+            pub struct Accrual {
+                pub relay_delta: i128,
+                pub fee: u64,
+            }
+
+            thread_local! {
+                static STATE: RefCell<HashMap<ResourceType, Accrual>> = RefCell::new(HashMap::new());
+                static LOCKED: Cell<bool> = const { Cell::new(false) };
+            }
+
+            fn with<R>(resource: ResourceType, f: impl FnOnce(&mut Accrual) -> R) -> R {
+                STATE.with_borrow_mut(|m| f(m.entry(resource).or_default()))
+            }
+
+            pub fn consume(
+                resource: ResourceType,
+                user: AccountNumber,
+                sub: Option<String>,
+                cost: u64,
+            ) {
+                crate::tx_cache::check_lock(&LOCKED);
+                if is_system_user(user) || cost == 0 {
+                    return;
+                }
+                balance_cache::charge(user, sub, cost);
+                with(resource, |a| a.relay_delta += cost as i128);
+            }
+
+            pub fn free(
+                resource: ResourceType,
+                user: AccountNumber,
+                sub: Option<String>,
+                user_refund: u64,
+                fee: u64,
+            ) {
+                crate::tx_cache::check_lock(&LOCKED);
+                let gross = user_refund + fee;
+                if is_system_user(user) || gross == 0 {
+                    return;
+                }
+                with(resource, |a| {
+                    a.relay_delta -= gross as i128;
+                    a.fee += fee;
+                });
+                if user_refund > 0 {
+                    balance_cache::refund(user, sub, user_refund);
+                }
+            }
+
+            pub fn drain() -> Vec<(ResourceType, Accrual)> {
+                crate::tx_cache::lock_billing(&LOCKED);
+                STATE.with_borrow_mut(|m| std::mem::take(m).into_iter().collect())
+            }
+        }
     }
 }
 
@@ -158,8 +377,11 @@ mod tx_cache {
 /// service to manage server specs, network variables, and billing parameters, as needed.
 #[psibase::service(name = "vserver", recursive = "true", tables = "tables::tables")]
 mod service {
+    use crate::billing;
     use crate::tables::tables::{UserSettings, *};
     use crate::tx_cache;
+    use crate::tx_cache::accrual;
+    use crate::tx_cache::balance_cache;
     use psibase::services::events;
     use psibase::services::{
         accounts::Wrapper as Accounts,
@@ -334,7 +556,7 @@ mod service {
 
         if enabled {
             let payer = check_some(payer, "payer is required when enabling billing");
-            CapacityPricing::get_assert(Disk).settle_relay_balance(payer);
+            billing::settle_relay_balance(Disk, payer);
         }
 
         BillingConfig::enable(enabled);
@@ -364,6 +586,7 @@ mod service {
 
         Tokens::call().debit(sys, buyer, amount, "".into());
         Tokens::call().toSub(sys, for_user.to_string(), amount);
+        balance_cache::update_balance(for_user, None, amount.value as i128);
 
         if buyer != for_user {
             // No need for a subsidy event if user == buyer because it's not a subsidy and the purchase
@@ -395,9 +618,10 @@ mod service {
         Tokens::call().debit(sys, buyer, amount, "".into());
         Tokens::call().toSub(
             sys,
-            UserSettings::to_sub_account_key(buyer, Some(sub_account)),
+            UserSettings::to_sub_account_key(buyer, Some(sub_account.clone())),
             amount,
         );
+        balance_cache::update_balance(buyer, Some(sub_account), amount.value as i128);
     }
 
     /// Deletes the resource subaccount, returning the resources back to the caller's primary
@@ -417,9 +641,11 @@ mod service {
         };
 
         if balance.value != 0u64 {
-            let sub_account = UserSettings::to_sub_account_key(sender, Some(sub_account));
-            Tokens::call().fromSub(sys, sub_account, balance);
+            let sub_key = UserSettings::to_sub_account_key(sender, Some(sub_account.clone()));
+            Tokens::call().fromSub(sys, sub_key, balance);
             Tokens::call().toSub(sys, sender.to_string(), balance);
+            balance_cache::update_balance(sender, Some(sub_account), -(balance.value as i128));
+            balance_cache::update_balance(sender, None, balance.value as i128);
         }
     }
 
@@ -670,12 +896,10 @@ mod service {
         );
 
         let amount_bits = check_some(amount_bytes.checked_mul(8), "network usage overflow");
-        let cost = RateLimitPricing::get_assert(Net).consume(
-            amount_bits,
-            user,
-            tx_cache::get_sub(user),
-            is_billing_enabled(),
-        );
+        let sub = tx_cache::get_sub(user);
+        let raw_cost = RateLimitPricing::get_assert(Net).consume(amount_bits);
+        let cost = if is_billing_enabled() { raw_cost } else { 0 };
+        accrual::rate_limited::consume(Net, user, sub, cost);
 
         let amount = to_i64(amount_bytes, "Consumed network bandwidth");
         let cost = to_i64(cost, "Consumed network bandwidth cost");
@@ -696,12 +920,10 @@ mod service {
             "[useCpuSys] Unauthorized",
         );
 
-        let cost = RateLimitPricing::get_assert(Cpu).consume(
-            amount_ns,
-            user,
-            tx_cache::get_sub(user),
-            is_billing_enabled(),
-        );
+        let sub = tx_cache::get_sub(user);
+        let raw_cost = RateLimitPricing::get_assert(Cpu).consume(amount_ns);
+        let cost = if is_billing_enabled() { raw_cost } else { 0 };
+        accrual::rate_limited::consume(Cpu, user, sub, cost);
 
         let amount = to_i64(amount_ns, "Consumed CPU");
         let cost = to_i64(cost, "Consumed CPU cost");
@@ -720,6 +942,8 @@ mod service {
                 .history()
                 .consumed(disk_user, Disk.as_id(), disk_amount, disk_cost);
         }
+
+        billing::reconcile();
     }
 
     /// Suppress billing/tracking for the next `num_writes` `useDiskSys` calls.
@@ -773,19 +997,29 @@ mod service {
             return;
         }
 
+        let billing = is_billing_enabled();
         let sub = tx_cache::get_sub(user);
 
         let cost = match db_id {
             DbId::Service | DbId::Native => {
                 if amount_bytes > 0 {
-                    let c =
-                        CapacityPricing::get_assert(Disk).consume(amount_bytes as u64, user, sub);
-                    to_i64(c, "Disk consume cost")
+                    let c = CapacityPricing::get_assert(Disk).consume(amount_bytes as u64);
+                    if billing {
+                        accrual::capacity_limited::consume(Disk, user, sub, c);
+                        to_i64(c, "Disk consume cost")
+                    } else {
+                        0
+                    }
                 } else {
                     // amount_bytes < 0
-                    let user_refund =
-                        CapacityPricing::get_assert(Disk).free((-amount_bytes) as u64, user, sub);
-                    -(to_i64(user_refund, "Disk refund"))
+                    let (user_refund, fee) =
+                        CapacityPricing::get_assert(Disk).free((-amount_bytes) as u64);
+                    if billing {
+                        accrual::capacity_limited::free(Disk, user, sub, user_refund, fee);
+                        -(to_i64(user_refund, "Disk refund"))
+                    } else {
+                        0
+                    }
                 }
             }
             DbId::HistoryEvent | DbId::UiEvent | DbId::MerkleEvent | DbId::WriteOnly => return, // TODO: Event billing (rate-limit-style)
