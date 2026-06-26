@@ -204,25 +204,25 @@ pub mod tables {
         fn check_difficulty_increase(&mut self, clamp_increase: bool) -> u64 {
             if self.counter > self.target_max {
                 let factor = 1.0 + self.ratio_increase();
-                // Number of difficulty adjustments for `counter` events in the window:
-                //   - target_max == 0: every event is a adjustment (adjustments = counter)
-                //   - target_max == N: floor((counter - 1) / N). The first adjustment requires
-                //     N + 1 events; afterward every additional N events adds one adjustment.
-                // The remainder is carried in `counter` so the cumulative adjustments over a window
-                //   always equal floor((events - 1) / N), independent of how the events were batched across increments.
-                let (mut adjustments, remaining_counter) = if self.target_max == 0 {
-                    (self.counter, 0)
-                } else {
-                    let adjustments = (self.counter - 1) / self.target_max;
-                    let remaining = (self.counter - 1) % self.target_max + 1;
-                    (adjustments, remaining)
-                };
+                // `target_max` events accumulate with no adjustment; the next event triggers
+                //   one. So one adjustment is applied per `target_max + 1` events, and the
+                //   cumulative adjustments for `events` in a window is
+                //   floor(events / (target_max + 1)).
+                // The remainder is carried in `counter` so a batched
+                //   increment produces the same result as the equivalent single increments.
+                // (u64 math avoids overflow when target_max == u32::MAX.)
+                let events_per_adjustment = self.target_max as u64 + 1;
+                let mut adjustments = (self.counter as u64 / events_per_adjustment) as u32;
                 if clamp_increase {
                     adjustments = adjustments.min(1);
                 }
                 self.active_difficulty =
                     Self::apply_increase(self.active_difficulty, factor, adjustments);
-                self.counter = if clamp_increase { 0 } else { remaining_counter };
+                self.counter = if clamp_increase {
+                    0
+                } else {
+                    (self.counter as u64 % events_per_adjustment) as u32
+                };
                 // The update is happening "mid block", so we round up to the next second. In other words,
                 // updates happens at the "end" of the block. Without this, a one-second block window would
                 // cause a decrease every block, because an increase zeroes out the counter, so each block
@@ -369,11 +369,12 @@ pub mod service {
 
     /// Increment RateLimit instance, potentially increasing the difficulty.
     ///
-    /// The number of difficulty adjustments applied for `events` accumulated in the window is
-    ///   `floor((events - 1) / target_max)` (or `events` when `target_max == 0`). So the
-    ///   first adjustment happens on the `(target_max + 1)`-th event, and every additional
-    ///   `target_max` events applies one more adjustment; a single large increment may apply
-    ///   multiple adjustments at once.
+    /// `target_max` events accumulate with no adjustment, and the next event triggers one,
+    ///   so the number of adjustments for `events` accumulated in the window is
+    ///   `floor(events / (target_max + 1))`. Adjustments therefore land every
+    ///   `target_max + 1` events (and `target_max == 0` means every event adjusts). A single
+    ///   large increment may apply multiple adjustments at once, matching the equivalent
+    ///   sequence of single increments (the remainder is carried across calls).
     ///
     /// Returns the difficulty before any difficulty adjustment due to the increment.
     ///
