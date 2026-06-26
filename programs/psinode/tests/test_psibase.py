@@ -159,11 +159,11 @@ class TestPsibase(unittest.TestCase):
     def test_install(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer'])
-        a.run_psibase(['install'] + a.node_args() + ['Symbol', 'Tokens', 'TokenUsers'])
+        a.run_psibase(['install', '-y'] + a.node_args() + ['Symbol', 'Tokens', 'TokenUsers'])
         a.wait(new_block())
         a.graphql('tokens', '''query { token(tokenId: "0") { id precision } }''')
         # Installing packages that are already installed should do nothing
-        a.run_psibase(['install'] + a.node_args() + ['Symbol', 'Tokens', 'TokenUsers'])
+        a.run_psibase(['install', '-y'] + a.node_args() + ['Symbol', 'Tokens', 'TokenUsers'])
 
     @testutil.psinode_test
     def test_install_upgrade(self, cluster):
@@ -174,12 +174,12 @@ class TestPsibase(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as dir:
             make_package_repository(dir, [foo.foo10])
-            a.run_psibase(['install'] + a.node_args() + ['foo', '--package-source', dir])
+            a.run_psibase(['install', '-y'] + a.node_args() + ['foo', '--package-source', dir])
             a.wait(new_block())
             self.assertResponse(a.get('/file1.txt', 'foo'), 'original')
             self.assertResponse(a.get('/file2.txt', 'foo'), 'deleted')
             make_package_repository(dir, [foo.foo10, foo.foo11])
-            a.run_psibase(['install'] + a.node_args() + ['foo', '--package-source', dir])
+            a.run_psibase(['install', '-y'] + a.node_args() + ['foo', '--package-source', dir])
             a.wait(new_block())
             self.assertResponse(a.get('/file1.txt', 'foo'), 'updated')
             self.assertEqual(a.get('/file2.txt', 'foo').status_code, 404)
@@ -194,12 +194,12 @@ class TestPsibase(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as dir:
             make_package_repository(dir, [foo.foo10])
-            a.run_psibase(['install'] + a.node_args() + ['foo', '--package-source', dir])
+            a.run_psibase(['install', '-y'] + a.node_args() + ['foo', '--package-source', dir])
             a.wait(new_block())
             self.assertResponse(a.get('/file1.txt', 'foo'), 'original')
             self.assertResponse(a.get('/file2.txt', 'foo'), 'deleted')
             make_package_repository(dir, [foo.foo10, foo.foo11, foo.foo20])
-            a.run_psibase(command + a.node_args() + ['foo', '--package-source', dir])
+            a.run_psibase(command + ['-y'] + a.node_args() + ['foo', '--package-source', dir])
             a.wait(new_block())
             if v2:
                 self.assertResponse(a.get('/file1.txt', 'foo'), 'version 2')
@@ -241,7 +241,7 @@ class TestPsibase(unittest.TestCase):
             self.assertIn('description: Major version update', info)
             self.assertIn('name: foo-2.0.0', info)
 
-            a.run_psibase(['install'] + a.node_args() + ['foo-1.0', '--package-source', dir])
+            a.run_psibase(['install', '-y'] + a.node_args() + ['foo-1.0', '--package-source', dir])
             a.wait(new_block())
 
             for name in ['foo', 'foo-1', 'foo-1.0', 'foo-1.0.0']:
@@ -255,7 +255,7 @@ class TestPsibase(unittest.TestCase):
                 self.assertIn('description: Major version update', info)
                 self.assertIn('name: foo-2.0.0', info)
 
-            a.run_psibase(['install'] + a.node_args() + ['foo-2.0', '--package-source', dir])
+            a.run_psibase(['install', '-y'] + a.node_args() + ['foo-2.0', '--package-source', dir])
             a.wait(new_block())
 
             info = get_info('foo')
@@ -307,7 +307,7 @@ class TestPsibase(unittest.TestCase):
             l = get_list('--updates')
             self.assertEqual(l, "")
 
-            a.run_psibase(['install'] + a.node_args() + ['foo-1.0', '--package-source', dir])
+            a.run_psibase(['install', '-y'] + a.node_args() + ['foo-1.0', '--package-source', dir])
             a.wait(new_block())
 
             l = get_list('--installed')
@@ -320,7 +320,7 @@ class TestPsibase(unittest.TestCase):
             l = get_list('--updates')
             self.assertIn('foo 1.0.0->2.0.0', l)
 
-            a.run_psibase(['install'] + a.node_args() + ['foo-2.0', '--package-source', dir])
+            a.run_psibase(['install', '-y'] + a.node_args() + ['foo-2.0', '--package-source', dir])
             a.wait(new_block())
 
             l = get_list('--updates')
@@ -356,11 +356,11 @@ class TestPsibase(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as dir:
             make_package_repository(dir, [foo.foo10])
-            a.run_psibase(['install', '--local'] + a.node_args() + ['XFoo', '--package-source', dir])
+            a.run_psibase(['install', '--local', '-y'] + a.node_args() + ['XFoo', '--package-source', dir])
             self.assertResponse(a.get('/file1.txt', 'x-foo'), 'original')
             self.assertResponse(a.get('/file2.txt', 'x-foo'), 'deleted')
             make_package_repository(dir, [foo.foo10, foo.foo11])
-            a.run_psibase(['install', '--local'] + a.node_args() + ['XFoo', '--package-source', dir])
+            a.run_psibase(['install', '--local', '-y'] + a.node_args() + ['XFoo', '--package-source', dir])
             self.assertResponse(a.get('/file1.txt', 'x-foo'), 'updated')
             self.assertEqual(a.get('/file2.txt', 'x-foo').status_code, 404)
             self.assertResponse(a.get('/file3.txt', 'x-foo'), 'added')
@@ -368,7 +368,7 @@ class TestPsibase(unittest.TestCase):
     @testutil.psinode_test
     def test_local_install_with_server(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
-        a.run_psibase(['install', '--local'] + a.node_args() + ['XWithServer', '--package-source', testutil.test_packages()])
+        a.run_psibase(['install', '--local', '-y'] + a.node_args() + ['XWithServer', '--package-source', testutil.test_packages()])
         # Should use the registered server, not the service
         with a.get('/id', service='x-server') as reply:
             reply.raise_for_status()
@@ -399,7 +399,7 @@ class TestPsibase(unittest.TestCase):
             print("list --local --available")
             print(local)
             self.assertIn('xfoo', local)
-            a.run_psibase(['install'] + a.node_args() + ['foo'])
+            a.run_psibase(['install', '-y'] + a.node_args() + ['foo'])
             a.wait(new_block())
             self.assertResponse(a.get('/file1.txt', 'foo'), 'data')
 
@@ -437,7 +437,7 @@ class TestPsibase(unittest.TestCase):
         auth_sig.set_key('aaaaaaa123', key)
         a.wait(new_block())
 
-        a.run_psibase(['install'] + a.node_args() + ['Symbol', 'Tokens', '--proposer', 'bbbbbbb123'])
+        a.run_psibase(['install', '-y'] + a.node_args() + ['Symbol', 'Tokens', '--proposer', 'bbbbbbb123'])
         a.wait(new_block())
 
         # This should be None because the transaction was only proposed
