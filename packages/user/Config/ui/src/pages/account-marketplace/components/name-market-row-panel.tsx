@@ -1,7 +1,4 @@
-import type {
-    NameMarketFormRow,
-    NameMarketsFormValues,
-} from "@/lib/name-market-form";
+import type { NameMarketsFormValues } from "@/lib/name-market-form";
 import type { AnyFieldMeta } from "@tanstack/react-form";
 import type { ReactNode } from "react";
 
@@ -48,7 +45,7 @@ type MarketFormApi = {
                 value: string;
                 meta: {
                     errors: unknown[];
-                    isTouched: boolean;
+                    isDefaultValue: boolean;
                 };
             };
             handleChange: (value: string) => void;
@@ -64,7 +61,6 @@ type MarketFormApi = {
 export type NameMarketRowPanelProps = {
     form: MarketFormApi;
     index: number;
-    baseline: NameMarketFormRow;
     actionsDisabled: boolean;
 };
 
@@ -78,7 +74,6 @@ function CompactField({
     placeholder,
     inputMode,
     meta,
-    isDirty,
 }: {
     id: string;
     label: string;
@@ -88,14 +83,23 @@ function CompactField({
     disabled?: boolean;
     placeholder?: string;
     inputMode?: "numeric" | "text";
-    meta: { errors: unknown[]; isTouched: boolean };
-    isDirty?: boolean;
+    meta: {
+        errors: unknown[];
+        isDefaultValue: boolean;
+    };
 }) {
-    const isError = meta.errors.length > 0 && meta.isTouched;
+    const isDirty = !meta.isDefaultValue;
+    const isError = meta.errors.length > 0;
 
     return (
         <div className="grid min-w-0 gap-1">
-            <Label htmlFor={id} className={FIELD_LABEL_CLASS}>
+            <Label
+                htmlFor={id}
+                className={cn(
+                    FIELD_LABEL_CLASS,
+                    isError && "text-destructive",
+                )}
+            >
                 {label}
             </Label>
             <Input
@@ -110,8 +114,8 @@ function CompactField({
                 className={cn(
                     "h-8 scroll-mt-28 font-mono text-sm",
                     isDirty &&
-                        !isError &&
-                        "border-amber-300 ring-2 ring-amber-400/50 dark:border-amber-700 dark:ring-amber-500/40",
+                    !isError &&
+                    "border-amber-300 ring-2 ring-amber-400/50 dark:border-amber-700 dark:ring-amber-500/40",
                 )}
                 aria-invalid={isError}
             />
@@ -138,10 +142,12 @@ function WindowLengthField({
     onUnitChange: (value: DurationUnit) => void;
     onAmountBlur: () => void;
     disabled?: boolean;
-    meta: { errors: unknown[]; isTouched: boolean };
+    meta: {
+        errors: unknown[];
+    };
     isDirty?: boolean;
 }) {
-    const isError = meta.errors.length > 0 && meta.isTouched;
+    const isError = meta.errors.length > 0;
     const dirtyRingClass =
         isDirty && !isError
             ? "border-amber-300 ring-2 ring-amber-400/50 dark:border-amber-700 dark:ring-amber-500/40"
@@ -204,7 +210,6 @@ function WindowLengthField({
 export function NameMarketRowPanel({
     form,
     index,
-    baseline,
     actionsDisabled,
 }: NameMarketRowPanelProps) {
     const baseName = `markets[${index}]` as const;
@@ -232,9 +237,6 @@ export function NameMarketRowPanel({
                                         : MARKET_FIELD_PLACEHOLDERS.initialPrice
                                 }
                                 meta={field.state.meta}
-                                isDirty={
-                                    field.state.value !== baseline.initialPrice
-                                }
                             />
                         )}
                     </form.Field>
@@ -252,9 +254,6 @@ export function NameMarketRowPanel({
                                     MARKET_FIELD_PLACEHOLDERS.floorPrice
                                 }
                                 meta={field.state.meta}
-                                isDirty={
-                                    field.state.value !== baseline.floorPrice
-                                }
                             />
                         )}
                     </form.Field>
@@ -278,10 +277,10 @@ export function NameMarketRowPanel({
                                         disabled={actionsDisabled}
                                         meta={amountField.state.meta}
                                         isDirty={
-                                            amountField.state.value !==
-                                                baseline.windowAmount ||
-                                            unitField.state.value !==
-                                                baseline.windowUnit
+                                            !amountField.state.meta
+                                                .isDefaultValue ||
+                                            !unitField.state.meta
+                                                .isDefaultValue
                                         }
                                     />
                                 )}
@@ -301,7 +300,6 @@ export function NameMarketRowPanel({
                                 inputMode="numeric"
                                 placeholder={MARKET_FIELD_PLACEHOLDERS.target}
                                 meta={field.state.meta}
-                                isDirty={field.state.value !== baseline.target}
                             />
                         )}
                     </form.Field>
@@ -320,9 +318,6 @@ export function NameMarketRowPanel({
                                     MARKET_FIELD_PLACEHOLDERS.increasePct
                                 }
                                 meta={field.state.meta}
-                                isDirty={
-                                    field.state.value !== baseline.increasePct
-                                }
                             />
                         )}
                     </form.Field>
@@ -341,9 +336,6 @@ export function NameMarketRowPanel({
                                     MARKET_FIELD_PLACEHOLDERS.decreasePct
                                 }
                                 meta={field.state.meta}
-                                isDirty={
-                                    field.state.value !== baseline.decreasePct
-                                }
                             />
                         )}
                     </form.Field>

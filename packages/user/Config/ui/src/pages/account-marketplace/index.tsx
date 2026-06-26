@@ -9,7 +9,6 @@ import {
     type NameMarketsFormValues,
     buildNameMarketsFormValues,
     getDirtyMarkets,
-    marketRowsEqual,
     validateDirtyMarkets,
 } from "@/lib/name-market-form";
 import { scrollToFirstMarketFieldError } from "@/lib/name-market-validation-ui";
@@ -56,6 +55,16 @@ const MARKET_EDITABLE_FIELDS: Array<keyof NameMarketFormRow> = [
     "increasePct",
     "decreasePct",
 ];
+
+function isMarketRowDirty(
+    fieldMeta: Record<string, { isDefaultValue?: boolean } | undefined>,
+    index: number,
+): boolean {
+    return MARKET_EDITABLE_FIELDS.some((field) => {
+        const meta = fieldMeta[`markets[${index}].${field}`];
+        return meta != null && meta.isDefaultValue === false;
+    });
+}
 
 export const NameMarketConfig = () => {
     const { data: systemToken, isLoading: systemTokenLoading } =
@@ -107,17 +116,6 @@ export const NameMarketConfig = () => {
 
                 if (validation?.fields) {
                     window.requestAnimationFrame(() => {
-                        for (const fieldPath of Object.keys(
-                            validation.fields,
-                        )) {
-                            form.setFieldMeta(
-                                fieldPath as `markets[${number}].initialPrice`,
-                                (prev) => ({
-                                    ...prev,
-                                    isTouched: true,
-                                }),
-                            );
-                        }
                         scrollToFirstMarketFieldError(validation.fields);
                     });
                 }
@@ -143,27 +141,17 @@ export const NameMarketConfig = () => {
         },
     });
 
-    const isDirty = useStore(form.store, (state) => state.isDirty);
+    const isDirty = useStore(form.store, (state) => !state.isDefaultValue);
 
     const resetMarketRow = useCallback(
         (index: number) => {
-            const baseline = defaultValues.markets[index];
-            if (!baseline) {
-                return;
-            }
-
             for (const field of MARKET_EDITABLE_FIELDS) {
-                const fieldName =
-                    `markets[${index}].${field}` as `markets[${number}].${typeof field}`;
-                form.setFieldValue(fieldName, baseline[field]);
-                form.setFieldMeta(fieldName, (prev) => ({
-                    ...prev,
-                    isTouched: false,
-                    errors: [],
-                }));
+                form.resetField(
+                    `markets[${index}].${field}` as `markets[${number}].${typeof field}`,
+                );
             }
         },
-        [defaultValues.markets, form],
+        [form],
     );
 
     const isMarketsLoading = systemTokenLoading || isLoading;
@@ -249,151 +237,149 @@ export const NameMarketConfig = () => {
                     }}
                     className="pb-20"
                 >
-                    <div className="space-y-4">
-                        {defaultValues.markets.map((market, index) => (
-                            <Card
-                                key={market.length}
-                                className={cn(
-                                    "gap-0 py-0 shadow-sm",
-                                    !market.configured && "border-dashed",
-                                )}
-                            >
-                                <form.Subscribe
-                                    selector={(state) => {
-                                        const current =
-                                            state.values.markets[index];
-                                        const baseline =
-                                            defaultValues.markets[index];
-                                        return {
-                                            enabled: current?.enabled,
-                                            isRowDirty:
-                                                current !== undefined &&
-                                                baseline !== undefined &&
-                                                !marketRowsEqual(
-                                                    current,
-                                                    baseline,
+                    <form.Subscribe selector={(state) => state.values.markets}>
+                        {(markets) => (
+                            <div className="space-y-4">
+                                {markets.map((market, index) => (
+                                    <Card
+                                        key={market.length}
+                                        className={cn(
+                                            "gap-0 py-0 shadow-sm",
+                                            !market.configured &&
+                                                "border-dashed",
+                                        )}
+                                    >
+                                        <form.Subscribe
+                                            selector={(state) => ({
+                                                enabled:
+                                                    state.values.markets[index]
+                                                        ?.enabled,
+                                                isRowDirty: isMarketRowDirty(
+                                                    state.fieldMeta,
+                                                    index,
                                                 ),
-                                        };
-                                    }}
-                                >
-                                    {({ enabled, isRowDirty }) => (
-                                        <>
-                                            <CardHeader
-                                                className={cn(
-                                                    "flex items-center gap-4 px-4 py-3",
-                                                    enabled &&
-                                                        "[.border-b]:pb-3 border-b",
-                                                )}
-                                            >
-                                                <div className="flex flex-1 flex-wrap items-center justify-between gap-2">
-                                                    <div className="flex flex-wrap items-center gap-2">
-                                                        <CardTitle className="font-mono text-sm font-medium">
-                                                            Length{" "}
-                                                            {market.length}
-                                                        </CardTitle>
-                                                        {market.configured &&
-                                                        enabled &&
-                                                        systemToken ? (
-                                                            <LivePrice
-                                                                price={livePriceByLength.get(
-                                                                    market.length,
-                                                                )}
-                                                                systemToken={
-                                                                    systemToken
-                                                                }
-                                                                className="text-muted-foreground px-1 py-0.5 text-xs"
-                                                            />
-                                                        ) : null}
-                                                    </div>
-                                                    <div
+                                            })}
+                                        >
+                                            {({ enabled, isRowDirty }) => (
+                                                <>
+                                                    <CardHeader
                                                         className={cn(
-                                                            "flex items-center gap-1.5",
-                                                            !isRowDirty &&
-                                                                "invisible",
+                                                            "flex items-center gap-4 px-4 py-3",
+                                                            enabled &&
+                                                                "[.border-b]:pb-3 border-b",
                                                         )}
-                                                        aria-hidden={
-                                                            !isRowDirty
-                                                        }
                                                     >
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
-                                                        >
-                                                            Unsaved changes
-                                                        </Badge>
-                                                        <Button
-                                                            type="button"
-                                                            variant="ghost"
-                                                            size="icon-sm"
-                                                            disabled={
-                                                                rowActionsDisabled ||
-                                                                isSaving
-                                                            }
-                                                            aria-label="Reset changes"
-                                                            onClick={() =>
-                                                                resetMarketRow(
-                                                                    index,
-                                                                )
-                                                            }
-                                                        >
-                                                            <Undo2 />
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <Label
-                                                        htmlFor={`pm-enabled-${index}`}
-                                                        className="text-muted-foreground text-xs font-normal"
-                                                    >
-                                                        Enabled
-                                                    </Label>
-                                                    <form.Field
-                                                        name={`markets[${index}].enabled`}
-                                                    >
-                                                        {(field) => (
-                                                            <Switch
-                                                                id={`pm-enabled-${index}`}
-                                                                checked={
-                                                                    field.state
-                                                                        .value
+                                                        <div className="flex flex-1 flex-wrap items-center justify-between gap-2">
+                                                            <div className="flex flex-wrap items-center gap-2">
+                                                                <CardTitle className="font-mono text-sm font-medium">
+                                                                    Length{" "}
+                                                                    {
+                                                                        market.length
+                                                                    }
+                                                                </CardTitle>
+                                                                {market.configured &&
+                                                                enabled &&
+                                                                systemToken ? (
+                                                                    <LivePrice
+                                                                        price={livePriceByLength.get(
+                                                                            market.length,
+                                                                        )}
+                                                                        systemToken={
+                                                                            systemToken
+                                                                        }
+                                                                        className="text-muted-foreground px-1 py-0.5 text-xs"
+                                                                    />
+                                                                ) : null}
+                                                            </div>
+                                                            <div
+                                                                className={cn(
+                                                                    "flex items-center gap-1.5",
+                                                                    !isRowDirty &&
+                                                                        "invisible",
+                                                                )}
+                                                                aria-hidden={
+                                                                    !isRowDirty
                                                                 }
-                                                                disabled={
+                                                            >
+                                                                <Badge
+                                                                    variant="outline"
+                                                                    className="border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
+                                                                >
+                                                                    Unsaved
+                                                                    changes
+                                                                </Badge>
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="ghost"
+                                                                    size="icon-sm"
+                                                                    disabled={
+                                                                        rowActionsDisabled ||
+                                                                        isSaving
+                                                                    }
+                                                                    aria-label="Reset changes"
+                                                                    onClick={() =>
+                                                                        resetMarketRow(
+                                                                            index,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <Undo2 />
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <Label
+                                                                htmlFor={`pm-enabled-${index}`}
+                                                                className="text-muted-foreground text-xs font-normal"
+                                                            >
+                                                                Enabled
+                                                            </Label>
+                                                            <form.Field
+                                                                name={`markets[${index}].enabled`}
+                                                            >
+                                                                {(field) => (
+                                                                    <Switch
+                                                                        id={`pm-enabled-${index}`}
+                                                                        checked={
+                                                                            field
+                                                                                .state
+                                                                                .value
+                                                                        }
+                                                                        disabled={
+                                                                            rowActionsDisabled ||
+                                                                            isSaving
+                                                                        }
+                                                                        aria-label={`Purchases for length-${market.length} names`}
+                                                                        onCheckedChange={
+                                                                            field.handleChange
+                                                                        }
+                                                                    />
+                                                                )}
+                                                            </form.Field>
+                                                        </div>
+                                                    </CardHeader>
+                                                    {enabled ? (
+                                                        <CardContent className="px-4 py-3">
+                                                            <NameMarketRowPanel
+                                                                form={
+                                                                    form as NameMarketRowPanelProps["form"]
+                                                                }
+                                                                index={index}
+                                                                actionsDisabled={
                                                                     rowActionsDisabled ||
                                                                     isSaving
                                                                 }
-                                                                aria-label={`Purchases for length-${market.length} names`}
-                                                                onCheckedChange={
-                                                                    field.handleChange
-                                                                }
                                                             />
-                                                        )}
-                                                    </form.Field>
-                                                </div>
-                                            </CardHeader>
-                                            {enabled ? (
-                                                <CardContent className="px-4 py-3">
-                                                    <NameMarketRowPanel
-                                                        form={
-                                                            form as NameMarketRowPanelProps["form"]
-                                                        }
-                                                        index={index}
-                                                        baseline={
-                                                            defaultValues
-                                                                .markets[index]!
-                                                        }
-                                                        actionsDisabled={
-                                                            rowActionsDisabled ||
-                                                            isSaving
-                                                        }
-                                                    />
-                                                </CardContent>
-                                            ) : null}
-                                        </>
-                                    )}
-                                </form.Subscribe>
-                            </Card>
-                        ))}
-                    </div>
+                                                        </CardContent>
+                                                    ) : null}
+                                                </>
+                                            )}
+                                        </form.Subscribe>
+                                    </Card>
+                                ))}
+                            </div>
+                        )}
+                    </form.Subscribe>
 
                     <div
                         className={cn(
