@@ -137,9 +137,9 @@ export function buildNameMarketsFormValues(
         const windowForm = configured
             ? secondsToWindowForm(row!.windowSeconds)
             : {
-                  amount: "",
-                  unit: NAME_MARKET_DEFAULT_PARAMS.windowUnit,
-              };
+                amount: "",
+                unit: NAME_MARKET_DEFAULT_PARAMS.windowUnit,
+            };
         markets.push({
             length,
             configured,
@@ -157,40 +157,15 @@ export function buildNameMarketsFormValues(
     return { markets };
 }
 
-export function marketRowsEqual(
-    a: NameMarketFormRow,
-    b: NameMarketFormRow,
-): boolean {
-    return (
-        a.enabled === b.enabled &&
-        a.initialPrice === b.initialPrice &&
-        a.floorPrice === b.floorPrice &&
-        a.windowAmount === b.windowAmount &&
-        a.windowUnit === b.windowUnit &&
-        a.target === b.target &&
-        a.increasePct === b.increasePct &&
-        a.decreasePct === b.decreasePct
-    );
-}
-
-export function getDirtyMarkets(
-    values: NameMarketsFormValues,
-    defaults: NameMarketsFormValues,
-): NameMarketFormRow[] {
-    return values.markets.filter(
-        (row, index) => !marketRowsEqual(row, defaults.markets[index]!),
-    );
-}
-
 export function validateDirtyMarkets(
     values: NameMarketsFormValues,
-    defaults: NameMarketsFormValues,
     systemToken: SystemTokenInfo,
+    isRowDirty: (index: number) => boolean,
 ): { fields: Record<string, string> } | undefined {
     const fieldErrors: Record<string, string> = {};
 
     values.markets.forEach((row, index) => {
-        if (marketRowsEqual(row, defaults.markets[index]!)) {
+        if (!isRowDirty(index)) {
             return;
         }
 
