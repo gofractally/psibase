@@ -15,7 +15,7 @@ namespace UserService
       static constexpr auto                   serviceFlags = 0;
 
       /// Mark the table as having a pending index update
-      void update(psibase::DbId db, psibase::AccountNumber service, psibase::MethodNumber event);
+      void update(EventDb db, psibase::AccountNumber service, psibase::MethodNumber event);
       /// Indexes all new events. This is run automatically at the end of every transaction.
       void sync();
       /// Runs in subjective mode at the end of each block

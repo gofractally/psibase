@@ -59,8 +59,8 @@ pub mod service {
         table.put(&InitRow {}).unwrap();
 
         let updated = MethodNumber::from("updated");
-        Events::call().addIndex(DbId::HistoryEvent, SERVICE, updated, 0); // Index events related to specific txid
-        Events::call().addIndex(DbId::HistoryEvent, SERVICE, updated, 1); // Index events related to specific proposer/accepter/rejecter
+        Events::call().addIndex(EventDb::HistoryEvent, SERVICE, updated, 0); // Index events related to specific txid
+        Events::call().addIndex(EventDb::HistoryEvent, SERVICE, updated, 1); // Index events related to specific proposer/accepter/rejecter
     }
 
     /// Proposes a new staged transaction containing the specified actions.

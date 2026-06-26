@@ -175,10 +175,13 @@ namespace SystemService
 
    struct EventIndexerInterface
    {
+      void startBlock();
       /// Indexes all new events. This is run automatically at the end of every transaction.
       void sync();
+      // Gets the eventMerkle root and writes back any cached state
+      auto saveMerkle() -> psibase::Checksum256;
    };
-   PSIO_REFLECT(EventIndexerInterface, method(sync))
+   PSIO_REFLECT(EventIndexerInterface, method(startBlock), method(sync), method(saveMerkle))
 
    struct VerifyInterface
    {

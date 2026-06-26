@@ -107,25 +107,6 @@ mod service {
             AnswerTable::read().get_index_pk().get(&account)
         }
 
-        /// Look up an event
-        ///
-        /// ```
-        /// query {
-        ///   event(id: 1) {
-        ///     __typename
-        ///     ... on Add {
-        ///       a b result
-        ///     }
-        ///     ... on Multiply {
-        ///       a b result
-        ///     }
-        ///   }
-        /// }
-        /// ```
-        async fn event(&self, id: u64) -> Result<event_structs::HistoryEvents, anyhow::Error> {
-            get_event(id)
-        }
-
         async fn get_add_events(
             &self,
             condition: Option<String>,

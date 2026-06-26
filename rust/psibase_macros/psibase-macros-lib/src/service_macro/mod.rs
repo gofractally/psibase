@@ -555,7 +555,7 @@ fn process_mod(
         items.push(parse_quote! {
             #[automatically_derived]
             pub struct #history_events {
-                event_log: #psibase_mod::DbId,
+                event_log: #psibase_mod::EventDb,
                 sender: #psibase_mod::AccountNumber,
             }
         });
@@ -563,7 +563,7 @@ fn process_mod(
         items.push(parse_quote! {
             #[automatically_derived]
             pub struct #ui_events {
-                event_log: #psibase_mod::DbId,
+                event_log: #psibase_mod::EventDb,
                 sender: #psibase_mod::AccountNumber,
             }
         });
@@ -571,7 +571,7 @@ fn process_mod(
         items.push(parse_quote! {
             #[automatically_derived]
             pub struct #merkle_events {
-                event_log: #psibase_mod::DbId,
+                event_log: #psibase_mod::EventDb,
                 sender: #psibase_mod::AccountNumber,
             }
         });
@@ -601,13 +601,10 @@ fn process_mod(
         items.push(parse_quote! {
             impl EmitEvent {
                 pub fn history(&self) -> #history_events {
-                    #history_events { event_log: #psibase_mod::DbId::HistoryEvent, sender: self.sender }
-                }
-                pub fn ui(&self) -> #ui_events {
-                    #ui_events { event_log: #psibase_mod::DbId::UiEvent, sender: self.sender }
+                    #history_events { event_log: #psibase_mod::EventDb::HistoryEvent, sender: self.sender }
                 }
                 pub fn merkle(&self) -> #merkle_events {
-                    #merkle_events { event_log: #psibase_mod::DbId::MerkleEvent, sender: self.sender }
+                    #merkle_events { event_log: #psibase_mod::EventDb::MerkleEvent, sender: self.sender }
                 }
             }
         });
@@ -901,11 +898,6 @@ fn gen_polyfill(psibase_mod: &proc_macro2::TokenStream) -> proc_macro2::TokenStr
             }
 
             #[no_mangle]
-            pub unsafe extern "C" fn getSequential(db: DbId, id: u64) -> u32 {
-                tester::polyfill::getSequential(db, id)
-            }
-
-            #[no_mangle]
             pub unsafe extern "C" fn kvGreaterEqual(
                 db: KvHandle,
                 key: *const u8,
@@ -942,10 +934,6 @@ fn gen_polyfill(psibase_mod: &proc_macro2::TokenStream) -> proc_macro2::TokenStr
             #[no_mangle]
             pub unsafe extern "C" fn call(action: *const u8, len: u32, flags: u64) -> u32 {
                 panic!("call not supported in tester");
-            }
-            #[no_mangle]
-            pub unsafe extern "C" fn putSequential(_db: DbId, _value: *const u8, _value_len: u32) -> u64 {
-                panic!("putSequential not supported in tester");
             }
             #[no_mangle]
             pub unsafe extern "C" fn getCurrentAction() -> u32 {

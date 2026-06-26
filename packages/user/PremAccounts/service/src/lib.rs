@@ -79,7 +79,7 @@ pub mod service {
     fn register_prem_acct_event_indices() {
         let add_index = |method: &str, column: u8| {
             events::Wrapper::call().addIndex(
-                DbId::HistoryEvent,
+                EventDb::HistoryEvent,
                 get_service(),
                 MethodNumber::from(method),
                 column,

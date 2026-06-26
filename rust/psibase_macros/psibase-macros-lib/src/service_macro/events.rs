@@ -40,7 +40,7 @@ pub fn process_event_callers(
         #outer_doc
         pub fn #name(&self, #inputs) -> u64 {
             #inner_doc
-            #psibase_mod::put_sequential(self.event_log, self.sender, &#method_number, &(#invoke_args))
+            #psibase_mod::services::events::Wrapper::call().event(self.event_log, #method_number, #psibase_mod::fracpack::Pack::packed(&(#invoke_args)))
         }
     };
 }

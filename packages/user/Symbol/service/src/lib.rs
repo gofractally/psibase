@@ -303,7 +303,7 @@ pub mod service {
 
             let add_index = |method: &str, column: u8| {
                 events::Wrapper::call().addIndex(
-                    DbId::HistoryEvent,
+                    EventDb::HistoryEvent,
                     Wrapper::SERVICE,
                     MethodNumber::from(method),
                     column,
@@ -341,7 +341,10 @@ pub mod service {
 
     #[action]
     fn admin_create(symbol: AccountNumber, recipient: AccountNumber) {
-        check(get_sender() == get_service(), "only symbol service can call this action");
+        check(
+            get_sender() == get_service(),
+            "only symbol service can call this action",
+        );
         Symbol::add(symbol, recipient);
     }
 

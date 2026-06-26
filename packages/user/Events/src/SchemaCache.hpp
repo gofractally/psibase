@@ -8,7 +8,7 @@ namespace UserService
    struct SchemaCache
    {
       explicit SchemaCache(InstalledSchemaTable table);
-      const psio::schema_types::CompiledType* getSchemaType(psibase::DbId          db,
+      const psio::schema_types::CompiledType* getSchemaType(psibase::EventDb       db,
                                                             psibase::AccountNumber service,
                                                             psibase::MethodNumber  event);
 
