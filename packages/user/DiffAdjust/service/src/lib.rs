@@ -144,12 +144,14 @@ pub mod tables {
             }
         }
 
-        // PRECONDITION: `factor` is based on an increase specified in PPM
+        // PRECONDITION: `increase_ppm`, which `factor` is based on, must be ppm resolution or courser.
         fn apply_increase(difficulty: u64, factor: f64, times: u32) -> u64 {
             if times == 0 || difficulty == u64::MAX || factor <= 1.0 {
                 return difficulty;
             }
             // ensure no cast safety of `times` from u32 to i32
+            // `increase_ppm`, specified in higher resolution than ppm, may lead to a premature calculation of overflow
+            // if `times` doesn't fit in `i32`, and `factor` is at least 1.0 + 1PPM, the result overflows f64
             let powered = if times > i32::MAX as u32 {
                 f64::INFINITY
             } else {
