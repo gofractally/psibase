@@ -55,10 +55,10 @@ const MARKET_EDITABLE_FIELDS: Array<keyof NameMarketFormRow> = [
     "decreasePct",
 ];
 
-function isMarketRowDirty(
+const isMarketRowDirty = (
     fieldMeta: Record<string, { isDefaultValue?: boolean } | undefined>,
     index: number,
-): boolean {
+): boolean => {
     return MARKET_EDITABLE_FIELDS.some((field) => {
         const meta = fieldMeta[`markets[${index}].${field}`];
         return meta != null && meta.isDefaultValue === false;
@@ -105,12 +105,11 @@ export const NameMarketConfig = () => {
                     return undefined;
                 }
 
-                const defaults = formApi.options
-                    .defaultValues as NameMarketsFormValues;
+                const { fieldMeta } = formApi.state;
                 const validation = validateDirtyMarkets(
                     value,
-                    defaults,
                     systemToken,
+                    (index) => isMarketRowDirty(fieldMeta, index),
                 );
 
                 if (validation?.fields) {
@@ -246,7 +245,7 @@ export const NameMarketConfig = () => {
                                         className={cn(
                                             "gap-0 py-0 shadow-sm",
                                             !market.configured &&
-                                                "border-dashed",
+                                            "border-dashed",
                                         )}
                                     >
                                         <form.Subscribe
@@ -266,7 +265,7 @@ export const NameMarketConfig = () => {
                                                         className={cn(
                                                             "flex items-center gap-4 px-4 py-3",
                                                             enabled &&
-                                                                "[.border-b]:pb-3 border-b",
+                                                            "[.border-b]:pb-3 border-b",
                                                         )}
                                                     >
                                                         <div className="flex flex-1 flex-wrap items-center justify-between gap-2">
@@ -278,8 +277,8 @@ export const NameMarketConfig = () => {
                                                                     }
                                                                 </CardTitle>
                                                                 {market.configured &&
-                                                                enabled &&
-                                                                systemToken ? (
+                                                                    enabled &&
+                                                                    systemToken ? (
                                                                     <LivePrice
                                                                         price={livePriceByLength.get(
                                                                             market.length,
@@ -295,7 +294,7 @@ export const NameMarketConfig = () => {
                                                                 className={cn(
                                                                     "flex items-center gap-1.5",
                                                                     !isRowDirty &&
-                                                                        "invisible",
+                                                                    "invisible",
                                                                 )}
                                                                 aria-hidden={
                                                                     !isRowDirty
