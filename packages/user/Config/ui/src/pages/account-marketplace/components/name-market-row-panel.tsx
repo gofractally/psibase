@@ -95,10 +95,7 @@ function CompactField({
         <div className="grid min-w-0 gap-1">
             <Label
                 htmlFor={id}
-                className={cn(
-                    FIELD_LABEL_CLASS,
-                    isError && "text-destructive",
-                )}
+                className={FIELD_LABEL_CLASS}
             >
                 {label}
             </Label>
