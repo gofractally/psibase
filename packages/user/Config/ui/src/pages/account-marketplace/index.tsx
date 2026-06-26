@@ -8,7 +8,6 @@ import {
     type NameMarketFormRow,
     type NameMarketsFormValues,
     buildNameMarketsFormValues,
-    getDirtyMarkets,
     validateDirtyMarkets,
 } from "@/lib/name-market-form";
 import { scrollToFirstMarketFieldError } from "@/lib/name-market-validation-ui";
@@ -128,9 +127,10 @@ export const NameMarketConfig = () => {
                 return;
             }
 
-            const defaults = formApi.options
-                .defaultValues as NameMarketsFormValues;
-            const dirtyRows = getDirtyMarkets(value, defaults);
+            const { fieldMeta } = formApi.state;
+            const dirtyRows = value.markets.filter((_, index) =>
+                isMarketRowDirty(fieldMeta, index),
+            );
             if (dirtyRows.length === 0) {
                 return;
             }

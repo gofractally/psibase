@@ -173,15 +173,6 @@ export function marketRowsEqual(
     );
 }
 
-export function getDirtyMarkets(
-    values: NameMarketsFormValues,
-    defaults: NameMarketsFormValues,
-): NameMarketFormRow[] {
-    return values.markets.filter(
-        (row, index) => !marketRowsEqual(row, defaults.markets[index]!),
-    );
-}
-
 export function validateDirtyMarkets(
     values: NameMarketsFormValues,
     defaults: NameMarketsFormValues,
@@ -190,9 +181,6 @@ export function validateDirtyMarkets(
     const fieldErrors: Record<string, string> = {};
 
     values.markets.forEach((row, index) => {
-        if (marketRowsEqual(row, defaults.markets[index]!)) {
-            return;
-        }
 
         const result = zDirtyMarketRow(systemToken).safeParse(row);
         if (result.success) {
