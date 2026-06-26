@@ -6,7 +6,6 @@ import { useConfiguredNameMarkets } from "@/hooks/name-markets/use-configured-ma
 import { useSaveNameMarkets } from "@/hooks/name-markets/use-save-name-markets";
 import {
     type NameMarketFormRow,
-    type NameMarketsFormValues,
     buildNameMarketsFormValues,
     validateDirtyMarkets,
 } from "@/lib/name-market-form";
