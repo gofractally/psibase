@@ -781,7 +781,6 @@ cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/NameMarket.psi
     PATH packages/user/NameMarket
     TARGET_DIR ${USER_WORKSPACE_TARGET}
-    DEPENDS ${NameMarket_js_DEP}
 )
 
 psibase_package(

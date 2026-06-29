@@ -44,7 +44,7 @@ export const TextInput = ({
                 )}
             />
             {endContent && (
-                <span className="text-muted-foreground pointer-events-none flex items-center">
+                <span className="pointer-events-none flex items-center">
                     {endContent}
                 </span>
             )}
