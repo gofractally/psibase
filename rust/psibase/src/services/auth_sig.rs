@@ -135,11 +135,7 @@ mod service {
     /// * `true`: If the sender is among the rejecters
     /// * `false`: If the sender is not among the rejecters
     #[action]
-    fn isRejectSys(
-        sender: AccountNumber,
-        rejecters: Vec<AccountNumber>,
-        method: Option<ServiceMethod>,
-    ) -> bool {
+    fn isRejectSys(sender: AccountNumber, rejecters: Vec<AccountNumber>) -> bool {
         unimplemented!()
     }
 

@@ -94,11 +94,7 @@ mod service {
     }
 
     #[action]
-    fn isRejectSys(
-        sender: AccountNumber,
-        rejecters: Vec<AccountNumber>,
-        method: Option<ServiceMethod>,
-    ) -> bool {
+    fn isRejectSys(sender: AccountNumber, rejecters: Vec<AccountNumber>) -> bool {
         unimplemented!()
     }
 }
