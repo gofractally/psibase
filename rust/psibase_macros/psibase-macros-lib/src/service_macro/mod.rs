@@ -236,33 +236,6 @@ fn process_mod(
             pub struct #wrapper;
         });
 
-        let push_from_to_doc = format!(
-            "
-            push transactions to [psibase::Chain]({psibase}::Chain).
-
-            This method returns an object which has [methods]({actions}#implementations)
-            (one per action) which push transactions to a test chain and return a
-            [psibase::ChainResult]({psibase}::ChainResult) or
-            [psibase::ChainEmptyResult]({psibase}::ChainEmptyResult). This final object
-            can verify success or failure and can retrieve the return value, if any.
-
-            ",
-            psibase = options.psibase_mod,
-            actions = options.actions
-        );
-        let push_doc = format!(
-            "{} This method defaults both `sender` and `service` to \"{}\".",
-            push_from_to_doc, options.name
-        );
-        let push_to_doc = format!(
-            "{} This method defaults `sender` to \"{}\".",
-            push_from_to_doc, options.name
-        );
-        let push_from_doc = format!(
-            "{} This method defaults `service` to \"{}\".",
-            push_from_to_doc, options.name
-        );
-
         let pack_from_to_doc = format!(
             "
             Pack actions into [psibase::Action]({psibase}::Action).
@@ -306,50 +279,6 @@ fn process_mod(
                 #[doc = #constant_doc]
                 pub const SERVICE: #psibase_mod::AccountNumber =
                     #psibase_mod::AccountNumber::new(#psibase_mod::account_raw!(#service_account));
-
-                #[doc = #push_doc]
-                pub fn push(chain: &#psibase_mod::Chain) -> #actions<#psibase_mod::ChainPusher> {
-                    #psibase_mod::ChainPusher {
-                        chain,
-                        sender: Self::#constant,
-                        service: Self::#constant,
-                    }
-                    .into()
-                }
-
-                #[doc = #push_to_doc]
-                pub fn push_to(chain: &#psibase_mod::Chain, service: #psibase_mod::AccountNumber)
-                -> #actions<#psibase_mod::ChainPusher>
-                {
-                    #psibase_mod::ChainPusher {
-                        chain,
-                        sender: Self::#constant,
-                        service,
-                    }
-                    .into()
-                }
-
-                #[doc = #push_from_doc]
-                pub fn push_from(chain: &#psibase_mod::Chain, sender: #psibase_mod::AccountNumber)
-                -> #actions<#psibase_mod::ChainPusher>
-                {
-                    #psibase_mod::ChainPusher {
-                        chain,
-                        sender,
-                        service: Self::#constant,
-                    }
-                    .into()
-                }
-
-                #[doc = #push_from_to_doc]
-                pub fn push_from_to(
-                    chain: &#psibase_mod::Chain,
-                    sender: #psibase_mod::AccountNumber,
-                    service: #psibase_mod::AccountNumber)
-                -> #actions<#psibase_mod::ChainPusher>
-                {
-                    #psibase_mod::ChainPusher { chain, sender, service }.into()
-                }
 
                 #[doc = #pack_doc]
                 pub fn pack() -> #actions<#psibase_mod::ActionPacker> {

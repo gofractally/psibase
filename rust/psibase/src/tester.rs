@@ -14,9 +14,9 @@ use crate::{
     AccountNumber, Action, ActionFormatter, BlockTime, Caller, Checksum256, CodeByHashRow, CodeRow,
     DbId, DirectoryRegistry, Error, HostConfigRow, HttpBody, HttpHeader, HttpReply, HttpRequest,
     InnerTraceEnum, JointRegistry, KvHandle, KvMode, PackageOpFull, PackageRegistry,
-    PackagedService, RunMode, Schema, SchemaFetcher, SchemaMap, Seconds, SignedTransaction,
-    StatusRow, Table, TableRecord, Tapos, TimePointSec, TimePointUSec, ToKey, Transaction,
-    TransactionBuilder, TransactionTrace,
+    PackagedService, RunMode, Schema, SchemaFetcher, SchemaMap, Seconds, ServiceWrapper,
+    SignedTransaction, StatusRow, Table, TableRecord, Tapos, TimePointSec, TimePointUSec, ToKey,
+    Transaction, TransactionBuilder, TransactionTrace,
 };
 #[cfg(target_family = "wasm")]
 use crate::{MicroSeconds, PackageList};
@@ -1112,6 +1112,68 @@ impl<'a> Caller for ChainPusher<'a> {
         ret
     }
 }
+
+pub trait Push: ServiceWrapper {
+    /// push transactions to [psibase::Chain](psibase::Chain).
+    ///
+    /// This method returns an object which has methods
+    /// (one per action) which push transactions to a test chain and return a
+    /// [psibase::ChainResult](psibase::ChainResult) or
+    /// [psibase::ChainEmptyResult](psibase::ChainEmptyResult). This final object
+    /// can verify success or failure and can retrieve the return value, if any.
+    ///
+    /// This method defaults both `sender` and `service` to Self::SERVICE
+    fn push<'a>(chain: &'a Chain) -> Self::Actions<ChainPusher<'a>> {
+        Self::push_from_to(chain, Self::SERVICE, Self::SERVICE)
+    }
+
+    /// push transactions to [psibase::Chain](psibase::Chain).
+    ///
+    /// This method returns an object which has methods
+    /// (one per action) which push transactions to a test chain and return a
+    /// [psibase::ChainResult](psibase::ChainResult) or
+    /// [psibase::ChainEmptyResult](psibase::ChainEmptyResult). This final object
+    /// can verify success or failure and can retrieve the return value, if any.
+    ///
+    /// This method defaults `sender` to Self::SERVICE
+    fn push_to<'a>(chain: &'a Chain, service: AccountNumber) -> Self::Actions<ChainPusher<'a>> {
+        Self::push_from_to(chain, Self::SERVICE, service)
+    }
+
+    /// push transactions to [psibase::Chain](psibase::Chain).
+    ///
+    /// This method returns an object which has methods
+    /// (one per action) which push transactions to a test chain and return a
+    /// [psibase::ChainResult](psibase::ChainResult) or
+    /// [psibase::ChainEmptyResult](psibase::ChainEmptyResult). This final object
+    /// can verify success or failure and can retrieve the return value, if any.
+    ///
+    /// This method defaults `service` to Self::SERVICE
+    fn push_from<'a>(chain: &'a Chain, sender: AccountNumber) -> Self::Actions<ChainPusher<'a>> {
+        Self::push_from_to(chain, sender, Self::SERVICE)
+    }
+
+    /// push transactions to [psibase::Chain](psibase::Chain).
+    ///
+    /// This method returns an object which has methods
+    /// (one per action) which push transactions to a test chain and return a
+    /// [psibase::ChainResult](psibase::ChainResult) or
+    /// [psibase::ChainEmptyResult](psibase::ChainEmptyResult). This final object
+    /// can verify success or failure and can retrieve the return value, if any.
+    fn push_from_to<'a>(
+        chain: &'a Chain,
+        sender: AccountNumber,
+        service: AccountNumber,
+    ) -> Self::Actions<ChainPusher<'a>> {
+        Self::with_caller(ChainPusher {
+            chain,
+            sender,
+            service,
+        })
+    }
+}
+
+impl<T: ServiceWrapper> Push for T {}
 
 #[cfg(target_family = "wasm")]
 #[allow(non_snake_case)]
