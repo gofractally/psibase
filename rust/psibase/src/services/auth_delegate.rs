@@ -55,11 +55,7 @@ mod service {
     /// * `true`: If the sender's owner is among the authorizers
     /// * `false`: Otherwise
     #[action]
-    fn isAuthSys(
-        sender: AccountNumber,
-        authorizers: Vec<AccountNumber>,
-        method: Option<ServiceMethod>,
-    ) -> bool {
+    fn isAuthSys(sender: AccountNumber, authorizers: Vec<AccountNumber>) -> bool {
         unimplemented!()
     }
 
