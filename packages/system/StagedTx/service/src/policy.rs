@@ -62,26 +62,71 @@ fn is_reject_sys(
 
 type CheckFn = fn(&ServiceCaller, AccountNumber, Vec<AccountNumber>, Option<ServiceMethod>) -> bool;
 
-/// A single account in the delegation graph that still needs delegate-based
-/// resolution: its auth service, the method to check it against, and the deduped
-/// set of accounts it delegates authority to.
+/// A single account in the method-wiped delegation graph that still needs
+/// delegate-based resolution: its auth service and the deduped set of accounts
+/// it delegates authority to.
 struct Delegation {
     account: AccountNumber,
     auth_service: AccountNumber,
     delegates: Vec<AccountNumber>,
-    method: Option<ServiceMethod>,
 }
 
-/// Determines whether `user` is authorized given the accounts that actually
-/// responded (`responders`).
+/// Fetches an account's delegations, deduped while preserving order.
+fn deduped_delegations(
+    caller: &ServiceCaller,
+    account: AccountNumber,
+    method: Option<ServiceMethod>,
+) -> Vec<AccountNumber> {
+    let mut delegates: Vec<AccountNumber> = Vec::new();
+    for delegate in get_delegations(caller, account, method) {
+        if !delegates.contains(&delegate) {
+            delegates.push(delegate);
+        }
+    }
+    delegates
+}
+
+/// The authorizers available to an account without resolving any delegate: the
+/// responders themselves for a leaf, or the delegates that responded directly.
+fn direct_authorizers(
+    delegates: &[AccountNumber],
+    responders: &[AccountNumber],
+) -> Vec<AccountNumber> {
+    if delegates.is_empty() {
+        responders.to_vec()
+    } else {
+        delegates
+            .iter()
+            .copied()
+            .filter(|delegate| responders.contains(delegate))
+            .collect()
+    }
+}
+
+/// The authorizers backing an account once its delegates have been resolved: the
+/// delegates that either responded directly or came out authorized.
+fn resolved_authorizers(
+    delegates: &[AccountNumber],
+    responders: &[AccountNumber],
+    authorized: &[AccountNumber],
+) -> Vec<AccountNumber> {
+    delegates
+        .iter()
+        .copied()
+        .filter(|delegate| responders.contains(delegate) || authorized.contains(delegate))
+        .collect()
+}
+
+/// Resolves the delegation graph reachable from `seeds` and returns the set of
+/// accounts that come out authorized (i.e. that can act as authorizers for the
+/// accounts delegating to them).
 ///
-/// A leaf account (one that delegates to no one) is authorized if the responders
-/// satisfy its auth service. Otherwise authority is derived from the delegated
-/// accounts that are themselves authorized.
+/// Every account here is queried and checked with the method wiped (`None`),
+/// because staged-tx drops the method as authority propagates down the chain;
+/// the originating, method-bearing account is handled separately by the caller.
 ///
-/// The graph reachable from `user` is explored top-down while authority is
-/// resolved bottom-up. Several optimizations keep the number of (cross-service)
-/// auth queries small:
+/// The graph is explored top-down while authority is resolved bottom-up. Several
+/// optimizations keep the number of (cross-service) auth queries small:
 ///
 /// * Each account's auth service is queried for its delegations exactly once.
 ///   Accounts reachable through multiple paths (e.g. a multisig whose signers
@@ -97,22 +142,17 @@ struct Delegation {
 /// * Once every delegate of an account is resolved (known to be authorized or
 ///   known to fail) and the account still isn't authorized, it is marked as
 ///   known to fail and is never revisited.
-///
-/// `method` is only meaningful for `user`. Delegated accounts are queried with
-/// `None` because staged-tx (not the auth services) is responsible for wiping
-/// the method as authority propagates down the chain.
-fn check_delegation_auth(
-    user: AccountNumber,
-    method: ServiceMethod,
+fn resolve_authorizations(
+    seeds: &[AccountNumber],
     responders: &[AccountNumber],
     check_fn: CheckFn,
-) -> bool {
+) -> Vec<AccountNumber> {
     enum Frame {
-        Enter(AccountNumber, Option<ServiceMethod>),
+        Enter(AccountNumber),
         Exit(Delegation),
     }
 
-    let mut stack: Vec<Frame> = vec![Frame::Enter(user, Some(method))];
+    let mut stack: Vec<Frame> = seeds.iter().map(|seed| Frame::Enter(*seed)).collect();
     let mut graph: Vec<Delegation> = Vec::new();
     let mut seen: Vec<AccountNumber> = Vec::new();
     let mut authorized: Vec<AccountNumber> = Vec::new();
@@ -121,14 +161,14 @@ fn check_delegation_auth(
     // Top-down expansion. Records `graph` in post-order and resolves every
     // account that can be decided without recursing into its delegates.
     while let Some(frame) = stack.pop() {
-        let (account, account_method) = match frame {
+        let account = match frame {
             // Reached on the way back up: every delegate has been expanded, so
             // recording the account now keeps `graph` in post-order.
             Frame::Exit(delegation) => {
                 graph.push(delegation);
                 continue;
             }
-            Frame::Enter(account, account_method) => (account, account_method),
+            Frame::Enter(account) => account,
         };
 
         if seen.contains(&account) {
@@ -143,26 +183,14 @@ fn check_delegation_auth(
         };
 
         let caller = auth_caller(auth_service);
-        let mut delegates: Vec<AccountNumber> = Vec::new();
-        for delegate in get_delegations(&caller, account, account_method) {
-            if !delegates.contains(&delegate) {
-                delegates.push(delegate);
-            }
-        }
+        let delegates = deduped_delegations(&caller, account, None);
 
-        // Authorizers available without resolving any delegate: the responders
-        // themselves for a leaf, or the delegates that responded directly.
-        let direct_authorizers: Vec<AccountNumber> = if delegates.is_empty() {
-            responders.to_vec()
-        } else {
-            delegates
-                .iter()
-                .copied()
-                .filter(|delegate| responders.contains(delegate))
-                .collect()
-        };
-
-        if check_fn(&caller, account, direct_authorizers, account_method) {
+        if check_fn(
+            &caller,
+            account,
+            direct_authorizers(&delegates, responders),
+            None,
+        ) {
             // Authorized already; its delegates can't change that, so skip them.
             authorized.push(account);
             continue;
@@ -180,10 +208,9 @@ fn check_delegation_auth(
             account,
             auth_service,
             delegates: delegates.clone(),
-            method: account_method,
         }));
         for delegate in delegates {
-            stack.push(Frame::Enter(delegate, None));
+            stack.push(Frame::Enter(delegate));
         }
     }
 
@@ -198,15 +225,10 @@ fn check_delegation_auth(
                 continue; // already resolved; both sets are monotonic
             }
 
-            let authorizers: Vec<AccountNumber> = delegation
-                .delegates
-                .iter()
-                .copied()
-                .filter(|delegate| responders.contains(delegate) || authorized.contains(delegate))
-                .collect();
+            let authorizers = resolved_authorizers(&delegation.delegates, responders, &authorized);
 
             let caller = auth_caller(delegation.auth_service);
-            if check_fn(&caller, delegation.account, authorizers, delegation.method) {
+            if check_fn(&caller, delegation.account, authorizers, None) {
                 authorized.push(delegation.account);
                 changed = true;
             } else if delegation
@@ -222,7 +244,58 @@ fn check_delegation_auth(
         }
     }
 
-    authorized.contains(&user)
+    authorized
+}
+
+/// Determines whether `user` is authorized given the accounts that actually
+/// responded (`responders`).
+///
+/// A leaf account (one that delegates to no one) is authorized if the responders
+/// satisfy its auth service. Otherwise authority is derived from the delegated
+/// accounts that are themselves authorized.
+///
+/// The requested `method` is only applied to the originating `user`; every
+/// account reached through a delegation is checked with the method wiped. Since
+/// nothing delegates *to* the originating invocation (delegate edges always lead
+/// to method-wiped nodes), `user` is the single special node: it is resolved
+/// here directly, while [`resolve_authorizations`] handles the uniform,
+/// method-wiped remainder of the graph. A method-wiped `user` reached through a
+/// delegation cycle is therefore resolved independently of this check.
+fn check_delegation_auth(
+    user: AccountNumber,
+    method: ServiceMethod,
+    responders: &[AccountNumber],
+    check_fn: CheckFn,
+) -> bool {
+    let method = Some(method);
+
+    let Some(auth_service) = get_auth_service(user) else {
+        return false;
+    };
+    let caller = auth_caller(auth_service);
+    let delegates = deduped_delegations(&caller, user, method);
+
+    // Short-circuit: already authorized by the accounts that responded directly.
+    if check_fn(
+        &caller,
+        user,
+        direct_authorizers(&delegates, responders),
+        method,
+    ) {
+        return true;
+    }
+
+    if delegates.is_empty() {
+        // A leaf the responders don't satisfy can never be authorized.
+        return false;
+    }
+
+    // Otherwise authority must flow up from `user`'s delegates. Resolve them (and
+    // the rest of the graph) with the method wiped, then re-check `user` against
+    // the requested method with whichever delegates came out authorized.
+    let authorized = resolve_authorizations(&delegates, responders, check_fn);
+    let authorizers = resolved_authorizers(&delegates, responders, &authorized);
+    check_fn(&caller, user, authorizers, method)
 }
 
 pub struct StagedTxPolicy {
