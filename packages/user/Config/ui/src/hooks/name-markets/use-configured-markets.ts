@@ -19,8 +19,8 @@ const zRow = z.object({
     enabled: z.boolean(),
     target: z.number().int().min(1),
     floorPrice: z.string(),
-    increasePct: z.number().int().min(1).max(255),
-    decreasePct: z.number().int().min(1).max(255),
+    increasePct: z.number().int().min(1).max(99),
+    decreasePct: z.number().int().min(1).max(99),
     initialPrice: z.string(),
     windowSeconds: z.number().int().min(1),
 });

@@ -102,18 +102,18 @@ const zDirtyMarketRow = (systemToken: SystemTokenInfo) =>
                 });
             }
 
-            if (parsePercentToPct(row.increasePct) === null) {
+            if (parsePercentToPct(row.increasePct, 99) === null) {
                 ctx.addIssue({
                     code: "custom",
-                    message: "Enter a whole-number percent from 1 to 255",
+                    message: "Enter a whole-number percent from 1 to 99",
                     path: ["increasePct"],
                 });
             }
 
-            if (parsePercentToPct(row.decreasePct) === null) {
+            if (parsePercentToPct(row.decreasePct, 99) === null) {
                 ctx.addIssue({
                     code: "custom",
-                    message: "Enter a whole-number percent from 1 to 255",
+                    message: "Enter a whole-number percent from 1 to 99",
                     path: ["decreasePct"],
                 });
             }
@@ -137,9 +137,9 @@ export function buildNameMarketsFormValues(
         const windowForm = configured
             ? secondsToWindowForm(row!.windowSeconds)
             : {
-                amount: "",
-                unit: NAME_MARKET_DEFAULT_PARAMS.windowUnit,
-            };
+                  amount: "",
+                  unit: NAME_MARKET_DEFAULT_PARAMS.windowUnit,
+              };
         markets.push({
             length,
             configured,
@@ -196,7 +196,7 @@ export function toMarketConfig(
 ): MarketConfigParam {
     const target = parsePositiveInt(row.target);
     const increasePct = parsePercentToPct(row.increasePct);
-    const decreasePct = parsePercentToPct(row.decreasePct);
+    const decreasePct = parsePercentToPct(row.decreasePct, 99);
     const floorPrice = parseSystemTokenAmount(row.floorPrice, systemToken);
     const windowSeconds = parseWindowSeconds(row.windowAmount, row.windowUnit);
 

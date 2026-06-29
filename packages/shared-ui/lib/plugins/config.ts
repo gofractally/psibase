@@ -6,9 +6,9 @@ export type MarketConfigInput = {
     windowSeconds: number;
     target: number;
     floorPrice: string;
-    /** Whole-number percent (1–255), e.g. 5 for 5%. */
+    /** Whole-number percent (1–99), e.g. 5 for 5%. */
     increasePct: number;
-    /** Whole-number percent (1–255), e.g. 5 for 5%. */
+    /** Whole-number percent (1–99), e.g. 5 for 5%. */
     decreasePct: number;
     enabled: boolean;
     /** Required when creating a new market; ignored for existing markets. */

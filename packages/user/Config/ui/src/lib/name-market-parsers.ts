@@ -59,15 +59,15 @@ export function parsePositiveInt(raw: string): number | null {
     return n;
 }
 
-/** Parses a whole-number percent for the plugin API (u8, 1–255). */
-export function parsePercentToPct(raw: string): number | null {
+/** Parses a whole-number percent for the plugin API (u8, 1–max). */
+export function parsePercentToPct(raw: string, max = 255): number | null {
     const t = raw.trim().replace(/%$/, "").trim();
     if (!t || !/^\d+$/.test(t)) {
         return null;
     }
 
     const percent = Number.parseInt(t, 10);
-    if (!Number.isFinite(percent) || percent <= 0 || percent > 255) {
+    if (!Number.isFinite(percent) || percent <= 0 || percent > max) {
         return null;
     }
 
