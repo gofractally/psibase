@@ -2,14 +2,24 @@ use crate::resource_type::ResourceType;
 use crate::tables::tables::{BillingConfig, CapacityPricing, CapacityPricingTable, UserSettings};
 use crate::tx_cache::{accrual, balance_cache};
 use psibase::services::tokens::{Decimal, Quantity, Wrapper as Tokens};
+use psibase::services::transact::Wrapper as Transact;
 use psibase::{abort_message, get_service, AccountNumber, Table};
 use std::collections::HashMap;
+
+/// Upper bound on the bytes written when crediting the fee receiver during
+/// settlement.
+/// Possible writes:
+/// * A new primary balance record on the fee receiver account
+/// * A new SharedBalance record between vserver and the fee receiver
+const FEE_RECEIVER_CREDIT_MAX_BYTES: u64 = 169;
 
 /// Pays fees out to the configured `fee_receiver`.
 pub fn credit_fee_receiver(amount: u64) {
     if amount > 0 {
+        Transact::call().systemWrite(FEE_RECEIVER_CREDIT_MAX_BYTES);
         let c = BillingConfig::get_assert();
         Tokens::call().credit(c.sys, c.fee_receiver, amount.into(), "".into());
+        Transact::call().systemWrite(0);
     }
 }
 

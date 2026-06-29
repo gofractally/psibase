@@ -266,10 +266,10 @@ mod tx_cache {
                 sub: Option<String>,
                 cost: u64,
             ) {
-                crate::tx_cache::check_lock(&LOCKED);
                 if is_system_user(user) || cost == 0 {
                     return;
                 }
+                crate::tx_cache::check_lock(&LOCKED);
                 balance_cache::charge(user, sub, cost);
                 with(resource, |a| a.relay_delta += cost as i128);
             }
@@ -281,11 +281,11 @@ mod tx_cache {
                 user_refund: u64,
                 fee: u64,
             ) {
-                crate::tx_cache::check_lock(&LOCKED);
                 let gross = user_refund + fee;
                 if is_system_user(user) || gross == 0 {
                     return;
                 }
+                crate::tx_cache::check_lock(&LOCKED);
                 with(resource, |a| {
                     a.relay_delta -= gross as i128;
                     a.fee += fee;
