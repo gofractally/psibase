@@ -442,6 +442,11 @@ namespace SystemService
       /// Asserts that all writes promised by `skipBilling` were consumed.
       void endSkipBilling();
 
+      /// Attribute subsequent disk writes to the system account until `numBytes`
+      /// bytes have been written or the transaction ends. `numBytes = 0` clears
+      /// the override. Callable only by the VirtualServer service.
+      void systemWrite(uint64_t numBytes);
+
       /// Get the currently executing transaction
       psio::view<const psibase::Transaction> getTransaction() const;
 
@@ -494,6 +499,7 @@ namespace SystemService
                 method(resMonitoring, enable),
                 method(skipBilling, numWrites),
                 method(endSkipBilling),
+                method(systemWrite, numBytes),
                 method(getTransaction),
                 method(isTransaction),
                 method(currentBlock),

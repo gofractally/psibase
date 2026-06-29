@@ -346,6 +346,14 @@ mod service {
         unimplemented!()
     }
 
+    /// Attribute subsequent disk writes to the system account until `numBytes`
+    /// bytes have been written or the transaction ends. `numBytes = 0` clears
+    ///  the override. Callable only by the VirtualServer service.
+    #[action]
+    fn systemWrite(numBytes: u64) {
+        unimplemented!()
+    }
+
     /// Get the currently executing transaction
     #[action]
     fn getTransaction() -> crate::Transaction {
