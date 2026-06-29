@@ -236,32 +236,6 @@ fn process_mod(
             pub struct #wrapper;
         });
 
-        let pack_from_to_doc = format!(
-            "
-            Pack actions into [psibase::Action]({psibase}::Action).
-
-            This method returns an object which has [methods]({actions}#implementations)
-            (one per action) which pack the action's arguments using [fracpack] and
-            return a [psibase::Action]({psibase}::Action). The `pack_*` series of
-            functions is mainly useful to applications which push transactions
-            to blockchains.
-
-            ",
-            psibase = options.psibase_mod,
-            actions = options.actions
-        );
-        let pack_doc = format!(
-            "{} This method defaults both `sender` and `service` to \"{}\".",
-            pack_from_to_doc, options.name
-        );
-        let pack_to_doc = format!(
-            "{} This method defaults `sender` to \"{}\".",
-            pack_from_to_doc, options.name
-        );
-        let pack_from_doc = format!(
-            "{} This method defaults `service` to \"{}\".",
-            pack_from_to_doc, options.name
-        );
         let emit_from_doc = format!(
             "
             Emit events from a service.
@@ -279,44 +253,6 @@ fn process_mod(
                 #[doc = #constant_doc]
                 pub const SERVICE: #psibase_mod::AccountNumber =
                     #psibase_mod::AccountNumber::new(#psibase_mod::account_raw!(#service_account));
-
-                #[doc = #pack_doc]
-                pub fn pack() -> #actions<#psibase_mod::ActionPacker> {
-                    #psibase_mod::ActionPacker {
-                        sender: Self::#constant,
-                        service: Self::#constant,
-                    }
-                    .into()
-                }
-
-                #[doc = #pack_to_doc]
-                pub fn pack_to(service: #psibase_mod::AccountNumber)
-                -> #actions<#psibase_mod::ActionPacker>
-                {
-                    #psibase_mod::ActionPacker {
-                        sender: Self::#constant,
-                        service,
-                    }
-                    .into()
-                }
-
-                #[doc = #pack_from_doc]
-                pub fn pack_from(sender: #psibase_mod::AccountNumber)
-                -> #actions<#psibase_mod::ActionPacker>
-                {
-                    #psibase_mod::ActionPacker {
-                        sender,
-                        service: Self::#constant,
-                    }
-                    .into()
-                }
-
-                #[doc = #pack_from_to_doc]
-                pub fn pack_from_to(sender: #psibase_mod::AccountNumber, service: #psibase_mod::AccountNumber)
-                -> #actions<#psibase_mod::ActionPacker>
-                {
-                    #psibase_mod::ActionPacker { sender, service }.into()
-                }
 
                 #[doc = #emit_doc]
                 pub fn emit() -> EmitEvent {

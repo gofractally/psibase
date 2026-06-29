@@ -23,7 +23,7 @@ use exports::packages::plugin::queries::Guest as Queries;
 use psibase::fracpack::{Pack, Unpack};
 use psibase::services::packages::PackageSource;
 use psibase::{
-    make_refs, method, solve_dependencies, AccountNumber, Action, InstalledPackageInfo,
+    make_refs, method, solve_dependencies, AccountNumber, Action, InstalledPackageInfo, PackAction,
     PackageDisposition, PackageList, PackageManifest, PackagedService, SchemaMap, StagedUpload,
     TransactionBuilder,
 };

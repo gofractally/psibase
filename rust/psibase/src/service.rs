@@ -315,3 +315,57 @@ pub trait Call: ServiceWrapper {
 }
 
 impl<T: ServiceWrapper> Call for T {}
+
+pub trait PackAction: ServiceWrapper {
+    /// Pack actions into [psibase::Action](psibase::Action).
+    ///
+    /// This method returns an object which has methods
+    /// (one per action) which pack the action's arguments using [fracpack] and
+    /// return a [psibase::Action](psibase::Action). The `pack_*` series of
+    /// functions is mainly useful to applications which push transactions
+    /// to blockchains.
+    ///
+    /// This method defaults both `sender` and `service` to `Self::SERVICE`.
+    fn pack() -> Self::Actions<ActionPacker> {
+        Self::pack_from_to(Self::SERVICE, Self::SERVICE)
+    }
+
+    /// Pack actions into [psibase::Action](psibase::Action).
+    ///
+    /// This method returns an object which has methods
+    /// (one per action) which pack the action's arguments using [fracpack] and
+    /// return a [psibase::Action](psibase::Action). The `pack_*` series of
+    /// functions is mainly useful to applications which push transactions
+    /// to blockchains.
+    ///
+    /// This method defaults `sender` to `Self::SERVICE`.
+    fn pack_to(service: AccountNumber) -> Self::Actions<ActionPacker> {
+        Self::pack_from_to(Self::SERVICE, service)
+    }
+
+    /// Pack actions into [psibase::Action](psibase::Action).
+    ///
+    /// This method returns an object which has methods
+    /// (one per action) which pack the action's arguments using [fracpack] and
+    /// return a [psibase::Action](psibase::Action). The `pack_*` series of
+    /// functions is mainly useful to applications which push transactions
+    /// to blockchains.
+    ///
+    /// This method defaults `service` to `Self::SERVICE`.
+    fn pack_from(sender: AccountNumber) -> Self::Actions<ActionPacker> {
+        Self::pack_from_to(sender, Self::SERVICE)
+    }
+
+    /// Pack actions into [psibase::Action](psibase::Action).
+    ///
+    /// This method returns an object which has methods
+    /// (one per action) which pack the action's arguments using [fracpack] and
+    /// return a [psibase::Action](psibase::Action). The `pack_*` series of
+    /// functions is mainly useful to applications which push transactions
+    /// to blockchains.
+    fn pack_from_to(sender: AccountNumber, service: AccountNumber) -> Self::Actions<ActionPacker> {
+        Self::with_caller(ActionPacker { sender, service })
+    }
+}
+
+impl<T: ServiceWrapper> PackAction for T {}

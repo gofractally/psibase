@@ -13,7 +13,7 @@ use crate::{
     fetch_packages, get_optional_result_bytes, get_result_bytes, services, status_key, tester_raw,
     AccountNumber, Action, ActionFormatter, BlockTime, Caller, Checksum256, CodeByHashRow, CodeRow,
     DbId, DirectoryRegistry, Error, HostConfigRow, HttpBody, HttpHeader, HttpReply, HttpRequest,
-    InnerTraceEnum, JointRegistry, KvHandle, KvMode, PackageOpFull, PackageRegistry,
+    InnerTraceEnum, JointRegistry, KvHandle, KvMode, PackAction, PackageOpFull, PackageRegistry,
     PackagedService, RunMode, Schema, SchemaFetcher, SchemaMap, Seconds, ServiceWrapper,
     SignedTransaction, StatusRow, Table, TableRecord, Tapos, TimePointSec, TimePointUSec, ToKey,
     Transaction, TransactionBuilder, TransactionTrace,
