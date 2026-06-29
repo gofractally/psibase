@@ -36,6 +36,12 @@ serialize_as_str!(AccountNumber, "account number");
 
 pub struct Subaccount(u8);
 
+impl From<u8> for Subaccount {
+    fn from(value: u8) -> Self {
+        Subaccount(value)
+    }
+}
+
 impl AccountNumber {
     pub const MIN: Self = AccountNumber { value: 0 };
     pub const MAX: Self = AccountNumber { value: u64::MAX };
