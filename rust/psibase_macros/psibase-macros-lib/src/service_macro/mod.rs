@@ -236,51 +236,6 @@ fn process_mod(
             pub struct #wrapper;
         });
 
-        let call_from_to_doc = format!(
-            "
-            Call another service.
-
-            This method returns an object which has [methods]({actions}#implementations)
-            (one per action) which call another service and return the result from the call.
-            This method is only usable by services.
-
-            ",
-            actions = options.actions
-        );
-        let call_doc = format!(
-            "{} This method defaults `sender` to [`{psibase}::get_sender`] and `service` to \"{}\".",
-            call_from_to_doc, options.name,            psibase = options.psibase_mod,
-        );
-        let call_to_doc = format!(
-            "{} This method defaults `sender` to [`{psibase}::get_sender`].",
-            call_from_to_doc,
-            psibase = options.psibase_mod,
-        );
-        let call_from_doc = format!(
-            "{} This method defaults `service` to \"{}\".",
-            call_from_to_doc, options.name
-        );
-        let call_as_doc = format!(
-            "
-            Call another service using [runAs]({psibase}::services::transact::Actions::runAs).
-
-            This method returns an object which has [methods]({actions}#implementations)
-            (one per action) which call another service via `runAs` and return the result from the call.
-            The action will run with `sender` set to the provided account. This method defaults `service` to \"{name}\".
-
-            This will fail unless certain conditions are met. See [runAs]({psibase}::services::transact::Actions::runAs) 
-            documentation for more details.
-
-            ",
-            psibase = options.psibase_mod,
-            actions = options.actions,
-            name = options.name
-        );
-        let call_as_extend_doc = format!(
-            "{} This method also accepts `allowedActions` for nested `runAs` calls.",
-            call_as_doc
-        );
-
         let push_from_to_doc = format!(
             "
             push transactions to [psibase::Chain]({psibase}::Chain).
@@ -351,86 +306,6 @@ fn process_mod(
                 #[doc = #constant_doc]
                 pub const SERVICE: #psibase_mod::AccountNumber =
                     #psibase_mod::AccountNumber::new(#psibase_mod::account_raw!(#service_account));
-
-                #[doc = #call_doc]
-                pub fn call() -> #actions<#psibase_mod::ServiceCaller> {
-                    #psibase_mod::ServiceCaller {
-                        sender: #psibase_mod::get_service(),
-                        service: Self::#constant,
-                        flags: 0,
-                    }
-                    .into()
-                }
-
-                #[doc = #call_to_doc]
-                pub fn call_to(service: #psibase_mod::AccountNumber)
-                -> #actions<#psibase_mod::ServiceCaller>
-                {
-                    #psibase_mod::ServiceCaller {
-                        sender: #psibase_mod::get_service(),
-                        service,
-                        flags: 0,
-                    }
-                    .into()
-                }
-
-                #[doc = #call_from_doc]
-                pub fn call_from(sender: #psibase_mod::AccountNumber)
-                -> #actions<#psibase_mod::ServiceCaller>
-                {
-                    #psibase_mod::ServiceCaller {
-                        sender,
-                        service: Self::#constant,
-                        flags: 0,
-                    }
-                    .into()
-                }
-
-                #[doc = #call_from_to_doc]
-                pub fn call_from_to(
-                    sender: #psibase_mod::AccountNumber,
-                    service: #psibase_mod::AccountNumber)
-                -> #actions<#psibase_mod::ServiceCaller>
-                {
-                    #psibase_mod::ServiceCaller { sender, service,
-                        flags: 0, }.into()
-                }
-
-                #[doc = #call_as_doc]
-                pub fn call_as(sender: #psibase_mod::AccountNumber)
-                -> #actions<#psibase_mod::RunAsCaller>
-                {
-                    #psibase_mod::RunAsCaller {
-                        sender,
-                        service: Self::#constant,
-                        allowed_actions: vec![],
-                    }
-                    .into()
-                }
-
-                #[doc = #call_as_extend_doc]
-                pub fn call_as_extend(
-                    sender: #psibase_mod::AccountNumber,
-                    allowed_actions: Vec<#psibase_mod::services::transact::ServiceMethod>)
-                -> #actions<#psibase_mod::RunAsCaller>
-                {
-                    #psibase_mod::RunAsCaller {
-                        sender,
-                        service: Self::#constant,
-                        allowed_actions,
-                    }
-                    .into()
-                }
-
-                #[doc = #call_doc]
-                pub fn rpc() -> #actions<#psibase_mod::ServiceCaller> {
-                    #psibase_mod::ServiceCaller {
-                        sender: #psibase_mod::get_service(),
-                        service: Self::#constant,
-                        flags: 1,
-                    }
-                    .into()
-                }
 
                 #[doc = #push_doc]
                 pub fn push(chain: &#psibase_mod::Chain) -> #actions<#psibase_mod::ChainPusher> {
@@ -545,6 +420,7 @@ fn process_mod(
         items.push(parse_quote! {
             #[automatically_derived]
             impl #psibase_mod::ServiceWrapper for #wrapper {
+                const SERVICE: #psibase_mod::AccountNumber = Self::SERVICE;
                 type Actions<T: #psibase_mod::Caller> = #actions<T>;
                 fn with_caller<T: #psibase_mod::Caller>(caller: T) -> #actions<T> {
                     caller.into()

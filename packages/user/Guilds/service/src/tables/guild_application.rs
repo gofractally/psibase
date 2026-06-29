@@ -1,7 +1,7 @@
 use async_graphql::ComplexObject;
 use async_graphql::{connection::Connection, SimpleObject};
 
-use psibase::{check_none, check_some, AccountNumber, RawKey, Table, TableQuery};
+use psibase::{check_none, check_some, AccountNumber, Call, RawKey, Table, TableQuery};
 
 use crate::{
     constants::{GUILD_APP_ENDORSEMENT_THRESHOLD, GUILD_APP_REJECT_THRESHOLD},

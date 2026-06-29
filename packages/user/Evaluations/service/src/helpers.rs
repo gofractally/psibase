@@ -1,3 +1,4 @@
+use psibase::Call;
 use std::collections::HashMap;
 use std::fmt;
 

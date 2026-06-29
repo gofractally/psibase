@@ -6,8 +6,8 @@ pub mod tables {
     use psibase::services::token_swap::{swap, Wrapper as TokenSwap, PPM};
     use psibase::services::tokens::{Decimal, Quantity, TokenRecord, Wrapper as Tokens, TID};
     use psibase::{
-        abort_message, check, check_none, check_some, get_sender, AccountNumber, Fracpack, Memo,
-        Table, ToSchema,
+        abort_message, check, check_none, check_some, get_sender, AccountNumber, Call, Fracpack,
+        Memo, Table, ToSchema,
     };
 
     use crate::helpers::{mul_div, sqrt};

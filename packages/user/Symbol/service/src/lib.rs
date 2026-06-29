@@ -6,7 +6,7 @@ pub mod tables {
     use psibase::services::nft::{Nft as NftRecord, Wrapper as Nft, NID};
     use psibase::services::tokens::Wrapper as Tokens;
     use psibase::services::tokens::{Decimal, Quantity, TokenRecord, TID};
-    use psibase::{check, check_some, get_sender, AccountNumber, Fracpack, Table, ToSchema};
+    use psibase::{check, check_some, get_sender, AccountNumber, Call, Fracpack, Table, ToSchema};
     use psibase::{check_none, get_service};
     use serde::{Deserialize, Serialize};
 
@@ -341,7 +341,10 @@ pub mod service {
 
     #[action]
     fn admin_create(symbol: AccountNumber, recipient: AccountNumber) {
-        check(get_sender() == get_service(), "only symbol service can call this action");
+        check(
+            get_sender() == get_service(),
+            "only symbol service can call this action",
+        );
         Symbol::add(symbol, recipient);
     }
 

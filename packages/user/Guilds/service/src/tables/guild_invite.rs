@@ -1,7 +1,7 @@
 use async_graphql::ComplexObject;
 
 use psibase::{
-    check, check_some, get_sender, services::tokens::Quantity, AccountNumber, Memo, Table,
+    check, check_some, get_sender, services::tokens::Quantity, AccountNumber, Call, Memo, Table,
     TimePointSec,
 };
 

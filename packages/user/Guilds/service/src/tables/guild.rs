@@ -5,7 +5,7 @@ use psibase::services::fractals::weighted_normalization::{
     curves::{get_curve, Curve},
     weighted_normalization,
 };
-use psibase::{check, check_none, check_some, get_sender, AccountNumber, Flags, Memo, Table};
+use psibase::{check, check_none, check_some, get_sender, AccountNumber, Call, Flags, Memo, Table};
 
 use crate::constants::{
     COUNCIL_SEATS, DEFAULT_CANDIDACY_COOLDOWN, DEFAULT_RANK_ORDERING_THRESHOLD,
