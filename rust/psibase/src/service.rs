@@ -309,7 +309,7 @@ pub trait Call: ServiceWrapper {
         Self::with_caller(ServiceCaller {
             sender: get_service(),
             service: Self::SERVICE,
-            flags: 0,
+            flags: 1,
         })
     }
 }
