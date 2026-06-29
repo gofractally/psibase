@@ -1849,10 +1849,10 @@ async fn do_install<T: Read + Seek>(
 
 fn confirm_install(yes: bool, to_install: &[PackageOp]) -> Result<bool, anyhow::Error> {
     if to_install.is_empty() {
-        println!("Nothing to install.");
+        eprintln!("Nothing to install.");
         return Ok(false);
     } else {
-        println!("The following changes will be applied:");
+        eprintln!("The following changes will be applied:");
         to_install
             .iter()
             .map(|op| match op {
@@ -1866,7 +1866,7 @@ fn confirm_install(yes: bool, to_install: &[PackageOp]) -> Result<bool, anyhow::
                 }
                 PackageOp::Remove(meta) => format!("Remove {}-{}", meta.name, meta.version),
             })
-            .for_each(|line| println!("  {}", line));
+            .for_each(|line| eprintln!("  {}", line));
     }
 
     if !yes {
@@ -1877,7 +1877,7 @@ fn confirm_install(yes: bool, to_install: &[PackageOp]) -> Result<bool, anyhow::
                 .default(true)
                 .interact_on(&term)?;
             if !proceed {
-                println!("Install aborted.");
+                eprintln!("Install aborted.");
                 return Ok(false);
             }
         }
