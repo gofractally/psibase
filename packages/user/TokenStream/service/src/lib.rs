@@ -3,7 +3,7 @@ pub mod tables {
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::services::tokens::{Decimal, Precision, Quantity, TID};
     use psibase::{
-        check, check_some, AccountNumber, Call, Fracpack, Table, TimePointSec, ToSchema,
+        check, check_some, AccountNumber, Fracpack, ServiceWrapper, Table, TimePointSec, ToSchema,
     };
     use serde::{Deserialize, Serialize};
 
@@ -176,7 +176,7 @@ pub mod service {
 
     use psibase::services::nft::Wrapper as Nft;
     use psibase::services::tokens::Wrapper as Tokens;
-    use psibase::{get_sender, AccountNumber, Call, Memo};
+    use psibase::{get_sender, AccountNumber, Memo, ServiceWrapper};
 
     use crate::tables::Stream;
 

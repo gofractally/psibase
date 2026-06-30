@@ -1,6 +1,6 @@
 use std::u64;
 
-use psibase::{check_none, check_some, AccountNumber, Call, Table};
+use psibase::{check_none, check_some, AccountNumber, ServiceWrapper, Table};
 
 use crate::{
     constants::DEFAULT_RECRUITMENT_PPM,

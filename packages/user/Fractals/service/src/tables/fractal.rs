@@ -24,7 +24,7 @@ use crate::tables::tables::{
 };
 use psibase::{
     account, check_none, check_some, services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber,
-    Call, Table,
+    ServiceWrapper, Table,
 };
 
 use psibase::services::fractals::{self, occu_wrapper};

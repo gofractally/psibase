@@ -20,10 +20,11 @@ use psibase::{
     set_owner_action, sign_transaction, AccountNumber, Action, ActionFormatter, AnyPrivateKey,
     AnyPublicKey, ChainUrl, Checksum256, DirectoryRegistry, ExactAccountNumber, FileSetRegistry,
     FilteredRegistry, HTTPRegistry, HttpSchemaFetcher, JointRegistry, Meta, NullSchemaFetcher,
-    PackAction, PackageDataFile, PackageInfo, PackageList, PackageOp, PackageOpFull, PackageOrigin,
+    PackageDataFile, PackageInfo, PackageList, PackageOp, PackageOpFull, PackageOrigin,
     PackagePreference, PackageRef, PackageRegistry, PackagedService, PrettyAction, SchemaFetcher,
-    SchemaMap, Seconds, ServiceInfo, SignedTransaction, StagedUpload, Tapos, TaposRefBlock,
-    TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace, Version,
+    SchemaMap, Seconds, ServiceInfo, ServiceWrapper, SignedTransaction, StagedUpload, Tapos,
+    TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace,
+    Version,
 };
 use regex::Regex;
 use reqwest::Url;

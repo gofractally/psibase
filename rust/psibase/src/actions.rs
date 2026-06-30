@@ -2,7 +2,7 @@ use crate::services::{
     accounts, auth_delegate, auth_sig, http_server, producers, setcode, verify_sig,
 };
 use crate::{
-    account_raw, method_raw, AccountNumber, Action, AnyPublicKey, MethodNumber, PackAction,
+    account_raw, method_raw, AccountNumber, Action, AnyPublicKey, MethodNumber, ServiceWrapper,
 };
 use fracpack::Pack;
 

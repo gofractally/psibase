@@ -4,7 +4,7 @@ use crate::{
 };
 use psibase::services::auth_dyn::policy::DynamicAuthPolicy;
 use psibase::services::fractals::FractalRole;
-use psibase::{check, check_none, check_some, AccountNumber, Call, Table};
+use psibase::{check, check_none, check_some, AccountNumber, ServiceWrapper, Table};
 
 impl Role {
     fn new(

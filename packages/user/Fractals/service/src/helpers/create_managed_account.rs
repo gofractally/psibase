@@ -1,5 +1,5 @@
 use psibase::services::{accounts, auth_delegate, auth_dyn};
-use psibase::{AccountNumber, Call};
+use psibase::{AccountNumber, ServiceWrapper};
 
 pub fn create_managed_account<F>(new_account: AccountNumber, f: F)
 where

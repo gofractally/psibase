@@ -1,4 +1,4 @@
-use psibase::Call;
+use psibase::ServiceWrapper;
 use std::collections::HashMap;
 use std::fmt;
 

@@ -1,4 +1,4 @@
-use psibase::{check, check_none, check_some, AccountNumber, Call, Memo, Table};
+use psibase::{check, check_none, check_some, AccountNumber, Memo, ServiceWrapper, Table};
 
 use crate::constants::{
     DEFAULT_MEMBER_DISTRIBUTION_INTERVAL, FRACTAL_STREAM_HALF_LIFE, MEMBER_STREAM_HALF_LIFE,

@@ -4,8 +4,8 @@ pub mod tables {
     use psibase::services::auth_dyn::int_wrapper;
     use psibase::services::transact::ServiceMethod;
     use psibase::{
-        check, check_some, services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber, Call,
-        Fracpack, Table, ToSchema,
+        check, check_some, services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber, Fracpack,
+        ServiceWrapper, Table, ToSchema,
     };
     use serde::{Deserialize, Serialize};
 

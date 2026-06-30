@@ -182,43 +182,7 @@ pub trait ServiceWrapper {
     const SERVICE: AccountNumber;
     type Actions<T: Caller>;
     fn with_caller<T: Caller>(caller: T) -> Self::Actions<T>;
-}
 
-#[derive(Clone, Default)]
-pub struct RunAsCaller {
-    pub sender: AccountNumber,
-    pub service: AccountNumber,
-    pub allowed_actions: Vec<ServiceMethod>,
-}
-
-impl Caller for RunAsCaller {
-    type ReturnsNothing = ();
-    type ReturnType<T: UnpackOwned> = T;
-
-    fn call_returns_nothing<Args: Pack>(&self, method: MethodNumber, args: Args) {
-        let action = Action {
-            sender: self.sender,
-            service: self.service,
-            method,
-            rawData: args.packed().into(),
-        };
-        crate::services::transact::Wrapper::call().runAs(action, self.allowed_actions.clone());
-    }
-
-    fn call<Ret: UnpackOwned, Args: Pack>(&self, method: MethodNumber, args: Args) -> Ret {
-        let action = Action {
-            sender: self.sender,
-            service: self.service,
-            method,
-            rawData: args.packed().into(),
-        };
-        let ret =
-            crate::services::transact::Wrapper::call().runAs(action, self.allowed_actions.clone());
-        Ret::unpacked(&ret.0).unwrap()
-    }
-}
-
-pub trait Call: ServiceWrapper {
     /// Call another service.
     ///
     /// This method returns an object which has methods
@@ -312,11 +276,7 @@ pub trait Call: ServiceWrapper {
             flags: 1,
         })
     }
-}
 
-impl<T: ServiceWrapper> Call for T {}
-
-pub trait PackAction: ServiceWrapper {
     /// Pack actions into [psibase::Action](psibase::Action).
     ///
     /// This method returns an object which has methods
@@ -368,4 +328,36 @@ pub trait PackAction: ServiceWrapper {
     }
 }
 
-impl<T: ServiceWrapper> PackAction for T {}
+#[derive(Clone, Default)]
+pub struct RunAsCaller {
+    pub sender: AccountNumber,
+    pub service: AccountNumber,
+    pub allowed_actions: Vec<ServiceMethod>,
+}
+
+impl Caller for RunAsCaller {
+    type ReturnsNothing = ();
+    type ReturnType<T: UnpackOwned> = T;
+
+    fn call_returns_nothing<Args: Pack>(&self, method: MethodNumber, args: Args) {
+        let action = Action {
+            sender: self.sender,
+            service: self.service,
+            method,
+            rawData: args.packed().into(),
+        };
+        crate::services::transact::Wrapper::call().runAs(action, self.allowed_actions.clone());
+    }
+
+    fn call<Ret: UnpackOwned, Args: Pack>(&self, method: MethodNumber, args: Args) -> Ret {
+        let action = Action {
+            sender: self.sender,
+            service: self.service,
+            method,
+            rawData: args.packed().into(),
+        };
+        let ret =
+            crate::services::transact::Wrapper::call().runAs(action, self.allowed_actions.clone());
+        Ret::unpacked(&ret.0).unwrap()
+    }
+}

@@ -130,7 +130,7 @@ pub mod impls {
     use psibase::fracpack::Pack;
     use psibase::services::transact::ServiceMethod;
     use psibase::services::{accounts::Wrapper as Accounts, transact::Wrapper as Transact};
-    use psibase::{check, get_sender, AccountNumber, Action, Call, Checksum256, Table};
+    use psibase::{check, get_sender, AccountNumber, Action, Checksum256, ServiceWrapper, Table};
 
     impl StagedTx {
         pub fn add(actions: Vec<Action>, auto_exec: bool) -> Self {
