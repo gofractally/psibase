@@ -57,16 +57,7 @@ pub mod tables {
             }
         }
 
-        fn check_ppm_change(ppm: u32) {
-            check(
-                ppm > 0 && ppm < ONE_MILLION,
-                "ppm must be between 0 - 1,000,000",
-            );
-        }
-
         fn check_targets(target_min: u32, target_max: u32) {
-            check(target_min > 0, "target_min must be above 0");
-            check(target_max > 0, "target_max must be above 0");
             check(
                 target_min <= target_max,
                 "target_min must not exceed target_max",
@@ -75,6 +66,11 @@ pub mod tables {
 
         fn check_window_seconds(seconds: u32) {
             check(seconds > 0, "window seconds must be above 0");
+        }
+
+        /// Decrease rate is capped at 100% per window; increase remains unclamped.
+        fn clamp_decrease_ppm(decrease_ppm: u32) -> u32 {
+            decrease_ppm.min(ONE_MILLION)
         }
 
         pub fn add(
@@ -94,8 +90,6 @@ pub mod tables {
                 TransactSvc::call().currentBlock().time.seconds() + psibase::Seconds::new(1); // See comment in check_difficulty_increase
 
             Self::check_targets(target_min, target_max);
-            Self::check_ppm_change(increase_ppm);
-            Self::check_ppm_change(decrease_ppm);
             Self::check_window_seconds(window_seconds);
 
             let new_instance = Self::new(
@@ -108,7 +102,7 @@ pub mod tables {
                 floor_difficulty,
                 last_updated,
                 increase_ppm,
-                decrease_ppm,
+                Self::clamp_decrease_ppm(decrease_ppm),
             );
             new_instance.save();
 
@@ -123,6 +117,71 @@ pub mod tables {
             self.decrease_ppm as f64 / ONE_MILLION as f64
         }
 
+        /// Caller must ensure the value is finite and positive.
+        fn f64_to_u64_saturating(value: f64) -> u64 {
+            if value >= u64::MAX as f64 {
+                u64::MAX
+            } else {
+                value as u64
+            }
+        }
+
+        /// Decay compound math may underflow or yield NaN; treat those as zero (floor applied by caller).
+        fn decay_f64_to_u64(value: f64) -> u64 {
+            if !value.is_finite() || value <= 0.0 {
+                0
+            } else {
+                Self::f64_to_u64_saturating(value)
+            }
+        }
+
+        /// Increase compound math may overflow to inf or NaN; saturate rather than collapse to zero.
+        fn increase_f64_to_u64(value: f64) -> u64 {
+            if !value.is_finite() {
+                u64::MAX
+            } else {
+                Self::f64_to_u64_saturating(value)
+            }
+        }
+
+        // PRECONDITION: `increase_ppm`, which `factor` is based on, must be ppm resolution or courser.
+        fn apply_increase(difficulty: u64, factor: f64, times: u32) -> u64 {
+            if times == 0 || difficulty == u64::MAX || factor <= 1.0 {
+                return difficulty;
+            }
+            // ensure no cast safety of `times` from u32 to i32
+            // `increase_ppm`, specified in higher resolution than ppm, may lead to a premature calculation of overflow
+            // if `times` doesn't fit in `i32`, and `factor` is at least 1.0 + 1PPM, the result overflows f64
+            let powered = if times > i32::MAX as u32 {
+                f64::INFINITY
+            } else {
+                factor.powi(times as i32)
+            };
+            // Large exponents can overflow to inf or NaN on wasm; increases saturate, never collapse to zero.
+            if !powered.is_finite() || powered >= u64::MAX as f64 {
+                return u64::MAX;
+            }
+            Self::increase_f64_to_u64(difficulty as f64 * powered)
+        }
+
+        fn apply_decrease(mut difficulty: u64, factor: f64, times: u32, floor: u64) -> u64 {
+            if times == 0 {
+                return difficulty;
+            }
+            let factor = factor.max(0.0);
+            if factor == 0.0 {
+                return floor;
+            }
+            if factor == 1.0 {
+                return difficulty;
+            }
+            // Per-window truncate + floor so batching N windows matches N single-window steps.
+            for _ in 0..times {
+                difficulty = Self::decay_f64_to_u64(difficulty as f64 * factor).max(floor);
+            }
+            difficulty
+        }
+
         pub fn check_difficulty_decrease(&mut self) -> u64 {
             let now = TransactSvc::call().currentBlock().time.seconds();
             let seconds_elapsed = (now.seconds - self.last_update.seconds).max(0) as u32;
@@ -133,13 +192,13 @@ pub mod tables {
                 self.counter = 0;
                 self.last_update = TimePointSec::from(now.seconds - seconds_remainder as i64);
                 if below_target {
-                    let mut new_difficulty = self.active_difficulty;
                     let factor = 1.0 - self.ratio_decrease();
-                    for _ in 0..windows_elapsed {
-                        let temp = new_difficulty as f64 * factor;
-                        new_difficulty = (temp as u64).max(self.floor_difficulty);
-                    }
-                    self.active_difficulty = new_difficulty;
+                    self.active_difficulty = Self::apply_decrease(
+                        self.active_difficulty,
+                        factor,
+                        windows_elapsed,
+                        self.floor_difficulty,
+                    );
                 }
             }
             self.active_difficulty
@@ -148,16 +207,25 @@ pub mod tables {
         fn check_difficulty_increase(&mut self, clamp_increase: bool) -> u64 {
             if self.counter > self.target_max {
                 let factor = 1.0 + self.ratio_increase();
-                let mut times_over_target = self.counter / self.target_max;
+                // `target_max` events accumulate with no adjustment; the next event triggers
+                //   one. So one adjustment is applied per `target_max + 1` events, and the
+                //   cumulative adjustments for `events` in a window is
+                //   floor(events / (target_max + 1)).
+                // The remainder is carried in `counter` so a batched
+                //   increment produces the same result as the equivalent single increments.
+                // (u64 math avoids overflow when target_max == u32::MAX.)
+                let events_per_adjustment = self.target_max as u64 + 1;
+                let mut adjustments = (self.counter as u64 / events_per_adjustment) as u32;
                 if clamp_increase {
-                    times_over_target = times_over_target.min(1);
+                    adjustments = adjustments.min(1);
                 }
-                let mut difficulty = self.active_difficulty as f64;
-                for _ in 0..times_over_target {
-                    difficulty = difficulty * factor;
-                }
-                self.active_difficulty = difficulty.min(u64::MAX as f64) as u64;
-                self.counter = 0;
+                self.active_difficulty =
+                    Self::apply_increase(self.active_difficulty, factor, adjustments);
+                self.counter = if clamp_increase {
+                    0
+                } else {
+                    (self.counter as u64 % events_per_adjustment) as u32
+                };
                 // The update is happening "mid block", so we round up to the next second. In other words,
                 // updates happens at the "end" of the block. Without this, a one-second block window would
                 // cause a decrease every block, because an increase zeroes out the counter, so each block
@@ -183,7 +251,7 @@ pub mod tables {
         pub fn increment(&mut self, increment_amount: u32) -> u64 {
             self.check_sender_is_consumer();
             let difficulty = self.check_difficulty_decrease();
-            self.counter += increment_amount;
+            self.counter = self.counter.saturating_add(increment_amount);
             self.check_difficulty_increase(false);
             self.save();
             difficulty
@@ -211,10 +279,8 @@ pub mod tables {
         pub fn set_ppm(&mut self, increase_ppm: u32, decrease_ppm: u32) {
             self.check_sender_has_nft();
             self.check_difficulty_decrease();
-            Self::check_ppm_change(increase_ppm);
-            Self::check_ppm_change(decrease_ppm);
             self.increase_ppm = increase_ppm;
-            self.decrease_ppm = decrease_ppm;
+            self.decrease_ppm = Self::clamp_decrease_ppm(decrease_ppm);
             self.save();
         }
 
@@ -306,8 +372,12 @@ pub mod service {
 
     /// Increment RateLimit instance, potentially increasing the difficulty.
     ///
-    /// The difficulty may increase multiple times if the counter exceeds `target_max`
-    ///   by more than one multiple of `target_max`.
+    /// `target_max` events accumulate with no adjustment, and the next event triggers one,
+    ///   so the number of adjustments for `events` accumulated in the window is
+    ///   `floor(events / (target_max + 1))`. Adjustments therefore land every
+    ///   `target_max + 1` events (and `target_max == 0` means every event adjusts). A single
+    ///   large increment may apply multiple adjustments at once, matching the equivalent
+    ///   sequence of single increments (the remainder is carried across calls).
     ///
     /// Returns the difficulty before any difficulty adjustment due to the increment.
     ///
