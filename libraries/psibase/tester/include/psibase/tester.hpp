@@ -7,6 +7,7 @@
 #include <psibase/nativeTables.hpp>
 #include <psibase/trace.hpp>
 #include <psio/to_hex.hpp>
+#include <services/system/Accounts.hpp>
 #include <services/system/PrivateKeyInfo.hpp>
 #include <services/system/Spki.hpp>
 #include <services/system/VirtualServer.hpp>
@@ -38,6 +39,11 @@ namespace psibase
       if (action.sender == SystemService::Transact::service &&
           action.service == SystemService::VirtualServer::service)
          return false;
+      if (action.sender == SystemService::Transact::service &&
+          action.service == SystemService::Accounts::service && action.method == "getAuthOf"_m)
+      {
+         return false;
+      }
       if (action.service == "events"_a && action.method == "sync"_m)
          return false;
       if (action.sender == AccountNumber{})

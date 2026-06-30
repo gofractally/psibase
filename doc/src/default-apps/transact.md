@@ -42,5 +42,4 @@ Future psinode versions may trim the action traces when not in a developer mode.
 The token can be submitted either in an `Authorization` header or in a cookie named `__Host-SESSION`.
 
 {{#cpp-doc ::SystemService::Transact}}
-{{#cpp-doc ::SystemService::ServiceMethod}}
 {{#cpp-doc ::SystemService::AuthInterface}}

@@ -9,18 +9,19 @@ import {
 export interface AppInterface {
     preloadPlugins: (
         callerOrigin: string,
+        id: string,
         plugins: QualifiedPluginId[],
-    ) => void;
+    ) => Promise<void>;
 
     entry: (
         callerOrigin: string,
         id: UUID,
         args: QualifiedFunctionCallArgs,
-    ) => void;
+    ) => Promise<void>;
 
     getJson: (
         callerOrigin: string,
         id: string,
         plugin: QualifiedPluginId,
-    ) => void;
+    ) => Promise<void>;
 }
