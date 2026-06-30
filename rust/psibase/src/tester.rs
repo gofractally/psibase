@@ -989,11 +989,14 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
     fn is_user_action(act: &Action) -> bool {
         use crate::{
             self as psibase, method,
-            services::{cpu_limit, db, events, transact, virtual_server},
+            services::{accounts, cpu_limit, db, events, transact, virtual_server},
         };
         !(act.service == db::SERVICE && act.method == method!("open")
             || act.service == cpu_limit::SERVICE
             || act.sender == transact::SERVICE && act.service == virtual_server::SERVICE
+            || act.sender == transact::SERVICE
+                && act.service == accounts::SERVICE
+                && act.method == method!("getAuthOf")
             || act.service == events::SERVICE && act.method == method!("sync")
             || act.sender == AccountNumber::default())
     }

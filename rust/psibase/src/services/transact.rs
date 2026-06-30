@@ -366,6 +366,13 @@ mod service {
         unimplemented!()
     }
 
+    /// Returns the tapos `refBlockIndex` and `refBlockSuffix`
+    /// for the head block.
+    #[action]
+    fn headTapos() -> (u8, u32) {
+        unimplemented!();
+    }
+
     /// Emitted at the start of each block
     #[event(history)]
     fn blockStart(blockNum: crate::BlockNum, blockTime: crate::BlockTime) {

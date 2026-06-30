@@ -454,6 +454,10 @@ namespace SystemService
       /// TODO: remove
       psibase::BlockTime headBlockTime() const;
 
+      /// Returns the tapos `refBlockIndex` and `refBlockSuffix`
+      /// for the head block.
+      std::pair<uint8_t, uint32_t> headTapos();
+
       struct Events
       {
          struct History
@@ -487,6 +491,7 @@ namespace SystemService
                 method(currentBlock),
                 method(headBlock),
                 method(headBlockTime),
+                method(headTapos)
                 //
    )
 
