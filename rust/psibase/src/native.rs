@@ -279,9 +279,18 @@ pub fn kv_get<V: UnpackOwned, K: ToKey>(
 /// matches the provided key, then returns the value. Use [get_key_bytes] to get
 /// the found key.
 pub fn kv_greater_equal_bytes(db: &KvHandle, key: &[u8], match_key_size: u32) -> Option<Vec<u8>> {
+    kv_greater_equal_value_size(db, key, match_key_size).map(get_result_bytes)
+}
+
+/// Get the value size of the first key-value pair which is greater than or
+/// equal to the provided key.
+///
+/// Like [kv_greater_equal_bytes], but returns only the value's size. Use
+/// [get_key_bytes] to read the matched key. Returns `None` when no row matches.
+pub fn kv_greater_equal_value_size(db: &KvHandle, key: &[u8], match_key_size: u32) -> Option<u32> {
     let size =
         unsafe { native_raw::kvGreaterEqual(db.0, key.as_ptr(), key.len() as u32, match_key_size) };
-    get_optional_result_bytes(size)
+    (size < u32::MAX).then_some(size)
 }
 
 /// Get the first key-value pair which is greater than or equal to the provided

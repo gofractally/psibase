@@ -8,10 +8,10 @@
 #include <services/system/VirtualServer.hpp>
 
 #include <boost/container/flat_map.hpp>
+#include <cstdio>
+#include <psibase/api.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/serviceEntry.hpp>
-
-#include <cstdio>
 
 using namespace psibase;
 
@@ -31,6 +31,20 @@ namespace SystemService
          auto config = table.get({});
          return config && config->enabled;
       }
+
+      // When set, kv writes are attributed to the system account (`{}`) instead of `trxSender`
+      bool systemWrite = false;
+
+      // RAII guard that marks the enclosing scope as performing authorized system
+      // writes. Restores the previous value on destruction so nesting is safe.
+      struct SystemWriteGuard
+      {
+         bool prev;
+         SystemWriteGuard() : prev(systemWrite) { systemWrite = true; }
+         ~SystemWriteGuard() { systemWrite = prev; }
+         SystemWriteGuard(const SystemWriteGuard&)            = delete;
+         SystemWriteGuard& operator=(const SystemWriteGuard&) = delete;
+      };
    }  // namespace
 
    void Transact::startBoot(psio::view<const std::vector<Checksum256>> bootTransactions)
@@ -86,6 +100,11 @@ namespace SystemService
    {
       check(getSender().value == 0, "Only native code may call startBlock");
       auto _ = recurse();
+
+      // This function is executed outside the context of any action/transaction context.
+      // Therefore, any database write operations are treated as system writes, and their
+      // cost is socialized.
+      SystemWriteGuard sysWrite;
 
       Tables tables(Transact::service);
 
@@ -552,6 +571,24 @@ namespace SystemService
                                      act.method().unpack().str()));
          }
       }
+
+      namespace
+      {
+         // Asserts that the sender is a privileged service.
+         void checkPrivilegedSender()
+         {
+            auto code = Native::tables(KvMode::read).open<CodeTable>().get(getSender());
+            check(code && (code->flags & CodeRow::isPrivileged),
+                  "operation requires a privileged service");
+         }
+
+         // The sender of the currently executing transaction.
+         //
+         // It is set to the sender of the first action at the start of a transaction, unset when
+         // processing is complete.
+         std::optional<AccountNumber> trxSender;
+      }  // namespace
+
    }  // namespace
    bool Transact::checkFirstAuth(Checksum256 id, psio::view<const psibase::Transaction> trx)
    {
@@ -573,6 +610,20 @@ namespace SystemService
           .put({.enabled = enable});
    }
 
+   void Transact::skipBilling(uint32_t numWrites)
+   {
+      checkPrivilegedSender();
+      systemWrite = true;
+      to<VirtualServer>().skip_billing(numWrites);
+   }
+
+   void Transact::endSkipBilling()
+   {
+      checkPrivilegedSender();
+      to<VirtualServer>().end_skip_billing();
+      systemWrite = false;
+   }
+
    static void processTransactionImpl(
        psio::view<const psio::shared_view_ptr<psibase::Transaction>> arg,
        bool                                                          speculative)
@@ -585,6 +636,8 @@ namespace SystemService
 
       check(trx.actions().size() > 0, "transaction has no actions");
 
+      trxSender = trx.actions()[0].sender();
+
       // unpack some fields for convenience
       auto tapos  = trx.tapos().unpack();
       auto claims = trx.claims().unpack();
@@ -594,7 +647,6 @@ namespace SystemService
       auto includedIdx   = includedTable.getIndex<0>();
 
       check(!includedIdx.get(std::tuple{tapos.expiration, id}), "duplicate transaction");
-      includedTable.put({tapos.expiration, id});
 
       bool enforceAuth = checkTapos(id, tapos, speculative, isStartBlock(trx));
 
@@ -608,13 +660,17 @@ namespace SystemService
             auto first = get_view_data(act) == get_view_data(trx.actions()[0]);
             checkAuth(act, claims, first, false);
 
-            if (first && isResMonitoring())
+            if (first)
             {
-               // Billing network usage *after* first action auth, because first action auth may set
-               //   a billable subaccount on the VirtualServer.
-               uint64_t      netUsage = t.size();
-               AccountNumber sender   = act.sender();
-               to<VirtualServer>().useNetSys(sender, netUsage);
+               // Anything that could be billed should be done after first auth, because first
+               //   auth may set a billable subaccount on the VirtualServer.
+
+               if (isResMonitoring())
+               {
+                  uint64_t      netUsage = t.size();
+                  AccountNumber sender   = act.sender();
+                  to<VirtualServer>().useNetSys(sender, netUsage);
+               }
             }
          }
          if constexpr (enable_print)
@@ -630,6 +686,8 @@ namespace SystemService
             psibase::call(act.unpack(), CallFlags::none);
          }
       }
+
+      includedTable.put({tapos.expiration, id});
 
       if (auto callbacks =
               tables.open<CallbacksTable>().getIndex<0>().get(CallbackType::onTransaction))
@@ -662,6 +720,7 @@ namespace SystemService
       }
 
       trxData = std::span<const char>{};
+      trxSender.reset();
    }
 
    void Transact::execTrx(psio::view<const psio::shared_view_ptr<psibase::Transaction>> trx,
@@ -681,6 +740,42 @@ namespace SystemService
                            std::uint32_t newValueLen)
    {
       check(getSender() == AccountNumber{}, "Wrong sender");
+
+      constexpr std::uint32_t DNE = static_cast<std::uint32_t>(-1);
+      check(!(oldValueLen == DNE && newValueLen == DNE), "Invalid kv notify");
+
+      if (isResMonitoring())
+      {
+         int64_t delta = 0;
+         if (oldValueLen == DNE)
+         {
+            delta = static_cast<int64_t>(keyLen) + static_cast<int64_t>(newValueLen);
+         }
+         else if (newValueLen == DNE)
+         {
+            delta = -(static_cast<int64_t>(keyLen) + static_cast<int64_t>(oldValueLen));
+         }
+         else
+         {
+            delta = static_cast<int64_t>(newValueLen) - static_cast<int64_t>(oldValueLen);
+         }
+         if (delta != 0)
+         {
+            AccountNumber user;
+
+            if (systemWrite)
+            {
+               user = AccountNumber{};
+            }
+            else
+            {
+               check(trxSender.has_value(), "unauthorized db write: trxSender not set");
+               user = *trxSender;
+            }
+
+            recurse().to<VirtualServer>().useDiskSys(user, db, delta);
+         }
+      }
    }
 
 #ifndef PSIBASE_GENERATE_SCHEMA

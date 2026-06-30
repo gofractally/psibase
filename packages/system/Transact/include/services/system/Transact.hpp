@@ -433,6 +433,15 @@ namespace SystemService
       /// Enable/disable resource monitoring
       void resMonitoring(bool enable);
 
+      /// The next `numWrites` db writes will not be billed.
+      /// This may only be called by privileged services, and must be paired
+      /// with a call to `endSkipBilling` when the specified number of writes
+      /// have been performed.
+      void skipBilling(uint32_t numWrites);
+
+      /// Asserts that all writes promised by `skipBilling` were consumed.
+      void endSkipBilling();
+
       /// Get the currently executing transaction
       psio::view<const psibase::Transaction> getTransaction() const;
 
@@ -474,6 +483,7 @@ namespace SystemService
       };
    };
    PSIO_REFLECT(Transact,
+                allowHashedMethods(),
                 method(startBoot, bootTransactions),
                 method(finishBoot),
                 method(startBlock),
@@ -486,6 +496,8 @@ namespace SystemService
                 method(runAs, action, allowedActions),
                 method(checkFirstAuth, id, transaction),
                 method(resMonitoring, enable),
+                method(skipBilling, numWrites),
+                method(endSkipBilling),
                 method(getTransaction),
                 method(isTransaction),
                 method(currentBlock),

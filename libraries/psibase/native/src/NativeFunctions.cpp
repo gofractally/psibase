@@ -956,9 +956,6 @@ namespace psibase
                 abortMessage("Cannot read from this db handle " + bucket.to_string());
              auto fullKey       = bucket.key(key);
              auto fullMatchSize = bucket.prefix.size() + matchKeySize;
-             if (keyHasServicePrefix(bucket.db))
-                check(fullMatchSize >= sizeof(AccountNumber::value),
-                      "matchKeySize is smaller than 8 bytes");
              return setResult(*this, bucket.trimResult(database.kvGreaterEqualRaw(
                                          bucket.db, fullKey, fullMatchSize)));
           });
@@ -978,9 +975,6 @@ namespace psibase
                 abortMessage("Cannot read from this db handle " + bucket.to_string());
              auto fullKey       = bucket.key(key);
              auto fullMatchSize = bucket.prefix.size() + matchKeySize;
-             if (keyHasServicePrefix(bucket.db))
-                check(fullMatchSize >= sizeof(AccountNumber::value),
-                      "matchKeySize is smaller than 8 bytes");
              return setResult(*this, bucket.trimResult(database.kvLessThanRaw(bucket.db, fullKey,
                                                                               fullMatchSize)));
           });
@@ -996,9 +990,6 @@ namespace psibase
              if (!bucket.isRead())
                 abortMessage("Cannot read from this db handle " + bucket.to_string());
              auto fullKey = bucket.key(key);
-             if (keyHasServicePrefix(bucket.db))
-                check(fullKey.size() >= sizeof(AccountNumber::value),
-                      "key is shorter than 8 bytes");
              return setResult(*this, bucket.trimResult(database.kvMaxRaw(bucket.db, fullKey)));
           });
    }

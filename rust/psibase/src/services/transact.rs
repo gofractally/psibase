@@ -330,6 +330,22 @@ mod service {
         unimplemented!()
     }
 
+    /// The next `numWrites` db writes will not be billed.
+    ///
+    /// This may only be called by privileged services, and must be paired
+    /// with a call to `endSkipBilling` when the specified number of writes
+    /// have been performed.
+    #[action]
+    fn skipBilling(numWrites: u32) {
+        unimplemented!()
+    }
+
+    /// Asserts that all writes promised by [skipBilling](Self::skipBilling) were consumed.
+    #[action]
+    fn endSkipBilling() {
+        unimplemented!()
+    }
+
     /// Get the currently executing transaction
     #[action]
     fn getTransaction() -> crate::Transaction {

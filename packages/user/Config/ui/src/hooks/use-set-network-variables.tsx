@@ -11,6 +11,7 @@ interface NetworkVariables {
     blockReplayFactor: number;
     perBlockSysCpuNs: number;
     objStorageBytes: number;
+    subjStorageBytes: number;
 }
 
 export const useSetNetworkVariables = () =>

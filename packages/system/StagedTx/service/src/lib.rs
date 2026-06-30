@@ -56,7 +56,11 @@ pub mod service {
     #[action]
     fn init() {
         let table = InitTable::new();
-        table.put(&InitRow {}).unwrap();
+
+        if table.get_index_pk().get(&()).is_none() {
+            table.put(&InitRow {}).unwrap();
+            let _ = LastUsed::get_next_id(); // Create this singleton on init instead of first use.
+        }
 
         let updated = MethodNumber::from("updated");
         Events::call().addIndex(DbId::HistoryEvent, SERVICE, updated, 0); // Index events related to specific txid
