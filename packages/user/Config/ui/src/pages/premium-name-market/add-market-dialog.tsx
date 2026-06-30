@@ -5,6 +5,10 @@ import { useEffect, useMemo, useState } from "react";
 
 import { PREMIUM_MARKET_DEFAULT_PARAMS } from "@/lib/premium-name-market-defaults";
 
+import {
+    MAX_ACCOUNT_NAME_LENGTH,
+    MIN_ACCOUNT_NAME_LENGTH,
+} from "@shared/lib/schemas/account";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Dialog,
@@ -16,11 +20,7 @@ import {
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 
-import { parseAccountNameLength, parsePositiveInt, parsePpm } from "./parsers";
-import {
-    MAX_ACCOUNT_NAME_LENGTH,
-    MIN_ACCOUNT_NAME_LENGTH,
-} from "@shared/lib/schemas/account";
+import { parseAccountNameLength, parsePct, parsePositiveInt } from "./parsers";
 
 type AddMarketParams = [number, string, number, string, number, number];
 
@@ -55,11 +55,11 @@ export function AddMarketDialog({
     const [addTargetRaw, setAddTargetRaw] = useState(
         String(PREMIUM_MARKET_DEFAULT_PARAMS.target),
     );
-    const [addIncreasePpmRaw, setAddIncreasePpmRaw] = useState(
-        String(PREMIUM_MARKET_DEFAULT_PARAMS.increasePpm),
+    const [addIncreasePctRaw, setAddIncreasePctRaw] = useState(
+        String(PREMIUM_MARKET_DEFAULT_PARAMS.increasePct),
     );
-    const [addDecreasePpmRaw, setAddDecreasePpmRaw] = useState(
-        String(PREMIUM_MARKET_DEFAULT_PARAMS.decreasePpm),
+    const [addDecreasePctRaw, setAddDecreasePctRaw] = useState(
+        String(PREMIUM_MARKET_DEFAULT_PARAMS.decreasePct),
     );
 
     useEffect(() => {
@@ -68,8 +68,8 @@ export function AddMarketDialog({
         setAddInitial(PREMIUM_MARKET_DEFAULT_PARAMS.initialPrice);
         setAddFloor(PREMIUM_MARKET_DEFAULT_PARAMS.floorPrice);
         setAddTargetRaw(String(PREMIUM_MARKET_DEFAULT_PARAMS.target));
-        setAddIncreasePpmRaw(String(PREMIUM_MARKET_DEFAULT_PARAMS.increasePpm));
-        setAddDecreasePpmRaw(String(PREMIUM_MARKET_DEFAULT_PARAMS.decreasePpm));
+        setAddIncreasePctRaw(String(PREMIUM_MARKET_DEFAULT_PARAMS.increasePct));
+        setAddDecreasePctRaw(String(PREMIUM_MARKET_DEFAULT_PARAMS.decreasePct));
     }, [open]);
 
     const parsedLength = useMemo(
@@ -78,14 +78,14 @@ export function AddMarketDialog({
     );
 
     const addTarget = parsePositiveInt(addTargetRaw);
-    const addIncreasePpm = parsePpm(addIncreasePpmRaw);
-    const addDecreasePpm = parsePpm(addDecreasePpmRaw);
+    const addIncreasePct = parsePct(addIncreasePctRaw);
+    const addDecreasePct = parsePct(addDecreasePctRaw);
     const addPricesOk =
         addInitial.trim() !== "" &&
         addFloor.trim() !== "" &&
         addTarget !== null &&
-        addIncreasePpm !== null &&
-        addDecreasePpm !== null;
+        addIncreasePct !== null &&
+        addDecreasePct !== null;
 
     const trimmedLen = newLengthRaw.trim();
     const lengthTooLong =
@@ -136,7 +136,8 @@ export function AddMarketDialog({
                         />
                         {lengthTooLong ? (
                             <p className="text-destructive text-sm">
-                                Name length must be at most {MAX_ACCOUNT_NAME_LENGTH}.
+                                Name length must be at most{" "}
+                                {MAX_ACCOUNT_NAME_LENGTH}.
                             </p>
                         ) : null}
                         {duplicate ? (
@@ -148,8 +149,9 @@ export function AddMarketDialog({
                         parsedLength === null &&
                         !lengthTooLong ? (
                             <p className="text-destructive text-sm">
-                                Enter a whole number from {MIN_ACCOUNT_NAME_LENGTH}{" "}
-                                to {MAX_ACCOUNT_NAME_LENGTH}.
+                                Enter a whole number from{" "}
+                                {MIN_ACCOUNT_NAME_LENGTH} to{" "}
+                                {MAX_ACCOUNT_NAME_LENGTH}.
                             </p>
                         ) : null}
                     </div>
@@ -187,13 +189,13 @@ export function AddMarketDialog({
                         />
                     </div>
                     <div className="grid gap-2">
-                        <Label htmlFor="add-pm-inc-ppm">Increase PPM</Label>
+                        <Label htmlFor="add-pm-inc-pct">Increase percent</Label>
                         <Input
-                            id="add-pm-inc-ppm"
+                            id="add-pm-inc-pct"
                             inputMode="numeric"
-                            value={addIncreasePpmRaw}
+                            value={addIncreasePctRaw}
                             onChange={(e) =>
-                                setAddIncreasePpmRaw(e.target.value)
+                                setAddIncreasePctRaw(e.target.value)
                             }
                             autoComplete="off"
                             className="font-mono"
@@ -201,13 +203,13 @@ export function AddMarketDialog({
                         />
                     </div>
                     <div className="grid gap-2">
-                        <Label htmlFor="add-pm-dec-ppm">Decrease PPM</Label>
+                        <Label htmlFor="add-pm-dec-pct">Decrease percent</Label>
                         <Input
-                            id="add-pm-dec-ppm"
+                            id="add-pm-dec-pct"
                             inputMode="numeric"
-                            value={addDecreasePpmRaw}
+                            value={addDecreasePctRaw}
                             onChange={(e) =>
-                                setAddDecreasePpmRaw(e.target.value)
+                                setAddDecreasePctRaw(e.target.value)
                             }
                             autoComplete="off"
                             className="font-mono"
@@ -234,8 +236,8 @@ export function AddMarketDialog({
                             if (
                                 parsedLength === null ||
                                 addTarget === null ||
-                                addIncreasePpm === null ||
-                                addDecreasePpm === null
+                                addIncreasePct === null ||
+                                addDecreasePct === null
                             ) {
                                 return;
                             }
@@ -245,8 +247,8 @@ export function AddMarketDialog({
                                     addInitial.trim(),
                                     addTarget,
                                     addFloor.trim(),
-                                    addIncreasePpm,
-                                    addDecreasePpm,
+                                    addIncreasePct,
+                                    addDecreasePct,
                                 ],
                                 {
                                     onSuccess: () => {

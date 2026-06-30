@@ -18,8 +18,8 @@ const zRow = z.object({
     enabled: z.boolean(),
     target: z.number().int().min(1),
     floorPrice: z.string(),
-    increasePpm: z.number().int().min(1).max(999_999),
-    decreasePpm: z.number().int().min(1).max(999_999),
+    increasePct: z.number().int().min(1).max(255),
+    decreasePct: z.number().int().min(1).max(255),
 });
 
 const zData = z.object({
@@ -39,12 +39,12 @@ export const useConfiguredPremiumNameMarkets = () =>
                         enabled
                         target
                         floorPrice
-                        increasePpm
-                        decreasePpm
+                        increasePct
+                        decreasePct
                     }
                 }
             `;
-            const raw = await graphql(query, { service: "prem-accounts" });
+            const raw = await graphql(query, { service: "namemarket" });
             const parsed = zData.parse(raw);
             return parsed.marketParams;
         },

@@ -9,6 +9,9 @@ world impl {
     include transact:plugin/imports;
     include permissions:plugin/imports;
     include auth-sig:plugin/imports;
+    include name-market:plugin/imports;
+    include tokens:plugin/imports;
+    include host:crypto/imports;
 
     import invite:plugin/redemption;
 

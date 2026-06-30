@@ -13,6 +13,7 @@ members = [
     "user/ClientData/plugin",
     "user/Config/plugin",
     "user/FractalCore/plugin",
+    "user/Homepage/plugin",
     "user/Host/plugin/auth",
     "user/Host/plugin/crypto",
     "user/Host/plugin/common",

@@ -2298,6 +2298,46 @@ dependencies = [
 ]
 
 [[package]]
+name = "name-market"
+version = "0.23.0"
+dependencies = [
+ "async-graphql",
+ "name-market-pkg",
+ "pem",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_macros",
+ "psibase_service",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "name-market-pkg"
+version = "0.23.0"
+dependencies = [
+ "name-market",
+ "name-market-plugin",
+ "psibase-user-workspace-hack",
+ "r-name-market",
+]
+
+[[package]]
+name = "name-market-plugin"
+version = "0.23.0"
+dependencies = [
+ "name-market",
+ "pem",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_plugin",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "wit-bindgen-rt",
+]
+
+[[package]]
 name = "nft"
 version = "0.23.0"
 dependencies = [
@@ -2580,46 +2620,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "85eae3c4ed2f50dcfe72643da4befc30deadb458a9b590d720cde2f2b1e97da9"
 dependencies = [
  "zerocopy",
-]
-
-[[package]]
-name = "prem-accounts"
-version = "0.23.0"
-dependencies = [
- "async-graphql",
- "pem",
- "prem-accounts-pkg",
- "psibase",
- "psibase-user-workspace-hack",
- "psibase_macros",
- "psibase_service",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "prem-accounts-pkg"
-version = "0.23.0"
-dependencies = [
- "prem-accounts",
- "prem-accounts-plugin",
- "psibase-user-workspace-hack",
- "r-prem-accts",
-]
-
-[[package]]
-name = "prem-accounts-plugin"
-version = "0.23.0"
-dependencies = [
- "pem",
- "prem-accounts",
- "psibase",
- "psibase-user-workspace-hack",
- "psibase_plugin",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
- "wit-bindgen-rt",
 ]
 
 [[package]]
@@ -3001,6 +3001,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "r-name-market"
+version = "0.23.0"
+dependencies = [
+ "async-graphql",
+ "name-market",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_service",
+ "serde",
+ "serde-aux",
+ "serde_json",
+]
+
+[[package]]
 name = "r-nft"
 version = "0.23.0"
 dependencies = [
@@ -3010,20 +3024,6 @@ dependencies = [
  "psibase-user-workspace-hack",
  "psibase_service",
  "serde",
- "serde_json",
-]
-
-[[package]]
-name = "r-prem-accts"
-version = "0.23.0"
-dependencies = [
- "async-graphql",
- "prem-accounts",
- "psibase",
- "psibase-user-workspace-hack",
- "psibase_service",
- "serde",
- "serde-aux",
  "serde_json",
 ]
 

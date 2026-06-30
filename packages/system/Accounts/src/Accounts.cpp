@@ -7,7 +7,8 @@
 #include <services/system/AuthDelegate.hpp>
 #include <services/system/Transact.hpp>
 
-static constexpr bool enable_print = false;
+static constexpr bool        enable_print               = false;
+static constexpr std::size_t MIN_ALLOWED_ACCOUNT_LENGTH = 8;
 
 using namespace psibase;
 
@@ -61,7 +62,7 @@ namespace SystemService
       }
       else
       {
-         check(getSender() == getReceiver() || getSender() == AccountNumber("prem-accounts"),
+         check(getSender() == getReceiver() || getSender() == AccountNumber("namemarket"),
                "unauthorized");
       }
 
@@ -101,8 +102,9 @@ namespace SystemService
          {
             check(!strName.starts_with("x-"),
                   "The 'x-' account prefix is reserved for infrastructure providers");
-            check(strName.length() >= 10,
-                  "account name must be at least 10 characters: " + strName);
+            check(strName.length() >= MIN_ALLOWED_ACCOUNT_LENGTH,
+                  "account name must be at least " + std::to_string(MIN_ALLOWED_ACCOUNT_LENGTH) +
+                      " characters: " + strName);
          }
       }
 
