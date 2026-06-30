@@ -101,9 +101,11 @@ fn direct_authorizers(
     }
 }
 
-/// The authorizers backing an account once its delegates have been resolved: the
-/// delegates that either responded directly or came out authorized.
-fn resolved_authorizers(
+/// The delegates that are "backed" — i.e. that carry real authority behind them
+/// because they either responded directly or were themselves authorized. These
+/// are exactly the delegates that count as authorizers for the account that
+/// delegates to them.
+fn backed_delegates(
     delegates: &HashSet<AccountNumber>,
     responders: &[AccountNumber],
     authorized: &HashSet<AccountNumber>,
@@ -222,17 +224,17 @@ fn resolve_authorizations(
                 continue; // already resolved; both sets are monotonic
             }
 
-            let authorizers = resolved_authorizers(&delegation.delegates, responders, &authorized);
+            let authorizers = backed_delegates(&delegation.delegates, responders, &authorized);
 
             let caller = auth_caller(delegation.auth_service);
             if check_fn(&caller, delegation.account, authorizers, None) {
                 authorized.insert(delegation.account);
                 changed = true;
-            } else if delegation
-                .delegates
-                .iter()
-                .all(|delegate| authorized.contains(delegate) || failed.contains(delegate))
-            {
+            } else if delegation.delegates.iter().all(|delegate| {
+                responders.contains(delegate)
+                    || authorized.contains(delegate)
+                    || failed.contains(delegate)
+            }) {
                 // Every delegate is resolved and the account still isn't
                 // authorized, so it never can be: mark it as known to fail.
                 failed.insert(delegation.account);
@@ -291,7 +293,7 @@ fn check_delegation_auth(
     // the rest of the graph) with the method wiped, then re-check `user` against
     // the requested method with whichever delegates came out authorized.
     let authorized = resolve_authorizations(&delegates, responders, check_fn);
-    let authorizers = resolved_authorizers(&delegates, responders, &authorized);
+    let authorizers = backed_delegates(&delegates, responders, &authorized);
     check_fn(&caller, user, authorizers, method)
 }
 
