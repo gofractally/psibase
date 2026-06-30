@@ -1,14 +1,14 @@
-import { isPluginErrorObject } from "@psibase/common-lib/messaging";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import { CALL_SENTINEL } from "@/test/test-plugin";
 import {
+    TEST_ORIGIN,
     createTestSupervisor,
     mockAppCallArgs,
     mockAppPluginId,
     mockParentReplies,
-    TEST_ORIGIN,
 } from "@/test/supervisor-test-harness";
+import { CALL_SENTINEL } from "@/test/test-plugin";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { isPluginErrorObject } from "@psibase/common-lib/messaging";
 
 vi.mock("./plugin/plugin-loader", () => ({
     PluginLoader: class {
@@ -79,10 +79,14 @@ describe("Supervisor concurrent entry", () => {
         const args = mockAppCallArgs();
 
         await Promise.all([
-            supervisor.preloadPlugins(TEST_ORIGIN, [mockAppPluginId()]),
+            supervisor.preloadPlugins(TEST_ORIGIN, "id-preload", [
+                mockAppPluginId(),
+            ]),
             supervisor.entry(TEST_ORIGIN, "id-entry", args),
         ]);
 
+        expect(replies.get("id-preload")).toBe(null);
+        expect(isPluginErrorObject(replies.get("id-preload"))).toBe(false);
         expect(replies.get("id-entry")).toBe(CALL_SENTINEL);
         expect(isPluginErrorObject(replies.get("id-entry"))).toBe(false);
     });
