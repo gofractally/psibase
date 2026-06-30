@@ -416,7 +416,7 @@ impl<'a, F: SchemaFetcher + 'a> ActionFormatter<'a, F> {
                 if let Some(action_type) = schema.actions.get(&action_name) {
                     if atrace.action.rawData.is_empty() {
                         cschema.extend(&action_type.params);
-                        let _ = cschema.to_value(&action_type.params, &atrace.action.rawData);
+                        let _ = cschema.verify(&action_type.params, &atrace.action.rawData);
                         for service in &*service_method.missing.borrow() {
                             res = res.and(self.add_service(*service).await);
                         }
@@ -792,6 +792,22 @@ impl<'a> CustomHandler for CustomResolvedServiceMethod<'a> {
                 })?)?,
             };
         Ok(value.pack(dest))
+    }
+    fn fracpack_verify(
+        &self,
+        _schema: &CompiledSchema,
+        ty: &CompiledType,
+        src: &mut FracInputStream,
+        _allow_empty_container: bool,
+    ) -> Result<(), fracpack::Error> {
+        if !service_method_type(ty).is_some() {
+            panic!("Wrong type");
+        };
+        let value = ServiceMethod::unpack(src)?;
+        if !self.schemas.contains_key(&value.service) {
+            self.missing.borrow_mut().insert(value.service);
+        }
+        Ok(())
     }
     fn is_empty_container(&self, _ty: &CompiledType, _value: &serde_json::Value) -> bool {
         false
