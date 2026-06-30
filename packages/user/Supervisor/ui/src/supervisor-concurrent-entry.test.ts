@@ -1,14 +1,15 @@
-import { isPluginErrorObject } from "@psibase/common-lib/messaging";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import { CALL_SENTINEL } from "@/test/test-plugin";
+import { serialize } from "@/serialize";
 import {
+    TEST_ORIGIN,
     createTestSupervisor,
     mockAppCallArgs,
     mockAppPluginId,
     mockParentReplies,
-    TEST_ORIGIN,
 } from "@/test/supervisor-test-harness";
+import { CALL_SENTINEL } from "@/test/test-plugin";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { isPluginErrorObject } from "@psibase/common-lib/messaging";
 
 vi.mock("./plugin/plugin-loader", () => ({
     PluginLoader: class {
@@ -50,8 +51,8 @@ describe("Supervisor concurrent entry", () => {
         const supervisor = createTestSupervisor();
         const args = mockAppCallArgs();
 
-        await supervisor.entry(TEST_ORIGIN, "id-1", args);
-        await supervisor.entry(TEST_ORIGIN, "id-2", args);
+        await serialize(() => supervisor.entry(TEST_ORIGIN, "id-1", args));
+        await serialize(() => supervisor.entry(TEST_ORIGIN, "id-2", args));
 
         expect(replies.get("id-1")).toBe(CALL_SENTINEL);
         expect(replies.get("id-2")).toBe(CALL_SENTINEL);
@@ -63,8 +64,8 @@ describe("Supervisor concurrent entry", () => {
         const args = mockAppCallArgs();
 
         await Promise.all([
-            supervisor.entry(TEST_ORIGIN, "id-a", args),
-            supervisor.entry(TEST_ORIGIN, "id-b", args),
+            serialize(() => supervisor.entry(TEST_ORIGIN, "id-a", args)),
+            serialize(() => supervisor.entry(TEST_ORIGIN, "id-b", args)),
         ]);
 
         expect(replies.get("id-a")).toBe(CALL_SENTINEL);
@@ -79,8 +80,10 @@ describe("Supervisor concurrent entry", () => {
         const args = mockAppCallArgs();
 
         await Promise.all([
-            supervisor.preloadPlugins(TEST_ORIGIN, [mockAppPluginId()]),
-            supervisor.entry(TEST_ORIGIN, "id-entry", args),
+            serialize(() =>
+                supervisor.preloadPlugins(TEST_ORIGIN, [mockAppPluginId()]),
+            ),
+            serialize(() => supervisor.entry(TEST_ORIGIN, "id-entry", args)),
         ]);
 
         expect(replies.get("id-entry")).toBe(CALL_SENTINEL);
