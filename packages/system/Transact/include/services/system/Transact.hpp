@@ -433,13 +433,18 @@ namespace SystemService
       /// Enable/disable resource monitoring
       void resMonitoring(bool enable);
 
-      /// The next `numWrites` db writes will not be billed.
-      /// This may only be called by privileged services, and must be paired
-      /// with a call to `endSkipBilling` when the specified number of writes
-      /// have been performed.
+      /// Suppress billing/tracking for the next `numWrites` disk writes.
+      ///
+      /// Intended for wrapping privileged-service writes that are modified
+      /// by both wasm and native code (e.g. status row). The caller is expected
+      /// to perform exactly `numWrites` writes/frees and then call `endSkipBilling`.
+      ///
+      /// Only callable by privileged services.
       void skipBilling(uint32_t numWrites);
 
       /// Asserts that all writes promised by `skipBilling` were consumed.
+      ///
+      /// Only callable by privileged services.
       void endSkipBilling();
 
       /// Get the currently executing transaction

@@ -35,6 +35,10 @@ namespace SystemService
       // When set, kv writes are attributed to the system account (`{}`) instead of `trxSender`
       bool systemWrite = false;
 
+      // When set with `skipBilling`, the next `N` disk writes are not billed; exactly N unbilled
+      // writes must occur before `endSkipBilling` is called.
+      std::optional<uint32_t> skipDiskWrites;
+
       // RAII guard that marks the enclosing scope as performing authorized system
       // writes. Restores the previous value on destruction so nesting is safe.
       struct SystemWriteGuard
@@ -619,15 +623,16 @@ namespace SystemService
    void Transact::skipBilling(uint32_t numWrites)
    {
       checkPrivilegedSender();
-      systemWrite = true;
-      to<VirtualServer>().skip_billing(numWrites);
+      check(!skipDiskWrites.has_value(), "skipBilling already active");
+      skipDiskWrites = numWrites;
    }
 
    void Transact::endSkipBilling()
    {
       checkPrivilegedSender();
-      to<VirtualServer>().end_skip_billing();
-      systemWrite = false;
+      check(skipDiskWrites.has_value(), "endSkipBilling without active skipBilling");
+      check(*skipDiskWrites == 0, "endSkipBilling called before all skipped writes occurred");
+      skipDiskWrites.reset();
    }
 
    static void processTransactionImpl(
@@ -752,6 +757,13 @@ namespace SystemService
 
       if (isResMonitoring())
       {
+         if (skipDiskWrites.has_value())
+         {
+            check(*skipDiskWrites > 0, "more writes occurred than promised by skipBilling");
+            --*skipDiskWrites;
+            return;
+         }
+
          int64_t delta = 0;
          if (oldValueLen == DNE)
          {

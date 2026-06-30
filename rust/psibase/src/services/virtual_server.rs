@@ -420,26 +420,6 @@ mod service {
         unimplemented!()
     }
 
-    /// Suppress billing/tracking for the next `num_writes` `useDiskSys` calls.
-    ///
-    /// Intended for wrapping privileged-service writes that should not
-    /// be billed. The caller is expected to perform exactly `num_writes`
-    /// writes/frees and then call `end_skip_billing`.
-    ///
-    /// Only callable by Transact
-    #[action]
-    fn skip_billing(num_writes: u32) {
-        unimplemented!()
-    }
-
-    /// Asserts that all writes promised by `skip_billing` were consumed.
-    ///
-    /// Only callable by Transact
-    #[action]
-    fn end_skip_billing() {
-        unimplemented!()
-    }
-
     /// Called by the system when `user` causes a write to any database.
     ///
     /// `amount_bytes` is positive for consumption and negative for a free
