@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use psibase::services::accounts::Wrapper as Accounts;
 use psibase::services::transact::auth_interface::auth_action_structs;
 use psibase::services::transact::ServiceMethod;
@@ -63,33 +65,29 @@ fn is_reject_sys(
 type CheckFn = fn(&ServiceCaller, AccountNumber, Vec<AccountNumber>, Option<ServiceMethod>) -> bool;
 
 /// A single account in the method-wiped delegation graph that still needs
-/// delegate-based resolution: its auth service and the deduped set of accounts
-/// it delegates authority to.
+/// delegate-based resolution: its auth service and the deduplicated set of
+/// accounts it delegates authority to.
 struct Delegation {
     account: AccountNumber,
     auth_service: AccountNumber,
-    delegates: Vec<AccountNumber>,
+    delegates: HashSet<AccountNumber>,
 }
 
-/// Fetches an account's delegations, deduped while preserving order.
 fn deduped_delegations(
     caller: &ServiceCaller,
     account: AccountNumber,
     method: Option<ServiceMethod>,
-) -> Vec<AccountNumber> {
-    let mut delegates: Vec<AccountNumber> = Vec::new();
-    for delegate in get_delegations(caller, account, method) {
-        if !delegates.contains(&delegate) {
-            delegates.push(delegate);
-        }
-    }
-    delegates
+) -> HashSet<AccountNumber> {
+    get_delegations(caller, account, method)
+        .into_iter()
+        .collect()
 }
 
-/// The authorizers available to an account without resolving any delegate: the
-/// responders themselves for a leaf, or the delegates that responded directly.
+// A non-leaf has declared its authorizing accounts (its delegates), so we filter responders to that allow-list.
+// A leaf's authorizing identity is internal to its auth service,
+// so we can't filter and must pass all responders and let `is_auth` judge.
 fn direct_authorizers(
-    delegates: &[AccountNumber],
+    delegates: &HashSet<AccountNumber>,
     responders: &[AccountNumber],
 ) -> Vec<AccountNumber> {
     if delegates.is_empty() {
@@ -106,9 +104,9 @@ fn direct_authorizers(
 /// The authorizers backing an account once its delegates have been resolved: the
 /// delegates that either responded directly or came out authorized.
 fn resolved_authorizers(
-    delegates: &[AccountNumber],
+    delegates: &HashSet<AccountNumber>,
     responders: &[AccountNumber],
-    authorized: &[AccountNumber],
+    authorized: &HashSet<AccountNumber>,
 ) -> Vec<AccountNumber> {
     delegates
         .iter()
@@ -143,10 +141,10 @@ fn resolved_authorizers(
 ///   known to fail) and the account still isn't authorized, it is marked as
 ///   known to fail and is never revisited.
 fn resolve_authorizations(
-    seeds: &[AccountNumber],
+    seeds: &HashSet<AccountNumber>,
     responders: &[AccountNumber],
     check_fn: CheckFn,
-) -> Vec<AccountNumber> {
+) -> HashSet<AccountNumber> {
     enum Frame {
         Enter(AccountNumber),
         Exit(Delegation),
@@ -154,9 +152,9 @@ fn resolve_authorizations(
 
     let mut stack: Vec<Frame> = seeds.iter().map(|seed| Frame::Enter(*seed)).collect();
     let mut graph: Vec<Delegation> = Vec::new();
-    let mut seen: Vec<AccountNumber> = Vec::new();
-    let mut authorized: Vec<AccountNumber> = Vec::new();
-    let mut failed: Vec<AccountNumber> = Vec::new();
+    let mut seen: HashSet<AccountNumber> = HashSet::new();
+    let mut authorized: HashSet<AccountNumber> = HashSet::new();
+    let mut failed: HashSet<AccountNumber> = HashSet::new();
 
     // Top-down expansion. Records `graph` in post-order and resolves every
     // account that can be decided without recursing into its delegates.
@@ -171,14 +169,13 @@ fn resolve_authorizations(
             Frame::Enter(account) => account,
         };
 
-        if seen.contains(&account) {
+        if !seen.insert(account) {
             continue;
         }
-        seen.push(account);
 
         let Some(auth_service) = get_auth_service(account) else {
             // An account with no auth service can never become authorized.
-            failed.push(account);
+            failed.insert(account);
             continue;
         };
 
@@ -192,13 +189,13 @@ fn resolve_authorizations(
             None,
         ) {
             // Authorized already; its delegates can't change that, so skip them.
-            authorized.push(account);
+            authorized.insert(account);
             continue;
         }
 
         if delegates.is_empty() {
             // A leaf the responders don't satisfy can never be authorized.
-            failed.push(account);
+            failed.insert(account);
             continue;
         }
 
@@ -229,7 +226,7 @@ fn resolve_authorizations(
 
             let caller = auth_caller(delegation.auth_service);
             if check_fn(&caller, delegation.account, authorizers, None) {
-                authorized.push(delegation.account);
+                authorized.insert(delegation.account);
                 changed = true;
             } else if delegation
                 .delegates
@@ -238,7 +235,7 @@ fn resolve_authorizations(
             {
                 // Every delegate is resolved and the account still isn't
                 // authorized, so it never can be: mark it as known to fail.
-                failed.push(delegation.account);
+                failed.insert(delegation.account);
                 changed = true;
             }
         }
