@@ -71,6 +71,18 @@ namespace
       }
       return result;
    }
+
+   void checkEvents(const psio::Schema& types, const psibase::ServiceSchema::EventMap& events)
+   {
+      for (const auto& [name, type] : events)
+      {
+         types.checkType(type.type);
+         if (type.access != "public" && type.access != "private")
+         {
+            psibase::abortMessage("Invalid access: " + type.access);
+         }
+      }
+   }
 }  // namespace
 
 void psibase::ServiceSchema::checkValid() const
@@ -85,18 +97,9 @@ void psibase::ServiceSchema::checkValid() const
       if (type.result)
          types.checkType(*type.result);
    }
-   for (const auto& [name, type] : ui)
-   {
-      types.checkType(type);
-   }
-   for (const auto& [name, type] : history)
-   {
-      types.checkType(type);
-   }
-   for (const auto& [name, type] : merkle)
-   {
-      types.checkType(type);
-   }
+   checkEvents(types, ui);
+   checkEvents(types, history);
+   checkEvents(types, merkle);
    if (database)
    {
       for (const auto& [name, db] : *database)

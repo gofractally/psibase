@@ -64,6 +64,13 @@ namespace psibase
       return "unknown";
    }
 
+   struct EventType
+   {
+      psio::schema_types::AnyType type;
+      std::string                 access = "public";
+      PSIO_REFLECT(EventType, type, access)
+   };
+
    /// Represents the schema for a service
    struct ServiceSchema
    {
@@ -72,7 +79,7 @@ namespace psibase
       using ActionMap =
           std::map<std::string, psio::schema_types::FunctionType, CompareMethodNumber>;
       ActionMap actions;
-      using EventMap = std::map<std::string, psio::schema_types::AnyType, CompareMethodNumber>;
+      using EventMap = std::map<std::string, EventType, CompareMethodNumber>;
       EventMap ui;
       EventMap history;
       EventMap merkle;
@@ -144,23 +151,23 @@ namespace psibase
                              std::vector<psio::schema_types::AnyType*>& eventTypes)
       {
          std::size_t i = 0;
-         psio::for_each_member_type((typename psio::reflect<T>::member_functions*)nullptr,
-                                    [&](auto member)
-                                    {
-                                       std::span<const char* const> names =
-                                           psio::reflect<T>::member_function_names[i];
-                                       using m = psio::MemberPtrType<decltype(member)>;
-                                       if constexpr (m::isFunction)
-                                       {
-                                          auto [pos, inserted] = out.try_emplace(
-                                              names[0], makeParams<m>(builder, names.subspan(1)));
-                                          if (inserted)
-                                          {
-                                             eventTypes.push_back(&pos->second);
-                                          }
-                                       }
-                                       ++i;
-                                    });
+         psio::for_each_member_type(
+             (typename psio::reflect<T>::member_functions*)nullptr,
+             [&](auto member)
+             {
+                std::span<const char* const> names = psio::reflect<T>::member_function_names[i];
+                using m                            = psio::MemberPtrType<decltype(member)>;
+                if constexpr (m::isFunction)
+                {
+                   auto [pos, inserted] = out.try_emplace(
+                       names[0], EventType{.type = makeParams<m>(builder, names.subspan(1))});
+                   if (inserted)
+                   {
+                      eventTypes.push_back(&pos->second.type);
+                   }
+                }
+                ++i;
+             });
       }
 
       template <auto K, auto... M>
@@ -393,7 +400,7 @@ namespace psibase
       {
          if (const auto* dbTypes = getDb(db))
             if (auto pos = dbTypes->find(event); pos != dbTypes->end())
-               return pos->second.resolve(types);
+               return pos->second.type.resolve(types);
          return nullptr;
       }
       std::vector<const psio::schema_types::AnyType*> eventTypes() const
@@ -403,7 +410,7 @@ namespace psibase
          {
             for (const auto& [_, type] : *m)
             {
-               result.push_back(&type);
+               result.push_back(&type.type);
             }
          }
          return result;

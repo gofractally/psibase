@@ -75,7 +75,7 @@ pub fn process_event_schema(
 
     *insertions = quote! {
         #insertions
-        events.insert(#psibase_mod::MethodString(#name_str.to_string()), builder.insert::<#event_mod::#name>());
+        events.insert(#psibase_mod::MethodString(#name_str.to_string()), #psibase_mod::EventType{ type_: builder.insert::<#event_mod::#name>(), access: "public".to_owned() });
     }
 }
 
