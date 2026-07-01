@@ -83,43 +83,10 @@ fn deduped_delegations(
         .collect()
 }
 
-// A non-leaf has declared its authorizing accounts (its delegates), so we filter responders to that allow-list.
-// A leaf's authorizing identity is internal to its auth service,
-// so we can't filter and must pass all responders and let `is_auth` judge.
-fn direct_authorizers(
-    delegates: &HashSet<AccountNumber>,
-    responders: &[AccountNumber],
-) -> Vec<AccountNumber> {
-    if delegates.is_empty() {
-        responders.to_vec()
-    } else {
-        delegates
-            .iter()
-            .copied()
-            .filter(|delegate| responders.contains(delegate))
-            .collect()
-    }
-}
-
-/// The delegates that are "backed" — i.e. that carry real authority behind them
-/// because they either responded directly or were themselves authorized. These
-/// are exactly the delegates that count as authorizers for the account that
-/// delegates to them.
-fn backed_delegates(
-    delegates: &HashSet<AccountNumber>,
-    responders: &[AccountNumber],
-    authorized: &HashSet<AccountNumber>,
-) -> Vec<AccountNumber> {
-    delegates
-        .iter()
-        .copied()
-        .filter(|delegate| responders.contains(delegate) || authorized.contains(delegate))
-        .collect()
-}
-
-/// Resolves the delegation graph reachable from `seeds` and returns the set of
-/// accounts that come out authorized (i.e. that can act as authorizers for the
-/// accounts delegating to them).
+/// Resolves the delegation graph reachable from `seeds`, inserting every account
+/// that comes out authorized into `backed`. `backed` starts as the responders,
+/// so it ends as `responders ∪ authorized` — the set of accounts that can act as
+/// authorizers for whoever delegates to them.
 ///
 /// Every account here is queried and checked with the method wiped (`None`),
 /// because staged-tx drops the method as authority propagates down the chain;
@@ -132,21 +99,21 @@ fn backed_delegates(
 ///   Accounts reachable through multiple paths (e.g. a multisig whose signers
 ///   delegate to a common owner) are consolidated rather than expanded
 ///   repeatedly.
-/// * If an account is already authorized by the accounts that responded
-///   directly, it is short-circuited: it is marked authorized and its delegates
-///   are never fetched or expanded, since they cannot change its outcome.
+/// * If an account is already authorized by the backed accounts, it is
+///   short-circuited: it is marked authorized and its delegates are never fetched
+///   or expanded, since they cannot change its outcome.
 /// * Accounts are recorded in post-order (delegates before the accounts that
 ///   delegate to them), so a single bottom-up pass resolves chains and trees.
 ///   The fixpoint loop only performs additional passes when the graph contains
 ///   cycles.
-/// * Once every delegate of an account is resolved (known to be authorized or
-///   known to fail) and the account still isn't authorized, it is marked as
-///   known to fail and is never revisited.
+/// * Once every delegate of an account is resolved (backed or known to fail) and
+///   the account still isn't authorized, it is marked as known to fail and is
+///   never revisited.
 fn resolve_authorizations(
     seeds: &HashSet<AccountNumber>,
-    responders: &[AccountNumber],
+    backed: &mut HashSet<AccountNumber>,
     check_fn: CheckFn,
-) -> HashSet<AccountNumber> {
+) {
     enum Frame {
         Enter(AccountNumber),
         Exit(Delegation),
@@ -155,7 +122,6 @@ fn resolve_authorizations(
     let mut stack: Vec<Frame> = seeds.iter().map(|seed| Frame::Enter(*seed)).collect();
     let mut graph: Vec<Delegation> = Vec::new();
     let mut seen: HashSet<AccountNumber> = HashSet::new();
-    let mut authorized: HashSet<AccountNumber> = HashSet::new();
     let mut failed: HashSet<AccountNumber> = HashSet::new();
 
     // Top-down expansion. Records `graph` in post-order and resolves every
@@ -171,6 +137,9 @@ fn resolve_authorizations(
             Frame::Enter(account) => account,
         };
 
+        if backed.contains(&account) {
+            continue;
+        }
         if !seen.insert(account) {
             continue;
         }
@@ -184,19 +153,15 @@ fn resolve_authorizations(
         let caller = auth_caller(auth_service);
         let delegates = deduped_delegations(&caller, account, None);
 
-        if check_fn(
-            &caller,
-            account,
-            direct_authorizers(&delegates, responders),
-            None,
-        ) {
-            // Authorized already; its delegates can't change that, so skip them.
-            authorized.insert(account);
+        // Short-circuit: already authorized by the backed accounts, so its
+        // delegates can't change that and we skip them.
+        if check_fn(&caller, account, backed.iter().copied().collect(), None) {
+            backed.insert(account);
             continue;
         }
 
         if delegates.is_empty() {
-            // A leaf the responders don't satisfy can never be authorized.
+            // A leaf the backed accounts don't satisfy can never be authorized.
             failed.insert(account);
             continue;
         }
@@ -220,21 +185,24 @@ fn resolve_authorizations(
         changed = false;
 
         for delegation in &graph {
-            if authorized.contains(&delegation.account) || failed.contains(&delegation.account) {
+            if backed.contains(&delegation.account) || failed.contains(&delegation.account) {
                 continue; // already resolved; both sets are monotonic
             }
 
-            let authorizers = backed_delegates(&delegation.delegates, responders, &authorized);
-
             let caller = auth_caller(delegation.auth_service);
-            if check_fn(&caller, delegation.account, authorizers, None) {
-                authorized.insert(delegation.account);
+            if check_fn(
+                &caller,
+                delegation.account,
+                backed.iter().copied().collect(),
+                None,
+            ) {
+                backed.insert(delegation.account);
                 changed = true;
-            } else if delegation.delegates.iter().all(|delegate| {
-                responders.contains(delegate)
-                    || authorized.contains(delegate)
-                    || failed.contains(delegate)
-            }) {
+            } else if delegation
+                .delegates
+                .iter()
+                .all(|delegate| backed.contains(delegate) || failed.contains(delegate))
+            {
                 // Every delegate is resolved and the account still isn't
                 // authorized, so it never can be: mark it as known to fail.
                 failed.insert(delegation.account);
@@ -242,16 +210,14 @@ fn resolve_authorizations(
             }
         }
     }
-
-    authorized
 }
 
 /// Determines whether `user` is authorized given the accounts that actually
 /// responded (`responders`).
 ///
-/// A leaf account (one that delegates to no one) is authorized if the responders
-/// satisfy its auth service. Otherwise authority is derived from the delegated
-/// accounts that are themselves authorized.
+/// A leaf account (one that delegates to no one) is authorized if the backed
+/// accounts satisfy its auth service. Otherwise authority is derived from the
+/// delegated accounts that are themselves authorized.
 ///
 /// The requested `method` is only applied to the originating `user`; every
 /// account reached through a delegation is checked with the method wiped. Since
@@ -274,13 +240,11 @@ fn check_delegation_auth(
     let caller = auth_caller(auth_service);
     let delegates = deduped_delegations(&caller, user, method);
 
-    // Short-circuit: already authorized by the accounts that responded directly.
-    if check_fn(
-        &caller,
-        user,
-        direct_authorizers(&delegates, responders),
-        method,
-    ) {
+    // `backed` starts as the responders and grows as accounts are authorized.
+    let mut backed: HashSet<AccountNumber> = responders.iter().copied().collect();
+
+    // Short-circuit: already authorized by the accounts that responded.
+    if check_fn(&caller, user, &backed.iter().copied().collect(), method) {
         return true;
     }
 
@@ -291,10 +255,9 @@ fn check_delegation_auth(
 
     // Otherwise authority must flow up from `user`'s delegates. Resolve them (and
     // the rest of the graph) with the method wiped, then re-check `user` against
-    // the requested method with whichever delegates came out authorized.
-    let authorized = resolve_authorizations(&delegates, responders, check_fn);
-    let authorizers = backed_delegates(&delegates, responders, &authorized);
-    check_fn(&caller, user, authorizers, method)
+    // the requested method with whichever accounts came out backed.
+    resolve_authorizations(&delegates, &mut backed, check_fn);
+    check_fn(&caller, user, &backed.iter().copied().collect(), method)
 }
 
 pub struct StagedTxPolicy {
