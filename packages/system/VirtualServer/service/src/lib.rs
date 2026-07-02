@@ -110,6 +110,7 @@ mod tx_cache {
     pub mod balance_cache {
         use crate::tables::tables::UserSettings;
         use crate::tx_cache::{drain_cache, with_cache};
+        use psibase::services::tokens::Quantity;
         use psibase::{abort_message, AccountNumber};
         use std::cell::RefCell;
         use std::collections::HashMap;
@@ -171,6 +172,14 @@ mod tx_cache {
         /// Returns whether the payer already has a pending accrual in this tx.
         pub fn has_pending(account: AccountNumber, sub: Option<String>) -> bool {
             with(|m| m.contains_key(&(account, sub)))
+        }
+
+        /// The current resource balance for the specified account
+        pub fn get_available(account: AccountNumber, sub: Option<String>) -> Quantity {
+            match with(|m| m.get(&(account, sub.clone())).map(|b| b.available)) {
+                Some(available) => Quantity::new(available.max(0) as u64),
+                None => UserSettings::get_resource_balance(account, sub),
+            }
         }
 
         /// Handles mid-tx resource purchase/deletion.
@@ -663,13 +672,13 @@ mod service {
     /// Gets the amount of resources available for the caller
     #[action]
     fn res_balance() -> Quantity {
-        UserSettings::get_resource_balance(get_sender(), None)
+        balance_cache::get_available(get_sender(), None)
     }
 
     /// Gets the amount of resources available for the caller's specified sub-account
     #[action]
     fn res_balance_sub(sub_account: String) -> Quantity {
-        UserSettings::get_resource_balance(get_sender(), Some(sub_account.clone()))
+        balance_cache::get_available(get_sender(), Some(sub_account))
     }
 
     /// Reserves system tokens for future resource consumption by the sender
@@ -1088,7 +1097,7 @@ mod service {
         }
 
         let cpu_pricing = RateLimitPricing::get_assert(Cpu);
-        let res_balance = UserSettings::get_resource_balance(account, sub_account).value;
+        let res_balance = balance_cache::get_available(account, sub_account).value;
 
         let price_per_unit = cpu_pricing.price();
         let ns_per_unit = cpu_pricing.billable_unit;
