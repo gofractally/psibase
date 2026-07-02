@@ -32,23 +32,51 @@ namespace SystemService
          return config && config->enabled;
       }
 
-      // When set, kv writes are attributed to the system account (`{}`) instead of `trxSender`
-      bool systemWrite = false;
+      // While nonzero, kv writes are attributed to the system account (`{}`) instead of
+      // `trxSender`, up to a budget of `systemWriteBudget` net bytes written.
+      uint64_t systemWriteBudget = 0;
 
       // When set with `skipBilling`, the next `N` disk writes are not billed; exactly N unbilled
       // writes must occur before `endSkipBilling` is called.
       std::optional<uint32_t> skipDiskWrites;
 
       // RAII guard that marks the enclosing scope as performing authorized system
-      // writes. Restores the previous value on destruction so nesting is safe.
+      // writes. All writes are attributed to the system account until the guard is
+      // destroyed.
       struct SystemWriteGuard
       {
-         bool prev;
-         SystemWriteGuard() : prev(systemWrite) { systemWrite = true; }
-         ~SystemWriteGuard() { systemWrite = prev; }
+         SystemWriteGuard()
+         {
+            check(systemWriteBudget == 0, "system write already active");
+            // Use the guard when the limit is specified by the scope of the guard,
+            // rather than a byte limit.
+            systemWriteBudget = static_cast<uint64_t>(-1);
+         }
+         ~SystemWriteGuard() { systemWriteBudget = 0; }
          SystemWriteGuard(const SystemWriteGuard&)            = delete;
          SystemWriteGuard& operator=(const SystemWriteGuard&) = delete;
       };
+
+      // Returns true if a write of net size `delta` should be attributed to the
+      // system account
+      bool chargeSystemWrite(int64_t delta)
+      {
+         if (systemWriteBudget == 0)
+            return false;
+         if (delta > 0)
+         {
+            auto d = static_cast<uint64_t>(delta);
+            if (d > systemWriteBudget)
+            {
+               systemWriteBudget = 0;
+               // If the budget is exceeded, attribute the whole write to
+               // the normal sender.
+               return false;
+            }
+            systemWriteBudget -= d;
+         }
+         return true;
+      }
    }  // namespace
 
    void Transact::startBoot(psio::view<const std::vector<Checksum256>> bootTransactions)
@@ -635,6 +663,15 @@ namespace SystemService
       skipDiskWrites.reset();
    }
 
+   void Transact::systemWrite(uint64_t numBytes)
+   {
+      check(getSender() == VirtualServer::service, "Wrong sender");
+      if (numBytes > 0)
+         check(systemWriteBudget == 0, "system write already active");
+
+      systemWriteBudget = numBytes;
+   }
+
    static void processTransactionImpl(
        psio::view<const psio::shared_view_ptr<psibase::Transaction>> arg,
        bool                                                          speculative)
@@ -781,7 +818,7 @@ namespace SystemService
          {
             AccountNumber user;
 
-            if (systemWrite)
+            if (chargeSystemWrite(delta))
             {
                user = AccountNumber{};
             }

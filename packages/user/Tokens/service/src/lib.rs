@@ -4,7 +4,7 @@ pub mod helpers;
 pub mod tables;
 pub use tables::tables::{BalanceFlags, TokenFlags};
 
-#[psibase::service(tables = "tables::tables", recursive = true)]
+#[psibase::service(tables = "tables::tables")]
 pub mod service {
     pub use crate::tables::tables::{BalanceFlags, TokenFlags};
     use crate::tables::tables::{ConfigRow, SubAccount, *};

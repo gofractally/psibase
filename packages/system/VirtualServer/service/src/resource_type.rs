@@ -1,6 +1,6 @@
 use psibase::abort_message;
 
-#[derive(async_graphql::Enum, Copy, Clone, Eq, PartialEq)]
+#[derive(async_graphql::Enum, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum ResourceType {
     Cpu,
     Net,

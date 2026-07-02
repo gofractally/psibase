@@ -64,10 +64,6 @@ fn relay_sub(resource: ResourceType) -> String {
     )
 }
 
-fn is_billing_active() -> bool {
-    BillingConfig::get().map(|c| c.enabled).unwrap_or(false)
-}
-
 pub(crate) struct Curve {
     pub(crate) x0: u64,
     pub(crate) y0: u64,
@@ -190,10 +186,6 @@ impl CurvePosition {
     }
 }
 
-fn is_system(user: AccountNumber) -> bool {
-    user == AccountNumber::new(0)
-}
-
 /// Ensures a valid curve parameterization
 pub(crate) fn validate_curve_params(
     max_reserve: u64,
@@ -240,7 +232,7 @@ pub(crate) fn check_curve_params(max_reserve: u64, max_capacity: u64, curve_d: u
 }
 
 impl CapacityPricing {
-    fn resource(&self) -> ResourceType {
+    pub(crate) fn resource(&self) -> ResourceType {
         ResourceType::from_id(self.resource_id)
     }
 
@@ -362,16 +354,9 @@ impl CapacityPricing {
         Quantity::new(self.refund_of(amount_freed))
     }
 
-    pub fn consume(
-        &self,
-        amount_consumed: u64,
-        user: AccountNumber,
-        sub_account: Option<String>,
-    ) -> u64 {
+    pub fn consume(&self, amount_consumed: u64) -> u64 {
         let resource = self.resource();
         let mut cost = 0u64;
-        let billing_active = is_billing_active();
-        let system_write = is_system(user);
         Self::update(resource, |p| {
             // Refilling a prealloc deficit is free; only the remainder is billed.
             let restored = amount_consumed.min(p.prealloc_deficit);
@@ -388,39 +373,13 @@ impl CapacityPricing {
                 .cost_of(billable);
             p.remaining_capacity -= billable;
         });
-
-        if cost > 0 && billing_active && !system_write {
-            let config = BillingConfig::get_assert();
-            let sys = config.sys;
-            let balance = UserSettings::get_resource_balance(user, sub_account.clone());
-            let amt = Quantity::new(cost);
-
-            if balance < amt {
-                abort_message(&format!(
-                    "{} has insufficient resource balance for {}",
-                    user,
-                    resource.name(),
-                ));
-            }
-
-            let sub_key = UserSettings::to_sub_account_key(user, sub_account);
-            Tokens::call().fromSub(sys, sub_key, amt);
-            Tokens::call().toSub(sys, relay_sub(resource), amt);
-        }
-
-        if !billing_active {
-            return 0;
-        }
-
         cost
     }
 
-    pub fn free(&self, amount_freed: u64, user: AccountNumber, sub_account: Option<String>) -> u64 {
+    pub fn free(&self, amount_freed: u64) -> (u64, u64) {
         let resource = self.resource();
         let mut gross_refund = 0u64;
         let mut fee_ppm_val = 0u32;
-        let billing_active = is_billing_active();
-        let system_write = is_system(user);
         Self::update(resource, |p| {
             let consumed = p.max_capacity - p.remaining_capacity;
 
@@ -438,29 +397,8 @@ impl CapacityPricing {
         });
 
         let fee = (gross_refund as u128 * fee_ppm_val as u128 / PPM) as u64;
-        let user_refund = gross_refund - fee;
-
-        if gross_refund > 0 && billing_active && !system_write {
-            let config = BillingConfig::get_assert();
-            let sys = config.sys;
-
-            Tokens::call().fromSub(sys, relay_sub(resource), Quantity::new(gross_refund));
-
-            if user_refund > 0 {
-                let sub_key = UserSettings::to_sub_account_key(user, sub_account);
-                Tokens::call().toSub(sys, sub_key, Quantity::new(user_refund));
-            }
-
-            if fee > 0 {
-                Self::credit_fee_receiver(resource, fee);
-            }
-        }
-
-        if !billing_active {
-            return 0;
-        }
-
-        user_refund
+        let refund = gross_refund - fee;
+        (refund, fee)
     }
 
     pub fn set_capacity(&self, new_max_capacity: u64) {
@@ -478,27 +416,17 @@ impl CapacityPricing {
     fn increase_capacity(&self, delta_bytes: u64) {
         check(delta_bytes > 0, "invalid capacity increase");
 
-        let resource = self.resource();
-        let mut delta_reserve = 0i64;
-        let billing_active = is_billing_active();
-        Self::update(resource, |p| {
+        Self::update(self.resource(), |p| {
             let old_reserve = p.required_reserve();
 
             p.max_capacity += delta_bytes;
             p.remaining_capacity += delta_bytes;
 
-            delta_reserve = p.required_reserve() as i64 - old_reserve as i64;
+            check(
+                p.required_reserve() <= old_reserve,
+                "Reserves drop after capacity increase",
+            );
         });
-        if delta_reserve != 0 && billing_active {
-            let config = BillingConfig::get_assert();
-            let amt = Quantity::new(delta_reserve.unsigned_abs());
-            let sub = relay_sub(resource);
-
-            check(delta_reserve < 0, "Reserves drop after capacity increase");
-
-            Tokens::call().fromSub(config.sys, sub, amt);
-            Self::credit_fee_receiver(resource, delta_reserve.unsigned_abs());
-        }
     }
 
     pub fn reduce_reserve_budget(&self, delta_supply: u64) {
@@ -509,10 +437,8 @@ impl CapacityPricing {
         );
         check_curve_params(new_max_reserve, self.max_capacity, self.curve_d);
 
-        let resource = self.resource();
         let mut to_remove = 0u64;
-        let billing_active = is_billing_active();
-        Self::update(resource, |p| {
+        Self::update(self.resource(), |p| {
             let old_reserve = p.required_reserve();
 
             p.max_reserve -= delta_supply;
@@ -526,88 +452,34 @@ impl CapacityPricing {
             consumed == 0 || to_remove > 0,
             "Reserves drop after reserve budget decrease",
         );
-
-        if to_remove > 0 && billing_active {
-            let config = BillingConfig::get_assert();
-            let amt = Quantity::new(to_remove);
-            Tokens::call().fromSub(config.sys, relay_sub(resource), amt);
-            Self::credit_fee_receiver(resource, to_remove);
-        }
     }
 
-    /// Credits `fee_receiver`, settling any outstanding relay balance first.
-    ///
-    /// The relay balance drifts from the curve `reserve` only when:
-    /// 1. special system writes occur (no payer to charge), or
-    /// 2. billing is disabled
-    ///
-    /// If the relay is short, part/all of the fee is redirected into it to cover the gap.
-    /// If the relay has excess, the surplus is pulled out and added to the fee payment.
-    fn credit_fee_receiver(resource: ResourceType, amount: u64) {
-        if amount == 0 {
-            return;
-        }
-        let config = BillingConfig::get_assert();
-        let sys = config.sys;
-        let net = Self::get_assert(resource).relay_net();
-
-        let mut to_relay = 0u64;
-        let mut from_relay = 0u64;
-        let mut to_fee = amount;
-        if net > 0 {
-            let settle = (net as u64).min(amount);
-            to_relay = settle;
-            to_fee = amount - settle;
-        } else if net < 0 {
-            let extra = (-net) as u64;
-            from_relay = extra;
-            to_fee = amount + extra;
-        }
-
+    /// Moves `delta` system tokens between vserver's primary balance and the relay
+    /// subaccount (positive = into the relay, negative = out).
+    pub(crate) fn settle_relay(resource: ResourceType, delta: i128) {
+        let sys = BillingConfig::get_assert().sys;
         let sub = relay_sub(resource);
-        if to_relay > 0 {
-            Tokens::call().toSub(sys, sub, Quantity::new(to_relay));
-        } else if from_relay > 0 {
-            Tokens::call().fromSub(sys, sub, Quantity::new(from_relay));
-        }
-        if to_fee > 0 {
-            Tokens::call().credit(sys, config.fee_receiver, Quantity::new(to_fee), "".into());
+        if delta > 0 {
+            Tokens::call().toSub(sys, sub, Quantity::new(delta as u64));
+        } else if delta < 0 {
+            Tokens::call().fromSub(sys, sub, Quantity::new((-delta) as u64));
         }
     }
 
-    /// Settles the relay balance by moving real tokens to match the curve `reserve`.
-    ///
-    /// If the relay is short (net > 0), debits `payer` and deposits into the
-    /// relay sub. If it has excess (net < 0), withdraws from the relay sub to
-    /// the fee_receiver.
-    pub fn settle_relay_balance(&self, payer: AccountNumber) {
-        let net = self.relay_net();
-        if net == 0 {
-            return;
-        }
-        let config = BillingConfig::get_assert();
-        let sys = config.sys;
-        let sub = relay_sub(self.resource());
-        if net > 0 {
-            let amt = Quantity::new(net as u64);
-            let service = get_service();
-            let shared = Tokens::call().getSharedBal(sys, payer, service);
-            if shared < amt {
-                let precision = BillingConfig::get_sys_token().precision;
-                let paid = Decimal::new(shared, precision);
-                let required = Decimal::new(amt, precision);
-                abort_message(&format!(
-                    "Account {payer} has paid {paid} tokens, but enabling billing requires {required} tokens"
-                ));
-            }
-            Tokens::call().debit(sys, payer, amt, "".into());
-            Tokens::call().toSub(sys, sub, amt);
-            Tokens::call().reject(sys, payer, "Change".into());
+    /// Settles the relay drift using up to `available` tokens, returning the leftover.
+    pub(crate) fn settle_drift(resource: ResourceType, available: u64) -> u64 {
+        let drift = Self::get_assert(resource).relay_net();
+        let available = available as i128;
+
+        let (relay_move, remaining): (i128, i128) = if drift > 0 {
+            let covered = drift.min(available);
+            (covered, available - covered)
         } else {
-            let amt = Quantity::new((-net) as u64);
-            Tokens::call().fromSub(sys, sub, amt);
-            Tokens::call().credit(sys, config.fee_receiver, amt, "".into());
-        }
+            (drift, available - drift)
+        };
+
+        Self::settle_relay(resource, relay_move);
+        remaining as u64
     }
 
     pub fn utilization_ppm(&self) -> u32 {
