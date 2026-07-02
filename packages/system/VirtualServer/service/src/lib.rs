@@ -36,7 +36,6 @@ mod tx_cache {
     thread_local! {
         static BILLABLE_ACCOUNT: Cell<Option<AccountNumber>> = const { Cell::new(None) };
         static BILL_TO_SUB: RefCell<Option<HashMap<AccountNumber, String>>> = const { RefCell::new(None) };
-        static SKIP_BILLING_COUNT: Cell<u32> = const { Cell::new(0) };
         static DISK_NET: RefCell<Option<HashMap<AccountNumber, (i64, i64)>>> = const { RefCell::new(None) };
     }
 
@@ -57,26 +56,6 @@ mod tx_cache {
             map.get_or_insert_with(HashMap::new)
                 .insert(user, sub_account);
         });
-    }
-
-    pub fn get_skip_count() -> u32 {
-        SKIP_BILLING_COUNT.with(|c| c.get())
-    }
-
-    pub fn set_skip_count(n: u32) {
-        SKIP_BILLING_COUNT.with(|c| c.set(n));
-    }
-
-    pub fn dec_skip_count() -> bool {
-        SKIP_BILLING_COUNT.with(|c| {
-            let n = c.get();
-            if n == 0 {
-                false
-            } else {
-                c.set(n - 1);
-                true
-            }
-        })
     }
 
     pub fn add_disk_usage(user: AccountNumber, amount_bytes: i64, cost: i64) {
@@ -972,35 +951,6 @@ mod service {
         billing::reconcile();
     }
 
-    /// Suppress billing/tracking for the next `num_writes` `useDiskSys` calls.
-    ///
-    /// Intended for wrapping privileged-service writes that should not
-    /// be billed. The caller is expected to perform exactly `num_writes`
-    /// writes/frees and then call `end_skip_billing`.
-    ///
-    /// Only callable by Transact
-    #[action]
-    fn skip_billing(num_writes: u32) {
-        check(get_sender() == Transact::SERVICE, "Unauthorized");
-        check(
-            tx_cache::get_skip_count() == 0,
-            "skip_billing already active",
-        );
-        tx_cache::set_skip_count(num_writes);
-    }
-
-    /// Asserts that all writes promised by `skip_billing` were consumed.
-    ///
-    /// Only callable by Transact
-    #[action]
-    fn end_skip_billing() {
-        check(get_sender() == Transact::SERVICE, "Unauthorized");
-        check(
-            tx_cache::get_skip_count() == 0,
-            "end_skip_billing called before all skipped writes occurred",
-        );
-    }
-
     /// Called by the system when `user` causes a write to any database.
     ///
     /// `amount_bytes` is positive for consumption and negative for a free
@@ -1014,10 +964,6 @@ mod service {
             get_sender() == Transact::SERVICE,
             "[useDiskSys] Unauthorized",
         );
-
-        if tx_cache::dec_skip_count() {
-            return;
-        }
 
         if amount_bytes == 0 {
             return;

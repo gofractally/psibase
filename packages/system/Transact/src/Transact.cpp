@@ -36,6 +36,10 @@ namespace SystemService
       // `trxSender`, up to a budget of `systemWriteBudget` net bytes written.
       uint64_t systemWriteBudget = 0;
 
+      // When set with `skipBilling`, the next `N` disk writes are not billed; exactly N unbilled
+      // writes must occur before `endSkipBilling` is called.
+      std::optional<uint32_t> skipDiskWrites;
+
       // RAII guard that marks the enclosing scope as performing authorized system
       // writes. All writes are attributed to the system account until the guard is
       // destroyed.
@@ -48,10 +52,7 @@ namespace SystemService
             // rather than a byte limit.
             systemWriteBudget = static_cast<uint64_t>(-1);
          }
-         ~SystemWriteGuard()
-         {
-            systemWriteBudget = 0;
-         }
+         ~SystemWriteGuard() { systemWriteBudget = 0; }
          SystemWriteGuard(const SystemWriteGuard&)            = delete;
          SystemWriteGuard& operator=(const SystemWriteGuard&) = delete;
       };
@@ -650,13 +651,16 @@ namespace SystemService
    void Transact::skipBilling(uint32_t numWrites)
    {
       checkPrivilegedSender();
-      to<VirtualServer>().skip_billing(numWrites);
+      check(!skipDiskWrites.has_value(), "skipBilling already active");
+      skipDiskWrites = numWrites;
    }
 
    void Transact::endSkipBilling()
    {
       checkPrivilegedSender();
-      to<VirtualServer>().end_skip_billing();
+      check(skipDiskWrites.has_value(), "endSkipBilling without active skipBilling");
+      check(*skipDiskWrites == 0, "endSkipBilling called before all skipped writes occurred");
+      skipDiskWrites.reset();
    }
 
    void Transact::systemWrite(uint64_t numBytes)
@@ -790,6 +794,13 @@ namespace SystemService
 
       if (isResMonitoring())
       {
+         if (skipDiskWrites.has_value())
+         {
+            check(*skipDiskWrites > 0, "more writes occurred than promised by skipBilling");
+            --*skipDiskWrites;
+            return;
+         }
+
          int64_t delta = 0;
          if (oldValueLen == DNE)
          {
