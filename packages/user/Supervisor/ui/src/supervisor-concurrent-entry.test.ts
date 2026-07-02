@@ -81,11 +81,15 @@ describe("Supervisor concurrent entry", () => {
 
         await Promise.all([
             serialize(() =>
-                supervisor.preloadPlugins(TEST_ORIGIN, [mockAppPluginId()]),
+                supervisor.preloadPlugins(TEST_ORIGIN, "id-preload", [
+                    mockAppPluginId(),
+                ]),
             ),
             serialize(() => supervisor.entry(TEST_ORIGIN, "id-entry", args)),
         ]);
 
+        expect(replies.get("id-preload")).toBe(null);
+        expect(isPluginErrorObject(replies.get("id-preload"))).toBe(false);
         expect(replies.get("id-entry")).toBe(CALL_SENTINEL);
         expect(isPluginErrorObject(replies.get("id-entry"))).toBe(false);
     });

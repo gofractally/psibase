@@ -368,16 +368,21 @@ export class Supervisor implements AppInterface {
     // This is an entrypoint for apps to preload plugins.
     // Intended to be used on pageload to prepare the plugins that an app requires,
     //   which accelerates the responsiveness of the plugins for subsequent calls.
-    async preloadPlugins(callerOrigin: string, plugins: QualifiedPluginId[]) {
+    async preloadPlugins(
+        callerOrigin: string,
+        id: string,
+        plugins: QualifiedPluginId[],
+    ) {
+        let result: unknown = null;
         try {
             await networkNamePromise;
             this.setParentOrigination(callerOrigin);
             await this.preload(plugins);
         } catch (e) {
-            console.error("TODO: Return an error to the caller.");
-            console.error(e);
+            result = e;
         } finally {
             this.plugins.disposeAll();
+            this.replyToParent(id, result);
             this.cleanupSessionState();
         }
     }
