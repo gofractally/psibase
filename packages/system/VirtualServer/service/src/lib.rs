@@ -707,6 +707,12 @@ mod service {
         );
 
         let sender = get_sender();
+
+        check(
+            UserSettings::get_resource_balance_opt(sender, Some(sub_account.clone())).is_some(),
+            "Billable sub-account does not exist",
+        );
+
         tx_cache::set_sub(sender, sub_account.clone());
 
         if sender == billable_account {
