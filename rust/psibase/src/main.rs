@@ -22,8 +22,9 @@ use psibase::{
     FilteredRegistry, HTTPRegistry, HttpSchemaFetcher, JointRegistry, Meta, NullSchemaFetcher,
     PackageDataFile, PackageInfo, PackageList, PackageOp, PackageOpFull, PackageOrigin,
     PackagePreference, PackageRef, PackageRegistry, PackagedService, PrettyAction, SchemaFetcher,
-    SchemaMap, Seconds, ServiceInfo, SignedTransaction, StagedUpload, Tapos, TaposRefBlock,
-    TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace, Version,
+    SchemaMap, Seconds, ServiceInfo, ServiceWrapper, SignedTransaction, StagedUpload, Tapos,
+    TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace,
+    Version,
 };
 use regex::Regex;
 use reqwest::Url;
