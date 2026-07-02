@@ -14,15 +14,23 @@ mod tx_cache {
     use std::collections::HashMap;
     use std::thread::LocalKey;
 
-    pub fn check_lock(lock: &'static LocalKey<Cell<bool>>) {
-        if lock.with(Cell::get) {
-            abort_message("resource billing attempted during end-of-tx settlement");
-        }
+    /// Mutably access a billing cache
+    fn with_cache<T: 'static, R>(
+        cache: &'static LocalKey<RefCell<Option<T>>>,
+        f: impl FnOnce(&mut T) -> R,
+    ) -> R {
+        cache.with_borrow_mut(|m| {
+            f(m.as_mut()
+                .expect("resource billing attempted during end-of-tx settlement"))
+        })
     }
 
-    pub fn lock_billing(lock: &'static LocalKey<Cell<bool>>) {
-        check_lock(lock);
-        lock.with(|l| l.set(true));
+    /// Drain a billing cache, subsequent access panics.
+    fn drain_cache<T: 'static>(cache: &'static LocalKey<RefCell<Option<T>>>) -> T {
+        cache.with_borrow_mut(|m| {
+            m.take()
+                .expect("resource billing attempted during end-of-tx settlement")
+        })
     }
 
     thread_local! {
@@ -101,8 +109,9 @@ mod tx_cache {
     /// balances once at the end of the transaction.
     pub mod balance_cache {
         use crate::tables::tables::UserSettings;
+        use crate::tx_cache::{drain_cache, with_cache};
         use psibase::{abort_message, AccountNumber};
-        use std::cell::{Cell, RefCell};
+        use std::cell::RefCell;
         use std::collections::HashMap;
 
         type Payer = (AccountNumber, Option<String>);
@@ -129,17 +138,16 @@ mod tx_cache {
         }
 
         thread_local! {
-            static BALANCES: RefCell<HashMap<Payer, Balance>> = RefCell::new(HashMap::new());
-            static LOCKED: Cell<bool> = const { Cell::new(false) };
+            static BALANCES: RefCell<Option<HashMap<Payer, Balance>>> =
+                RefCell::new(Some(HashMap::new()));
         }
 
         fn with<R>(f: impl FnOnce(&mut HashMap<Payer, Balance>) -> R) -> R {
-            BALANCES.with_borrow_mut(f)
+            with_cache(&BALANCES, f)
         }
 
         /// Applies `delta` to the payer's balance, aborts on overdraft.
         fn adjust(account: AccountNumber, sub: Option<String>, delta: i128) {
-            crate::tx_cache::check_lock(&LOCKED);
             with(|m| {
                 let bal = m
                     .entry((account, sub.clone()))
@@ -164,7 +172,6 @@ mod tx_cache {
         /// Shifts available+initial together so the delta is unchanged but the new balance is spendable.
         /// No-op if the account hasn't yet been touched for billing.
         pub fn update_balance(account: AccountNumber, sub: Option<String>, delta: i128) {
-            crate::tx_cache::check_lock(&LOCKED);
             with(|m| {
                 if let Some(bal) = m.get_mut(&(account, sub)) {
                     bal.available += delta;
@@ -174,13 +181,10 @@ mod tx_cache {
         }
 
         pub fn drain_balances() -> Vec<(Payer, i128)> {
-            crate::tx_cache::lock_billing(&LOCKED);
-            with(|m| {
-                std::mem::take(m)
-                    .into_iter()
-                    .map(|(payer, b)| (payer, b.delta()))
-                    .collect()
-            })
+            drain_cache(&BALANCES)
+                .into_iter()
+                .map(|(payer, b)| (payer, b.delta()))
+                .collect()
         }
     }
 
@@ -194,9 +198,9 @@ mod tx_cache {
         pub mod rate_limited {
             use super::is_system_user;
             use crate::resource_type::ResourceType;
-            use crate::tx_cache::balance_cache;
+            use crate::tx_cache::{balance_cache, drain_cache, with_cache};
             use psibase::AccountNumber;
-            use std::cell::{Cell, RefCell};
+            use std::cell::RefCell;
             use std::collections::HashMap;
 
             #[derive(Default)]
@@ -205,8 +209,8 @@ mod tx_cache {
             }
 
             thread_local! {
-                static STATE: RefCell<HashMap<ResourceType, Accrual>> = RefCell::new(HashMap::new());
-                static LOCKED: Cell<bool> = const { Cell::new(false) };
+                static STATE: RefCell<Option<HashMap<ResourceType, Accrual>>> =
+                    RefCell::new(Some(HashMap::new()));
             }
 
             pub fn consume(
@@ -215,7 +219,6 @@ mod tx_cache {
                 sub: Option<String>,
                 cost: u64,
             ) {
-                crate::tx_cache::check_lock(&LOCKED);
                 if cost == 0 {
                     return;
                 }
@@ -223,12 +226,11 @@ mod tx_cache {
                     psibase::abort_message("System user consumes rate-limited resources!");
                 }
                 balance_cache::charge(user, sub, cost);
-                STATE.with_borrow_mut(|m| m.entry(resource).or_default().fee += cost);
+                with_cache(&STATE, |m| m.entry(resource).or_default().fee += cost);
             }
 
             pub fn drain() -> Vec<(ResourceType, Accrual)> {
-                crate::tx_cache::lock_billing(&LOCKED);
-                STATE.with_borrow_mut(|m| std::mem::take(m).into_iter().collect())
+                drain_cache(&STATE).into_iter().collect()
             }
         }
 
@@ -240,9 +242,9 @@ mod tx_cache {
         pub mod capacity_limited {
             use super::is_system_user;
             use crate::resource_type::ResourceType;
-            use crate::tx_cache::balance_cache;
+            use crate::tx_cache::{balance_cache, drain_cache, with_cache};
             use psibase::AccountNumber;
-            use std::cell::{Cell, RefCell};
+            use std::cell::RefCell;
             use std::collections::HashMap;
 
             #[derive(Default)]
@@ -252,12 +254,12 @@ mod tx_cache {
             }
 
             thread_local! {
-                static STATE: RefCell<HashMap<ResourceType, Accrual>> = RefCell::new(HashMap::new());
-                static LOCKED: Cell<bool> = const { Cell::new(false) };
+                static STATE: RefCell<Option<HashMap<ResourceType, Accrual>>> =
+                    RefCell::new(Some(HashMap::new()));
             }
 
             fn with<R>(resource: ResourceType, f: impl FnOnce(&mut Accrual) -> R) -> R {
-                STATE.with_borrow_mut(|m| f(m.entry(resource).or_default()))
+                with_cache(&STATE, |m| f(m.entry(resource).or_default()))
             }
 
             pub fn consume(
@@ -269,7 +271,6 @@ mod tx_cache {
                 if is_system_user(user) || cost == 0 {
                     return;
                 }
-                crate::tx_cache::check_lock(&LOCKED);
                 balance_cache::charge(user, sub, cost);
                 with(resource, |a| a.relay_delta += cost as i128);
             }
@@ -285,7 +286,6 @@ mod tx_cache {
                 if is_system_user(user) || gross == 0 {
                     return;
                 }
-                crate::tx_cache::check_lock(&LOCKED);
                 with(resource, |a| {
                     a.relay_delta -= gross as i128;
                     a.fee += fee;
@@ -296,8 +296,7 @@ mod tx_cache {
             }
 
             pub fn drain() -> Vec<(ResourceType, Accrual)> {
-                crate::tx_cache::lock_billing(&LOCKED);
-                STATE.with_borrow_mut(|m| std::mem::take(m).into_iter().collect())
+                drain_cache(&STATE).into_iter().collect()
             }
         }
     }
