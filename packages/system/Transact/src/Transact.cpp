@@ -32,10 +32,9 @@ namespace SystemService
          return config && config->enabled;
       }
 
-      // While enabled, kv writes are attributed to the system account (`{}`) instead of
+      // While nonzero, kv writes are attributed to the system account (`{}`) instead of
       // `trxSender`, up to a budget of `systemWriteBudget` net bytes written.
-      bool     systemWriteEnabled = false;
-      uint64_t systemWriteBudget  = 0;
+      uint64_t systemWriteBudget = 0;
 
       // RAII guard that marks the enclosing scope as performing authorized system
       // writes. All writes are attributed to the system account until the guard is
@@ -44,16 +43,14 @@ namespace SystemService
       {
          SystemWriteGuard()
          {
-            check(!systemWriteEnabled, "system write already active");
-            systemWriteEnabled = true;
+            check(systemWriteBudget == 0, "system write already active");
             // Use the guard when the limit is specified by the scope of the guard,
             // rather than a byte limit.
             systemWriteBudget = static_cast<uint64_t>(-1);
          }
          ~SystemWriteGuard()
          {
-            systemWriteEnabled = false;
-            systemWriteBudget  = 0;
+            systemWriteBudget = 0;
          }
          SystemWriteGuard(const SystemWriteGuard&)            = delete;
          SystemWriteGuard& operator=(const SystemWriteGuard&) = delete;
@@ -63,22 +60,19 @@ namespace SystemService
       // system account
       bool chargeSystemWrite(int64_t delta)
       {
-         if (!systemWriteEnabled)
+         if (systemWriteBudget == 0)
             return false;
          if (delta > 0)
          {
             auto d = static_cast<uint64_t>(delta);
             if (d > systemWriteBudget)
             {
-               systemWriteBudget  = 0;
-               systemWriteEnabled = false;
+               systemWriteBudget = 0;
                // If the budget is exceeded, attribute the whole write to
                // the normal sender.
                return false;
             }
             systemWriteBudget -= d;
-            if (systemWriteBudget == 0)
-               systemWriteEnabled = false;
          }
          return true;
       }
@@ -669,10 +663,9 @@ namespace SystemService
    {
       check(getSender() == VirtualServer::service, "Wrong sender");
       if (numBytes > 0)
-         check(!systemWriteEnabled, "system write already active");
+         check(systemWriteBudget == 0, "system write already active");
 
-      systemWriteEnabled = numBytes != 0;
-      systemWriteBudget  = numBytes;
+      systemWriteBudget = numBytes;
    }
 
    static void processTransactionImpl(
