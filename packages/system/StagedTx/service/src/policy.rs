@@ -244,7 +244,7 @@ fn check_delegation_auth(
     let mut backed: HashSet<AccountNumber> = responders.iter().copied().collect();
 
     // Short-circuit: already authorized by the accounts that responded.
-    if check_fn(&caller, user, &backed.iter().copied().collect(), method) {
+    if check_fn(&caller, user, backed.iter().copied().collect(), method) {
         return true;
     }
 
@@ -257,7 +257,7 @@ fn check_delegation_auth(
     // the rest of the graph) with the method wiped, then re-check `user` against
     // the requested method with whichever accounts came out backed.
     resolve_authorizations(&delegates, &mut backed, check_fn);
-    check_fn(&caller, user, &backed.iter().copied().collect(), method)
+    check_fn(&caller, user, backed.iter().copied().collect(), method)
 }
 
 pub struct StagedTxPolicy {
