@@ -168,6 +168,11 @@ mod tx_cache {
             adjust(account, sub, amount as i128);
         }
 
+        /// Returns whether the payer already has a pending accrual in this tx.
+        pub fn has_pending(account: AccountNumber, sub: Option<String>) -> bool {
+            with(|m| m.contains_key(&(account, sub)))
+        }
+
         /// Handles mid-tx resource purchase/deletion.
         /// Shifts available+initial together so the delta is unchanged but the new balance is spendable.
         /// No-op if the account hasn't yet been touched for billing.
@@ -633,6 +638,13 @@ mod service {
         let sys = config.sys;
 
         let sender = get_sender();
+
+        // Cannot delete a sub-account that has pending billing
+        check(
+            !balance_cache::has_pending(sender, Some(sub_account.clone())),
+            "cannot delete a sub-account that has pending billing this transaction",
+        );
+
         let Some(balance) =
             UserSettings::get_resource_balance_opt(sender, Some(sub_account.clone()))
         else {
