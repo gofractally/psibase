@@ -84,22 +84,17 @@ mod service {
     }
 
     #[action]
-    fn isAuthSys(
-        sender: AccountNumber,
-        authorizers: Vec<AccountNumber>,
-        method: Option<ServiceMethod>,
-        auth_set: Option<Vec<AccountNumber>>,
-    ) -> bool {
+    fn getDlgsSys(sender: AccountNumber) -> Vec<AccountNumber> {
         unimplemented!()
     }
 
     #[action]
-    fn isRejectSys(
-        sender: AccountNumber,
-        authorizers: Vec<AccountNumber>,
-        method: Option<ServiceMethod>,
-        auth_set: Option<Vec<AccountNumber>>,
-    ) -> bool {
+    fn isAuthSys(sender: AccountNumber, authorizers: Vec<AccountNumber>) -> bool {
+        unimplemented!()
+    }
+
+    #[action]
+    fn isRejectSys(sender: AccountNumber, rejecters: Vec<AccountNumber>) -> bool {
         unimplemented!()
     }
 }

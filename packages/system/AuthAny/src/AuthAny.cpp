@@ -30,6 +30,13 @@ namespace SystemService
          std::printf("canAuthUserSys\n");
    }
 
+   std::vector<AccountNumber> AuthAny::getDlgsSys(AccountNumber sender)
+   {
+      if (enable_print)
+         std::printf("getDlgsSys\n");
+      return {};
+   }
+
    bool AuthAny::isAuthSys(AccountNumber sender, std::vector<AccountNumber> authorizers)
    {
       if (enable_print)
