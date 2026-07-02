@@ -55,6 +55,7 @@ export class GenericErrorObject {
 export const isGenericError = (error: any): error is Error => {
     return (
         typeof error === "object" &&
+        error !== null &&
         "message" in error &&
         typeof error.message === "string" &&
         "name" in error &&
@@ -71,6 +72,7 @@ export const isGenericErrorObject = (
 ): error is GenericErrorObject => {
     return (
         typeof error === "object" &&
+        error !== null &&
         "message" in error &&
         typeof error.message === "string" &&
         "name" in error &&
