@@ -241,3 +241,9 @@ namespace psibase
 
 #define PSIBASE_REFLECT_TABLES(SERVICE, ...) \
    boost::mp11::mp_list<__VA_ARGS__> psibase_get_tables(SERVICE*);
+
+#define PSIBASE_PUBLIC_EVENT(e)                                             \
+   constexpr ::std::string_view eventAccess(void*, ::psibase::nt_wrap<&e>*) \
+   {                                                                        \
+      return "public";                                                      \
+   }

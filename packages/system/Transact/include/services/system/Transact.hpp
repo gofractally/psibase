@@ -498,6 +498,7 @@ namespace SystemService
    PSIBASE_REFLECT_TABLES(Transact, Transact::Tables)
    PSIBASE_REFLECT_EVENTS(Transact);
    PSIBASE_REFLECT_HISTORY_EVENTS(Transact, method(blockStart, blockNum, blockTime));
+   PSIBASE_PUBLIC_EVENT(Transact::Events::History::blockStart)
    PSIBASE_REFLECT_UI_EVENTS(Transact);
    PSIBASE_REFLECT_MERKLE_EVENTS(Transact);
 

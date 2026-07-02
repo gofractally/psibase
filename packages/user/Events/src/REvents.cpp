@@ -530,7 +530,10 @@ int event_connect(sqlite3*           db,
          check(false, "Unknown argument: " + std::string(arg));
       }
    }
-   const CompiledType* type = SchemaCache::instance().getSchemaType(event_db, service, event);
+   auto* user = (const AccountNumber*)sqlite3_get_clientdata(db, "user");
+   check(user != nullptr, "username not set");
+   const CompiledType* type =
+       SchemaCache::instance().getSchemaType(*user, event_db, service, event);
    if (type == nullptr)
       return SQLITE_ERROR;
    auto                vtab = std::make_unique<EventVTab>(event_db, service, event, type);
@@ -848,7 +851,7 @@ KeyResult account_to_key(const CompiledType* type, sqlite3_value* key, std::vect
 {
    psio::vector_stream stream(out);
    auto                s = std::string_view{reinterpret_cast<const char*>(sqlite3_value_text(key)),
-                             static_cast<std::size_t>(sqlite3_value_bytes(key))};
+                                            static_cast<std::size_t>(sqlite3_value_bytes(key))};
    to_key(AccountNumber{s}, stream);
    return KeyResult::exact;
 }
@@ -1131,11 +1134,11 @@ void load_tables(sqlite3* db, std::string_view sql)
    }
 }
 
-std::vector<char> REvents::sqlQuery(const std::string&              squery,
-                                    const std::vector<std::string>& params)
+static std::vector<char> sqlQueryImpl(AccountNumber                   user,
+                                      std::string_view                query,
+                                      const std::vector<std::string>& params)
 {
-   std::string_view query{squery};
-   sqlite3*         db;
+   sqlite3* db;
    if (int err = sqlite3_open(":memory:", &db))
    {
       abortMessage(std::string("sqlite3_open: ") + sqlite3_errstr(err));
@@ -1147,6 +1150,10 @@ std::vector<char> REvents::sqlQuery(const std::string&              squery,
    if (int err = sqlite3_collation_needed(db, nullptr, &register_collation))
    {
       abortMessage(std::string("sqlite3_collation_needed: ") + sqlite3_errstr(err));
+   }
+   if (int err = sqlite3_set_clientdata(db, "user", &user, nullptr))
+   {
+      abortMessage(std::string("sqlite3_set_clientdata: ") + sqlite3_errstr(err));
    }
    load_tables(db, query);
    std::vector<char> result;
@@ -1212,13 +1219,20 @@ std::vector<char> REvents::sqlQuery(const std::string&              squery,
    return result;
 }
 
+std::vector<char> REvents::sqlQuery(const std::string&              squery,
+                                    const std::vector<std::string>& params)
+{
+   return sqlQueryImpl(getSender(), squery, params);
+}
+
 std::optional<HttpReply> REvents::serveSys(const HttpRequest& request)
 {
    if (request.target != "/sql")
       return {};
 
-   return HttpReply{.contentType = "application/json",
-                    .body        = sqlQuery({request.body.begin(), request.body.end()}, {})};
+   return HttpReply{
+       .contentType = "application/json",
+       .body = sqlQueryImpl(AccountNumber{}, {request.body.data(), request.body.size()}, {})};
 }
 
 PSIBASE_DISPATCH(UserService::REvents)

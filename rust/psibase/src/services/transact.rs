@@ -374,7 +374,7 @@ mod service {
     }
 
     /// Emitted at the start of each block
-    #[event(history)]
+    #[event(history, public)]
     fn blockStart(blockNum: crate::BlockNum, blockTime: crate::BlockTime) {
         unimplemented!()
     }

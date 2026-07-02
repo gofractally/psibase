@@ -78,7 +78,7 @@ namespace
          auto [service, type] = psio::from_frac<SequentialRecord<MethodNumber>>(data);
          if (!type)
             return true;
-         const CompiledType* ctype = cache.getSchemaType(db, service, *type);
+         const CompiledType* ctype = cache.getSchemaType({}, db, service, *type);
          if (!ctype)
             return true;
          wrapper.set(ctype);
@@ -174,7 +174,7 @@ namespace
          auto&               cache = SchemaCache::instance();
          EventWrapper        wrapper;
          std::vector<char>   data;
-         const CompiledType* ctype = cache.getSchemaType(item.db, item.service, item.event);
+         const CompiledType* ctype = cache.getSchemaType({}, item.db, item.service, item.event);
          wrapper.set(ctype);
          std::vector<char> subkey{key.begin(), key.begin() + prefixLen};
          subkey.back() = item.info.indexNum;
