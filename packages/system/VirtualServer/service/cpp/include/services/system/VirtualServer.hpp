@@ -287,20 +287,6 @@ namespace SystemService
       /// this resource.
       void useCpuSys(psibase::AccountNumber user, uint64_t amount_ns);
 
-      /// Suppress billing/tracking for the next `num_writes` `useDiskSys` calls.
-      ///
-      /// Intended for wrapping privileged-service writes that should not
-      /// be billed. The caller is expected to perform exactly `num_writes`
-      /// writes/frees and then call `end_skip_billing`.
-      ///
-      /// Only callable by privileged services.
-      void skip_billing(uint32_t num_writes);
-
-      /// Asserts that all writes promised by `skip_billing` were consumed.
-      ///
-      /// Only callable by privileged services.
-      void end_skip_billing();
-
       /// Called by the system when `user` causes a write to any database.
       ///
       /// `amount_bytes` is positive for consumption and negative for a free
@@ -377,8 +363,6 @@ namespace SystemService
                 method(disk_ref_quote, bytes),
                 method(useNetSys, user, amount_bytes),
                 method(useCpuSys, user, amount_ns),
-                method(skip_billing, num_writes),
-                method(end_skip_billing),
                 method(useDiskSys, user, db_id, amount_bytes),
                 method(get_resources, user),
                 method(notifyBlock, block_num),
