@@ -648,18 +648,6 @@ mod service {
         }
     }
 
-    /// Gets the amount of resources available for the caller
-    #[action]
-    fn res_balance() -> Quantity {
-        balance_cache::get_available(get_sender(), None)
-    }
-
-    /// Gets the amount of resources available for the caller's specified sub-account
-    #[action]
-    fn res_balance_sub(sub_account: String) -> Quantity {
-        balance_cache::get_available(get_sender(), Some(sub_account))
-    }
-
     /// Reserves system tokens for future resource consumption by the sender
     ///
     /// The reserve is consumed when interacting with metered network functionality.

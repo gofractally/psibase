@@ -226,18 +226,6 @@ mod service {
         unimplemented!()
     }
 
-    /// Gets the amount of resources available for the caller
-    #[action]
-    fn res_balance() -> Quantity {
-        unimplemented!()
-    }
-
-    /// Gets the amount of resources available for the caller's specified sub-account
-    #[action]
-    fn res_balance_sub(sub_account: String) -> Quantity {
-        unimplemented!()
-    }
-
     /// Reserves system tokens for future resource consumption by the sender
     ///
     /// The reserve is consumed when interacting with metered network functionality.

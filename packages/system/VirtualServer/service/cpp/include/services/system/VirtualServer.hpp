@@ -156,12 +156,6 @@ namespace SystemService
       /// resource balance.
       void del_res_sub(std::string sub_account);
 
-      /// Gets the amount of resources available for the caller
-      UserService::Quantity res_balance();
-
-      /// Gets the amount of resources available for the caller's specified sub-account
-      UserService::Quantity res_balance_sub(std::string sub_account);
-
       /// Reserves system tokens for future resource consumption by the sender
       ///
       /// The reserve is consumed when interacting with metered network functionality.
@@ -342,8 +336,6 @@ namespace SystemService
                 method(buy_res_for, amount, for_user, memo),
                 method(buy_res_sub, amount, sub_account),
                 method(del_res_sub, sub_account),
-                method(res_balance),
-                method(res_balance_sub, sub_account),
                 method(buy_res, amount),
                 method(bill_to_sub, sub_account),
                 method(conf_buffer, config),
