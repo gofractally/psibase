@@ -40,11 +40,7 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn isAuthSys(
-        sender: AccountNumber,
-        authorizers: Vec<AccountNumber>,
-        method: Option<ServiceMethod>,
-    ) -> bool {
+    fn isAuthSys(sender: AccountNumber, authorizers: Vec<AccountNumber>) -> bool {
         unimplemented!()
     }
 
