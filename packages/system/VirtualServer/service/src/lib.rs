@@ -19,17 +19,17 @@ mod tx_cache {
         cache: &'static LocalKey<RefCell<Option<T>>>,
         f: impl FnOnce(&mut T) -> R,
     ) -> R {
-        cache.with_borrow_mut(|m| {
-            f(m.as_mut()
-                .expect("resource billing attempted during end-of-tx settlement"))
+        cache.with_borrow_mut(|m| match m.as_mut() {
+            Some(inner) => f(inner),
+            None => abort_message("resource billing attempted during end-of-tx settlement"),
         })
     }
 
     /// Drain a billing cache, subsequent access panics.
     fn drain_cache<T: 'static>(cache: &'static LocalKey<RefCell<Option<T>>>) -> T {
-        cache.with_borrow_mut(|m| {
-            m.take()
-                .expect("resource billing attempted during end-of-tx settlement")
+        cache.with_borrow_mut(|m| match m.take() {
+            Some(inner) => inner,
+            None => abort_message("resource billing attempted during end-of-tx settlement"),
         })
     }
 
