@@ -1130,6 +1130,8 @@ mod service {
 
         tx_cache::set_billable_account(account);
 
+        warm_billable_account_caches();
+
         CpuLimit::rpc().setCpuLimit(get_cpu_limit(account, None));
     }
 
