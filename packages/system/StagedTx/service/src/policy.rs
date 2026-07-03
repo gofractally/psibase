@@ -151,15 +151,15 @@ fn resolve_authorizations(
         };
 
         let caller = auth_caller(auth_service);
-        let delegates = deduped_delegations(&caller, account, None);
 
         // Short-circuit: already authorized by the backed accounts, so its
-        // delegates can't change that and we skip them.
+        // delegates can't change that and we never even fetch them.
         if check_fn(&caller, account, backed.iter().copied().collect(), None) {
             backed.insert(account);
             continue;
         }
 
+        let delegates = deduped_delegations(&caller, account, None);
         if delegates.is_empty() {
             // A leaf the backed accounts don't satisfy can never be authorized.
             failed.insert(account);
@@ -238,16 +238,17 @@ fn check_delegation_auth(
         return false;
     };
     let caller = auth_caller(auth_service);
-    let delegates = deduped_delegations(&caller, user, method);
 
     // `backed` starts as the responders and grows as accounts are authorized.
     let mut backed: HashSet<AccountNumber> = responders.iter().copied().collect();
 
-    // Short-circuit: already authorized by the accounts that responded.
+    // Short-circuit: already authorized by the accounts that responded, without
+    // ever fetching `user`'s delegations.
     if check_fn(&caller, user, backed.iter().copied().collect(), method) {
         return true;
     }
 
+    let delegates = deduped_delegations(&caller, user, method);
     if delegates.is_empty() {
         // A leaf the responders don't satisfy can never be authorized.
         return false;
