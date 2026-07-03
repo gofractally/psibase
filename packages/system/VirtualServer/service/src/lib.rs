@@ -153,12 +153,16 @@ mod tx_cache {
             with(|m| m.contains_key(&(account, sub)))
         }
 
-        /// The current resource balance for the specified account
+        /// The current resource balance for the specified account.
+        ///
+        /// Caches on cache-miss.
         pub fn get_available(account: AccountNumber, sub: Option<String>) -> Quantity {
-            match with(|m| m.get(&(account, sub.clone())).map(|b| b.available)) {
-                Some(available) => Quantity::new(available.max(0) as u64),
-                None => UserSettings::get_resource_balance(account, sub),
-            }
+            with(|m| {
+                let bal = m
+                    .entry((account, sub))
+                    .or_insert_with_key(Balance::from_live);
+                Quantity::new(bal.available.max(0) as u64)
+            })
         }
 
         /// Handles mid-tx resource purchase/deletion.
@@ -235,7 +239,9 @@ mod tx_cache {
         pub mod capacity_limited {
             use super::is_system_user;
             use crate::resource_type::ResourceType;
+            use crate::tables::capacity_limit_pricing::relay_sub_account;
             use crate::tx_cache::{balance_cache, drain_cache, with_cache};
+            use crate::Wrapper;
             use psibase::AccountNumber;
             use std::cell::RefCell;
             use std::collections::HashMap;
@@ -253,6 +259,13 @@ mod tx_cache {
 
             fn with<R>(resource: ResourceType, f: impl FnOnce(&mut Accrual) -> R) -> R {
                 with_cache(&STATE, |m| f(m.entry(resource).or_default()))
+            }
+
+            pub fn get_collateral(resource: ResourceType) -> u64 {
+                let sub = relay_sub_account(resource);
+                let actual = balance_cache::get_available(Wrapper::SERVICE, sub).value as i128;
+                let pending = with(resource, |a| a.relay_delta);
+                (actual + pending).max(0) as u64
             }
 
             pub fn consume(
@@ -675,6 +688,8 @@ mod service {
 
         let sender = get_sender();
 
+        // Warning: This `get_resource_balance_opt` call calls into the tokens service. Therefore the
+        // tokens service is currently not allowed to use `bill_to_sub`` since it is not re-entrant.
         check(
             UserSettings::get_resource_balance_opt(sender, Some(sub_account.clone())).is_some(),
             "Billable sub-account does not exist",
@@ -953,6 +968,21 @@ mod service {
     ///  amount of bytes consumed/freed.
     #[action]
     fn useDiskSys(user: AccountNumber, db_id: psibase::DbId, amount_bytes: i64) {
+        // [WARNING]
+        //
+        // Unlike `useCpuSys` and `useNetSys`, `useDiskSys` is called in real time during the
+        // execution of the user's transaction. For that reason, any inline action calls that
+        // are made in this action may cause recursion into that foreign service whenever that
+        // service itself updates database records.
+        //
+        // Therefore, we must be very careful if we are introducing inline action calls to other
+        // services in this action.
+        //
+        // Currently, the only potential foreign service call in this action is the call to
+        // `Tokens::getSubBal` on balance_cache cache misses. For that reason, `setBillableAcc`
+        // (which runs outside of the transaction context) is used to warm the balance_cache for
+        // any accounts whose sub-account balances are needed.
+
         check(
             get_sender() == Transact::SERVICE,
             "[useDiskSys] Unauthorized",
@@ -1063,7 +1093,25 @@ mod service {
         Some(limit_ns)
     }
 
-    /// This action specifies which account is primarily responsible for
+    // This function is used to warm the balance_cache for any accounts whose resource token
+    // balances may be queried. This is called outside of the transaction context, allowing
+    // any such queries during the tx to hit the cache instead of triggering an inline action
+    // call.
+    fn warm_billable_account_caches(user_account: AccountNumber) {
+        if !is_billing_enabled() {
+            return;
+        }
+
+        let _ = balance_cache::get_available(user_account, None);
+
+        for pricing in &CapacityPricingTable::read().get_index_pk() {
+            let _ = accrual::capacity_limited::get_collateral(pricing.resource());
+        }
+    }
+
+    /// This action does some per-tx initialization for accounts involved in billing.
+    ///
+    /// The `account` parameter specifies which account is primarily responsible for
     /// paying the bill for any consumed resources.
     ///
     /// A time limit for the execution of the current tx/query will be set based
@@ -1073,6 +1121,8 @@ mod service {
         check(get_sender() == Transact::SERVICE, "Unauthorized");
 
         tx_cache::set_billable_account(account);
+
+        warm_billable_account_caches(account);
 
         CpuLimit::rpc().setCpuLimit(get_cpu_limit(account, None));
     }

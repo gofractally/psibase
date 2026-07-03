@@ -55,13 +55,12 @@ use async_graphql::ComplexObject;
 use psibase::services::tokens::{Decimal, Precision, Quantity, Wrapper as Tokens};
 use psibase::*;
 
-// Note: `pub(crate)` is used so the functions are available for the unit tests
+pub(crate) fn relay_sub_account(resource: ResourceType) -> Option<String> {
+    Some(format!("{}:relay", resource.name().to_lowercase()))
+}
 
 fn relay_sub(resource: ResourceType) -> String {
-    UserSettings::to_sub_account_key(
-        crate::Wrapper::SERVICE,
-        Some(format!("{}:relay", resource.name().to_lowercase())),
-    )
+    UserSettings::to_sub_account_key(crate::Wrapper::SERVICE, relay_sub_account(resource))
 }
 
 /// This is a constant product curve, where the fundamental equation is XY = k. In this case,
