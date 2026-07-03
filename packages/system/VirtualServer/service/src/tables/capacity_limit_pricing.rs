@@ -230,6 +230,7 @@ pub(crate) fn check_curve_params(max_reserve: u64, max_capacity: u64, curve_d: u
     }
 }
 
+use psibase::services::transact::Wrapper as Transact;
 impl CapacityPricing {
     pub(crate) fn resource(&self) -> ResourceType {
         ResourceType::from_id(self.resource_id)
@@ -458,11 +459,20 @@ impl CapacityPricing {
     pub(crate) fn settle_relay(resource: ResourceType, delta: i128) {
         let sys = BillingConfig::get_assert().sys;
         let sub = relay_sub(resource);
+        if delta == 0 {
+            return;
+        }
+
+        // The system's relay balance record is created once.
+        //   Instead of billing the first payer, socialize it as a system write.
+        const RELAY_BALANCE_RECORD_BYTES: u64 = 64;
+        Transact::call().systemWrite(RELAY_BALANCE_RECORD_BYTES);
         if delta > 0 {
             Tokens::call().toSub(sys, sub, Quantity::new(delta as u64));
         } else if delta < 0 {
             Tokens::call().fromSub(sys, sub, Quantity::new((-delta) as u64));
         }
+        Transact::call().systemWrite(0);
     }
 
     /// Settles the relay drift using up to `available` tokens, returning the leftover.
