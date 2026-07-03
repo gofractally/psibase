@@ -46,11 +46,7 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn isRejectSys(
-        sender: AccountNumber,
-        rejecters: Vec<AccountNumber>,
-        method: Option<ServiceMethod>,
-    ) -> bool {
+    fn isRejectSys(sender: AccountNumber, rejecters: Vec<AccountNumber>) -> bool {
         unimplemented!()
     }
 
