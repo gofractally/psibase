@@ -110,8 +110,8 @@ impl Curve {
         // bounds `max_reserve * max_capacity * (curve_d + 1)` whenever those
         // inputs are set.
         //
-        // Flooring x0/y0 and ceiling k all bias `pos_from_resources`'
-        // `ceil(k / (resources + y0)) - x0` upward, keeping the pool capitalized.
+        // Flooring x0/y0 and ceiling k all bias `pos_from_remaining_capacity`'s
+        // `ceil(k / (remaining_capacity + y0)) - x0` upward, keeping the pool capitalized.
         Curve {
             x0: (max_reserve / curve_d),
             y0: (max_capacity / curve_d),
@@ -120,12 +120,12 @@ impl Curve {
         }
     }
 
-    /// Positions the curve by solving for reserves from resources.
-    /// reserves = ceil(k / (resources + y0)) - x0
+    /// Positions the curve by solving for reserves from remaining capacity.
+    /// reserves = ceil(k / (remaining_capacity + y0)) - x0
     ///
     /// Rounds the required reserves up, keeping the pool fully capitalized.
-    pub(crate) fn pos_from_resources(&self, resources: u64) -> CurvePosition {
-        let Y = resources as u128 + self.y0 as u128;
+    pub(crate) fn pos_from_remaining_capacity(&self, remaining_capacity: u64) -> CurvePosition {
+        let Y = remaining_capacity as u128 + self.y0 as u128;
         // True reserves never exceed `max_reserve`; clamp so the upward rounding
         // bias can't push past it and wrap the `as u64` cast.
         let reserves = (self.k.div_ceil(Y) - self.x0 as u128).min(self.max_reserve as u128) as u64;
@@ -254,7 +254,7 @@ impl CapacityPricing {
     /// Reserve token backing required in the relay for the current curve position.
     pub(crate) fn required_reserve(&self) -> u64 {
         self.curve()
-            .pos_from_resources(self.remaining_capacity)
+            .pos_from_remaining_capacity(self.remaining_capacity)
             .reserves
     }
 
@@ -264,14 +264,14 @@ impl CapacityPricing {
         }
 
         self.curve()
-            .pos_from_resources(self.remaining_capacity)
+            .pos_from_remaining_capacity(self.remaining_capacity)
             .cost_of(amount_consumed)
     }
 
     fn refund_of(&self, amount_freed: u64) -> u64 {
         let gross = self
             .curve()
-            .pos_from_resources(self.remaining_capacity)
+            .pos_from_remaining_capacity(self.remaining_capacity)
             .refund_of(amount_freed);
         let fee = (gross as u128 * self.fee_ppm as u128 / PPM) as u64;
         gross - fee
@@ -369,7 +369,7 @@ impl CapacityPricing {
             );
             cost = p
                 .curve()
-                .pos_from_resources(p.remaining_capacity)
+                .pos_from_remaining_capacity(p.remaining_capacity)
                 .cost_of(billable);
             p.remaining_capacity -= billable;
         });
@@ -390,7 +390,7 @@ impl CapacityPricing {
 
             gross_refund = p
                 .curve()
-                .pos_from_resources(p.remaining_capacity)
+                .pos_from_remaining_capacity(p.remaining_capacity)
                 .refund_of(refundable);
             p.remaining_capacity += refundable;
             fee_ppm_val = p.fee_ppm;
@@ -519,7 +519,7 @@ impl CapacityPricing {
     pub async fn spot_price(&self) -> Decimal {
         let price = self
             .curve()
-            .pos_from_resources(self.remaining_capacity)
+            .pos_from_remaining_capacity(self.remaining_capacity)
             .spot_price();
         sys_decimal(price)
     }

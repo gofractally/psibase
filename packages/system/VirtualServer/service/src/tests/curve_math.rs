@@ -17,13 +17,13 @@ fn endpoints() {
     for (max_reserves, max_resources, d) in test_curves() {
         let c = Curve::new(max_reserves, max_resources, d);
 
-        assert_eq!(c.pos_from_resources(0).reserves, max_reserves);
+        assert_eq!(c.pos_from_remaining_capacity(0).reserves, max_reserves);
 
         // When nothing has been consumed yet, the ideal reserve is 0, but
         // conservative rounding (ceil `k`, floor `x0`/`y0`) can push it higher, so
         // assert only that it's the minimal reserve keeping the pool capitalized
         // (`X * Y >= k`).
-        let pos = c.pos_from_resources(max_resources);
+        let pos = c.pos_from_remaining_capacity(max_resources);
         let big_y = max_resources as u128 + c.y0 as u128;
         let x = pos.reserves as u128 + c.x0 as u128;
         assert!(
@@ -55,8 +55,8 @@ fn cost_increases() {
         let c = Curve::new(max_reserves, max_resources, d);
         let amount = (max_resources / 10).max(1);
 
-        let cost_low = c.pos_from_resources(remaining_low).cost_of(amount);
-        let cost_high = c.pos_from_resources(remaining_high).cost_of(amount);
+        let cost_low = c.pos_from_remaining_capacity(remaining_low).cost_of(amount);
+        let cost_high = c.pos_from_remaining_capacity(remaining_high).cost_of(amount);
 
         assert!(
             cost_high > cost_low,
@@ -87,7 +87,7 @@ fn pool_capitalization() {
         }
 
         for resources in resource_checkpoints {
-            let pos = c.pos_from_resources(resources);
+            let pos = c.pos_from_remaining_capacity(resources);
             let xy = (pos.reserves as u128 + c.x0 as u128) * (resources as u128 + c.y0 as u128);
             // `X*Y >= k` holds except where reserves is capped at the budget, in
             // which case `X*Y` dips below `k`, which is harmless. Curve is still
@@ -111,9 +111,9 @@ fn no_arbitrage() {
         let c = Curve::new(max_reserves, max_resources, d);
 
         let partial_amount = (max_resources / 2).max(1);
-        let full = c.pos_from_resources(max_resources);
-        let partial = c.pos_from_resources(max_resources - partial_amount);
-        let empty = c.pos_from_resources(0);
+        let full = c.pos_from_remaining_capacity(max_resources);
+        let partial = c.pos_from_remaining_capacity(max_resources - partial_amount);
+        let empty = c.pos_from_remaining_capacity(0);
 
         // No-arbitrage: a buy then sell of the same amount round-trips exactly.
         let cost_all = full.cost_of(max_resources);
@@ -131,11 +131,11 @@ fn no_arbitrage() {
 fn cost_refund_of_zero() {
     for (max_reserves, max_resources, d) in test_curves() {
         let c = Curve::new(max_reserves, max_resources, d);
-        let full = c.pos_from_resources(max_resources);
+        let full = c.pos_from_remaining_capacity(max_resources);
         assert_eq!(full.cost_of(0), 0);
         assert_eq!(full.refund_of(0), 0);
 
-        let empty = c.pos_from_resources(0);
+        let empty = c.pos_from_remaining_capacity(0);
         assert_eq!(empty.cost_of(0), 0);
         assert_eq!(empty.refund_of(0), 0);
     }
