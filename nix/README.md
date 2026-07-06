@@ -6,14 +6,14 @@ Not (yet) supported: macOS
 
 # Overview
 
-The Nix configuration, emulating the current psibase-contributor config provides:
+The Nix configuration includes
 
 - **C++**: Clang/LLVM 18, Boost, CMake
 - **Rust**: 1.86.0 (pinned) with WASM targets (`wasm32-unknown-unknown`, `wasm32-wasip1`)
 - **WebAssembly**: WASI SDK 29, wasm-pack, wasm-tools, binaryen
 - **JavaScript**: Node.js 20, Yarn
 - **Tools**: clangd, gdb, direnv, mkcert, SoftHSM2
-- **Docs**: mdbook with mermaid plugin
+- **Docs**: mdbook with plugins
 
 You do **not** need to pre-install Rust, Node, or other dev tools; `nix develop` provides everything.
 
@@ -49,13 +49,6 @@ experimental-features = nix-command flakes
 nix.settings.experimental-features = [ "nix-command" "flakes" ];
 ```
 
-## Install direnv (Recommended but optional)
-
-- **Ubuntu/Debian**: `sudo apt install direnv` then add `eval "$(direnv hook bash)"` to `~/.bashrc`
-- **Fedora/RHEL**: `sudo dnf install direnv` and same hook in `~/.bashrc`
-- **Arch**: `sudo pacman -S direnv` and hook in `~/.bashrc` or `~/.zshrc`
-- **Via Nix**: `nix profile install nixpkgs#direnv` then add the hook for your shell
-
 # Quick Start
 
 ## 1. Enter the development shell
@@ -74,67 +67,27 @@ This will ensure your build and dev envs can find everything they need
 ### 2.2 Initializing/Configuring the Environment (and IDE)
 
 #### Launching IDE within the nix-shell
-It's recommended to launch Cursor in the nix-shell so Cursor (and its terminals) have the normal dev environment (that `nix develop` sets up)
-So an easy option is to write a launch script that does the following
-- `nix develop`
-- HOST_IP=127.0.0.1 #This is determined automatically in a `psibase-contributor` container, but that obviously doesn't apply here
-- cursor [cursor workspace file] (or other IDE)
-
-Recommended extensions: clangd, rust-analyzer, wit-idl, ESLint, Prettier, direnv.
-
-#### (using direnv/.envrc, which activates the environment automatically when you `cd` into the repo)
-From the psibase repo root:
+Launch Cursor (or another IDE) from the dev shell so the editor and its terminals inherit the flake environment (including `HOST_IP` for Launch/Continue tasks):
 
 ```bash
-cat >> .vscode/.envrc <<'EOF'
-# set IP for Launch/Continue scripts
-HOST_IP=127.0.0.1
-# git credentials configured in .git/config
-#[credential]
-#    helper = 
-#    helper = store --file=/path/to/.git-credentials-work
-EOF
-direnv allow
+nix develop -c cursor /path/to/your.code-workspace
 ```
 
-## 3. Build psibase
-### Clean build required on first run (or after shell changes):
-Manually wipe your build dir, then run the build script.
+Or use a wrapper script (see `~/repos/cursor-workspaces/cursor-psibase-via-nix.sh`).
 
-```bash
-.vscode/scripts/build.sh
-```
-
-Click the VS Code custom Build button or run the build manually.
-
-## 4. Launch a chain
-### Launch
-Press Launch to launch a change (manual hacky command below).
-
-Within the nix shell, replace the PROJECT_ROOT below with your repo root path:
-```bash
-PSIBASE_ADMIN_IP=127.0.0.1 psinode "$PROJECT_ROOT/db" -p myprod -l 7777
-```
-
-### Boot
-Boot as you normally would from the cli or use the provided x-admin link and boot with the UI.
-
-# Optional: HTTPS and SoftHSM
-SKIP if you're doing a quick build and http test.
-
-- **HTTPS**: The shell includes `mkcert`. Run `mkcert -install`, create certs, and set `VITE_SECURE_LOCAL_DEV=true` and `VITE_SECURE_PATH_TO_CERTS` if needed.
-- **SoftHSM2**: `softhsm2-util --init-token --slot 0 --label "psibase SoftHSM" --pin "Ch4ng#Me!" --so-pin "Ch4ng#Me!"`
+## 3. Build and Launch psibase
+Build and Launch with the tasks.json buttons of by running the same command at the nix shell
 
 # Environment variables set by the shell
 
 | Variable | Description |
 |----------|-------------|
+| `HOST_IP` | Loopback admin IP (`127.0.0.1`) for Launch/Continue tasks and `launch.sh` |
 | `WASI_SDK_PREFIX` | Path to WASI SDK |
-| `WASI_SYSROOT` | WASI sysroot |
 | `CC` / `CXX` | Clang paths |
 | `LIBCLANG_PATH` | For rust-analyzer |
 | `RUST_SRC_PATH` | For rust-analyzer |
-| `IN_NIX_SHELL` | Set to `1` in the shell |
+| `IN_NIX_SHELL` | Set to `1` when in a nix shell |
 
 # Troubleshooting
 

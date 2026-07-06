@@ -23,9 +23,18 @@
     nixpkgs-cargo-generate.url = "github:NixOS/nixpkgs/1d0bb7b61b251a261b0963aacf4b141e770a4f1d";
     #   cargo-edit 0.13.0
     nixpkgs-cargo-edit.url = "github:NixOS/nixpkgs/30bae272ac6c85ea58c05501e3a8cb41b8dcfa0a";
+    # mdbook / plugins pinned separately — nixos-25.05 ships older versions.
+    #   mdbook 0.4.52
+    nixpkgs-mdbook.url = "github:NixOS/nixpkgs/bd16676f18040e23761b54a98e9d906a962220ae";
+    #   mdbook-mermaid 0.16.2
+    nixpkgs-mdbook-mermaid.url = "github:NixOS/nixpkgs/afd39ffbac700ed696fdee83842309302cae4c4e";
+    #   mdbook-tabs 0.2.3 (mdbook-plugins; last release compatible with mdbook 0.4.x)
+    nixpkgs-mdbook-plugins.url = "github:NixOS/nixpkgs/aaf821b4208b829d6a398cdd6b8db795daf4eb6d";
+    #   nodejs 20.11.0
+    nixpkgs-nodejs.url = "github:NixOS/nixpkgs/fea57dc5b57285d33918813d2f3695024d8fc9e8";
   };
 
-  outputs = { self, nixpkgs, flake-utils, fenix, nixpkgs-cargo-component, nixpkgs-cargo-generate, nixpkgs-cargo-edit }:
+  outputs = { self, nixpkgs, flake-utils, fenix, nixpkgs-cargo-component, nixpkgs-cargo-generate, nixpkgs-cargo-edit, nixpkgs-mdbook, nixpkgs-mdbook-mermaid, nixpkgs-mdbook-plugins, nixpkgs-nodejs }:
     flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (system:
       let
         pkgs = import nixpkgs {
@@ -38,6 +47,11 @@
         cargoComponent = (import nixpkgs-cargo-component { inherit system; }).cargo-component;
         cargoGenerate = (import nixpkgs-cargo-generate { inherit system; }).cargo-generate;
         cargoEdit = (import nixpkgs-cargo-edit { inherit system; }).cargo-edit;
+
+        mdbook = (import nixpkgs-mdbook { inherit system; }).mdbook;
+        mdbookMermaid = (import nixpkgs-mdbook-mermaid { inherit system; }).mdbook-mermaid;
+        mdbookPlugins = (import nixpkgs-mdbook-plugins { inherit system; }).mdbook-plugins;
+        nodejs20 = (import nixpkgs-nodejs { inherit system; }).nodejs_20;
 
         # Rust 1.86.0 toolchain with WASM targets (see nix/rust-toolchain.toml)
         rustToolchain = fenix.packages.${system}.fromToolchainFile {
@@ -140,7 +154,7 @@
             runHook preInstall
             mkdir -p $out/lib/yarn $out/bin
             cp -r . $out/lib/yarn/
-            makeWrapper ${pkgs.nodejs_20}/bin/node $out/bin/yarn \
+            makeWrapper ${nodejs20}/bin/node $out/bin/yarn \
               --add-flags "$out/lib/yarn/packages/yarnpkg-cli/bin/yarn.js"
             runHook postInstall
           '';
@@ -174,7 +188,7 @@
           wabt
           wasm-pack
           wasm-tools
-          nodejs_20
+          nodejs20
           yarnBerry
           nodePackages.eslint
           nodePackages.prettier
@@ -193,8 +207,10 @@
           mkcert
           softhsm
           mdbook
-          mdbook-mermaid
-          mdbook-linkcheck
+          mdbookMermaid
+          pkgs.mdbook-pagetoc
+          mdbookPlugins
+          pkgs.mdbook-linkcheck
           cacert
           # Shell and editor UX in nix develop
           vim
@@ -217,7 +233,6 @@
           packages = commonPackages ++ linuxPackages;
 
           WASI_SDK_PREFIX = "${wasiSdk}";
-          WASI_SYSROOT = "${wasiSdk}/share/wasi-sysroot";
           WASI_SDK_AR = "${wasiSdk}/bin/ar";
           WASI_SDK_RANLIB = "${wasiSdk}/bin/ranlib";
 
@@ -230,6 +245,8 @@
           CMAKE_IGNORE_PATH = "/usr/lib:/usr/lib64";
           CMAKE_SYSTEM_IGNORE_PATH = "/usr/lib:/usr/lib64";
           RUST_SRC_PATH = "${rustToolchain}/lib/rustlib/src/rust/library";
+          # Loopback admin IP for Launch/Continue tasks and launch.sh (set automatically in psibase-contributor).
+          HOST_IP = "127.0.0.1";
 
           shellHook = ''
             export NIX_SHELL_DEPTH=$(("''${NIX_SHELL_DEPTH:-0}" + 1))

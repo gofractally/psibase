@@ -103,6 +103,70 @@
         "type": "github"
       }
     },
+    "nixpkgs-mdbook": {
+      "locked": {
+        "lastModified": 1752645292,
+        "narHash": "sha256-l2PUXp4ojs0VehrHIpDhuvkb2R9mf2T92FujYRzXRDQ=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "bd16676f18040e23761b54a98e9d906a962220ae",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "bd16676f18040e23761b54a98e9d906a962220ae",
+        "type": "github"
+      }
+    },
+    "nixpkgs-mdbook-mermaid": {
+      "locked": {
+        "lastModified": 1760708036,
+        "narHash": "sha256-BbUnJguPjoBmAtI+C/Bm7Rz9doEiR5EX6sEMnM2ESlM=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "afd39ffbac700ed696fdee83842309302cae4c4e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "afd39ffbac700ed696fdee83842309302cae4c4e",
+        "type": "github"
+      }
+    },
+    "nixpkgs-mdbook-plugins": {
+      "locked": {
+        "lastModified": 1762181925,
+        "narHash": "sha256-/erqgvt+KhOYkLW8SQn3qJ3NawIf11yQfmkpc4AsMbk=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "aaf821b4208b829d6a398cdd6b8db795daf4eb6d",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "aaf821b4208b829d6a398cdd6b8db795daf4eb6d",
+        "type": "github"
+      }
+    },
+    "nixpkgs-nodejs": {
+      "locked": {
+        "lastModified": 1705033200,
+        "narHash": "sha256-g2ctv18BjQl7VvaUtdm7/l1y1C2mgITOFkw3t+RBvNo=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "fea57dc5b57285d33918813d2f3695024d8fc9e8",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "fea57dc5b57285d33918813d2f3695024d8fc9e8",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "fenix": "fenix",
@@ -110,7 +174,11 @@
         "nixpkgs": "nixpkgs",
         "nixpkgs-cargo-component": "nixpkgs-cargo-component",
         "nixpkgs-cargo-edit": "nixpkgs-cargo-edit",
-        "nixpkgs-cargo-generate": "nixpkgs-cargo-generate"
+        "nixpkgs-cargo-generate": "nixpkgs-cargo-generate",
+        "nixpkgs-mdbook": "nixpkgs-mdbook",
+        "nixpkgs-mdbook-mermaid": "nixpkgs-mdbook-mermaid",
+        "nixpkgs-mdbook-plugins": "nixpkgs-mdbook-plugins",
+        "nixpkgs-nodejs": "nixpkgs-nodejs"
       }
     },
     "rust-analyzer-src": {
