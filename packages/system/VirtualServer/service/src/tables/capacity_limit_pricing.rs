@@ -182,7 +182,7 @@ impl CurvePosition {
 
     // Spot price: X / Y
     pub(crate) fn spot_price(&self) -> u64 {
-        (self.X / self.Y) as u64
+        (self.X / self.Y).min(u64::MAX as u128) as u64
     }
 }
 
