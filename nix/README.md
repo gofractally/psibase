@@ -91,8 +91,8 @@ Build and Launch with the tasks.json buttons of by running the same command at t
 
 # Troubleshooting
 
-- **"command not found"**: Ensure you're in a `nix develop` shell or that direnv has run (`direnv allow`).
-- **Wrong cargo tool versions**: `cargo-component`, `cargo-generate`, and `cargo-set-version` are pinned and provided by the flake. If `which cargo-component` does not point into `/nix/store`, a host-installed copy is shadowing it on `PATH` (check `$HOME/.cargo/bin`).
+- **"command not found"** at the cli: Ensure you're in a `nix develop` shell.
+- **Wrong cargo tool versions**: cargo tools are pinned and provided by the flake. If `which cargo-component` does not point at the right thing, a host-installed copy may be shadowing it on `PATH`
 - **ICU / ABI errors**: Ensure you're in the Nix shell and do a clean build (`rm -rf build && mkdir build`). The flake sets `ICU_ROOT` and `CMAKE_IGNORE_PATH` to avoid picking up system ICU from `/usr/lib`.
 - **Rust analyzer not finding deps**: Run the editor from inside the Nix shell or use the direnv extension.
 

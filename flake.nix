@@ -320,11 +320,6 @@
               echo "  cargo-component: $(cargo-component --version 2>/dev/null | head -1)"
               echo "  cargo-generate:  $(cargo-generate --version 2>/dev/null | head -1)"
               echo ""
-              echo "To build psibase (clean build required on first run):"
-              echo "  rm -rf build && mkdir build && cd build"
-              echo "cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release -DBUILD_DEBUG_WASM=ON -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_INSTALL_PREFIX="psidk" .."
-              echo "  cmake --build . -j\$(nproc)"
-              echo ""
             fi
           '';
         };
