@@ -106,9 +106,9 @@ impl Curve {
         let ym = max_capacity as u128;
         let d = curve_d as u128;
 
-        // `xm * ym * (d + 1)` stays within u128 because `check_curve_params`
-        // bounds `max_reserve * max_capacity * (curve_d + 1)` whenever those
-        // inputs are set.
+        // For `xm * ym * (d + 1)` to stay within u128: callers must construct `Curve`
+        // only from params that were passed through `check_curve_params`, which bounds
+        // `max_reserve * max_capacity * (curve_d + 1)`.
         //
         // Flooring x0/y0 and ceiling k all bias `pos_from_remaining_capacity`'s
         // `ceil(k / (remaining_capacity + y0)) - x0` upward, keeping the pool capitalized.
