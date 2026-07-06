@@ -101,9 +101,9 @@ impl Curve {
     ///
     /// Substituting yields:
     /// k = (x_max * y_max)(D+1) / D^2
-    pub(crate) fn new(max_reserves: u64, max_resources: u64, curve_d: u64) -> Self {
-        let xm = max_reserves as u128;
-        let ym = max_resources as u128;
+    pub(crate) fn new(max_reserve: u64, max_capacity: u64, curve_d: u64) -> Self {
+        let xm = max_reserve as u128;
+        let ym = max_capacity as u128;
         let d = curve_d as u128;
 
         // `xm * ym * (d + 1)` stays within u128 because `check_curve_params`
@@ -113,10 +113,10 @@ impl Curve {
         // Flooring x0/y0 and ceiling k all bias `pos_from_resources`'
         // `ceil(k / (resources + y0)) - x0` upward, keeping the pool capitalized.
         Curve {
-            x0: (max_reserves / curve_d),
-            y0: (max_resources / curve_d),
+            x0: (max_reserve / curve_d),
+            y0: (max_capacity / curve_d),
             k: (xm * ym * (d + 1)).div_ceil(d * d),
-            max_reserve: max_reserves,
+            max_reserve,
         }
     }
 
