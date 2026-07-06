@@ -424,7 +424,7 @@ impl CapacityPricing {
 
             check(
                 p.required_reserve() <= old_reserve,
-                "Reserves drop after capacity increase",
+                "required reserve rose after capacity increase",
             );
         });
     }
@@ -450,7 +450,7 @@ impl CapacityPricing {
         let consumed = self.max_capacity - self.remaining_capacity;
         check(
             consumed == 0 || to_remove > 0,
-            "Reserves drop after reserve budget decrease",
+            "reserve budget decrease freed no reserves",
         );
     }
 
