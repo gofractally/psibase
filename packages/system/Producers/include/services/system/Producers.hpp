@@ -89,7 +89,7 @@ namespace SystemService
       /// * `authorizers`: The set of accounts that have already authorized the execution of the transaction.
       ///
       /// Returns:
-      /// * `true`: If enough authorizers meet the sender's threshold
+      /// * `true`: If the total authorizations from `authorizers` meets sender's threshold
       /// * `false`: Otherwise
       bool isAuthSys(psibase::AccountNumber              sender,
                      std::vector<psibase::AccountNumber> authorizers);
