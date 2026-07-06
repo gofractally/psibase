@@ -64,6 +64,18 @@ fn relay_sub(resource: ResourceType) -> String {
     )
 }
 
+/// This is a constant product curve, where the fundamental equation is XY = k. In this case,
+/// we derive X = (x+x0) and Y = (y+y0) where x0 and y0 are virtual offsets.
+///
+/// Evaluating k = XY at each endpoint and equating yields:
+/// x0(y_max+y0) = y0(x_max + x0)
+///
+/// Algebraically simplifying yields:
+/// x_max / x0 = y_max / y0
+///
+/// We refer to this single constant as the "shape parameter", or `D`. D controls how "aggressive"
+/// pricing is near the endpoints. Smaller D means larger offsets (flatter), larger D means
+/// smaller offsets (steeper).
 pub(crate) struct Curve {
     pub(crate) x0: u64,
     pub(crate) y0: u64,
@@ -81,18 +93,6 @@ pub(crate) struct CurvePosition {
     max_reserve: u64,
 }
 
-/// This is a constant product curve, where the fundamental equation is XY = k. In this case,
-/// we derive X = (x+x0) and Y = (y+y0) where x0 and y0 are virtual offsets.
-///
-/// Evaluating k = XY at each endpoint and equating yields:
-/// x0(y_max+y0) = y0(x_max + x0)
-///
-/// Algebraically simplifying yields:
-/// x_max / x0 = y_max / y0
-///
-/// We refer to this single constant as the "shape parameter", or `D`. D controls how "aggressive"
-/// pricing is near the endpoints. Smaller D means larger offsets (flatter), larger D means
-/// smaller offsets (steeper).
 impl Curve {
     /// All parameters can be expressed in terms of x_max, y_max, and D.
     /// x0 = x_max / D
