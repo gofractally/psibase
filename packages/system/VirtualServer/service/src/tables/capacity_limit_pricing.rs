@@ -160,7 +160,7 @@ impl CurvePosition {
         let dx = dx.min((self.max_reserve - self.reserves) as u128);
 
         // `dx <= max_reserve <= u64::MAX` after the cap so this cannot fail
-        check_some(u64::try_from(dx).ok(), "Insufficient capacity")
+        u64::try_from(dx).expect("cost exceeds u64")
     }
 
     // Gross refund for freeing `amount` units of resource.
