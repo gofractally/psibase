@@ -1,13 +1,13 @@
 //! # Capacity-limit pricing
 //!
 //! Resources in this category are limited by **total consumed capacity** relative to a maximum
-//! (e.g. objective storage bytes). This module implements that pricing with a constant-product curve between
-//!
+//! (e.g. objective storage bytes). This module implements that pricing with a constant-product curve
+//! between:
 //! - a **reserve token** (the unit used to pay for access to the resource), and
-//! - a **resource share token** (representing a claim on remaining resource capacity).
+//! - a **remaining resource capacity**
 //!
 //! The relay is configured so that the entire resource capacity can be consumed (i.e. the pool can
-//! reach 0 available resources) when a fixed budget of reserve tokens is sold into the pool.
+//! reach 0 remaining capacity) when a fixed budget of reserve tokens is sold into the pool.
 //!
 //! Offsets to the normal hyperbola are used in this design to avoid the price->infinity
 //! behavior of the vanilla $x y = k$ curve.
@@ -35,11 +35,11 @@
 //! Let:
 //!
 //! - $x$: pool reserve of **real** reserve tokens
-//! - $y$: pool reserve of **real** resource-share tokens (remaining capacity)
+//! - $y$: pool reserve of **real** remaining capacity
 //! - $x_{\max}$: total reserve-token budget that may be sold into the relay
 //! - $y_{\max}$: total resource capacity
 //! - $x_0$: an offset of **virtual** reserve tokens that cannot be withdrawn
-//! - $y_0$: an offset of **virtual** resource-share tokens that cannot be withdrawn
+//! - $y_0$: an offset of **virtual** resource capacity that cannot be withdrawn
 //!
 //! Interpretation:
 //!
@@ -140,7 +140,7 @@ impl Curve {
 }
 
 impl CurvePosition {
-    // Cost of consuming `amount` units of resource.
+    // Cost of consuming `amount` units of capacity.
     // delta_x = ceil(k / (Y - delta_y)) - X
     pub(crate) fn cost_of(&self, amount_consumed: u64) -> u64 {
         if amount_consumed == 0 {
@@ -163,7 +163,7 @@ impl CurvePosition {
         u64::try_from(dx).expect("cost exceeds u64")
     }
 
-    // Gross refund for freeing `amount` units of resource.
+    // Gross refund for freeing `amount` units of capacity.
     // delta_x = X - ceil(k / (Y + delta_y))
     pub(crate) fn refund_of(&self, amount_freed: u64) -> u64 {
         if amount_freed == 0 {

@@ -6,7 +6,7 @@ fn test_curves() -> [(u64, u64, u64); 7] {
         (1, 1, 1),                               // The minimal curve
         (1_000_000, 1_000_000, 1),               // D = 1
         (u64::MAX, 1_000_000, 1),                // D = 1, max reserves
-        (1_000_000, u64::MAX, 1),                // D = 1, max resources
+        (1_000_000, u64::MAX, 1),                // D = 1, max capacity
         (67_280_421_310_721, u64::MAX, 274_176), // A maximal curve
         (u64::MAX, 67_280_421_310_721, 274_176), // A maximal curve
     ]
@@ -14,17 +14,17 @@ fn test_curves() -> [(u64, u64, u64); 7] {
 
 #[test]
 fn endpoints() {
-    for (max_reserves, max_resources, d) in test_curves() {
-        let c = Curve::new(max_reserves, max_resources, d);
+    for (max_reserve, max_capacity, d) in test_curves() {
+        let c = Curve::new(max_reserve, max_capacity, d);
 
-        assert_eq!(c.pos_from_remaining_capacity(0).reserves, max_reserves);
+        assert_eq!(c.pos_from_remaining_capacity(0).reserves, max_reserve);
 
         // When nothing has been consumed yet, the ideal reserve is 0, but
         // conservative rounding (ceil `k`, floor `x0`/`y0`) can push it higher, so
         // assert only that it's the minimal reserve keeping the pool capitalized
         // (`X * Y >= k`).
-        let pos = c.pos_from_remaining_capacity(max_resources);
-        let big_y = max_resources as u128 + c.y0 as u128;
+        let pos = c.pos_from_remaining_capacity(max_capacity);
+        let big_y = max_capacity as u128 + c.y0 as u128;
         let x = pos.reserves as u128 + c.x0 as u128;
         assert!(
             x * big_y >= c.k,
@@ -42,9 +42,9 @@ fn endpoints() {
 
 #[test]
 fn cost_increases() {
-    for (max_reserves, max_resources, d) in test_curves() {
-        let remaining_low = max_resources * 8 / 10;
-        let remaining_high = max_resources * 2 / 10;
+    for (max_reserve, max_capacity, d) in test_curves() {
+        let remaining_low = max_capacity * 8 / 10;
+        let remaining_high = max_capacity * 2 / 10;
 
         if remaining_low <= remaining_high {
             // Not really a valid test for the minimal (1,1,1) curve.
@@ -52,8 +52,8 @@ fn cost_increases() {
             continue;
         }
 
-        let c = Curve::new(max_reserves, max_resources, d);
-        let amount = (max_resources / 10).max(1);
+        let c = Curve::new(max_reserve, max_capacity, d);
+        let amount = (max_capacity / 10).max(1);
 
         let cost_low = c.pos_from_remaining_capacity(remaining_low).cost_of(amount);
         let cost_high = c.pos_from_remaining_capacity(remaining_high).cost_of(amount);
@@ -69,37 +69,37 @@ fn cost_increases() {
 
 #[test]
 fn pool_capitalization() {
-    for (max_reserves, max_resources, d) in test_curves() {
-        let c = Curve::new(max_reserves, max_resources, d);
+    for (max_reserve, max_capacity, d) in test_curves() {
+        let c = Curve::new(max_reserve, max_capacity, d);
 
-        let mut resource_checkpoints = Vec::new();
-        for resources in [
+        let mut capacity_checkpoints = Vec::new();
+        for remaining_capacity in [
             0,
-            1.min(max_resources),
-            max_resources / 4,
-            max_resources / 2,
-            max_resources.saturating_sub(1),
-            max_resources,
+            1.min(max_capacity),
+            max_capacity / 4,
+            max_capacity / 2,
+            max_capacity.saturating_sub(1),
+            max_capacity,
         ] {
-            if !resource_checkpoints.contains(&resources) {
-                resource_checkpoints.push(resources);
+            if !capacity_checkpoints.contains(&remaining_capacity) {
+                capacity_checkpoints.push(remaining_capacity);
             }
         }
 
-        for resources in resource_checkpoints {
-            let pos = c.pos_from_remaining_capacity(resources);
-            let xy = (pos.reserves as u128 + c.x0 as u128) * (resources as u128 + c.y0 as u128);
+        for remaining_capacity in capacity_checkpoints {
+            let pos = c.pos_from_remaining_capacity(remaining_capacity);
+            let xy = (pos.reserves as u128 + c.x0 as u128) * (remaining_capacity as u128 + c.y0 as u128);
             // `X*Y >= k` holds except where reserves is capped at the budget, in
             // which case `X*Y` dips below `k`, which is harmless. Curve is still
             // economically safe.
             assert!(
-                xy >= c.k || pos.reserves == max_reserves,
-                "undercapitalized at resources={}: x*y={} < k={} (reserves={}, max_reserve={})",
-                resources,
+                xy >= c.k || pos.reserves == max_reserve,
+                "undercapitalized at remaining_capacity={}: x*y={} < k={} (reserves={}, max_reserve={})",
+                remaining_capacity,
                 xy,
                 c.k,
                 pos.reserves,
-                max_reserves,
+                max_reserve,
             );
         }
     }
@@ -107,18 +107,18 @@ fn pool_capitalization() {
 
 #[test]
 fn no_arbitrage() {
-    for (max_reserves, max_resources, d) in test_curves() {
-        let c = Curve::new(max_reserves, max_resources, d);
+    for (max_reserve, max_capacity, d) in test_curves() {
+        let c = Curve::new(max_reserve, max_capacity, d);
 
-        let partial_amount = (max_resources / 2).max(1);
-        let full = c.pos_from_remaining_capacity(max_resources);
-        let partial = c.pos_from_remaining_capacity(max_resources - partial_amount);
+        let partial_amount = (max_capacity / 2).max(1);
+        let full = c.pos_from_remaining_capacity(max_capacity);
+        let partial = c.pos_from_remaining_capacity(max_capacity - partial_amount);
         let empty = c.pos_from_remaining_capacity(0);
 
         // No-arbitrage: a buy then sell of the same amount round-trips exactly.
-        let cost_all = full.cost_of(max_resources);
+        let cost_all = full.cost_of(max_capacity);
         let cost_partial = full.cost_of(partial_amount);
-        let refund_all = empty.refund_of(max_resources);
+        let refund_all = empty.refund_of(max_capacity);
         let refund_partial = partial.refund_of(partial_amount);
         assert!(cost_all > 0);
         assert!(cost_partial > 0);
@@ -129,9 +129,9 @@ fn no_arbitrage() {
 
 #[test]
 fn cost_refund_of_zero() {
-    for (max_reserves, max_resources, d) in test_curves() {
-        let c = Curve::new(max_reserves, max_resources, d);
-        let full = c.pos_from_remaining_capacity(max_resources);
+    for (max_reserve, max_capacity, d) in test_curves() {
+        let c = Curve::new(max_reserve, max_capacity, d);
+        let full = c.pos_from_remaining_capacity(max_capacity);
         assert_eq!(full.cost_of(0), 0);
         assert_eq!(full.refund_of(0), 0);
 
@@ -141,16 +141,16 @@ fn cost_refund_of_zero() {
     }
 }
 
-fn ok(max_reserve: u64, max_resources: u64, curve_d: u64) {
+fn ok(max_reserve: u64, max_capacity: u64, curve_d: u64) {
     assert_eq!(
-        validate_curve_params(max_reserve, max_resources, curve_d),
+        validate_curve_params(max_reserve, max_capacity, curve_d),
         Ok(())
     );
 }
 
-fn err(max_reserve: u64, max_resources: u64, curve_d: u64, expected: &str) {
+fn err(max_reserve: u64, max_capacity: u64, curve_d: u64, expected: &str) {
     assert_eq!(
-        validate_curve_params(max_reserve, max_resources, curve_d),
+        validate_curve_params(max_reserve, max_capacity, curve_d),
         Err(expected)
     );
 }
@@ -179,34 +179,34 @@ fn boundary_construction() {
 
     // (D + 1) * MAX_RES == 2^64 + 1
     {
-        let (max_reserves, max_resources, d) = (u64::MAX, 67_280_421_310_721, 274_176);
-        ok(max_reserves, max_resources, d);
+        let (max_reserve, max_capacity, d) = (u64::MAX, 67_280_421_310_721, 274_176);
+        ok(max_reserve, max_capacity, d);
         err(
-            max_reserves,
-            max_resources + 1,
+            max_reserve,
+            max_capacity + 1,
             d,
             "curve parameters too large: pricing math would overflow",
         );
         err(
-            max_reserves,
-            max_resources,
+            max_reserve,
+            max_capacity,
             d + 1,
             "curve parameters too large: pricing math would overflow",
         );
     }
 
     {
-        let (max_reserves, max_resources, d) = (67_280_421_310_721, u64::MAX, 274_176);
-        ok(max_reserves, max_resources, d);
+        let (max_reserve, max_capacity, d) = (67_280_421_310_721, u64::MAX, 274_176);
+        ok(max_reserve, max_capacity, d);
         err(
-            max_reserves + 1,
-            max_resources,
+            max_reserve + 1,
+            max_capacity,
             d,
             "curve parameters too large: pricing math would overflow",
         );
         err(
-            max_reserves,
-            max_resources,
+            max_reserve,
+            max_capacity,
             d + 1,
             "curve parameters too large: pricing math would overflow",
         );
