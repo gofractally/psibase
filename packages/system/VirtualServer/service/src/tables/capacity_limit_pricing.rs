@@ -463,8 +463,9 @@ impl CapacityPricing {
             return;
         }
 
-        // The system's relay balance record is created once.
-        //   Instead of billing the first payer, socialize it as a system write.
+        // [DB WRITE] Possible allocation - Therefore must be attributed to the system account.
+        // Consider finding a way to guarantee avoiding this allocation, which would avoid the need to
+        // attribute it to the system account.
         const RELAY_BALANCE_RECORD_BYTES: u64 = 64;
         Transact::call().systemWrite(RELAY_BALANCE_RECORD_BYTES);
         if delta > 0 {

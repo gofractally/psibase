@@ -16,6 +16,9 @@ const FEE_RECEIVER_CREDIT_MAX_BYTES: u64 = 169;
 /// Pays fees out to the configured `fee_receiver`.
 pub fn credit_fee_receiver(amount: u64) {
     if amount > 0 {
+        // [DB WRITE] Possible allocation - Therefore must be attributed to the system account.
+        // Consider finding a way to guarantee avoiding this allocation, which would avoid the need to
+        // attribute it to the system account.
         Transact::call().systemWrite(FEE_RECEIVER_CREDIT_MAX_BYTES);
         let c = BillingConfig::get_assert();
         Tokens::call().credit(c.sys, c.fee_receiver, amount.into(), "".into());
@@ -27,6 +30,12 @@ pub fn credit_fee_receiver(amount: u64) {
 /// * one per-payer settlement
 /// * one per-relay settlement
 /// * one fee-receiver credit
+///
+/// [DB_WRITE] WARNING:
+/// As of this point in the lifecycle of the transaction, we can no longer service subsequent user billing events.
+/// Therefore, all records that are updated from here on within this transaction must either have already been
+/// created to avoid an allocation, or must be attributed to the system account which will cause its billing to
+/// be handled as drift settlement.
 pub fn reconcile() {
     let payer_accruals = balance_cache::drain_balances();
     let capacity_accruals = accrual::capacity_limited::drain();
@@ -43,6 +52,8 @@ pub fn reconcile() {
     // 1. Charge payers first so the service balance funds the relay/fee payouts below.
     for ((account, sub), net) in &payer_accruals {
         if *net < 0 {
+            // [DB WRITE] No allocation - primary balance record for vserver already exists, it is created
+            // by the first resource purchase, which must be done before billing is enabled.
             Tokens::call().fromSub(sys, key(account, sub), Quantity::new((-net) as u64));
         }
     }
@@ -68,6 +79,8 @@ pub fn reconcile() {
     // 4. Process payer resource refunds
     for ((account, sub), net) in &payer_accruals {
         if *net > 0 {
+            // [DB WRITE] No allocation - primary balance record for vserver already exists, it is created
+            // by the first resource purchase, which must be done before billing is enabled.
             Tokens::call().toSub(sys, key(account, sub), Quantity::new(*net as u64));
         }
     }
