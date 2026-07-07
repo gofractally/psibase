@@ -10,7 +10,7 @@ use crate::{
 
 use async_graphql::*;
 use psibase::{
-    check, is_auth,
+    is_auth,
     services::{
         tokens::{Decimal, Quantity, Wrapper as Tokens},
         transact::ServiceMethod,
@@ -271,27 +271,6 @@ impl Query {
             .unwrap_or(Quantity::new(0));
         let token = BillingConfig::get_sys_token();
         Decimal::new(refund, token.precision)
-    }
-
-    /// Returns the token cost that must be paid to enable billing.
-    ///
-    /// This is the amount of system tokens that the payer must credit to VirtualServer
-    /// before `enable_billing(true, payer)` can succeed.
-    ///
-    /// A 5% buffer is added to the cost to account for any minor variations in the cost
-    /// between query time and the time billing is enabled.
-    async fn enable_billing_cost(&self) -> Decimal {
-        let balance = CapacityPricing::get(ResourceType::Disk)
-            .map(|p| p.relay_net())
-            .unwrap_or(0);
-        let cost: u128 = balance.max(0) as u128;
-        let cost = cost
-            .checked_mul(105)
-            .expect("enable_billing_cost: overflow")
-            / 100;
-        check(cost <= u64::MAX as u128, "settlement cost exceeds u64");
-        let token = BillingConfig::get_sys_token();
-        Decimal::new(Quantity::new(cost as u64), token.precision)
     }
 
     /// Returns information related to the account's resource buffer.

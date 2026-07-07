@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use psibase::{
     services::tokens::{self, Decimal, TID},
     AccountNumber,
@@ -228,17 +226,6 @@ pub(super) fn get_sub_balance(
     );
     let b: SubBal = query_auth(chain, tokens::SERVICE, "subaccountBalance", &q, auth_token)?;
     Ok(b.balance.quantity.value)
-}
-
-pub(super) fn get_enable_billing_cost(chain: &psibase::Chain) -> Result<u64, psibase::Error> {
-    let s: String = query(
-        chain,
-        Wrapper::SERVICE,
-        "enableBillingCost",
-        r#"query { enableBillingCost }"#,
-    )?;
-    let decimal = Decimal::from_str(&s).map_err(psibase::Error::new)?;
-    Ok(decimal.quantity.value)
 }
 
 pub(super) fn get_invite_cost(

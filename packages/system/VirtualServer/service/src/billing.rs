@@ -1,9 +1,9 @@
 use crate::resource_type::ResourceType;
 use crate::tables::tables::{BillingConfig, CapacityPricing, CapacityPricingTable, UserSettings};
 use crate::tx_cache::{accrual, balance_cache};
-use psibase::services::tokens::{Decimal, Quantity, Wrapper as Tokens};
+use psibase::services::tokens::{Quantity, Wrapper as Tokens};
 use psibase::services::transact::Wrapper as Transact;
-use psibase::{abort_message, get_service, AccountNumber, Table};
+use psibase::{AccountNumber, Table};
 use std::collections::HashMap;
 
 /// Upper bound on the bytes written when crediting the fee receiver during
@@ -87,35 +87,4 @@ pub fn reconcile() {
 
     // 5. Credit the fee receiver
     credit_fee_receiver(to_fee_receiver);
-}
-
-/// Used when enabling billing to capitalize any relay shortfall
-/// The specified payer is simply paying for it out of pocket
-/// Todo: consider constructing a new curve when billing is enabled for the first time to
-///       avoid requiring some particular payer to subsidize everyone else's prior writes.
-pub fn settle_relay_balance(resource: ResourceType, payer: AccountNumber) {
-    let net = CapacityPricing::get_assert(resource).relay_net();
-    if net == 0 {
-        return;
-    }
-    let config = BillingConfig::get_assert();
-    let sys = config.sys;
-    if net > 0 {
-        let amt = Quantity::new(net as u64);
-        let shared = Tokens::call().getSharedBal(sys, payer, get_service());
-        if shared < amt {
-            let precision = BillingConfig::get_sys_token().precision;
-            let paid = Decimal::new(shared, precision);
-            let required = Decimal::new(amt, precision);
-            abort_message(&format!(
-                "Account {payer} has paid {paid} tokens, but enabling billing requires {required} tokens"
-            ));
-        }
-        Tokens::call().debit(sys, payer, amt, "".into());
-        CapacityPricing::settle_relay(resource, net);
-        Tokens::call().reject(sys, payer, "Change".into());
-    } else {
-        CapacityPricing::settle_relay(resource, net);
-        credit_fee_receiver((-net) as u64);
-    }
 }

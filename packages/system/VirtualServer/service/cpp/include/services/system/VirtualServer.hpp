@@ -66,11 +66,9 @@ namespace SystemService
    /// 2 - Call `init_billing`: Initializes the billing system. To call this, the system token
    ///     must have already been set in the `Tokens` service. The specified `fee_receiver` will
    ///     receive all of the system token fees paid for resources by users.
-   /// 3 - Call `enable_billing(true, Some(payer))`: When ready, calling this action enables the
-   ///     billing system. Two requirements: (a) the caller must have already filled their resource
-   ///     buffer because this action is itself billed, and (b) `payer` must have credited sufficient
-   ///     system tokens to this service to settle any net disk consumption that accumulated while
-   ///     billing was disabled (see the `enableBillingCost` GraphQL query for the required amount).
+   /// 3 - Call `enable_billing(true)`: When ready, calling this action enables the
+   ///     billing system. The caller must have already filled their resource buffer because
+   ///     this action is itself billed.
    ///
    /// > Note: typically, step 1 should be called at system boot, and therefore the network should
    /// >       always at least have some server specs and derived network specs.
@@ -116,11 +114,7 @@ namespace SystemService
       /// If billing is disabled, resource consumption will still be tracked, but the resources will
       /// not be automatically metered by the network. This is insecure and allows users to abuse
       /// the network by consuming all of the network's resources.
-      ///
-      /// `payer` is required only when `enabled = true`: that account must have previously credited
-      /// sufficient system tokens to this service to cover the settlement cost of any net disk
-      /// consumption that occurred while billing was disabled.
-      void enable_billing(bool enabled, std::optional<psibase::AccountNumber> payer);
+      void enable_billing(bool enabled);
 
       /// Returns whether the billing system has been enabled
       bool is_billing_enabled();
@@ -339,7 +333,7 @@ namespace SystemService
                 method(get_fee_receiver),
                 method(set_specs, specs),
                 method(set_network_variables, variables),
-                method(enable_billing, enabled, payer),
+                method(enable_billing, enabled),
                 method(is_billing_enabled),
                 method(buy_res_for, amount, for_user, memo),
                 method(buy_res_sub, amount, sub_account),

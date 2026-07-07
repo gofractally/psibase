@@ -85,15 +85,9 @@ interface admin {
     /// This must be called after the billing system has been initialized and the
     /// system token has been set.
     ///
-    /// `payer` is required only when `enabled = true`: that account must have
-    /// previously credited sufficient system tokens to this service to cover the
-    /// settlement cost of any net disk consumption that occurred while billing
-    /// was disabled.
-    ///
     /// Parameters:
     /// * `enabled` - Whether to enable the billing system
-    /// * `payer` - The account that will pay the settlement cost (required when enabling)
-    enable-billing: func(enabled: bool, payer: option<string>) -> result<_, error>;
+    enable-billing: func(enabled: bool) -> result<_, error>;
 
     /// Set virtual server specs
     /// It is from these specs that the pricing for network resources is derived.

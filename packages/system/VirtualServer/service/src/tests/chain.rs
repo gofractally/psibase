@@ -25,9 +25,9 @@ use super::utils::{fmt_mb, fmt_num, fmt_sys};
 
 use super::helpers::{assert_error, check_balance, enable_billing as setup_enable_billing};
 use super::query::{
-    get_billing_config, get_db_prealloc, get_disk_state, get_enable_billing_cost, get_invite_cost,
-    get_network_vars, get_server_specs, get_site_paths, get_sub_balance, get_total_consumed_disk,
-    get_user_resources, DiskPricingState,
+    get_billing_config, get_db_prealloc, get_disk_state, get_invite_cost, get_network_vars,
+    get_server_specs, get_site_paths, get_sub_balance, get_total_consumed_disk, get_user_resources,
+    DiskPricingState,
 };
 
 fn consumption_details(
@@ -318,18 +318,10 @@ fn metering(chain: psibase::Chain) -> Result<(), psibase::Error> {
         .credit(sys, PRODUCER_ACCOUNT, 50_000_0000.into(), "".into())
         .get()?;
 
-    // Credit the settlement cost to VirtualServer before enabling billing
-    let billing_cost = get_enable_billing_cost(&chain)?;
-    if billing_cost > 0 {
-        tokens::Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
-            .credit(sys, vserver, billing_cost.into(), "".into())
-            .get()?;
-    }
-
     // Verify enable billing
     chain
         .propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
-        .enable_billing(true, Some(PRODUCER_ACCOUNT))
+        .enable_billing(true)
         .get()?;
 
     // Verify alice out of resources

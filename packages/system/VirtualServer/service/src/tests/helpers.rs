@@ -6,7 +6,7 @@ use psibase::{
     AccountNumber, ChainEmptyResult,
 };
 
-use super::query::{get_enable_billing_cost, get_user_resources};
+use super::query::get_user_resources;
 
 pub(super) fn assert_error(result: ChainEmptyResult, message: &str) {
     let err = result.trace.error.unwrap();
@@ -46,7 +46,8 @@ pub(super) fn enable_billing(chain: &psibase::Chain) -> Result<(), psibase::Erro
         .get()?;
     chain.finish_block();
 
-    chain.propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
+    chain
+        .propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
         .init_billing(tokens)
         .get()?;
 
@@ -66,23 +67,14 @@ pub(super) fn enable_billing(chain: &psibase::Chain) -> Result<(), psibase::Erro
         .buy_res(min_resource_buffer.into())
         .get()?;
 
-    let billing_cost = get_enable_billing_cost(&chain)?;
-    if billing_cost > 0 {
-        tokens::Wrapper::push_from(&chain, alice)
-            .credit(sys, PRODUCER_ACCOUNT, billing_cost.into(), "".into())
-            .get()?;
-        tokens::Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
-            .credit(sys, vserver, billing_cost.into(), "".into())
-            .get()?;
-    }
-
     // Give producer account some more tokens for general use
     tokens::Wrapper::push_from(&chain, alice)
         .credit(sys, PRODUCER_ACCOUNT, 50_000_0000.into(), "".into())
         .get()?;
 
-    chain.propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
-        .enable_billing(true, Some(PRODUCER_ACCOUNT))
+    chain
+        .propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
+        .enable_billing(true)
         .get()?;
 
     Ok(())
