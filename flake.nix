@@ -2,9 +2,14 @@
   description = "Psibase dev environment";
 
   inputs = {
-    # nixos-25.05 provides Boost 1.88 (matches psibase-contributor). Was previously
+    # Package versions are intended to match `psibase-contributor`. Places where that's
+    # impossible for nix packaging logical reason (packages not available where we need
+    # them or the set of packages we need not available from the same place), we diverge.
+    # Each divergence is called out and re-synced with `psibase-contributor` when possible.
+
+    # nixos-26.05 provides Boost 1.88 (matches psibase-contributor). Was previously
     # pinned to 24.05 for GCC 13 / libstdc++ compatibility with Catch2.
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
     flake-utils.url = "github:numtide/flake-utils";
 
     fenix = {
@@ -16,25 +21,31 @@
     # the required version (chosen for Rust 1.86.0 / psibase compatibility). These
     # MUST stay at their pinned versions, so they deliberately do NOT `follow`
     # nixpkgs — the frozen revision is the whole point. No single nixpkgs rev
-    # carries all three versions at once, hence one input per tool.
+    # carries all required versions at once, hence one input per tool (cargo-generate
+    # and cargo-edit share a rev that packages both 0.23.5 and 0.13.7).
     #   cargo-component 0.15.0
     nixpkgs-cargo-component.url = "github:NixOS/nixpkgs/b1e27a8646234340ea2c8b4e3f73e9e2b2bca505";
     #   cargo-generate 0.23.5, cargo-edit 0.13.7 (same nixpkgs rev)
     nixpkgs-cargo-generate.url = "github:NixOS/nixpkgs/1d0bb7b61b251a261b0963aacf4b141e770a4f1d";
-    #   cursor-cli (cursor-agent; not in nixos-25.05)
+    #   cursor-cli (cursor-agent; not in nixos-26.05)
     nixpkgs-cursor-cli.url = "github:NixOS/nixpkgs/nixos-unstable";
-    # mdbook / plugins pinned separately — nixos-25.05 ships older versions.
-    #   mdbook 0.4.52
+    # mdbook / plugins pinned separately — nixos-26.05 ships mdbook 0.5.x.
+    #   mdbook 0.4.52, wasm-pack 0.13.1 (same nixpkgs rev)
     nixpkgs-mdbook.url = "github:NixOS/nixpkgs/bd16676f18040e23761b54a98e9d906a962220ae";
     #   mdbook-mermaid 0.16.2
     nixpkgs-mdbook-mermaid.url = "github:NixOS/nixpkgs/afd39ffbac700ed696fdee83842309302cae4c4e";
     #   mdbook-tabs 0.2.3 (mdbook-plugins; last release compatible with mdbook 0.4.x)
     nixpkgs-mdbook-plugins.url = "github:NixOS/nixpkgs/aaf821b4208b829d6a398cdd6b8db795daf4eb6d";
+    #   mdbook-linkcheck 0.7.7 (removed from nixos-26.05)
+    nixpkgs-mdbook-linkcheck.url = "github:NixOS/nixpkgs/bd16676f18040e23761b54a98e9d906a962220ae";
+    #   mdbook-pagetoc 0.2.0 — DIVERGES from psibase-contributor (0.2.2): no nixpkgs rev
+    #   ships 0.2.2 while keeping mdbook 0.4.x compatibility (0.3.0 breaks mdbook 0.4.x).
+    nixpkgs-mdbook-pagetoc.url = "github:NixOS/nixpkgs/ac62194c3917d5f474c1a844b6fd6da2db95077d";
     #   nodejs 20.11.0
     nixpkgs-nodejs.url = "github:NixOS/nixpkgs/fea57dc5b57285d33918813d2f3695024d8fc9e8";
   };
 
-  outputs = { self, nixpkgs, flake-utils, fenix, nixpkgs-cargo-component, nixpkgs-cargo-generate, nixpkgs-cursor-cli, nixpkgs-mdbook, nixpkgs-mdbook-mermaid, nixpkgs-mdbook-plugins, nixpkgs-nodejs }:
+  outputs = { self, nixpkgs, flake-utils, fenix, nixpkgs-cargo-component, nixpkgs-cargo-generate, nixpkgs-cursor-cli, nixpkgs-mdbook, nixpkgs-mdbook-mermaid, nixpkgs-mdbook-plugins, nixpkgs-mdbook-linkcheck, nixpkgs-mdbook-pagetoc, nixpkgs-nodejs }:
     flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (system:
       let
         pkgs = import nixpkgs {
@@ -56,6 +67,9 @@
         mdbook = (import nixpkgs-mdbook { inherit system; }).mdbook;
         mdbookMermaid = (import nixpkgs-mdbook-mermaid { inherit system; }).mdbook-mermaid;
         mdbookPlugins = (import nixpkgs-mdbook-plugins { inherit system; }).mdbook-plugins;
+        mdbookLinkcheck = (import nixpkgs-mdbook-linkcheck { inherit system; }).mdbook-linkcheck;
+        mdbookPagetoc = (import nixpkgs-mdbook-pagetoc { inherit system; }).mdbook-pagetoc;
+        wasmPack = (import nixpkgs-mdbook { inherit system; }).wasm-pack;
         nodejs20 = (import nixpkgs-nodejs { inherit system; }).nodejs_20;
 
         # Rust 1.86.0 toolchain with WASM targets (see nix/rust-toolchain.toml)
@@ -64,8 +78,10 @@
           sha256 = "sha256-X/4ZBHO3iW0fOenQ3foEvscgAPJYl2abspaBThDOukI=";
         };
 
-        # WASI SDK - fetched from GitHub releases (version 29 matches psibase's CMakeLists.txt)
-        # On Linux, binaries need patching to work on NixOS (they're built for generic Linux)
+        # DIVERGES from psibase-contributor (wasi-sdk 24 embedded in llvm-18): standalone
+        # wasi-sdk 29 matches psibase CMakeLists.txt default. Releases 24→29 are incremental
+        # libc/toolchain updates on wasm32-wasip1; output may differ in size/debug metadata
+        # but remains ABI-compatible for psibase's CMake/wasip1 build.
         wasiSdk = pkgs.stdenv.mkDerivation rec {
           pname = "wasi-sdk";
           version = "29";
@@ -107,7 +123,7 @@
 
         llvmPackages = pkgs.llvmPackages_18;
 
-        # nixos-25.05 ships GCC 14 libstdc++; Catch2 + clang need GCC 13 headers.
+        # nixos-26.05 ships GCC 15 libstdc++; Catch2 + clang need GCC 13 headers.
         gcc13 = pkgs.gcc13;
         gccTriple =
           if system == "aarch64-linux" then "aarch64-unknown-linux-gnu"
@@ -165,6 +181,10 @@
           '';
         };
 
+        # wasm-tools: unpinned from nixpkgs (floats with nixos-26.05), like contributor's
+        # unpinned `cargo install wasm-tools`.
+        wasmTools = pkgs.wasm-tools;
+
         commonPackages = with pkgs; [
           cmake
           ninja
@@ -191,12 +211,12 @@
           cargoEdit
           binaryen
           wabt
-          wasm-pack
-          wasm-tools
+          wasmPack
+          wasmTools
           nodejs20
           yarnBerry
-          nodePackages.eslint
-          nodePackages.prettier
+          eslint
+          prettier
           python3
           python3Packages.websockets
           python3Packages.requests
@@ -214,9 +234,9 @@
           softhsm
           mdbook
           mdbookMermaid
-          pkgs.mdbook-pagetoc
+          mdbookPagetoc
           mdbookPlugins
-          pkgs.mdbook-linkcheck
+          mdbookLinkcheck
           cacert
           # Shell and editor UX in nix develop
           vim
