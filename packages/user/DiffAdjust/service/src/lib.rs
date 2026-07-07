@@ -147,14 +147,16 @@ pub mod tables {
             }
         }
 
-        // PRECONDITION: `increase_ppm`, which `factor` is based on, must be ppm resolution or courser.
         fn apply_increase(difficulty: u64, factor: f64, times: u32) -> u64 {
             if times == 0 || difficulty == u64::MAX || factor <= 1.0 {
                 return difficulty;
             }
-            // ensure no cast safety of `times` from u32 to i32
-            // `increase_ppm`, specified in higher resolution than ppm, may lead to a premature calculation of overflow
-            // if `times` doesn't fit in `i32`, and `factor` is at least 1.0 + 1PPM, the result overflows f64
+            // ppm-resolution `factor` keeps the `times > i32::MAX` overflow shortcut below sound.
+            debug_assert!(
+                factor >= 1.0 + 1.0 / ONE_MILLION as f64,
+                "increase factor must be ppm resolution or coarser"
+            );
+            // `times` past i32::MAX overflows f64 given factor >= 1.0 + 1PPM, so saturate to infinity.
             let powered = if times > i32::MAX as u32 {
                 f64::INFINITY
             } else {
@@ -376,12 +378,8 @@ pub mod service {
 
     /// Increment RateLimit instance, potentially increasing the difficulty.
     ///
-    /// `target_max` events accumulate with no adjustment, and the next event triggers one,
-    ///   so the number of adjustments for `events` accumulated in the window is
-    ///   `floor(events / (target_max + 1))`. Adjustments therefore land every
-    ///   `target_max + 1` events (and `target_max == 0` means every event adjusts). A single
-    ///   large increment may apply multiple adjustments at once, matching the equivalent
-    ///   sequence of single increments (the remainder is carried across calls).
+    /// The difficulty may increase multiple times if the counter exceeds `target_max`
+    ///   by more than one multiple of `target_max`.
     ///
     /// Returns the difficulty before any difficulty adjustment due to the increment.
     ///
