@@ -753,16 +753,17 @@ namespace SystemService
          {
             std::chrono::nanoseconds cpuUsage = cpuLimit.getCpuTime();
             to<VirtualServer>().useCpuSys(trx.actions()[0].sender(), cpuUsage.count());
+            to<VirtualServer>().finishTx();
          }
       }
 
       if (auto eventIndexer = tables.open<EventIndexerTable>().get({}))
       {
          // Events were already indexed before useCpuSys, which is intentional because we want to bill CPU time for event
-         // indexing. However, if indexing is done before useCpuSys, then the event emitted by useCpuSys that reports
-         // the used CPU doesn't get indexed (or billed).
+         // indexing. However, if indexing is done before useCpuSys, then the event(s) emitted by useCpuSys and finishTx
+         // don't get indexed (or billed).
          //
-         // Therefore, we do one more event indexer sync after useCpuSys, which will only index the new event (and uses
+         // Therefore, we do one more event indexer sync, which will only index the new events (and uses
          // cached service schemas so isn't as expensive).
          to<EventIndexerInterface>(eventIndexer->service).sync();
       }

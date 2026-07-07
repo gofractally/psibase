@@ -408,6 +408,13 @@ mod service {
         unimplemented!()
     }
 
+    /// A notification called at the end of a transaction in which to do any final
+    /// per-tx accounting or cleanup.
+    #[action]
+    fn finishTx() {
+        unimplemented!()
+    }
+
     /// Called by the system when `user` causes a write to any database.
     ///
     /// `amount_bytes` is positive for consumption and negative for a free

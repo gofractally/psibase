@@ -924,9 +924,14 @@ mod service {
         Wrapper::emit()
             .history()
             .consumed(user, Cpu.as_id(), amount, cost);
+    }
 
-        // useCpuSys runs once at the end of a billed transaction, so this is where we
-        // emit the per-tx aggregated disk `consumed` events that useDiskSys accumulated.
+    /// A notification called at the end of a transaction in which to do any final
+    /// per-tx accounting or cleanup.
+    #[action]
+    fn finishTx() {
+        check(get_sender() == Transact::SERVICE, "[finishTx] Unauthorized");
+
         for (disk_user, disk_amount, disk_cost) in tx_cache::drain_disk_usage() {
             if disk_amount == 0 && disk_cost == 0 {
                 continue;
@@ -997,7 +1002,7 @@ mod service {
         };
 
         // Avoiding a flood of events for writing individual records. Accumulate in the tx_cache and emit
-        // one event at the end of the tx (using `useCpuSys` as the tx end hook)
+        // one event at the end of the tx (using `finishTx` as the tx end hook)
         tx_cache::add_disk_usage(user, amount_bytes, cost);
     }
 
