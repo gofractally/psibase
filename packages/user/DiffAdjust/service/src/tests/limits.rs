@@ -3,6 +3,7 @@ use crate::Wrapper;
 use psibase::*;
 
 const MAX_DECREASE_PPM: u32 = 1_000_000;
+const DECREASE_PPM_ERROR: &str = "decrease_ppm must not exceed 1_000_000";
 
 #[psibase::test_case(packages("DiffAdjust"))]
 fn test_max_ppm_unclamped(mut chain: psibase::Chain) -> Result<(), psibase::Error> {
@@ -19,7 +20,9 @@ fn test_max_ppm_unclamped(mut chain: psibase::Chain) -> Result<(), psibase::Erro
         .get()?;
     chain.start_block();
 
-    Wrapper::push_from(&chain, alice).increment(nft_id, 1).get()?;
+    Wrapper::push_from(&chain, alice)
+        .increment(nft_id, 1)
+        .get()?;
     let increase_factor = 1.0 + f64::from(max_ppm) / ONE_MILLION;
     let expected_increase = (1000.0 * increase_factor).min(u64::MAX as f64) as u64;
     assert_eq!(
@@ -27,22 +30,17 @@ fn test_max_ppm_unclamped(mut chain: psibase::Chain) -> Result<(), psibase::Erro
         expected_increase
     );
 
-    // Decrease ppm above 100% is clamped; u32::MAX behaves like 1_000_000 (full decay to floor).
-    let nft_id = Wrapper::push_from(&chain, alice)
-        .create(10_000, 60, 10, 10, 1, 50_000, max_ppm)
-        .get()?;
-    chain.start_block();
-    chain.start_block_after(Seconds::new(60).into());
-
-    assert_eq!(Wrapper::push(&chain).get_diff(nft_id).get()?, 1);
-
-    // set_ppm also accepts values above the old 100% cap for increase; decrease is clamped on store.
+    // set_ppm also accepts values above the old 100% cap for increase.
     let nft_id = Wrapper::push_from(&chain, alice)
         .create(2000, 60, 0, 0, 1, 50_000, 50_000)
         .get()?;
     chain.start_block();
-    Wrapper::push_from(&chain, alice).set_ppm(nft_id, max_ppm, max_ppm);
-    Wrapper::push_from(&chain, alice).increment(nft_id, 1).get()?;
+    Wrapper::push_from(&chain, alice)
+        .set_ppm(nft_id, max_ppm, 50_000)
+        .get()?;
+    Wrapper::push_from(&chain, alice)
+        .increment(nft_id, 1)
+        .get()?;
     let expected_set_ppm = (2000.0 * increase_factor).min(u64::MAX as f64) as u64;
     assert_eq!(
         Wrapper::push(&chain).get_diff(nft_id).get()?,
@@ -53,7 +51,7 @@ fn test_max_ppm_unclamped(mut chain: psibase::Chain) -> Result<(), psibase::Erro
 }
 
 #[psibase::test_case(packages("DiffAdjust"))]
-fn test_decrease_ppm_clamped_to_100_percent(
+fn test_decrease_ppm_rejected_above_100_percent(
     mut chain: psibase::Chain,
 ) -> Result<(), psibase::Error> {
     chain.set_auto_block_start(false);
@@ -61,19 +59,22 @@ fn test_decrease_ppm_clamped_to_100_percent(
     let alice = account!("alice");
     chain.new_account(alice).unwrap();
 
-    let at_cap = Wrapper::push_from(&chain, alice)
+    Wrapper::push_from(&chain, alice)
+        .create(8000, 0, 10, 10, 500, 50_000, 50_000)
+        .match_error("window seconds must be above 0")?;
+
+    Wrapper::push_from(&chain, alice)
+        .create(8000, 60, 10, 10, 500, 50_000, 1_000_001)
+        .match_error(DECREASE_PPM_ERROR)?;
+
+    let nft_id = Wrapper::push_from(&chain, alice)
         .create(8000, 60, 10, 10, 500, 50_000, MAX_DECREASE_PPM)
         .get()?;
-    let above_cap = Wrapper::push_from(&chain, alice)
-        .create(8000, 60, 10, 10, 500, 50_000, u32::MAX)
-        .get()?;
     chain.start_block();
-    chain.start_block_after(Seconds::new(60).into());
 
-    let at_cap_diff = Wrapper::push(&chain).get_diff(at_cap).get()?;
-    let above_cap_diff = Wrapper::push(&chain).get_diff(above_cap).get()?;
-    assert_eq!(at_cap_diff, 500);
-    assert_eq!(above_cap_diff, at_cap_diff);
+    Wrapper::push_from(&chain, alice)
+        .set_ppm(nft_id, 50_000, u32::MAX)
+        .match_error(DECREASE_PPM_ERROR)?;
 
     Ok(())
 }
@@ -93,7 +94,9 @@ fn test_saturated_difficulty_and_counter(mut chain: psibase::Chain) -> Result<()
 
     assert_eq!(Wrapper::push(&chain).get_diff(nft_id).get()?, u64::MAX);
     assert_eq!(
-        Wrapper::push_from(&chain, alice).increment(nft_id, 1).get()?,
+        Wrapper::push_from(&chain, alice)
+            .increment(nft_id, 1)
+            .get()?,
         u64::MAX
     );
     chain.start_block();
@@ -111,7 +114,9 @@ fn test_saturated_difficulty_and_counter(mut chain: psibase::Chain) -> Result<()
     chain.start_block();
     assert_eq!(Wrapper::push(&chain).get_diff(nft_id).get()?, u64::MAX);
 
-    Wrapper::push_from(&chain, alice).increment(nft_id, 1).get()?;
+    Wrapper::push_from(&chain, alice)
+        .increment(nft_id, 1)
+        .get()?;
     chain.start_block();
     assert_eq!(Wrapper::push(&chain).get_diff(nft_id).get()?, u64::MAX);
 

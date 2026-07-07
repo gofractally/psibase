@@ -68,9 +68,11 @@ pub mod tables {
             check(seconds > 0, "window seconds must be above 0");
         }
 
-        /// Decrease rate is capped at 100% per window; increase remains unclamped.
-        fn clamp_decrease_ppm(decrease_ppm: u32) -> u32 {
-            decrease_ppm.min(ONE_MILLION)
+        fn check_decrease_ppm(decrease_ppm: u32) {
+            check(
+                decrease_ppm <= ONE_MILLION,
+                "decrease_ppm must not exceed 1_000_000",
+            );
         }
 
         pub fn add(
@@ -82,15 +84,16 @@ pub mod tables {
             increase_ppm: u32,
             decrease_ppm: u32,
         ) -> Self {
+            Self::check_targets(target_min, target_max);
+            Self::check_window_seconds(window_seconds);
+            Self::check_decrease_ppm(decrease_ppm);
+
             let nft_id = Nft::call().mint();
             let sender = get_sender();
             Nft::call().credit(nft_id, sender, "RateLimit administration NFT".into());
 
             let last_updated =
                 TransactSvc::call().currentBlock().time.seconds() + psibase::Seconds::new(1); // See comment in check_difficulty_increase
-
-            Self::check_targets(target_min, target_max);
-            Self::check_window_seconds(window_seconds);
 
             let new_instance = Self::new(
                 nft_id,
@@ -102,7 +105,7 @@ pub mod tables {
                 floor_difficulty,
                 last_updated,
                 increase_ppm,
-                Self::clamp_decrease_ppm(decrease_ppm),
+                decrease_ppm,
             );
             new_instance.save();
 
@@ -278,9 +281,10 @@ pub mod tables {
 
         pub fn set_ppm(&mut self, increase_ppm: u32, decrease_ppm: u32) {
             self.check_sender_has_nft();
+            Self::check_decrease_ppm(decrease_ppm);
             self.check_difficulty_decrease();
             self.increase_ppm = increase_ppm;
-            self.decrease_ppm = Self::clamp_decrease_ppm(decrease_ppm);
+            self.decrease_ppm = decrease_ppm;
             self.save();
         }
 
