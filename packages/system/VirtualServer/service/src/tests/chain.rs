@@ -777,6 +777,15 @@ fn free_into_prealloc(chain: psibase::Chain) -> Result<(), psibase::Error> {
         );
     }
 
+    // Buy extra resources to comfortably cover the large writes below
+    let extra_resources: u64 = 200_000_000;
+    tokens::Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
+        .credit(sys, vserver, extra_resources.into(), "".into())
+        .get()?;
+    Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
+        .buy_res(extra_resources.into())
+        .get()?;
+
     {
         // a write crossing the deficit boundary bills the excess into the relay
         let deficit_pre_cross = get_disk_state(&chain).prealloc_deficit;
