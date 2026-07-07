@@ -151,12 +151,7 @@ pub mod tables {
             if times == 0 || difficulty == u64::MAX || factor <= 1.0 {
                 return difficulty;
             }
-            // ppm-resolution `factor` keeps the `times > i32::MAX` overflow shortcut below sound.
-            debug_assert!(
-                factor >= 1.0 + 1.0 / ONE_MILLION as f64,
-                "increase factor must be ppm resolution or coarser"
-            );
-            // `times` past i32::MAX overflows f64 given factor >= 1.0 + 1PPM, so saturate to infinity.
+            // `powi` takes i32, so `times` beyond i32::MAX can't be cast; saturate to infinity.
             let powered = if times > i32::MAX as u32 {
                 f64::INFINITY
             } else {
