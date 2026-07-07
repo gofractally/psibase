@@ -287,18 +287,30 @@ mod tx_cache {
                 sub: Option<String>,
                 user_refund: u64,
                 fee: u64,
-            ) {
-                let gross = user_refund + fee;
-                if is_system_user(user) || gross == 0 {
-                    return;
+            ) -> u64 {
+                let total_out = user_refund + fee;
+                if is_system_user(user) || total_out == 0 {
+                    return 0;
                 }
+                let collateral = get_collateral(resource);
+
+                let (gross, clamped_fee, refund) = if total_out > collateral {
+                    // Clamp the fee and the refund (keeping fee_ppm ratio)
+                    // if the payout exceeds available collateral.
+                    let clamped_fee = (fee as u128 * collateral as u128 / total_out as u128) as u64;
+                    (collateral, clamped_fee, collateral - clamped_fee)
+                } else {
+                    (total_out, fee, user_refund)
+                };
+
                 with(resource, |a| {
                     a.relay_delta -= gross as i128;
-                    a.fee += fee;
+                    a.fee += clamped_fee;
                 });
-                if user_refund > 0 {
-                    balance_cache::refund(user, sub, user_refund);
+                if refund > 0 {
+                    balance_cache::refund(user, sub, refund);
                 }
+                refund
             }
 
             pub fn drain() -> Vec<(ResourceType, Accrual)> {
@@ -1009,8 +1021,9 @@ mod service {
                     let (user_refund, fee) =
                         CapacityPricing::get_assert(Disk).free((-amount_bytes) as u64);
                     if billing {
-                        accrual::capacity_limited::free(Disk, user, sub, user_refund, fee);
-                        -(to_i64(user_refund, "Disk refund"))
+                        let refund =
+                            accrual::capacity_limited::free(Disk, user, sub, user_refund, fee);
+                        -(to_i64(refund, "Disk refund"))
                     } else {
                         0
                     }
