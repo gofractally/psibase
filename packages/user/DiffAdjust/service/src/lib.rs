@@ -120,33 +120,6 @@ pub mod tables {
             self.decrease_ppm as f64 / ONE_MILLION as f64
         }
 
-        /// Caller must ensure the value is finite and positive.
-        fn f64_to_u64_saturating(value: f64) -> u64 {
-            if value >= u64::MAX as f64 {
-                u64::MAX
-            } else {
-                value as u64
-            }
-        }
-
-        /// Decay compound math may underflow or yield NaN; treat those as zero (floor applied by caller).
-        fn decay_f64_to_u64(value: f64) -> u64 {
-            if !value.is_finite() || value <= 0.0 {
-                0
-            } else {
-                Self::f64_to_u64_saturating(value)
-            }
-        }
-
-        /// Increase compound math may overflow to inf or NaN; saturate rather than collapse to zero.
-        fn increase_f64_to_u64(value: f64) -> u64 {
-            if !value.is_finite() {
-                u64::MAX
-            } else {
-                Self::f64_to_u64_saturating(value)
-            }
-        }
-
         fn apply_increase(difficulty: u64, factor: f64, times: u32) -> u64 {
             if times == 0 || difficulty == u64::MAX || factor <= 1.0 {
                 return difficulty;
@@ -161,7 +134,12 @@ pub mod tables {
             if !powered.is_finite() || powered >= u64::MAX as f64 {
                 return u64::MAX;
             }
-            Self::increase_f64_to_u64(difficulty as f64 * powered)
+            let diff_as_f64 = difficulty as f64 * powered;
+            check(
+                !diff_as_f64.is_nan(),
+                "diffadjust increase computation resulted in NaN",
+            );
+            diff_as_f64 as u64
         }
 
         fn apply_decrease(mut difficulty: u64, factor: f64, times: u32, floor: u64) -> u64 {
@@ -177,7 +155,12 @@ pub mod tables {
             }
             // Per-window truncate + floor so batching N windows matches N single-window steps.
             for _ in 0..times {
-                difficulty = Self::decay_f64_to_u64(difficulty as f64 * factor).max(floor);
+                let diff_as_f64 = difficulty as f64 * factor;
+                check(
+                    !diff_as_f64.is_nan(),
+                    "diffadjust decrease computation resulted in NaN",
+                );
+                difficulty = (diff_as_f64 as u64).max(floor);
             }
             difficulty
         }
