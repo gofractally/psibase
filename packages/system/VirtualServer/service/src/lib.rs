@@ -320,7 +320,7 @@ mod tx_cache {
     }
 }
 
-/// Virtual Server Service
+/// # Virtual Server Service
 ///
 /// This service defines a "virtual server" that represents the subset of a real server that
 /// a node operator dedicates to running their network node. A user then interacts with one
@@ -390,6 +390,68 @@ mod tx_cache {
 /// After each of the above steps, the billing service will be enabled, and users will be
 /// required to buy resources to transact with the network. Use the other actions in this
 /// service to manage server specs, network variables, and billing parameters, as needed.
+///
+/// ## Curve under-collateralization
+///
+/// Capacity limited resources are managed via a constant-product curve that reports the quantity
+/// of reserve tokens required to be held as collateral for the current utilization levels of the
+/// resource.
+///
+/// This service attempts to balance the required collateral as reported by the state of the curve
+/// with the actual collateral as measured by the relay subaccount token balance. The curve for a
+/// capacity-limited resource can be undercollateralized in certain well-defined scenarios (e.g.
+/// consumption before billing is enabled).
+///
+/// An undercollateralized curve is recollateralized over time using the fees that would otherwise
+/// be sent to the fee receiver.
+///
+/// Example disk recollateralization flow diagram (simplified for clarity) for a transaction that
+/// frees bytes:
+///
+/// ```text
+///             .---------------.
+///            (   free bytes    )
+///             '-------+-------'
+///                     |
+///                     v
+///          +--------------------------+
+///          | Reduces curve shortfall  |
+///          +-----------+--------------+
+///                      |
+///                      v
+///                 .----------.
+///                /            \
+///       No      /   curve has  \     Yes
+///     .--------(   collateral?  )--------.
+///     |         \              /          |
+///     |          \            /           |
+///     v           '----------'            v
+///  .-----.                      +--------------------+
+/// (  End  )                     |  Calc user refund  |
+///  '-----'                      +---------+----------+
+///                                         |
+///                                         v
+///                               +----------------------+
+///                               | Take fee from refund |
+///                               +---------+------------+
+///                                         |
+///                                         v
+///                               +--------------------+
+///                               |  Send user refund  |
+///                               +---------+----------+
+///                                         |
+///                                         v
+///                                .-----------------.
+///                               /                   \
+///                   yes        /    Curve under-     \        no
+///                 .-----------(   collateralized?     )-----------.
+///                 |            \                     /            |
+///                 v             '-------------------'             v
+///       +--------------------+                        +--------------------------+
+///       |  Add fee to relay  |                        | Send fee to fee receiver |
+///       +--------------------+                        +--------------------------+
+/// ```
+///
 #[psibase::service(name = "vserver", recursive = "true", tables = "tables::tables")]
 mod service {
     use crate::billing;

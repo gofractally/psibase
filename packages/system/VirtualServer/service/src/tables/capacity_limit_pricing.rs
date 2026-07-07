@@ -47,6 +47,11 @@
 //! - As the resource is consumed, $x$ increases and $y$ decreases.
 //! - Full consumption corresponds to $(x, y) = (x_{\max}, 0)$.
 //!
+//! ## Collateralization
+//!
+//! The curve math in this module calculates a quantity of reserve tokens that would be necessary
+//! collateral for the current utilization of the resource. Whether the curve is in fact actually
+//! collateralized is outside of this module's scope.
 
 use crate::math_utils::PPM;
 use crate::resource_type::ResourceType;
