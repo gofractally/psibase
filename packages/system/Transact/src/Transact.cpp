@@ -634,12 +634,6 @@ namespace SystemService
       auto _           = recurse();
       bool enforceAuth = checkTapos(id, trx.tapos(), true, false);
       if (enforceAuth) {
-         auto actors = std::vector<AccountNumber>();
-         actors.reserve(trx.actions().size());
-         for (auto act : trx.actions()) {
-            actors.push_back(act.sender().unpack());
-         }
-         to<VirtualServer>().prestartTx(actors);
          checkAuth(trx.actions().front(), trx.claims(), true, true);
       }
       return enforceAuth;
@@ -707,6 +701,15 @@ namespace SystemService
 
       Actor<CpuLimit> cpuLimit(Transact::service, CpuLimit::service, CallFlags::runModeRpc);
       Actor<Accounts> accounts(Transact::service, Accounts::service);
+
+      if (enforceAuth && isResMonitoring())
+      {
+         auto actors = std::vector<AccountNumber>();
+         actors.reserve(trx.actions().size());
+         for (auto act : trx.actions())
+            actors.push_back(act.sender().unpack());
+         to<VirtualServer>().prestartTx(actors);
+      }
 
       for (auto act : trx.actions())
       {
