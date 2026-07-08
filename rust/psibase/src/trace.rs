@@ -215,8 +215,7 @@ fn format_action_trace(
     )?;
     if let Some(action_type) = action_type {
         let mut custom = schema_types();
-        let mut ignore_services = HashSet::new();
-        let service_method = CustomResolvedServiceMethod::new(schemas, &mut ignore_services);
+        let service_method = CustomResolvedServiceMethod::new(schemas, std::mem::drop);
         custom.insert("ServiceMethod".to_string(), &service_method);
         let custom_action = CustomActionCollector::new(&*schemas, no_action);
         custom.insert("Action".to_string(), &custom_action);
@@ -415,7 +414,13 @@ impl<'a, F: SchemaFetcher + 'a> ActionFormatter<'a, F> {
         let schemas = self.storage.schemas.borrow();
         if let Some(schema) = schemas.get(&act.service) {
             let mut custom = schema_types();
-            let service_method = CustomResolvedServiceMethod::new(&*schemas, services);
+            let services = RefCell::new(services);
+            let service_method =
+                CustomResolvedServiceMethod::new(&*schemas, |service_method: ServiceMethod| {
+                    if !schemas.contains_key(&service_method.service) {
+                        services.borrow_mut().insert(service_method.service);
+                    }
+                });
             custom.insert("ServiceMethod".to_string(), &service_method);
             let custom_action = CustomActionCollector::new(&*schemas, |act| {
                 nested_actions.push(act);
@@ -646,9 +651,7 @@ impl<'a, 'b> Serialize for UnpackedTrace<'a, &'b ActionTrace> {
 
         if let Some(action_type) = action_type {
             let mut custom = schema_types();
-            let mut ignore_services = HashSet::new();
-            let service_method =
-                CustomResolvedServiceMethod::new(self.schemas, &mut ignore_services);
+            let service_method = CustomResolvedServiceMethod::new(self.schemas, std::mem::drop);
             custom.insert("ServiceMethod".to_string(), &service_method);
             let custom_action = CustomActionCollector::new(&self.schemas, no_action);
             custom.insert("Action".to_string(), &custom_action);
@@ -735,17 +738,14 @@ impl<'a, 'b> Serialize for UnpackedTrace<'a, &'b InnerTraceEnum> {
 
 // Uses on-chain schemas to resolve the original
 // spelling of methods.
-struct CustomResolvedServiceMethod<'a, 'b> {
+struct CustomResolvedServiceMethod<'a, F> {
     schemas: &'a HashMap<AccountNumber, Schema>,
-    missing: RefCell<&'b mut HashSet<AccountNumber>>,
+    f: F,
 }
 
-impl<'a, 'b> CustomResolvedServiceMethod<'a, 'b> {
-    fn new(schemas: &'a SchemaMap, missing: &'b mut HashSet<AccountNumber>) -> Self {
-        CustomResolvedServiceMethod {
-            schemas,
-            missing: RefCell::new(missing),
-        }
+impl<'a, F> CustomResolvedServiceMethod<'a, F> {
+    fn new(schemas: &'a SchemaMap, f: F) -> Self {
+        CustomResolvedServiceMethod { schemas, f }
     }
 }
 
@@ -765,7 +765,7 @@ fn field_names<const N: usize>(ty: &CompiledType) -> Option<[&str; N]> {
     None
 }
 
-impl<'a, 'b, 'c> CustomHandler<'a> for CustomResolvedServiceMethod<'b, 'c> {
+impl<'a, 'b, F: Fn(ServiceMethod) -> ()> CustomHandler<'a> for CustomResolvedServiceMethod<'b, F> {
     fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool {
         if let Some([service, method]) = field_types::<2>(ty) {
             schema.matches_u64(service) && schema.matches_u64(method)
@@ -787,8 +787,6 @@ impl<'a, 'b, 'c> CustomHandler<'a> for CustomResolvedServiceMethod<'b, 'c> {
             if let Some((key, _)) = schema.actions.get_key_value(&method) {
                 method = key.clone();
             }
-        } else {
-            self.missing.borrow_mut().insert(value.service);
         }
         let mut result = serde_json::Map::with_capacity(2);
         result.insert(sname.to_owned(), value.service.to_string().into());
@@ -826,9 +824,7 @@ impl<'a, 'b, 'c> CustomHandler<'a> for CustomResolvedServiceMethod<'b, 'c> {
         _allow_empty_container: bool,
     ) -> Result<(), fracpack::Error> {
         let value = ServiceMethod::unpack(src)?;
-        if !self.schemas.contains_key(&value.service) {
-            self.missing.borrow_mut().insert(value.service);
-        }
+        (self.f)(value);
         Ok(())
     }
     fn is_empty_container(&self, _ty: &CompiledType, _value: &serde_json::Value) -> bool {
@@ -880,9 +876,7 @@ impl<'a, 'b, F: FnMut(SharedAction<'a>) -> ()> CustomHandler<'a> for CustomActio
                 method = key.clone();
 
                 let mut custom = schema_types();
-                let mut ignore_services = HashSet::new();
-                let service_method =
-                    CustomResolvedServiceMethod::new(self.schemas, &mut ignore_services);
+                let service_method = CustomResolvedServiceMethod::new(self.schemas, std::mem::drop);
                 custom.insert("ServiceMethod".to_string(), &service_method);
                 let custom_action = CustomActionCollector::new(&self.schemas, no_action);
                 custom.insert("Action".to_string(), &custom_action);
