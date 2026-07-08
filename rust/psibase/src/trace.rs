@@ -422,8 +422,9 @@ impl<'a, F: SchemaFetcher + 'a> ActionFormatter<'a, F> {
                     }
                 });
             custom.insert("ServiceMethod".to_string(), &service_method);
+            let nested_actions = RefCell::new(nested_actions);
             let custom_action = CustomActionCollector::new(&*schemas, |act| {
-                nested_actions.push(act);
+                nested_actions.borrow_mut().push(act);
             });
             custom.insert("Action".to_string(), &custom_action);
             let mut cschema = CompiledSchema::new(&schema.types, &custom);
@@ -833,20 +834,17 @@ impl<'a, 'b, F: Fn(ServiceMethod) -> ()> CustomHandler<'a> for CustomResolvedSer
 }
 
 struct CustomActionCollector<'a, F> {
-    f: RefCell<F>,
+    f: F,
     schemas: &'a HashMap<AccountNumber, Schema>,
 }
 
 impl<'a, F> CustomActionCollector<'a, F> {
     fn new(schemas: &'a SchemaMap, f: F) -> Self {
-        Self {
-            f: RefCell::new(f),
-            schemas,
-        }
+        Self { f, schemas }
     }
 }
 
-impl<'a, 'b, F: FnMut(SharedAction<'a>) -> ()> CustomHandler<'a> for CustomActionCollector<'b, F> {
+impl<'a, 'b, F: Fn(SharedAction<'a>) -> ()> CustomHandler<'a> for CustomActionCollector<'b, F> {
     fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool {
         if let Some([sender_type, service_type, method_type, raw_data_type]) = field_types::<4>(ty)
         {
@@ -911,7 +909,7 @@ impl<'a, 'b, F: FnMut(SharedAction<'a>) -> ()> CustomHandler<'a> for CustomActio
         _allow_empty_container: bool,
     ) -> Result<(), fracpack::Error> {
         let value = SharedAction::unpack(src)?;
-        (*self.f.borrow_mut())(value);
+        (self.f)(value);
         Ok(())
     }
     fn is_empty_container(&self, _ty: &CompiledType, _value: &serde_json::Value) -> bool {
