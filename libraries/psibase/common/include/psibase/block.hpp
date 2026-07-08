@@ -30,6 +30,10 @@ namespace psibase
       friend bool operator==(const Action&, const Action&) = default;
       PSIO_REFLECT(Action, sender, service, method, rawData)
    };
+   inline constexpr bool psio_custom_schema(Action*)
+   {
+      return true;
+   }
 
    struct GenesisService
    {

@@ -4,6 +4,7 @@ use crate::{
     method, schema_types,
     services::{db, transact},
     AccountNumber, Action, Hex, MethodNumber, MethodString, Schema, SchemaMap, ServiceMethod,
+    SharedAction,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -214,8 +215,11 @@ fn format_action_trace(
     )?;
     if let Some(action_type) = action_type {
         let mut custom = schema_types();
-        let service_method = CustomResolvedServiceMethod::new(schemas);
+        let mut ignore_services = HashSet::new();
+        let service_method = CustomResolvedServiceMethod::new(schemas, &mut ignore_services);
         custom.insert("ServiceMethod".to_string(), &service_method);
+        let custom_action = CustomActionCollector::new(&*schemas, no_action);
+        custom.insert("Action".to_string(), &custom_action);
         let mut cschema = CompiledSchema::new(&schema.unwrap().types, &custom);
         if !atrace.action.rawData.is_empty() {
             cschema.extend(&action_type.params);
@@ -402,26 +406,52 @@ impl<'a, F: SchemaFetcher + 'a> ActionFormatter<'a, F> {
     pub async fn prepare_event_trace(&self, _etrace: &EventTrace) -> Result<(), anyhow::Error> {
         Ok(())
     }
+    pub async fn prepare_action_impl<'b>(
+        &self,
+        act: SharedAction<'b>,
+        nested_actions: &mut Vec<SharedAction<'b>>,
+        services: &mut HashSet<AccountNumber>,
+    ) {
+        let schemas = self.storage.schemas.borrow();
+        if let Some(schema) = schemas.get(&act.service) {
+            let mut custom = schema_types();
+            let service_method = CustomResolvedServiceMethod::new(&*schemas, services);
+            custom.insert("ServiceMethod".to_string(), &service_method);
+            let custom_action = CustomActionCollector::new(&*schemas, |act| {
+                nested_actions.push(act);
+            });
+            custom.insert("Action".to_string(), &custom_action);
+            let mut cschema = CompiledSchema::new(&schema.types, &custom);
+            let action_name = MethodString(act.method.to_string());
+            if let Some(action_type) = schema.actions.get(&action_name) {
+                cschema.extend(&action_type.params);
+                let _ = cschema.verify(&action_type.params, act.rawData.0);
+            }
+        }
+    }
+    pub async fn prepare_action<'b>(&self, act: SharedAction<'b>) {
+        let mut actions = vec![act];
+        let mut services = HashSet::new();
+        while let Some(act) = actions.pop() {
+            let _ = self.add_service(act.service).await;
+            self.prepare_action_impl(act, &mut actions, &mut services)
+                .await;
+        }
+        for service in services {
+            let _ = self.add_service(service).await;
+        }
+    }
     pub async fn prepare_action_trace(&self, atrace: &ActionTrace) -> Result<(), anyhow::Error> {
         let mut res = self.add_service(atrace.action.service).await;
         if res.is_ok() {
-            let schemas = self.storage.schemas.borrow();
-            if let Some(schema) = schemas.get(&atrace.action.service) {
-                let mut custom = schema_types();
-                let service_method = CustomResolvedServiceMethod::new(&*schemas);
-                custom.insert("ServiceMethod".to_string(), &service_method);
-                let mut cschema = CompiledSchema::new(&schema.types, &custom);
-
-                let action_name = MethodString(atrace.action.method.to_string());
-                if let Some(action_type) = schema.actions.get(&action_name) {
-                    if atrace.action.rawData.is_empty() {
-                        cschema.extend(&action_type.params);
-                        let _ = cschema.verify(&action_type.params, &atrace.action.rawData);
-                        for service in &*service_method.missing.borrow() {
-                            res = res.and(self.add_service(*service).await);
-                        }
-                    }
-                }
+            if !atrace.action.rawData.is_empty() {
+                self.prepare_action(SharedAction {
+                    sender: atrace.action.sender,
+                    service: atrace.action.service,
+                    method: atrace.action.method,
+                    rawData: (&atrace.action.rawData.0[..]).into(),
+                })
+                .await;
             }
         }
         for inner in &atrace.inner_traces {
@@ -616,8 +646,12 @@ impl<'a, 'b> Serialize for UnpackedTrace<'a, &'b ActionTrace> {
 
         if let Some(action_type) = action_type {
             let mut custom = schema_types();
-            let service_method = CustomResolvedServiceMethod::new(self.schemas);
+            let mut ignore_services = HashSet::new();
+            let service_method =
+                CustomResolvedServiceMethod::new(self.schemas, &mut ignore_services);
             custom.insert("ServiceMethod".to_string(), &service_method);
+            let custom_action = CustomActionCollector::new(&self.schemas, no_action);
+            custom.insert("Action".to_string(), &custom_action);
             let mut cschema = CompiledSchema::new(&schema.unwrap().types, &custom);
             if !atrace.action.rawData.is_empty() {
                 cschema.extend(&action_type.params);
@@ -701,16 +735,16 @@ impl<'a, 'b> Serialize for UnpackedTrace<'a, &'b InnerTraceEnum> {
 
 // Uses on-chain schemas to resolve the original
 // spelling of methods.
-struct CustomResolvedServiceMethod<'a> {
+struct CustomResolvedServiceMethod<'a, 'b> {
     schemas: &'a HashMap<AccountNumber, Schema>,
-    missing: Rc<RefCell<HashSet<AccountNumber>>>,
+    missing: RefCell<&'b mut HashSet<AccountNumber>>,
 }
 
-impl<'a> CustomResolvedServiceMethod<'a> {
-    fn new(schemas: &'a SchemaMap) -> Self {
+impl<'a, 'b> CustomResolvedServiceMethod<'a, 'b> {
+    fn new(schemas: &'a SchemaMap, missing: &'b mut HashSet<AccountNumber>) -> Self {
         CustomResolvedServiceMethod {
             schemas,
-            missing: Rc::new(RefCell::new(HashSet::new())),
+            missing: RefCell::new(missing),
         }
     }
 }
@@ -727,7 +761,7 @@ fn service_method_type(ty: &CompiledType) -> Option<((&String, &String), (usize,
     None
 }
 
-impl<'a> CustomHandler for CustomResolvedServiceMethod<'a> {
+impl<'a, 'b, 'c> CustomHandler<'a> for CustomResolvedServiceMethod<'b, 'c> {
     fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool {
         let is_u64 = |member| {
             matches!(
@@ -807,6 +841,141 @@ impl<'a> CustomHandler for CustomResolvedServiceMethod<'a> {
         if !self.schemas.contains_key(&value.service) {
             self.missing.borrow_mut().insert(value.service);
         }
+        Ok(())
+    }
+    fn is_empty_container(&self, _ty: &CompiledType, _value: &serde_json::Value) -> bool {
+        false
+    }
+}
+
+struct CustomActionCollector<'a, F> {
+    f: RefCell<F>,
+    schemas: &'a HashMap<AccountNumber, Schema>,
+}
+
+fn no_action(_act: SharedAction) {}
+
+impl<'a, F> CustomActionCollector<'a, F> {
+    fn new(schemas: &'a SchemaMap, f: F) -> Self {
+        Self {
+            f: RefCell::new(f),
+            schemas,
+        }
+    }
+}
+
+fn action_type(
+    ty: &CompiledType,
+) -> Option<(
+    (&String, &String, &String, &String),
+    (usize, usize, usize, usize),
+)> {
+    if let CompiledType::Object { children } = ty {
+        if children.len() == 4 {
+            return Some((
+                (
+                    &children[0].0,
+                    &children[1].0,
+                    &children[2].0,
+                    &children[3].0,
+                ),
+                (children[0].1, children[1].1, children[2].1, children[3].1),
+            ));
+        }
+    }
+    None
+}
+
+impl<'a, 'b, F: FnMut(SharedAction<'a>) -> ()> CustomHandler<'a> for CustomActionCollector<'b, F> {
+    fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool {
+        if let Some((_, (sender_type, service_type, method_type, raw_data_type))) = action_type(ty)
+        {
+            let is_u64 = |member| {
+                matches!(
+                    schema.unwrap_struct(schema.get_by_id(member)),
+                    CompiledType::Int {
+                        bits: 64,
+                        is_signed: false
+                    }
+                )
+            };
+            let is_bytes = |member| {
+                if let CompiledType::List(item) = schema.unwrap_struct(schema.get_by_id(member)) {
+                    matches!(schema.get_by_id(*item), CompiledType::Int { bits: 8, .. })
+                } else {
+                    false
+                }
+            };
+            is_u64(sender_type)
+                && is_u64(service_type)
+                && is_u64(method_type)
+                && is_bytes(raw_data_type)
+        } else {
+            false
+        }
+    }
+    fn frac2json(
+        &self,
+        _schema: &CompiledSchema,
+        ty: &CompiledType,
+        src: &mut FracInputStream<'a>,
+        _allow_empty_container: bool,
+    ) -> Result<serde_json::Value, fracpack::Error> {
+        let Some(((sender_name, service_name, method_name, raw_data_name), _)) = action_type(ty)
+        else {
+            panic!("Wrong type");
+        };
+        let value = SharedAction::unpack(src)?;
+        let mut method = MethodString(value.method.to_string());
+        let mut data = None;
+        if let Some(schema) = self.schemas.get(&value.service) {
+            if let Some((key, action_type)) = schema.actions.get_key_value(&method) {
+                method = key.clone();
+
+                let mut custom = schema_types();
+                let mut ignore_services = HashSet::new();
+                let service_method =
+                    CustomResolvedServiceMethod::new(self.schemas, &mut ignore_services);
+                custom.insert("ServiceMethod".to_string(), &service_method);
+                let custom_action = CustomActionCollector::new(&self.schemas, no_action);
+                custom.insert("Action".to_string(), &custom_action);
+                let mut cschema = CompiledSchema::new(&schema.types, &custom);
+                cschema.extend(&action_type.params);
+                data = cschema.to_value(&action_type.params, value.rawData.0).ok();
+            }
+        }
+        let mut result = serde_json::Map::with_capacity(4);
+        result.insert(sender_name.clone(), value.sender.to_string().into());
+        result.insert(service_name.clone(), value.service.to_string().into());
+        result.insert(method_name.clone(), method.0.into());
+        if let Some(data) = data {
+            result.insert("data".to_string(), data);
+        } else {
+            result.insert(raw_data_name.clone(), value.rawData.to_string().into());
+        }
+        Ok(result.into())
+    }
+    fn json2frac(
+        &self,
+        _schema: &CompiledSchema,
+        _ty: &CompiledType,
+        _val: &serde_json::Value,
+        _dest: &mut Vec<u8>,
+    ) -> Result<(), serde_json::Error> {
+        unimplemented!()
+    }
+    fn fracpack_verify(
+        &self,
+        _schema: &CompiledSchema,
+        ty: &CompiledType,
+        src: &mut FracInputStream<'a>,
+        _allow_empty_container: bool,
+    ) -> Result<(), fracpack::Error> {
+        if !action_type(ty).is_some() {
+            panic!("Wrong type");
+        }
+        let value = SharedAction::unpack(src)?;
+        (*self.f.borrow_mut())(value);
         Ok(())
     }
     fn is_empty_container(&self, _ty: &CompiledType, _value: &serde_json::Value) -> bool {

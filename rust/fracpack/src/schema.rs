@@ -556,13 +556,13 @@ tuple_impl!(T0 T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 T11 T12 T13);
 tuple_impl!(T0 T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 T11 T12 T13 T14);
 tuple_impl!(T0 T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 T11 T12 T13 T14 T15);
 
-pub trait CustomHandler {
+pub trait CustomHandler<'a> {
     fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool;
-    fn frac2json(
+    fn frac2json<'b>(
         &self,
-        schema: &CompiledSchema,
+        schema: &CompiledSchema<'b, 'a>,
         ty: &CompiledType,
-        src: &mut FracInputStream,
+        src: &mut FracInputStream<'a>,
         allow_empty_container: bool,
     ) -> Result<serde_json::Value, Error>;
     fn json2frac(
@@ -572,11 +572,11 @@ pub trait CustomHandler {
         val: &serde_json::Value,
         dest: &mut Vec<u8>,
     ) -> Result<(), serde_json::Error>;
-    fn fracpack_verify(
+    fn fracpack_verify<'b>(
         &self,
-        schema: &CompiledSchema,
+        schema: &CompiledSchema<'b, 'a>,
         ty: &CompiledType,
-        src: &mut FracInputStream,
+        src: &mut FracInputStream<'a>,
         allow_empty_container: bool,
     ) -> Result<(), Error> {
         fracpack_verify_impl(schema, ty, src, allow_empty_container)
@@ -585,16 +585,16 @@ pub trait CustomHandler {
 }
 
 #[derive(Default)]
-pub struct CustomTypes<'a> {
+pub struct CustomTypes<'a, 'b> {
     by_name: HashMap<String, usize>,
-    handlers: Vec<&'a dyn CustomHandler>,
+    handlers: Vec<&'a dyn CustomHandler<'b>>,
 }
 
-impl<'a> CustomTypes<'a> {
+impl<'a, 'b> CustomTypes<'a, 'b> {
     pub fn new() -> Self {
         Default::default()
     }
-    pub fn insert(&mut self, name: String, handler: &'a dyn CustomHandler) {
+    pub fn insert(&mut self, name: String, handler: &'a dyn CustomHandler<'b>) {
         let id = self.handlers.len();
         self.handlers.push(handler);
         self.by_name.insert(name, id);
@@ -608,9 +608,9 @@ impl<'a> CustomTypes<'a> {
     fn frac2json(
         &self,
         id: usize,
-        schema: &CompiledSchema,
+        schema: &CompiledSchema<'a, 'b>,
         ty: &CompiledType,
-        src: &mut FracInputStream,
+        src: &mut FracInputStream<'b>,
         allow_empty_container: bool,
     ) -> Result<serde_json::Value, Error> {
         self.handlers[id].frac2json(schema, ty, src, allow_empty_container)
@@ -628,9 +628,9 @@ impl<'a> CustomTypes<'a> {
     fn fracpack_verify(
         &self,
         id: usize,
-        schema: &CompiledSchema,
+        schema: &CompiledSchema<'a, 'b>,
         ty: &CompiledType,
-        src: &mut FracInputStream,
+        src: &mut FracInputStream<'b>,
         allow_empty_container: bool,
     ) -> Result<(), Error> {
         self.handlers[id].fracpack_verify(schema, ty, src, allow_empty_container)
@@ -642,7 +642,7 @@ impl<'a> CustomTypes<'a> {
 
 struct CustomBool;
 
-impl CustomHandler for CustomBool {
+impl<'a> CustomHandler<'a> for CustomBool {
     fn matches(&self, _schema: &CompiledSchema, ty: &CompiledType) -> bool {
         matches!(
             ty,
@@ -652,11 +652,11 @@ impl CustomHandler for CustomBool {
             }
         )
     }
-    fn frac2json(
+    fn frac2json<'b>(
         &self,
-        _schema: &CompiledSchema,
+        _schema: &CompiledSchema<'b, 'a>,
         _ty: &CompiledType,
-        src: &mut FracInputStream,
+        src: &mut FracInputStream<'a>,
         _allow_empty_container: bool,
     ) -> Result<serde_json::Value, Error> {
         Ok(bool::unpack(src)?.into())
@@ -677,7 +677,7 @@ impl CustomHandler for CustomBool {
 
 struct CustomString;
 
-impl CustomHandler for CustomString {
+impl<'a> CustomHandler<'a> for CustomString {
     fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool {
         use CompiledType::*;
         if let List(item) = ty {
@@ -686,11 +686,11 @@ impl CustomHandler for CustomString {
             false
         }
     }
-    fn frac2json(
+    fn frac2json<'b>(
         &self,
-        _schema: &CompiledSchema,
+        _schema: &CompiledSchema<'b, 'a>,
         _ty: &CompiledType,
-        src: &mut FracInputStream,
+        src: &mut FracInputStream<'a>,
         allow_empty_container: bool,
     ) -> Result<serde_json::Value, Error> {
         let result = String::unpack(src)?;
@@ -716,7 +716,7 @@ impl CustomHandler for CustomString {
 
 struct CustomHex;
 
-impl CustomHandler for CustomHex {
+impl<'a> CustomHandler<'a> for CustomHex {
     fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool {
         use CompiledType::*;
         if let List(item) = ty {
@@ -725,11 +725,11 @@ impl CustomHandler for CustomHex {
             matches!(ty, FracPack(..)) || !ty.is_variable_size()
         }
     }
-    fn frac2json(
+    fn frac2json<'b>(
         &self,
-        _schema: &CompiledSchema,
+        _schema: &CompiledSchema<'b, 'a>,
         ty: &CompiledType,
-        src: &mut FracInputStream,
+        src: &mut FracInputStream<'a>,
         allow_empty_container: bool,
     ) -> Result<serde_json::Value, Error> {
         let len = if ty.is_variable_size() {
@@ -775,7 +775,7 @@ impl CustomHandler for CustomHex {
 
 struct CustomMap;
 
-impl CustomHandler for CustomMap {
+impl<'a> CustomHandler<'a> for CustomMap {
     fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool {
         use CompiledType::*;
         if let List(item) = ty {
@@ -789,11 +789,11 @@ impl CustomHandler for CustomMap {
             false
         }
     }
-    fn frac2json(
+    fn frac2json<'b>(
         &self,
-        schema: &CompiledSchema,
+        schema: &CompiledSchema<'b, 'a>,
         ty: &CompiledType,
-        src: &mut FracInputStream,
+        src: &mut FracInputStream<'a>,
         allow_empty_container: bool,
     ) -> Result<serde_json::Value, Error> {
         let mut result = frac2json_impl(schema, ty, src, allow_empty_container)?;
@@ -871,7 +871,7 @@ impl CustomHandler for CustomMap {
     }
 }
 
-pub fn standard_types() -> CustomTypes<'static> {
+pub fn standard_types<'a, 'b>() -> CustomTypes<'a, 'b> {
     static BOOL: CustomBool = CustomBool;
     static STRING: CustomString = CustomString;
     static HEX: CustomHex = CustomHex;
@@ -919,16 +919,16 @@ impl CompiledSchemaType for CompiledType {
     }
 }
 
-pub struct CompiledSchema<'a> {
+pub struct CompiledSchema<'a, 'b> {
     type_map: HashMap<*const AnyType, usize>,
     queue: Vec<(usize, &'a AnyType)>,
     schema: &'a Schema,
     types: Vec<CompiledType>,
-    custom: &'a CustomTypes<'a>,
+    custom: &'a CustomTypes<'a, 'b>,
 }
 
-impl<'a> CompiledSchema<'a> {
-    pub fn new(schema: &'a Schema, custom: &'a CustomTypes<'a>) -> Self {
+impl<'a, 'b> CompiledSchema<'a, 'b> {
+    pub fn new(schema: &'a Schema, custom: &'a CustomTypes<'a, 'b>) -> Self {
         let mut result = CompiledSchema {
             type_map: HashMap::new(),
             queue: Vec::new(),
@@ -1164,7 +1164,7 @@ impl<'a> CompiledSchema<'a> {
     pub fn to_value<T: CompiledSchemaType + ?Sized>(
         &self,
         ty: &T,
-        src: &[u8],
+        src: &'b [u8],
     ) -> Result<serde_json::Value, Error> {
         frac2json(
             self,
@@ -1178,7 +1178,11 @@ impl<'a> CompiledSchema<'a> {
     /// The type can be specified as any of a string,
     /// a &CompiledType, or an &AnyType.
     #[allow(private_bounds)]
-    pub fn verify<T: CompiledSchemaType + ?Sized>(&self, ty: &T, src: &[u8]) -> Result<(), Error> {
+    pub fn verify<T: CompiledSchemaType + ?Sized>(
+        &self,
+        ty: &T,
+        src: &'b [u8],
+    ) -> Result<(), Error> {
         fracpack_verify(
             self,
             ty.as_compiled_type(self)
@@ -1195,7 +1199,7 @@ impl<'a> CompiledSchema<'a> {
     pub fn verify_strict<T: CompiledSchemaType + ?Sized>(
         &self,
         ty: &T,
-        src: &[u8],
+        src: &'b [u8],
     ) -> Result<(), Error> {
         fracpack_verify_strict(
             self,
@@ -1373,10 +1377,10 @@ impl CompiledType {
     }
 }
 
-fn frac2json_pointer(
-    schema: &CompiledSchema,
+fn frac2json_pointer<'a, 'b>(
+    schema: &CompiledSchema<'a, 'b>,
     ty: &CompiledType,
-    stream: &mut FracInputStream,
+    stream: &mut FracInputStream<'b>,
     fixed_pos: u32,
     offset: u32,
 ) -> Result<serde_json::Value, Error> {
@@ -1390,11 +1394,11 @@ fn frac2json_pointer(
     return frac2json_impl(schema, ty, stream, false);
 }
 
-fn frac2json_embedded(
-    schema: &CompiledSchema,
+fn frac2json_embedded<'a, 'b>(
+    schema: &CompiledSchema<'a, 'b>,
     ty: &CompiledType,
-    fixed_stream: &mut FracInputStream,
-    stream: &mut FracInputStream,
+    fixed_stream: &mut FracInputStream<'b>,
+    stream: &mut FracInputStream<'b>,
     empty_optional: &mut bool,
 ) -> Result<serde_json::Value, Error> {
     *empty_optional = false;
@@ -1420,10 +1424,10 @@ fn frac2json_embedded(
     }
 }
 
-fn frac2json(
-    schema: &CompiledSchema,
+fn frac2json<'a, 'b>(
+    schema: &CompiledSchema<'a, 'b>,
     ty: &CompiledType,
-    src: &[u8],
+    src: &'b [u8],
 ) -> Result<serde_json::Value, Error> {
     let mut stream = FracInputStream::new(src);
     let result = frac2json_impl(schema, ty, &mut stream, true)?;
@@ -1431,10 +1435,10 @@ fn frac2json(
     Ok(result)
 }
 
-fn frac2json_impl(
-    schema: &CompiledSchema,
+fn frac2json_impl<'a, 'b>(
+    schema: &CompiledSchema<'a, 'b>,
     ty: &CompiledType,
-    stream: &mut FracInputStream,
+    stream: &mut FracInputStream<'b>,
     allow_empty_container: bool,
 ) -> Result<serde_json::Value, Error> {
     use CompiledType::*;
@@ -1700,20 +1704,20 @@ struct Repack<'a> {
     fixed_pos: usize,
 }
 
-enum EmbeddedPack<'a> {
+enum EmbeddedPack<'a, 'b> {
     Offset {
         ty: &'a CompiledType,
         val: &'a serde_json::Value,
     },
     NoHeap {
-        schema: &'a CompiledSchema<'a>,
+        schema: &'a CompiledSchema<'a, 'b>,
         ty: &'a CompiledType,
         val: &'a serde_json::Value,
     },
     EmptyOption,
 }
 
-impl<'a> EmbeddedPack<'a> {
+impl<'a, 'b> EmbeddedPack<'a, 'b> {
     fn pack(self, dest: &mut Vec<u8>) -> Result<Option<Repack<'a>>, serde_json::Error> {
         use EmbeddedPack::*;
         match self {
@@ -1734,11 +1738,11 @@ impl<'a> EmbeddedPack<'a> {
     }
 }
 
-fn json2frac_pointer<'a>(
-    schema: &'a CompiledSchema,
+fn json2frac_pointer<'a, 'b>(
+    schema: &'a CompiledSchema<'a, 'b>,
     ty: &'a CompiledType,
     val: &'a serde_json::Value,
-) -> Result<EmbeddedPack<'a>, serde_json::Error> {
+) -> Result<EmbeddedPack<'a, 'b>, serde_json::Error> {
     if ty.is_empty_container(schema, val) {
         Ok(EmbeddedPack::NoHeap { schema, ty, val })
     } else {
@@ -1746,11 +1750,11 @@ fn json2frac_pointer<'a>(
     }
 }
 
-fn json2frac_fixed<'a>(
-    schema: &'a CompiledSchema<'a>,
+fn json2frac_fixed<'a, 'b>(
+    schema: &'a CompiledSchema<'a, 'b>,
     ty: &'a CompiledType,
     val: Option<&'a serde_json::Value>,
-) -> Result<EmbeddedPack<'a>, serde_json::Error> {
+) -> Result<EmbeddedPack<'a, 'b>, serde_json::Error> {
     match ty {
         CompiledType::Option(ty) => {
             if let Some(val) = val {
@@ -1801,9 +1805,9 @@ impl<'a> ObjectWriter<'a> {
             empty_count: 0,
         }
     }
-    fn push(
+    fn push<'b>(
         &mut self,
-        item: EmbeddedPack<'a>,
+        item: EmbeddedPack<'a, 'b>,
         dest: &mut Vec<u8>,
     ) -> Result<(), serde_json::Error> {
         if matches!(&item, EmbeddedPack::EmptyOption) {
@@ -2069,10 +2073,10 @@ fn json2frac(
     }
 }
 
-fn fracpack_verify_pointer(
-    schema: &CompiledSchema,
+fn fracpack_verify_pointer<'a, 'b>(
+    schema: &CompiledSchema<'a, 'b>,
     ty: &CompiledType,
-    stream: &mut FracInputStream,
+    stream: &mut FracInputStream<'b>,
     fixed_pos: u32,
     offset: u32,
 ) -> Result<(), Error> {
@@ -2087,11 +2091,11 @@ fn fracpack_verify_pointer(
     fracpack_verify_impl(schema, ty, stream, false)
 }
 
-fn fracpack_verify_embedded(
-    schema: &CompiledSchema,
+fn fracpack_verify_embedded<'a, 'b>(
+    schema: &CompiledSchema<'a, 'b>,
     ty: &CompiledType,
-    fixed_stream: &mut FracInputStream,
-    stream: &mut FracInputStream,
+    fixed_stream: &mut FracInputStream<'b>,
+    stream: &mut FracInputStream<'b>,
     empty_optional: &mut bool,
 ) -> Result<(), Error> {
     *empty_optional = false;
@@ -2117,10 +2121,10 @@ fn fracpack_verify_embedded(
     }
 }
 
-fn fracpack_verify_impl(
-    schema: &CompiledSchema,
+fn fracpack_verify_impl<'a, 'b>(
+    schema: &CompiledSchema<'a, 'b>,
     ty: &CompiledType,
-    stream: &mut FracInputStream,
+    stream: &mut FracInputStream<'b>,
     allow_empty_container: bool,
 ) -> Result<(), Error> {
     use CompiledType::*;
@@ -2323,17 +2327,21 @@ fn fracpack_verify_impl(
     Ok(())
 }
 
-fn fracpack_verify(schema: &CompiledSchema, ty: &CompiledType, src: &[u8]) -> Result<(), Error> {
+fn fracpack_verify<'a, 'b>(
+    schema: &CompiledSchema<'a, 'b>,
+    ty: &CompiledType,
+    src: &'b [u8],
+) -> Result<(), Error> {
     let mut stream = FracInputStream::new(src);
     fracpack_verify_impl(schema, ty, &mut stream, true)?;
     stream.finish()?;
     Ok(())
 }
 
-fn fracpack_verify_strict(
-    schema: &CompiledSchema,
+fn fracpack_verify_strict<'a, 'b>(
+    schema: &CompiledSchema<'a, 'b>,
     ty: &CompiledType,
-    src: &[u8],
+    src: &'b [u8],
 ) -> Result<(), Error> {
     let mut stream = FracInputStream::new(src);
     fracpack_verify_impl(schema, ty, &mut stream, true)?;
