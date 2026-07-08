@@ -36,23 +36,19 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn isAuthSys(
-        sender: AccountNumber,
-        authorizers: Vec<AccountNumber>,
-        method: Option<ServiceMethod>,
-        auth_set: Option<Vec<AccountNumber>>,
-    ) -> bool {
+    fn getDlgsSys(sender: AccountNumber) -> Vec<AccountNumber> {
         unimplemented!()
     }
 
     #[action]
     #[allow(non_snake_case)]
-    fn isRejectSys(
-        sender: AccountNumber,
-        authorizers: Vec<AccountNumber>,
-        method: Option<ServiceMethod>,
-        auth_set: Option<Vec<AccountNumber>>,
-    ) -> bool {
+    fn isAuthSys(sender: AccountNumber, authorizers: Vec<AccountNumber>) -> bool {
+        unimplemented!()
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn isRejectSys(sender: AccountNumber, rejecters: Vec<AccountNumber>) -> bool {
         unimplemented!()
     }
 
