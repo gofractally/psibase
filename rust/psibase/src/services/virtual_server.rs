@@ -437,6 +437,13 @@ mod service {
         unimplemented!()
     }
 
+    /// A notification called before the start of a transaction with the specified top-level
+    /// action senders. Used for any pre-tx initialization.
+    #[action]
+    fn prestartTx(actors: Vec<AccountNumber>) {
+        unimplemented!()
+    }
+
     /// This action specifies which account is primarily responsible for
     /// paying the bill for any consumed resources.
     ///

@@ -979,9 +979,8 @@ mod service {
         // services in this action.
         //
         // Currently, the only potential foreign service call in this action is the call to
-        // `Tokens::getSubBal` on balance_cache cache misses. For that reason, `setBillableAcc`
-        // (which runs outside of the transaction context) is used to warm the balance_cache for
-        // any accounts whose sub-account balances are needed.
+        // `Tokens::getSubBal` on balance_cache cache misses. For that reason, billable resource
+        // token balances are pre-warmed during the pre-tx initialization.
 
         check(
             get_sender() == Transact::SERVICE,
@@ -1097,22 +1096,31 @@ mod service {
     // balances may be queried. This is called outside of the transaction context, allowing
     // any such queries during the tx to hit the cache instead of triggering an inline action
     // call.
-    fn warm_billable_account_caches(user_account: AccountNumber) {
+    fn warm_billable_account_caches(user_accounts: Vec<AccountNumber>) {
         if !is_billing_enabled() {
             return;
         }
 
-        let _ = balance_cache::get_available(user_account, None);
+        for actor in user_accounts {
+            let _ = balance_cache::get_available(actor, None);
+        }
 
         for pricing in &CapacityPricingTable::read().get_index_pk() {
             let _ = accrual::capacity_limited::get_collateral(pricing.resource());
         }
     }
 
-    /// This action does some per-tx initialization for accounts involved in billing.
-    ///
-    /// The `account` parameter specifies which account is primarily responsible for
-    /// paying the bill for any consumed resources.
+    /// A notification called before the start of a transaction with the specified top-level
+    /// action senders. Used for any pre-tx initialization.
+    #[action]
+    fn prestartTx(actors: Vec<AccountNumber>) {
+        check(get_sender() == Transact::SERVICE, "Unauthorized");
+
+        warm_billable_account_caches(actors);
+    }
+
+    /// This action specifies which `account` is primarily responsible for paying the
+    /// bill for any resources consumed by the current tx.
     ///
     /// A time limit for the execution of the current tx/query will be set based
     /// on the resources available for the specified account.
@@ -1121,8 +1129,6 @@ mod service {
         check(get_sender() == Transact::SERVICE, "Unauthorized");
 
         tx_cache::set_billable_account(account);
-
-        warm_billable_account_caches(account);
 
         CpuLimit::rpc().setCpuLimit(get_cpu_limit(account, None));
     }

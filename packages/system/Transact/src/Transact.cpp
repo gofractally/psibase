@@ -633,8 +633,15 @@ namespace SystemService
       check(trx.actions().size() > 0, "transaction has no actions");
       auto _           = recurse();
       bool enforceAuth = checkTapos(id, trx.tapos(), true, false);
-      if (enforceAuth)
+      if (enforceAuth) {
+         auto actors = std::vector<AccountNumber>();
+         actors.reserve(trx.actions().size());
+         for (auto act : trx.actions()) {
+            actors.push_back(act.sender().unpack());
+         }
+         to<VirtualServer>().prestartTx(actors);
          checkAuth(trx.actions().front(), trx.claims(), true, true);
+      }
       return enforceAuth;
    }
 
