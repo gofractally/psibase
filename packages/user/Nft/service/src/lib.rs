@@ -278,8 +278,8 @@ pub mod tables {
 pub mod service {
     use crate::tables::*;
     use psibase::{
-        check, check_some, get_sender, get_service, services::events, AccountNumber, DbId, Memo,
-        MethodNumber, ServiceWrapper,
+        check, check_some, get_sender, services::events, AccountNumber, DbId, Memo, MethodNumber,
+        ServiceWrapper,
     };
 
     pub type NID = u32;

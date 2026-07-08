@@ -10,23 +10,23 @@ from services import Accounts, AuthSig, Tokens, Transact
 
 FAUCET_DEBIT = {"token_id": 1, "creditor": "faucet-tok", "amount": {"value": 1000000000}, "memo": ""}
 
-def accept_faucet_tokens(node, *accounts, keys=[], wait_node=None):
+def accept_faucet_tokens(node, *accounts, keys=[]):
     for account in accounts:
         node.push_action(account, 'tokens', 'debit', FAUCET_DEBIT, keys=keys)
-    (wait_node or getattr(node, 'api', node)).wait(new_block())
+    node.wait(new_block())
 
 class TestTransactionQueue(unittest.TestCase):
     @testutil.psinode_test
     def test_submit(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer', 'TokenUsers'])
+        accept_faucet_tokens(a, 'alice', 'bob')
         a.install(sources=[testutil.test_packages()], packages=['SubjectiveCounter'])
         a.wait(new_block())
 
         tokens = Tokens(a)
         txqueue = Transact(a)
         auth = txqueue.login('alice')
-        accept_faucet_tokens(txqueue, 'alice', 'bob')
         old_balance = tokens.balance('alice', token=1, token_auth=auth)
 
         txqueue.push_action('alice', 'tokens', 'credit', {"token_id":1,"debitor":"bob","amount":{"value":10000}, "memo":"test"})
@@ -70,12 +70,12 @@ class TestTransactionQueue(unittest.TestCase):
     def test_forward(self, cluster):
         prods = cluster.complete(*testutil.generate_names(3))
         a = testutil.boot_with_producers(prods, packages=['Minimal', 'Explorer', 'TokenUsers'])
+        accept_faucet_tokens(a, 'alice')
 
         tokens = Tokens(a)
         transact = Transact(a)
         auth = transact.login('alice')
         txqueue = Transact(prods[2])
-        accept_faucet_tokens(txqueue, 'alice', wait_node=a)
         old_balance = tokens.balance('alice', token=1, token_auth=auth)
         txqueue.push_action('alice', 'tokens', 'credit', {"token_id":1,"debitor":"bob","amount":{"value":10000}, "memo":"test"})
 
@@ -99,10 +99,10 @@ class TestTransactionQueue(unittest.TestCase):
         key = PrivateKey()
         AuthSig(a).set_key('alice', key)
         a.wait(new_block())
+        accept_faucet_tokens(a, 'alice', keys=[key])
+        accept_faucet_tokens(a, 'bob')
 
         txqueue = Transact(c)
-        accept_faucet_tokens(txqueue, 'alice', keys=[key], wait_node=a)
-        accept_faucet_tokens(txqueue, 'bob', wait_node=a)
         old_balance = tokens.balance('alice', token=1, token_auth=auth_a)
         txqueue.push_action('alice', 'tokens', 'credit', {"token_id":1,"debitor":"bob","amount":{"value":10000}, "memo":"test"}, keys=[key])
         pred = new_block()
