@@ -1254,6 +1254,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "frac-gen"
+version = "0.23.0"
+dependencies = [
+ "frac-gen-pkg",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_service",
+ "serde",
+]
+
+[[package]]
+name = "frac-gen-pkg"
+version = "0.23.0"
+dependencies = [
+ "frac-gen",
+ "psibase-user-workspace-hack",
+]
+
+[[package]]
 name = "frac-tester"
 version = "0.23.0"
 dependencies = [
@@ -1284,25 +1303,6 @@ dependencies = [
  "serde",
  "serde-aux",
  "serde_json",
-]
-
-[[package]]
-name = "fractal-gen"
-version = "0.23.0"
-dependencies = [
- "fractal-gen-pkg",
- "psibase",
- "psibase-user-workspace-hack",
- "psibase_service",
- "serde",
-]
-
-[[package]]
-name = "fractal-gen-pkg"
-version = "0.23.0"
-dependencies = [
- "fractal-gen",
- "psibase-user-workspace-hack",
 ]
 
 [[package]]

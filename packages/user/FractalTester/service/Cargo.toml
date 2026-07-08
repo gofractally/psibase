@@ -22,7 +22,7 @@ serde.workspace = true
 [package.metadata.psibase.dependencies]
 Accounts = "0.23.0"
 Fractals = "0.23.0"
-FractalGen = "0.23.0"
+FracGen = "0.23.0"
 Producers = "0.23.0"
 
 [dev-dependencies]

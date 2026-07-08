@@ -1,5 +1,5 @@
 [package]
-name = "fractal-gen-pkg"
+name = "frac-gen-pkg"
 description = "System fractal generator. If a network is using fractal governance, this should be installed at boot."
 version.workspace = true
 edition.workspace = true
@@ -9,8 +9,8 @@ rust-version.workspace = true
 publish.workspace = true
 
 [package.metadata.psibase]
-package-name = "FractalGen"
-services = ["fractal-gen"]
+package-name = "FracGen"
+services = ["frac-gen"]
 
 [package.metadata.psibase.dependencies]
 Sites = "0.23.0"
@@ -20,5 +20,5 @@ HttpServer = "0.23.0"
 crate-type = ["rlib"]
 
 [dependencies]
-fractal-gen = { path = "service", version = "0.23.0" }
+frac-gen = { path = "service", version = "0.23.0" }
 psibase-user-workspace-hack.workspace = true

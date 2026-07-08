@@ -1,5 +1,5 @@
 /// Creates 18 auth-any test accounts and adds them as guild members of the
-/// system fractal's genesis guild (created by FractalGen).
+/// system fractal's genesis guild (created by FracGen).
 /// Not for production use.
 ///
 /// Accounts created: `testfrac01` through `testfrac18`.

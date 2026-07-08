@@ -1,5 +1,5 @@
 [package]
-name = "fractal-gen"
+name = "frac-gen"
 version.workspace = true
 rust-version.workspace = true
 repository.workspace = true
@@ -10,7 +10,7 @@ publish.workspace = true
 [package.metadata.psibase]
 flags = ["isPrivileged"]
 postinstall = [
-    { sender = "fractal-gen", service = "fractal-gen", method = "create_frac" },
+    { sender = "frac-gen", service = "frac-gen", method = "create_frac" },
 ]
 
 [dependencies]
@@ -32,4 +32,4 @@ AuthDelegate = "0.23.0"
 Producers = "0.23.0"
 
 [dev-dependencies]
-fractal-gen-pkg = { path = "..", version = "0.23.0" }
+frac-gen-pkg = { path = "..", version = "0.23.0" }
