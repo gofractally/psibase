@@ -10,23 +10,38 @@ The `sites` service is used to host content for an account and serve it over HTT
 
 ## CSP header baseline
 
-The `Content-Security-Policy` header aids security efforts, as modern browsers restrict the capabilities of the document on the client-side according to the policy expressed in this header. The sites server uses a permissive baseline CSP header that should permit most common requirements.
+The `Content-Security-Policy` header aids security efforts, as modern browsers restrict the capabilities of the document on the client-side according to the policy expressed in this header. The sites server uses a strict baseline CSP header; apps with additional requirements (e.g. the supervisor, prompt pages, or sites built with tooling that emits inline scripts) override it with the `setCsp` action.
 
-| Default policy | Values                                           |
-| -------------- | ------------------------------------------------ |
-| `default-src`  | `self`                                           |
-| `font-src`     | `self, https:`                                   |
-| `script-src`   | `self, unsafe-eval, unsafe-inline, blob: https:` |
-| `img-src`      | `*`                                              |
-| `style-src`    | `self, unsafe-inline`                            |
-| `frame-src`    | `*`                                              |
-| `connect-src`  | `*, blob:`                                       |
+Host sources are written scheme-relative (no `http://`/`https://` prefix), so the same policy works over `http` in local development and `https` in production. The root host is currently hardcoded to `psibase.localhost:8080`; deriving it per request is planned as separate work.
+
+| Default policy    | Values                                                       |
+| ----------------- | ------------------------------------------------------------ |
+| `default-src`     | `'self'`                                                     |
+| `script-src`      | `'self'`                                                     |
+| `style-src`       | `'self' 'unsafe-inline'`                                     |
+| `img-src`         | `'self' data: psibase.localhost:8080 *.psibase.localhost:8080` |
+| `font-src`        | `'self'`                                                     |
+| `connect-src`     | `'self' psibase.localhost:8080 *.psibase.localhost:8080`     |
+| `frame-src`       | `supervisor.psibase.localhost:8080`                          |
+| `frame-ancestors` | `'self'`                                                     |
+| `base-uri`        | `'none'`                                                     |
+| `form-action`     | `'self'`                                                     |
+| `object-src`      | `'none'`                                                     |
+
+Notable consequences of the strict baseline:
+
+- Inline `<script>` tags, `eval`, and CDN-hosted scripts are blocked by default. Apps that need them must opt in via `setCsp`.
+- Pages may only be embedded same-origin by default (`frame-ancestors 'self'`). Pages designed to be embedded by the supervisor (e.g. plugin prompt pages) must widen `frame-ancestors` to include the supervisor's origin.
+- The only frameable origin is the supervisor (every app embeds the hidden supervisor iframe).
+- Cross-subdomain `fetch`/WebSocket and image loads within the deployment's domain are allowed; arbitrary external origins are not.
 
 ### Dynamic CSP
 
 If the baseline CSP is insufficient, the `sites` service allows users to customize the header for their entire site or for a specific path using the `setCsp` action.
 
 The priority of the CSP header applied to content is given to a header set for a specific path, then the header set for an entire site, and finally will default to the default policy if no custom headers were provided.
+
+Note that a custom CSP **completely replaces** the baseline for the content it covers — the policies are not merged — so a custom CSP should be stated as a complete policy.
 
 ## HTTP caching
 

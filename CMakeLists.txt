@@ -733,6 +733,7 @@ psibase_package(
     NAME Docs
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Psibase documentation"
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/doc/postinstall.json
     SERVICE docs
         DATA ${CMAKE_CURRENT_BINARY_DIR}/book/html /
     PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
@@ -887,6 +888,7 @@ psibase_package(
     NAME Explorer
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Block explorer"
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Explorer/postinstall.json
     SERVICE explorer
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Explorer.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Explorer-schema.json
@@ -930,6 +932,7 @@ psibase_package(
     NAME Supervisor
     VERSION ${PSIBASE_VERSION}.0
     PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "CommonApi(^${PSIBASE_VERSION}.0)" "DynLd(^${PSIBASE_VERSION}.0)"
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Supervisor/postinstall.json
     SERVICE supervisor
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Supervisor/ui/dist/* /
     DEPENDS ${Supervisor_js_DEP}
