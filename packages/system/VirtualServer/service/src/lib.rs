@@ -528,13 +528,13 @@ mod service {
 
         // `InitRow`, `NetworkSpecs`, and `CapacityPricing` are necessarily written
         // after the db scan, and before resMonitoring is enabled. Therefore we must
-        // explicitly add their exact footprints to the baseline.
-        let used_bytes = get_prealloc()
+        // explicitly add their exact footprints into the prealloc.
+        let prealloc = get_prealloc()
             + row_size(&InitTable::new(), &InitRow::default())
             + row_size(&NetworkSpecsTable::new(), &NetworkSpecs::default())
             + row_size(&CapacityPricingTable::new(), &CapacityPricing::default());
 
-        InitRow::init(used_bytes);
+        InitRow::init(prealloc);
 
         // Must run after `InitRow::init` because it transitively depends on `InitRow::used_bytes()`
         NetworkSpecs::update();
@@ -555,6 +555,14 @@ mod service {
         events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("consumed"), 0);
         events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("subsidized"), 0);
         events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("subsidized"), 1);
+
+        CapacityPricing::get_assert(Disk).consume(prealloc);
+        Wrapper::emit().history().consumed(
+            AccountNumber::new(0),
+            Disk.as_id(),
+            to_i64(prealloc, "preallocated disk space"),
+            0,
+        );
     }
 
     #[pre_action(exclude(init))]

@@ -309,7 +309,6 @@ impl CapacityPricing {
                 max_capacity,
                 curve_d,
                 fee_ppm,
-                prealloc_deficit: 0,
             })
             .unwrap();
     }
@@ -363,20 +362,15 @@ impl CapacityPricing {
         let resource = self.resource();
         let mut cost = 0u64;
         Self::update(resource, |p| {
-            // Refilling a prealloc deficit is free; only the remainder is billed.
-            let restored = amount_consumed.min(p.prealloc_deficit);
-            p.prealloc_deficit -= restored;
-            let billable = amount_consumed - restored;
-
             check(
-                billable <= p.remaining_capacity,
+                amount_consumed <= p.remaining_capacity,
                 &format!("Insufficient {} capacity", resource.name()),
             );
             cost = p
                 .curve()
                 .pos_from_remaining_capacity(p.remaining_capacity)
-                .cost_of(billable);
-            p.remaining_capacity -= billable;
+                .cost_of(amount_consumed);
+            p.remaining_capacity -= amount_consumed;
         });
         cost
     }
@@ -388,16 +382,18 @@ impl CapacityPricing {
         Self::update(resource, |p| {
             let consumed = p.max_capacity - p.remaining_capacity;
 
-            // Freeing past `consumed` dips into prealloc: unrefundable, tracked as
-            // a deficit that later writes refill for free.
-            let refundable = amount_freed.min(consumed);
-            p.prealloc_deficit += amount_freed - refundable;
+            // This should not be possible since preallocated bytes are "consumed"
+            // in `init`, every byte should be accounted for on the curve.
+            check(
+                amount_freed <= consumed,
+                "freed more disk than was consumed",
+            );
 
             gross_refund = p
                 .curve()
                 .pos_from_remaining_capacity(p.remaining_capacity)
-                .refund_of(refundable);
-            p.remaining_capacity += refundable;
+                .refund_of(amount_freed);
+            p.remaining_capacity += amount_freed;
             fee_ppm_val = p.fee_ppm;
         });
 

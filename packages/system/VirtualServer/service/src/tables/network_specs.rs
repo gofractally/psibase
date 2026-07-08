@@ -5,15 +5,10 @@ use psibase::*;
 impl NetworkSpecs {
     /// Bytes of objective server storage that are not available to the network
     ///
-    /// Reductions here reduce the max billable storage, which is better than treating
-    /// the offsets like a normal "consumption" because then whoever enables billing
-    ///  would be required to settle a much larger virtual balance.
+    /// Reductions here reduce the max billable storage.
     pub(crate) fn obj_storage_offset() -> u64 {
-        // Bytes already in db at boot (`Native` + `Service`)
-        InitRow::used_bytes()
-
         // One misc gigabyte
-        + 1_000_000_000
+        1_000_000_000
     }
 
     fn derive_net(vars: &NetworkVariables, specs: &ServerSpecs) -> u64 {

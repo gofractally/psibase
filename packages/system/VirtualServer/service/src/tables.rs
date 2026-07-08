@@ -217,8 +217,6 @@ pub mod tables {
         pub curve_d: u64,
         /// Fee on refunds, parts per million
         pub fee_ppm: u32,
-        /// Prealloc bytes that were freed; later writes refill them for free.
-        pub prealloc_deficit: u64,
     }
 }
 
