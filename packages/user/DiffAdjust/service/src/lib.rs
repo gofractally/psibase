@@ -120,41 +120,11 @@ pub mod tables {
             self.decrease_ppm as f64 / ONE_MILLION as f64
         }
 
-        /// Caller must ensure the value is finite and positive.
-        fn f64_to_u64_saturating(value: f64) -> u64 {
-            if value >= u64::MAX as f64 {
-                u64::MAX
-            } else {
-                value as u64
-            }
-        }
-
-        /// Decay compound math may underflow or yield NaN; treat those as zero (floor applied by caller).
-        fn decay_f64_to_u64(value: f64) -> u64 {
-            if !value.is_finite() || value <= 0.0 {
-                0
-            } else {
-                Self::f64_to_u64_saturating(value)
-            }
-        }
-
-        /// Increase compound math may overflow to inf or NaN; saturate rather than collapse to zero.
-        fn increase_f64_to_u64(value: f64) -> u64 {
-            if !value.is_finite() {
-                u64::MAX
-            } else {
-                Self::f64_to_u64_saturating(value)
-            }
-        }
-
-        // PRECONDITION: `increase_ppm`, which `factor` is based on, must be ppm resolution or courser.
         fn apply_increase(difficulty: u64, factor: f64, times: u32) -> u64 {
             if times == 0 || difficulty == u64::MAX || factor <= 1.0 {
                 return difficulty;
             }
-            // ensure no cast safety of `times` from u32 to i32
-            // `increase_ppm`, specified in higher resolution than ppm, may lead to a premature calculation of overflow
-            // if `times` doesn't fit in `i32`, and `factor` is at least 1.0 + 1PPM, the result overflows f64
+            // `powi` takes i32, so `times` beyond i32::MAX can't be cast; saturate to infinity.
             let powered = if times > i32::MAX as u32 {
                 f64::INFINITY
             } else {
@@ -164,7 +134,12 @@ pub mod tables {
             if !powered.is_finite() || powered >= u64::MAX as f64 {
                 return u64::MAX;
             }
-            Self::increase_f64_to_u64(difficulty as f64 * powered)
+            let diff_as_f64 = difficulty as f64 * powered;
+            check(
+                !diff_as_f64.is_nan(),
+                "diffadjust increase computation resulted in NaN",
+            );
+            diff_as_f64 as u64
         }
 
         fn apply_decrease(mut difficulty: u64, factor: f64, times: u32, floor: u64) -> u64 {
@@ -180,7 +155,12 @@ pub mod tables {
             }
             // Per-window truncate + floor so batching N windows matches N single-window steps.
             for _ in 0..times {
-                difficulty = Self::decay_f64_to_u64(difficulty as f64 * factor).max(floor);
+                let diff_as_f64 = difficulty as f64 * factor;
+                check(
+                    !diff_as_f64.is_nan(),
+                    "diffadjust decrease computation resulted in NaN",
+                );
+                difficulty = (diff_as_f64 as u64).max(floor);
             }
             difficulty
         }
@@ -376,12 +356,8 @@ pub mod service {
 
     /// Increment RateLimit instance, potentially increasing the difficulty.
     ///
-    /// `target_max` activity accumulates with no adjustment, and the next unit triggers one,
-    ///   so the number of adjustments for `activity_count` accumulated in the window is
-    ///   `floor(activity_count / (target_max + 1))`. Adjustments therefore land every
-    ///   `target_max + 1` activity (and `target_max == 0` means every unit adjusts). A single
-    ///   large increment may apply multiple adjustments at once, matching the equivalent
-    ///   sequence of single increments (the remainder is carried across calls).
+    /// The difficulty may increase multiple times if the `activity_count` exceeds `target_max`
+    ///   by more than one multiple of `target_max`.
     ///
     /// Returns the difficulty before any difficulty adjustment due to the increment.
     ///
