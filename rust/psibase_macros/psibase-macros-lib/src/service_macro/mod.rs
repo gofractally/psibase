@@ -516,6 +516,7 @@ fn process_mod(
 
                     pub unsafe fn start(this_service: u64) {
                         #psibase_mod::set_service(#psibase_mod::AccountNumber::new(this_service));
+                        #psibase_mod::service_start();
                     }
                 }
             });
