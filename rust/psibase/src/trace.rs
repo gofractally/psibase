@@ -749,14 +749,18 @@ impl<'a, 'b> CustomResolvedServiceMethod<'a, 'b> {
     }
 }
 
-fn service_method_type(ty: &CompiledType) -> Option<((&String, &String), (usize, usize))> {
+fn field_types<const N: usize>(ty: &CompiledType) -> Option<[usize; N]> {
     if let CompiledType::Object { children } = ty {
-        if children.len() == 2 {
-            return Some((
-                (&children[0].0, &children[1].0),
-                (children[0].1, children[1].1),
-            ));
-        }
+        let children: &[_; N] = children[..].try_into().ok()?;
+        return Some(children.each_ref().map(|child| child.1));
+    }
+    None
+}
+
+fn field_names<const N: usize>(ty: &CompiledType) -> Option<[&str; N]> {
+    if let CompiledType::Object { children } = ty {
+        let children: &[_; N] = children[..].try_into().ok()?;
+        return Some(children.each_ref().map(|child| child.0.as_str()));
     }
     None
 }
@@ -772,7 +776,7 @@ impl<'a, 'b, 'c> CustomHandler<'a> for CustomResolvedServiceMethod<'b, 'c> {
                 }
             )
         };
-        if let Some((_, (service, method))) = service_method_type(ty) {
+        if let Some([service, method]) = field_types::<2>(ty) {
             is_u64(service) && is_u64(method)
         } else {
             false
@@ -785,9 +789,7 @@ impl<'a, 'b, 'c> CustomHandler<'a> for CustomResolvedServiceMethod<'b, 'c> {
         src: &mut FracInputStream,
         _allow_empty_container: bool,
     ) -> Result<serde_json::Value, fracpack::Error> {
-        let Some(((sname, mname), _)) = service_method_type(ty) else {
-            panic!("Wrong type");
-        };
+        let [sname, mname] = field_names::<2>(ty).unwrap();
         let value = ServiceMethod::unpack(src)?;
         let mut method = MethodString(value.method.to_string());
         if let Some(schema) = self.schemas.get(&value.service) {
@@ -798,8 +800,8 @@ impl<'a, 'b, 'c> CustomHandler<'a> for CustomResolvedServiceMethod<'b, 'c> {
             self.missing.borrow_mut().insert(value.service);
         }
         let mut result = serde_json::Map::with_capacity(2);
-        result.insert(sname.clone(), value.service.to_string().into());
-        result.insert(mname.clone(), method.0.into());
+        result.insert(sname.to_owned(), value.service.to_string().into());
+        result.insert(mname.to_owned(), method.0.into());
         Ok(result.into())
     }
     fn json2frac(
@@ -810,9 +812,7 @@ impl<'a, 'b, 'c> CustomHandler<'a> for CustomResolvedServiceMethod<'b, 'c> {
         dest: &mut Vec<u8>,
     ) -> Result<(), serde_json::Error> {
         use serde::de::Error;
-        let Some(((sname, mname), _)) = service_method_type(ty) else {
-            panic!("Wrong type");
-        };
+        let [sname, mname] = field_names::<2>(ty).unwrap();
         let Some(object) = val.as_object() else {
             Err(serde_json::Error::custom("expected object"))?
         };
@@ -830,13 +830,10 @@ impl<'a, 'b, 'c> CustomHandler<'a> for CustomResolvedServiceMethod<'b, 'c> {
     fn fracpack_verify(
         &self,
         _schema: &CompiledSchema,
-        ty: &CompiledType,
+        _ty: &CompiledType,
         src: &mut FracInputStream,
         _allow_empty_container: bool,
     ) -> Result<(), fracpack::Error> {
-        if !service_method_type(ty).is_some() {
-            panic!("Wrong type");
-        };
         let value = ServiceMethod::unpack(src)?;
         if !self.schemas.contains_key(&value.service) {
             self.missing.borrow_mut().insert(value.service);
@@ -864,31 +861,9 @@ impl<'a, F> CustomActionCollector<'a, F> {
     }
 }
 
-fn action_type(
-    ty: &CompiledType,
-) -> Option<(
-    (&String, &String, &String, &String),
-    (usize, usize, usize, usize),
-)> {
-    if let CompiledType::Object { children } = ty {
-        if children.len() == 4 {
-            return Some((
-                (
-                    &children[0].0,
-                    &children[1].0,
-                    &children[2].0,
-                    &children[3].0,
-                ),
-                (children[0].1, children[1].1, children[2].1, children[3].1),
-            ));
-        }
-    }
-    None
-}
-
 impl<'a, 'b, F: FnMut(SharedAction<'a>) -> ()> CustomHandler<'a> for CustomActionCollector<'b, F> {
     fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool {
-        if let Some((_, (sender_type, service_type, method_type, raw_data_type))) = action_type(ty)
+        if let Some([sender_type, service_type, method_type, raw_data_type]) = field_types::<4>(ty)
         {
             let is_u64 = |member| {
                 matches!(
@@ -921,10 +896,7 @@ impl<'a, 'b, F: FnMut(SharedAction<'a>) -> ()> CustomHandler<'a> for CustomActio
         src: &mut FracInputStream<'a>,
         _allow_empty_container: bool,
     ) -> Result<serde_json::Value, fracpack::Error> {
-        let Some(((sender_name, service_name, method_name, raw_data_name), _)) = action_type(ty)
-        else {
-            panic!("Wrong type");
-        };
+        let [sender_name, service_name, method_name, raw_data_name] = field_names::<4>(ty).unwrap();
         let value = SharedAction::unpack(src)?;
         let mut method = MethodString(value.method.to_string());
         let mut data = None;
@@ -945,13 +917,13 @@ impl<'a, 'b, F: FnMut(SharedAction<'a>) -> ()> CustomHandler<'a> for CustomActio
             }
         }
         let mut result = serde_json::Map::with_capacity(4);
-        result.insert(sender_name.clone(), value.sender.to_string().into());
-        result.insert(service_name.clone(), value.service.to_string().into());
-        result.insert(method_name.clone(), method.0.into());
+        result.insert(sender_name.to_owned(), value.sender.to_string().into());
+        result.insert(service_name.to_owned(), value.service.to_string().into());
+        result.insert(method_name.to_owned(), method.0.into());
         if let Some(data) = data {
             result.insert("data".to_string(), data);
         } else {
-            result.insert(raw_data_name.clone(), value.rawData.to_string().into());
+            result.insert(raw_data_name.to_owned(), value.rawData.to_string().into());
         }
         Ok(result.into())
     }
@@ -967,13 +939,10 @@ impl<'a, 'b, F: FnMut(SharedAction<'a>) -> ()> CustomHandler<'a> for CustomActio
     fn fracpack_verify(
         &self,
         _schema: &CompiledSchema,
-        ty: &CompiledType,
+        _ty: &CompiledType,
         src: &mut FracInputStream<'a>,
         _allow_empty_container: bool,
     ) -> Result<(), fracpack::Error> {
-        if !action_type(ty).is_some() {
-            panic!("Wrong type");
-        }
         let value = SharedAction::unpack(src)?;
         (*self.f.borrow_mut())(value);
         Ok(())
