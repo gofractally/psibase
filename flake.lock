@@ -71,22 +71,6 @@
         "type": "github"
       }
     },
-    "nixpkgs-cargo-edit": {
-      "locked": {
-        "lastModified": 1726594066,
-        "narHash": "sha256-DTlrwfUzkzCFfESWBgTbcDRl3IBzuWAXJFM8jC7MPow=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "30bae272ac6c85ea58c05501e3a8cb41b8dcfa0a",
-        "type": "github"
-      },
-      "original": {
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "30bae272ac6c85ea58c05501e3a8cb41b8dcfa0a",
-        "type": "github"
-      }
-    },
     "nixpkgs-cargo-generate": {
       "locked": {
         "lastModified": 1762132571,
@@ -100,6 +84,22 @@
         "owner": "NixOS",
         "repo": "nixpkgs",
         "rev": "1d0bb7b61b251a261b0963aacf4b141e770a4f1d",
+        "type": "github"
+      }
+    },
+    "nixpkgs-cursor-cli": {
+      "locked": {
+        "lastModified": 1783224372,
+        "narHash": "sha256-8i/87eeoqiGE4yOTjwSA3Eh/ziJRQEmd/unYU+K27sk=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "d407951447dcd00442e97087bf374aad70c04cea",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
         "type": "github"
       }
     },
@@ -173,8 +173,8 @@
         "flake-utils": "flake-utils",
         "nixpkgs": "nixpkgs",
         "nixpkgs-cargo-component": "nixpkgs-cargo-component",
-        "nixpkgs-cargo-edit": "nixpkgs-cargo-edit",
         "nixpkgs-cargo-generate": "nixpkgs-cargo-generate",
+        "nixpkgs-cursor-cli": "nixpkgs-cursor-cli",
         "nixpkgs-mdbook": "nixpkgs-mdbook",
         "nixpkgs-mdbook-mermaid": "nixpkgs-mdbook-mermaid",
         "nixpkgs-mdbook-plugins": "nixpkgs-mdbook-plugins",

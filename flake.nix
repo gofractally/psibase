@@ -19,10 +19,10 @@
     # carries all three versions at once, hence one input per tool.
     #   cargo-component 0.15.0
     nixpkgs-cargo-component.url = "github:NixOS/nixpkgs/b1e27a8646234340ea2c8b4e3f73e9e2b2bca505";
-    #   cargo-generate 0.23.5
+    #   cargo-generate 0.23.5, cargo-edit 0.13.7 (same nixpkgs rev)
     nixpkgs-cargo-generate.url = "github:NixOS/nixpkgs/1d0bb7b61b251a261b0963aacf4b141e770a4f1d";
-    #   cargo-edit 0.13.0
-    nixpkgs-cargo-edit.url = "github:NixOS/nixpkgs/30bae272ac6c85ea58c05501e3a8cb41b8dcfa0a";
+    #   cursor-cli (cursor-agent; not in nixos-25.05)
+    nixpkgs-cursor-cli.url = "github:NixOS/nixpkgs/nixos-unstable";
     # mdbook / plugins pinned separately — nixos-25.05 ships older versions.
     #   mdbook 0.4.52
     nixpkgs-mdbook.url = "github:NixOS/nixpkgs/bd16676f18040e23761b54a98e9d906a962220ae";
@@ -34,7 +34,7 @@
     nixpkgs-nodejs.url = "github:NixOS/nixpkgs/fea57dc5b57285d33918813d2f3695024d8fc9e8";
   };
 
-  outputs = { self, nixpkgs, flake-utils, fenix, nixpkgs-cargo-component, nixpkgs-cargo-generate, nixpkgs-cargo-edit, nixpkgs-mdbook, nixpkgs-mdbook-mermaid, nixpkgs-mdbook-plugins, nixpkgs-nodejs }:
+  outputs = { self, nixpkgs, flake-utils, fenix, nixpkgs-cargo-component, nixpkgs-cargo-generate, nixpkgs-cursor-cli, nixpkgs-mdbook, nixpkgs-mdbook-mermaid, nixpkgs-mdbook-plugins, nixpkgs-nodejs }:
     flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (system:
       let
         pkgs = import nixpkgs {
@@ -45,8 +45,13 @@
         # Fragile cargo tools, each from its own pinned nixpkgs revision (see inputs).
         # cargo-edit ships the cargo-set-version binary used by the build.
         cargoComponent = (import nixpkgs-cargo-component { inherit system; }).cargo-component;
-        cargoGenerate = (import nixpkgs-cargo-generate { inherit system; }).cargo-generate;
-        cargoEdit = (import nixpkgs-cargo-edit { inherit system; }).cargo-edit;
+        cargoToolsPkgs = import nixpkgs-cargo-generate { inherit system; };
+        cargoGenerate = cargoToolsPkgs.cargo-generate;
+        cargoEdit = cargoToolsPkgs.cargo-edit;
+        cursorCli = (import nixpkgs-cursor-cli {
+          inherit system;
+          config.allowUnfree = true;
+        }).cursor-cli;
 
         mdbook = (import nixpkgs-mdbook { inherit system; }).mdbook;
         mdbookMermaid = (import nixpkgs-mdbook-mermaid { inherit system; }).mdbook-mermaid;
@@ -196,6 +201,7 @@
           python3Packages.websockets
           python3Packages.requests
           git
+          gh
           curl
           wget
           jq
@@ -217,6 +223,7 @@
           bashInteractive
           bash-completion
           nixDevelopBash
+          cursorCli
         ];
 
         linuxPackages = with pkgs; [
@@ -319,6 +326,8 @@
               echo "  WASI SDK: ${wasiSdk}"
               echo "  cargo-component: $(cargo-component --version 2>/dev/null | head -1)"
               echo "  cargo-generate:  $(cargo-generate --version 2>/dev/null | head -1)"
+              echo "  cargo-edit:      0.13.7 (cargo-set-version)"
+              echo "  cursor-agent:    $(cursor-agent --version 2>/dev/null | head -1)"
               echo ""
             fi
           '';

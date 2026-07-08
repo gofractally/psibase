@@ -12,7 +12,7 @@ The Nix configuration includes
 - **Rust**: 1.86.0 (pinned) with WASM targets (`wasm32-unknown-unknown`, `wasm32-wasip1`)
 - **WebAssembly**: WASI SDK 29, wasm-pack, wasm-tools, binaryen
 - **JavaScript**: Node.js 20, Yarn
-- **Tools**: clangd, gdb, direnv, mkcert, SoftHSM2
+- **Tools**: clangd, gdb, direnv, mkcert, SoftHSM2, gh, cursor-agent (cursor-cli)
 - **Docs**: mdbook with plugins
 
 You do **not** need to pre-install Rust, Node, or other dev tools; `nix develop` provides everything.
