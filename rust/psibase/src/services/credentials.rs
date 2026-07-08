@@ -38,7 +38,6 @@ pub mod service {
         sender: AccountNumber,
         authorizers: Vec<AccountNumber>,
         method: Option<ServiceMethod>,
-        auth_set: Option<Vec<AccountNumber>>,
     ) -> bool {
         unimplemented!()
     }
@@ -49,7 +48,6 @@ pub mod service {
         sender: AccountNumber,
         authorizers: Vec<AccountNumber>,
         method: Option<ServiceMethod>,
-        auth_set: Option<Vec<AccountNumber>>,
     ) -> bool {
         unimplemented!()
     }

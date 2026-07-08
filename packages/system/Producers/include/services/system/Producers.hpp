@@ -87,7 +87,7 @@ namespace SystemService
       ///
       /// Returns:
       /// * `true`: If the total authorizations from `authorizers` or their auth services meets sender's threshold
-      /// * `false`: If not returning true, or on recursive checks for the same sender
+      /// * `false`: Otherwise
       bool isAuthSys(psibase::AccountNumber              sender,
                      std::vector<psibase::AccountNumber> authorizers,
                      std::optional<ServiceMethod>        method);
@@ -100,7 +100,7 @@ namespace SystemService
       ///
       /// Returns:
       /// * `true`: If the total authorizations from `rejecters` or their auth services meets sender's threshold
-      /// * `false`: If not returning true, or on recursive checks for the same sender
+      /// * `false`: Otherwise
       bool isRejectSys(psibase::AccountNumber              sender,
                        std::vector<psibase::AccountNumber> rejecters,
                        std::optional<ServiceMethod>        method);

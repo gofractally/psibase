@@ -79,11 +79,11 @@ impl GuildApplication {
         let auth = psibase::services::auth_dyn::Wrapper::call();
 
         if score >= (GUILD_APP_ENDORSEMENT_THRESHOLD as i16)
-            || auth.isAuthSys(self.guild, acceptors, None, None)
+            || auth.isAuthSys(self.guild, acceptors, None)
         {
             ApplicationStatus::Accepted
         } else if score <= -(GUILD_APP_REJECT_THRESHOLD as i16)
-            || auth.isAuthSys(self.guild, rejectors, None, None)
+            || auth.isAuthSys(self.guild, rejectors, None)
         {
             ApplicationStatus::Rejected
         } else {

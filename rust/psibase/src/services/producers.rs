@@ -88,7 +88,6 @@ mod service {
         sender: AccountNumber,
         authorizers: Vec<AccountNumber>,
         method: Option<ServiceMethod>,
-        auth_set: Option<Vec<AccountNumber>>,
     ) -> bool {
         unimplemented!()
     }
@@ -98,7 +97,6 @@ mod service {
         sender: AccountNumber,
         authorizers: Vec<AccountNumber>,
         method: Option<ServiceMethod>,
-        auth_set: Option<Vec<AccountNumber>>,
     ) -> bool {
         unimplemented!()
     }
