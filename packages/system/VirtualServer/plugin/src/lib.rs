@@ -82,10 +82,10 @@ impl Admin for VirtualServerPlugin {
         Ok(())
     }
 
-    fn enable_billing(enabled: bool) -> Result<(), Error> {
+    fn enable_billing() -> Result<(), Error> {
         assert_caller(&["config"], "enable_billing");
 
-        VirtualServer::add_to_tx().enable_billing(enabled);
+        VirtualServer::add_to_tx().enable_billing();
         Ok(())
     }
 

@@ -380,7 +380,7 @@ mod tx_cache {
 /// 2 - Call `init_billing`: Initializes the billing system. To call this, the system token
 ///     must have already been set in the `Tokens` service. The specified `fee_receiver` will
 ///     receive all of the system token fees paid for resources by users.
-/// 3 - Call `enable_billing(true)`: When ready, calling this action enables the
+/// 3 - Call `enable_billing`: When ready, calling this action enables the
 ///     billing system. The caller must have already filled their resource buffer because
 ///     this action is itself billed.
 ///
@@ -618,16 +618,12 @@ mod service {
             .set_capacity(NetworkSpecs::get_assert().obj_storage_bytes);
     }
 
-    /// Enable or disable the billing system
-    ///
-    /// If billing is disabled, resource consumption will still be tracked, but the resources will
-    /// not be automatically metered by the network. This is insecure and allows users to abuse
-    /// the network by consuming all of the network's resources.
+    /// Enable the billing system
     #[action]
-    fn enable_billing(enabled: bool) {
+    fn enable_billing() {
         check(get_sender() == get_service(), "Unauthorized");
 
-        BillingConfig::enable(enabled);
+        BillingConfig::enable();
     }
 
     /// Returns whether the billing system has been enabled

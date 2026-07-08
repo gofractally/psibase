@@ -94,7 +94,7 @@ namespace SystemService
    /// 2 - Call `init_billing`: Initializes the billing system. To call this, the system token
    ///     must have already been set in the `Tokens` service. The specified `fee_receiver` will
    ///     receive all of the system token fees paid for resources by users.
-   /// 3 - Call `enable_billing(true)`: When ready, calling this action enables the
+   /// 3 - Call `enable_billing`: When ready, calling this action enables the
    ///     billing system. The caller must have already filled their resource buffer because
    ///     this action is itself billed.
    ///
@@ -198,12 +198,8 @@ namespace SystemService
       /// functionality.
       void set_network_variables(NetworkVariables variables);
 
-      /// Enable or disable the billing system
-      ///
-      /// If billing is disabled, resource consumption will still be tracked, but the resources will
-      /// not be automatically metered by the network. This is insecure and allows users to abuse
-      /// the network by consuming all of the network's resources.
-      void enable_billing(bool enabled);
+      /// Enable the billing system
+      void enable_billing();
 
       /// Returns whether the billing system has been enabled
       bool is_billing_enabled();
@@ -422,7 +418,7 @@ namespace SystemService
                 method(get_fee_receiver),
                 method(set_specs, specs),
                 method(set_network_variables, variables),
-                method(enable_billing, enabled),
+                method(enable_billing),
                 method(is_billing_enabled),
                 method(buy_res_for, amount, for_user, memo),
                 method(buy_res_sub, amount, sub_account),

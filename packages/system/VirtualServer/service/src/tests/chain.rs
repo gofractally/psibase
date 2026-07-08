@@ -321,7 +321,7 @@ fn metering(chain: psibase::Chain) -> Result<(), psibase::Error> {
     // Verify enable billing
     chain
         .propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
-        .enable_billing(true)
+        .enable_billing()
         .get()?;
 
     // Verify alice out of resources

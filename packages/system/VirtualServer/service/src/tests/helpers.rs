@@ -74,7 +74,7 @@ pub(super) fn enable_billing(chain: &psibase::Chain) -> Result<(), psibase::Erro
 
     chain
         .propose::<Wrapper>(PRODUCER_ACCOUNT, Wrapper::SERVICE)
-        .enable_billing(true)
+        .enable_billing()
         .get()?;
 
     Ok(())

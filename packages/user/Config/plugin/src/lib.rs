@@ -202,13 +202,11 @@ impl VirtualServer for ConfigPlugin {
         virtual_server::plugin::admin::set_network_variables(variables)
     }
 
-    fn enable_billing(enabled: bool) -> Result<(), Error> {
-        if enabled {
-            virtual_server::plugin::billing::fill_gas_tank()?;
-        }
+    fn enable_billing() -> Result<(), Error> {
+        virtual_server::plugin::billing::fill_gas_tank()?;
 
         set_propose_latch(Some(VIRTUAL_SERVER))?;
-        virtual_server::plugin::admin::enable_billing(enabled)
+        virtual_server::plugin::admin::enable_billing()
     }
 
     fn set_cpu_pricing_params(params: CpuPricingParams) -> Result<(), Error> {
