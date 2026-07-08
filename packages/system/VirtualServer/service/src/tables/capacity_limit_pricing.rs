@@ -1,13 +1,13 @@
 //! # Capacity-limit pricing
 //!
 //! Resources in this category are limited by **total consumed capacity** relative to a maximum
-//! (e.g. objective storage bytes). This module implements that pricing with a constant-product curve between
-//!
+//! (e.g. objective storage bytes). This module implements that pricing with a constant-product curve
+//! between:
 //! - a **reserve token** (the unit used to pay for access to the resource), and
-//! - a **resource share token** (representing a claim on remaining resource capacity).
+//! - a **remaining resource capacity**
 //!
 //! The relay is configured so that the entire resource capacity can be consumed (i.e. the pool can
-//! reach 0 available resources) when a fixed budget of reserve tokens is sold into the pool.
+//! reach 0 remaining capacity) when a fixed budget of reserve tokens is sold into the pool.
 //!
 //! Offsets to the normal hyperbola are used in this design to avoid the price->infinity
 //! behavior of the vanilla $x y = k$ curve.
@@ -35,11 +35,11 @@
 //! Let:
 //!
 //! - $x$: pool reserve of **real** reserve tokens
-//! - $y$: pool reserve of **real** resource-share tokens (remaining capacity)
+//! - $y$: pool reserve of **real** remaining capacity
 //! - $x_{\max}$: total reserve-token budget that may be sold into the relay
 //! - $y_{\max}$: total resource capacity
 //! - $x_0$: an offset of **virtual** reserve tokens that cannot be withdrawn
-//! - $y_0$: an offset of **virtual** resource-share tokens that cannot be withdrawn
+//! - $y_0$: an offset of **virtual** resource capacity that cannot be withdrawn
 //!
 //! Interpretation:
 //!
@@ -64,6 +64,18 @@ fn relay_sub(resource: ResourceType) -> String {
     )
 }
 
+/// This is a constant product curve, where the fundamental equation is XY = k. In this case,
+/// we derive X = (x+x0) and Y = (y+y0) where x0 and y0 are virtual offsets.
+///
+/// Evaluating k = XY at each endpoint and equating yields:
+/// x0(y_max+y0) = y0(x_max + x0)
+///
+/// Algebraically simplifying yields:
+/// x_max / x0 = y_max / y0
+///
+/// We refer to this single constant as the "shape parameter", or `D`. D controls how "aggressive"
+/// pricing is near the endpoints. Smaller D means larger offsets (flatter), larger D means
+/// smaller offsets (steeper).
 pub(crate) struct Curve {
     pub(crate) x0: u64,
     pub(crate) y0: u64,
@@ -81,18 +93,6 @@ pub(crate) struct CurvePosition {
     max_reserve: u64,
 }
 
-/// This is a constant product curve, where the fundamental equation is XY = k. In this case,
-/// we derive X = (x+x0) and Y = (y+y0) where x0 and y0 are virtual offsets.
-///
-/// Evaluating k = XY at each endpoint and equating yields:
-/// x0(y_max+y0) = y0(x_max + x0)
-///
-/// Algebraically simplifying yields:
-/// x_max / x0 = y_max / y0
-///
-/// We refer to this single constant as the "shape parameter", or `D`. D controls how "aggressive"
-/// pricing is near the endpoints. Smaller D means larger offsets (flatter), larger D means
-/// smaller offsets (steeper).
 impl Curve {
     /// All parameters can be expressed in terms of x_max, y_max, and D.
     /// x0 = x_max / D
@@ -101,31 +101,31 @@ impl Curve {
     ///
     /// Substituting yields:
     /// k = (x_max * y_max)(D+1) / D^2
-    pub(crate) fn new(max_reserves: u64, max_resources: u64, curve_d: u64) -> Self {
-        let xm = max_reserves as u128;
-        let ym = max_resources as u128;
+    pub(crate) fn new(max_reserve: u64, max_capacity: u64, curve_d: u64) -> Self {
+        let xm = max_reserve as u128;
+        let ym = max_capacity as u128;
         let d = curve_d as u128;
 
-        // `xm * ym * (d + 1)` stays within u128 because `check_curve_params`
-        // bounds `max_reserve * max_capacity * (curve_d + 1)` whenever those
-        // inputs are set.
+        // For `xm * ym * (d + 1)` to stay within u128: callers must construct `Curve`
+        // only from params that were passed through `check_curve_params`, which bounds
+        // `max_reserve * max_capacity * (curve_d + 1)`.
         //
-        // Flooring x0/y0 and ceiling k all bias `pos_from_resources`'
-        // `ceil(k / (resources + y0)) - x0` upward, keeping the pool capitalized.
+        // Flooring x0/y0 and ceiling k all bias `pos_from_remaining_capacity`'s
+        // `ceil(k / (remaining_capacity + y0)) - x0` upward, keeping the pool capitalized.
         Curve {
-            x0: (max_reserves / curve_d),
-            y0: (max_resources / curve_d),
+            x0: (max_reserve / curve_d),
+            y0: (max_capacity / curve_d),
             k: (xm * ym * (d + 1)).div_ceil(d * d),
-            max_reserve: max_reserves,
+            max_reserve,
         }
     }
 
-    /// Positions the curve by solving for reserves from resources.
-    /// reserves = ceil(k / (resources + y0)) - x0
+    /// Positions the curve by solving for reserves from remaining capacity.
+    /// reserves = ceil(k / (remaining_capacity + y0)) - x0
     ///
     /// Rounds the required reserves up, keeping the pool fully capitalized.
-    pub(crate) fn pos_from_resources(&self, resources: u64) -> CurvePosition {
-        let Y = resources as u128 + self.y0 as u128;
+    pub(crate) fn pos_from_remaining_capacity(&self, remaining_capacity: u64) -> CurvePosition {
+        let Y = remaining_capacity as u128 + self.y0 as u128;
         // True reserves never exceed `max_reserve`; clamp so the upward rounding
         // bias can't push past it and wrap the `as u64` cast.
         let reserves = (self.k.div_ceil(Y) - self.x0 as u128).min(self.max_reserve as u128) as u64;
@@ -140,7 +140,7 @@ impl Curve {
 }
 
 impl CurvePosition {
-    // Cost of consuming `amount` units of resource.
+    // Cost of consuming `amount` units of capacity.
     // delta_x = ceil(k / (Y - delta_y)) - X
     pub(crate) fn cost_of(&self, amount_consumed: u64) -> u64 {
         if amount_consumed == 0 {
@@ -160,10 +160,10 @@ impl CurvePosition {
         let dx = dx.min((self.max_reserve - self.reserves) as u128);
 
         // `dx <= max_reserve <= u64::MAX` after the cap so this cannot fail
-        check_some(u64::try_from(dx).ok(), "Insufficient capacity")
+        u64::try_from(dx).expect("cost exceeds u64")
     }
 
-    // Gross refund for freeing `amount` units of resource.
+    // Gross refund for freeing `amount` units of capacity.
     // delta_x = X - ceil(k / (Y + delta_y))
     pub(crate) fn refund_of(&self, amount_freed: u64) -> u64 {
         if amount_freed == 0 {
@@ -182,7 +182,7 @@ impl CurvePosition {
 
     // Spot price: X / Y
     pub(crate) fn spot_price(&self) -> u64 {
-        (self.X / self.Y) as u64
+        (self.X / self.Y).min(u64::MAX as u128) as u64
     }
 }
 
@@ -254,7 +254,7 @@ impl CapacityPricing {
     /// Reserve token backing required in the relay for the current curve position.
     pub(crate) fn required_reserve(&self) -> u64 {
         self.curve()
-            .pos_from_resources(self.remaining_capacity)
+            .pos_from_remaining_capacity(self.remaining_capacity)
             .reserves
     }
 
@@ -264,14 +264,14 @@ impl CapacityPricing {
         }
 
         self.curve()
-            .pos_from_resources(self.remaining_capacity)
+            .pos_from_remaining_capacity(self.remaining_capacity)
             .cost_of(amount_consumed)
     }
 
     fn refund_of(&self, amount_freed: u64) -> u64 {
         let gross = self
             .curve()
-            .pos_from_resources(self.remaining_capacity)
+            .pos_from_remaining_capacity(self.remaining_capacity)
             .refund_of(amount_freed);
         let fee = (gross as u128 * self.fee_ppm as u128 / PPM) as u64;
         gross - fee
@@ -369,7 +369,7 @@ impl CapacityPricing {
             );
             cost = p
                 .curve()
-                .pos_from_resources(p.remaining_capacity)
+                .pos_from_remaining_capacity(p.remaining_capacity)
                 .cost_of(billable);
             p.remaining_capacity -= billable;
         });
@@ -390,7 +390,7 @@ impl CapacityPricing {
 
             gross_refund = p
                 .curve()
-                .pos_from_resources(p.remaining_capacity)
+                .pos_from_remaining_capacity(p.remaining_capacity)
                 .refund_of(refundable);
             p.remaining_capacity += refundable;
             fee_ppm_val = p.fee_ppm;
@@ -424,7 +424,7 @@ impl CapacityPricing {
 
             check(
                 p.required_reserve() <= old_reserve,
-                "Reserves drop after capacity increase",
+                "required reserve rose after capacity increase",
             );
         });
     }
@@ -450,7 +450,7 @@ impl CapacityPricing {
         let consumed = self.max_capacity - self.remaining_capacity;
         check(
             consumed == 0 || to_remove > 0,
-            "Reserves drop after reserve budget decrease",
+            "reserve budget decrease freed no reserves",
         );
     }
 
@@ -519,7 +519,7 @@ impl CapacityPricing {
     pub async fn spot_price(&self) -> Decimal {
         let price = self
             .curve()
-            .pos_from_resources(self.remaining_capacity)
+            .pos_from_remaining_capacity(self.remaining_capacity)
             .spot_price();
         sys_decimal(price)
     }

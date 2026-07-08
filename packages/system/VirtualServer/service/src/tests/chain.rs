@@ -136,7 +136,7 @@ fn relay_balance_basics(chain: psibase::Chain) -> Result<(), psibase::Error> {
         initial_disk_state.max_capacity,
         initial_disk_state.curve_d,
     )
-    .pos_from_resources(initial_disk_state.remaining_capacity)
+    .pos_from_remaining_capacity(initial_disk_state.remaining_capacity)
     .cost_of(cap_consumed);
     let new_shortfall = new_disk_state.relay_shortfall.quantity.value;
     assert_eq!(new_shortfall, initial_shortfall + cost, "invalid increase");

@@ -19,17 +19,17 @@ mod tx_cache {
         cache: &'static LocalKey<RefCell<Option<T>>>,
         f: impl FnOnce(&mut T) -> R,
     ) -> R {
-        cache.with_borrow_mut(|m| {
-            f(m.as_mut()
-                .expect("resource billing attempted during end-of-tx settlement"))
+        cache.with_borrow_mut(|m| match m.as_mut() {
+            Some(inner) => f(inner),
+            None => abort_message("resource billing attempted during end-of-tx settlement"),
         })
     }
 
     /// Drain a billing cache, subsequent access panics.
     fn drain_cache<T: 'static>(cache: &'static LocalKey<RefCell<Option<T>>>) -> T {
-        cache.with_borrow_mut(|m| {
-            m.take()
-                .expect("resource billing attempted during end-of-tx settlement")
+        cache.with_borrow_mut(|m| match m.take() {
+            Some(inner) => inner,
+            None => abort_message("resource billing attempted during end-of-tx settlement"),
         })
     }
 
@@ -648,18 +648,6 @@ mod service {
         }
     }
 
-    /// Gets the amount of resources available for the caller
-    #[action]
-    fn res_balance() -> Quantity {
-        balance_cache::get_available(get_sender(), None)
-    }
-
-    /// Gets the amount of resources available for the caller's specified sub-account
-    #[action]
-    fn res_balance_sub(sub_account: String) -> Quantity {
-        balance_cache::get_available(get_sender(), Some(sub_account))
-    }
-
     /// Reserves system tokens for future resource consumption by the sender
     ///
     /// The reserve is consumed when interacting with metered network functionality.
@@ -936,9 +924,14 @@ mod service {
         Wrapper::emit()
             .history()
             .consumed(user, Cpu.as_id(), amount, cost);
+    }
 
-        // useCpuSys runs once at the end of a billed transaction, so this is where we
-        // emit the per-tx aggregated disk `consumed` events that useDiskSys accumulated.
+    /// A notification called at the end of a transaction in which to do any final
+    /// per-tx accounting or cleanup.
+    #[action]
+    fn finishTx() {
+        check(get_sender() == Transact::SERVICE, "[finishTx] Unauthorized");
+
         for (disk_user, disk_amount, disk_cost) in tx_cache::drain_disk_usage() {
             if disk_amount == 0 && disk_cost == 0 {
                 continue;
@@ -1009,7 +1002,7 @@ mod service {
         };
 
         // Avoiding a flood of events for writing individual records. Accumulate in the tx_cache and emit
-        // one event at the end of the tx (using `useCpuSys` as the tx end hook)
+        // one event at the end of the tx (using `finishTx` as the tx end hook)
         tx_cache::add_disk_usage(user, amount_bytes, cost);
     }
 

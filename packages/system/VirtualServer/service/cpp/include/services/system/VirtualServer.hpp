@@ -156,12 +156,6 @@ namespace SystemService
       /// resource balance.
       void del_res_sub(std::string sub_account);
 
-      /// Gets the amount of resources available for the caller
-      UserService::Quantity res_balance();
-
-      /// Gets the amount of resources available for the caller's specified sub-account
-      UserService::Quantity res_balance_sub(std::string sub_account);
-
       /// Reserves system tokens for future resource consumption by the sender
       ///
       /// The reserve is consumed when interacting with metered network functionality.
@@ -287,6 +281,10 @@ namespace SystemService
       /// this resource.
       void useCpuSys(psibase::AccountNumber user, uint64_t amount_ns);
 
+      /// A notification called at the end of a transaction in which to do any final
+      /// per-tx accounting or cleanup.
+      void finishTx();
+
       /// Called by the system when `user` causes a write to any database.
       ///
       /// `amount_bytes` is positive for consumption and negative for a free
@@ -342,8 +340,6 @@ namespace SystemService
                 method(buy_res_for, amount, for_user, memo),
                 method(buy_res_sub, amount, sub_account),
                 method(del_res_sub, sub_account),
-                method(res_balance),
-                method(res_balance_sub, sub_account),
                 method(buy_res, amount),
                 method(bill_to_sub, sub_account),
                 method(conf_buffer, config),
@@ -363,6 +359,7 @@ namespace SystemService
                 method(disk_ref_quote, bytes),
                 method(useNetSys, user, amount_bytes),
                 method(useCpuSys, user, amount_ns),
+                method(finishTx),
                 method(useDiskSys, user, db_id, amount_bytes),
                 method(get_resources, user),
                 method(notifyBlock, block_num),
