@@ -767,17 +767,8 @@ fn field_names<const N: usize>(ty: &CompiledType) -> Option<[&str; N]> {
 
 impl<'a, 'b, 'c> CustomHandler<'a> for CustomResolvedServiceMethod<'b, 'c> {
     fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool {
-        let is_u64 = |member| {
-            matches!(
-                schema.unwrap_struct(schema.get_by_id(member)),
-                CompiledType::Int {
-                    bits: 64,
-                    is_signed: false
-                }
-            )
-        };
         if let Some([service, method]) = field_types::<2>(ty) {
-            is_u64(service) && is_u64(method)
+            schema.matches_u64(service) && schema.matches_u64(method)
         } else {
             false
         }
@@ -865,26 +856,10 @@ impl<'a, 'b, F: FnMut(SharedAction<'a>) -> ()> CustomHandler<'a> for CustomActio
     fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool {
         if let Some([sender_type, service_type, method_type, raw_data_type]) = field_types::<4>(ty)
         {
-            let is_u64 = |member| {
-                matches!(
-                    schema.unwrap_struct(schema.get_by_id(member)),
-                    CompiledType::Int {
-                        bits: 64,
-                        is_signed: false
-                    }
-                )
-            };
-            let is_bytes = |member| {
-                if let CompiledType::List(item) = schema.unwrap_struct(schema.get_by_id(member)) {
-                    matches!(schema.get_by_id(*item), CompiledType::Int { bits: 8, .. })
-                } else {
-                    false
-                }
-            };
-            is_u64(sender_type)
-                && is_u64(service_type)
-                && is_u64(method_type)
-                && is_bytes(raw_data_type)
+            schema.matches_u64(sender_type)
+                && schema.matches_u64(service_type)
+                && schema.matches_u64(method_type)
+                && schema.matches_bytes(raw_data_type)
         } else {
             false
         }
