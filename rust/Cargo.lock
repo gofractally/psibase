@@ -588,6 +588,7 @@ dependencies = [
  "jobserver",
  "psibase",
  "psibase-rust-workspace-hack",
+ "psibase_package_naming",
  "regex",
  "serde",
  "serde_json",
@@ -3344,6 +3345,18 @@ version = "0.23.0"
 dependencies = [
  "psibase-rust-workspace-hack",
  "seahash",
+]
+
+[[package]]
+name = "psibase_package_naming"
+version = "0.23.0"
+dependencies = [
+ "anyhow",
+ "psibase-rust-workspace-hack",
+ "regex",
+ "serde",
+ "serde_json",
+ "toml 0.8.19",
 ]
 
 [[package]]

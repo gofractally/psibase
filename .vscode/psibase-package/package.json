@@ -1,0 +1,75 @@
+{
+  "name": "psibase-package",
+  "displayName": "Psibase Package Naming",
+  "description": "Diagnostics, hover help, rename, and inlay hints for psibase package naming",
+  "version": "0.1.0",
+  "publisher": "psibase",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Linters", "Other"],
+  "activationEvents": [
+    "workspaceContains:**/Cargo.toml"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "wit",
+        "aliases": ["WebAssembly Interface Type"],
+        "extensions": [".wit"]
+      }
+    ],
+    "commands": [
+      {
+        "command": "psibasePackage.renameEntity",
+        "title": "Rename entity…",
+        "category": "Psibase package"
+      },
+      {
+        "command": "psibasePackage.findCorrelated",
+        "title": "Find correlated names",
+        "category": "Psibase package"
+      }
+    ],
+    "configuration": {
+      "title": "Psibase Package",
+      "properties": {
+        "psibasePackage.inlayHints.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show inlay hints labeling psibase naming slots."
+        },
+        "psibasePackage.semanticHighlighting.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Color psibase naming identifiers by entity type. Highlights naming strings in Cargo.toml, `#[psibase::service(name = ...)]` in `.rs`, and `package` lines in `.wit`.\n\n**NOTE:** VS Code **Editor: Semantic Highlighting** (`editor.semanticHighlighting.enabled`) must also be enabled."
+        },
+        "psibasePackage.statusBar.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show psibase package context in the status bar (right side)."
+        }
+      }
+    },
+    "configurationDefaults": {
+      "editor.semanticHighlighting.enabled": true,
+      "files.associations": {
+        "*.wit": "wit"
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "@iarna/toml": "^2.2.5"
+  }
+}

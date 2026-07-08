@@ -514,6 +514,41 @@ fn check_psibase_version(metadata: &Metadata) {
     }
 }
 
+fn preflight_package_naming(
+    index: &MetadataIndex<'_>,
+    roots: &[&PackageId],
+    workspace_root: &Path,
+) -> Result<(), Error> {
+    let mut cmake_roots: Vec<PathBuf> = vec![workspace_root.to_path_buf()];
+    let mut current = workspace_root.to_path_buf();
+    while current.pop() {
+        if current.join("CMakeLists.txt").is_file() {
+            cmake_roots.push(current.clone());
+        }
+    }
+    let cmake_refs: Vec<&Path> = cmake_roots.iter().map(|p| p.as_path()).collect();
+
+    for root in roots {
+        let package = index.packages.get(root.repr.as_str()).unwrap();
+        let package_root = package.manifest_path.parent().unwrap();
+        let package_root_path = package_root.as_std_path();
+        let diagnostics = psibase_package_naming::check_package(package_root_path, &cmake_refs)
+            .with_context(|| format!("package naming preflight failed for {}", package_root))?;
+        for diagnostic in diagnostics {
+            if diagnostic.severity == psibase_package_naming::Severity::Error {
+                return Err(anyhow!(
+                    "{}:{}: {}: {}",
+                    diagnostic.location.file.display(),
+                    diagnostic.location.line,
+                    diagnostic.code,
+                    diagnostic.message
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 type JobAcquiredSender = tokio::sync::oneshot::Sender<std::io::Result<jobserver::Acquired>>;
 
 struct AsyncJobServer {
@@ -1226,6 +1261,7 @@ async fn main2(jclient: jobserver::FromEnv) -> Result<(), Error> {
                     );
                 }
             }
+            preflight_package_naming(&index, &ids, metadata.workspace_root.as_std_path())?;
             build_packages(&jobs, &args, &index, &ids).await?;
             pretty("Done", "");
         }
