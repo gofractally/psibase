@@ -483,7 +483,7 @@ pub mod impls {
         }
 
         pub fn declare_result(&self, result: Vec<u8>) {
-            let parent_eval = Evaluation::get(self.owner, self.evaluation_id);
+            let parent_eval = Evaluation::get_assert(self.owner, self.evaluation_id);
 
             if parent_eval.use_hooks {
                 EvalHooks::call_to(self.owner).on_grp_fin(
