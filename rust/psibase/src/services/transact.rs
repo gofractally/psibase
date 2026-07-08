@@ -1,36 +1,7 @@
-use crate::{Pack, ToKey, ToSchema, Unpack};
-use async_graphql::{InputObject, SimpleObject};
-use serde::{Deserialize, Serialize};
-
 /// Identify a service and method
 ///
 /// An empty `service` or `method` indicates a wildcard.
-#[derive(
-    Copy,
-    Clone,
-    Debug,
-    Pack,
-    Unpack,
-    ToKey,
-    ToSchema,
-    Serialize,
-    Deserialize,
-    SimpleObject,
-    InputObject,
-)]
-#[fracpack(fracpack_mod = "crate::fracpack")]
-#[to_key(psibase_mod = "crate")]
-#[graphql(input_name = "ServiceMethodInput")]
-pub struct ServiceMethod {
-    pub service: crate::AccountNumber,
-    pub method: crate::MethodNumber,
-}
-
-impl ServiceMethod {
-    pub fn new(service: crate::AccountNumber, method: crate::MethodNumber) -> Self {
-        Self { service, method }
-    }
-}
+pub use crate::ServiceMethod;
 
 type CallbackType = u32;
 
@@ -56,7 +27,7 @@ type CallbackType = u32;
 /// Services implement `auth_interface` by defining actions with
 /// identical signatures; there is no trait.
 #[crate::service(
-    name = "example-auth",
+    name = "i-auth",
     actions = "AuthActions",
     wrapper = "AuthWrapper",
     structs = "auth_action_structs",
@@ -396,6 +367,13 @@ mod service {
     #[action]
     fn headBlockTime() -> crate::TimePointSec {
         unimplemented!()
+    }
+
+    /// Returns the tapos `refBlockIndex` and `refBlockSuffix`
+    /// for the head block.
+    #[action]
+    fn headTapos() -> (u8, u32) {
+        unimplemented!();
     }
 
     /// Emitted at the start of each block

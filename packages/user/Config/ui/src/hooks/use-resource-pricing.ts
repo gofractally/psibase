@@ -70,7 +70,7 @@ export const useResourcePricing = () => {
                 }
             `;
 
-            const res = await graphql(query, { service: "virtual-server" });
+            const res = await graphql(query, { service: "vserver" });
             const parsed = zPricingResponse.parse(res);
 
             if (!parsed.cpuPricing) {

@@ -2,8 +2,8 @@ use crate::services::{accounts, auth_delegate, auth_sig, producers, transact};
 use crate::{
     get_schemas, method_raw, new_account_action, set_key_action, validate_dependencies,
     AccountNumber, Action, AnyPublicKey, Claim, EssentialServices, GenesisActionData, MethodNumber,
-    PackageList, PackageOrigin, PackagedService, Producer, SchemaMap, SignedTransaction, Tapos,
-    TimePointSec, Transaction, TransactionBuilder,
+    PackageList, PackageOrigin, PackagedService, Producer, SchemaMap, ServiceWrapper,
+    SignedTransaction, Tapos, TimePointSec, Transaction, TransactionBuilder,
 };
 use fracpack::Pack;
 use sha2::{Digest, Sha256};

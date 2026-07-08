@@ -53,8 +53,8 @@ namespace SystemService
       /// |--------|-----------|------------|
       /// | weak   | 1         | ⌈n/3⌉      |
       /// | strong | ⌊n/2⌋ + 1 | ⌊2n/3⌋ + 1 |
-      static constexpr auto producerAccountWeak   = psibase::AccountNumber("prods-weak");
-      static constexpr auto producerAccountStrong = psibase::AccountNumber("prods-strong");
+      static constexpr auto producerAccountWeak   = psibase::AccountNumber("producers+2");
+      static constexpr auto producerAccountStrong = psibase::AccountNumber("producers+3");
 
       void setConsensus(psibase::ConsensusData consensus);
       void setProducers(std::vector<psibase::Producer> prods);

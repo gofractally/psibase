@@ -1,4 +1,4 @@
-#[crate::service(name = "auth-delegate", dispatch = false, psibase_mod = "crate")]
+#[crate::service(name = "auth-delg", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use crate::{services::transact::ServiceMethod, AccountNumber, Claim};

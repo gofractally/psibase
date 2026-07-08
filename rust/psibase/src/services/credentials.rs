@@ -1,6 +1,8 @@
-pub const CREDENTIAL_SENDER: &str = "cred-sys";
+use crate::{self as psibase, account, AccountNumber};
 
-#[crate::service(name = "credentials", dispatch = false, psibase_mod = "crate")]
+pub const CREDENTIAL_SENDER: AccountNumber = account!("cred-sys");
+
+#[crate::service(name = "credential", dispatch = false, psibase_mod = "crate")]
 #[allow(unused_variables)]
 pub mod service {
     use crate::{

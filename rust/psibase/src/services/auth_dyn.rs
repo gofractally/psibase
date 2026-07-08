@@ -55,7 +55,7 @@ pub mod policy {
 }
 
 #[crate::service(
-    name = "auth-dyn-it",
+    name = "i-auth-dyn",
     actions = "int_actions",
     wrapper = "int_wrapper",
     structs = "int_structs",

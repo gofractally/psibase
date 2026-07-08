@@ -19,8 +19,8 @@ mod tests {
             tokens::{self, Decimal, Precision, Quantity, Wrapper as Tokens},
             verify_sig,
         },
-        tester, AccountNumber, Action, ChainEmptyResult, Claim, MethodNumber, SignedTransaction,
-        Transaction,
+        tester, AccountNumber, Action, ChainEmptyResult, Claim, MethodNumber, Push,
+        SignedTransaction, Transaction,
     };
     use rand::Rng;
     use serde::Deserialize;
@@ -207,7 +207,7 @@ mod tests {
         let vserver = Wrapper::SERVICE;
         let tokens = tokens::Wrapper::SERVICE;
         let sys: tokens::TID = 1;
-        let alice = AccountNumber::from("alice");
+        let alice = account!("alice");
 
         initial_setup(&chain)?;
 
@@ -387,7 +387,7 @@ mod tests {
         initial_setup(&chain)?;
 
         http_server::Wrapper::push_from(&chain, invite)
-            .registerServer(account!("r-invite"))
+            .registerServer(account!("invite+1"))
             .get()?;
         chain.finish_block();
 
@@ -427,7 +427,7 @@ mod tests {
         let mut trx = Transaction {
             tapos: Default::default(),
             actions: vec![Action {
-                sender: AccountNumber::from(credentials::CREDENTIAL_SENDER),
+                sender: credentials::CREDENTIAL_SENDER,
                 service: invite,
                 method: MethodNumber::new(method_raw!("createAccount")),
                 rawData: (

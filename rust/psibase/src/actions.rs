@@ -1,7 +1,9 @@
 use crate::services::{
     accounts, auth_delegate, auth_sig, http_server, producers, setcode, verify_sig,
 };
-use crate::{account_raw, method_raw, AccountNumber, Action, AnyPublicKey, MethodNumber};
+use crate::{
+    account_raw, method_raw, AccountNumber, Action, AnyPublicKey, MethodNumber, ServiceWrapper,
+};
 use fracpack::Pack;
 
 macro_rules! account {
@@ -11,7 +13,9 @@ macro_rules! account {
 }
 
 pub fn preapprove_action(sender: AccountNumber, account: AccountNumber) -> Option<Action> {
-    if sender == producers::ROOT {
+    if account.is_subaccount() {
+        Some(accounts::Wrapper::pack_from(account.base()).preapproveAcc(account))
+    } else if sender == producers::ROOT {
         Some(accounts::Wrapper::pack().preapproveAcc(account))
     } else {
         None

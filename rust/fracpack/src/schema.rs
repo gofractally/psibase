@@ -1103,7 +1103,7 @@ impl<'a> CompiledSchema<'a> {
             self.types[id] = Alias(next);
         }
     }
-    fn get_by_id(&self, id: usize) -> &CompiledType {
+    pub fn get_by_id(&self, id: usize) -> &CompiledType {
         match &self.types[id] {
             CompiledType::Alias(next) => &self.types[*next],
             ty => ty,
@@ -1215,7 +1215,8 @@ impl<'a> CompiledSchema<'a> {
                 is_variable_size: false,
                 children,
                 ..
-            } if children.len() == 1 => self.get_by_id(children[0].1),
+            } if children.len() == 1 => self.unwrap_struct(self.get_by_id(children[0].1)),
+            Custom { repr, .. } => self.unwrap_struct(self.get_by_id(*repr)),
             _ => ty,
         }
     }

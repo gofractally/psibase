@@ -8,12 +8,7 @@ namespace SystemService
    /// Identify a service and method
    ///
    /// An empty `service` or `method` indicates a wildcard.
-   struct ServiceMethod
-   {
-      psibase::AccountNumber service;
-      psibase::MethodNumber  method;
-   };
-   PSIO_REFLECT(ServiceMethod, service, method)
+   using psibase::ServiceMethod;
 
    /// Authenticate actions
    ///
@@ -223,8 +218,9 @@ namespace SystemService
    struct BlockSummary
    {
       std::array<uint32_t, 256> blockSuffixes;
+      std::uint32_t             blockNum;
    };
-   PSIO_REFLECT(BlockSummary, blockSuffixes)
+   PSIO_REFLECT(BlockSummary, blockSuffixes, blockNum)
    using BlockSummaryTable = psibase::Table<BlockSummary, psibase::SingletonKey{}>;
    PSIO_REFLECT_TYPENAME(BlockSummaryTable)
 
@@ -466,6 +462,10 @@ namespace SystemService
       /// TODO: remove
       psibase::BlockTime headBlockTime() const;
 
+      /// Returns the tapos `refBlockIndex` and `refBlockSuffix`
+      /// for the head block.
+      std::pair<uint8_t, uint32_t> headTapos();
+
       struct Events
       {
          struct History
@@ -499,6 +499,7 @@ namespace SystemService
                 method(currentBlock),
                 method(headBlock),
                 method(headBlockTime),
+                method(headTapos)
                 //
    )
 
@@ -580,6 +581,10 @@ namespace SystemService
          if (!(stat->head->header.blockNum & 0x1fff))
             update((stat->head->header.blockNum >> 13) | 0x80);
       }
+      if (stat)
+      {
+         summary->blockNum = stat->current.blockNum;
+      }
       return *summary;
    }  // getBlockSummary()
 
@@ -596,5 +601,15 @@ namespace SystemService
       }
       else
          return {0, 0};  // Usable for transactions in the genesis block
+   }
+
+   inline bool isStartBlock(psio::view<const psibase::Action> act)
+   {
+      return act.sender() == psibase::AccountNumber{} && act.service() == Transact::service &&
+             act.method() == psibase::MethodNumber{"startBlock"};
+   }
+   inline bool isStartBlock(psio::view<const psibase::Transaction> tx)
+   {
+      return tx.actions().size() == 1 && isStartBlock(tx.actions()[0]);
    }
 }  // namespace SystemService

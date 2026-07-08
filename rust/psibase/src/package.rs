@@ -8,7 +8,7 @@ use crate::{
     new_account_owned_action, preapprove_action, reg_server, schema_types, set_code_action,
     solve_dependencies, version_match, AccountNumber, Action, Checksum256, CodeRow, GenesisService,
     Hex, MethodNumber, MethodString, Pack, PackageDisposition, PackageOp, PackagePreference,
-    Schema, ToSchema, Unpack, Version,
+    Schema, ServiceWrapper, ToSchema, Unpack, Version,
 };
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
@@ -282,7 +282,7 @@ pub struct PrettyAction {
     pub sender: AccountNumber,
 
     /// Service to execute the action
-    pub service: AccountNumber,
+    pub service: String,
 
     /// Service method to execute
     pub method: MethodNumber,
@@ -318,27 +318,29 @@ impl PrettyAction {
         }
     }
     pub fn into_action(self, schemas: &SchemaMap) -> Result<Action, anyhow::Error> {
+        let service = AccountNumber::from_exact(&self.service)?;
         let raw_data = if let Some(raw_data) = self.raw_data {
             raw_data
         } else {
-            PrettyAction::pack_data(self.service, self.method, &self.data, schemas)?
+            PrettyAction::pack_data(service, self.method, &self.data, schemas)?
         };
         Ok(Action {
             sender: self.sender,
-            service: self.service,
+            service,
             method: self.method,
             rawData: raw_data,
         })
     }
     pub fn to_action(&self, schemas: &SchemaMap) -> Result<Action, anyhow::Error> {
+        let service = AccountNumber::from_exact(&self.service)?;
         let raw_data = if let Some(raw_data) = &self.raw_data {
             raw_data.clone()
         } else {
-            PrettyAction::pack_data(self.service, self.method, &self.data, schemas)?
+            PrettyAction::pack_data(service, self.method, &self.data, schemas)?
         };
         Ok(Action {
             sender: self.sender,
-            service: self.service,
+            service: service,
             method: self.method,
             rawData: raw_data,
         })
@@ -406,7 +408,7 @@ impl<R: Read + Seek> PackagedService<R> {
         let mut service_files: Vec<(AccountNumber, usize)> = vec![];
         let mut data = vec![];
         let mut meta_index = None;
-        let service_re = Regex::new(r"^service/([-a-zA-Z0-9]*)\.(wasm|json)$")?;
+        let service_re = Regex::new(r"^service/([-a-zA-Z0-9]*(?:/\d+)?)\.(wasm|json)$")?;
         let data_re = Regex::new(r"^data/([-a-zA-Z0-9]*)/.*$")?;
         for index in 0..archive.len() {
             let raw_file = archive.by_index_raw(index)?;
@@ -416,10 +418,10 @@ impl<R: Read + Seek> PackagedService<R> {
             } else if let Some(captures) = service_re.captures(filename) {
                 match captures.extract() {
                     (_, [name, "wasm"]) => {
-                        service_files.push((AccountNumber::from_str(name)?, index));
+                        service_files.push((name.replace("/", "+").parse()?, index));
                     }
                     (_, [name, "json"]) => {
-                        info_files.insert(AccountNumber::from_str(name)?, index);
+                        info_files.insert(name.replace("/", "+").parse()?, index);
                     }
                     _ => {}
                 }
@@ -625,7 +627,7 @@ impl<R: Read + Seek> PackagedService<R> {
     pub fn needs_ui(&mut self) -> bool {
         self.postinstall
             .iter()
-            .any(|act| act.service == sites::SERVICE)
+            .any(|act| act.service.parse().unwrap_or(AccountNumber::new(0)) == sites::SERVICE)
     }
 
     fn manifest_services(&self) -> HashMap<AccountNumber, ServiceInfo> {
@@ -684,14 +686,18 @@ impl<R: Read + Seek> PackagedService<R> {
         Ok(())
     }
 
-    pub fn install_accounts(
+    pub fn install_account_group(
         &mut self,
         actions: &mut Vec<Vec<Action>>,
-        mut uploader: Option<&mut StagedUpload>,
+        mut uploader: &mut Option<&mut StagedUpload>,
         sender: AccountNumber,
+        subaccounts: bool,
     ) -> Result<(), anyhow::Error> {
         // service accounts
         for (account, index, info) in &self.services {
+            if account.is_subaccount() != subaccounts {
+                continue;
+            }
             let mut group = vec![];
             self.create_account(*account, sender, &mut group)?;
             let code = read(&mut self.archive.by_index(*index)?)?;
@@ -727,6 +733,9 @@ impl<R: Read + Seek> PackagedService<R> {
         }
         // extra accounts
         for account in self.get_accounts() {
+            if account.is_subaccount() != subaccounts {
+                continue;
+            }
             if !self.has_service(*account) {
                 let mut group = vec![];
                 self.create_account(*account, sender, &mut group)?;
@@ -734,6 +743,16 @@ impl<R: Read + Seek> PackagedService<R> {
             }
         }
         Ok(())
+    }
+
+    pub fn install_accounts(
+        &mut self,
+        actions: &mut Vec<Vec<Action>>,
+        mut uploader: Option<&mut StagedUpload>,
+        sender: AccountNumber,
+    ) -> Result<(), anyhow::Error> {
+        self.install_account_group(actions, &mut uploader, sender, false)?;
+        self.install_account_group(actions, &mut uploader, sender, true)
     }
 
     // TODO: handle recovery from partial install
@@ -788,10 +807,17 @@ impl<R: Read + Seek> PackagedService<R> {
             }
         }
 
+        for account in &self.meta.accounts {
+            if account.is_subaccount() {
+                accounts.push(account.base());
+            }
+        }
+
         for act in &self.postinstall {
+            let service = act.service.parse()?;
             accounts.push(act.sender);
-            services.push(act.service);
-            if act.service == transact::SERVICE
+            services.push(service);
+            if service == transact::SERVICE
                 && act.method == MethodNumber::from(transact::action_structs::runAs::ACTION_NAME)
             {
                 let nested = act.parse_data_as::<transact::action_structs::runAs>()?;
@@ -816,7 +842,7 @@ impl<R: Read + Seek> PackagedService<R> {
     ) -> Result<(), anyhow::Error> {
         for act in &self.postinstall {
             if act.raw_data.is_none() {
-                out.insert(act.service);
+                out.insert(act.service.parse()?);
             }
         }
         Ok(())

@@ -9,14 +9,14 @@
 #![cfg_attr(not(target_family = "wasm"), allow(unused_imports, dead_code))]
 
 use crate::{
-    actions::login_action, check, create_boot_transactions, fetch_packages,
-    get_optional_result_bytes, get_result_bytes, services, status_key, tester_raw, AccountNumber,
-    Action, ActionFormatter, BlockTime, Caller, Checksum256, CodeByHashRow, CodeRow, DbId,
-    DirectoryRegistry, Error, HostConfigRow, HttpBody, HttpHeader, HttpReply, HttpRequest,
+    self as psibase, account, actions::login_action, check, create_boot_transactions,
+    fetch_packages, get_optional_result_bytes, get_result_bytes, services, status_key, tester_raw,
+    AccountNumber, Action, ActionFormatter, BlockTime, Caller, Checksum256, CodeByHashRow, CodeRow,
+    DbId, DirectoryRegistry, Error, HostConfigRow, HttpBody, HttpHeader, HttpReply, HttpRequest,
     InnerTraceEnum, JointRegistry, KvHandle, KvMode, PackageOpFull, PackageRegistry,
-    PackagedService, RunMode, Schema, SchemaFetcher, SchemaMap, Seconds, SignedTransaction,
-    StatusRow, Table, TableRecord, Tapos, TimePointSec, TimePointUSec, ToKey, Transaction,
-    TransactionBuilder, TransactionTrace,
+    PackagedService, RunMode, Schema, SchemaFetcher, SchemaMap, Seconds, ServiceWrapper,
+    SignedTransaction, StatusRow, Table, TableRecord, Tapos, TimePointSec, TimePointUSec, ToKey,
+    Transaction, TransactionBuilder, TransactionTrace,
 };
 #[cfg(target_family = "wasm")]
 use crate::{MicroSeconds, PackageList};
@@ -400,6 +400,33 @@ impl Chain {
         self.start_block_at(current_time + micro_seconds);
     }
 
+    fn push_start_block(&self, expiration: TimePointUSec) {
+        let trx = Transaction {
+            tapos: Tapos {
+                expiration: expiration.ceil_seconds(),
+                refBlockSuffix: 0,
+                flags: 0,
+                refBlockIndex: 0,
+            },
+            actions: vec![
+                services::transact::Wrapper::pack_from(AccountNumber::new(0)).startBlock(),
+            ],
+            claims: vec![],
+        };
+        let strx = SignedTransaction {
+            transaction: trx.packed().into(),
+            proofs: vec![],
+            subjectiveData: None,
+        }
+        .packed();
+        let size =
+            unsafe { tester_raw::pushTransaction(self.chain_handle, strx.as_ptr(), strx.len()) };
+        let trace = TransactionTrace::unpacked(&get_result_bytes(size)).unwrap();
+        if let Some(error) = &trace.error {
+            panic!("startBlock failed: {error}");
+        }
+    }
+
     /// Start a new block
     ///
     /// Starts a new block at `time`. If `time.seconds` is 0,
@@ -419,7 +446,7 @@ impl Chain {
             };
             (
                 if producers.is_empty() {
-                    AccountNumber::from("firstproducer")
+                    account!("firstprod")
                 } else {
                     producers[0].name
                 },
@@ -427,7 +454,7 @@ impl Chain {
                 status.head.as_ref().map_or(0, |head| head.header.blockNum),
             )
         } else {
-            (AccountNumber::from("firstproducer"), 0, 0)
+            (account!("firstprod"), 0, 0)
         };
 
         // Guarantee that there is a recent block for fillTapos to use.
@@ -442,6 +469,7 @@ impl Chain {
                         commit_num,
                     )
                 }
+                self.push_start_block(time);
                 commit_num += 1;
             }
         }
@@ -453,6 +481,9 @@ impl Chain {
                 term,
                 commit_num,
             )
+        }
+        if status.is_some() {
+            self.push_start_block(time + Seconds::new(1));
         }
         *status = self
             .kv_get::<StatusRow, _>(StatusRow::DB, &status_key())
@@ -958,11 +989,14 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
     fn is_user_action(act: &Action) -> bool {
         use crate::{
             self as psibase, method,
-            services::{cpu_limit, db, events, transact, virtual_server},
+            services::{accounts, cpu_limit, db, events, transact, virtual_server},
         };
         !(act.service == db::SERVICE && act.method == method!("open")
             || act.service == cpu_limit::SERVICE
             || act.sender == transact::SERVICE && act.service == virtual_server::SERVICE
+            || act.sender == transact::SERVICE
+                && act.service == accounts::SERVICE
+                && act.method == method!("getAuthOf")
             || act.service == events::SERVICE && act.method == method!("sync")
             || act.sender == AccountNumber::default())
     }
@@ -1081,6 +1115,68 @@ impl<'a> Caller for ChainPusher<'a> {
         ret
     }
 }
+
+pub trait Push: ServiceWrapper {
+    /// push transactions to [psibase::Chain](psibase::Chain).
+    ///
+    /// This method returns an object which has methods
+    /// (one per action) which push transactions to a test chain and return a
+    /// [psibase::ChainResult](psibase::ChainResult) or
+    /// [psibase::ChainEmptyResult](psibase::ChainEmptyResult). This final object
+    /// can verify success or failure and can retrieve the return value, if any.
+    ///
+    /// This method defaults both `sender` and `service` to Self::SERVICE
+    fn push<'a>(chain: &'a Chain) -> Self::Actions<ChainPusher<'a>> {
+        Self::push_from_to(chain, Self::SERVICE, Self::SERVICE)
+    }
+
+    /// push transactions to [psibase::Chain](psibase::Chain).
+    ///
+    /// This method returns an object which has methods
+    /// (one per action) which push transactions to a test chain and return a
+    /// [psibase::ChainResult](psibase::ChainResult) or
+    /// [psibase::ChainEmptyResult](psibase::ChainEmptyResult). This final object
+    /// can verify success or failure and can retrieve the return value, if any.
+    ///
+    /// This method defaults `sender` to Self::SERVICE
+    fn push_to<'a>(chain: &'a Chain, service: AccountNumber) -> Self::Actions<ChainPusher<'a>> {
+        Self::push_from_to(chain, Self::SERVICE, service)
+    }
+
+    /// push transactions to [psibase::Chain](psibase::Chain).
+    ///
+    /// This method returns an object which has methods
+    /// (one per action) which push transactions to a test chain and return a
+    /// [psibase::ChainResult](psibase::ChainResult) or
+    /// [psibase::ChainEmptyResult](psibase::ChainEmptyResult). This final object
+    /// can verify success or failure and can retrieve the return value, if any.
+    ///
+    /// This method defaults `service` to Self::SERVICE
+    fn push_from<'a>(chain: &'a Chain, sender: AccountNumber) -> Self::Actions<ChainPusher<'a>> {
+        Self::push_from_to(chain, sender, Self::SERVICE)
+    }
+
+    /// push transactions to [psibase::Chain](psibase::Chain).
+    ///
+    /// This method returns an object which has methods
+    /// (one per action) which push transactions to a test chain and return a
+    /// [psibase::ChainResult](psibase::ChainResult) or
+    /// [psibase::ChainEmptyResult](psibase::ChainEmptyResult). This final object
+    /// can verify success or failure and can retrieve the return value, if any.
+    fn push_from_to<'a>(
+        chain: &'a Chain,
+        sender: AccountNumber,
+        service: AccountNumber,
+    ) -> Self::Actions<ChainPusher<'a>> {
+        Self::with_caller(ChainPusher {
+            chain,
+            sender,
+            service,
+        })
+    }
+}
+
+impl<T: ServiceWrapper> Push for T {}
 
 #[cfg(target_family = "wasm")]
 #[allow(non_snake_case)]
