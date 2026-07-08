@@ -208,6 +208,16 @@ pub mod service {
         Wrapper::emit().history().joined_fractal(fractal, member);
     }
 
+    /// Check if an account is a member of a fractal.
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    /// * `member` - The account to check.
+    #[action]
+    fn is_member(fractal: AccountNumber, member: AccountNumber) -> bool {
+        FractalMember::get(fractal, member).is_some()
+    }
+
     /// Set ordered occupations
     ///
     /// Payment for each ordered occupation will be according to the fractals payment strategy.

@@ -334,4 +334,60 @@ pub mod service {
 
         evaluation.unregister_user(registrant);
     }
+
+    /// Gets the schedule of an evaluation.
+    ///
+    /// # Arguments
+    /// * `owner` - The account number of the evaluation owner.
+    /// * `evaluation_id` - The ID of the evaluation.
+    ///
+    /// # Returns
+    /// The `(registration, deliberation, submission, finish_by)` unix seconds timestamps,
+    /// or `None` if the evaluation does not exist.
+    #[action]
+    fn get_sched(owner: AccountNumber, evaluation_id: u32) -> Option<(u32, u32, u32, u32)> {
+        Evaluation::get(owner, evaluation_id).map(|evaluation| {
+            (
+                evaluation.registration_starts,
+                evaluation.deliberation_starts,
+                evaluation.submission_starts,
+                evaluation.finish_by,
+            )
+        })
+    }
+
+    /// Gets the accounts of all users registered for an evaluation, ordered by account.
+    ///
+    /// # Arguments
+    /// * `owner` - The account number of the evaluation owner.
+    /// * `evaluation_id` - The ID of the evaluation.
+    #[action]
+    fn get_users(owner: AccountNumber, evaluation_id: u32) -> Vec<AccountNumber> {
+        Evaluation::get_assert(owner, evaluation_id)
+            .get_users()
+            .into_iter()
+            .map(|user| user.user)
+            .collect()
+    }
+
+    /// Gets the accounts of the users in a group of an evaluation, ordered by account.
+    ///
+    /// # Arguments
+    /// * `owner` - The account number of the evaluation owner.
+    /// * `evaluation_id` - The ID of the evaluation.
+    /// * `group_number` - The group number within the evaluation.
+    #[action]
+    fn get_grp_users(
+        owner: AccountNumber,
+        evaluation_id: u32,
+        group_number: u32,
+    ) -> Vec<AccountNumber> {
+        let evaluation = Evaluation::get_assert(owner, evaluation_id);
+        let group = check_some(evaluation.get_group(group_number), "group not found");
+        group
+            .get_users()
+            .into_iter()
+            .map(|user| user.user)
+            .collect()
+    }
 }

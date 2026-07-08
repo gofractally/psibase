@@ -1574,8 +1574,6 @@ name = "guilds"
 version = "0.23.0"
 dependencies = [
  "async-graphql",
- "evaluations",
- "fractals",
  "guilds-pkg",
  "psibase",
  "psibase-user-workspace-hack",

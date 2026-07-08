@@ -233,7 +233,7 @@ pub mod impls {
             }
         }
 
-        fn get_users(&self) -> Vec<User> {
+        pub fn get_users(&self) -> Vec<User> {
             let table = UserTable::new();
             table
                 .get_index_pk()
@@ -301,11 +301,14 @@ pub mod impls {
             result
         }
 
-        pub fn get(owner: AccountNumber, evaluation_id: u32) -> Self {
+        pub fn get(owner: AccountNumber, evaluation_id: u32) -> Option<Self> {
             let table = EvaluationTable::new();
-            let result = table.get_index_pk().get(&(owner, evaluation_id));
+            table.get_index_pk().get(&(owner, evaluation_id))
+        }
+
+        pub fn get_assert(owner: AccountNumber, evaluation_id: u32) -> Self {
             psibase::check_some(
-                result,
+                Self::get(owner, evaluation_id),
                 &format!("evaluation {} {} not found", owner, evaluation_id),
             )
         }
