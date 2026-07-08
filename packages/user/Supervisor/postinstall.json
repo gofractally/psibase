@@ -1,0 +1,11 @@
+[
+  {
+    "sender": "supervisor",
+    "service": "sites",
+    "method": "setcsp",
+    "data": {
+      "path": "*",
+      "csp": "default-src 'self';script-src 'self' 'wasm-unsafe-eval' blob:;style-src 'self' 'unsafe-inline';img-src 'self' data: psibase.localhost:8080 *.psibase.localhost:8080;font-src 'self';connect-src 'self' blob: psibase.localhost:8080 *.psibase.localhost:8080;frame-src psibase.localhost:8080 *.psibase.localhost:8080;frame-ancestors psibase.localhost:8080 *.psibase.localhost:8080;base-uri 'none';form-action 'self';object-src 'none';"
+    }
+  }
+]

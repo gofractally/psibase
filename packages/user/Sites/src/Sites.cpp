@@ -69,32 +69,43 @@ namespace SystemService
       }
 
       /*
-        script-src:
-          * `unsafe-eval` is needed for WebAssembly.compile()
-          * `unsafe-inline` is needed for inline <script> tags
-          * `blob:` for loading dynamically generated modules
-          * `https:` for dynamically loading libs from CDNs
-        font-src:
-          * `https:` for dynamically loading fonts from CDNs
-        frame-src:
-          * `*` is needed to allow embedding supervisor
-        connect-src:
-          * `blob:` for fetch-compiling blob urls
-          * `*` allows fetching plugins, as well as websocket connections
+        Strict baseline. Apps with additional needs (supervisor, prompt pages,
+        Explorer, Docs) override it via setCsp; see doc/src/default-apps/sites.md.
 
         CSP strings (default or user-defined via setCsp) may include the
         keyword `{{root}}`, which is replaced with the root domain including
         port when present (e.g. psibase.localhost:8080 or example.com).
-        See expandCspKeywords.
+        See expandCspKeywords. Host sources are written scheme-relative so
+        the same policy works over http (local dev) and https (production).
+
+        style-src:
+          * `unsafe-inline` is needed for runtime-injected <style> tags
+            (e.g. the shared chart component)
+        img-src:
+          * `data:` for generated identicons and inline app icons
+          * root + subdomains for cross-subdomain avatars
+            (<account>.<root>/profile/avatar)
+        connect-src:
+          * root + subdomains for fetching GraphQL/RPC from sibling services;
+            `'self'` also covers same-origin websockets
+        frame-src:
+          * only the supervisor may be embedded (hidden iframe used by apps)
+        frame-ancestors:
+          * `'self'` blocks cross-origin embedding (clickjacking defense);
+            prompt pages override this to allow the supervisor
       */
-      const std::string DEFAULT_CSP_HEADER =                               //
-          "default-src 'self';"                                            //
-          "font-src 'self' https:;"                                        //
-          "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: https:;"  //
-          "img-src * data:;"                                               //
-          "style-src 'self' 'unsafe-inline';"                              //
-          "frame-src *;"                                                   //
-          "connect-src * blob:;"                                           //
+      const std::string DEFAULT_CSP_HEADER =                //
+          "default-src 'self';"                             //
+          "script-src 'self';"                              //
+          "style-src 'self' 'unsafe-inline';"               //
+          "img-src 'self' data: {{root}} *.{{root}};"       //
+          "font-src 'self';"                                //
+          "connect-src 'self' {{root}} *.{{root}};"         //
+          "frame-src supervisor.{{root}};"                  //
+          "frame-ancestors 'self';"                         //
+          "base-uri 'none';"                                //
+          "form-action 'self';"                             //
+          "object-src 'none';"                              //
           ;
 
       // Root domain for CSP host sources: rootHost + optional port.

@@ -4,5 +4,14 @@
         "service": "sites",
         "method": "enablespa",
         "data": { "enable": true }
+    },
+    {
+        "sender": "accounts",
+        "service": "sites",
+        "method": "setcsp",
+        "data": {
+            "path": "*",
+            "csp": "default-src 'self';script-src 'self';style-src 'self' 'unsafe-inline';img-src 'self' data: psibase.localhost:8080 *.psibase.localhost:8080;font-src 'self';connect-src 'self' psibase.localhost:8080 *.psibase.localhost:8080;frame-src supervisor.psibase.localhost:8080;frame-ancestors 'self' supervisor.psibase.localhost:8080;base-uri 'none';form-action 'self';object-src 'none';"
+        }
     }
 ]
