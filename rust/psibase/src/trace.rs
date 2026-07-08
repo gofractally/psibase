@@ -217,7 +217,7 @@ fn format_action_trace(
         let mut custom = schema_types();
         let service_method = CustomResolvedServiceMethod::new(schemas, std::mem::drop);
         custom.insert("ServiceMethod".to_string(), &service_method);
-        let custom_action = CustomActionCollector::new(&*schemas, no_action);
+        let custom_action = CustomActionCollector::new(&*schemas, std::mem::drop);
         custom.insert("Action".to_string(), &custom_action);
         let mut cschema = CompiledSchema::new(&schema.unwrap().types, &custom);
         if !atrace.action.rawData.is_empty() {
@@ -653,7 +653,7 @@ impl<'a, 'b> Serialize for UnpackedTrace<'a, &'b ActionTrace> {
             let mut custom = schema_types();
             let service_method = CustomResolvedServiceMethod::new(self.schemas, std::mem::drop);
             custom.insert("ServiceMethod".to_string(), &service_method);
-            let custom_action = CustomActionCollector::new(&self.schemas, no_action);
+            let custom_action = CustomActionCollector::new(&self.schemas, std::mem::drop);
             custom.insert("Action".to_string(), &custom_action);
             let mut cschema = CompiledSchema::new(&schema.unwrap().types, &custom);
             if !atrace.action.rawData.is_empty() {
@@ -837,8 +837,6 @@ struct CustomActionCollector<'a, F> {
     schemas: &'a HashMap<AccountNumber, Schema>,
 }
 
-fn no_action(_act: SharedAction) {}
-
 impl<'a, F> CustomActionCollector<'a, F> {
     fn new(schemas: &'a SchemaMap, f: F) -> Self {
         Self {
@@ -878,7 +876,7 @@ impl<'a, 'b, F: FnMut(SharedAction<'a>) -> ()> CustomHandler<'a> for CustomActio
                 let mut custom = schema_types();
                 let service_method = CustomResolvedServiceMethod::new(self.schemas, std::mem::drop);
                 custom.insert("ServiceMethod".to_string(), &service_method);
-                let custom_action = CustomActionCollector::new(&self.schemas, no_action);
+                let custom_action = CustomActionCollector::new(&self.schemas, std::mem::drop);
                 custom.insert("Action".to_string(), &custom_action);
                 let mut cschema = CompiledSchema::new(&schema.types, &custom);
                 cschema.extend(&action_type.params);
