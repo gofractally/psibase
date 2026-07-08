@@ -572,6 +572,15 @@ pub trait CustomHandler {
         val: &serde_json::Value,
         dest: &mut Vec<u8>,
     ) -> Result<(), serde_json::Error>;
+    fn fracpack_verify(
+        &self,
+        schema: &CompiledSchema,
+        ty: &CompiledType,
+        src: &mut FracInputStream,
+        allow_empty_container: bool,
+    ) -> Result<(), Error> {
+        fracpack_verify_impl(schema, ty, src, allow_empty_container)
+    }
     fn is_empty_container(&self, ty: &CompiledType, value: &serde_json::Value) -> bool;
 }
 
@@ -615,6 +624,16 @@ impl<'a> CustomTypes<'a> {
         dest: &mut Vec<u8>,
     ) -> Result<(), serde_json::Error> {
         self.handlers[id].json2frac(schema, ty, val, dest)
+    }
+    fn fracpack_verify(
+        &self,
+        id: usize,
+        schema: &CompiledSchema,
+        ty: &CompiledType,
+        src: &mut FracInputStream,
+        allow_empty_container: bool,
+    ) -> Result<(), Error> {
+        self.handlers[id].fracpack_verify(schema, ty, src, allow_empty_container)
     }
     fn is_empty_container(&self, id: usize, ty: &CompiledType, value: &serde_json::Value) -> bool {
         self.handlers[id].is_empty_container(ty, value)
@@ -2291,9 +2310,11 @@ fn fracpack_verify_impl(
             stream.has_unknown |= substream.has_unknown;
             substream.finish()?;
         }
-        Custom { repr, .. } => {
+        Custom { id, repr, .. } => {
             let repr = schema.get_by_id(*repr);
-            fracpack_verify_impl(schema, repr, stream, allow_empty_container)?;
+            schema
+                .custom
+                .fracpack_verify(*id, schema, repr, stream, allow_empty_container)?;
         }
         _ => {
             unimplemented!();
