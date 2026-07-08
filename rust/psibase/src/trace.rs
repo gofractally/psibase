@@ -3,11 +3,11 @@ use std::fmt;
 use crate::{
     method, schema_types,
     services::{db, transact},
-    AccountNumber, Action, Hex, MethodString, Pack, Schema, SchemaMap,
+    AccountNumber, Action, Hex, MethodNumber, MethodString, Schema, SchemaMap, ServiceMethod,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
-use fracpack::{CompiledSchema, Unpack};
+use fracpack::{CompiledSchema, CompiledType, CustomHandler, FracInputStream, Pack, Unpack};
 use futures::future::{FutureExt, LocalBoxFuture, Shared};
 use serde::{
     ser::{SerializeSeq, SerializeStruct},
@@ -15,7 +15,7 @@ use serde::{
 };
 use serde_aux::prelude::deserialize_number_from_string;
 use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::Write;
 use std::rc::Rc;
 
@@ -213,7 +213,9 @@ fn format_action_trace(
         "", atrace.action.sender, atrace.action.service, action_name
     )?;
     if let Some(action_type) = action_type {
-        let custom = schema_types();
+        let mut custom = schema_types();
+        let service_method = CustomResolvedServiceMethod::new(schemas);
+        custom.insert("ServiceMethod".to_string(), &service_method);
         let mut cschema = CompiledSchema::new(&schema.unwrap().types, &custom);
         if !atrace.action.rawData.is_empty() {
             cschema.extend(&action_type.params);
@@ -402,6 +404,26 @@ impl<'a, F: SchemaFetcher + 'a> ActionFormatter<'a, F> {
     }
     pub async fn prepare_action_trace(&self, atrace: &ActionTrace) -> Result<(), anyhow::Error> {
         let mut res = self.add_service(atrace.action.service).await;
+        if res.is_ok() {
+            let schemas = self.storage.schemas.borrow();
+            if let Some(schema) = schemas.get(&atrace.action.service) {
+                let mut custom = schema_types();
+                let service_method = CustomResolvedServiceMethod::new(&*schemas);
+                custom.insert("ServiceMethod".to_string(), &service_method);
+                let mut cschema = CompiledSchema::new(&schema.types, &custom);
+
+                let action_name = MethodString(atrace.action.method.to_string());
+                if let Some(action_type) = schema.actions.get(&action_name) {
+                    if atrace.action.rawData.is_empty() {
+                        cschema.extend(&action_type.params);
+                        let _ = cschema.to_value(&action_type.params, &atrace.action.rawData);
+                        for service in &*service_method.missing.borrow() {
+                            res = res.and(self.add_service(*service).await);
+                        }
+                    }
+                }
+            }
+        }
         for inner in &atrace.inner_traces {
             match &inner.inner {
                 InnerTraceEnum::EventTrace(e) => res = res.and(self.prepare_event_trace(e).await),
@@ -593,7 +615,9 @@ impl<'a, 'b> Serialize for UnpackedTrace<'a, &'b ActionTrace> {
         let mut unpacked_retval = None;
 
         if let Some(action_type) = action_type {
-            let custom = schema_types();
+            let mut custom = schema_types();
+            let service_method = CustomResolvedServiceMethod::new(self.schemas);
+            custom.insert("ServiceMethod".to_string(), &service_method);
             let mut cschema = CompiledSchema::new(&schema.unwrap().types, &custom);
             if !atrace.action.rawData.is_empty() {
                 cschema.extend(&action_type.params);
@@ -672,5 +696,104 @@ impl<'a, 'b> Serialize for UnpackedTrace<'a, &'b InnerTraceEnum> {
                 },
             ),
         }
+    }
+}
+
+// Uses on-chain schemas to resolve the original
+// spelling of methods.
+struct CustomResolvedServiceMethod<'a> {
+    schemas: &'a HashMap<AccountNumber, Schema>,
+    missing: Rc<RefCell<HashSet<AccountNumber>>>,
+}
+
+impl<'a> CustomResolvedServiceMethod<'a> {
+    fn new(schemas: &'a SchemaMap) -> Self {
+        CustomResolvedServiceMethod {
+            schemas,
+            missing: Rc::new(RefCell::new(HashSet::new())),
+        }
+    }
+}
+
+fn service_method_type(ty: &CompiledType) -> Option<((&String, &String), (usize, usize))> {
+    if let CompiledType::Object { children } = ty {
+        if children.len() == 2 {
+            return Some((
+                (&children[0].0, &children[1].0),
+                (children[0].1, children[1].1),
+            ));
+        }
+    }
+    None
+}
+
+impl<'a> CustomHandler for CustomResolvedServiceMethod<'a> {
+    fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool {
+        let is_u64 = |member| {
+            matches!(
+                schema.unwrap_struct(schema.get_by_id(member)),
+                CompiledType::Int {
+                    bits: 64,
+                    is_signed: false
+                }
+            )
+        };
+        if let Some((_, (service, method))) = service_method_type(ty) {
+            is_u64(service) && is_u64(method)
+        } else {
+            false
+        }
+    }
+    fn frac2json(
+        &self,
+        _schema: &CompiledSchema,
+        ty: &CompiledType,
+        src: &mut FracInputStream,
+        _allow_empty_container: bool,
+    ) -> Result<serde_json::Value, fracpack::Error> {
+        let Some(((sname, mname), _)) = service_method_type(ty) else {
+            panic!("Wrong type");
+        };
+        let value = ServiceMethod::unpack(src)?;
+        let mut method = MethodString(value.method.to_string());
+        if let Some(schema) = self.schemas.get(&value.service) {
+            if let Some((key, _)) = schema.actions.get_key_value(&method) {
+                method = key.clone();
+            }
+        } else {
+            self.missing.borrow_mut().insert(value.service);
+        }
+        let mut result = serde_json::Map::with_capacity(2);
+        result.insert(sname.clone(), value.service.to_string().into());
+        result.insert(mname.clone(), method.0.into());
+        Ok(result.into())
+    }
+    fn json2frac(
+        &self,
+        _schema: &CompiledSchema,
+        ty: &CompiledType,
+        val: &serde_json::Value,
+        dest: &mut Vec<u8>,
+    ) -> Result<(), serde_json::Error> {
+        use serde::de::Error;
+        let Some(((sname, mname), _)) = service_method_type(ty) else {
+            panic!("Wrong type");
+        };
+        let Some(object) = val.as_object() else {
+            Err(serde_json::Error::custom("expected object"))?
+        };
+        let value =
+            ServiceMethod {
+                service: AccountNumber::deserialize(object.get(sname).ok_or_else(|| {
+                    serde_json::Error::custom(format!("missing field {}", sname))
+                })?)?,
+                method: MethodNumber::deserialize(object.get(mname).ok_or_else(|| {
+                    serde_json::Error::custom(format!("missing field {}", mname))
+                })?)?,
+            };
+        Ok(value.pack(dest))
+    }
+    fn is_empty_container(&self, _ty: &CompiledType, _value: &serde_json::Value) -> bool {
+        false
     }
 }

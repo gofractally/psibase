@@ -239,7 +239,7 @@ mod tests {
     fn test_subaccounts(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
         http_server::Wrapper::push_from(&chain, Wrapper::SERVICE)
-            .registerServer(account!("r-tokens"))
+            .registerServer(account!("tokens+1"))
             .get()?;
         chain.finish_block();
 

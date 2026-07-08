@@ -4,7 +4,7 @@ pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::{
         abort_message, check, check_none, check_some, define_flags, get_sender, AccountNumber,
-        FlagsType, Fracpack, Memo, Table, ToSchema,
+        FlagsType, Fracpack, Memo, ServiceWrapper, Table, ToSchema,
     };
     use serde::{Deserialize, Serialize};
 
@@ -278,7 +278,8 @@ pub mod tables {
 pub mod service {
     use crate::tables::*;
     use psibase::{
-        check, check_some, get_sender, services::events, AccountNumber, DbId, Memo, MethodNumber,
+        check, check_some, get_sender, get_service, services::events, AccountNumber, DbId, Memo,
+        MethodNumber, ServiceWrapper,
     };
 
     pub type NID = u32;

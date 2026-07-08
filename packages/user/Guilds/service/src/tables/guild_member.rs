@@ -1,7 +1,7 @@
 use async_graphql::ComplexObject;
 use psibase::services::fractals::weighted_normalization::HasScore;
 use psibase::services::tokens::{Decimal, Precision, Quantity};
-use psibase::{check, check_none, check_some, AccountNumber, Table};
+use psibase::{check, check_none, check_some, AccountNumber, ServiceWrapper, Table};
 
 use crate::constants::{EMA_ALPHA_DENOMINATOR, GUILD_EVALUATION_GROUP_SIZE, SCORE_SCALE};
 use crate::helpers::{calculate_ema_u32, Fraction, RollingBits16};
@@ -13,7 +13,10 @@ use psibase::services::transact::Wrapper as TransactSvc;
 
 impl HasScore for GuildMember {
     fn get_score(&self) -> Decimal {
-        Decimal::new(Quantity::from(self.score as u64), Precision::new(4).unwrap())
+        Decimal::new(
+            Quantity::from(self.score as u64),
+            Precision::new(4).unwrap(),
+        )
     }
 }
 

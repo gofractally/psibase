@@ -143,6 +143,7 @@ struct EventCursor : sqlite3_vtab_cursor
    std::vector<char> end;
    std::vector<char> data;
    std::size_t       prefixLen;
+   bool              descending = false;
    EventIndexHandle  handle{KvMode::read};
    EventCursor(const EventVTab& vtab) : key(vtab.key()), prefixLen(key.size() + 1) {}
    EventVTab* vtab() { return static_cast<EventVTab*>(pVtab); }
@@ -153,20 +154,18 @@ struct EventCursor : sqlite3_vtab_cursor
    }
    bool          eof() { return key.size() < prefixLen; }
    std::uint64_t eventId() const { return keyToEventId(key, prefixLen); }
-   void          seek()
+   void          load(std::uint32_t sz)
    {
-      auto sz = psibase::raw::kvGreaterEqual(handle, key.data(), key.size(), prefixLen);
       if (sz == 0xffffffffu)
-      {
          setEof();
-      }
       else
       {
-         // vtab()->index.db
          auto key_size = psibase::raw::getKey(nullptr, 0);
          key.resize(key_size);
          psibase::raw::getKey(key.data(), key.size());
-         if (!end.empty() && compare_blob(key, end) >= 0)
+         bool outOfRange = descending ? compare_blob(key, end) < 0
+                                      : (!end.empty() && compare_blob(key, end) >= 0);
+         if (outOfRange)
             setEof();
          else
          {
@@ -241,6 +240,9 @@ struct EventCursor : sqlite3_vtab_cursor
          }
       }
    }
+   void seek() { load(psibase::raw::kvGreaterEqual(handle, key.data(), key.size(), prefixLen)); }
+   void seekPrev() { load(psibase::raw::kvLessThan(handle, key.data(), key.size(), prefixLen)); }
+   void seekLast() { load(psibase::raw::kvMax(handle, key.data(), prefixLen)); }
 };
 
 int event_eof(sqlite3_vtab_cursor* cursor)
@@ -256,8 +258,15 @@ int event_next(sqlite3_vtab_cursor* cursor)
    {
       return SQLITE_ERROR;
    }
-   c->key.push_back('\0');
-   c->seek();
+   if (c->descending)
+   {
+      c->seekPrev();
+   }
+   else
+   {
+      c->key.push_back('\0');
+      c->seek();
+   }
    return SQLITE_OK;
 }
 
@@ -549,25 +558,49 @@ struct IndexConstraints
    bool eq : 1;
    bool upper : 1;
    bool lower : 1;
+   int  limit = -1;
    int  estimatedCost() const
    {
       if (!usable)
          return 1000000;
+      int cost;
       if (eq && unique)
-         return 1;
-      if (eq && !unique)
-         return 10;
-      if (lower && upper)
-         return 300;
-      if (lower || upper)
-         return 500;
-      return 1000;
+         cost = 1;
+      else if (eq && !unique)
+         cost = 10;
+      else if (lower && upper)
+         cost = 300;
+      else if (lower || upper)
+         cost = 500;
+      else
+         cost = 1000;
+      if (limit >= 0 && limit < cost)
+         cost = limit;
+      return cost;
    }
    friend bool operator==(const IndexConstraints&, const IndexConstraints&) = default;
 };
 auto operator<=>(const IndexConstraints& lhs, const IndexConstraints& rhs)
 {
    return lhs.estimatedCost() <=> rhs.estimatedCost();
+}
+
+// A single-column ORDER BY can be satisfied by scanning that column's index.
+// If the query also has a LIMIT, the scan stops after that many rows, so lower
+// that column's cost accordingly.
+void applyOrderByLimitCost(sqlite3_index_info* info, IndexConstraints& orderByCol)
+{
+   auto constraintRange =
+       std::ranges::subrange(info->aConstraint, info->aConstraint + info->nConstraint);
+   auto limitConstraint = std::ranges::find_if(
+       constraintRange, [](auto& c) { return c.op == SQLITE_INDEX_CONSTRAINT_LIMIT; });
+   if (limitConstraint == constraintRange.end())
+      return;
+
+   const int      i     = static_cast<int>(limitConstraint - info->aConstraint);
+   sqlite3_value* value = nullptr;
+   if (sqlite3_vtab_rhs_value(info, i, &value) == SQLITE_OK)
+      orderByCol.limit = sqlite3_value_int64(value);
 }
 
 int event_best_index(sqlite3_vtab* base_vtab, sqlite3_index_info* info)
@@ -608,14 +641,25 @@ int event_best_index(sqlite3_vtab* base_vtab, sqlite3_index_info* info)
          }
       }
    }
+
+   if (info->nOrderBy == 1 && constraints[info->aOrderBy[0].iColumn + 1].usable)
+      applyOrderByLimitCost(info, constraints[info->aOrderBy[0].iColumn + 1]);
+
    int  best = std::ranges::min_element(constraints) - constraints.begin() - 1;
-   auto buf  = static_cast<char*>(alloca(info->nConstraint + 1));
+   bool desc = false;
+   if (info->nOrderBy == 1 && best == info->aOrderBy[0].iColumn)
+   {
+      info->orderByConsumed = 1;
+      desc                  = info->aOrderBy[0].desc;
+   }
+   auto buf  = static_cast<char*>(alloca(info->nConstraint + 2));
    int  argc = 0;
+   buf[0]    = desc ? '-' : '+';
    for (int i = 0; i < info->nConstraint; ++i)
    {
       auto appendArg = [&](char type)
       {
-         buf[argc]                           = type;
+         buf[argc + 1]                       = type;
          info->aConstraintUsage[i].argvIndex = argc + 1;
          ++argc;
       };
@@ -641,12 +685,12 @@ int event_best_index(sqlite3_vtab* base_vtab, sqlite3_index_info* info)
          }
       }
    }
-   buf[argc]    = '\0';
-   info->idxNum = best;
-   info->idxStr = (char*)sqlite3_malloc(argc + 1);
+   buf[argc + 1] = '\0';
+   info->idxNum  = best;
+   info->idxStr  = (char*)sqlite3_malloc(argc + 2);
    if (!info->idxStr)
       return SQLITE_NOMEM;
-   std::memcpy(info->idxStr, buf, argc + 1);
+   std::memcpy(info->idxStr, buf, argc + 2);
    info->needToFreeIdxStr = 1;
    info->estimatedCost    = constraints[best + 1].estimatedCost();
    return SQLITE_OK;
@@ -915,6 +959,9 @@ int event_filter(sqlite3_vtab_cursor* cursor,
    key.push_back(static_cast<char>(index));
    c->prefixLen = key.size();
    c->key       = key;
+   // xFilter may be called multiple times to restart a scan on the same
+   // cursor; the upper bound must not leak from a previous filter.
+   c->end.clear();
    auto keyType = index >= 0 ? vtab->rowType->children[index] : CompiledMember{.type = &u64};
    auto incKey  = [&](std::vector<char>& k)
    {
@@ -938,7 +985,7 @@ int event_filter(sqlite3_vtab_cursor* cursor,
    {
       key.resize(c->prefixLen);
       auto adj = sql_to_key(keyType, argv[i], key);
-      switch (argTypes[i])
+      switch (argTypes[i + 1])
       {
          case '=':
             if (adj != KeyResult::exact)
@@ -968,7 +1015,26 @@ int event_filter(sqlite3_vtab_cursor* cursor,
             break;
       }
    }
-   c->seek();
+   c->descending = (argTypes[0] == '-');
+   if (c->descending)
+   {
+      std::vector<char> upper = std::move(c->end);
+      c->end                  = std::move(c->key);
+      if (upper.empty())
+      {
+         c->key.assign(c->end.begin(), c->end.begin() + c->prefixLen);
+         c->seekLast();
+      }
+      else
+      {
+         c->key = std::move(upper);
+         c->seekPrev();
+      }
+   }
+   else
+   {
+      c->seek();
+   }
    return SQLITE_OK;
 }
 

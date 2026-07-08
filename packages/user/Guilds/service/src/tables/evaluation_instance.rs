@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use ::evaluations::service::{Evaluation, EvaluationTable, User, UserTable};
 use psibase::services::evaluations;
-use psibase::{check_some, get_service, AccountNumber, Table};
+use psibase::{check_some, get_service, AccountNumber, ServiceWrapper, Table};
 
 use crate::constants::GUILD_EVALUATION_GROUP_SIZE;
 use crate::helpers::assign_decreasing_levels;

@@ -451,6 +451,19 @@ class TestPsibase(unittest.TestCase):
         result = a.graphql('accounts', '''query { getAccount(accountName: "symbol") { accountNum authService } }''')
         self.assertIsNotNone(result['getAccount'])
 
+    @testutil.psinode_test
+    def test_json_trace(self, cluster):
+        (a,) = cluster.complete(*testutil.generate_names(1));
+        a.boot(packages=['Minimal', 'Explorer'])
+        p = a.run_psibase(['install', '-y']  + a.node_args() + ['TokenUsers', '--trace=json'], stdout=subprocess.PIPE, encoding="utf-8")
+        text = p.stdout.strip(' \t\r\n')
+        decoder = json.JSONDecoder()
+        while text != "":
+            print("'%s'" % text[:20])
+            (_, pos) = decoder.raw_decode(text)
+            print('pos = %d' % pos);
+            text = text[pos:].strip(' \t\r\n')
+
     def assertResponse(self, response, expected):
         response.raise_for_status()
         self.assertEqual(response.text, expected)

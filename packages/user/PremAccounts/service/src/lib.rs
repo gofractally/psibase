@@ -40,7 +40,7 @@ pub mod tables {
 
 pub mod constants;
 
-#[psibase::service(name = "prem-accounts", tables = "tables")]
+#[psibase::service(name = "prem-accts", tables = "tables")]
 pub mod service {
     use crate::constants::{MAX_ACCOUNT_NAME_LENGTH, MIN_ACCOUNT_NAME_LENGTH};
     use crate::tables::{

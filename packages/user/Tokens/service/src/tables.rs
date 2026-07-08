@@ -2,10 +2,12 @@
 pub mod tables {
     use crate::service::{fmt_amount, TID};
     use async_graphql::{ComplexObject, SimpleObject};
+    use psibase::services::accounts::Wrapper as Accounts;
     use psibase::services::nft::{Wrapper as Nfts, NID};
     use psibase::services::tokens::{Decimal, Precision, Quantity};
     use psibase::{
-        abort_message, check, check_none, check_some, get_sender, AccountNumber, Memo, TableRecord,
+        abort_message, check, check_none, check_some, get_sender, AccountNumber, Memo,
+        ServiceWrapper, TableRecord,
     };
     use psibase::{define_flags, Flags};
     use psibase::{Fracpack, Table, ToSchema};
@@ -428,6 +430,13 @@ pub mod tables {
                 creditor != debitor,
                 format!("Sender {} cannot also be receiver", creditor).as_str(),
             );
+
+            if !Accounts::call().exists(debitor) {
+                abort_message(&format!(
+                    "debitor account '{}' does not exist",
+                    debitor.to_string()
+                ));
+            }
 
             Self {
                 shared_bal_id: InitRow::next_shared_bal_id(),

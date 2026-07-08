@@ -3,7 +3,8 @@ pub mod tables {
     use psibase::services::nft::Wrapper as Nft;
     use psibase::services::transact::Wrapper as TransactSvc;
     use psibase::{
-        check, check_some, get_sender, AccountNumber, Fracpack, Table, TimePointSec, ToSchema,
+        check, check_some, get_sender, AccountNumber, Fracpack, ServiceWrapper, Table,
+        TimePointSec, ToSchema,
     };
 
     use async_graphql::{ComplexObject, SimpleObject};
@@ -254,7 +255,7 @@ pub mod tables {
     }
 }
 
-#[psibase::service(name = "diff-adjust", tables = "tables")]
+#[psibase::service(name = "diff-adj", tables = "tables")]
 pub mod service {
     use crate::tables::RateLimit;
 

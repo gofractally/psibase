@@ -13,9 +13,9 @@ use transact::plugin::intf::add_action_to_transaction;
 use exports::producers::plugin::api::Guest as Api;
 use producers::plugin::types::*;
 
+use psibase::account;
 use psibase::fracpack::Pack;
 use psibase::services;
-use psibase::AccountNumber;
 use serde::Deserialize;
 use services::producers::action_structs as Actions;
 
@@ -86,7 +86,7 @@ impl ProducersPlugin {
             let spki = SubjectPublicKeyInfo(der_bytes);
 
             let claim = psibase::Claim {
-                service: AccountNumber::from(candidate_info.claim.service.as_str()),
+                service: candidate_info.claim.service.parse().unwrap(),
                 rawData: spki.0.into(),
             };
 
@@ -102,7 +102,7 @@ impl ProducersPlugin {
         Ok(account_claims
             .into_iter()
             .map(|(account, auth)| Producer {
-                name: AccountNumber::from(account.as_str()),
+                name: account.parse().unwrap(),
                 auth,
             })
             .collect())
@@ -152,12 +152,12 @@ impl Api for ProducersPlugin {
                         .map_err(|e| InvalidResponse(format!("Invalid PEM: {}", e)))?;
 
                 psibase::Claim {
-                    service: AccountNumber::from("verify-sig"),
+                    service: account!("verify-sig"),
                     rawData: spki.0.into(),
                 }
             }
             ClaimType::Generic(claim) => psibase::Claim {
-                service: AccountNumber::from(claim.verify_service.as_str()),
+                service: claim.verify_service.parse().unwrap(),
                 rawData: claim.raw_data.into(),
             },
         };

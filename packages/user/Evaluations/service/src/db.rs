@@ -97,7 +97,7 @@ pub mod impls {
     };
     use psibase::services::evaluations::Hooks::hooks_wrapper as EvalHooks;
     use psibase::services::subgroups::Wrapper as Subgroups;
-    use psibase::{AccountNumber, Table};
+    use psibase::{AccountNumber, ServiceWrapper, Table};
     use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
 
     impl ConfigRow {
