@@ -34,7 +34,7 @@ fn test_diff_adjust_basic(mut chain: psibase::Chain) -> Result<(), psibase::Erro
     // 7 sales increases the Difficulty by 5%
     assert_eq!(Wrapper::push(&chain).get_diff(nft_id).get()?, 2992);
 
-    // Adjustments = floor(events / (target_max + 1)). The 7 sales above left no remainder
+    // Adjustments = floor(activity_count / (target_max + 1)). The 7 sales above left no remainder
     // (7 % 7 == 0), so these 18 sales give floor(18 / 7) = 2 steps (5% x 2 on top of 2992).
     chain.start_block_after(Seconds::new(5).into());
 
@@ -72,15 +72,15 @@ fn test_asymmetric_ppm(mut chain: psibase::Chain) -> Result<(), psibase::Error> 
     Ok(())
 }
 
-/// Verifies the core rule across targets: `target` events accumulate with no adjustment and
-/// the next event triggers one, so the number of difficulty steps for `events` accumulated in
-/// a window is `floor(events / (target + 1))` (which makes `target == 0` adjust every event).
+/// Verifies the core rule across targets: `target` activity accumulates with no adjustment and
+/// the next unit triggers one, so the number of difficulty steps for `activity_count` accumulated in
+/// a window is `floor(activity_count / (target + 1))` (which makes `target == 0` adjust every unit).
 ///
 /// This reproduces the NameMarket / Symbol usage pattern (`increment(nft, 1)` once per
-/// purchase). For example with `target = 3` the steps land on events 4, 8, 12, ... :
-///   events 1-3 -> 0 steps, events 4-7 -> 1, events 8-11 -> 2, event 12 -> 3.
+/// purchase). For example with `target = 3` the steps land on activity 4, 8, 12, ... :
+///   activity 1-3 -> 0 steps, activity 4-7 -> 1, activity 8-11 -> 2, activity 12 -> 3.
 #[psibase::test_case(packages("DiffAdjust"))]
-fn test_adjustment_count_matches_floor_events_over_target_plus_one(
+fn test_adjustment_count_matches_floor_activity_over_target_plus_one(
     mut chain: psibase::Chain,
 ) -> Result<(), psibase::Error> {
     chain.set_auto_block_start(false);
@@ -103,7 +103,7 @@ fn test_adjustment_count_matches_floor_events_over_target_plus_one(
         }
         d
     };
-    let expected_steps = |target: u32, events: u32| -> u32 { events / (target + 1) };
+    let expected_steps = |target: u32, activity: u32| -> u32 { activity / (target + 1) };
 
     for target in [0u32, 1, 2, 3, 5] {
         let nft_id = Wrapper::push_from(&chain, alice)
@@ -111,16 +111,16 @@ fn test_adjustment_count_matches_floor_events_over_target_plus_one(
             .get()?;
         chain.start_block();
 
-        let total_events = target.max(1) * 3 + 1;
-        for events in 1..=total_events {
+        let total_activity = target.max(1) * 3 + 1;
+        for activity in 1..=total_activity {
             Wrapper::push_from(&chain, alice)
                 .increment(nft_id, 1)
                 .get()?;
             chain.start_block();
             assert_eq!(
                 Wrapper::push(&chain).get_diff(nft_id).get()?,
-                diff_after_steps(expected_steps(target, events)),
-                "target={target}: wrong difficulty after {events} events"
+                diff_after_steps(expected_steps(target, activity)),
+                "target={target}: wrong difficulty after {activity} activity"
             );
         }
     }
@@ -156,13 +156,13 @@ fn test_target_zero_increase_every_event(mut chain: psibase::Chain) -> Result<()
     Ok(())
 }
 
-/// The counter remainder must be CARRIED across increments (not reset to 0). A series of
+/// The activity_count remainder must be CARRIED across increments (not reset to 0). A series of
 /// individually-below-threshold batches must still earn the adjustments that their
-/// cumulative event count deserves, and a batched increment must match the same events fed
+/// cumulative activity count deserves, and a batched increment must match the same activity fed
 /// one at a time.
 ///
-/// With `target = 3` (one adjustment per `target + 1 = 4` events), four increments of 3
-/// (12 events) trace the counter as: 3 (no step) -> 6 (1 step, carry 2) -> 5 (1 step,
+/// With `target = 3` (one adjustment per `target + 1 = 4` activity), four increments of 3
+/// (12 activity) trace the activity_count as: 3 (no step) -> 6 (1 step, carry 2) -> 5 (1 step,
 /// carry 1) -> 4 (1 step, carry 0), i.e. 3 steps. A reset-to-0 implementation would instead
 /// fire only on the 2nd and 4th batch (2 steps) and silently drop the carried remainder.
 #[psibase::test_case(packages("DiffAdjust"))]
@@ -199,7 +199,7 @@ fn test_remainder_carries_across_batches(mut chain: psibase::Chain) -> Result<()
         assert_eq!(Wrapper::push(&chain).get_diff(batched).get()?, expected);
     }
 
-    // The same 12 events, one at a time, must land on the identical difficulty (11_576).
+    // The same 12 activity, one at a time, must land on the identical difficulty (11_576).
     let mut individual_diff = INITIAL;
     for _ in 0..12 {
         Wrapper::push_from(&chain, alice)
@@ -210,7 +210,7 @@ fn test_remainder_carries_across_batches(mut chain: psibase::Chain) -> Result<()
     }
     assert_eq!(
         individual_diff, 11_576,
-        "batched increments must equal the same events fed one at a time"
+        "batched increments must equal the same activity fed one at a time"
     );
 
     Ok(())

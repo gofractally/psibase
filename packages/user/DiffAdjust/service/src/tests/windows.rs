@@ -50,7 +50,7 @@ fn test_one_second_window(mut chain: psibase::Chain) -> Result<(), psibase::Erro
     // Blocks: [0] [1] [2] [3] [4] [5] [6] [7] [8]
     //                      ^current_block
     //                          ^last_update
-    assert_eq!(get_diff_2(nft_id)?, 300); // It increments immediately since counter exceeded target, which also
+    assert_eq!(get_diff_2(nft_id)?, 300); // It increments immediately since activity_count exceeded target, which also
                                           // sets the last_update (window reset)
     chain.start_block();
     // Blocks: [0] [1] [2] [3] [4] [5] [6] [7] [8]
@@ -79,14 +79,14 @@ fn test_one_second_window(mut chain: psibase::Chain) -> Result<(), psibase::Erro
     //                                      ^current_block
     //                                      ^last_update
 
-    // The 6 + 7 = 13 events above gave floor(13 / (5 + 1)) = 2 steps and leave a carried
-    // counter of 1 (13 % 6 == 1), so a single extra event keeps the counter below the next
+    // The 6 + 7 = 13 activity above gave floor(13 / (5 + 1)) = 2 steps and leave a carried
+    // activity_count of 1 (13 % 6 == 1), so a single extra unit keeps the activity_count below the next
     // step threshold (target_max + 1 = 6).
     Wrapper::push_from(&chain, alice).increment(nft_id, 1);
     // Blocks: [0] [1] [2] [3] [4] [5] [6] [7] [8]
     //                                      ^current_block
-    //                                      ^last_update - window not reset because the counter stayed below target
-    assert_eq!(get_diff(nft_id)?, 108); // difficulty also not changed: counter (2) did not exceed target_max
+    //                                      ^last_update - window not reset because the activity_count stayed below target
+    assert_eq!(get_diff(nft_id)?, 108); // difficulty also not changed: activity_count (2) did not exceed target_max
     chain.start_block();
     // Blocks: [0] [1] [2] [3] [4] [5] [6] [7] [8]
     //                                          ^current_block

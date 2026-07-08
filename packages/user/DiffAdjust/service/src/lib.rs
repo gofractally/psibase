@@ -18,7 +18,7 @@ pub mod tables {
         #[primary_key]
         pub nft_id: u32,
         pub window_seconds: u32,
-        pub counter: u32,
+        pub activity_count: u32,
         pub target_min: u32,
         pub target_max: u32,
         pub floor_difficulty: u64,
@@ -45,7 +45,7 @@ pub mod tables {
             Self {
                 nft_id,
                 active_difficulty: initial_difficulty,
-                counter: 0,
+                activity_count: 0,
                 floor_difficulty,
                 target_min,
                 target_max,
@@ -170,9 +170,9 @@ pub mod tables {
             let seconds_elapsed = (now.seconds - self.last_update.seconds).max(0) as u32;
             let windows_elapsed = seconds_elapsed / self.window_seconds;
             if windows_elapsed > 0 {
-                let below_target = self.counter < self.target_min;
+                let below_target = self.activity_count < self.target_min;
                 let seconds_remainder = seconds_elapsed % self.window_seconds;
-                self.counter = 0;
+                self.activity_count = 0;
                 self.last_update = TimePointSec::from(now.seconds - seconds_remainder as i64);
                 if below_target {
                     let factor = 1.0 - self.ratio_decrease();
@@ -188,30 +188,30 @@ pub mod tables {
         }
 
         fn check_difficulty_increase(&mut self, clamp_increase: bool) -> u64 {
-            if self.counter > self.target_max {
+            if self.activity_count > self.target_max {
                 let factor = 1.0 + self.ratio_increase();
-                // `target_max` events accumulate with no adjustment; the next event triggers
-                //   one. So one adjustment is applied per `target_max + 1` events, and the
-                //   cumulative adjustments for `events` in a window is
-                //   floor(events / (target_max + 1)).
-                // The remainder is carried in `counter` so a batched
+                // `target_max` activity accumulates with no adjustment; the next unit triggers
+                //   one. So one adjustment is applied per `target_max + 1` activity, and the
+                //   cumulative adjustments for `activity_count` in a window is
+                //   floor(activity_count / (target_max + 1)).
+                // The remainder is carried in `activity_count` so a batched
                 //   increment produces the same result as the equivalent single increments.
                 // (u64 math avoids overflow when target_max == u32::MAX.)
-                let events_per_adjustment = self.target_max as u64 + 1;
-                let mut adjustments = (self.counter as u64 / events_per_adjustment) as u32;
+                let activity_per_adjustment = self.target_max as u64 + 1;
+                let mut adjustments = (self.activity_count as u64 / activity_per_adjustment) as u32;
                 if clamp_increase {
                     adjustments = adjustments.min(1);
                 }
                 self.active_difficulty =
                     Self::apply_increase(self.active_difficulty, factor, adjustments);
-                self.counter = if clamp_increase {
+                self.activity_count = if clamp_increase {
                     0
                 } else {
-                    (self.counter as u64 % events_per_adjustment) as u32
+                    (self.activity_count as u64 % activity_per_adjustment) as u32
                 };
                 // The update is happening "mid block", so we round up to the next second. In other words,
                 // updates happens at the "end" of the block. Without this, a one-second block window would
-                // cause a decrease every block, because an increase zeroes out the counter, so each block
+                // cause a decrease every block, because an increase zeroes out the activity_count, so each block
                 // would consider a window to have elapsed.
                 self.last_update =
                     TransactSvc::call().currentBlock().time.seconds() + psibase::Seconds::new(1);
@@ -231,10 +231,10 @@ pub mod tables {
             check(self.consumer == get_sender(), "must be consumer");
         }
 
-        pub fn increment(&mut self, increment_amount: u32) -> u64 {
+        pub fn increment(&mut self, activity: u32) -> u64 {
             self.check_sender_is_consumer();
             let difficulty = self.check_difficulty_decrease();
-            self.counter = self.counter.saturating_add(increment_amount);
+            self.activity_count = self.activity_count.saturating_add(activity);
             self.check_difficulty_increase(false);
             self.save();
             difficulty
@@ -356,7 +356,7 @@ pub mod service {
 
     /// Increment RateLimit instance, potentially increasing the difficulty.
     ///
-    /// The difficulty may increase multiple times if the counter exceeds `target_max`
+    /// The difficulty may increase multiple times if the `activity_count` exceeds `target_max`
     ///   by more than one multiple of `target_max`.
     ///
     /// Returns the difficulty before any difficulty adjustment due to the increment.
@@ -365,7 +365,7 @@ pub mod service {
     ///
     /// # Arguments
     /// * `nft_id` - RateLimit / NFT ID
-    /// * `amount` - Amount to increment the counter by
+    /// * `amount` - Amount to increment the activity_count by
     #[action]
     fn increment(nft_id: u32, amount: u32) -> u64 {
         RateLimit::get_assert(nft_id).increment(amount)
@@ -377,8 +377,8 @@ pub mod service {
     ///
     /// # Arguments
     /// * `nft_id` - RateLimit / NFT ID
-    /// * `target_min` - Minimum target difficulty
-    /// * `target_max` - Maximum target difficulty
+    /// * `target_min` - Minimum target activity
+    /// * `target_max` - Maximum target activity
     #[action]
     fn set_targets(nft_id: u32, target_min: u32, target_max: u32) {
         RateLimit::get_assert(nft_id).set_targets(target_min, target_max);

@@ -135,7 +135,9 @@ fn test_increase_ppm_is_parts_per_million(mut chain: psibase::Chain) -> Result<(
 }
 
 #[psibase::test_case(packages("DiffAdjust"))]
-fn test_saturated_difficulty_and_counter(mut chain: psibase::Chain) -> Result<(), psibase::Error> {
+fn test_saturated_difficulty_and_activity_count(
+    mut chain: psibase::Chain,
+) -> Result<(), psibase::Error> {
     chain.set_auto_block_start(false);
 
     let alice = account!("alice");
@@ -157,7 +159,7 @@ fn test_saturated_difficulty_and_counter(mut chain: psibase::Chain) -> Result<()
     chain.start_block();
     assert_eq!(Wrapper::push(&chain).get_diff(nft_id).get()?, u64::MAX);
 
-    // Counter saturates at u32::MAX instead of wrapping; difficulty still caps at u64::MAX.
+    // activity_count saturates at u32::MAX instead of wrapping; difficulty still caps at u64::MAX.
     let nft_id = Wrapper::push_from(&chain, alice)
         .create(1000, 60, 5, 5, 1, u32::MAX, 50_000)
         .get()?;
