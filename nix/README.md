@@ -76,7 +76,7 @@ nix develop -c cursor /path/to/your.code-workspace
 Or use a wrapper script (see `~/repos/cursor-workspaces/cursor-psibase-via-nix.sh`).
 
 ## 3. Build and Launch psibase
-Build and Launch with the tasks.json buttons of by running the same command at the nix shell
+Build or Launch with the tasks.json buttons of by running the same command at the nix shell
 
 # Environment variables set by the shell
 
@@ -91,9 +91,11 @@ Build and Launch with the tasks.json buttons of by running the same command at t
 
 # Troubleshooting
 
+- **First nix build fails**: Try wiping your build/ dir to regenerate caches
 - **"command not found"** at the cli: Ensure you're in a `nix develop` shell.
 - **Wrong cargo tool versions**: cargo tools are pinned and provided by the flake. If `which cargo-component` does not point at the right thing, a host-installed copy may be shadowing it on `PATH`
 - **ICU / ABI errors**: Ensure you're in the Nix shell and do a clean build (`rm -rf build && mkdir build`). The flake sets `ICU_ROOT` and `CMAKE_IGNORE_PATH` to avoid picking up system ICU from `/usr/lib`.
+- **cargo-component "Invalid cross-device link"**: The flake sets `TMPDIR` under `$HOME/.cache` so temp files stay on the same filesystem as the repo. If you still see this from a Cursor agent/sandbox run, retry the build from a normal terminal in `nix develop`.
 - **Rust analyzer not finding deps**: Run the editor from inside the Nix shell or use the direnv extension.
 
 # Updating the environment

@@ -301,6 +301,10 @@
             export SCCACHE_DIR="''${SCCACHE_DIR:-$HOME/.cache/sccache}"
             export CARGO_COMPONENT_CACHE_DIR="''${CARGO_COMPONENT_CACHE_DIR:-$HOME/.cache/cargo-component}"
             export WASM_PACK_CACHE="''${WASM_PACK_CACHE:-$HOME/.cache/wasm-pack}"
+            # nix-shell puts TMPDIR on /tmp, often a separate mount from $HOME. cargo-component
+            # atomically renames temp outputs into the build tree, which fails across devices.
+            export TMPDIR="$HOME/.cache/psibase-nix/tmp"
+            mkdir -p "$TMPDIR"
 
             alias ll="ls -alF"
             parse_git_branch() {

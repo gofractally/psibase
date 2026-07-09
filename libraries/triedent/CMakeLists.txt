@@ -12,6 +12,11 @@ add_library(triedent
 target_include_directories(triedent PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include ${Boost_INCLUDE_DIRS})
 target_link_libraries(triedent PUBLIC Threads::Threads)
 
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+   set(CMAKE_AR ${CMAKE_CXX_COMPILER_AR})
+   set(CMAKE_RANLIB ${CMAKE_CXX_COMPILER_RANLIB})
+endif()
+
 if (CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64)|(X86_64)|(amd64)|(AMD64)")
    if( NOT APPLE )
     target_compile_options(triedent PUBLIC $<$<CONFIG:Release>:-march=haswell -flto>)
