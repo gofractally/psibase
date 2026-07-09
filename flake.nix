@@ -7,8 +7,7 @@
     # them or the set of packages we need not available from the same place), we diverge.
     # Each divergence is called out and re-synced with `psibase-contributor` when possible.
 
-    # nixos-26.05 provides Boost 1.88 (matches psibase-contributor). Was previously
-    # pinned to 24.05 for GCC 13 / libstdc++ compatibility with Catch2.
+    # nixos-26.05 provides Boost 1.88. Native C++ uses stdenv GCC.
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
     flake-utils.url = "github:numtide/flake-utils";
 
@@ -123,12 +122,6 @@
 
         llvmPackages = pkgs.llvmPackages_18;
 
-        # nixos-26.05 ships GCC 15 libstdc++; Catch2 + clang need GCC 13 headers.
-        gcc13 = pkgs.gcc13;
-        gccTriple =
-          if system == "aarch64-linux" then "aarch64-unknown-linux-gnu"
-          else "x86_64-unknown-linux-gnu";
-
         boost = pkgs.boost188.override {
           enableStatic = true;
           enableShared = true;
@@ -200,7 +193,6 @@
           llvmPackages.lld
           llvmPackages.libclang
           llvmPackages.clang-tools
-          gcc13
           boostForCMake
           openssl
           zlib
@@ -263,9 +255,6 @@
           WASI_SDK_AR = "${wasiSdk}/bin/ar";
           WASI_SDK_RANLIB = "${wasiSdk}/bin/ranlib";
 
-          CC = "${llvmPackages.clang}/bin/clang";
-          CXX = "${llvmPackages.clang}/bin/clang++";
-
           LIBCLANG_PATH = "${llvmPackages.libclang.lib}/lib";
           ICU_ROOT = "${pkgs.icu}";
           ICU_LIBRARY_DIR = "${pkgs.icu}/lib";
@@ -282,8 +271,6 @@
             # Point SHELL at bashInteractive so subshells and IDE terminals get a usable bash.
             export SHELL="${pkgs.bashInteractive}/bin/bash"
 
-            export CC="${llvmPackages.clang}/bin/clang"
-            export CXX="${llvmPackages.clang}/bin/clang++"
             export PATH="$PATH:${wasiSdk}/bin"
 
             unset NIX_LDFLAGS
@@ -294,7 +281,6 @@
             export CMAKE_PREFIX_PATH="${boostForCMake}''${CMAKE_PREFIX_PATH:+:$CMAKE_PREFIX_PATH}"
             export BOOST_LIBRARYDIR="${boost}/lib"
             export BOOST_INCLUDEDIR="${boost.dev}/include"
-            export NIX_CFLAGS_COMPILE="-nostdinc++ -isystem ${gcc13.cc}/include/c++/${gcc13.cc.version} -isystem ${gcc13.cc}/include/c++/${gcc13.cc.version}/${gccTriple} -isystem ${pkgs.openssl.dev}/include"
             export NIX_LDFLAGS="-L${pkgs.icu}/lib -L${pkgs.openssl.out}/lib"
             export LIBRARY_PATH="${pkgs.icu}/lib''${LIBRARY_PATH:+:$LIBRARY_PATH}"
             export CMAKE_LIBRARY_PATH="${pkgs.icu}/lib''${CMAKE_LIBRARY_PATH:+:$CMAKE_LIBRARY_PATH}"
@@ -339,7 +325,8 @@
             if [ "$NIX_SHELL_DEPTH" -eq 1 ]; then
               echo ""
               echo "Psibase Nix Development Environment"
-              echo "  Clang: $(clang --version | head -1)"
+              echo "  GCC:   $(gcc --version | head -1)"
+              echo "  Clang: $(clang --version | head -1)  (WASM / clangd)"
               echo "  Rust:  $(rustc --version)"
               echo "  Node:  $(node --version)"
               echo "  Yarn:  $(yarn --version)"

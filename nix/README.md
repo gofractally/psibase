@@ -8,7 +8,7 @@ Not (yet) supported: macOS
 
 The Nix configuration includes
 
-- **C++**: Clang/LLVM 18, Boost, CMake
+- **C++**: GCC (native), LLVM/Clang 18 (WASM, clangd), Boost, CMake
 - **Rust**: 1.86.0 (pinned) with WASM targets (`wasm32-unknown-unknown`, `wasm32-wasip1`)
 - **WebAssembly**: WASI SDK 29, wasm-pack, wasm-tools, binaryen
 - **JavaScript**: Node.js 20, Yarn
@@ -84,7 +84,7 @@ Build and Launch with the tasks.json buttons of by running the same command at t
 |----------|-------------|
 | `HOST_IP` | Loopback admin IP (`127.0.0.1`) for Launch/Continue tasks and `launch.sh` |
 | `WASI_SDK_PREFIX` | Path to WASI SDK |
-| `CC` / `CXX` | Clang paths |
+| `CC` / `CXX` | GCC via Nix stdenv |
 | `LIBCLANG_PATH` | For rust-analyzer |
 | `RUST_SRC_PATH` | For rust-analyzer |
 | `IN_NIX_SHELL` | Set to `1` when in a nix shell |
