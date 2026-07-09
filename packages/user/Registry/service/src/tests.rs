@@ -4,7 +4,7 @@ mod tests {
     use constants::app_status;
     use constants::MAX_NAME_SIZE;
     use psibase::services::http_server;
-    use psibase::{account, ChainEmptyResult, TimePointUSec};
+    use psibase::{account, ChainEmptyResult, Push, TimePointUSec};
     use serde_json::{json, Value};
     use service::AppMetadata;
 

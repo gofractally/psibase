@@ -8,7 +8,7 @@ use crate::{
     new_account_owned_action, preapprove_action, reg_server, schema_types, set_code_action,
     solve_dependencies, version_match, AccountNumber, Action, Checksum256, CodeRow, GenesisService,
     Hex, MethodNumber, MethodString, Pack, PackageDisposition, PackageOp, PackagePreference,
-    Schema, ToSchema, Unpack, Version,
+    Schema, ServiceWrapper, ToSchema, Unpack, Version,
 };
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;

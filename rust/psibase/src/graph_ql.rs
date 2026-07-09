@@ -1,7 +1,7 @@
 use crate::{
     get_key_bytes, get_sequential_bytes, kv_get, kv_greater_equal_bytes, kv_less_than_bytes,
-    kv_max_bytes, AccountNumber, BlockNum, BlockTime, DbId, MethodNumber, RawKey, TableIndex,
-    TableRecord, ToKey,
+    kv_max_bytes, AccountNumber, BlockNum, BlockTime, DbId, MethodNumber, RawKey, ServiceWrapper,
+    TableIndex, TableRecord, ToKey,
 };
 use anyhow::anyhow;
 use async_graphql::connection::{query_with, Connection, Edge, EmptyFields};

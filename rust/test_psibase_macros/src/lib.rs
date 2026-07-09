@@ -4,8 +4,8 @@ mod service {}
 
 #[cfg(test)]
 mod tests {
-    use psibase::account;
     use psibase::services::http_server;
+    use psibase::{account, Push};
     use serde_json::{json, Value};
 
     #[psibase::test_case(packages("PsiMacroTest"))]

@@ -1536,10 +1536,7 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
                              trx.proofs[i]);
          }
          // check auth
-         auto accountsTables = Accounts::Tables(Accounts::service);
-         auto accountTable   = accountsTables.open<AccountTable>();
-         auto accountIndex   = accountTable.getIndex<0>();
-         auto account        = accountIndex.get(sender);
+         auto account = to<Accounts>().getAccount(sender);
          if (!account)
             return make404("Account not found");
          Actor<AuthInterface> auth(RTransact::service, account->authService);
@@ -1553,9 +1550,9 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
          // Construct token
          auto exp = std::chrono::time_point_cast<std::chrono::seconds>(
              std::chrono::system_clock::now() + std::chrono::days(30));
-         auto                token = encodeJWT(getJWTKey(), LoginTokenData{.sub = sender,
-                                                                           .aud = std::string(rootHost(request)),
-                                                                           .exp = exp.time_since_epoch().count()});
+         auto token = encodeJWT(getJWTKey(), LoginTokenData{.sub = sender,
+                                                            .aud = std::string(rootHost(request)),
+                                                            .exp = exp.time_since_epoch().count()});
          HttpReply           reply{.contentType = "application/json",
                                    .headers     = allowCors(request, AccountNumber{"supervisor"})};
          psio::vector_stream stream{reply.body};

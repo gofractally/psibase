@@ -56,43 +56,11 @@ namespace
                         { return std::move(c.producers); }, status.consensus.next->consensus.data);
    }
 
-   using IndirectCheckFunc =
-       bool (Actor<SystemService::AuthInterface>::*)(AccountNumber,
-                                                     std::vector<AccountNumber>,
-                                                     std::optional<ServiceMethod>,
-                                                     std::optional<std::vector<AccountNumber>>);
-
-   bool checkOverlapping(std::vector<AccountNumber> producers,
-                         std::vector<AccountNumber> authorizers,
-                         std::size_t                threshold,
-                         IndirectCheckFunc          indirectCheck,
-                         std::vector<AccountNumber> authSet)
+   std::size_t countOverlapping(const std::vector<AccountNumber>& producers,
+                                const std::vector<AccountNumber>& authorizers)
    {
-      // We only check for indirect auth if there are insufficient direct auths.
-      auto nonOverlapping = std::ranges::partition(
+      return std::ranges::count_if(
           producers, [&](const auto& p) { return std::ranges::contains(authorizers, p); });
-      auto numOverlapping = std::ranges::distance(producers.begin(), nonOverlapping.begin());
-      if (numOverlapping >= threshold)
-      {
-         return true;
-      }
-
-      // Now check for indirect authorization
-      for (const auto& account :
-           std::ranges::subrange(nonOverlapping.begin(), nonOverlapping.end()))
-      {
-         auto toAuth = Actor<SystemService::AuthInterface>{
-             SystemService::Producers::service, to<SystemService::Accounts>().getAuthOf(account)};
-
-         if ((toAuth.*indirectCheck)(account, authorizers, std::nullopt,
-                                     std::optional(std::move(authSet))) &&
-             ++numOverlapping >= threshold)
-         {
-            return true;
-         }
-      }
-
-      return false;
    }
 
 }  // namespace
@@ -273,43 +241,25 @@ namespace SystemService
             "Can only authorize predefined accounts");
    }
 
-   bool Producers::isAuthSys(AccountNumber                             sender,
-                             std::vector<AccountNumber>                authorizers,
-                             std::optional<ServiceMethod>              method,
-                             std::optional<std::vector<AccountNumber>> authSet_opt)
+   std::vector<AccountNumber> Producers::getDlgsSys(AccountNumber sender)
    {
-      auto authSet = authSet_opt ? std::move(*authSet_opt) : std::vector<AccountNumber>{};
+      return getProducers();
+   }
 
-      // Base case to prevent infinite recursion
-      if (std::ranges::contains(authSet, sender))
-         return false;
-
-      authSet.push_back(sender);
-
+   bool Producers::isAuthSys(AccountNumber                sender,
+                             std::vector<AccountNumber>   authorizers)
+   {
       auto producers = ::getProducers()                          //
                        | std::views::transform(&Producer::name)  //
                        | std::ranges::to<std::vector>();
 
       auto threshold = producers.empty() ? 0 : getThreshold(sender);
-
-      auto _ = recurse();
-      return checkOverlapping(std::move(producers), std::move(authorizers), threshold,
-                              &Actor<AuthInterface>::isAuthSys, std::move(authSet));
+      return countOverlapping(producers, authorizers) >= threshold;
    }
 
-   bool Producers::isRejectSys(AccountNumber                             sender,
-                               std::vector<AccountNumber>                rejecters,
-                               std::optional<ServiceMethod>              method,
-                               std::optional<std::vector<AccountNumber>> authSet_opt)
+   bool Producers::isRejectSys(AccountNumber                sender,
+                               std::vector<AccountNumber>   rejecters)
    {
-      auto authSet = authSet_opt ? std::move(*authSet_opt) : std::vector<AccountNumber>{};
-
-      // Base case to prevent infinite recursion
-      if (std::ranges::contains(authSet, sender))
-         return false;
-
-      authSet.push_back(sender);
-
       auto producers = ::getProducers()                          //
                        | std::views::transform(&Producer::name)  //
                        | std::ranges::to<std::vector>();
@@ -318,10 +268,7 @@ namespace SystemService
          return false;
 
       auto threshold = antiThreshold(sender);
-
-      auto _ = recurse();
-      return checkOverlapping(std::move(producers), std::move(rejecters), threshold,
-                              &Actor<AuthInterface>::isRejectSys, std::move(authSet));
+      return countOverlapping(producers, rejecters) >= threshold;
    }
 
 }  // namespace SystemService
