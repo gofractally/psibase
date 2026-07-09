@@ -308,7 +308,7 @@ pub trait ToServiceSchema {
 
 struct CustomAccountNumber;
 
-impl<'a> CustomHandler<'a> for CustomAccountNumber {
+impl CustomHandler for CustomAccountNumber {
     fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool {
         matches!(
             schema.unwrap_struct(ty),
@@ -318,11 +318,11 @@ impl<'a> CustomHandler<'a> for CustomAccountNumber {
             }
         )
     }
-    fn frac2json<'b>(
+    fn frac2json(
         &self,
-        _schema: &CompiledSchema<'b, 'a>,
+        _schema: &CompiledSchema,
         _ty: &CompiledType,
-        src: &mut FracInputStream<'a>,
+        src: &mut FracInputStream,
         _allow_empty_container: bool,
     ) -> Result<serde_json::Value, fracpack::Error> {
         Ok(AccountNumber::new(u64::unpack(src)?).to_string().into())
@@ -343,7 +343,7 @@ impl<'a> CustomHandler<'a> for CustomAccountNumber {
 
 struct CustomMethodNumber;
 
-impl<'a> CustomHandler<'a> for CustomMethodNumber {
+impl CustomHandler for CustomMethodNumber {
     fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool {
         matches!(
             schema.unwrap_struct(ty),
@@ -353,11 +353,11 @@ impl<'a> CustomHandler<'a> for CustomMethodNumber {
             }
         )
     }
-    fn frac2json<'b>(
+    fn frac2json(
         &self,
-        _schema: &CompiledSchema<'b, 'a>,
+        _schema: &CompiledSchema,
         _ty: &CompiledType,
-        src: &mut FracInputStream<'a>,
+        src: &mut FracInputStream,
         _allow_empty_container: bool,
     ) -> Result<serde_json::Value, fracpack::Error> {
         Ok(MethodNumber::new(u64::unpack(src)?).to_string().into())
@@ -376,7 +376,7 @@ impl<'a> CustomHandler<'a> for CustomMethodNumber {
     }
 }
 
-pub fn schema_types<'a, 'b>() -> CustomTypes<'a, 'b> {
+pub fn schema_types() -> CustomTypes<'static> {
     let mut result = fracpack::standard_types();
     static ACCOUNT_NUMBER: CustomAccountNumber = CustomAccountNumber;
     static METHOD_NUMBER: CustomMethodNumber = CustomMethodNumber;

@@ -217,7 +217,7 @@ fn format_action_trace(
         let mut custom = schema_types();
         let service_method = CustomResolvedServiceMethod::new(schemas, std::mem::drop);
         custom.insert("ServiceMethod".to_string(), &service_method);
-        let custom_action = CustomActionCollector::new(&*schemas, std::mem::drop);
+        let custom_action = CustomActionCollector::new(&*schemas, drop_action);
         custom.insert("Action".to_string(), &custom_action);
         let mut cschema = CompiledSchema::new(&schema.unwrap().types, &custom);
         if !atrace.action.rawData.is_empty() {
@@ -362,6 +362,25 @@ pub struct ActionFormatter<'a, F: SchemaFetcher + 'a> {
     storage: Rc<ActionFormatterImpl<'a, F>>,
 }
 
+pub fn restore_lifetime<'a, 'b, T>(outer: &'a [T], inner: &'b [T]) -> Option<&'a [T]> {
+    let inner_p = inner.as_ptr_range();
+    let outer_p = outer.as_ptr_range();
+    if inner_p.start as usize >= outer_p.start as usize
+        && inner_p.end as usize <= outer_p.end as usize
+    {
+        let sz = size_of::<T>();
+        let start = inner_p.start as usize - outer_p.start as usize;
+        let end = inner_p.end as usize - outer_p.start as usize;
+        if start % sz == 0 {
+            Some(&outer[(start / sz)..(end / sz)])
+        } else {
+            None
+        }
+    } else {
+        return None;
+    }
+}
+
 impl<'a, F: SchemaFetcher + 'a> ActionFormatter<'a, F> {
     pub fn with_schemas(schemas: SchemaMap, fetcher: F) -> Self {
         ActionFormatter {
@@ -423,8 +442,15 @@ impl<'a, F: SchemaFetcher + 'a> ActionFormatter<'a, F> {
                 });
             custom.insert("ServiceMethod".to_string(), &service_method);
             let nested_actions = RefCell::new(nested_actions);
-            let custom_action = CustomActionCollector::new(&*schemas, |act| {
-                nested_actions.borrow_mut().push(act);
+            let custom_action = CustomActionCollector::new(&*schemas, |inner: SharedAction| {
+                if let Some(raw_data) = restore_lifetime(act.rawData.0, inner.rawData.0) {
+                    nested_actions.borrow_mut().push(SharedAction {
+                        sender: inner.sender,
+                        service: inner.service,
+                        method: inner.method,
+                        rawData: raw_data.into(),
+                    });
+                }
             });
             custom.insert("Action".to_string(), &custom_action);
             let mut cschema = CompiledSchema::new(&schema.types, &custom);
@@ -654,7 +680,7 @@ impl<'a, 'b> Serialize for UnpackedTrace<'a, &'b ActionTrace> {
             let mut custom = schema_types();
             let service_method = CustomResolvedServiceMethod::new(self.schemas, std::mem::drop);
             custom.insert("ServiceMethod".to_string(), &service_method);
-            let custom_action = CustomActionCollector::new(&self.schemas, std::mem::drop);
+            let custom_action = CustomActionCollector::new(&self.schemas, drop_action);
             custom.insert("Action".to_string(), &custom_action);
             let mut cschema = CompiledSchema::new(&schema.unwrap().types, &custom);
             if !atrace.action.rawData.is_empty() {
@@ -766,7 +792,7 @@ fn field_names<const N: usize>(ty: &CompiledType) -> Option<[&str; N]> {
     None
 }
 
-impl<'a, 'b, F: Fn(ServiceMethod) -> ()> CustomHandler<'a> for CustomResolvedServiceMethod<'b, F> {
+impl<'b, F: Fn(ServiceMethod) -> ()> CustomHandler for CustomResolvedServiceMethod<'b, F> {
     fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool {
         if let Some([service, method]) = field_types::<2>(ty) {
             schema.matches_u64(service) && schema.matches_u64(method)
@@ -844,7 +870,10 @@ impl<'a, F> CustomActionCollector<'a, F> {
     }
 }
 
-impl<'a, 'b, F: Fn(SharedAction<'a>) -> ()> CustomHandler<'a> for CustomActionCollector<'b, F> {
+// std::mem::drop doesn't handle lifetimes generically enough
+fn drop_action<'b>(_act: SharedAction<'b>) {}
+
+impl<'b, F: Fn(SharedAction) -> ()> CustomHandler for CustomActionCollector<'b, F> {
     fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool {
         if let Some([sender_type, service_type, method_type, raw_data_type]) = field_types::<4>(ty)
         {
@@ -860,7 +889,7 @@ impl<'a, 'b, F: Fn(SharedAction<'a>) -> ()> CustomHandler<'a> for CustomActionCo
         &self,
         _schema: &CompiledSchema,
         ty: &CompiledType,
-        src: &mut FracInputStream<'a>,
+        src: &mut FracInputStream,
         _allow_empty_container: bool,
     ) -> Result<serde_json::Value, fracpack::Error> {
         let [sender_name, service_name, method_name, raw_data_name] = field_names::<4>(ty).unwrap();
@@ -874,7 +903,7 @@ impl<'a, 'b, F: Fn(SharedAction<'a>) -> ()> CustomHandler<'a> for CustomActionCo
                 let mut custom = schema_types();
                 let service_method = CustomResolvedServiceMethod::new(self.schemas, std::mem::drop);
                 custom.insert("ServiceMethod".to_string(), &service_method);
-                let custom_action = CustomActionCollector::new(&self.schemas, std::mem::drop);
+                let custom_action = CustomActionCollector::new(&self.schemas, drop_action);
                 custom.insert("Action".to_string(), &custom_action);
                 let mut cschema = CompiledSchema::new(&schema.types, &custom);
                 cschema.extend(&action_type.params);
@@ -905,7 +934,7 @@ impl<'a, 'b, F: Fn(SharedAction<'a>) -> ()> CustomHandler<'a> for CustomActionCo
         &self,
         _schema: &CompiledSchema,
         _ty: &CompiledType,
-        src: &mut FracInputStream<'a>,
+        src: &mut FracInputStream,
         _allow_empty_container: bool,
     ) -> Result<(), fracpack::Error> {
         let value = SharedAction::unpack(src)?;
