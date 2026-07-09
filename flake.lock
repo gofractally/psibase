@@ -41,16 +41,16 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1767313136,
-        "narHash": "sha256-16KkgfdYqjaeRGBaYsNrhPRRENs0qzkQVUooNHtoy2w=",
+        "lastModified": 1783148766,
+        "narHash": "sha256-uslt2pqShTIXDdAHRHv2QkYLsVdY8Oqwz0EA48/RSM8=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "ac62194c3917d5f474c1a844b6fd6da2db95077d",
+        "rev": "a50de1b7d8a586adc18d2395c19de7d6058e6030",
         "type": "github"
       },
       "original": {
         "owner": "NixOS",
-        "ref": "nixos-25.05",
+        "ref": "nixos-26.05",
         "repo": "nixpkgs",
         "type": "github"
       }
@@ -119,6 +119,22 @@
         "type": "github"
       }
     },
+    "nixpkgs-mdbook-linkcheck": {
+      "locked": {
+        "lastModified": 1752645292,
+        "narHash": "sha256-l2PUXp4ojs0VehrHIpDhuvkb2R9mf2T92FujYRzXRDQ=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "bd16676f18040e23761b54a98e9d906a962220ae",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "bd16676f18040e23761b54a98e9d906a962220ae",
+        "type": "github"
+      }
+    },
     "nixpkgs-mdbook-mermaid": {
       "locked": {
         "lastModified": 1760708036,
@@ -132,6 +148,22 @@
         "owner": "NixOS",
         "repo": "nixpkgs",
         "rev": "afd39ffbac700ed696fdee83842309302cae4c4e",
+        "type": "github"
+      }
+    },
+    "nixpkgs-mdbook-pagetoc": {
+      "locked": {
+        "lastModified": 1767313136,
+        "narHash": "sha256-16KkgfdYqjaeRGBaYsNrhPRRENs0qzkQVUooNHtoy2w=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "ac62194c3917d5f474c1a844b6fd6da2db95077d",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "ac62194c3917d5f474c1a844b6fd6da2db95077d",
         "type": "github"
       }
     },
@@ -176,7 +208,9 @@
         "nixpkgs-cargo-generate": "nixpkgs-cargo-generate",
         "nixpkgs-cursor-cli": "nixpkgs-cursor-cli",
         "nixpkgs-mdbook": "nixpkgs-mdbook",
+        "nixpkgs-mdbook-linkcheck": "nixpkgs-mdbook-linkcheck",
         "nixpkgs-mdbook-mermaid": "nixpkgs-mdbook-mermaid",
+        "nixpkgs-mdbook-pagetoc": "nixpkgs-mdbook-pagetoc",
         "nixpkgs-mdbook-plugins": "nixpkgs-mdbook-plugins",
         "nixpkgs-nodejs": "nixpkgs-nodejs"
       }
