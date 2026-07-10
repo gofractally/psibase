@@ -286,7 +286,7 @@ pub mod impls {
         }
 
         pub fn get_groups(&self) -> Vec<Group> {
-            let table = GroupTable::new();
+            let table = GroupTable::read();
             table
                 .get_index_pk()
                 .range((self.owner, self.id, 0)..=(self.owner, self.id, u32::MAX))
@@ -294,7 +294,7 @@ pub mod impls {
         }
 
         pub fn get_group(&self, group_number: u32) -> Option<Group> {
-            let table = GroupTable::new();
+            let table = GroupTable::read();
             let result = table
                 .get_index_pk()
                 .get(&(self.owner, self.id, group_number));
@@ -302,15 +302,14 @@ pub mod impls {
         }
 
         pub fn get(owner: AccountNumber, evaluation_id: u32) -> Option<Self> {
-            let table = EvaluationTable::new();
-            table.get_index_pk().get(&(owner, evaluation_id))
+            EvaluationTable::read()
+                .get_index_pk()
+                .get(&(owner, evaluation_id))
         }
 
         pub fn get_assert(owner: AccountNumber, evaluation_id: u32) -> Self {
-            psibase::check_some(
-                Self::get(owner, evaluation_id),
-                &format!("evaluation {} {} not found", owner, evaluation_id),
-            )
+            Self::get(owner, evaluation_id)
+                .expect(&format!("evaluation {} {} not found", owner, evaluation_id))
         }
 
         pub fn delete(&self) {
@@ -396,10 +395,9 @@ pub mod impls {
                 .collect();
 
             let population = users.len() as u32;
-            let chunk_sizes = psibase::check_some(
-                Subgroups::call().gmp(population, allowable_group_sizes),
-                "unable to group users",
-            );
+            let chunk_sizes = Subgroups::call()
+                .gmp(population, allowable_group_sizes)
+                .expect("unable to group users");
 
             for (index, &chunk_size) in chunk_sizes.iter().enumerate() {
                 let group_number = (index as u32) + 1;
