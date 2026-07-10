@@ -1,4 +1,4 @@
-Nix-Based Development Environment for Psibase (Linux)
+# Nix-Based Development Environment for Psibase (Linux)
 
 How to use Nix as an alternative to the Docker-based development environment (psibase-contributor).
 **Supported platforms: Linux x86_64 and Linux aarch64.**
