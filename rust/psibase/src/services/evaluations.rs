@@ -175,7 +175,7 @@ pub mod Service {
         unimplemented!()
     }
 
-    /// Gets the accounts of all users registered for an evaluation, ordered by account.
+    /// Gets the accounts of all users registered for an evaluation.
     ///
     /// # Arguments
     /// * `owner` - The account number of the evaluation owner.
@@ -185,7 +185,7 @@ pub mod Service {
         unimplemented!()
     }
 
-    /// Gets the accounts of the users in a group of an evaluation, ordered by account.
+    /// Gets the accounts of the users in a group of an evaluation.
     ///
     /// # Arguments
     /// * `owner` - The account number of the evaluation owner.

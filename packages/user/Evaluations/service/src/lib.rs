@@ -356,7 +356,7 @@ pub mod service {
         })
     }
 
-    /// Gets the accounts of all users registered for an evaluation, ordered by account.
+    /// Gets the accounts of all users registered for an evaluation.
     ///
     /// # Arguments
     /// * `owner` - The account number of the evaluation owner.
@@ -370,7 +370,7 @@ pub mod service {
             .collect()
     }
 
-    /// Gets the accounts of the users in a group of an evaluation, ordered by account.
+    /// Gets the accounts of the users in a group of an evaluation.
     ///
     /// # Arguments
     /// * `owner` - The account number of the evaluation owner.
@@ -383,8 +383,9 @@ pub mod service {
         group_number: u32,
     ) -> Vec<AccountNumber> {
         let evaluation = Evaluation::get_assert(owner, evaluation_id);
-        let group = check_some(evaluation.get_group(group_number), "group not found");
-        group
+        evaluation
+            .get_group(group_number)
+            .expect("group not found")
             .get_users()
             .into_iter()
             .map(|user| user.user)
