@@ -13,8 +13,9 @@ package-name = "FracGen"
 services = ["frac-gen"]
 
 [package.metadata.psibase.dependencies]
-Sites = "0.23.0"
+DynLd = "0.23.0"
 HttpServer = "0.23.0"
+Sites = "0.23.0"
 
 [lib]
 crate-type = ["rlib"]

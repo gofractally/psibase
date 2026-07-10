@@ -17,7 +17,7 @@ use psibase::services::fractals::FractalRole::{
     self, Executive, Judiciary, Legislature, Recruitment,
 };
 
-use crate::helpers::create_managed_account;
+use crate::helpers::{create_managed_account, link_fractal_core_plugin_deps};
 use crate::tables::tables::{
     Fractal, FractalMember, FractalMemberTable, FractalTable, Occupation, RewardStream, Role,
     RoleTable,
@@ -104,6 +104,10 @@ impl Fractal {
 
         create_managed_account(fractal, || {
             sites::Wrapper::call_as(fractal).setProxy(account!("fractal-cr"));
+            // Proxy serves static content only; dyn-ld must be linked on the
+            // fractal account so supervisor can resolve plugin deps
+            // (e.g. permissions → perms) for core-fract:plugin calls.
+            link_fractal_core_plugin_deps(fractal);
         });
 
         FractalMember::add(fractal, get_sender(), None);

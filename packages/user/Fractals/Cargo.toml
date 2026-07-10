@@ -15,6 +15,7 @@ services = ["fractals", "de-facto"]
 [package.metadata.psibase.dependencies]
 Accounts = "0.23.0"
 Base64 = "0.23.0"
+DynLd = "0.23.0"
 Guilds = "0.23.0"
 Host = "0.23.0"
 HttpServer = "0.23.0"

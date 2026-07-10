@@ -28,9 +28,13 @@ pub mod tables {
 mod service {
     use crate::tables::ConfigRow;
     use psibase::services::{
-        auth_delegate::Wrapper as AuthDelegate, fractals::FractalRole,
-        fractals::Wrapper as Fractals, guilds::Wrapper as Guilds,
-        guilds::SERVICE as GUILDS_SERVICE, producers::Wrapper as Producers,
+        auth_delegate::Wrapper as AuthDelegate,
+        dyn_ld::{self, DynDep},
+        fractals::FractalRole,
+        fractals::Wrapper as Fractals,
+        guilds::Wrapper as Guilds,
+        guilds::SERVICE as GUILDS_SERVICE,
+        producers::Wrapper as Producers,
     };
     use psibase::*;
 
@@ -38,11 +42,54 @@ mod service {
     const SYS_GUILD: AccountNumber = account!("core-gld-1");
     const ROOT: AccountNumber = account!("root");
 
+    /// Re-link FractalCore plugin deps for an existing system fractal.
+    /// Keep in sync with Fractals `link_fractal_core_plugin_deps`.
+    fn link_core_fractal_plugin_deps() {
+        let deps = vec![
+            DynDep {
+                name: "host".into(),
+                service: account!("host"),
+            },
+            DynDep {
+                name: "transact".into(),
+                service: account!("transact"),
+            },
+            DynDep {
+                name: "permissions".into(),
+                service: account!("perms"),
+            },
+            DynDep {
+                name: "fractals".into(),
+                service: account!("fractals"),
+            },
+            DynDep {
+                name: "guilds".into(),
+                service: account!("guilds"),
+            },
+            DynDep {
+                name: "staged-tx".into(),
+                service: account!("staged-tx"),
+            },
+            DynDep {
+                name: "accounts".into(),
+                service: account!("accounts"),
+            },
+            DynDep {
+                name: "sites".into(),
+                service: account!("sites"),
+            },
+        ];
+        dyn_ld::Wrapper::call_as(SYS_FRACTAL).link("FractalCore".into(), deps);
+    }
+
     #[action]
     fn create_frac() {
         check(get_sender() == Wrapper::SERVICE, "Unauthorized");
 
         if ConfigRow::is_init() {
+            // Upgrade path for chains that already created core-fract
+            // before dyn-ld was linked on fractal accounts.
+            link_core_fractal_plugin_deps();
             return;
         }
         ConfigRow::init();
