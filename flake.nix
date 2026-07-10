@@ -219,7 +219,6 @@
           jq
           xxd
           unzip
-          zstd
           icu
           direnv
           mkcert
