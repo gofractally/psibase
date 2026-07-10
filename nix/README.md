@@ -76,7 +76,7 @@ nix develop -c cursor /path/to/your.code-workspace
 Or use a wrapper script (see `~/repos/cursor-workspaces/cursor-psibase-via-nix.sh`).
 
 ## 3. Build and Launch psibase
-Build or Launch with the tasks.json buttons of by running the same command at the nix shell
+Build or Launch with the tasks.json buttons or by running the same command at the nix shell
 
 # Environment variables set by the shell
 
