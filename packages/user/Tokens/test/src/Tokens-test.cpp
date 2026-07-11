@@ -432,7 +432,7 @@ SCENARIO("Burning tokens")
    }
 }
 
-SCENARIO("Toggling manual-debit")
+SCENARIO("Toggling auto-debit")
 {
    GIVEN("A chain with users Alice and Bob")
    {
