@@ -112,7 +112,7 @@ pub mod service {
     #[action]
     fn start(evaluation_id: u32) {
         let owner = get_sender();
-        let evaluation = Evaluation::get(owner, evaluation_id);
+        let evaluation = Evaluation::get_assert(owner, evaluation_id);
 
         evaluation.assert_status(helpers::EvaluationStatus::Deliberation);
 
@@ -154,7 +154,7 @@ pub mod service {
     /// * `hash` - Hash of the keys for verification.
     #[action]
     fn group_key(owner: AccountNumber, evaluation_id: u32, keys: Vec<Vec<u8>>, hash: String) {
-        let evaluation = Evaluation::get(owner, evaluation_id);
+        let evaluation = Evaluation::get_assert(owner, evaluation_id);
 
         evaluation.assert_status(helpers::EvaluationStatus::Deliberation);
 
@@ -182,7 +182,7 @@ pub mod service {
     /// * `evaluation_id` - The ID of the evaluation to close.
     #[action]
     fn close(owner: AccountNumber, evaluation_id: u32) {
-        let evaluation = Evaluation::get(owner, evaluation_id);
+        let evaluation = Evaluation::get_assert(owner, evaluation_id);
 
         let is_closed = evaluation.get_current_phase() == EvaluationStatus::Closed;
         let has_all_results = || {
@@ -222,7 +222,7 @@ pub mod service {
     /// * `force` - If true, allows deletion regardless of the evaluation's phase.
     #[action]
     fn delete(evaluation_id: u32, force: bool) {
-        let evaluation = Evaluation::get(get_sender(), evaluation_id);
+        let evaluation = Evaluation::get_assert(get_sender(), evaluation_id);
         if !force {
             let phase = evaluation.get_current_phase();
             check(
@@ -241,7 +241,7 @@ pub mod service {
     /// * `proposal` - The encrypted proposal data.
     #[action]
     fn propose(owner: AccountNumber, evaluation_id: u32, proposal: Vec<u8>) {
-        let evaluation = Evaluation::get(owner, evaluation_id);
+        let evaluation = Evaluation::get_assert(owner, evaluation_id);
         evaluation.assert_status(EvaluationStatus::Deliberation);
 
         let sender = get_sender();
@@ -269,7 +269,7 @@ pub mod service {
     #[action]
     fn attest(owner: AccountNumber, evaluation_id: u32, attestation: Vec<u8>) {
         let sender = get_sender();
-        let evaluation = Evaluation::get(owner, evaluation_id);
+        let evaluation = Evaluation::get_assert(owner, evaluation_id);
 
         let ranks_within_scope = attestation
             .iter()
@@ -298,7 +298,7 @@ pub mod service {
     /// * `registrant` - The account number of the user to register.
     #[action]
     fn register(owner: AccountNumber, evaluation_id: u32, registrant: AccountNumber) {
-        let evaluation = Evaluation::get(owner, evaluation_id);
+        let evaluation = Evaluation::get_assert(owner, evaluation_id);
         evaluation.assert_status(EvaluationStatus::Registration);
 
         let sender = get_sender();
@@ -323,7 +323,7 @@ pub mod service {
     /// * `registrant` - The account number of the user to unregister.
     #[action]
     fn unregister(owner: AccountNumber, evaluation_id: u32, registrant: AccountNumber) {
-        let evaluation = Evaluation::get(owner, evaluation_id);
+        let evaluation = Evaluation::get_assert(owner, evaluation_id);
         evaluation.assert_status(EvaluationStatus::Registration);
 
         let sender = get_sender();
@@ -333,5 +333,62 @@ pub mod service {
         );
 
         evaluation.unregister_user(registrant);
+    }
+
+    /// Gets the schedule of an evaluation.
+    ///
+    /// # Arguments
+    /// * `owner` - The account number of the evaluation owner.
+    /// * `evaluation_id` - The ID of the evaluation.
+    ///
+    /// # Returns
+    /// The `(registration, deliberation, submission, finish_by)` unix seconds timestamps,
+    /// or `None` if the evaluation does not exist.
+    #[action]
+    fn get_sched(owner: AccountNumber, evaluation_id: u32) -> Option<(u32, u32, u32, u32)> {
+        Evaluation::get(owner, evaluation_id).map(|evaluation| {
+            (
+                evaluation.registration_starts,
+                evaluation.deliberation_starts,
+                evaluation.submission_starts,
+                evaluation.finish_by,
+            )
+        })
+    }
+
+    /// Gets the accounts of all users registered for an evaluation.
+    ///
+    /// # Arguments
+    /// * `owner` - The account number of the evaluation owner.
+    /// * `evaluation_id` - The ID of the evaluation.
+    #[action]
+    fn get_users(owner: AccountNumber, evaluation_id: u32) -> Vec<AccountNumber> {
+        Evaluation::get_assert(owner, evaluation_id)
+            .get_users()
+            .into_iter()
+            .map(|user| user.user)
+            .collect()
+    }
+
+    /// Gets the accounts of the users in a group of an evaluation.
+    ///
+    /// # Arguments
+    /// * `owner` - The account number of the evaluation owner.
+    /// * `evaluation_id` - The ID of the evaluation.
+    /// * `group_number` - The group number within the evaluation.
+    #[action]
+    fn get_grp_users(
+        owner: AccountNumber,
+        evaluation_id: u32,
+        group_number: u32,
+    ) -> Vec<AccountNumber> {
+        let evaluation = Evaluation::get_assert(owner, evaluation_id);
+        evaluation
+            .get_group(group_number)
+            .expect("group not found")
+            .get_users()
+            .into_iter()
+            .map(|user| user.user)
+            .collect()
     }
 }

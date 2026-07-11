@@ -6,7 +6,8 @@ pub mod tables {
     use psibase::services::nft::{Wrapper as Nfts, NID};
     use psibase::services::tokens::{Decimal, Precision, Quantity};
     use psibase::{
-        abort_message, check, check_none, check_some, get_sender, AccountNumber, Memo, TableRecord,
+        abort_message, check, check_none, check_some, get_sender, AccountNumber, Memo,
+        ServiceWrapper, TableRecord,
     };
     use psibase::{define_flags, Flags};
     use psibase::{Fracpack, Table, ToSchema};

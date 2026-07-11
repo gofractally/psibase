@@ -19,8 +19,8 @@ mod tests {
             tokens::{self, Decimal, Precision, Quantity, Wrapper as Tokens},
             verify_sig,
         },
-        tester, AccountNumber, Action, ChainEmptyResult, Claim, MethodNumber, SignedTransaction,
-        Transaction,
+        tester, AccountNumber, Action, ChainEmptyResult, Claim, MethodNumber, Push,
+        SignedTransaction, Transaction,
     };
     use rand::Rng;
     use serde::Deserialize;

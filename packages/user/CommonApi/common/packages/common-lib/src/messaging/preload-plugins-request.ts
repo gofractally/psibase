@@ -4,6 +4,7 @@ const PRE_LOAD_PLUGINS_REQUEST = "PRE_LOAD_PLUGINS_REQUEST" as const;
 
 export interface PreLoadPluginsRequest {
     type: typeof PRE_LOAD_PLUGINS_REQUEST;
+    id: string;
     payload: {
         plugins: QualifiedPluginId[];
     };
@@ -18,6 +19,7 @@ export const buildPreLoadPluginsRequest = (
     plugins: QualifiedPluginId[],
 ): PreLoadPluginsRequest => ({
     type: PRE_LOAD_PLUGINS_REQUEST,
+    id: window.crypto.randomUUID?.() ?? Math.random().toString(),
     payload: {
         plugins,
     },

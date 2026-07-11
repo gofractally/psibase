@@ -97,7 +97,7 @@ pub mod impls {
     };
     use psibase::services::evaluations::Hooks::hooks_wrapper as EvalHooks;
     use psibase::services::subgroups::Wrapper as Subgroups;
-    use psibase::{AccountNumber, Table};
+    use psibase::{AccountNumber, ServiceWrapper, Table};
     use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
 
     impl ConfigRow {
@@ -233,7 +233,7 @@ pub mod impls {
             }
         }
 
-        fn get_users(&self) -> Vec<User> {
+        pub fn get_users(&self) -> Vec<User> {
             let table = UserTable::new();
             table
                 .get_index_pk()
@@ -286,7 +286,7 @@ pub mod impls {
         }
 
         pub fn get_groups(&self) -> Vec<Group> {
-            let table = GroupTable::new();
+            let table = GroupTable::read();
             table
                 .get_index_pk()
                 .range((self.owner, self.id, 0)..=(self.owner, self.id, u32::MAX))
@@ -294,20 +294,22 @@ pub mod impls {
         }
 
         pub fn get_group(&self, group_number: u32) -> Option<Group> {
-            let table = GroupTable::new();
+            let table = GroupTable::read();
             let result = table
                 .get_index_pk()
                 .get(&(self.owner, self.id, group_number));
             result
         }
 
-        pub fn get(owner: AccountNumber, evaluation_id: u32) -> Self {
-            let table = EvaluationTable::new();
-            let result = table.get_index_pk().get(&(owner, evaluation_id));
-            psibase::check_some(
-                result,
-                &format!("evaluation {} {} not found", owner, evaluation_id),
-            )
+        pub fn get(owner: AccountNumber, evaluation_id: u32) -> Option<Self> {
+            EvaluationTable::read()
+                .get_index_pk()
+                .get(&(owner, evaluation_id))
+        }
+
+        pub fn get_assert(owner: AccountNumber, evaluation_id: u32) -> Self {
+            Self::get(owner, evaluation_id)
+                .expect(&format!("evaluation {} {} not found", owner, evaluation_id))
         }
 
         pub fn delete(&self) {
@@ -393,10 +395,9 @@ pub mod impls {
                 .collect();
 
             let population = users.len() as u32;
-            let chunk_sizes = psibase::check_some(
-                Subgroups::call().gmp(population, allowable_group_sizes),
-                "unable to group users",
-            );
+            let chunk_sizes = Subgroups::call()
+                .gmp(population, allowable_group_sizes)
+                .expect("unable to group users");
 
             for (index, &chunk_size) in chunk_sizes.iter().enumerate() {
                 let group_number = (index as u32) + 1;
@@ -480,7 +481,7 @@ pub mod impls {
         }
 
         pub fn declare_result(&self, result: Vec<u8>) {
-            let parent_eval = Evaluation::get(self.owner, self.evaluation_id);
+            let parent_eval = Evaluation::get_assert(self.owner, self.evaluation_id);
 
             if parent_eval.use_hooks {
                 EvalHooks::call_to(self.owner).on_grp_fin(
