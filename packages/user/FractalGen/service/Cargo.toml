@@ -1,5 +1,5 @@
 [package]
-name = "frac-gen"
+name = "fractal-gen"
 version.workspace = true
 rust-version.workspace = true
 repository.workspace = true
@@ -33,4 +33,4 @@ Transact = "0.23.0"
 VirtualServer = "0.23.0"
 
 [dev-dependencies]
-frac-gen-pkg = { path = "..", version = "0.23.0" }
+fractal-gen-pkg = { path = "..", version = "0.23.0" }

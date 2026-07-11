@@ -59,11 +59,9 @@ impl EvaluationInstance {
         let owner = get_service();
 
         match group_number {
-            Some(group_number) => evaluations::Wrapper::call().get_grp_users(
-                owner,
-                self.evaluation_id,
-                group_number,
-            ),
+            Some(group_number) => {
+                evaluations::Wrapper::call().get_grp_users(owner, self.evaluation_id, group_number)
+            }
             None => evaluations::Wrapper::call().get_users(owner, self.evaluation_id),
         }
     }

@@ -69,6 +69,22 @@ pub unsafe fn set_sender(_acc: AccountNumber) {
     SENDER = _acc;
 }
 
+#[doc(hidden)]
+#[cfg(target_family = "wasm")]
+pub fn service_start() {
+    std::panic::set_hook(Box::new(|info| {
+        let payload = info.payload();
+        let msg: &str = if let Some(s) = payload.downcast_ref::<&str>() {
+            *s
+        } else if let Some(s) = payload.downcast_ref::<String>() {
+            &*s
+        } else {
+            ""
+        };
+        crate::abort_message(msg)
+    }))
+}
+
 pub trait ProcessActionStruct {
     type Output;
 

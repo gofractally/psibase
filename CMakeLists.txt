@@ -545,8 +545,8 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
-    OUTPUT ${SERVICE_DIR}/FracGen.psi
-    PATH packages/user/FracGen
+    OUTPUT ${SERVICE_DIR}/FractalGen.psi
+    PATH packages/user/FractalGen
     TARGET_DIR ${USER_WORKSPACE_TARGET}
 )
 
@@ -1237,7 +1237,7 @@ psibase_package(
     NAME ProdWithFG
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Network initializes with production-ready apps, secure authentication, and \"fractal\" network governance."
-    PACKAGE_DEPENDS ProdDefault FracGen
+    PACKAGE_DEPENDS ProdDefault FractalGen
 )
 
 psibase_package(
@@ -1281,7 +1281,7 @@ endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
     Accounts AccountsService Aes AuthAny AuthDyn AuthDelegate AuthDelegateService AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
-    Docs DiffAdjust DynLd Events Evaluations FaucetTok Fractals FractalCore FracGen FractalTester Guilds Explorer Host Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry
+    Docs DiffAdjust DynLd Events Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap PremAccounts Transact TransactService Homepage VirtualServer WebCrypto Workshop Config
     XAdmin XBasic XDb XDefault XHttp XPackages XPeers XProxy XRun XSites XTimer XTransact)
 
@@ -1319,7 +1319,7 @@ install(
           ${SERVICE_DIR}/Fractals.psi
           ${SERVICE_DIR}/Guilds.psi
           ${SERVICE_DIR}/FractalCore.psi
-          ${SERVICE_DIR}/FracGen.psi
+          ${SERVICE_DIR}/FractalGen.psi
           ${SERVICE_DIR}/FractalTester.psi
           ${SERVICE_DIR}/Host.psi
           ${SERVICE_DIR}/HttpServer.psi
