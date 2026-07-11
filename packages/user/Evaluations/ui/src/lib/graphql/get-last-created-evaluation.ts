@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { EVALUATIONS_SERVICE } from "@shared/domains/fractal/lib/constants";
 import { graphql } from "@shared/lib/graphql";
 import { type Account, zAccount } from "@shared/lib/schemas/account";
 
@@ -10,7 +11,7 @@ export const getLastCreatedEvaluationId = async (account: Account) => {
             id
             owner
         } }`,
-        { service: "evaluations" },
+        { service: EVALUATIONS_SERVICE },
     );
 
     const response = z

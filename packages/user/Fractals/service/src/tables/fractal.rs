@@ -91,7 +91,7 @@ impl Fractal {
         // auth service to AuthDyn.
         new_instance.save();
 
-        let defacto_service = account!("de-facto");
+        let defacto_service = account!("fractals+2");
 
         let create_role = |role_account: AccountNumber, role: FractalRole| {
             Role::add(fractal, role_account, role, defacto_service)
