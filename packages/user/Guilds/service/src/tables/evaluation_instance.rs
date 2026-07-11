@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use psibase::services::evaluations;
-use psibase::{check_some, get_service, AccountNumber, Table};
+use psibase::{check_some, get_service, AccountNumber, ServiceWrapper, Table};
 
 use crate::constants::GUILD_EVALUATION_GROUP_SIZE;
 use crate::helpers::assign_decreasing_levels;
@@ -59,11 +59,9 @@ impl EvaluationInstance {
         let owner = get_service();
 
         match group_number {
-            Some(group_number) => evaluations::Wrapper::call().get_grp_users(
-                owner,
-                self.evaluation_id,
-                group_number,
-            ),
+            Some(group_number) => {
+                evaluations::Wrapper::call().get_grp_users(owner, self.evaluation_id, group_number)
+            }
             None => evaluations::Wrapper::call().get_users(owner, self.evaluation_id),
         }
     }
