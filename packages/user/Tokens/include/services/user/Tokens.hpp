@@ -129,7 +129,7 @@ namespace UserService
       /// Uncredit tokens that were credited into a shared balance
       ///
       /// On credit, tokens are typically placed in the shared balance and debited by the debitor. However,
-      /// if the debitor has enabled `auto_debit`, then the tokens will be automatically debited.
+      /// if the debitor has enabled `auto_debit`, then the tokens will be debited automatically.
       ///
       /// # Shared balance mechanics
       /// When in the shared balance, the tokens can be:
