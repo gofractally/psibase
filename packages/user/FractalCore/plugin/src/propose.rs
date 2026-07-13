@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use crate::bindings::guilds::plugin as GuildsPlugin;
 use crate::bindings::guilds::plugin::queries::Guild;
 use psibase::{AccountNumber, Subaccount};
