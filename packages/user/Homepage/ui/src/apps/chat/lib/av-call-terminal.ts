@@ -1,4 +1,4 @@
-/** Normalize av-call leave/decline reasons for x-webrtcsig + objective timeline. */
+/** Normalize av-call leave/decline reasons for x-wrtcsig + objective timeline. */
 export function normalizeAvCallTerminalReason(reason: string): string {
     const trimmed = reason.trim();
     if (trimmed === "invite-timeout") return "timeout";

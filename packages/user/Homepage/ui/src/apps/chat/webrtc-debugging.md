@@ -28,7 +28,7 @@ Primary historical spec: `e2e/tests/chat-group-three-party.spec.ts`
 
 | # | Hypothesis | Status | Notes |
 |---|------------|--------|-------|
-| H1 | WS subdomain typo (`x-webrtc-sig` vs `x-webrtcsig`) broke signaling | **Fixed** | DM e2e recovered |
+| H1 | WS subdomain typo (`x-webrtc-sig` vs `x-wrtcsig`) broke signaling | **Fixed** | DM e2e recovered |
 | H2 | `hasJoined` stale after WS reconnect; server has us in `pendingParticipants` but client skips `joinSession` | **Partial fix** | Clear on snapshot + `joinedWelcomeGeneration` |
 | H3 | Headless Chromium can't do WebRTC ICE | **Ruled out** | xvfb `--headed` run failed identically to headless |
 | H4 | Initiator deadlock: both sides create peers with `isInitiator: false` → no SDP offers | **Confirmed** | E2E logs showed zero `signal → offer` until bob path fixed |
@@ -59,7 +59,7 @@ Primary historical spec: `e2e/tests/chat-group-three-party.spec.ts`
 | H29 | Optimistic `hasJoined` on `joinSession` TX while server still has self in `pendingParticipants` → signals rejected, client thinks joined | **Fixed** | `hasJoined` only from `sessionSnapshot` / `selfJoinedNow`; `mustRequestJoin` until server confirms + welcome gen match |
 | H30 | Outbound SDP/ICE sent before joined socket → server drops or peer not ready | **Fixed** | Client defers in `webrtc-signaling-client.ts`; `flushDeferredSignals` on self ∈ `joinedParticipants` |
 | H31 | Background tab joined on server but active socket never got `sessionSnapshot` (fanout only to joined sockets) | **Fixed** | `fanout_session_snapshot` also delivers to **pending** participants' live sockets (`signaling.rs`) |
-| H32 | DM `sessionResolved` with peer offline never joined x-webrtcsig → no flush path when peer returns | **Fixed** | FSM: DM `sessionResolved` → `beginSignaling` even if `!anyPeerOnline` |
+| H32 | DM `sessionResolved` with peer offline never joined x-wrtcsig → no flush path when peer returns | **Fixed** | FSM: DM `sessionResolved` → `beginSignaling` even if `!anyPeerOnline` |
 | H33 | `beginSignalingDm` opened PC while peer offline; stale offers after roster rejoin | **Fixed** | Early `joinSession`, **skip `startDmPeer` until peer presence online** |
 | H34 | DM initiator rebuild after remote rejoin → offer/answer glare, matrix pairwise wedge | **Fixed** | Reconciler: **ignore initiator drift for DM** (lock role at peer creation); group still rebuilds |
 | H35 | `selfJoinedNow` re-ran full `beginSignaling` while DM peer already live | **Fixed** | Realtime handler skips redundant begin when DM peer exists |
@@ -194,7 +194,7 @@ Client `hasJoined: true` + `mustJoin: false` while server rejects signals until 
 
 | Date | Change | Files | E2E after |
 |------|--------|-------|-----------|
-| 2025-06-01 | WS URL `x-webrtcsig` | `realtime-client.ts` | DM pass |
+| 2025-06-01 | WS URL `x-wrtcsig` | `realtime-client.ts` | DM pass |
 | 2025-06-01 | Handler registration via provider `registerHandlers()` | orchestrator, `use-chat-socket.ts` | DM pass |
 | 2025-06-01 | Clear `hasJoined` when self ∉ `joinedParticipants` | `chat-data-realtime-handlers.ts` | — |
 | 2025-06-01 | `joinedWelcomeGeneration` on reconnect | `realtime-client.ts`, group orchestrator, run actor | — |

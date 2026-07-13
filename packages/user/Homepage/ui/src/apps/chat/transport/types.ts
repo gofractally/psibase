@@ -67,3 +67,5 @@ export const PEER_MAX_WARM = 10;
 export const IN_FLIGHT_ACK_WAIT_MS = 2_500;
 export const MAX_VALID_ATTEMPTS = 5;
 export const ACK_POLL_INTERVAL_MS = 500;
+/** Reject `ensure()` waiters that never reach usable (Meet start must not hang). */
+export const PEER_ENSURE_TIMEOUT_MS = 60_000;

@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { type Page, expect } from "@playwright/test";
 
 import {
     type ChatSelectionState,
@@ -54,10 +54,15 @@ export async function logSidebarInventory(
         })
         .catch(() => null);
 
-    const dmRow = page
-        .getByRole("button", { name: dmRowNamePattern(peerAccount) })
+    const dmToggle = page
+        .getByRole("button", { name: "Direct Messages", exact: true })
         .locator("visible=true")
         .last();
+    const dmRow = dmToggle
+        .locator("xpath=following-sibling::div[1]")
+        .getByRole("button", { name: dmRowNamePattern(peerAccount) })
+        .locator("visible=true")
+        .first();
     const contactsToggle = page
         .getByRole("button", { name: "Contacts", exact: true })
         .locator("visible=true")
@@ -85,7 +90,8 @@ export async function logSidebarInventory(
             const toggle = [...document.querySelectorAll("button")].find(
                 (b) => b.textContent?.trim() === "Direct Messages",
             );
-            if (!toggle) return { dmSectionExpanded: null, labels: [] as string[] };
+            if (!toggle)
+                return { dmSectionExpanded: null, labels: [] as string[] };
             const expanded = toggle.getAttribute("aria-expanded") === "true";
             const container = toggle.parentElement;
             const rows = container
@@ -165,10 +171,16 @@ export async function clickDmSidebarTarget(
     peerAccount: string,
 ): Promise<{ path: "dm-row" | "contacts-row" }> {
     await ensureSidebarSectionExpanded(page, "Direct Messages");
-    const dmRow = page
-        .getByRole("button", { name: dmRowNamePattern(peerAccount) })
+    // Scope to the DM panel only — group rows reuse peer names in aria-label.
+    const dmToggle = page
+        .getByRole("button", { name: "Direct Messages", exact: true })
         .locator("visible=true")
         .last();
+    const dmRow = dmToggle
+        .locator("xpath=following-sibling::div[1]")
+        .getByRole("button", { name: dmRowNamePattern(peerAccount) })
+        .locator("visible=true")
+        .first();
     const dmVisible = await dmRow.isVisible().catch(() => false);
     console.log(
         `${LOG_PREFIX} sidebar dm-row visible=${dmVisible} for ${peerAccount}`,
@@ -371,7 +383,9 @@ export async function runOpenDmThreadScenario(
     const assertMs = options?.assertMs ?? 45_000;
     const gotoTimeout = options?.gotoTimeout ?? 45_000;
 
-    console.log(`\n${LOG_PREFIX} ===== scenario: ${scenario} (openDmThread) =====`);
+    console.log(
+        `\n${LOG_PREFIX} ===== scenario: ${scenario} (openDmThread) =====`,
+    );
     const before = await snapshotSelection(page);
     logSelection(`${scenario}:before`, before);
     await logSidebarInventory(page, peerAccount, `${scenario}:before`);

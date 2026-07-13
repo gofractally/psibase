@@ -1,7 +1,6 @@
 import type { AvCallOrchestratorHost } from "./av-call-session-types";
 import type { MeetPeerHandle } from "./meet-peer-handle";
 
-import { MeetWebRtcPeer } from "./meet-webrtc-peer";
 import { createSharedMeetPeer } from "./shared-meet-peer";
 
 export type MeetPeerFactoryHandlers = {
@@ -25,8 +24,8 @@ export type CreateMeetPeerParams = {
 };
 
 /**
- * Prefer DeliveryFabric shared pair PC. Standalone MeetWebRtcPeer remains only
- * when fabric is unwired (tests / legacy); production Chat wires the fabric.
+ * One-PC invariant: Meet always attaches to the shared pair PC via
+ * DeliveryFabric (or PeerMediaPort). No standalone MeetWebRtcPeer fallback.
  */
 export function createMeetPeerForRemote(
     params: CreateMeetPeerParams,
@@ -43,7 +42,6 @@ export function createMeetPeerForRemote(
         });
     }
 
-    // Legacy fallback when host has PeerMediaPort via deprecated registry path
     const media = params.host.getPeerMediaPort?.() ?? null;
     if (media) {
         return createSharedMeetPeer(media, {
@@ -56,23 +54,9 @@ export function createMeetPeerForRemote(
         });
     }
 
-    const signaling = params.host.getSignaling();
-    if (!signaling) {
-        throw new Error("WebRTC signaling not ready");
-    }
-
-    return new MeetWebRtcPeer({
-        sessionId: params.avCallSessionId,
-        selfAccount: params.selfAccount,
-        peerAccount: params.remoteAccount,
-        iceServers: params.host.getIceServers(),
-        signaling,
-        isInitiator: params.isInitiator,
-        wantVideo: params.wantVideo,
-        wantAudio: params.wantAudio,
-        sharedLocalStream: params.sharedLocalStream,
-        handlers: params.handlers,
-    });
+    throw new Error(
+        "DeliveryFabric (or PeerMediaPort) required for Meet — shared pair PC only",
+    );
 }
 
 export function shouldReuseMeetPeer(

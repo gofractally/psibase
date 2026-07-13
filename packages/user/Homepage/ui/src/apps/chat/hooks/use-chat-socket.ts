@@ -263,7 +263,7 @@ export type UseChatSocketOptions = {
     urlConversationId?: string;
 };
 
-/** Chat UI state: objective Spaces (GraphQL) + x-webrtcsig presence/realtime + interim group websocket for group/call coordination (M3 DMs use data channel). */
+/** Chat UI state: objective Spaces (GraphQL) + x-wrtcsig presence/realtime + interim group websocket for group/call coordination (M3 DMs use data channel). */
 export function useChatSocket(options?: UseChatSocketOptions) {
     const {
         client: webrtcClient,
@@ -300,7 +300,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
     const [lastRealtimeError, setLastRealtimeError] = useState<string | null>(
         null,
     );
-    /** True after first `presenceSnapshot` on x-webrtcsig. */
+    /** True after first `presenceSnapshot` on x-wrtcsig. */
     const [presenceReady, setPresenceReady] = useState(false);
     const presenceReadyRef = useRef(false);
 
@@ -1801,6 +1801,8 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     ) {
                         return prev;
                     }
+                    // Only dismiss the terminal frame — leave a revived call alone.
+                    if (prev.status !== "ended") return prev;
                     return null;
                 });
                 if (match.spaceUuid) {
@@ -1892,12 +1894,31 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 ) {
                     const lastFrame = avCallTerminalUiMessage(terminalReason);
                     clearAvCallMedia();
-                    setActiveCall((prev) =>
-                        prev?.conversationId === spaceUuid &&
-                        prev.source === "av-call"
-                            ? { ...prev, status: "ended", lastFrame }
-                            : prev,
-                    );
+                    setActiveCall((prev) => {
+                        if (
+                            prev?.conversationId === spaceUuid &&
+                            prev.source === "av-call"
+                        ) {
+                            return { ...prev, status: "ended", lastFrame };
+                        }
+                        // Armed UI with a missing/stale activeCall (e.g. race
+                        // cleared Connected) — still surface the terminal frame.
+                        return {
+                            callId: snap.sessionId ?? prev?.callId ?? "",
+                            conversationId: spaceUuid,
+                            peerAccount: prev?.peerAccount ?? "",
+                            direction:
+                                prev?.direction ?? avCallDirectionRef.current,
+                            wantVideo: prev?.wantVideo ?? true,
+                            wantAudio: prev?.wantAudio ?? true,
+                            startedAt: prev?.startedAt ?? Date.now(),
+                            status: "ended",
+                            source: "av-call",
+                            lastFrame,
+                            callKind: prev?.callKind ?? "dm",
+                            groupParticipants: prev?.groupParticipants,
+                        };
+                    });
                     scheduleTerminalCallDismissRef.current({ spaceUuid });
                     return;
                 }
@@ -2042,6 +2063,13 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 }
 
                 setActiveCall((prev) => {
+                    if (
+                        prev?.conversationId === spaceUuid &&
+                        prev.source === "av-call" &&
+                        prev.status === "ended"
+                    ) {
+                        return prev;
+                    }
                     const direction =
                         prev?.conversationId === spaceUuid &&
                         prev.source === "av-call"
@@ -2092,6 +2120,13 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 (direction !== "outgoing" || remoteJoined);
 
             setActiveCall((prev) => {
+                if (
+                    prev?.conversationId === spaceUuid &&
+                    prev.source === "av-call" &&
+                    prev.status === "ended"
+                ) {
+                    return prev;
+                }
                 const callDirection =
                     prev?.conversationId === spaceUuid &&
                     prev.source === "av-call"
@@ -2151,12 +2186,26 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             ) {
                 return;
             }
+            const active = activeCallRef.current;
+            if (
+                active?.conversationId === spaceUuid &&
+                active.source === "av-call" &&
+                active.status === "ended"
+            ) {
+                return;
+            }
             const showUi =
                 avCallUiArmedRef.current === spaceUuid ||
-                (activeCallRef.current?.conversationId === spaceUuid &&
-                    activeCallRef.current.source === "av-call");
+                (active?.conversationId === spaceUuid &&
+                    active.source === "av-call");
             if (!showUi) return;
             const run = avCallOrchestratorRef.current?.getRun(spaceUuid);
+            if (
+                run?.snapshot.phase === "failed" ||
+                run?.snapshot.phase === "idle"
+            ) {
+                return;
+            }
             if (run?.kind === "dm") {
                 setAvCallAudioOnlyFallback(
                     run.peer?.getVideoActuallyDisabled() ?? false,
@@ -2187,6 +2236,13 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 setAvCallRemoteStream(info.remoteStream);
             }
             setActiveCall((prev) => {
+                if (
+                    prev?.conversationId === spaceUuid &&
+                    prev.source === "av-call" &&
+                    prev.status === "ended"
+                ) {
+                    return prev;
+                }
                 const conversation = conversationsRef.current.find(
                     (row) => row.conversationId === spaceUuid,
                 );

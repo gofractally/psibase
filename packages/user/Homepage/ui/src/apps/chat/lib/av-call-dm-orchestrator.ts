@@ -4,19 +4,19 @@ import {
     shortSessionId,
     shortSpaceId,
 } from "./av-call-debug";
-import { normalizeAvCallTerminalReason } from "./av-call-terminal";
-import { commitAvCallJoin } from "./av-call-timeline-commit";
 import {
     createMeetPeerForRemote,
     shouldReuseMeetPeer,
 } from "./av-call-meet-peer-factory";
 import {
+    type AvCallOrchestratorHost,
+    type DmAvCallRun,
     avCallConnectivityErrorMessage,
     dmPeerAccount,
     shouldInitiateOffer,
-    type AvCallOrchestratorHost,
-    type DmAvCallRun,
 } from "./av-call-session-types";
+import { normalizeAvCallTerminalReason } from "./av-call-terminal";
+import { commitAvCallJoin } from "./av-call-timeline-commit";
 
 const DEFAULT_WANT_VIDEO = true;
 const DEFAULT_WANT_AUDIO = true;
@@ -164,6 +164,7 @@ export function startDmAvCallPeer(
                     remoteStream: existing!.getRemoteStream() ?? null,
                 });
             }
+            run.onUpdate();
         }
         return;
     }
@@ -191,12 +192,17 @@ export function startDmAvCallPeer(
                         remoteStream: run.peer?.getRemoteStream() ?? null,
                     });
                 }
+                run.onUpdate();
             },
             onLocalStream: () => {
                 /* UI hooks via onAvCallMediaReady on connect */
             },
             onRemoteStream: (remote) => {
                 if (!remote || !run.snapshot.mediaConnected) return;
+                host.promoteAvCallParticipantToJoined?.(
+                    sessionId,
+                    run.peerAccount,
+                );
                 const local = run.peer?.getLocalStream();
                 if (local) {
                     host.onAvCallMediaReady?.(run.spaceUuid, {
@@ -205,6 +211,7 @@ export function startDmAvCallPeer(
                         remoteStream: remote,
                     });
                 }
+                run.onUpdate();
             },
             onFailed: (detail) => {
                 host.fail(run, detail);

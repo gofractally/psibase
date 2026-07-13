@@ -1,18 +1,19 @@
 # Chat-data transport: one PC per remote user
 
-> **PARTIALLY OUTDATED (2026-07-13) — still the preferred layer spine.**  
-> Keep L1→L2→L3→L4 as the internal module map (confirmed in [`webrtc-code-review.md`](../../../../../../../webrtc-code-review.md) §0). Outdated or incomplete relative to current judgment:
+> **Living internal stack doc (2026-07-14).**  
+> Keep L1→L2→L3→L4 as the internal module map (confirmed in [`webrtc-code-review.md`](../../../../../../../webrtc-code-review.md) §0). Status vs current code:
 >
+> - **Landed:** `PeerLifecycleCoordinator` (sole ensure/kick/recover owner), thin `DeliveryFabric` façade (`delivery-fabric.ts`), Meet as sibling of L4 on shared L3 PCs (hard-fail without fabric/media port).
+> - **Still open:** dual `joinedPairs` (stack vs L2) — fixed when M5 lands; L3 still special-cases chat `t:` dispatch (M4).
 > - Opening “Today / Proposed” framing — **per-remote PCs are largely implemented**; treat locked decisions + layer FSMs as the living parts.
-> - “Apps see only **L4**” — too chat-centric; Meet is a **sibling** app protocol on a shared peer map, not a consumer of messaging. Prefer a thin shared façade + dependency rule (see also outdated notes on `chat-meet-comms-architecture.md`).
-> - Missing: **PeerLifecycleCoordinator** as sole ensure/kick/recover owner; dual join-roster / competing ensure drivers are known debt, not target design.  
->   Locked constants (TTL, ACK, initiator=lex, etc.) remain authoritative unless code deliberately changes them.
+> - “Apps see only **L4**” — too chat-centric; Meet is a **sibling** app protocol. Prefer thin shared façade + dependency rule (see `chat-meet-comms-architecture.md`).
+> - Locked constants (TTL, ACK, initiator=lex, etc.) remain authoritative unless code deliberately changes them.
 
 Design direction for post–delivery-gate work on `mm/webrtc-refactor`. Living doc — update as we decide signaling/API shape.
 
 ## Summary
 
-**Today:** transport is organized **per Space** (DM Space or group Space). The same two accounts in a DM Space and in a group Space negotiate **separate** `RTCPeerConnection`s and **separate** x-webrtcsig `wrtc:*` sessions.
+**Today:** transport is organized **per Space** (DM Space or group Space). The same two accounts in a DM Space and in a group Space negotiate **separate** `RTCPeerConnection`s and **separate** x-wrtcsig `wrtc:*` sessions.
 
 **Proposed:** transport is organized **per remote account**. The app keeps a map `**remoteAccount → PeerConnection`** (keyed by Contacts / account name). Outbound chat-data is sent on the PC for that contact; every frame carries **space/thread metadata\*\* so the receiver routes into the correct UI thread.
 
@@ -197,7 +198,7 @@ interface RealtimeTransport {
 }
 ```
 
-### L2 — `PairSignaling` (x-webrtcsig)
+### L2 — `PairSignaling` (x-wrtcsig)
 
 ```typescript
 interface PairSignaling {
@@ -509,7 +510,7 @@ First (and every subsequent) `**{ t: "welcome" }**` frame on the open websocket 
 
 ### `sessionSnapshot` (signaling server frame — L2)
 
-Server broadcast `**{ t: "sessionSnapshot", sessionId, epoch, joinedParticipants, pendingParticipants }`** for one **x-webrtcsig session** (`wrtc:…` tied to a Space). Ground truth for who has **joined that session on the server** vs who is authorized but still **pending\*\*.
+Server broadcast `**{ t: "sessionSnapshot", sessionId, epoch, joinedParticipants, pendingParticipants }`** for one **x-wrtcsig session** (`wrtc:…` tied to a Space). Ground truth for who has **joined that session on the server** vs who is authorized but still **pending\*\*.
 
 - `**joinedParticipants`:\*\* accounts with a live `joinSession` on some socket for this session.
 - `**pendingParticipants`:\*\* in session auth list but not joined on any socket.
@@ -595,7 +596,7 @@ sequenceDiagram
     participant Run as Space run FSM
     participant Sig as WebRtcSignalingClient
     participant WS as L1 Realtime WS
-    participant Srv as x-webrtcsig
+    participant Srv as x-wrtcsig
 
     UI->>Run: ensureDm → ensure event
     Run->>Sig: joinSession(sessionId)
@@ -820,7 +821,7 @@ The delivery-gate **matrix** spec failed when alice had a **background DM** (pen
 
 ### Why welcome matters at all (constraint)
 
-x-webrtcsig `**joinSession` is per websocket socket**. A new `welcome` on a new socket means server-side joins on the old socket are dead. The client **must\*\* call `joinSession` again on the new socket before the server accepts outbound signals. Some “invalidate join” step is required.
+x-wrtcsig `**joinSession` is per websocket socket**. A new `welcome` on a new socket means server-side joins on the old socket are dead. The client **must\*\* call `joinSession` again on the new socket before the server accepts outbound signals. Some “invalidate join” step is required.
 
 The bug class is not “re-join is wrong” — it is **how aggressively** we tear down _client_ state (hasJoined, snapshot epoch, PCs, background scheduling) while doing that.
 
@@ -871,7 +872,7 @@ That makes H36 a **special case of peer-registry policy**, not a one-off matrix 
 
 These are **migration and protocol** work, not arguments that per-peer is worse:
 
-### 1. x-webrtcsig session model
+### 1. x-wrtcsig session model
 
 **Decided: pair-only** (`wrtc:pair(…)`). Server + client stop using per-Space `wrtc:*` for chat-data transport (objective Spaces remain for auth and storage).
 
@@ -923,7 +924,7 @@ Still **one tab ↔ one peer map** (or explicit leader-tab election). Second tab
 
 ## Open questions (remaining)
 
-- **Pair id string** exact format on x-webrtcsig (e.g. `wrtc:pair:alice:bob`)
+- **Pair id string** exact format on x-wrtcsig (e.g. `wrtc:pair:alice:bob`)
 - **Group badge denominator:** `k/(recipients)` vs `k/(all participants)` — recommend former; confirm in Chat UI
 - **History sync byte cap** per catch-up burst (late joiner) — TBD in [Test plan](#test-plan)
 

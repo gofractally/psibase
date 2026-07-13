@@ -1,8 +1,9 @@
+import type { RealtimeTransport } from "./l1-realtime-transport";
+import type { PeerTransportRegistry } from "./l3-peer-registry";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { serializeChatDataMessage } from "../lib/chat-data-envelope";
-import type { RealtimeTransport } from "./l1-realtime-transport";
-import type { PeerTransportRegistry } from "./l3-peer-registry";
 import { createMessagingService } from "./l4-messaging-service";
 import { IN_FLIGHT_ACK_WAIT_MS, MAX_VALID_ATTEMPTS } from "./types";
 
@@ -46,11 +47,17 @@ function createMockRealtime(
 function createMockPeerRegistry(): PeerTransportRegistry & {
     sent: Array<{ remote: string; bytes: Uint8Array }>;
     emitUsable: (remote: string) => void;
-    setState: (remote: string, state: ReturnType<PeerTransportRegistry["getState"]>) => void;
+    setState: (
+        remote: string,
+        state: ReturnType<PeerTransportRegistry["getState"]>,
+    ) => void;
 } {
     const handlers = new Map<string, Set<(remote: string) => void>>();
     const sent: Array<{ remote: string; bytes: Uint8Array }> = [];
-    const states = new Map<string, ReturnType<PeerTransportRegistry["getState"]>>();
+    const states = new Map<
+        string,
+        ReturnType<PeerTransportRegistry["getState"]>
+    >();
     return {
         sent,
         ensure: vi.fn(async () => {}),
@@ -76,6 +83,7 @@ function createMockPeerRegistry(): PeerTransportRegistry & {
         getChatPeer: vi.fn(() => null),
         holdMeet: vi.fn(),
         releaseMeet: vi.fn(),
+        isMeetHeld: vi.fn(() => false),
         setState(remote, state) {
             states.set(remote, state);
         },
@@ -280,6 +288,62 @@ describe("l4-messaging-service", () => {
             delivered: 1,
             total: 2,
         });
+
+        messaging.handleWireFromRemote(
+            "carol",
+            JSON.stringify({
+                t: "messageAck",
+                spaceUuid: "space:group",
+                clientMsgId: msgId,
+                from: "carol",
+            }),
+        );
+
+        expect(messaging.getPendingCount(msgId)).toEqual({
+            delivered: 0,
+            total: 0,
+        });
+        expect(messaging.getStatus(msgId)).toBe("DELIVERED");
+    });
+
+    it("partial group ACK leaves pending until the offline recipient never acks", async () => {
+        const realtime = createMockRealtime({ bob: true, carol: false });
+        const peerRegistry = createMockPeerRegistry();
+        const messaging = createMessagingService({
+            localAccount: "alice",
+            chainId: "test-chain-partial-offline",
+            realtime,
+            peerRegistry,
+        }) as ReturnType<typeof createMessagingService> & {
+            handleWireFromRemote: (remote: string, raw: string) => void;
+        };
+
+        const { msgId } = await messaging.sendGroup({
+            spaceUuid: "space:group",
+            recipient: "bob",
+            recipients: ["bob", "carol"],
+            body: "one offline",
+        });
+        peerRegistry.emitUsable("bob");
+        await Promise.resolve();
+
+        messaging.handleWireFromRemote(
+            "bob",
+            JSON.stringify({
+                t: "messageAck",
+                spaceUuid: "space:group",
+                clientMsgId: msgId,
+                from: "bob",
+            }),
+        );
+
+        expect(messaging.getPendingCount(msgId)).toEqual({
+            delivered: 1,
+            total: 2,
+        });
+        expect(messaging.getStatus(msgId)).not.toBe("DELIVERED");
+        // carol never becomes usable / never ACKs — stays partial.
+        expect(peerRegistry.sent.map((s) => s.remote)).toEqual(["bob"]);
     });
 
     it("does not auto-ack inbound chatMessage on wire parse", async () => {
@@ -409,5 +473,60 @@ describe("l4-messaging-service", () => {
             clientMsgId: "msg-persist-1",
             from: "bob",
         });
+    });
+
+    it("does not dispose on ACK timeout when peer is Meet-held", async () => {
+        const realtime = createMockRealtime({ bob: true });
+        const peerRegistry = createMockPeerRegistry();
+        peerRegistry.ping = vi.fn(async () => false);
+        peerRegistry.isMeetHeld = vi.fn(() => true);
+
+        const messaging = createMessagingService({
+            localAccount: "alice",
+            chainId: "test-chain-ack-meet-held",
+            realtime,
+            peerRegistry,
+        });
+
+        await messaging.send({
+            spaceUuid: "space:dm",
+            recipient: "bob",
+            body: "during meet",
+        });
+        peerRegistry.emitUsable("bob");
+        await Promise.resolve();
+
+        await vi.advanceTimersByTimeAsync(IN_FLIGHT_ACK_WAIT_MS + 1);
+        await Promise.resolve();
+
+        expect(peerRegistry.dispose).not.toHaveBeenCalled();
+        expect(peerRegistry.isMeetHeld).toHaveBeenCalledWith("bob");
+    });
+
+    it("disposes on ACK timeout when ping fails and peer is not Meet-held", async () => {
+        const realtime = createMockRealtime({ bob: true });
+        const peerRegistry = createMockPeerRegistry();
+        peerRegistry.ping = vi.fn(async () => false);
+        peerRegistry.isMeetHeld = vi.fn(() => false);
+
+        const messaging = createMessagingService({
+            localAccount: "alice",
+            chainId: "test-chain-ack-dispose",
+            realtime,
+            peerRegistry,
+        });
+
+        await messaging.send({
+            spaceUuid: "space:dm",
+            recipient: "bob",
+            body: "no meet",
+        });
+        peerRegistry.emitUsable("bob");
+        await Promise.resolve();
+
+        await vi.advanceTimersByTimeAsync(IN_FLIGHT_ACK_WAIT_MS + 1);
+        await Promise.resolve();
+
+        expect(peerRegistry.dispose).toHaveBeenCalledWith("bob", "ack_timeout");
     });
 });

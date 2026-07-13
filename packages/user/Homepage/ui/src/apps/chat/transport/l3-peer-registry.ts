@@ -8,13 +8,6 @@ import type { PairSignaling } from "./l2-pair-signaling";
 import type { PeerRosterSnapshot } from "./roster-renegotiation-coordinator";
 
 import { chatDataRecord } from "../lib/chat-data-debug";
-import {
-    type ChatDataMessageAckEnvelope,
-    type ChatDataMessageEnvelope,
-    type ChatDataWireEnvelope,
-    type ChatHistorySyncEnvelope,
-    parseChatDataWireEnvelope,
-} from "../lib/chat-data-envelope";
 import { ChatDataWebRtcPeer } from "../lib/chat-data-webrtc-peer";
 import { recordTransportLifecycle } from "../lib/thread-lifecycle";
 import { EventBus } from "./event-bus";
@@ -22,6 +15,7 @@ import { createNegotiationScheduler } from "./negotiation-scheduler";
 import { isLexInitiator, pairSessionId } from "./pair-id";
 import {
     type EnsureReason,
+    PEER_ENSURE_TIMEOUT_MS,
     PEER_ESTABLISHING_STUCK_MS,
     PEER_IDLE_TTL_MS,
     PEER_JOIN_STUCK_MS,
@@ -37,6 +31,12 @@ type PeerRegistryEvents = {
     usable: (remote: string) => void;
     suspected_dead: (remote: string) => void;
     disposed: (remote: string) => void;
+};
+
+type EnsureWaiter = {
+    resolve: () => void;
+    reject: (err: Error) => void;
+    timer: ReturnType<typeof setTimeout>;
 };
 
 export interface PeerTransportRegistry {
@@ -56,6 +56,8 @@ export interface PeerTransportRegistry {
     ping(remoteAccount: string): Promise<boolean>;
     touch(remoteAccount: string): void;
     dispose(remoteAccount: string, reason: string): void;
+    /** Clear stuck-check interval and force-dispose every peer entry. */
+    disposeAll(): void;
     handleRemoteSignal(
         remoteAccount: string,
         frame: {
@@ -72,6 +74,8 @@ export interface PeerTransportRegistry {
     /** Prevent idle TTL dispose while Meet holds the pair PC. */
     holdMeet(remoteAccount: string): void;
     releaseMeet(remoteAccount: string): void;
+    /** True while Meet holds the shared pair PC (`meetHoldCount > 0`). */
+    isMeetHeld(remoteAccount: string): boolean;
     getKickCounts(): Readonly<Record<string, number>>;
     resetKickCounts(): void;
 }
@@ -84,7 +88,7 @@ type PeerEntry = {
     joinRequestedAt: number;
     negotiationStartedAt: number | null;
     peer: ChatDataWebRtcPeer | null;
-    ensureWaiters: Array<() => void>;
+    ensureWaiters: EnsureWaiter[];
     dataChannelReady: boolean;
     meetHoldCount: number;
     pendingRemoteSignals: Array<{
@@ -163,7 +167,18 @@ export function createPeerTransportRegistry(
     const resolveEnsureWaiters = (entry: PeerEntry) => {
         if (entry.state !== "usable") return;
         const waiters = entry.ensureWaiters.splice(0);
-        for (const resolve of waiters) resolve();
+        for (const waiter of waiters) {
+            clearTimeout(waiter.timer);
+            waiter.resolve();
+        }
+    };
+
+    const rejectEnsureWaiters = (entry: PeerEntry, err: Error) => {
+        const waiters = entry.ensureWaiters.splice(0);
+        for (const waiter of waiters) {
+            clearTimeout(waiter.timer);
+            waiter.reject(err);
+        }
     };
 
     const disposeEntry = (remote: string, reason: string) => {
@@ -171,6 +186,7 @@ export function createPeerTransportRegistry(
         if (!entry || entry.state === "disposing") return;
         if (entry.meetHoldCount > 0 && reason !== "force") return;
         setState(entry, "disposing", "dispose");
+        rejectEnsureWaiters(entry, new Error(`peer disposed: ${reason}`));
         entry.peer?.stopMeetMedia();
         entry.peer?.dispose();
         entry.peer = null;
@@ -237,29 +253,11 @@ export function createPeerTransportRegistry(
                     resolveEnsureWaiters(entry);
                     bus.emit("usable", entry.remote);
                 },
-                onChatMessage: (envelope: ChatDataMessageEnvelope) => {
+                onWireMessage: (raw: string) => {
                     touchEntry(entry);
                     opts.onInboundBytes?.(
                         entry.remote,
-                        new TextEncoder().encode(JSON.stringify(envelope)),
-                    );
-                },
-                onMessageAck: (envelope: ChatDataMessageAckEnvelope) => {
-                    touchEntry(entry);
-                    opts.onInboundBytes?.(
-                        entry.remote,
-                        new TextEncoder().encode(JSON.stringify(envelope)),
-                    );
-                },
-                onSpaceMembershipHint: () => {
-                    touchEntry(entry);
-                    opts.onSpaceMembershipHint?.(entry.remote);
-                },
-                onChatHistorySync: (envelope: ChatHistorySyncEnvelope) => {
-                    touchEntry(entry);
-                    opts.onInboundBytes?.(
-                        entry.remote,
-                        new TextEncoder().encode(JSON.stringify(envelope)),
+                        new TextEncoder().encode(raw),
                     );
                 },
                 // Route through recoverStuckPeer so the scheduler slot is
@@ -414,11 +412,10 @@ export function createPeerTransportRegistry(
         }
     };
 
-    const stuckCheckId =
+    let stuckCheckId: ReturnType<typeof setInterval> | null =
         typeof setInterval !== "undefined"
             ? setInterval(checkStuckPeers, PEER_STUCK_CHECK_MS)
             : null;
-    void stuckCheckId;
 
     const retryNegotiationOnRealtimeReady = () => {
         for (const entry of entries.values()) {
@@ -510,8 +507,15 @@ export function createPeerTransportRegistry(
         if (entries.get(remoteAccount)?.state === "usable") {
             return Promise.resolve();
         }
-        return new Promise<void>((resolve) => {
-            entry.ensureWaiters.push(resolve);
+        return new Promise<void>((resolve, reject) => {
+            const timer = setTimeout(() => {
+                const idx = entry.ensureWaiters.findIndex(
+                    (w) => w.resolve === resolve,
+                );
+                if (idx >= 0) entry.ensureWaiters.splice(idx, 1);
+                reject(new Error(`ensure timed out for ${remoteAccount}`));
+            }, PEER_ENSURE_TIMEOUT_MS);
+            entry.ensureWaiters.push({ resolve, reject, timer });
         });
     };
 
@@ -543,21 +547,7 @@ export function createPeerTransportRegistry(
             if (entry.state !== "usable" || !entry.peer) {
                 return { ok: false, reason: "peer_not_ready" };
             }
-            const text = new TextDecoder().decode(bytes);
-            const envelope = parseChatDataWireEnvelope(text);
-            if (!envelope) {
-                return { ok: false, reason: "peer_not_ready" };
-            }
-            let ok = false;
-            if (envelope.t === "chatMessage") {
-                ok = entry.peer.sendChatMessage(envelope);
-            } else if (envelope.t === "chatHistorySync") {
-                ok = entry.peer.sendHistorySync(envelope);
-            } else if (envelope.t === "messageAck") {
-                ok = entry.peer.sendMessageAck(envelope);
-            } else if (envelope.t === "spaceMembershipHint") {
-                ok = entry.peer.sendSpaceMembershipHint(envelope);
-            }
+            const ok = entry.peer.sendWireBytes(bytes);
             if (ok) touchEntry(entry);
             if (!ok && entry.state === "usable") {
                 recoverStuckPeer(entry, "send_failed");
@@ -601,7 +591,7 @@ export function createPeerTransportRegistry(
         async ping(remoteAccount) {
             const entry = entries.get(remoteAccount);
             if (!entry || entry.state !== "usable") return false;
-            return entry.dataChannelReady;
+            return entry.peer?.dataChannelReady === true;
         },
 
         touch(remoteAccount) {
@@ -611,6 +601,16 @@ export function createPeerTransportRegistry(
 
         dispose(remoteAccount, reason) {
             disposeEntry(remoteAccount, reason);
+        },
+
+        disposeAll() {
+            if (stuckCheckId != null) {
+                clearInterval(stuckCheckId);
+                stuckCheckId = null;
+            }
+            for (const remote of [...entries.keys()]) {
+                disposeEntry(remote, "force");
+            }
         },
 
         async handleRemoteSignal(remoteAccount, frame) {
@@ -659,6 +659,10 @@ export function createPeerTransportRegistry(
             if (!entry) return;
             entry.meetHoldCount = Math.max(0, entry.meetHoldCount - 1);
             touchEntry(entry);
+        },
+
+        isMeetHeld(remoteAccount) {
+            return (entries.get(remoteAccount)?.meetHoldCount ?? 0) > 0;
         },
 
         getKickCounts() {

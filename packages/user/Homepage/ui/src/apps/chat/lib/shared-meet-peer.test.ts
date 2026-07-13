@@ -73,4 +73,45 @@ describe("SharedMeetPeer", () => {
         // Media port has no dispose — SharedMeetPeer must not tear down the PC.
         expect(media.releaseMeet).toHaveBeenCalledWith("bob");
     });
+
+    it("start rejects cleanly when ensure rejects (no hang)", async () => {
+        const media = createMockMediaPort(null);
+        (media.ensure as ReturnType<typeof vi.fn>).mockRejectedValue(
+            new Error("ensure timed out for bob"),
+        );
+        const onFailed = vi.fn();
+        const peer = createSharedMeetPeer(media, {
+            remoteAccount: "bob",
+            avCallSessionId: "wrtc:space-1",
+            wantVideo: true,
+            wantAudio: true,
+            onFailed,
+        });
+
+        await expect(peer.start()).rejects.toThrow(/ensure timed out for bob/);
+        expect(media.holdMeet).not.toHaveBeenCalled();
+        expect(media.releaseMeet).not.toHaveBeenCalled();
+        expect(peer.isDisposed).toBe(false);
+    });
+
+    it("start fails cleanly when ensure resolves but peer is missing", async () => {
+        const media = createMockMediaPort(null);
+        const onFailed = vi.fn();
+        const peer = createSharedMeetPeer(media, {
+            remoteAccount: "bob",
+            avCallSessionId: "wrtc:space-1",
+            wantVideo: true,
+            wantAudio: true,
+            onFailed,
+        });
+
+        await peer.start();
+
+        expect(media.ensure).toHaveBeenCalledWith("bob", "meet_start");
+        expect(onFailed).toHaveBeenCalledWith(
+            "Shared pair PC not ready for Meet",
+        );
+        expect(media.holdMeet).not.toHaveBeenCalled();
+        expect(peer.isDisposed).toBe(false);
+    });
 });

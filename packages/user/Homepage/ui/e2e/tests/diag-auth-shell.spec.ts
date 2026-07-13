@@ -1,19 +1,25 @@
-import { test, expect } from "../fixtures/chain";
+import { expect, test } from "../fixtures/chain";
 
 /**
  * Diagnostic-only spec: captures every console message, page error, request
  * failure, and the supervisor-iframe handshake during a 90-second window.
  *
- * Run with `yarn e2e e2e/tests/diag-auth-shell.spec.ts` (fresh boot) or
- * `PSIBASE_E2E_EXTERNAL_CHAIN=1 yarn e2e e2e/tests/diag-auth-shell.spec.ts`
- * (against an already-running chain) and compare the timelines.
+ * Opt-in (skipped in default `yarn e2e`):
+ *   PSIBASE_E2E_DIAG_AUTH=1 yarn e2e e2e/tests/diag-auth-shell.spec.ts
+ *   PSIBASE_E2E_EXTERNAL_CHAIN=1 PSIBASE_E2E_DIAG_AUTH=1 yarn e2e e2e/tests/diag-auth-shell.spec.ts
  */
+test.skip(
+    process.env.PSIBASE_E2E_DIAG_AUTH !== "1",
+    "Opt-in: set PSIBASE_E2E_DIAG_AUTH=1",
+);
+
 test("diag: capture supervisor init signal and any errors", async ({
     chain,
     alicePage,
 }) => {
     const startedAt = Date.now();
-    const ts = () => `+${(Date.now() - startedAt).toString().padStart(5, " ")}ms`;
+    const ts = () =>
+        `+${(Date.now() - startedAt).toString().padStart(5, " ")}ms`;
 
     alicePage.on("console", (msg) => {
         console.log(`${ts()} [console:${msg.type()}]`, msg.text());
@@ -54,7 +60,9 @@ test("diag: capture supervisor init signal and any errors", async ({
     await alicePage.addInitScript(() => {
         // Already too late on first load (init script runs on next nav), but
         // harmless — we'll use page.evaluate below for the live page.
-        (window as unknown as { __diagPostMessages: unknown[] }).__diagPostMessages = [];
+        (
+            window as unknown as { __diagPostMessages: unknown[] }
+        ).__diagPostMessages = [];
     });
 
     await alicePage.evaluate(() => {
@@ -135,7 +143,9 @@ test("diag: capture supervisor init signal and any errors", async ({
             return arr ? arr.slice(0, 100) : [];
         })
         .catch(() => []);
-    console.log(`${ts()} captured ${(dump as unknown[]).length} postMessage events`);
+    console.log(
+        `${ts()} captured ${(dump as unknown[]).length} postMessage events`,
+    );
     for (const entry of dump as unknown[]) {
         console.log(`${ts()} [postMessage]`, JSON.stringify(entry));
     }

@@ -16,7 +16,7 @@ type Props = {
 };
 
 /**
- * Status strip for x-webrtcsig realtime transport: connected / reconnecting / offline.
+ * Status strip for x-wrtcsig realtime transport: connected / reconnecting / offline.
  */
 export function ConnectionStatusBanner({
     connectionState,

@@ -1,4 +1,4 @@
-"""Headless DM/group chat-data WebRTC negotiation via aiortc + x-webrtcsig (no browser)."""
+"""Headless DM/group chat-data WebRTC negotiation via aiortc + x-wrtcsig (no browser)."""
 
 from __future__ import annotations
 
@@ -843,7 +843,7 @@ class _GroupPendingStore:
 
 
 class _GroupMeshSession:
-    """Drive a 3-party full mesh over x-webrtcsig with aiortc data channels."""
+    """Drive a 3-party full mesh over x-wrtcsig with aiortc data channels."""
 
     def __init__(
         self,

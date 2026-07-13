@@ -1,9 +1,9 @@
 #!/usr/bin/python
 
-"""Integration tests for x-webrtcsig / Chat (T-006, T-021, T-055).
+"""Integration tests for x-wrtcsig / Chat (T-006, T-021, T-055).
 
 Supersedes legacy test_pslack*.py: auth, presence, chat-data and av-call
-signaling delegate to x-webrtcsig (psibase.realtime.v1), not x-pslack.
+signaling delegate to x-wrtcsig (psibase.realtime.v1), not x-pslack.
 """
 
 import json
@@ -272,7 +272,7 @@ def _create_av_call_session(node, alice='alice', bob='bob'):
 
 
 def _commit_webrtc_session_event(node, sender, session_id, kind, reason):
-    """Record objective timeline event after x-webrtcsig join/leave (M5)."""
+    """Record objective timeline event after x-wrtcsig join/leave (M5)."""
     node.push_action(
         sender,
         'chat',
@@ -331,7 +331,7 @@ class TestXWebRtcSig(unittest.TestCase):
         """Bearer auth on /ws returns welcome with user, serverTime, iceServers."""
         a = self._boot_with_webrtcsig(cluster)
         tok = Transact(a).login('alice')
-        url = websocket_url(a, '/ws', service='x-webrtcsig')
+        url = websocket_url(a, '/ws', service='x-wrtcsig')
         headers = [('Authorization', 'Bearer ' + tok)]
 
         async def body():
@@ -346,7 +346,7 @@ class TestXWebRtcSig(unittest.TestCase):
     def test_ws_unauthenticated_rejected(self, cluster):
         """Unauthenticated /ws upgrade must fail (401)."""
         a = self._boot_with_webrtcsig(cluster)
-        url = websocket_url(a, '/ws', service='x-webrtcsig')
+        url = websocket_url(a, '/ws', service='x-wrtcsig')
 
         async def body():
             async with _unix_connect(a, url, []):
@@ -363,7 +363,7 @@ class TestXWebRtcSig(unittest.TestCase):
         a = self._boot_with_webrtcsig(cluster)
         ta = Transact(a).login('alice')
         tb = Transact(a).login('bob')
-        url = websocket_url(a, '/ws', service='x-webrtcsig')
+        url = websocket_url(a, '/ws', service='x-wrtcsig')
 
         async def body():
             async with _unix_connect(a, url, [('Authorization', 'Bearer ' + ta)]) as ws_a:
@@ -392,7 +392,7 @@ class TestXWebRtcSig(unittest.TestCase):
         a = self._boot_with_webrtcsig(cluster)
         ta = Transact(a).login('alice')
         tb = Transact(a).login('bob')
-        url = websocket_url(a, '/ws', service='x-webrtcsig')
+        url = websocket_url(a, '/ws', service='x-wrtcsig')
 
         async def body():
             async with _unix_connect(
@@ -423,7 +423,7 @@ class TestXWebRtcSig(unittest.TestCase):
         a = self._boot_with_webrtcsig(cluster)
         ta = Transact(a).login('alice')
         tb = Transact(a).login('bob')
-        url = websocket_url(a, '/ws', service='x-webrtcsig')
+        url = websocket_url(a, '/ws', service='x-wrtcsig')
 
         async def body():
             async with _unix_connect(
@@ -463,7 +463,7 @@ class TestXWebRtcSig(unittest.TestCase):
         """clientReady and ping work; chat frame types are rejected."""
         a = self._boot_with_webrtcsig(cluster)
         tok = Transact(a).login('alice')
-        url = websocket_url(a, '/ws', service='x-webrtcsig')
+        url = websocket_url(a, '/ws', service='x-wrtcsig')
 
         async def body():
             async with _unix_connect(a, url, [('Authorization', 'Bearer ' + tok)]) as ws:
@@ -504,7 +504,7 @@ class TestXWebRtcSig(unittest.TestCase):
         a = self._boot_with_chat_and_sig(cluster)
         _space_uuid, session_id = _create_chat_data_session(a)
         ta = Transact(a).login('alice')
-        url = websocket_url(a, '/ws', service='x-webrtcsig')
+        url = websocket_url(a, '/ws', service='x-wrtcsig')
 
         async def body():
             async with _unix_connect(a, url, [('Authorization', 'Bearer ' + ta)]) as ws:
@@ -537,7 +537,7 @@ class TestXWebRtcSig(unittest.TestCase):
         a = self._boot_with_chat_and_sig(cluster)
         _space_uuid, session_id = _create_av_call_session(a)
         tb = Transact(a).login('bob')
-        url = websocket_url(a, '/ws', service='x-webrtcsig')
+        url = websocket_url(a, '/ws', service='x-wrtcsig')
 
         async def body():
             async with _unix_connect(a, url, [('Authorization', 'Bearer ' + tb)]) as ws:
@@ -579,7 +579,7 @@ class TestXWebRtcSig(unittest.TestCase):
         _ensure_test_accounts(a, CAROL)
         _space_uuid, session_id = _create_chat_data_session(a)
         tc = Transact(a).login(CAROL)
-        url = websocket_url(a, '/ws', service='x-webrtcsig')
+        url = websocket_url(a, '/ws', service='x-wrtcsig')
 
         async def body():
             async with _unix_connect(a, url, [('Authorization', 'Bearer ' + tc)]) as ws:
@@ -615,7 +615,7 @@ class TestXWebRtcSig(unittest.TestCase):
         _space_uuid, session_id = _create_chat_data_session(a)
         ta = Transact(a).login('alice')
         tb = Transact(a).login('bob')
-        url = websocket_url(a, '/ws', service='x-webrtcsig')
+        url = websocket_url(a, '/ws', service='x-wrtcsig')
 
         async def body():
             async with _unix_connect(
@@ -686,7 +686,7 @@ class TestXWebRtcSig(unittest.TestCase):
         token = Transact(a).login('e2ealicegc')
         pair_alice_carol = 'wrtc:pair:e2ealicegc:e2ecarolgc'
         pair_david_alice = 'wrtc:pair:daviddavid:e2ealicegc'
-        url = websocket_url(a, '/ws', service='x-webrtcsig')
+        url = websocket_url(a, '/ws', service='x-wrtcsig')
 
         async def body():
             async with _unix_connect(a, url, [('Authorization', 'Bearer ' + token)]) as ws:
@@ -733,7 +733,7 @@ class TestXWebRtcSig(unittest.TestCase):
         tb = Transact(a).login('e2ecarolgc')
         pair_alice_carol = 'wrtc:pair:e2ealicegc:e2ecarolgc'
         pair_david_alice = 'wrtc:pair:daviddavid:e2ealicegc'
-        url = websocket_url(a, '/ws', service='x-webrtcsig')
+        url = websocket_url(a, '/ws', service='x-wrtcsig')
 
         async def body():
             async with _unix_connect(
@@ -813,7 +813,7 @@ class TestXWebRtcSig(unittest.TestCase):
         a = self._boot_with_chat_and_sig(cluster)
         space_uuid, session_id = _create_group_chat_data_session(a)
         ta = Transact(a).login('alice')
-        url = websocket_url(a, '/ws', service='x-webrtcsig')
+        url = websocket_url(a, '/ws', service='x-wrtcsig')
 
         async def body():
             async with _unix_connect(a, url, [('Authorization', 'Bearer ' + ta)]) as ws:
@@ -855,7 +855,7 @@ class TestXWebRtcSig(unittest.TestCase):
         _ensure_test_accounts(a, DAVE)
         _space_uuid, session_id = _create_group_chat_data_session(a)
         td = Transact(a).login(DAVE)
-        url = websocket_url(a, '/ws', service='x-webrtcsig')
+        url = websocket_url(a, '/ws', service='x-wrtcsig')
 
         async def body():
             async with _unix_connect(a, url, [('Authorization', 'Bearer ' + td)]) as ws:
@@ -885,7 +885,7 @@ class TestXWebRtcSig(unittest.TestCase):
         ta = Transact(a).login('alice')
         tb = Transact(a).login('bob')
         tc = Transact(a).login(CAROL)
-        url = websocket_url(a, '/ws', service='x-webrtcsig')
+        url = websocket_url(a, '/ws', service='x-wrtcsig')
 
         async def join(ws, user, instance_id):
             await ws.send(
@@ -968,7 +968,7 @@ class TestXWebRtcSig(unittest.TestCase):
         _space_uuid, session_id = _create_group_chat_data_session(a)
         ta = Transact(a).login('alice')
         td = Transact(a).login(DAVE)
-        url = websocket_url(a, '/ws', service='x-webrtcsig')
+        url = websocket_url(a, '/ws', service='x-wrtcsig')
 
         async def body():
             async with _unix_connect(
@@ -1018,7 +1018,7 @@ class TestXWebRtcSig(unittest.TestCase):
         a = self._boot_with_chat_and_sig(cluster)
         space_uuid, session_id = _create_group_av_call_session(a)
         ta = Transact(a).login('alice')
-        url = websocket_url(a, '/ws', service='x-webrtcsig')
+        url = websocket_url(a, '/ws', service='x-wrtcsig')
 
         async def body():
             async with _unix_connect(a, url, [('Authorization', 'Bearer ' + ta)]) as ws:
@@ -1059,7 +1059,7 @@ class TestXWebRtcSig(unittest.TestCase):
         _ensure_test_accounts(a, DAVE)
         _space_uuid, session_id = _create_group_av_call_session(a)
         td = Transact(a).login(DAVE)
-        url = websocket_url(a, '/ws', service='x-webrtcsig')
+        url = websocket_url(a, '/ws', service='x-wrtcsig')
 
         async def body():
             async with _unix_connect(a, url, [('Authorization', 'Bearer ' + td)]) as ws:
@@ -1089,7 +1089,7 @@ class TestXWebRtcSig(unittest.TestCase):
         ta = Transact(a).login('alice')
         tb = Transact(a).login('bob')
         tc = Transact(a).login(CAROL)
-        url = websocket_url(a, '/ws', service='x-webrtcsig')
+        url = websocket_url(a, '/ws', service='x-wrtcsig')
 
         async def join(ws, user, instance_id):
             await ws.send(
@@ -1174,7 +1174,7 @@ class TestXWebRtcSig(unittest.TestCase):
         _space_uuid, session_id = _create_av_call_session(a)
         ta = Transact(a).login('alice')
         tb = Transact(a).login('bob')
-        url = websocket_url(a, '/ws', service='x-webrtcsig')
+        url = websocket_url(a, '/ws', service='x-wrtcsig')
 
         async def body():
             async with _unix_connect(
@@ -1238,7 +1238,7 @@ class TestXWebRtcSig(unittest.TestCase):
         _space_uuid, session_id = _create_av_call_session(a)
         ta = Transact(a).login('alice')
         tb = Transact(a).login('bob')
-        url = websocket_url(a, '/ws', service='x-webrtcsig')
+        url = websocket_url(a, '/ws', service='x-wrtcsig')
 
         async def body():
             import asyncio
@@ -1295,7 +1295,7 @@ class TestXWebRtcSig(unittest.TestCase):
         a = self._boot_with_chat_and_sig(cluster)
         _space_uuid, session_id = _create_chat_data_session(a)
         ta = Transact(a).login('alice')
-        url = websocket_url(a, '/ws', service='x-webrtcsig')
+        url = websocket_url(a, '/ws', service='x-wrtcsig')
 
         async def body():
             async with _unix_connect(a, url, [('Authorization', 'Bearer ' + ta)]) as ws:
@@ -1325,7 +1325,7 @@ class TestXWebRtcSig(unittest.TestCase):
         _space_uuid, session_id = _create_chat_data_session(a)
         ta = Transact(a).login('alice')
         tb = Transact(a).login('bob')
-        url = websocket_url(a, '/ws', service='x-webrtcsig')
+        url = websocket_url(a, '/ws', service='x-wrtcsig')
 
         async def body():
             import asyncio
@@ -1441,7 +1441,7 @@ class TestXWebRtcSig(unittest.TestCase):
         a = self._boot_with_chat_and_sig(cluster)
         _space_uuid, session_id = _create_av_call_session(a)
         ta = Transact(a).login('alice')
-        url = websocket_url(a, '/ws', service='x-webrtcsig')
+        url = websocket_url(a, '/ws', service='x-wrtcsig')
 
         async def body():
             async with _unix_connect(a, url, [('Authorization', 'Bearer ' + ta)]) as ws:
@@ -1492,7 +1492,7 @@ class TestChatDataP2pHarness(TestXWebRtcSig):
         """Document default welcome: STUN without TURN (browser uses host-only ICE)."""
         a = self._boot_with_webrtcsig(cluster)
         tok = Transact(a).login('alice')
-        url = websocket_url(a, '/ws', service='x-webrtcsig')
+        url = websocket_url(a, '/ws', service='x-wrtcsig')
 
         async def body():
             async with _unix_connect(a, url, [('Authorization', 'Bearer ' + tok)]) as ws:
@@ -1524,7 +1524,7 @@ class TestChatDataP2pHarness(TestXWebRtcSig):
         _space_uuid, session_id = _create_chat_data_session(a)
         ta = Transact(a).login('alice')
         tb = Transact(a).login('bob')
-        url = websocket_url(a, '/ws', service='x-webrtcsig')
+        url = websocket_url(a, '/ws', service='x-wrtcsig')
 
         async def body():
             return await run_chat_data_p2p(
@@ -1564,7 +1564,7 @@ class TestChatDataP2pHarness(TestXWebRtcSig):
         _space_uuid, session_id = _create_chat_data_session(a)
         ta = Transact(a).login('alice')
         tb = Transact(a).login('bob')
-        url = websocket_url(a, '/ws', service='x-webrtcsig')
+        url = websocket_url(a, '/ws', service='x-wrtcsig')
 
         async def body():
             return await run_chat_data_p2p_pending_flush_on_rejoin(
@@ -1620,7 +1620,7 @@ class TestChatDataP2pHarness(TestXWebRtcSig):
         ta = Transact(a).login('alice')
         tb = Transact(a).login('bob')
         tc = Transact(a).login(CAROL)
-        url = websocket_url(a, '/ws', service='x-webrtcsig')
+        url = websocket_url(a, '/ws', service='x-wrtcsig')
 
         async def body():
             return await run_chat_data_p2p_group_three_party_roundtrip(
@@ -1667,7 +1667,7 @@ class TestChatDataP2pHarness(TestXWebRtcSig):
         ta = Transact(a).login('alice')
         tb = Transact(a).login('bob')
         tc = Transact(a).login(CAROL)
-        url = websocket_url(a, '/ws', service='x-webrtcsig')
+        url = websocket_url(a, '/ws', service='x-wrtcsig')
 
         async def body():
             return await run_chat_data_p2p_group_offline_member_catchup(
@@ -1719,7 +1719,7 @@ class TestChatDataP2pHarness(TestXWebRtcSig):
         ta = Transact(a).login('alice')
         tb = Transact(a).login('bob')
         tc = Transact(a).login(CAROL)
-        url = websocket_url(a, '/ws', service='x-webrtcsig')
+        url = websocket_url(a, '/ws', service='x-wrtcsig')
 
         async def body():
             return await run_chat_data_p2p_group_pending_before_peers_open(
@@ -1753,7 +1753,7 @@ class TestChatDataP2pHarness(TestXWebRtcSig):
         ta = Transact(a).login('alice')
         tb = Transact(a).login('bob')
         tc = Transact(a).login(CAROL)
-        url = websocket_url(a, '/ws', service='x-webrtcsig')
+        url = websocket_url(a, '/ws', service='x-wrtcsig')
 
         async def join(ws, instance_id):
             await ws.send(
@@ -1799,7 +1799,7 @@ class TestChatDataP2pHarness(TestXWebRtcSig):
         _space_uuid, session_id = _create_group_chat_data_session(a)
         ta = Transact(a).login('alice')
         tb = Transact(a).login('bob')
-        url = websocket_url(a, '/ws', service='x-webrtcsig')
+        url = websocket_url(a, '/ws', service='x-wrtcsig')
 
         async def body():
             async with _unix_connect(

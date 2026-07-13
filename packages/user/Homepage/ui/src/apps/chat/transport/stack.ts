@@ -62,11 +62,6 @@ export function createChatTransportStack(
 ): ChatTransportStack {
     const realtime = createRealtimeTransport(opts.realtimeClient);
     const signaling = new WebRtcSignalingClient(opts.realtimeClient);
-    const joinedPairs = new Map<string, boolean>();
-
-    signaling.bindSessionJoinedGate(
-        (sessionId) => joinedPairs.get(sessionId) === true,
-    );
 
     /** Latest applied sessionSnapshot epoch per pair (out-of-order delivery). */
     const pairSnapshotEpoch = new Map<string, number>();
@@ -75,18 +70,19 @@ export function createChatTransportStack(
         localAccount: opts.localAccount,
         realtime,
         signaling,
-        isJoinedOnServer: (pairId) => joinedPairs.get(pairId) === true,
         onServerJoined: (pairId) => {
-            joinedPairs.set(pairId, true);
             signaling.flushDeferredSignals(pairId);
         },
         joinStaggerMs: opts.pairJoinStaggerMs,
         joinRetryMs: opts.pairJoinRetryMs,
     });
 
+    signaling.bindSessionJoinedGate((sessionId) =>
+        pairSignaling.isJoined(sessionId),
+    );
+
     const resetPairRoster = () => {
         pairSnapshotEpoch.clear();
-        joinedPairs.clear();
     };
 
     const stackUnsubs: Array<() => void> = [];
@@ -205,10 +201,6 @@ export function createChatTransportStack(
                 return;
             }
             pairSnapshotEpoch.set(frame.sessionId, frame.epoch);
-            joinedPairs.set(
-                frame.sessionId,
-                frame.joinedParticipants.includes(opts.localAccount),
-            );
             pairSignaling.applySessionSnapshot(
                 frame.sessionId,
                 frame.joinedParticipants,
@@ -308,6 +300,7 @@ export function createChatTransportStack(
         },
         wireRealtimeHandlers,
         dispose() {
+            peerRegistry.disposeAll();
             peerLifecycle.dispose();
             unregisterPairHandlers?.();
             unregisterPairHandlers = null;

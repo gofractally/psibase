@@ -3,10 +3,22 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ChatTransportBridge } from "./chat-transport-bridge";
 
 const stackMock = vi.hoisted(() => {
+    const peerHandlers = new Map<string, Set<(remote: string) => void>>();
     const peerRegistry = {
         ensure: vi.fn(),
         kickNegotiation: vi.fn(),
-        on: vi.fn(() => () => {}),
+        on: vi.fn((event: string, handler: (remote: string) => void) => {
+            const set = peerHandlers.get(event) ?? new Set();
+            set.add(handler);
+            peerHandlers.set(event, set);
+            return () => set.delete(handler);
+        }),
+        emit(event: string, remote: string) {
+            for (const h of peerHandlers.get(event) ?? []) h(remote);
+        },
+        clearHandlers() {
+            peerHandlers.clear();
+        },
     };
     const peerLifecycle = {
         ensure: vi.fn(async () => {}),
@@ -22,6 +34,7 @@ const stackMock = vi.hoisted(() => {
     };
     const messaging = {
         hydrateFromStorage: vi.fn(),
+        setFocusedSpace: vi.fn(),
         onInbound: vi.fn(),
         onRecipientDelivered: vi.fn(),
         onStatusChange: vi.fn(),
@@ -70,6 +83,7 @@ function createBridge(
     ) => "accepted" | "deferred_contacts" | "rejected" = vi.fn(
         () => "accepted" as const,
     ),
+    onPeerUsable: (remote: string) => void = vi.fn(),
 ): ChatTransportBridge {
     return new ChatTransportBridge({
         getRealtime: () =>
@@ -86,7 +100,7 @@ function createBridge(
         onInboundMessage: onInboundMessage as never,
         onInboundHistorySync: vi.fn(),
         onMessageAck: vi.fn(),
-        onPeerUsable: vi.fn(),
+        onPeerUsable,
         onSessionInvite: vi.fn(),
     });
 }
@@ -102,12 +116,16 @@ const inboundEnvelope = {
 
 describe("ChatTransportBridge", () => {
     beforeEach(() => {
+        stackMock.peerRegistry.clearHandlers();
         stackMock.messaging.onInbound.mockClear();
         stackMock.messaging.acknowledgeInbound.mockClear();
+        stackMock.messaging.hydrateFromStorage.mockClear();
+        stackMock.messaging.setFocusedSpace.mockClear();
         stackMock.stack.notifyRemoteReachable.mockClear();
         stackMock.deliveryFabric.notifyRemoteReachable.mockClear();
         stackMock.deliveryFabric.ensurePeer.mockClear();
         stackMock.peerRegistry.kickNegotiation.mockClear();
+        stackMock.createChatTransportStack.mockClear();
     });
 
     function latestInboundHandler(): (
@@ -237,5 +255,59 @@ describe("ChatTransportBridge", () => {
         bridge.ensurePeer("carol", "peer_focus");
 
         expect(stackMock.deliveryFabric.ensurePeer).not.toHaveBeenCalled();
+    });
+
+    it("calls onPeerUsable once across two usable events for the same remote", () => {
+        const onPeerUsable = vi.fn();
+        const bridge = createBridge(undefined, onPeerUsable);
+        bridge.start();
+
+        stackMock.peerRegistry.emit("usable", "bob");
+        stackMock.peerRegistry.emit("usable", "bob");
+
+        expect(onPeerUsable).toHaveBeenCalledTimes(1);
+        expect(onPeerUsable).toHaveBeenCalledWith("bob");
+    });
+
+    it("allows onPeerUsable again after dispose of the same remote", () => {
+        const onPeerUsable = vi.fn();
+        const bridge = createBridge(undefined, onPeerUsable);
+        bridge.start();
+
+        stackMock.peerRegistry.emit("usable", "bob");
+        stackMock.peerRegistry.emit("disposed", "bob");
+        stackMock.peerRegistry.emit("usable", "bob");
+
+        expect(onPeerUsable).toHaveBeenCalledTimes(2);
+    });
+
+    it("allows onPeerUsable again after suspected_dead of the same remote", () => {
+        const onPeerUsable = vi.fn();
+        const bridge = createBridge(undefined, onPeerUsable);
+        bridge.start();
+
+        stackMock.peerRegistry.emit("usable", "bob");
+        stackMock.peerRegistry.emit("suspected_dead", "bob");
+        stackMock.peerRegistry.emit("usable", "bob");
+
+        expect(onPeerUsable).toHaveBeenCalledTimes(2);
+    });
+
+    it("hydrates from storage once on start", () => {
+        const bridge = createBridge();
+        bridge.start();
+
+        expect(stackMock.messaging.hydrateFromStorage).toHaveBeenCalledTimes(1);
+    });
+
+    it("forwards setFocusedSpace to messaging", () => {
+        const bridge = createBridge();
+        bridge.start();
+        bridge.setFocusedSpace("space:dm");
+
+        expect(bridge.getFocusedSpace()).toBe("space:dm");
+        expect(stackMock.messaging.setFocusedSpace).toHaveBeenCalledWith(
+            "space:dm",
+        );
     });
 });

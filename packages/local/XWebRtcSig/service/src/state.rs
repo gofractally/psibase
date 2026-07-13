@@ -1,4 +1,4 @@
-//! Subjective socket/session tables for `x-webrtcsig` (architecture §11.2–§11.3).
+//! Subjective socket/session tables for `x-wrtcsig` (architecture §11.2–§11.3).
 
 pub mod subjective;
 

@@ -1,9 +1,9 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ChatDataPeerHandlers } from "../lib/chat-data-webrtc-peer";
 import { serializeChatDataWireEnvelope } from "../lib/chat-data-envelope";
 import { createPeerTransportRegistry } from "./l3-peer-registry";
-import type { PeerState } from "./types";
+import { PEER_ENSURE_TIMEOUT_MS, type PeerState } from "./types";
 
 const peerMock = vi.hoisted(() => {
     class MockChatDataWebRtcPeer {
@@ -98,6 +98,10 @@ const peerMock = vi.hoisted(() => {
         }
 
         resendOffer(): void {}
+
+        sendWireBytes(_bytes: Uint8Array): boolean {
+            return true;
+        }
 
         sendChatMessage(): boolean {
             return true;
@@ -615,7 +619,7 @@ describe("l3-peer-registry", () => {
             suspectedDead.push(remote);
         });
 
-        vi.spyOn(peer, "sendChatMessage").mockReturnValue(false);
+        vi.spyOn(peer, "sendWireBytes").mockReturnValue(false);
         const bytes = new TextEncoder().encode(
             serializeChatDataWireEnvelope({
                 t: "chatMessage",
@@ -632,6 +636,40 @@ describe("l3-peer-registry", () => {
         expect(suspectedDead).toEqual(["bob"]);
         expect(registry.getState("bob")).not.toBe("usable");
         expect(peer.disposed).toBe(true);
+    });
+
+    describe("ensure timeout", () => {
+        beforeEach(() => {
+            vi.useFakeTimers();
+        });
+
+        afterEach(() => {
+            vi.useRealTimers();
+        });
+
+        it("rejects after PEER_ENSURE_TIMEOUT_MS when peer never becomes usable", async () => {
+            peerMock.MockChatDataWebRtcPeer.created.length = 0;
+            const realtime = createRealtimeHarness(true);
+            const pairSignaling = createPairSignalingHarness(realtime);
+
+            const registry = createPeerTransportRegistry({
+                localAccount: "alice",
+                realtime: realtime as never,
+                pairSignaling: pairSignaling as never,
+                signaling: {} as never,
+                iceServers: null,
+            });
+
+            const ensureP = registry.ensure("bob", "peer_focus");
+            // Stay in joining_pair — never markJoined / open DC.
+            expect(registry.getState("bob")).toBe("joining_pair");
+
+            const expectation = expect(ensureP).rejects.toThrow(
+                /ensure timed out for bob/,
+            );
+            await vi.advanceTimersByTimeAsync(PEER_ENSURE_TIMEOUT_MS);
+            await expectation;
+        });
     });
 });
 

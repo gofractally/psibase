@@ -1,7 +1,7 @@
-import type { Page, WebSocket as PWWebSocket } from "@playwright/test";
+import type { WebSocket as PWWebSocket, Page } from "@playwright/test";
 
-import { test, expect } from "../fixtures/chain";
-import { loginProducerViaUi, PRODUCER_ACCOUNT } from "../lib/auth-ui";
+import { expect, test } from "../fixtures/chain";
+import { PRODUCER_ACCOUNT, loginProducerViaUi } from "../lib/auth-ui";
 import { openChat } from "../lib/chat-ui";
 import { attachDiagnostics } from "../lib/diagnostics";
 
@@ -9,7 +9,7 @@ import { attachDiagnostics } from "../lib/diagnostics";
  * Micro-reproduction for the "Reconnecting…" WS storm after re-opening Chat.
  *
  * Boots a chain, logs in the producer, opens Chat once, navigates away, opens
- * Chat again, then watches every x-webrtcsig WebSocket for ~5 seconds. If the
+ * Chat again, then watches every x-wrtcsig WebSocket for ~5 seconds. If the
  * WS is healthy we expect at most a tiny number of opens/closes (one per
  * navigation). If the storm reproduces we'll see dozens.
  */
@@ -20,7 +20,7 @@ type WsEvent = {
     payload?: string;
 };
 
-const SIG_WS = /x-webrtcsig\.psibase\.localhost.*\/ws$/;
+const SIG_WS = /x-wrtcsig\.psibase\.localhost.*\/ws$/;
 
 function attachSigWsRecorder(
     page: Page,
@@ -29,13 +29,17 @@ function attachSigWsRecorder(
     startedAt: { value: number },
 ): void {
     attachDiagnostics(page, label, {
-        consoleFilter: /realtime|x-webrtcsig|chat-data|websocket/i,
+        consoleFilter: /realtime|x-wrtcsig|chat-data|websocket/i,
         websocket: false,
     });
     page.on("websocket", (ws: PWWebSocket) => {
         if (!SIG_WS.test(ws.url())) return;
         const open = (kind: WsEvent["kind"], payload?: string): void => {
-            recorder.push({ relMs: Date.now() - startedAt.value, kind, payload });
+            recorder.push({
+                relMs: Date.now() - startedAt.value,
+                kind,
+                payload,
+            });
         };
         open("open");
         ws.on("close", () => open("close"));
@@ -57,7 +61,7 @@ function attachSigWsRecorder(
 }
 
 test.describe("Chat realtime WS survives re-navigation", () => {
-    test("only one healthy x-webrtcsig WS exists at any time across chat ↔ home re-navigation", async ({
+    test("only one healthy x-wrtcsig WS exists at any time across chat ↔ home re-navigation", async ({
         chain,
         alicePage,
     }) => {
@@ -88,8 +92,8 @@ test.describe("Chat realtime WS survives re-navigation", () => {
         // a single close at navigation. The storm produces tens-to-hundreds.
         const opens = recorder.filter((e) => e.kind === "open").length;
         const closes = recorder.filter((e) => e.kind === "close").length;
-        expect(opens, "x-webrtcsig WS open count").toBeLessThanOrEqual(4);
-        expect(closes, "x-webrtcsig WS close count").toBeLessThanOrEqual(4);
+        expect(opens, "x-wrtcsig WS open count").toBeLessThanOrEqual(4);
+        expect(closes, "x-wrtcsig WS close count").toBeLessThanOrEqual(4);
 
         // After the second openChat, the latest WS should still be alive 8s
         // later (no close after the last open).

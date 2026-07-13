@@ -80,7 +80,7 @@ export type {
 
 /**
  * Lazy per-space background orchestration: objective createSession(av-call)
- * then x-webrtcsig joinSession + signaling (architecture §7).
+ * then x-wrtcsig joinSession + signaling (architecture §7).
  * DM: one peer; group: mesh A/V peer connections per online member (§5.3).
  */
 export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
@@ -105,7 +105,7 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
     /** Objective/signaling sessions the user explicitly left; ignore WS resurrection. */
     private readonly groupMeetAttempts = new GroupMeetAttemptCoordinator();
 
-    /** Latest x-webrtcsig roster per objective av-call session (not pair sessions). */
+    /** Latest x-wrtcsig roster per objective av-call session (not pair sessions). */
     private readonly avCallSessionRosters = new Map<
         string,
         { joined: string[]; pending: string[]; epoch: number }
@@ -1256,7 +1256,7 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
     }
 
     /**
-     * Objective av-call session can outlive x-webrtcsig after everyone leaves
+     * Objective av-call session can outlive x-wrtcsig after everyone leaves
      * signaling. Close the stale row and create a fresh session before retrying.
      */
     async recoverStaleAvCallSession(
@@ -1351,7 +1351,7 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
             if (signal.aborted) return;
 
             // After a full group hangup the objective session row can remain
-            // active while x-webrtcsig has torn down. Host re-start must mint a
+            // active while x-wrtcsig has torn down. Host re-start must mint a
             // fresh session so joinSession fans out new sessionInvites.
             // Do not recover when others are still joined (partial leave rejoin).
             if (

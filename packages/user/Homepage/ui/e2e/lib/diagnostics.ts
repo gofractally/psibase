@@ -1,7 +1,7 @@
+import type { Page } from "@playwright/test";
+
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-
-import type { Page } from "@playwright/test";
 
 export type AttachDiagnosticsOptions = {
     /** Regex or string tested against console message text. */
@@ -21,7 +21,7 @@ export type AttachDiagnosticsOptions = {
 };
 
 const DEFAULT_CONSOLE_FILTER =
-    /chat-data|realtime|x-pslack|x-webrtcsig|websocket|auth|connect|reconnect|presence|signaling|peer|teardown|leaveSession|endPlaceholderCall|\[av-call\]/i;
+    /chat-data|realtime|x-pslack|x-wrtcsig|websocket|auth|connect|reconnect|presence|signaling|peer|teardown|leaveSession|endPlaceholderCall|\[av-call\]/i;
 
 /**
  * Stream filtered console, page errors, HTTP failures, and websocket frames from
@@ -117,10 +117,7 @@ const SNAPSHOT_DIR =
     join(process.cwd(), "e2e", "snapshots");
 
 /** Write a labeled full-page PNG under e2e/snapshots/ (path logged to stdout). */
-export async function snapshotStep(
-    page: Page,
-    label: string,
-): Promise<string> {
+export async function snapshotStep(page: Page, label: string): Promise<string> {
     mkdirSync(SNAPSHOT_DIR, { recursive: true });
     const safe = label.replace(/[^a-z0-9_-]+/gi, "-").replace(/^-+|-+$/g, "");
     const file = join(SNAPSHOT_DIR, `${Date.now()}-${safe}.png`);

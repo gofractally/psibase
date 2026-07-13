@@ -187,21 +187,23 @@ export class ChatTransportBridge {
             if (this.pendingSpaceHints.delete(remote)) {
                 this.sendSpaceMembershipHint(remote);
             }
-            this.deps.onPeerUsable(remote);
+            // History sync once per create→dispose cycle; hints every usable.
             if (!this.pushedHistoryTo.has(remote)) {
                 this.pushedHistoryTo.add(remote);
+                this.deps.onPeerUsable(remote);
             }
         });
 
         this.stack.peerRegistry.on("suspected_dead", (remote) => {
             recordThreadLifecycle("webrtc-suspected-dead", { remote });
+            // Allow history re-push after recover → usable (offline peer return).
+            this.pushedHistoryTo.delete(remote);
         });
 
         this.stack.peerRegistry.on("disposed", (remote) => {
             recordThreadLifecycle("webrtc-disposed", { remote });
+            this.pushedHistoryTo.delete(remote);
         });
-
-        this.stack.messaging.hydrateFromStorage();
 
         this.stack.messaging.onStatusChange((msgId, status) => {
             this.recordDebug("message-status", { msgId, status });
@@ -275,6 +277,7 @@ export class ChatTransportBridge {
 
     setFocusedSpace(spaceUuid: string | null | undefined): void {
         this.focusedSpace = spaceUuid ?? null;
+        this.stack?.messaging.setFocusedSpace(spaceUuid);
     }
 
     getFocusedSpace(): string | undefined {
@@ -359,16 +362,25 @@ export class ChatTransportBridge {
         /* No per-Space teardown on offline; peer TTL handles idle dispose. */
     }
 
+    /**
+     * @deprecated Chat send path is `messaging.send` / `sendGroup` (hook).
+     * Envelope has no recipient when `from` is self; do not use this stub.
+     */
     sendChatMessage(
         _spaceUuid: string,
         envelope: ChatDataMessageEnvelope,
     ): boolean {
-        const recipient =
-            envelope.from === this.deps.getSelf() ? undefined : undefined;
-        void recipient;
-        void envelope;
+        if (!ChatTransportBridge.sendChatMessageWarned) {
+            ChatTransportBridge.sendChatMessageWarned = true;
+            chatDataLog(
+                "deprecated bridge.sendChatMessage — use messaging.send",
+                { clientMsgId: envelope.clientMsgId },
+            );
+        }
         return false;
     }
+
+    private static sendChatMessageWarned = false;
 
     sendHistorySync(
         _spaceUuid: string,

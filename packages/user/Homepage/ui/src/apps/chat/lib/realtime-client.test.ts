@@ -104,7 +104,9 @@ describe("RealtimeClient reconnect", () => {
         });
     }
 
-    async function connectThroughWelcome(client: RealtimeClient): Promise<MockWebSocket> {
+    async function connectThroughWelcome(
+        client: RealtimeClient,
+    ): Promise<MockWebSocket> {
         client.connect();
         await flushAsync();
         const ws = MockWebSocket.instances.at(-1)!;
@@ -165,9 +167,9 @@ describe("RealtimeClient reconnect", () => {
         vi.advanceTimersByTime(500);
 
         expect(client.state).toBe("connected");
-        expect(
-            stateChanges.filter((s) => s === "reconnecting").length,
-        ).toBe(reconnectingCountBefore);
+        expect(stateChanges.filter((s) => s === "reconnecting").length).toBe(
+            reconnectingCountBefore,
+        );
         expect(MockWebSocket.instances).toHaveLength(2);
     });
 
@@ -250,15 +252,16 @@ describe("RealtimeClient reconnect", () => {
         expect(client.state).toBe("connected");
     });
 
-    it("connects to x-webrtcsig subdomain (not invalid x-webrtc-sig account name)", async () => {
+    it("connects to x-wrtcsig subdomain (AccountNumber max 10; hyphens allowed)", async () => {
         const client = makeClient({
             baseUrl: "https://network.psibase.localhost:8080/",
         });
         client.connect();
         await flushAsync();
         const ws = MockWebSocket.instances.at(-1)!;
-        expect(ws.url).toBe("wss://x-webrtcsig.psibase.localhost:8080/ws");
+        expect(ws.url).toBe("wss://x-wrtcsig.psibase.localhost:8080/ws");
         expect(ws.url).not.toContain("x-webrtc-sig");
+        expect(ws.url).not.toContain("xwebrtcsig");
     });
 
     it("does not open a second websocket when connect() is called while already ready", async () => {
@@ -351,5 +354,57 @@ describe("RealtimeClient reconnect", () => {
         MockWebSocket.instances.at(-1)!.message(WELCOME);
         expect(welcomeA).toHaveBeenCalledTimes(1);
         expect(welcomeB).toHaveBeenCalledTimes(2);
+    });
+
+    it("after close, null auth token keeps reconnecting without opening sockets", async () => {
+        let token: string | null = "good-token";
+        const client = makeClient({
+            authTokenProvider: async () => token,
+            reconnect: { initialDelayMs: 50, maxDelayMs: 50 },
+        });
+        const ws = await connectThroughWelcome(client);
+        expect(client.state).toBe("connected");
+        expect(client.isSessionReady).toBe(true);
+
+        token = null;
+        ws.emitClose();
+        expect(client.state).toBe("reconnecting");
+        expect(client.isSessionReady).toBe(false);
+
+        const socketsBefore = MockWebSocket.instances.length;
+        await vi.advanceTimersByTimeAsync(200);
+        await flushAsync();
+        await vi.advanceTimersByTimeAsync(200);
+        await flushAsync();
+
+        // No new WS while token is null — must not look "connected"/usable.
+        expect(MockWebSocket.instances.length).toBe(socketsBefore);
+        expect(client.state).toBe("reconnecting");
+        expect(client.isSessionReady).toBe(false);
+    });
+
+    it("forwards mid-session error frames without forcing close", async () => {
+        const client = makeClient();
+        const onError = vi.fn();
+        client.registerHandlers({ error: onError });
+        await connectThroughWelcome(client);
+
+        MockWebSocket.instances.at(-1)!.message(
+            JSON.stringify({
+                t: "error",
+                code: "session-expired",
+                reason: "session expired",
+                sessionId: "wrtc:av-1",
+            }),
+        );
+        expect(onError).toHaveBeenCalledWith(
+            expect.objectContaining({
+                t: "error",
+                code: "session-expired",
+            }),
+        );
+        // Bearer is connect-only today; error frames do not auto-close the WS.
+        expect(client.state).toBe("connected");
+        expect(client.isSessionReady).toBe(true);
     });
 });

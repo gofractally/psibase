@@ -1,7 +1,14 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
 import type { RealtimeHandlers } from "./realtime-client";
 import type { ServerRealtimeFrame } from "./realtime-protocol";
+
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { AvCallSessionOrchestrator } from "./av-call-session-orchestrator";
+import {
+    createAvCallSession,
+    fetchActiveAvCallSession,
+    waitForActiveAvCallSession,
+} from "./chat-api";
 
 vi.mock("./av-call-debug", () => ({
     avCallLog: () => {},
@@ -102,6 +109,14 @@ const buildPeerMock = vi.hoisted(() => {
         getRemoteStream(): MediaStream | null {
             return null;
         }
+
+        getVideoActuallyDisabled(): boolean {
+            return false;
+        }
+
+        setAudioEnabled(_on: boolean): void {}
+
+        setVideoEnabled(_on: boolean): void {}
     }
 
     return { peers, MockPeer };
@@ -114,16 +129,38 @@ vi.mock("./local-media", () => ({
     })),
 }));
 
-vi.mock("./meet-webrtc-peer", () => ({
-    MeetWebRtcPeer: buildPeerMock.MockPeer,
+/** Meet factory hard-fails without fabric; tests stub the factory itself. */
+vi.mock("./av-call-meet-peer-factory", () => ({
+    createMeetPeerForRemote: (params: {
+        host: {
+            getIceServers: () => import("./protocol").IceServerConfig[] | null;
+        };
+        remoteAccount: string;
+        avCallSessionId: string;
+        selfAccount: string;
+        isInitiator: boolean;
+        wantVideo: boolean;
+        wantAudio: boolean;
+    }) =>
+        new buildPeerMock.MockPeer({
+            sessionId: params.avCallSessionId,
+            selfAccount: params.selfAccount,
+            peerAccount: params.remoteAccount,
+            isInitiator: params.isInitiator,
+            wantVideo: params.wantVideo,
+            wantAudio: params.wantAudio,
+            iceServers: params.host.getIceServers(),
+        }),
+    shouldReuseMeetPeer: (
+        host: { usesSharedTransport?: () => boolean },
+        existing: { isDisposed: boolean; sessionId: string } | null | undefined,
+        avCallSessionId: string,
+    ) => {
+        if (!existing || existing.isDisposed) return false;
+        if (host.usesSharedTransport?.()) return true;
+        return existing.sessionId === avCallSessionId;
+    },
 }));
-
-import {
-    createAvCallSession,
-    fetchActiveAvCallSession,
-    waitForActiveAvCallSession,
-} from "./chat-api";
-import { AvCallSessionOrchestrator } from "./av-call-session-orchestrator";
 
 const SELF = "alice";
 const PEER = "bob";
@@ -525,9 +562,12 @@ describe("AvCallSessionOrchestrator — group lifecycle", () => {
         presence[PEER] = "online";
         orch.onPeerOnline(PEER);
 
-        await vi.waitFor(() => {
-            expect(orch.getSnapshot(SPACE_GROUP).phase).toBe("signaling");
-        }, { timeout: 5000 });
+        await vi.waitFor(
+            () => {
+                expect(orch.getSnapshot(SPACE_GROUP).phase).toBe("signaling");
+            },
+            { timeout: 5000 },
+        );
 
         expect(buildPeerMock.peers.some((p) => p.peerAccount === PEER)).toBe(
             true,
@@ -564,9 +604,9 @@ describe("AvCallSessionOrchestrator — group lifecycle", () => {
             expect(buildPeerMock.peers.every((p) => p.isDisposed)).toBe(true);
         });
 
-        expect(orch.getSnapshot(SPACE_GROUP).meshPeerSignalingReady?.[PEER]).toBe(
-            false,
-        );
+        expect(
+            orch.getSnapshot(SPACE_GROUP).meshPeerSignalingReady?.[PEER],
+        ).toBe(false);
         expect(orch.getSnapshot(SPACE_GROUP).phase).toBe("waiting-peer");
         orch.dispose();
     });
@@ -686,12 +726,7 @@ describe("AvCallSessionOrchestrator — group lifecycle", () => {
 
     it("ignores stale sessionSnapshot epoch on av-call roster", () => {
         const { orch } = makeOrchestrator();
-        orch.recordAvCallSessionSnapshot(
-            SESSION_GROUP,
-            GROUP_MEMBERS,
-            [],
-            3,
-        );
+        orch.recordAvCallSessionSnapshot(SESSION_GROUP, GROUP_MEMBERS, [], 3);
         orch.recordAvCallSessionSnapshot(
             SESSION_GROUP,
             [SELF, PEER],
@@ -701,6 +736,20 @@ describe("AvCallSessionOrchestrator — group lifecycle", () => {
         expect(orch.getAvCallSessionJoinedParticipants(SESSION_GROUP)).toEqual(
             GROUP_MEMBERS,
         );
+        orch.dispose();
+    });
+
+    it("promoteAvCallParticipantToJoined seeds roster without sessionSnapshot", () => {
+        const { orch } = makeOrchestrator();
+        orch.promoteAvCallParticipantToJoined(SESSION_GROUP, PEER);
+        expect(orch.getAvCallSessionJoinedParticipants(SESSION_GROUP)).toEqual([
+            PEER,
+        ]);
+        orch.promoteAvCallParticipantToJoined(SESSION_GROUP, PEER2);
+        expect(orch.getAvCallSessionJoinedParticipants(SESSION_GROUP)).toEqual([
+            PEER,
+            PEER2,
+        ]);
         orch.dispose();
     });
 });

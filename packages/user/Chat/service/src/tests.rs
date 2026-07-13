@@ -10,7 +10,7 @@ mod tests {
 
     fn setup_chat_http(chain: &Chain) -> Result<(), psibase::Error> {
         http_server::Wrapper::push_from(chain, Wrapper::SERVICE)
-            .registerServer(account!("r-chat"))
+            .registerServer(account!("chat+1"))
             .get()?;
         chain.finish_block();
         Ok(())
@@ -83,7 +83,9 @@ mod tests {
     }
 
     #[psibase::test_case(packages("Chat"))]
-    fn test_ensure_space_rejects_non_member_sender(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    fn test_ensure_space_rejects_non_member_sender(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
 
         let alice = AccountNumber::from("alice");
@@ -178,12 +180,16 @@ mod tests {
             .find(|entry| entry.get("spaceUuid") == Some(&json!(dm.space_uuid)))
             .expect("dm space in mySpaces");
         assert_eq!(dm_entry.get("kind"), Some(&json!("DM")));
-        assert_eq!(dm_entry.pointer("/members").and_then(|m| m.as_array()).map(|m| m.len()), Some(2));
+        assert_eq!(
+            dm_entry
+                .pointer("/members")
+                .and_then(|m| m.as_array())
+                .map(|m| m.len()),
+            Some(2)
+        );
 
-        let unauth: Value = chain.graphql(
-            Wrapper::SERVICE,
-            r#"query { mySpaces { spaceUuid } }"#,
-        )?;
+        let unauth: Value =
+            chain.graphql(Wrapper::SERVICE, r#"query { mySpaces { spaceUuid } }"#)?;
         let errors = unauth
             .pointer("/errors")
             .and_then(|v| v.as_array())
@@ -337,9 +343,7 @@ mod tests {
             &token,
         )?;
 
-        let active = reply
-            .pointer("/data/activeSession")
-            .expect("activeSession");
+        let active = reply.pointer("/data/activeSession").expect("activeSession");
         assert_eq!(active.get("sessionId"), Some(&json!(session.session_id)));
         let active_parts = active
             .pointer("/participants")
@@ -366,10 +370,7 @@ mod tests {
             .and_then(|v| v.as_array())
             .expect("sessionJoinAuth participants");
         assert_eq!(auth_parts.len(), 3);
-        assert_eq!(
-            join_auth.get("spaceUuid"),
-            Some(&json!(group.space_uuid))
-        );
+        assert_eq!(join_auth.get("spaceUuid"), Some(&json!(group.space_uuid)));
 
         Ok(())
     }
@@ -383,7 +384,7 @@ mod tests {
         let alice = AccountNumber::from("alice");
         let bob = AccountNumber::from("bob");
         let carol = AccountNumber::from("carol");
-        let sig = account!("x-webrtcsig");
+        let sig = account!("x-wrtcsig");
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         chain.new_account(carol).unwrap();
@@ -551,11 +552,7 @@ mod tests {
 
         let space = Wrapper::push_from(&chain, alice).ensureDm(bob).get()?;
         let err = Wrapper::push_from(&chain, alice)
-            .createSession(
-                space.space_uuid,
-                "chat-data".into(),
-                vec![alice, carol],
-            )
+            .createSession(space.space_uuid, "chat-data".into(), vec![alice, carol])
             .get()
             .expect_err("carol is not a space member");
         assert!(
@@ -567,7 +564,9 @@ mod tests {
     }
 
     #[psibase::test_case(packages("Chat"))]
-    fn test_create_session_rejects_unknown_space(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    fn test_create_session_rejects_unknown_space(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
 
         let alice = AccountNumber::from("alice");
@@ -592,18 +591,14 @@ mod tests {
 
         let alice = AccountNumber::from("alice");
         let bob = AccountNumber::from("bob");
-        let sig = account!("x-webrtcsig");
+        let sig = account!("x-wrtcsig");
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         chain.new_account(sig).unwrap();
 
         let space = Wrapper::push_from(&chain, alice).ensureDm(bob).get()?;
         let session = Wrapper::push_from(&chain, alice)
-            .createSession(
-                space.space_uuid,
-                "chat-data".into(),
-                vec![alice, bob],
-            )
+            .createSession(space.space_uuid, "chat-data".into(), vec![alice, bob])
             .get()?;
         let session_id = session.session_id.clone();
 
@@ -658,11 +653,7 @@ mod tests {
 
         let space = Wrapper::push_from(&chain, alice).ensureDm(bob).get()?;
         let session = Wrapper::push_from(&chain, alice)
-            .createSession(
-                space.space_uuid,
-                "chat-data".into(),
-                vec![alice, bob],
-            )
+            .createSession(space.space_uuid, "chat-data".into(), vec![alice, bob])
             .get()?;
 
         let err = Wrapper::push_from(&chain, alice)
@@ -673,8 +664,8 @@ mod tests {
                 reason: "joined".into(),
             })
             .get()
-            .expect_err("only x-webrtcsig may call webrtcSessionEvent");
-        assert!(err.to_string().contains("x-webrtcsig"));
+            .expect_err("only x-wrtcsig may call webrtcSessionEvent");
+        assert!(err.to_string().contains("x-wrtcsig"));
 
         Ok(())
     }
@@ -699,11 +690,7 @@ mod tests {
             )
             .get()?;
         let second = Wrapper::push_from(&chain, alice)
-            .createSession(
-                space.space_uuid,
-                "chat-data".into(),
-                vec![alice, bob],
-            )
+            .createSession(space.space_uuid, "chat-data".into(), vec![alice, bob])
             .get()?;
 
         assert_eq!(first.session_id, second.session_id);
@@ -729,18 +716,10 @@ mod tests {
             .ensureGroup(vec![bob, carol])
             .get()?;
         let first = Wrapper::push_from(&chain, alice)
-            .createSession(
-                space.space_uuid.clone(),
-                "av-call".into(),
-                vec![alice, bob],
-            )
+            .createSession(space.space_uuid.clone(), "av-call".into(), vec![alice, bob])
             .get()?;
         let second = Wrapper::push_from(&chain, alice)
-            .createSession(
-                space.space_uuid,
-                "av-call".into(),
-                vec![alice, bob],
-            )
+            .createSession(space.space_uuid, "av-call".into(), vec![alice, bob])
             .get()?;
 
         assert_ne!(first.session_id, second.session_id);
@@ -772,11 +751,7 @@ mod tests {
             .ensureGroup(vec![bob, carol])
             .get()?;
         let first = Wrapper::push_from(&chain, alice)
-            .createSession(
-                space.space_uuid.clone(),
-                "av-call".into(),
-                vec![alice, bob],
-            )
+            .createSession(space.space_uuid.clone(), "av-call".into(), vec![alice, bob])
             .get()?;
 
         Wrapper::push_from(&chain, alice)
@@ -784,11 +759,7 @@ mod tests {
             .get()?;
 
         let second = Wrapper::push_from(&chain, alice)
-            .createSession(
-                space.space_uuid,
-                "av-call".into(),
-                vec![alice, bob],
-            )
+            .createSession(space.space_uuid, "av-call".into(), vec![alice, bob])
             .get()?;
 
         assert_ne!(first.session_id, second.session_id);
@@ -808,11 +779,7 @@ mod tests {
 
         let space = Wrapper::push_from(&chain, alice).ensureDm(bob).get()?;
         let session = Wrapper::push_from(&chain, alice)
-            .createSession(
-                space.space_uuid,
-                "chat-data".into(),
-                vec![alice, bob],
-            )
+            .createSession(space.space_uuid, "chat-data".into(), vec![alice, bob])
             .get()?;
         let session_id = session.session_id.clone();
 
@@ -849,11 +816,7 @@ mod tests {
 
         let space = Wrapper::push_from(&chain, alice).ensureDm(bob).get()?;
         let session = Wrapper::push_from(&chain, alice)
-            .createSession(
-                space.space_uuid,
-                "chat-data".into(),
-                vec![alice, bob],
-            )
+            .createSession(space.space_uuid, "chat-data".into(), vec![alice, bob])
             .get()?;
 
         let err = Wrapper::push_from(&chain, carol)
@@ -883,11 +846,7 @@ mod tests {
 
         let space = Wrapper::push_from(&chain, alice).ensureDm(bob).get()?;
         let session = Wrapper::push_from(&chain, alice)
-            .createSession(
-                space.space_uuid,
-                "chat-data".into(),
-                vec![alice, bob],
-            )
+            .createSession(space.space_uuid, "chat-data".into(), vec![alice, bob])
             .get()?;
 
         let auth = Wrapper::push_from(&chain, carol)
@@ -944,9 +903,7 @@ mod tests {
             &token,
         )?;
 
-        let active = reply
-            .pointer("/data/activeSession")
-            .expect("activeSession");
+        let active = reply.pointer("/data/activeSession").expect("activeSession");
         assert_eq!(active.get("sessionId"), Some(&json!(session.session_id)));
         assert_eq!(active.get("purpose"), Some(&json!("chat-data")));
         assert_eq!(active.get("lifecycle"), Some(&json!(1)));
@@ -977,18 +934,14 @@ mod tests {
 
         let alice = AccountNumber::from("alice");
         let bob = AccountNumber::from("bob");
-        let sig = account!("x-webrtcsig");
+        let sig = account!("x-wrtcsig");
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         chain.new_account(sig).unwrap();
 
         let space = Wrapper::push_from(&chain, alice).ensureDm(bob).get()?;
         let session = Wrapper::push_from(&chain, alice)
-            .createSession(
-                space.space_uuid,
-                "chat-data".into(),
-                vec![alice, bob],
-            )
+            .createSession(space.space_uuid, "chat-data".into(), vec![alice, bob])
             .get()?;
 
         Wrapper::push_from(&chain, sig)
@@ -1017,18 +970,14 @@ mod tests {
 
         let alice = AccountNumber::from("alice");
         let bob = AccountNumber::from("bob");
-        let sig = account!("x-webrtcsig");
+        let sig = account!("x-wrtcsig");
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         chain.new_account(sig).unwrap();
 
         let space = Wrapper::push_from(&chain, alice).ensureDm(bob).get()?;
         let session = Wrapper::push_from(&chain, alice)
-            .createSession(
-                space.space_uuid,
-                "chat-data".into(),
-                vec![alice, bob],
-            )
+            .createSession(space.space_uuid, "chat-data".into(), vec![alice, bob])
             .get()?;
         let session_id = session.session_id.clone();
 
@@ -1066,11 +1015,7 @@ mod tests {
 
         let space = Wrapper::push_from(&chain, alice).ensureDm(bob).get()?;
         let session = Wrapper::push_from(&chain, alice)
-            .createSession(
-                space.space_uuid.clone(),
-                "av-call".into(),
-                vec![alice, bob],
-            )
+            .createSession(space.space_uuid.clone(), "av-call".into(), vec![alice, bob])
             .get()?;
 
         assert!(session.session_id.starts_with("wrtc:"));
@@ -1117,11 +1062,7 @@ mod tests {
             .get()?;
 
         let session = Wrapper::push_from(&chain, alice)
-            .createSession(
-                group.space_uuid.clone(),
-                "av-call".into(),
-                vec![alice, bob],
-            )
+            .createSession(group.space_uuid.clone(), "av-call".into(), vec![alice, bob])
             .get()?;
 
         assert_eq!(session.purpose, "av-call");
@@ -1155,11 +1096,7 @@ mod tests {
 
         let space = Wrapper::push_from(&chain, alice).ensureDm(bob).get()?;
         let err = Wrapper::push_from(&chain, alice)
-            .createSession(
-                space.space_uuid,
-                "av-call".into(),
-                vec![alice, carol],
-            )
+            .createSession(space.space_uuid, "av-call".into(), vec![alice, carol])
             .get()
             .expect_err("carol is not a space member");
         assert!(
@@ -1213,18 +1150,14 @@ mod tests {
 
         let alice = AccountNumber::from("alice");
         let bob = AccountNumber::from("bob");
-        let sig = account!("x-webrtcsig");
+        let sig = account!("x-wrtcsig");
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         chain.new_account(sig).unwrap();
 
         let space = Wrapper::push_from(&chain, alice).ensureDm(bob).get()?;
         let session = Wrapper::push_from(&chain, alice)
-            .createSession(
-                space.space_uuid,
-                "av-call".into(),
-                vec![alice, bob],
-            )
+            .createSession(space.space_uuid, "av-call".into(), vec![alice, bob])
             .get()?;
         let session_id = session.session_id.clone();
 
@@ -1281,18 +1214,14 @@ mod tests {
 
         let alice = AccountNumber::from("alice");
         let bob = AccountNumber::from("bob");
-        let sig = account!("x-webrtcsig");
+        let sig = account!("x-wrtcsig");
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         chain.new_account(sig).unwrap();
 
         let space = Wrapper::push_from(&chain, alice).ensureDm(bob).get()?;
         let session = Wrapper::push_from(&chain, alice)
-            .createSession(
-                space.space_uuid.clone(),
-                "av-call".into(),
-                vec![alice, bob],
-            )
+            .createSession(space.space_uuid.clone(), "av-call".into(), vec![alice, bob])
             .get()?;
         let session_id = session.session_id.clone();
 
@@ -1356,11 +1285,7 @@ mod tests {
             .ensureGroup(vec![bob, carol])
             .get()?;
         let session = Wrapper::push_from(&chain, bob)
-            .createSession(
-                group.space_uuid.clone(),
-                "av-call".into(),
-                vec![bob, alice],
-            )
+            .createSession(group.space_uuid.clone(), "av-call".into(), vec![bob, alice])
             .get()?;
 
         let token = chain.login(alice, Wrapper::SERVICE)?;
@@ -1385,9 +1310,7 @@ mod tests {
             &token,
         )?;
 
-        let active = reply
-            .pointer("/data/activeSession")
-            .expect("activeSession");
+        let active = reply.pointer("/data/activeSession").expect("activeSession");
         assert_eq!(active.get("sessionId"), Some(&json!(session.session_id)));
         assert_eq!(active.get("purpose"), Some(&json!("av-call")));
         let active_parts = active
@@ -1430,11 +1353,7 @@ mod tests {
             )
             .get()?;
         let av_call = Wrapper::push_from(&chain, alice)
-            .createSession(
-                space.space_uuid.clone(),
-                "av-call".into(),
-                vec![alice, bob],
-            )
+            .createSession(space.space_uuid.clone(), "av-call".into(), vec![alice, bob])
             .get()?;
 
         assert_ne!(chat_data.session_id, av_call.session_id);

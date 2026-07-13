@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { type Page, expect } from "@playwright/test";
 
 const INCOMING_DIALOG = "Incoming Meet call";
 
@@ -206,9 +206,9 @@ export async function waitForGroupMeetRejoinBanner(
     await expect(page.getByText("Meet call in progress")).toBeVisible({
         timeout: options?.timeout ?? 60_000,
     });
-    await expect(
-        page.getByRole("button", { name: "Rejoin" }),
-    ).toBeVisible({ timeout: options?.timeout ?? 60_000 });
+    await expect(page.getByRole("button", { name: "Rejoin" })).toBeVisible({
+        timeout: options?.timeout ?? 60_000,
+    });
 }
 
 export async function clickRejoinGroupMeet(page: Page): Promise<void> {
@@ -235,6 +235,44 @@ export async function expectNoIncomingMeetRing(
     await expect(
         page.getByRole("dialog", { name: INCOMING_DIALOG }),
     ).toBeHidden({ timeout: options?.timeout ?? 5_000 });
+}
+
+/** Caller terminal copy after decline / timeout (`avCallTerminalUiMessage`). */
+export async function waitForMeetTerminalMessage(
+    page: Page,
+    message: "Call declined" | "No answer",
+    options?: { timeout?: number },
+): Promise<void> {
+    const timeout = options?.timeout ?? 60_000;
+    // Race the terminal dismiss window — CallView copy, or durable timeline row.
+    await expect
+        .poll(
+            async () => {
+                const section = meetCallSection(page);
+                if ((await section.count()) > 0) {
+                    const ended = await meetCallHeaderStatusBadge(
+                        page,
+                        "Ended",
+                    ).count();
+                    const copy = await section
+                        .getByText(message, { exact: true })
+                        .count();
+                    if (ended > 0 && copy > 0) return true;
+                }
+                if (
+                    (await page.getByText(message, { exact: true }).count()) > 0
+                ) {
+                    return true;
+                }
+                return (
+                    (await page
+                        .getByText(new RegExp(`^${message}\\b`))
+                        .count()) > 0
+                );
+            },
+            { timeout, intervals: [50, 100, 200, 400] },
+        )
+        .toBe(true);
 }
 
 export async function expectMeetNotConnecting(

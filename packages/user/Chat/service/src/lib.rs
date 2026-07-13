@@ -89,12 +89,7 @@ pub mod tables {
     impl SessionEventRow {
         #[primary_key]
         fn pk(&self) -> (String, i64, u8, AccountNumber) {
-            (
-                self.session_id.clone(),
-                self.at,
-                self.kind,
-                self.account,
-            )
+            (self.session_id.clone(), self.at, self.kind, self.account)
         }
     }
 
@@ -146,12 +141,14 @@ pub mod spaces;
 
 #[psibase::service(name = "chat", tables = "tables")]
 pub mod service {
+    use crate::sessions::{self, SessionError};
     use crate::spaces::{
         dm_members, group_members, open_space, space_with_members, spaces_for_user,
         validate_group_members, SpaceError,
     };
-    use crate::sessions::{self, SessionError};
-    use crate::tables::{CallEvent, InitRow, InitTable, Session, SessionJoinAuth, Space, WebRtcSessionEvent};
+    use crate::tables::{
+        CallEvent, InitRow, InitTable, Session, SessionJoinAuth, Space, WebRtcSessionEvent,
+    };
     use psibase::services::transact::Wrapper as TransactSvc;
     use psibase::*;
 
@@ -305,8 +302,8 @@ pub mod service {
     #[allow(non_snake_case)]
     fn webrtcSessionEvent(event: WebRtcSessionEvent) {
         check(
-            get_sender() == account!("x-webrtcsig"),
-            "permission denied: webrtcSessionEvent only callable by x-webrtcsig",
+            get_sender() == account!("x-wrtcsig"),
+            "permission denied: webrtcSessionEvent only callable by x-wrtcsig",
         );
         abort_on_session_err(sessions::apply_webrtc_session_event(
             sessions::WebRtcSessionEvent {

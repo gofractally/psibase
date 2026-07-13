@@ -53,8 +53,6 @@ export type PairSignalingOptions = {
     localAccount: string;
     realtime: RealtimeTransport;
     signaling: WebRtcSignalingClient;
-    /** Server roster gate — defer SDP until self appears in joinedParticipants. */
-    isJoinedOnServer?: (pairId: string) => boolean;
     onServerJoined?: (pairId: string) => void;
     /** Delay between consecutive joinSession sends on the same socket. */
     joinStaggerMs?: number;
@@ -294,7 +292,6 @@ export function createPairSignaling(
         },
 
         isJoined(pairId) {
-            if (opts.isJoinedOnServer?.(pairId)) return true;
             return joinedPairs.has(pairId);
         },
 
@@ -317,14 +314,13 @@ export function createPairSignaling(
             const remoteOnRoster =
                 remote != null && joinedParticipants.includes(remote);
 
+            // Self-on-server is enough for SDP deferral gate and L3
+            // beginNegotiation; remote may still be pending.
             if (!selfOnRoster) {
                 joinedPairs.delete(pairId);
                 serverJoined.set(pairId, false);
-            }
-
-            if (selfOnRoster && !serverJoined.get(pairId)) {
-                serverJoined.set(pairId, true);
-                opts.onServerJoined?.(pairId);
+            } else if (!joinedPairs.has(pairId)) {
+                markJoined(pairId);
             }
 
             // Server acknowledged this pair join — drain the next queued pair
@@ -343,9 +339,6 @@ export function createPairSignaling(
                 stopJoinRetry();
             }
             if (remote) ensureActivePair(opts.localAccount, remote);
-            if (selfOnRoster) {
-                markJoined(pairId);
-            }
             maybeEmitJoinsIdle(pairId);
         },
 

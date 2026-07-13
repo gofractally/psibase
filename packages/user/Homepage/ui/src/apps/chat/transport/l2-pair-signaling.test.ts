@@ -29,17 +29,14 @@ function createL2Harness(local: string) {
         flushDeferredSignals: vi.fn(),
         bindSessionJoinedGate: vi.fn(),
     };
-    const joinedOnServer = new Map<string, boolean>();
     const pairSignaling = createPairSignaling({
         localAccount: local,
         realtime: realtime as never,
         signaling: signaling as never,
-        isJoinedOnServer: (pairId) => joinedOnServer.get(pairId) === true,
     });
     return {
         pairSignaling,
         joinSessions,
-        joinedOnServer,
         realtime,
         signaling,
     };
@@ -73,18 +70,31 @@ describe("l2-pair-signaling", () => {
         expect(joined).toHaveBeenCalledWith(pairId);
     });
 
+    it("marks joined when self alone is on the server roster", async () => {
+        const { pairSignaling } = createL2Harness("alice");
+        const pairId = pairSessionId("alice", "bob");
+        const joined = vi.fn();
+        pairSignaling.on("pairJoined", joined);
+
+        pairSignaling.joinPair("alice", "bob");
+        await Promise.resolve();
+
+        pairSignaling.applySessionSnapshot(pairId, ["alice"]);
+
+        expect(pairSignaling.isJoined(pairId)).toBe(true);
+        expect(joined).toHaveBeenCalledWith(pairId);
+    });
+
     it("clears joined state when a later snapshot moves self back to pending", async () => {
-        const { pairSignaling, joinedOnServer } = createL2Harness("alice");
+        const { pairSignaling } = createL2Harness("alice");
         const pairId = pairSessionId("alice", "bob");
 
         pairSignaling.joinPair("alice", "bob");
         await Promise.resolve();
         pairSignaling.applySessionSnapshot(pairId, ["alice", "bob"]);
-        joinedOnServer.set(pairId, true);
 
         expect(pairSignaling.isJoined(pairId)).toBe(true);
 
-        joinedOnServer.set(pairId, false);
         pairSignaling.applySessionSnapshot(pairId, ["bob"]);
 
         expect(pairSignaling.isJoined(pairId)).toBe(false);
@@ -117,7 +127,8 @@ describe("l2-pair-signaling", () => {
         await Promise.resolve();
         await vi.advanceTimersByTimeAsync(50);
         expect(joinSessions).toEqual([bobPair, carolPair]);
-        expect(pairSignaling.isJoined(bobPair)).toBe(false);
+        // Self-on-roster is enough for the join gate / beginNegotiation.
+        expect(pairSignaling.isJoined(bobPair)).toBe(true);
 
         pairSignaling.applySessionSnapshot(bobPair, ["alice", "bob"]);
         expect(pairSignaling.isJoined(bobPair)).toBe(true);
@@ -185,14 +196,14 @@ describe("l2-pair-signaling", () => {
         expect(joinSessions).toEqual([pairId]);
     });
 
-    it("re-joins after welcome when server roster gate still shows joined", () => {
-        const { pairSignaling, joinSessions, realtime, joinedOnServer } =
+    it("re-joins after welcome when already marked joined locally", async () => {
+        const { pairSignaling, joinSessions, realtime } =
             createL2Harness("alice");
         const pairId = pairSessionId("alice", "bob");
 
         pairSignaling.joinPair("alice", "bob");
+        await Promise.resolve();
         pairSignaling.applySessionSnapshot(pairId, ["alice", "bob"]);
-        joinedOnServer.set(pairId, true);
         joinSessions.length = 0;
 
         realtime.emit("welcome");

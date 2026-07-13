@@ -5,7 +5,7 @@ use psibase::AccountNumber;
 
 use crate::protocol::ServerFrame;
 use crate::signaling::{
-    query_session_auth_for_cleanup, PURPOSE_AV_CALL, EVENT_SESSION_ENDED, EVENT_SESSION_FAILED,
+    query_session_auth_for_cleanup, EVENT_SESSION_ENDED, EVENT_SESSION_FAILED, PURPOSE_AV_CALL,
 };
 use crate::state::{
     active_sig_session_ids, cleanup_all_subjective_for_session, joined_accounts_for_session,
@@ -52,7 +52,7 @@ fn terminal_event_account_from_participants(
         .find(|p| !joined.iter().any(|j| j == *p))
         .copied()
         .or_else(|| participants.first().copied())
-        .unwrap_or_else(|| psibase::account!("x-webrtcsig"))
+        .unwrap_or_else(|| psibase::account!("x-wrtcsig"))
 }
 
 fn terminal_event_account(auth: &chat::SessionJoinAuth, session_id: &str) -> AccountNumber {
@@ -104,12 +104,7 @@ fn maybe_sweep_session(session_id: &str, now: i64) -> Vec<(i32, ServerFrame)> {
             } else {
                 "session-not-active"
             };
-            return fail_session_subjective(
-                session_id,
-                &auth,
-                reason,
-                EVENT_SESSION_FAILED,
-            );
+            return fail_session_subjective(session_id, &auth, reason, EVENT_SESSION_FAILED);
         }
         cleanup_all_subjective_for_session(session_id);
         return vec![];
@@ -164,7 +159,7 @@ pub fn cleanup_session_if_terminal(
 #[cfg(test)]
 mod unit_tests {
     use super::*;
-    use psibase::AccountNumber;
+    use psibase::*;
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     struct SweepCandidate {
@@ -236,8 +231,8 @@ mod unit_tests {
 
     #[test]
     fn terminal_event_account_prefers_unjoined_participant() {
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
+        let alice = account!("alice");
+        let bob = account!("bob");
         assert_eq!(
             terminal_event_account_from_participants(&[alice, bob], &[]),
             alice

@@ -1,4 +1,4 @@
-# x-webrtcsig
+# x-wrtcsig
 
 Node-local subjective websocket service for WebRTC signaling, presence, and ICE
 relay (architecture §5–§6). M1: `/ws` auth, welcome, presence. M3: `chat-data`
@@ -22,6 +22,5 @@ with three users (A, B, C) in group Space **ChatABC**:
 Optional devtools check: websocket frames must not carry chat message bodies (`chatMessage` /
 `say` rejected; see `test_client_ready_ping_no_chat_frames`).
 
-Service account: `x-webrtcsig` (architecture doc `x-webrtc-sig` is not a valid
-psibase `AccountNumber`; see team note in T-001). Subprotocol target:
-`psibase.realtime.v1`.
+Service account: `x-wrtcsig` (hyphens are valid in `AccountNumber`; max length is 10, so
+`x-webrtcsig` does not fit). Subprotocol target: `psibase.realtime.v1`.

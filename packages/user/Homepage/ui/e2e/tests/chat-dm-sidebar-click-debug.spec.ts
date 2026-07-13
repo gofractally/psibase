@@ -10,12 +10,11 @@
  * accumulated-churn (4× park/dm cycles), post-pending (offline send + park).
  */
 import { test } from "../fixtures/chain";
-
 import {
+    PRODUCER_ACCOUNT,
     createAccountViaInviteUrl,
     createInviteUrl,
     loginProducerViaUi,
-    PRODUCER_ACCOUNT,
     uniqueE2eAccountName,
 } from "../lib/auth-ui";
 import {
@@ -30,7 +29,9 @@ import {
     startDmWithContact,
     wakeForDmInteraction,
 } from "../lib/chat-ui";
+import { attachDiagnostics } from "../lib/diagnostics";
 import {
+    type DmClickScenarioId,
     logSelection,
     logSidebarInventory,
     parseDmClickScenarios,
@@ -38,13 +39,24 @@ import {
     runOpenDmThreadScenario,
     shouldRunScenario,
     snapshotSelection,
-    type DmClickScenarioId,
 } from "../lib/dm-sidebar-click-debug";
-import { attachDiagnostics } from "../lib/diagnostics";
 
 const SCENARIO_FILTER = parseDmClickScenarios();
+const DM_CLICK_DEBUG_OPT_IN =
+    process.env.PSIBASE_E2E_DM_CLICK_DEBUG === "1" ||
+    Boolean(process.env.PSIBASE_E2E_DM_CLICK_SCENARIO?.trim());
 
+/**
+ * Opt-in diagnostic harness (not a default CI gate). Run via:
+ *   yarn e2e:dm-click-debug
+ *   PSIBASE_E2E_DM_CLICK_SCENARIO=group-deep-link yarn e2e:dm-click-debug
+ */
 test.describe("DM sidebar click debug", () => {
+    test.skip(
+        !DM_CLICK_DEBUG_OPT_IN,
+        "Opt-in: yarn e2e:dm-click-debug (or set PSIBASE_E2E_DM_CLICK_DEBUG=1)",
+    );
+
     test("reproduces group-url / parked / homeNav DM selection failures", async ({
         chain,
         alicePage,
@@ -109,11 +121,7 @@ test.describe("DM sidebar click debug", () => {
                 `[dm-click-debug] bootstrap groupSpaceId=${groupSpaceId}`,
             );
 
-            await startDmWithContact(
-                alicePage,
-                chain.baseUrl,
-                bobAccount.name,
-            );
+            await startDmWithContact(alicePage, chain.baseUrl, bobAccount.name);
             await sendChatMessage(alicePage, "dm-click-debug-bootstrap", {
                 composerTimeout: 45_000,
             });
@@ -185,12 +193,10 @@ test.describe("DM sidebar click debug", () => {
                     { groupSpaceId, composerTimeout: 45_000 },
                 );
                 await wakeForDmInteraction(alicePage, chain.baseUrl);
-                await openDmThread(
-                    alicePage,
-                    chain.baseUrl,
-                    bobAccount.name,
-                    { groupSpaceId, gotoTimeout: 45_000 },
-                );
+                await openDmThread(alicePage, chain.baseUrl, bobAccount.name, {
+                    groupSpaceId,
+                    gotoTimeout: 45_000,
+                });
                 await sendChatMessage(alicePage, "post-pending-offline-dm", {
                     composerTimeout: 45_000,
                 });
@@ -247,12 +253,9 @@ test.describe("DM sidebar click debug", () => {
                         composerTimeout: 45_000,
                     },
                 );
-                await churnHomeNav(
-                    alicePage,
-                    chain.baseUrl,
-                    groupPeers,
-                    { groupSpaceId },
-                );
+                await churnHomeNav(alicePage, chain.baseUrl, groupPeers, {
+                    groupSpaceId,
+                });
                 await wakeForDmInteraction(alicePage, chain.baseUrl);
             }
 

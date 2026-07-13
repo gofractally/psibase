@@ -1,6 +1,6 @@
 # Native-build test registrations for the XWebRtcSig service.
 #
-# These are Python integration tests that drive the x-webrtcsig websocket
+# These are Python integration tests that drive the x-wrtcsig websocket
 # protocol against a real psinode binary. They live next to the
 # package they exercise so that adding/changing them does not require touching
 # unrelated subtrees.

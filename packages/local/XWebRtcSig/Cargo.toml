@@ -11,7 +11,7 @@ publish.workspace = true
 [package.metadata.psibase]
 package-name = "XWebRtcSig"
 scope = "local"
-services = ["x-webrtcsig"]
+services = ["x-wrtcsig"]
 
 [package.metadata.psibase.dependencies]
 # Chat is a runtime dependency (authorizeSessionJoin) installed at boot via DevDefault,
@@ -23,4 +23,4 @@ XHttp = "0.23.0"
 crate-type = ["rlib"]
 
 [dependencies]
-x-webrtcsig = { path = "service", version = "0.23.0" }
+x-wrtcsig = { path = "service", version = "0.23.0" }

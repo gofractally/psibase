@@ -1,13 +1,12 @@
+import { type Page, expect } from "@playwright/test";
 import { createHash } from "node:crypto";
 
-import { expect, type Page } from "@playwright/test";
-
 import {
+    type ChurnDiagConfig,
     humanDiagPause,
     isHumanDiagStep,
-    recordPageChurnTrace,
     readPageChurnProbe,
-    type ChurnDiagConfig,
+    recordPageChurnTrace,
 } from "./churn-diag";
 import {
     cancelInFlightNavigation,
@@ -50,7 +49,9 @@ export function expectedDmSpaceIds(
         a.localeCompare(b),
     );
     const orderings =
-        canonical.length === 2 ? [canonical, [...canonical].reverse()] : [canonical];
+        canonical.length === 2
+            ? [canonical, [...canonical].reverse()]
+            : [canonical];
     return orderings.map((members) => {
         const digest = createHash("sha256")
             .update(JSON.stringify(members))
@@ -81,9 +82,7 @@ export function isSameSpaceId(
 }
 
 export function chatUrlForAccount(account: string, baseUrl: string): string {
-    const port = new URL(
-        baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`,
-    ).port;
+    const port = new URL(baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`).port;
     const host = port
         ? `${account}.psibase.localhost:${port}`
         : `${account}.psibase.localhost`;
@@ -138,10 +137,7 @@ async function hasStaleChurnRealtime(page: Page): Promise<boolean> {
         }),
         new Promise<null>((resolve) => setTimeout(() => resolve(null), 1_000)),
     ]).catch(() => null);
-    return (
-        typeof state === "string" &&
-        state.includes("ws health watchdog")
-    );
+    return typeof state === "string" && state.includes("ws health watchdog");
 }
 
 /** Last-open group space from Chat localStorage (same for all members). */
@@ -211,7 +207,10 @@ export async function waitForChatConnected(
     options?: { timeout?: number },
 ): Promise<void> {
     const timeout = options?.timeout ?? 120_000;
-    const connected = page.getByText("Connected").locator("visible=true").first();
+    const connected = page
+        .getByText("Connected")
+        .locator("visible=true")
+        .first();
     const retry = page
         .getByRole("button", { name: "Retry connection" })
         .locator("visible=true")
@@ -240,9 +239,9 @@ export async function waitForChatConnected(
                     return true;
                 }
                 if (await retry.isVisible().catch(() => false)) {
-                    await retry.click({ timeout: 3_000, force: true }).catch(
-                        () => {},
-                    );
+                    await retry
+                        .click({ timeout: 3_000, force: true })
+                        .catch(() => {});
                 }
                 return false;
             },
@@ -544,14 +543,29 @@ export async function sendChurnGroupMessage(
         await expect(page.getByRole("heading", { name: "Chat" })).toBeVisible({
             timeout: 15_000,
         });
-        if (await groupButton.first().isVisible().catch(() => false)) {
+        if (
+            await groupButton
+                .first()
+                .isVisible()
+                .catch(() => false)
+        ) {
             await groupButton.first().click({ timeout: 8_000 });
         } else {
-            await openExistingGroupChatQuick(page, baseUrl, otherMemberAccounts, {
-                sidebarTimeout: 20_000,
-            });
+            await openExistingGroupChatQuick(
+                page,
+                baseUrl,
+                otherMemberAccounts,
+                {
+                    sidebarTimeout: 20_000,
+                },
+            );
         }
-    } else if (await groupButton.first().isVisible().catch(() => false)) {
+    } else if (
+        await groupButton
+            .first()
+            .isVisible()
+            .catch(() => false)
+    ) {
         await groupButton.first().click({ timeout: 8_000 });
     } else {
         await openExistingGroupChatQuick(page, baseUrl, otherMemberAccounts, {
@@ -635,11 +649,16 @@ export async function churnHomeNav(
                 .navigationSuspended === true;
         if (!suspendedAfterCdp) {
             await page
-                .evaluate(() => {
-                    (
-                        window as Window & { __chatChurnSuspend?: () => void }
-                    ).__chatChurnSuspend?.();
-                }, { timeout: 5_000 })
+                .evaluate(
+                    () => {
+                        (
+                            window as Window & {
+                                __chatChurnSuspend?: () => void;
+                            }
+                        ).__chatChurnSuspend?.();
+                    },
+                    { timeout: 5_000 },
+                )
                 .catch(() => {});
             await page.waitForTimeout(50);
         }
@@ -726,7 +745,12 @@ export async function churnReselectGroup(
         sidebarTimeout: 20_000,
     });
     const groupButton = groupConversationButton(page, otherMemberAccounts);
-    if (await groupButton.first().isVisible().catch(() => false)) {
+    if (
+        await groupButton
+            .first()
+            .isVisible()
+            .catch(() => false)
+    ) {
         await groupButton.first().click({ timeout: 3_000 });
     }
 }
@@ -746,7 +770,12 @@ export async function ensureContact(
     });
 
     const existing = page.getByText(peerAccount, { exact: false });
-    if (await existing.first().isVisible().catch(() => false)) {
+    if (
+        await existing
+            .first()
+            .isVisible()
+            .catch(() => false)
+    ) {
         return;
     }
 
@@ -755,7 +784,9 @@ export async function ensureContact(
         .filter({ has: page.getByRole("heading", { name: "Contacts" }) })
         .getByRole("button")
         .click();
-    await expect(page.getByRole("heading", { name: "Create contact" })).toBeVisible();
+    await expect(
+        page.getByRole("heading", { name: "Create contact" }),
+    ).toBeVisible();
 
     await page.getByPlaceholder("Account name").fill(peerAccount);
     if (nickname) {
@@ -859,16 +890,12 @@ export async function establishThreePartyGroupMesh(
     const timeout = options?.timeout ?? GROUP_MESH_TIMEOUT_MS;
     await waitForGroupMeshReady(pages.alice, [accounts.bob], { timeout });
     await waitForGroupMeshReady(pages.alice, [accounts.carol], { timeout });
-    await waitForGroupMeshReady(
-        pages.bob,
-        [accounts.alice, accounts.carol],
-        { timeout },
-    );
-    await waitForGroupMeshReady(
-        pages.carol,
-        [accounts.alice, accounts.bob],
-        { timeout },
-    );
+    await waitForGroupMeshReady(pages.bob, [accounts.alice, accounts.carol], {
+        timeout,
+    });
+    await waitForGroupMeshReady(pages.carol, [accounts.alice, accounts.bob], {
+        timeout,
+    });
 }
 
 /**
@@ -887,11 +914,9 @@ export async function establishThreePartyGroupMeshCarolLast(
     await openCarolGroup();
     await waitForGroupMeshReady(pages.alice, [accounts.carol], { timeout });
     await waitForGroupMeshReady(pages.bob, [accounts.carol], { timeout });
-    await waitForGroupMeshReady(
-        pages.carol,
-        [accounts.alice, accounts.bob],
-        { timeout },
-    );
+    await waitForGroupMeshReady(pages.carol, [accounts.alice, accounts.bob], {
+        timeout,
+    });
 }
 
 /** H18: connect all three to chat, then leave home before creating a group. */
@@ -990,11 +1015,9 @@ export async function reenterThreePartyGroupAfterChurn(
     }
     await waitForGroupMeshReady(pages.alice, [accounts.carol], { timeout });
     await waitForGroupMeshReady(pages.bob, [accounts.carol], { timeout });
-    await waitForGroupMeshReady(
-        pages.carol,
-        [accounts.alice, accounts.bob],
-        { timeout },
-    );
+    await waitForGroupMeshReady(pages.carol, [accounts.alice, accounts.bob], {
+        timeout,
+    });
 }
 
 export async function resetTransportKickCounts(page: Page): Promise<void> {
@@ -1061,16 +1084,16 @@ export async function waitForDmDataChannelReady(
         await expect
             .poll(
                 async () => {
-                return page.evaluate((peer) => {
-                    const transport = (
-                        window as unknown as {
-                            __chatTransportDebug?: {
-                                peerState?: (remote: string) => string;
-                            };
-                        }
-                    ).__chatTransportDebug;
-                    return transport?.peerState?.(peer) === "usable";
-                }, peerAccount);
+                    return page.evaluate((peer) => {
+                        const transport = (
+                            window as unknown as {
+                                __chatTransportDebug?: {
+                                    peerState?: (remote: string) => string;
+                                };
+                            }
+                        ).__chatTransportDebug;
+                        return transport?.peerState?.(peer) === "usable";
+                    }, peerAccount);
                 },
                 { timeout, intervals: [500, 1000, 2000] },
             )
@@ -1110,20 +1133,23 @@ export async function bootstrapGroupMeshPeers(
     await expect
         .poll(
             async () => {
-                return page.evaluate((peers) => {
-                    const transport = (
-                        window as unknown as {
-                            __chatTransportDebug?: {
-                                started?: () => boolean;
-                                ensurePeers?: (remotes: string[]) => void;
-                                kickPeers?: (remotes: string[]) => void;
-                            };
-                        }
-                    ).__chatTransportDebug;
-                    if (!transport?.started?.()) return false;
-                    transport.ensurePeers?.(peers);
-                    return true;
-                }, [...peerAccounts]);
+                return page.evaluate(
+                    (peers) => {
+                        const transport = (
+                            window as unknown as {
+                                __chatTransportDebug?: {
+                                    started?: () => boolean;
+                                    ensurePeers?: (remotes: string[]) => void;
+                                    kickPeers?: (remotes: string[]) => void;
+                                };
+                            }
+                        ).__chatTransportDebug;
+                        if (!transport?.started?.()) return false;
+                        transport.ensurePeers?.(peers);
+                        return true;
+                    },
+                    [...peerAccounts],
+                );
             },
             { timeout: 60_000, intervals: [250, 500, 1000] },
         )
@@ -1142,19 +1168,23 @@ export async function waitForGroupMeshReady(
     await expect
         .poll(
             async () => {
-                return page.evaluate((peers) => {
-                    const transport = (
-                        window as unknown as {
-                            __chatTransportDebug?: {
-                                peerState?: (remote: string) => string;
-                            };
-                        }
-                    ).__chatTransportDebug;
-                    if (!transport?.peerState) return false;
-                    return peers.every(
-                        (p: string) => transport.peerState?.(p) === "usable",
-                    );
-                }, [...peerAccounts]);
+                return page.evaluate(
+                    (peers) => {
+                        const transport = (
+                            window as unknown as {
+                                __chatTransportDebug?: {
+                                    peerState?: (remote: string) => string;
+                                };
+                            }
+                        ).__chatTransportDebug;
+                        if (!transport?.peerState) return false;
+                        return peers.every(
+                            (p: string) =>
+                                transport.peerState?.(p) === "usable",
+                        );
+                    },
+                    [...peerAccounts],
+                );
             },
             { timeout, intervals: [1000, 2000, 3000] },
         )
@@ -1186,19 +1216,22 @@ export async function waitForThreadMeshLive(
     await expect
         .poll(
             async () => {
-                return page.evaluate((peers) => {
-                    const transport = (
-                        window as unknown as {
-                            __chatTransportDebug?: {
-                                peerState?: (remote: string) => string;
-                            };
-                        }
-                    ).__chatTransportDebug;
-                    if (!transport?.peerState) return false;
-                    return peers.every(
-                        (peer) => transport.peerState!(peer) === "usable",
-                    );
-                }, [...peerAccounts]);
+                return page.evaluate(
+                    (peers) => {
+                        const transport = (
+                            window as unknown as {
+                                __chatTransportDebug?: {
+                                    peerState?: (remote: string) => string;
+                                };
+                            }
+                        ).__chatTransportDebug;
+                        if (!transport?.peerState) return false;
+                        return peers.every(
+                            (peer) => transport.peerState!(peer) === "usable",
+                        );
+                    },
+                    [...peerAccounts],
+                );
             },
             { timeout, intervals: [200, 400, 800, 1500] },
         )
@@ -1335,8 +1368,8 @@ export async function openDmThreadForFlush(
                     aria: button.getAttribute("aria-label"),
                     visible: Boolean(
                         button.offsetWidth ||
-                            button.offsetHeight ||
-                            button.getClientRects().length,
+                        button.offsetHeight ||
+                        button.getClientRects().length,
                     ),
                 }));
                 return {
@@ -1383,10 +1416,7 @@ async function syncChatUrlToSelectedConversation(
                     };
                 }
             ).__chatChurnState?.();
-            if (
-                churn?.composePendingDmPeer ||
-                churn?.pendingDmMember
-            ) {
+            if (churn?.composePendingDmPeer || churn?.pendingDmMember) {
                 return null;
             }
             if (churn?.selectedConversationKind === "dm") {
@@ -1404,10 +1434,7 @@ async function syncChatUrlToSelectedConversation(
     } catch {
         return;
     }
-    if (
-        current === want ||
-        groupSpaceIdFromPage(page) === spaceId
-    ) {
+    if (current === want || groupSpaceIdFromPage(page) === spaceId) {
         return;
     }
 
@@ -1471,8 +1498,7 @@ export async function readChatSelectionState(
                 (churn?.selectedConversationId as string | null) ?? null,
             composePendingDmPeer:
                 (churn?.composePendingDmPeer as string | null) ?? null,
-            pendingDmMember:
-                (churn?.pendingDmMember as string | null) ?? null,
+            pendingDmMember: (churn?.pendingDmMember as string | null) ?? null,
             selectedConversationKind:
                 (churn?.selectedConversationKind as string | null) ?? null,
             urlSpaceId,
@@ -1564,7 +1590,9 @@ export async function assertOutboundDmRouting(
                 }
             ).__chatChurnState?.();
             const snap = transport?.routingSnapshot?.() ?? null;
-            const rows = (transport?.getOutbox?.() ?? []).filter((r) => r.body === body);
+            const rows = (transport?.getOutbox?.() ?? []).filter(
+                (r) => r.body === body,
+            );
             const groupTail = groupSpaceId.replace(/^space:/, "");
             const onGroup = rows.some(
                 (r) =>
@@ -1731,12 +1759,19 @@ async function clickOpenDmTarget(
     peerAccount: string,
 ): Promise<boolean> {
     await ensureSidebarSectionExpanded(page, "Direct Messages");
-    const dmRow = page
+    // Scope to the Direct Messages panel — peer names also appear in group
+    // row aria-labels (`alice, bob`), and page-wide `.last()` can click those.
+    const dmToggle = page
+        .getByRole("button", { name: "Direct Messages", exact: true })
+        .locator("visible=true")
+        .last();
+    const dmRow = dmToggle
+        .locator("xpath=following-sibling::div[1]")
         .getByRole("button", {
             name: dmRowNamePattern(peerAccount),
         })
         .locator("visible=true")
-        .last();
+        .first();
     if (await dmRow.isVisible().catch(() => false)) {
         await dmRow.click();
         return true;
@@ -1752,7 +1787,9 @@ async function clickOpenDmTarget(
         .getByRole("button")
         .filter({ hasText: peerAccount })
         .first();
-    if (!(await contactButton.isVisible({ timeout: 30_000 }).catch(() => false))) {
+    if (
+        !(await contactButton.isVisible({ timeout: 30_000 }).catch(() => false))
+    ) {
         return false;
     }
     const label = await contactButton
@@ -1789,10 +1826,7 @@ async function pushSelectedDmUrl(
                     };
                 }
             ).__chatChurnState?.();
-            if (
-                churn?.composePendingDmPeer ||
-                churn?.pendingDmMember
-            ) {
+            if (churn?.composePendingDmPeer || churn?.pendingDmMember) {
                 return null;
             }
             if (churn?.selectedConversationKind === "dm") {
@@ -1858,10 +1892,15 @@ export async function openDmThread(
     // Fast path when the DM row already exists in the sidebar. Click the row
     // (selects the chain's real space id) instead of deep-linking a guessed
     // hash URL — the chain may have hashed the reverse member ordering.
-    const dmRowVisible = await page
+    const dmToggle = page
+        .getByRole("button", { name: "Direct Messages", exact: true })
+        .locator("visible=true")
+        .last();
+    const dmRowVisible = await dmToggle
+        .locator("xpath=following-sibling::div[1]")
         .getByRole("button", { name: dmRowNamePattern(peerAccount) })
         .locator("visible=true")
-        .last()
+        .first()
         .isVisible()
         .catch(() => false);
     if (dmRowVisible) {
@@ -1958,7 +1997,10 @@ async function activeMessageComposer(
 ): Promise<ReturnType<Page["getByLabel"]>> {
     const composer = page.getByLabel("Message text");
     await expect(composer.first()).toBeEnabled({ timeout: timeoutMs });
-    return composer.locator("visible=true").and(page.locator(":enabled")).last();
+    return composer
+        .locator("visible=true")
+        .and(page.locator(":enabled"))
+        .last();
 }
 
 async function clickSendBesideComposer(
@@ -2072,7 +2114,10 @@ async function dumpChatTransportDebug(page: Page): Promise<unknown> {
                 : null,
             messaging: msg
                 ? {
-                      events: typeof msg.events === "function" ? msg.events() : null,
+                      events:
+                          typeof msg.events === "function"
+                              ? msg.events()
+                              : null,
                       outbox:
                           typeof msg.getOutbox === "function"
                               ? msg.getOutbox()
@@ -2140,7 +2185,9 @@ export function groupConversationButton(
     otherMemberAccounts: string[],
 ) {
     if (otherMemberAccounts.length === 0) {
-        throw new Error("groupConversationButton requires at least one other member");
+        throw new Error(
+            "groupConversationButton requires at least one other member",
+        );
     }
     let button = page.getByRole("button", {
         name: new RegExp(otherMemberAccounts[0]!),
@@ -2158,7 +2205,10 @@ export function groupConversationButton(
     }
     return button.or(byVisibleText);
 }
-export async function startGroupPickMode(page: Page, baseUrl: string): Promise<void> {
+export async function startGroupPickMode(
+    page: Page,
+    baseUrl: string,
+): Promise<void> {
     await openChat(page, baseUrl);
     await waitForChatConnected(page);
     await page.getByRole("button", { name: "New group chat" }).click();
@@ -2504,11 +2554,7 @@ export async function assertPendingDeliveredForPair(
                 );
             }
             if (!recipientHasMessage) {
-                await openDmForPair(
-                    recipientPage,
-                    senderAccount,
-                    timeout,
-                );
+                await openDmForPair(recipientPage, senderAccount, timeout);
             }
         } else {
             await openDmThread(recipientPage, options.baseUrl, senderAccount);
@@ -2542,10 +2588,9 @@ export async function expectOutboundMessageDelivered(
     const message = page.getByText(body, { exact: true });
     await expect(message).toBeVisible({ timeout });
     const row = page.locator("div").filter({ has: message });
-    await expect(row.locator("span").filter({ hasText: /^Pending/ })).toHaveCount(
-        0,
-        { timeout },
-    );
+    await expect(
+        row.locator("span").filter({ hasText: /^Pending/ }),
+    ).toHaveCount(0, { timeout });
 }
 
 /**
@@ -2596,15 +2641,10 @@ export async function openExistingGroupChatMinimal(
     const gotoTimeout = options?.gotoTimeout;
     let lastError: unknown;
     for (let attempt = 0; attempt < 2; attempt++) {
-        const pollMs =
-            attempt === 0 ? sidebarTimeout : sidebarTimeout + 15_000;
+        const pollMs = attempt === 0 ? sidebarTimeout : sidebarTimeout + 15_000;
         try {
             if (attempt > 0 && !page.url().includes("/chat")) {
-                const chatUrl = chatUrlForPage(
-                    page,
-                    baseUrl,
-                    options?.account,
-                );
+                const chatUrl = chatUrlForPage(page, baseUrl, options?.account);
                 await hardNavigate(page, chatUrl, {
                     timeout: gotoTimeout ?? 25_000,
                 });

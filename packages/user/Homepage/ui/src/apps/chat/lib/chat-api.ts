@@ -277,7 +277,7 @@ export async function closeAvCallSession(
     });
 }
 
-/** Record join/leave lifecycle on objective Chat after x-webrtcsig signaling. */
+/** Record join/leave lifecycle on objective Chat after x-wrtcsig signaling. */
 export async function commitWebRtcSessionEvent(
     sessionId: string,
     kind: number,

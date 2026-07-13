@@ -33,6 +33,8 @@ const CHAT_DATA_CHANNEL_LABEL = "chat";
 
 export type ChatDataPeerHandlers = {
     onDataChannelOpen?: () => void;
+    /** Opaque wire path — when set, skips typed envelope dispatch. */
+    onWireMessage?: (raw: string) => void;
     onChatMessage?: (envelope: ChatDataMessageEnvelope) => void;
     onChatHistorySync?: (envelope: ChatHistorySyncEnvelope) => void;
     /**
@@ -784,6 +786,19 @@ export class ChatDataWebRtcPeer {
         }
     }
 
+    /** Send opaque UTF-8 bytes on the ordered `chat` data channel when open. */
+    sendWireBytes(bytes: Uint8Array): boolean {
+        if (this.disposed || !this.dataChannelReady || !this.dataChannel) {
+            return false;
+        }
+        try {
+            this.dataChannel.send(new TextDecoder().decode(bytes));
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
     dispose(): void {
         this.suppressNegotiation = true;
         this.stopMeetMedia();
@@ -1071,6 +1086,10 @@ export class ChatDataWebRtcPeer {
                       ? new TextDecoder().decode(ev.data)
                       : null;
             if (raw === null) return;
+            if (this.handlers.onWireMessage) {
+                this.handlers.onWireMessage(raw);
+                return;
+            }
             const envelope = parseChatDataWireEnvelope(raw);
             if (!envelope) return;
             if (envelope.t === "chatMessage") {

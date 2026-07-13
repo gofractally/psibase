@@ -1,14 +1,14 @@
 import { siblingUrl } from "@psibase/common-lib";
 
-import { realtimeTraceLog } from "./realtime-trace";
 import {
-    parseServerRealtimeFrameText,
-    REALTIME_AUTH_SUBPROTOCOL_PREFIX,
-    REALTIME_SUBPROTOCOL_V1,
     type ClientRealtimeFrame,
     type ParseResult,
+    REALTIME_AUTH_SUBPROTOCOL_PREFIX,
+    REALTIME_SUBPROTOCOL_V1,
     type ServerRealtimeFrame,
+    parseServerRealtimeFrameText,
 } from "./realtime-protocol";
+import { realtimeTraceLog } from "./realtime-trace";
 
 /** User-facing realtime transport state (architecture §5.1 / M1 gate). */
 export type RealtimeConnectionState = "offline" | "reconnecting" | "connected";
@@ -59,9 +59,8 @@ function formatParseFailure(
 ): string {
     const errObj = r.error;
     if (errObj && typeof errObj === "object" && "flatten" in errObj) {
-        const f = (
-            errObj as { flatten: () => Record<string, unknown> }
-        ).flatten;
+        const f = (errObj as { flatten: () => Record<string, unknown> })
+            .flatten;
         if (typeof f === "function") {
             try {
                 return JSON.stringify(f());
@@ -132,7 +131,7 @@ function newClientInstanceId(): string {
 }
 
 /**
- * Websocket client for `x-webrtcsig` `/ws` with subprotocol `psibase.realtime.v1`.
+ * Websocket client for `x-wrtcsig` `/ws` with subprotocol `psibase.realtime.v1`.
  * (Architecture docs say `x-webrtc-sig`; that is not a valid psibase account name.)
  */
 export class RealtimeClient {
@@ -149,7 +148,9 @@ export class RealtimeClient {
 
     private nextHandlerLayerId = 1;
 
-    private readonly authTokenProvider?: () => Promise<string | null | undefined>;
+    private readonly authTokenProvider?: () => Promise<
+        string | null | undefined
+    >;
 
     private readonly authRequiredMessage: string;
 
@@ -294,7 +295,7 @@ export class RealtimeClient {
     }
 
     private wsUrl(): string {
-        const http = siblingUrl(this.baseUrl, "x-webrtcsig", "/ws");
+        const http = siblingUrl(this.baseUrl, "x-wrtcsig", "/ws");
         return siblingHttpToWsUrl(http);
     }
 
@@ -480,8 +481,7 @@ export class RealtimeClient {
                 this.pongDeadlineTimer = globalThis.setTimeout(() => {
                     this.pongDeadlineTimer = null;
                     if (this.userClosed || !this.sessionReady) return;
-                    const sinceLast =
-                        Date.now() - this.lastInboundFrameAt;
+                    const sinceLast = Date.now() - this.lastInboundFrameAt;
                     if (sinceLast < this.pongTimeoutMs) return;
                     realtimeTraceLog("ws health watchdog: forcing reconnect", {
                         instanceId: this.clientInstanceId,
@@ -492,10 +492,13 @@ export class RealtimeClient {
                         `ws health watchdog: ${sinceLast}ms since last frame`,
                     );
                     if (churnDisablesHealthReconnect()) {
-                        this.debugLog?.("ws health watchdog: reconnect disabled", {
-                            instanceId: this.clientInstanceId,
-                            sinceLastFrameMs: sinceLast,
-                        });
+                        this.debugLog?.(
+                            "ws health watchdog: reconnect disabled",
+                            {
+                                instanceId: this.clientInstanceId,
+                                sinceLastFrameMs: sinceLast,
+                            },
+                        );
                         return;
                     }
                     this.reconnectNow();
@@ -520,8 +523,7 @@ export class RealtimeClient {
             t: "clientReady",
             clientInstanceId: this.clientInstanceId,
             active: true,
-            visible:
-                typeof document === "undefined" ? true : !document.hidden,
+            visible: typeof document === "undefined" ? true : !document.hidden,
             supports: { audio: true, video: true, data: true },
         });
     }
@@ -563,14 +565,14 @@ export class RealtimeClient {
         const exponent = Math.min(this.rapidCloseStreak - 1, 8);
         return Math.min(
             this.maxDelayMs,
-            Math.max(
-                this.initialDelayMs,
-                this.initialDelayMs * 2 ** exponent,
-            ),
+            Math.max(this.initialDelayMs, this.initialDelayMs * 2 ** exponent),
         );
     }
 
-    private noteSessionClosed(sessionWasReady: boolean, connectStartedAt: number) {
+    private noteSessionClosed(
+        sessionWasReady: boolean,
+        connectStartedAt: number,
+    ) {
         if (!sessionWasReady) return;
         const ageMs =
             this.welcomeAt > 0
@@ -599,8 +601,7 @@ export class RealtimeClient {
 
     private sendJson(payload: Record<string, unknown>): void {
         if (!this.sessionReady || this.ws?.readyState !== WebSocket.OPEN) {
-            this._lastError =
-                "realtime websocket is not ready (await welcome)";
+            this._lastError = "realtime websocket is not ready (await welcome)";
             return;
         }
         try {
@@ -719,7 +720,7 @@ export class RealtimeClient {
                 }
                 if (typeof ev.data !== "string") {
                     this._lastError =
-                        "x-webrtcsig websocket message was not UTF-16 text";
+                        "x-wrtcsig websocket message was not UTF-16 text";
                     return;
                 }
                 this.receive(ev.data);

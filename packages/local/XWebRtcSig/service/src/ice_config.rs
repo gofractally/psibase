@@ -87,6 +87,13 @@ mod tests {
     }
 
     #[test]
+    fn merge_empty_turn_array_uses_default_stun_only() {
+        // XAdmin returns "[]" when unset or unauthorized; welcome must still work.
+        let servers = merged_ice_servers("[]");
+        assert_eq!(servers, default_stun_ice_server_configs());
+    }
+
+    #[test]
     fn merge_appends_valid_turn() {
         let json = r#"[{"urls":["turn:relay.example:3478"],"username":"u","credential":"c"}]"#;
         let servers = merged_ice_servers(json);

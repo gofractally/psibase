@@ -1,3 +1,4 @@
+import type { PendingLedger, PendingLedgerEntry } from "./churn-pending-ledger";
 import type { Page } from "@playwright/test";
 
 import {
@@ -6,22 +7,23 @@ import {
     focusChurnGroupThread,
     resyncOnlineActorsToGroup,
 } from "./chat-ui";
-import type {
-    PendingLedger,
-    PendingLedgerEntry,
-} from "./churn-pending-ledger";
 import {
+    type PendingFlushPages,
     ensureMeshForPendingEntry,
     expectPendingBodyVisible,
     flushPendingDmEntry,
-    type PendingFlushPages,
 } from "./pending-dm-delivery-helpers";
+import { prepareForPendingFlush } from "./pending-flush-prep";
 import {
+    type PartyActor,
     actorAccount,
     groupPeersFor,
-    type PartyActor,
 } from "./random-three-party-churn";
-import { prepareForPendingFlush } from "./pending-flush-prep";
+import {
+    arePeersUsable,
+    readTransportDebugSnapshot,
+    waitForPeersUsable,
+} from "./transport-state-assertions";
 
 export { FLUSH_ENTRY_BUDGET_MS } from "./pending-flush-constants";
 export {
@@ -65,66 +67,58 @@ export async function dumpTransportDeliverySnapshot(
     for (const who of ACTORS) {
         if (!online.has(who) || !pages[who]) continue;
         try {
-            const payload = await pageFor(who, pages).evaluate(
-                (peerAccounts) => {
-                    const transport = (
-                        window as unknown as {
-                            __chatTransportDebug?: {
-                                snapshot?: (remotes: string[]) => unknown;
-                                deliverySnapshot?: () => unknown;
-                                getOutbox?: () => unknown;
-                                events?: () => unknown;
-                                peerState?: (remote: string) => string;
-                                started?: () => boolean;
-                            };
-                        }
-                    ).__chatTransportDebug;
-                    const churn = (
-                        window as unknown as {
-                            __chatChurnState?: () => Record<string, unknown>;
-                        }
-                    ).__chatChurnState?.();
-                    const legacy = (
-                        window as unknown as {
-                            __chatDataDebug?: {
-                                snapshot?: () => unknown;
-                                events?: () => unknown;
-                            };
-                        }
-                    ).__chatDataDebug;
-                    return {
-                        url: location.href,
-                        churn,
-                        transport:
-                            transport?.snapshot?.(peerAccounts) ??
-                            (v2
-                                ? {
-                                      started: transport.started?.(),
-                                      peers: peerAccounts.map((remote) => ({
-                                          remote,
-                                          state: transport.peerState?.(remote),
-                                      })),
-                                  }
-                                : null),
-                        delivery:
-                            transport?.deliverySnapshot?.() ?? transport?.getOutbox?.() ?? null,
-                        routing:
-                            typeof transport?.routingSnapshot === "function"
-                                ? transport.routingSnapshot()
-                                : null,
-                        v2Events:
-                            typeof transport?.events === "function"
-                                ? transport.events()
-                                : null,
-                        chatDataEvents:
-                            legacy?.events?.()?.slice(-40) ?? null,
-                        chatDataSnapshot: legacy?.snapshot?.() ?? null,
-                    };
-                },
-                remotes,
-            );
+            const page = pageFor(who, pages);
+            const snapshot = await readTransportDebugSnapshot(page, remotes);
+            const extra = await page.evaluate(() => {
+                const churn = (
+                    window as unknown as {
+                        __chatChurnState?: () => Record<string, unknown>;
+                    }
+                ).__chatChurnState?.();
+                const transport = (
+                    window as unknown as {
+                        __chatTransportDebug?: {
+                            routingSnapshot?: () => unknown;
+                            events?: () => unknown;
+                        };
+                    }
+                ).__chatTransportDebug;
+                const legacy = (
+                    window as unknown as {
+                        __chatDataDebug?: {
+                            snapshot?: () => unknown;
+                            events?: () => unknown;
+                        };
+                    }
+                ).__chatDataDebug;
+                return {
+                    url: location.href,
+                    churn,
+                    routing:
+                        typeof transport?.routingSnapshot === "function"
+                            ? transport.routingSnapshot()
+                            : null,
+                    v2Events:
+                        typeof transport?.events === "function"
+                            ? transport.events()
+                            : null,
+                    chatDataEvents: legacy?.events?.()?.slice(-40) ?? null,
+                    chatDataSnapshot: legacy?.snapshot?.() ?? null,
+                };
+            });
             console.log(
-                `[random-churn] transport-snapshot ${label} ${who}=${JSON.stringify(payload)}`,
+                `[random-churn] transport-snapshot ${label} ${who}=${JSON.stringify(
+                    {
+                        ...extra,
+                        transport: {
+                            started: snapshot.started,
+                            peers: Object.entries(snapshot.peerStates).map(
+                                ([remote, state]) => ({ remote, state }),
+                            ),
+                        },
+                        delivery: snapshot.delivery,
+                    },
+                )}`,
             );
         } catch (err) {
             console.log(
@@ -216,14 +210,48 @@ async function flushPendingEntry(
 ): Promise<void> {
     const senderPage = pageFor(entry.from, pages);
     const assertMs = perEntryMeshMs(meshTimeoutMs);
+    const senderName = actorAccount(entry.from, names);
+    const recipientName = actorAccount(entry.to, names);
 
-    await ensureMeshForPendingEntry(
-        entry,
-        pages,
-        online,
-        names,
-        meshTimeoutMs,
-    );
+    // Soft path first: wait for transport usable via debug snapshot.
+    // Remesh is escalation only — under STRICT_L4_FLUSH it is a hard failure
+    // (delivery must happen via L4 flush-on-usable, not remesh helpers).
+    const strictL4 =
+        process.env.PSIBASE_E2E_STRICT_L4_FLUSH === "1" ||
+        process.env.PSIBASE_E2E_STRICT_L4_FLUSH === "true";
+    if (online.has(entry.from) && online.has(entry.to)) {
+        const softMs = Math.min(assertMs, strictL4 ? 25_000 : 15_000);
+        const senderReady = await waitForPeersUsable(
+            senderPage,
+            [recipientName],
+            { timeout: softMs },
+        );
+        const recipientPage = pageFor(entry.to, pages);
+        const recipientReady = await waitForPeersUsable(
+            recipientPage,
+            [senderName],
+            { timeout: softMs },
+        );
+        const bothUsable =
+            senderReady &&
+            recipientReady &&
+            (await arePeersUsable(senderPage, [recipientName])) &&
+            (await arePeersUsable(recipientPage, [senderName]));
+        if (!bothUsable) {
+            if (strictL4) {
+                throw new Error(
+                    `[strict-l4-flush] peers not usable without remesh for ${entry.from}->${entry.to} body=${entry.body}`,
+                );
+            }
+            await ensureMeshForPendingEntry(
+                entry,
+                pages,
+                online,
+                names,
+                meshTimeoutMs,
+            );
+        }
+    }
 
     if (entry.channel === "dm") {
         await flushPendingDmEntry({

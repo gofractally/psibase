@@ -5,7 +5,7 @@ import { buildRtcPeerConnectionConfig } from "./ice-config";
 import type { IceServerConfig } from "./protocol";
 import type { WebRtcSignalingClient } from "./webrtc-signaling-client";
 
-/** Mirrors x-webrtcsig welcome payload (STUN only, no TURN). */
+/** Mirrors x-wrtcsig welcome payload (STUN only, no TURN). */
 const STUN_ONLY_WELCOME: IceServerConfig[] = [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun.cloudflare.com:3478" },

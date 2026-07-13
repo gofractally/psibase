@@ -30,7 +30,7 @@ export type DeliveryCoordinatorOptions = {
 export type DeliveryCoordinator = {
     enqueue: (msgId: string, recipient: string) => void;
     flushRemote: (remote: string) => Promise<void>;
-    markInFlight: (msgId: string, recipient: string) => void;
+    /** SoT for delivery leg state; L4 keeps ACK timers only. */
     markAcked: (msgId: string, recipient: string) => void;
     markFailed: (msgId: string, recipient: string, reason: string) => void;
     onAckTimeout: (msgId: string, recipient: string) => void;
@@ -126,8 +126,7 @@ export function createDeliveryCoordinator(
 
                 for (const leg of [...legs.values()].filter(
                     (l) =>
-                        l.recipient === remote &&
-                        l.state === "ensuring_peer",
+                        l.recipient === remote && l.state === "ensuring_peer",
                 )) {
                     const result = options.trySend(leg.msgId, leg.recipient);
                     if (result.ok) {
@@ -158,10 +157,6 @@ export function createDeliveryCoordinator(
 
     const flushRemote = (remote: string) => runFlush(remote);
 
-    const markInFlight = (msgId: string, recipient: string) => {
-        setState(msgId, recipient, "in_flight");
-    };
-
     const markAcked = (msgId: string, recipient: string) => {
         setState(msgId, recipient, "acked");
         options.onAcked(msgId, recipient);
@@ -183,7 +178,6 @@ export function createDeliveryCoordinator(
     return {
         enqueue,
         flushRemote,
-        markInFlight,
         markAcked,
         markFailed,
         onAckTimeout,

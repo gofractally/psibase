@@ -105,7 +105,8 @@ namespace LocalService
       /// This action can be called inside a subjective tx
       AdminOptionsRow options();
 
-      /// JSON array string (possibly empty) of TURN/STUN entries; only x-webrtc-sig may call.
+      /// JSON array string (possibly empty) of TURN/STUN entries; only x-wrtcsig may call.
+      /// Unauthorized callers receive "[]" (no abort) so signaling welcome can fall back to STUN.
       std::string turnIceServersJson();
    };
    PSIO_REFLECT(XAdmin,

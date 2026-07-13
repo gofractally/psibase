@@ -9,7 +9,7 @@ pub mod signaling;
 
 #[cfg(not(test))]
 mod r_transact {
-    #[psibase::service(name = "r-transact", dispatch = false)]
+    #[psibase::service(name = "transact+1", dispatch = false)]
     #[allow(non_snake_case, unused_variables)]
     mod service {
         use psibase::{AccountNumber, HttpReply, HttpRequest};
@@ -62,16 +62,16 @@ mod r_transact {
     }
 }
 
-#[psibase::service(name = "x-webrtcsig", tables = "state::tables")]
+#[psibase::service(name = "x-wrtcsig", tables = "state::tables")]
 #[allow(non_snake_case)]
 mod service {
     use crate::ice_config::merged_ice_servers;
     use crate::protocol::{
         decode_server_frame_json, encode_server_frame, parse_client_frame, validate_client_frame,
-        ClientFrame, ProtocolError, ServerFrame, WEBSOCKET_TEXT, REALTIME_SUBPROTOCOL_V1,
+        ClientFrame, ProtocolError, ServerFrame, REALTIME_SUBPROTOCOL_V1, WEBSOCKET_TEXT,
     };
-    use crate::signaling::dispatch_signaling_client_frame;
     use crate::r_transact::Wrapper as RTransact;
+    use crate::signaling::dispatch_signaling_client_frame;
     use crate::state::subjective::{
         connect_presence_fanout_tx, disconnect_presence_fanout_tx,
         enqueue_pending_outbound_frames_tx, remove_socket_session_tx, socket_session_tx,
@@ -85,7 +85,7 @@ mod service {
     use psibase::services::x_http::Wrapper as XHttp;
     use psibase::{
         account, check, get_sender, services::transact::Wrapper as Transact, AccountNumber,
-        HttpHeader, HttpReply, HttpRequest, MethodNumber,
+        HttpHeader, HttpReply, HttpRequest, MethodNumber, ServiceWrapper,
     };
     use sha1::{Digest, Sha1};
 
@@ -112,7 +112,7 @@ mod service {
         socket: Option<i32>,
         user: Option<AccountNumber>,
     ) -> Option<HttpReply> {
-        RTransact::call_from(account!("http-server")).serveSys(request, socket, user)
+        RTransact::call_from(account!("x-http")).serveSys(request, socket, user)
     }
 
     pub(super) fn route_target(request: &HttpRequest) -> RouteTarget {
@@ -150,10 +150,9 @@ mod service {
 
         let token = bearer_subprotocol_token(request)?;
         let mut request = request.clone();
-        request.headers.push(HttpHeader::new(
-            "Authorization",
-            &format!("Bearer {token}"),
-        ));
+        request
+            .headers
+            .push(HttpHeader::new("Authorization", &format!("Bearer {token}")));
         RTransact::call().getUser(request)
     }
 
@@ -219,26 +218,30 @@ mod service {
         user: Option<AccountNumber>,
     ) -> Result<(i32, AccountNumber, HttpReply), HttpReply> {
         let Some(socket) = socket else {
-            return Err(plain_reply(503, "x-webrtcsig requires a websocket socket"));
+            return Err(plain_reply(503, "x-wrtcsig requires a websocket socket"));
         };
 
         let Some(user) = user else {
             return Err(plain_reply(
                 401,
-                "x-webrtcsig websocket requires authentication",
+                "x-wrtcsig websocket requires authentication",
             ));
         };
 
         let Some(reply) = websocket_handshake(request) else {
             return Err(plain_reply(
                 426,
-                "x-webrtcsig /ws requires websocket subprotocol psibase.realtime.v1",
+                "x-wrtcsig /ws requires websocket subprotocol psibase.realtime.v1",
             ));
         };
 
         Ok((socket, user, reply))
     }
 
+    /// TURN/STUN JSON from x-admin. On failure or empty config, callers pass the
+    /// result through [`merged_ice_servers`], which falls back to default STUN.
+    /// Must be fetched *before* websocket accept so an abort cannot leave a
+    /// hung upgraded socket with no welcome frames.
     fn turn_ice_servers_json() -> String {
         #[cfg(test)]
         {
@@ -246,7 +249,7 @@ mod service {
         }
         #[cfg(not(test))]
         {
-            XAdminWrapper::call_from(account!("x-webrtcsig")).turnIceServersJson()
+            XAdminWrapper::call_from(account!("x-wrtcsig")).turnIceServersJson()
         }
     }
 
@@ -278,8 +281,8 @@ mod service {
         XHttp::call().send(socket, payload.into_bytes(), WEBSOCKET_TEXT);
     }
 
-    fn send_welcome(socket: i32, user: AccountNumber, server_time: i64) {
-        let ice_servers = merged_ice_servers(&turn_ice_servers_json());
+    fn send_welcome(socket: i32, user: AccountNumber, server_time: i64, turn_json: &str) {
+        let ice_servers = merged_ice_servers(turn_json);
         send_frame(
             socket,
             &ServerFrame::Welcome {
@@ -349,14 +352,13 @@ mod service {
         // later `send_frame` aborts on a peer socket whose tcp already died.
         let tear_down_frames = tear_down_signaling_for_dead_socket_tx(socket, now);
         let removed = remove_socket_session_tx(socket);
-        let disconnect_fanout = removed.as_ref().map(|r| {
-            disconnect_presence_fanout_tx(r.user, r.was_final_socket())
-        });
+        let disconnect_fanout = removed
+            .as_ref()
+            .map(|r| disconnect_presence_fanout_tx(r.user, r.was_final_socket()));
 
         #[cfg(feature = "rt-trace")]
         {
-            let teardown_targets: Vec<i32> =
-                tear_down_frames.iter().map(|(s, _)| *s).collect();
+            let teardown_targets: Vec<i32> = tear_down_frames.iter().map(|(s, _)| *s).collect();
             xrtcsig_trace!(
                 "[xrtcsig-trace] cleanup-tear-down sock={} teardown_targets={:?}\n",
                 socket,
@@ -378,8 +380,7 @@ mod service {
         };
         #[cfg(feature = "rt-trace")]
         {
-            let disconnect_targets: Vec<i32> =
-                fanout.peer_deltas.iter().map(|(s, _)| *s).collect();
+            let disconnect_targets: Vec<i32> = fanout.peer_deltas.iter().map(|(s, _)| *s).collect();
             xrtcsig_trace!(
                 "[xrtcsig-trace] cleanup-disconnect sock={} user={} final={} disconnect_targets={:?}\n",
                 socket,
@@ -398,7 +399,7 @@ mod service {
     fn serveSys(request: HttpRequest, socket: Option<i32>) -> Option<HttpReply> {
         check(
             get_sender() == psibase::account!("x-http"),
-            "x-webrtcsig serveSys must be called by x-http",
+            "x-wrtcsig serveSys must be called by x-http",
         );
 
         match route_target(&request) {
@@ -407,10 +408,7 @@ mod service {
                 return rtransact_login(request, socket, user);
             }
             RouteTarget::NotFound => {
-                return Some(plain_reply(
-                    404,
-                    "x-webrtcsig endpoints are /login and /ws",
-                ));
+                return Some(plain_reply(404, "x-wrtcsig endpoints are /login and /ws"));
             }
             RouteTarget::WebSocket => {}
         }
@@ -421,6 +419,10 @@ mod service {
             Err(reply) => return Some(reply),
         };
 
+        // Fetch ICE before accept: XAdmin must not abort after the socket is upgraded.
+        // Empty/unauthorized responses ("[]") still yield default STUN via merged_ice_servers.
+        let turn_json = turn_ice_servers_json();
+
         XHttp::call().accept(socket, reply);
         XHttp::call().setCallback(
             socket,
@@ -429,12 +431,11 @@ mod service {
         );
         let now = Transact::call().currentBlock().time.microseconds;
         upsert_session_tx(socket, user, now);
-        send_welcome(socket, user, now);
+        send_welcome(socket, user, now, &turn_json);
         let fanout = connect_presence_fanout_tx(user);
         #[cfg(feature = "rt-trace")]
         {
-            let peer_targets: Vec<i32> =
-                fanout.peer_deltas.iter().map(|(s, _)| *s).collect();
+            let peer_targets: Vec<i32> = fanout.peer_deltas.iter().map(|(s, _)| *s).collect();
             xrtcsig_trace!(
                 "[xrtcsig-trace] accept sock={} user={} peer_delta_targets={:?}\n",
                 socket,
@@ -455,15 +456,13 @@ mod service {
     fn recv(socket: i32, data: Vec<u8>, flags: u32) {
         check(
             get_sender() == psibase::account!("x-http"),
-            "x-webrtcsig recv must be called by x-http",
+            "x-wrtcsig recv must be called by x-http",
         );
 
         if flags != WEBSOCKET_TEXT {
             send_protocol_error(
                 socket,
-                ProtocolError::InvalidFrame(
-                    "x-webrtcsig only accepts websocket text frames".into(),
-                ),
+                ProtocolError::InvalidFrame("x-wrtcsig only accepts websocket text frames".into()),
             );
             return;
         }
@@ -472,7 +471,7 @@ mod service {
         let Some(session) = session else {
             send_protocol_error(
                 socket,
-                ProtocolError::InvalidFrame("socket is not an active x-webrtcsig session".into()),
+                ProtocolError::InvalidFrame("socket is not an active x-wrtcsig session".into()),
             );
             return;
         };
@@ -528,7 +527,7 @@ mod service {
                     send_protocol_error(
                         socket,
                         ProtocolError::InvalidFrame(
-                            "socket is not an active x-webrtcsig session".into(),
+                            "socket is not an active x-wrtcsig session".into(),
                         ),
                     );
                 } else {
@@ -542,8 +541,7 @@ mod service {
                 flush_pending_outbound_for_socket(socket);
             }
             session_frame => {
-                let dispatch =
-                    dispatch_signaling_client_frame(socket, user, now, session_frame);
+                let dispatch = dispatch_signaling_client_frame(socket, user, now, session_frame);
                 #[cfg(feature = "rt-trace")]
                 {
                     let dispatch_targets: Vec<i32> =
@@ -569,7 +567,7 @@ mod service {
     fn close(socket: i32) {
         check(
             get_sender() == psibase::account!("x-http"),
-            "x-webrtcsig close must be called by x-http",
+            "x-wrtcsig close must be called by x-http",
         );
         handle_socket_cleanup(socket);
     }
@@ -579,7 +577,7 @@ mod service {
         let _ = reply;
         check(
             get_sender() == psibase::account!("x-http"),
-            "x-webrtcsig errSys must be called by x-http",
+            "x-wrtcsig errSys must be called by x-http",
         );
         handle_socket_cleanup(socket);
     }
@@ -588,8 +586,8 @@ mod service {
 #[cfg(test)]
 mod tests {
     use super::protocol::{
-        encode_server_frame, parse_client_frame, validate_client_frame, ClientFrame,
-        ProtocolError, ServerFrame, REALTIME_SUBPROTOCOL_V1,
+        encode_server_frame, parse_client_frame, validate_client_frame, ClientFrame, ProtocolError,
+        ServerFrame, REALTIME_SUBPROTOCOL_V1,
     };
     use super::service::{
         accept_key, bearer_subprotocol_token, header_contains, route_target, websocket_handshake,
@@ -746,7 +744,7 @@ mod tests {
 
     fn http_request(method: &str, target: &str, headers: Vec<HttpHeader>) -> HttpRequest {
         HttpRequest {
-            host: "x-webrtcsig.test".into(),
+            host: "x-wrtcsig.test".into(),
             method: method.into(),
             target: target.into(),
             contentType: String::new(),

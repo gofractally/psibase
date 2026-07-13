@@ -1,4 +1,4 @@
-#[psibase::service]
+#[psibase::service(name = "chat+1")]
 #[allow(non_snake_case)]
 mod service {
     use async_graphql::*;
@@ -212,8 +212,8 @@ mod service {
         user: Option<AccountNumber>,
     ) -> Option<HttpReply> {
         check(
-            get_sender() == AccountNumber::from("http-server"),
-            "permission denied: serveSys only callable by 'http-server'",
+            get_sender() == psibase::services::http_server::SERVICE,
+            "permission denied: serveSys only callable by 'http'",
         );
 
         None.or_else(|| serve_graphql(&request, Query { user }))

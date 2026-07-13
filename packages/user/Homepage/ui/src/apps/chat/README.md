@@ -102,6 +102,6 @@ relay). A single “connection per user” cannot carry group fan-out without ch
 that shape. **Meet** may also remain a separate negotiated session per Space even
 if chat-data pooling lands later.
 
-**Prerequisite work:** x-webrtcsig session model, join/roster/initiator rules, and
+**Prerequisite work:** x-wrtcsig session model, join/roster/initiator rules, and
 orchestrator runs are **space/session-centric** today; pooling requires a deliberate
 signaling + client refactor, not a UI-only change.

@@ -5,6 +5,41 @@ gaps are noticed during incident triage; pick from it during planned test
 hardening sprints. Items marked `[regression]` correspond to bugs that have
 been fixed in code but lack a dedicated guard.
 
+## Opt-in / diagnostic specs (not default `yarn e2e`)
+
+| Spec                                    | How to run                                                                                        |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `chat-dm-sidebar-click-debug.spec.ts`   | `yarn e2e:dm-click-debug` (or `PSIBASE_E2E_DM_CLICK_DEBUG=1` / `PSIBASE_E2E_DM_CLICK_SCENARIO=…`) |
+| `diag-auth-shell.spec.ts`               | `PSIBASE_E2E_DIAG_AUTH=1 yarn e2e e2e/tests/diag-auth-shell.spec.ts`                              |
+| `chat-group-three-party-random.spec.ts` | `yarn e2e:random-churn` / `PSIBASE_E2E_RANDOM_CHURN_RUNS=2`                                       |
+
+DM sidebar helpers scope clicks to the **Direct Messages** panel so group row
+aria-labels (`alice, bob`) are not mistaken for DM rows.
+
+## P2 gaps (webrtc-code-review.md) — landed vs remaining
+
+| Item                                                | Status                                                                                                                     |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| 13 Non-mocked L3→L4 opaque bytes                    | **Landed** — `transport/stack-opaque-bytes.integration.test.ts`                                                            |
+| 13 ICE/DC fail → recover → L4 flush                 | **Landed** (stack, mocked PC) — `pc_failed` / DC `transportLost` → usable → flush                                          |
+| 14 Token expiry mid-WS                              | **Partial** — RealtimeClient null-token reconnect + error-frame units; no mid-session bearer revalidation in XWebRtcSig    |
+| 14 Duplicate `clientMsgId`                          | **Partial** — store dedupe + stack double-inbound (L4 notifies twice; store owns dedupe)                                   |
+| 14 Partial group ACK                                | **Landed** (L4 unit) — one ACK → partial counts; second → DELIVERED; offline peer stays partial                            |
+| 14 `transportLost`                                  | **Landed** (stack) — recover→usable→flush; queue-during-recover                                                            |
+| 14 Reconnect-during-in-flight                       | **Landed** (stack) — welcome mid-ACK; ≤1 re-flush of same `clientMsgId`                                                    |
+| 15 Shrink e2e god-flush                             | **Partial** — `chat-dm-l4-flush-strict.spec.ts`; `PSIBASE_E2E_STRICT_L4_FLUSH=1` fails remesh escalation                   |
+| 16 Meet peer negotiation/`ontrack`                  | Remaining                                                                                                                  |
+| 16 Decline/timeout Meet e2e                         | **Landed** — `meet-dm-decline-timeout.spec.ts`                                                                             |
+| 16 Meet factory / SharedMeetPeer ensure fail        | **Partial** — factory hard-fail + SharedMeetPeer ensure-reject / peer-missing units                                        |
+| 16 Outgoing DM Connected vs delayed sessionSnapshot | **Landed** — `participantJoined` promotes local roster (`promoteAvCallParticipantToJoined`); clears 20s ring-timeout flake |
+
+### Concrete next specs (prefer unit/stack over heavy e2e)
+
+1. **True mid-session bearer expiry** — needs XWebRtcSig revalidation (not implemented); client null-token + `transportLost` cover reconnect today.
+2. **Wire e2e for duplicate `clientMsgId`** — assert single UI row after double delivery.
+3. **FakePeerConnection through full stack** — real ICE fail path without mock peer.
+4. **Meet `ontrack` / negotiation units** — SharedMeetPeer media path.
+
 ## End-to-end (Playwright, `e2e/tests/…`)
 
 ### Realtime + WebRTC
@@ -30,7 +65,7 @@ been fixed in code but lack a dedicated guard.
   repeatedly during an active DM; verify the peer connection is rebuilt
   cleanly each time and no signals are lost.
 - `chat-dm-signaling-arrival-before-shell.spec.ts` `[regression]` — force
-  alice's offer to land on bob's WS *before* bob's chat shell mounts (the
+  alice's offer to land on bob's WS _before_ bob's chat shell mounts (the
   exact race we just fixed). Assert it is buffered server-side and
   delivered atomically on bob's `joinSession`.
 - `chat-3-party-presence.spec.ts` — alice/bob/carol online; carol opens

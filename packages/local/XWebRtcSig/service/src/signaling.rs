@@ -18,20 +18,19 @@
 use std::collections::BTreeSet;
 
 use psibase::services::chat::{self, Wrapper as Chat};
-use psibase::AccountNumber;
-use psibase::ExactAccountNumber;
+use psibase::{AccountNumber, ExactAccountNumber, ServiceWrapper};
 
 use crate::protocol::{
     decode_server_frame_json, encode_server_frame, ChatAppMetadata, ClientFrame, DataChannelSpec,
     ServerFrame, SignalKind,
 };
+use crate::state::tables::SigSessionJoinRow;
 use crate::state::{
     enqueue_pending_signal, erase_sig_session_join, live_sockets_for_user, put_sig_session_join,
     sig_join_row, sig_joins_for_session, sig_joins_for_socket, take_pending_signal_payloads,
 };
 #[cfg(feature = "rt-trace")]
 use crate::trace::xrtcsig_trace;
-use crate::state::tables::SigSessionJoinRow;
 
 pub const APP_SERVICE_CHAT: &str = "chat";
 pub const PURPOSE_CHAT_DATA: &str = "chat-data";
@@ -45,7 +44,7 @@ pub(crate) const EVENT_SESSION_FAILED: u8 = 3;
 pub(crate) const EVENT_SESSION_ENDED: u8 = 4;
 
 fn sig_service() -> AccountNumber {
-    psibase::account!("x-webrtcsig")
+    psibase::account!("x-wrtcsig")
 }
 
 fn leave_lifecycle_event_kind(
@@ -132,12 +131,8 @@ fn session_invite_payload(auth: &chat::SessionJoinAuth) -> (Vec<String>, Vec<Dat
 }
 
 pub fn session_invite_frame(auth: &chat::SessionJoinAuth, from: AccountNumber) -> ServerFrame {
-    let participants: Vec<ExactAccountNumber> = auth
-        .participants
-        .iter()
-        .copied()
-        .map(Into::into)
-        .collect();
+    let participants: Vec<ExactAccountNumber> =
+        auth.participants.iter().copied().map(Into::into).collect();
     let (transports, data_channels) = session_invite_payload(auth);
     ServerFrame::SessionInvite {
         session_id: auth.session_id.clone(),
@@ -194,10 +189,7 @@ fn fanout_participant_joined(
 /// frame ready to broadcast. Pending participants are the auth-list members
 /// not currently joined. The epoch is `joined.len()` so clients can detect
 /// changes monotonically even without comparing lists.
-fn build_session_snapshot(
-    session_id: &str,
-    participants: &[AccountNumber],
-) -> ServerFrame {
+fn build_session_snapshot(session_id: &str, participants: &[AccountNumber]) -> ServerFrame {
     let mut joined_accounts: Vec<AccountNumber> = Vec::new();
     for row in sig_joins_for_session(session_id) {
         if !joined_accounts.iter().any(|a| *a == row.account) {
@@ -402,15 +394,8 @@ fn join_session_subjective(
     auth: chat::SessionJoinAuth,
 ) -> Vec<(i32, ServerFrame)> {
     let prior = sig_join_row(&session_id, user);
-    let duplicate_same_socket =
-        prior.as_ref().is_some_and(|row| row.socket == socket);
-    record_join(
-        &session_id,
-        user,
-        socket,
-        &client_instance_id,
-        now,
-    );
+    let duplicate_same_socket = prior.as_ref().is_some_and(|row| row.socket == socket);
+    record_join(&session_id, user, socket, &client_instance_id, now);
     crate::cleanup::note_session_activity(&session_id, now);
 
     // Deliver any signals buffered while this user had no joined socket.
@@ -462,7 +447,10 @@ fn join_session_subjective(
         out.extend(flushed);
         // F1: include the current snapshot so the retrying client sees the
         // same roster every other peer sees.
-        out.push((socket, build_session_snapshot(&session_id, &auth.participants)));
+        out.push((
+            socket,
+            build_session_snapshot(&session_id, &auth.participants),
+        ));
         return out;
     }
 
@@ -497,14 +485,7 @@ fn join_session_subjective_frames(
     now: i64,
     auth: chat::SessionJoinAuth,
 ) -> Vec<(i32, ServerFrame)> {
-    join_session_subjective(
-        socket,
-        user,
-        session_id,
-        client_instance_id,
-        now,
-        auth,
-    )
+    join_session_subjective(socket, user, session_id, client_instance_id, now, auth)
 }
 
 fn join_session_subjective_tx_subjective(
@@ -535,14 +516,7 @@ fn join_session_subjective_tx(
     now: i64,
     auth: chat::SessionJoinAuth,
 ) -> Vec<(i32, ServerFrame)> {
-    join_session_subjective_tx_subjective(
-        socket,
-        user,
-        session_id,
-        client_instance_id,
-        now,
-        auth,
-    )
+    join_session_subjective_tx_subjective(socket, user, session_id, client_instance_id, now, auth)
 }
 
 pub fn handle_join_session(
@@ -556,14 +530,7 @@ pub fn handle_join_session(
     if let Some(err) = join_session_auth_errors(socket, &session_id, &auth) {
         return err;
     }
-    join_session_subjective_tx(
-        socket,
-        user,
-        session_id,
-        client_instance_id,
-        now,
-        auth,
-    )
+    join_session_subjective_tx(socket, user, session_id, client_instance_id, now, auth)
 }
 
 fn validate_signal_in_tx(
@@ -881,10 +848,7 @@ pub(crate) fn tear_down_sessions_for_dead_socket_subjective(
     out
 }
 
-fn tear_down_sessions_for_dead_socket_inner(
-    dead_socket: i32,
-    now: i64,
-) -> Vec<(i32, ServerFrame)> {
+fn tear_down_sessions_for_dead_socket_inner(dead_socket: i32, now: i64) -> Vec<(i32, ServerFrame)> {
     ::psibase::subjective_tx! {
         tear_down_sessions_for_dead_socket_subjective(dead_socket, now)
     }
@@ -898,10 +862,7 @@ pub(crate) fn tear_down_sessions_for_dead_socket_tx(
 }
 
 /// Tear down subjective joins for a dead socket (caller sends frames).
-pub fn tear_down_sessions_for_dead_socket(
-    dead_socket: i32,
-    now: i64,
-) -> Vec<(i32, ServerFrame)> {
+pub fn tear_down_sessions_for_dead_socket(dead_socket: i32, now: i64) -> Vec<(i32, ServerFrame)> {
     tear_down_sessions_for_dead_socket_tx(dead_socket, now)
 }
 
@@ -957,7 +918,7 @@ pub fn dispatch_signaling_client_frame(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use psibase::AccountNumber;
+    use psibase::*;
 
     #[test]
     fn av_call_leave_event_kind_maps_ringing_timeout_to_failed() {
@@ -1021,15 +982,12 @@ mod tests {
             authorized: true,
             purpose: PURPOSE_CHAT_DATA.into(),
             space_uuid: "space:dm-1".into(),
-            participants: vec![
-                AccountNumber::from("alice"),
-                AccountNumber::from("bob"),
-            ],
+            participants: vec![account!("alice"), account!("bob")],
             lifecycle: 1,
             expires_at: 99,
             expired: false,
         };
-        let frame = session_invite_frame(&auth, AccountNumber::from("alice"));
+        let frame = session_invite_frame(&auth, account!("alice"));
         match frame {
             ServerFrame::SessionInvite {
                 app_service,
@@ -1065,15 +1023,12 @@ mod tests {
             authorized: true,
             purpose: PURPOSE_AV_CALL.into(),
             space_uuid: "space:dm-1".into(),
-            participants: vec![
-                AccountNumber::from("alice"),
-                AccountNumber::from("bob"),
-            ],
+            participants: vec![account!("alice"), account!("bob")],
             lifecycle: 1,
             expires_at: 99,
             expired: false,
         };
-        let frame = session_invite_frame(&auth, AccountNumber::from("alice"));
+        let frame = session_invite_frame(&auth, account!("alice"));
         match frame {
             ServerFrame::SessionInvite {
                 app_service,
@@ -1100,16 +1055,12 @@ mod tests {
             authorized: true,
             purpose: PURPOSE_CHAT_DATA.into(),
             space_uuid: "space:group-1".into(),
-            participants: vec![
-                AccountNumber::from("alice"),
-                AccountNumber::from("bob"),
-                AccountNumber::from("carol"),
-            ],
+            participants: vec![account!("alice"), account!("bob"), account!("carol")],
             lifecycle: 1,
             expires_at: 99,
             expired: false,
         };
-        let frame = session_invite_frame(&auth, AccountNumber::from("alice"));
+        let frame = session_invite_frame(&auth, account!("alice"));
         match frame {
             ServerFrame::SessionInvite {
                 participants,
@@ -1133,16 +1084,12 @@ mod tests {
             authorized: true,
             purpose: PURPOSE_AV_CALL.into(),
             space_uuid: "space:group-1".into(),
-            participants: vec![
-                AccountNumber::from("alice"),
-                AccountNumber::from("bob"),
-                AccountNumber::from("carol"),
-            ],
+            participants: vec![account!("alice"), account!("bob"), account!("carol")],
             lifecycle: 1,
             expires_at: 99,
             expired: false,
         };
-        let frame = session_invite_frame(&auth, AccountNumber::from("alice"));
+        let frame = session_invite_frame(&auth, account!("alice"));
         match frame {
             ServerFrame::SessionInvite {
                 participants,

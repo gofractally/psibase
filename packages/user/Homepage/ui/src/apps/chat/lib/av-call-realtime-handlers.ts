@@ -1,17 +1,18 @@
+import type { GroupMeetRunContext } from "./group-meet-attempt-coordinator";
+import type { ServerRealtimeFrame } from "./realtime-protocol";
+
 import { avCallLog, shortSessionId, shortSpaceId } from "./av-call-debug";
 import { syncMeshAvCallPeers } from "./av-call-group-orchestrator";
-import type { GroupMeetRunContext } from "./group-meet-attempt-coordinator";
-import { normalizeAvCallTerminalReason } from "./av-call-terminal";
-import { closeAvCallSession } from "./chat-api";
 import {
-    dmPeerAccount,
-    isGroupMembers,
     type AvCallOrchestratorHost,
     type AvCallSpaceRun,
     type DmAvCallRun,
     type GroupAvCallRun,
+    dmPeerAccount,
+    isGroupMembers,
 } from "./av-call-session-types";
-import type { ServerRealtimeFrame } from "./realtime-protocol";
+import { normalizeAvCallTerminalReason } from "./av-call-terminal";
+import { closeAvCallSession } from "./chat-api";
 import { WebRtcSignalingClient } from "./webrtc-signaling-client";
 
 function avCallTransportsWantVideo(transports: readonly string[]): boolean {
@@ -99,9 +100,7 @@ function onSessionInvite(
     const spaceUuid = frame.appMetadata.spaceUuid;
 
     const existing = host.getRun(spaceUuid);
-    const existingPhase = existing
-        ? host.liveSnapshot(existing).phase
-        : "idle";
+    const existingPhase = existing ? host.liveSnapshot(existing).phase : "idle";
 
     if (isGroup) {
         if (
@@ -167,7 +166,9 @@ function onSessionInvite(
             sessionId: frame.sessionId,
             signalingJoined: false,
             mediaConnected:
-                existing.kind === "dm" ? false : existing.snapshot.mediaConnected,
+                existing.kind === "dm"
+                    ? false
+                    : existing.snapshot.mediaConnected,
             meshPeerSignalingReady:
                 existing.kind === "group"
                     ? {}
@@ -201,7 +202,10 @@ function onSessionInvite(
                 transportRecoveryAttempt: 0,
                 awaitingInviteAccept: true,
                 onUpdate: () => {
-                    host.onSpaceUpdate?.(spaceUuid, host.liveSnapshot(groupRun));
+                    host.onSpaceUpdate?.(
+                        spaceUuid,
+                        host.liveSnapshot(groupRun),
+                    );
                 },
             };
             host.setRun(spaceUuid, groupRun);
@@ -282,7 +286,7 @@ function onSignal(
 
     const from =
         run.kind === "group"
-            ? frame.from ?? run.members.find((member) => member !== self)
+            ? (frame.from ?? run.members.find((member) => member !== self))
             : frame.from;
     if (!from || from === self) {
         avCallLog("onSignal: missing or self from");
@@ -311,13 +315,13 @@ function findRunForParticipantJoined(
 
     for (const candidate of host.getRuns()) {
         if (candidate.snapshot.phase === "failed") continue;
-        if (candidate.snapshot.sessionId && candidate.snapshot.sessionId !== sessionId) {
+        if (
+            candidate.snapshot.sessionId &&
+            candidate.snapshot.sessionId !== sessionId
+        ) {
             continue;
         }
-        if (
-            candidate.kind === "dm" &&
-            candidate.peerAccount === participant
-        ) {
+        if (candidate.kind === "dm" && candidate.peerAccount === participant) {
             return candidate;
         }
         if (
@@ -396,7 +400,8 @@ function onParticipantJoined(
         run.kind === "group" ? run.meshPeers.get(frame.participant) : undefined;
     const establishedMesh =
         run.kind === "group" &&
-        (run.snapshot.phase === "ready" || run.snapshot.phase === "signaling") &&
+        (run.snapshot.phase === "ready" ||
+            run.snapshot.phase === "signaling") &&
         meshPeer !== undefined &&
         !meshPeer.isDisposed &&
         (meshPeer.isMediaConnected || meshPeer.getRemoteStream() != null);
@@ -426,6 +431,9 @@ function onParticipantJoined(
         sessionId: frame.sessionId,
         participant: frame.participant,
     });
+    // Keep local roster in sync even if sessionSnapshot is delayed/missing —
+    // outgoing DM Connected UI gates on joinedParticipants.
+    host.promoteAvCallParticipantToJoined?.(frame.sessionId, frame.participant);
     if (
         run.kind === "group" &&
         self &&
@@ -438,6 +446,7 @@ function onParticipantJoined(
         }
     }
     host.onPeerOnline(frame.participant);
+    run.onUpdate();
 }
 
 function onSessionEnded(
@@ -481,9 +490,9 @@ function onSessionEnded(
         frame.reason === "left" &&
         frame.by &&
         host.isAvCallPendingRejoin?.(frame.sessionId, frame.by) &&
-        host.getAvCallSessionPendingParticipants?.(frame.sessionId)?.includes(
-            frame.by,
-        )
+        host
+            .getAvCallSessionPendingParticipants?.(frame.sessionId)
+            ?.includes(frame.by)
     ) {
         avCallLog("sessionEnded ignored (stale leave while rejoin pending)", {
             sessionId: shortSessionId(frame.sessionId),
@@ -505,11 +514,7 @@ function onSessionEnded(
         })
         .then(() => {
             if (run.snapshot.phase === "failed") {
-                host.recordAvCallSessionSnapshot?.(
-                    frame.sessionId,
-                    [],
-                    [],
-                );
+                host.recordAvCallSessionSnapshot?.(frame.sessionId, [], []);
                 host.onInviteCleared?.(frame.sessionId);
                 // Group meet reuses the same objective session after everyone
                 // leaves; retiring here would drop the next sessionInvite fanout.
@@ -588,16 +593,10 @@ export function wireAvCallRealtimeHandlers(
                 ) {
                     return;
                 }
-                void host.recoverStaleAvCallSession?.(
-                    run,
-                    frame.sessionId,
-                );
+                void host.recoverStaleAvCallSession?.(run, frame.sessionId);
                 return;
             }
-            host.fail(
-                run,
-                `${frame.code}: ${frame.reason}`.slice(0, 500),
-            );
+            host.fail(run, `${frame.code}: ${frame.reason}`.slice(0, 500));
         },
     });
     avCallLog("realtime handlers installed");

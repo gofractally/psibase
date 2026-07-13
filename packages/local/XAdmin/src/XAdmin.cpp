@@ -769,8 +769,8 @@ namespace LocalService
 
    std::string XAdmin::turnIceServersJson()
    {
-      const auto sender = getSender();
-      check(sender == psibase::AccountNumber{"x-webrtcsig"}, "Wrong sender");
+      if (getSender() != psibase::AccountNumber{"x-wrtcsig"})
+         return "[]";
       std::optional<std::string> json;
       PSIBASE_SUBJECTIVE_TX
       {

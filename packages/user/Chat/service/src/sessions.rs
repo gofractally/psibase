@@ -6,8 +6,8 @@ use crate::spaces::{
 };
 use crate::tables::SPACE_KIND_GROUP;
 use crate::tables::{
-    SessionEventRow, SessionEventTable, SessionParticipantRow, SessionParticipantTable,
-    SessionRow, SessionTable,
+    SessionEventRow, SessionEventTable, SessionParticipantRow, SessionParticipantTable, SessionRow,
+    SessionTable,
 };
 
 pub const PURPOSE_CHAT_DATA: &str = "chat-data";
@@ -176,10 +176,7 @@ pub fn parse_pair_session_id(session_id: &str) -> Option<Vec<AccountNumber>> {
     if lower.is_empty() || higher.is_empty() {
         return None;
     }
-    Some(vec![
-        AccountNumber::from(lower),
-        AccountNumber::from(higher),
-    ])
+    Some(vec![lower.parse().ok()?, higher.parse().ok()?])
 }
 
 pub fn is_pair_session_id(session_id: &str) -> bool {
@@ -232,13 +229,8 @@ pub fn allocate_unique_session_id(
     created_by: AccountNumber,
 ) -> (String, i64) {
     loop {
-        let session_id = allocate_session_id(
-            space_uuid,
-            purpose,
-            participants,
-            created_at,
-            created_by,
-        );
+        let session_id =
+            allocate_session_id(space_uuid, purpose, participants, created_at, created_by);
         if session_row(&session_id).is_none() {
             return (session_id, created_at);
         }
@@ -247,7 +239,9 @@ pub fn allocate_unique_session_id(
 }
 
 pub fn session_row(session_id: &str) -> Option<SessionRow> {
-    SessionTable::read().get_index_pk().get(&session_id.to_owned())
+    SessionTable::read()
+        .get_index_pk()
+        .get(&session_id.to_owned())
 }
 
 pub fn participants_of_session(session_id: &str) -> Vec<AccountNumber> {
@@ -304,16 +298,10 @@ pub fn create_session(
         )));
     }
     ensure_sender_is_member(space_uuid, sender)?;
-    let space_row = space_row(space_uuid).ok_or_else(|| {
-        SessionError::UnknownSpace(format!("unknown space {space_uuid}"))
-    })?;
+    let space_row = space_row(space_uuid)
+        .ok_or_else(|| SessionError::UnknownSpace(format!("unknown space {space_uuid}")))?;
     let space_members = canonical_space_members(members_of(space_uuid));
-    let resolved = participants_for_session(
-        space_row.kind,
-        purpose,
-        &space_members,
-        &participants,
-    );
+    let resolved = participants_for_session(space_row.kind, purpose, &space_members, &participants);
     let participants = validate_session_participants(sender, &space_members, &resolved)?;
 
     let mut session_created_at = now;
@@ -376,7 +364,11 @@ pub fn is_session_participant(session_id: &str, account: AccountNumber) -> bool 
         .is_some()
 }
 
-pub fn authorize_session_join(session_id: &str, account: AccountNumber, now: i64) -> SessionJoinAuth {
+pub fn authorize_session_join(
+    session_id: &str,
+    account: AccountNumber,
+    now: i64,
+) -> SessionJoinAuth {
     if let Some(pair_auth) = authorize_pair_session_join(session_id, account) {
         return pair_auth;
     }
@@ -435,7 +427,7 @@ fn session_event_exists(session_id: &str, kind: u8, account: AccountNumber) -> b
         .any(|row| row.session_id == session_id && row.kind == kind && row.account == account)
 }
 
-/// Participant-committed lifecycle event after x-webrtcsig join/leave (objective write).
+/// Participant-committed lifecycle event after x-wrtcsig join/leave (objective write).
 pub fn commit_webrtc_session_event(
     session_id: &str,
     kind: u8,
@@ -449,9 +441,8 @@ pub fn commit_webrtc_session_event(
         )));
     }
 
-    let row = session_row(session_id).ok_or_else(|| {
-        SessionError::UnknownSession(format!("unknown session {session_id}"))
-    })?;
+    let row = session_row(session_id)
+        .ok_or_else(|| SessionError::UnknownSession(format!("unknown session {session_id}")))?;
     if row.lifecycle != SESSION_LIFECYCLE_ACTIVE {
         return Err(SessionError::SessionNotActive(format!(
             "session {session_id} is not active"
@@ -483,10 +474,7 @@ pub fn commit_webrtc_session_event(
     )
 }
 
-pub fn apply_webrtc_session_event(
-    event: WebRtcSessionEvent,
-    now: i64,
-) -> Result<(), SessionError> {
+pub fn apply_webrtc_session_event(event: WebRtcSessionEvent, now: i64) -> Result<(), SessionError> {
     let row = session_row(&event.session_id).ok_or_else(|| {
         SessionError::UnknownSession(format!("unknown session {}", event.session_id))
     })?;
@@ -528,9 +516,8 @@ pub fn close_session(
     sender: AccountNumber,
     now: i64,
 ) -> Result<(), SessionError> {
-    let row = session_row(session_id).ok_or_else(|| {
-        SessionError::UnknownSession(format!("unknown session {session_id}"))
-    })?;
+    let row = session_row(session_id)
+        .ok_or_else(|| SessionError::UnknownSession(format!("unknown session {session_id}")))?;
     if !is_session_participant(session_id, sender) {
         return Err(SessionError::NotMember(format!(
             "account is not a participant in session {session_id}"
@@ -541,13 +528,7 @@ pub fn close_session(
             "session {session_id} is not active"
         )));
     }
-    append_session_event(
-        session_id,
-        SESSION_EVENT_SESSION_ENDED,
-        sender,
-        reason,
-        now,
-    );
+    append_session_event(session_id, SESSION_EVENT_SESSION_ENDED, sender, reason, now);
     let mut updated = row;
     updated.lifecycle = SESSION_LIFECYCLE_ENDED;
     SessionTable::new().put(&updated).unwrap();
@@ -573,12 +554,8 @@ mod unit_tests {
         let carol = AccountNumber::from("carol");
         let members = vec![alice, bob, carol];
 
-        let resolved = participants_for_session(
-            SPACE_KIND_GROUP,
-            PURPOSE_CHAT_DATA,
-            &members,
-            &[alice, bob],
-        );
+        let resolved =
+            participants_for_session(SPACE_KIND_GROUP, PURPOSE_CHAT_DATA, &members, &[alice, bob]);
         assert_eq!(resolved, vec![alice, bob, carol]);
     }
 
@@ -604,12 +581,8 @@ mod unit_tests {
         let carol = AccountNumber::from("carol");
         let members = vec![alice, bob, carol];
 
-        let resolved = participants_for_session(
-            SPACE_KIND_GROUP,
-            PURPOSE_AV_CALL,
-            &members,
-            &[alice, bob],
-        );
+        let resolved =
+            participants_for_session(SPACE_KIND_GROUP, PURPOSE_AV_CALL, &members, &[alice, bob]);
         assert_eq!(resolved, vec![alice, bob, carol]);
     }
 

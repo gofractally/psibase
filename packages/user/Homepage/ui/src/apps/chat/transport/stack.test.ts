@@ -1,20 +1,21 @@
+import type { ChatDataPeerHandlers } from "../lib/chat-data-webrtc-peer";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-    serializeChatDataMessage,
     type ChatDataMessageEnvelope,
+    serializeChatDataMessage,
 } from "../lib/chat-data-envelope";
-import type { ChatDataPeerHandlers } from "../lib/chat-data-webrtc-peer";
+import { createChatTransportStack } from "./stack";
 import {
+    FakeRealtimeClient,
+    createStackFixture,
+    createThreePartyStacks,
     createTwoPartyHub,
     createTwoPartyStacks,
-    createThreePartyStacks,
-    createStackFixture,
     establishPair,
-    FakeRealtimeClient,
     pairIdFor,
 } from "./stack-test-harness";
-import { createChatTransportStack } from "./stack";
 import { IN_FLIGHT_ACK_WAIT_MS, MAX_VALID_ATTEMPTS } from "./types";
 
 vi.mock("../lib/chat-data-debug", () => ({
@@ -79,6 +80,20 @@ const peerMock = vi.hoisted(() => {
             return this.disposed;
         }
 
+        sendWireBytes(bytes: Uint8Array): boolean {
+            if (!this.dataChannelReady) return false;
+            const raw = new TextDecoder().decode(bytes);
+            try {
+                const envelope = JSON.parse(raw) as ChatDataMessageEnvelope;
+                if (envelope.t === "chatMessage") {
+                    this.pendingOutbound.push(envelope);
+                }
+            } catch {
+                /* ignore non-JSON for tests that only assert delivery */
+            }
+            return true;
+        }
+
         sendChatMessage(envelope: ChatDataMessageEnvelope): boolean {
             if (!this.dataChannelReady) return false;
             this.pendingOutbound.push(envelope);
@@ -104,6 +119,16 @@ const peerMock = vi.hoisted(() => {
         restartIce(): void {}
 
         stopMeetMedia(): void {}
+
+        /** Simulate PC/ICE failure → L3 onFailed → recover. */
+        fireFailed(detail = "pc_failed"): void {
+            this.handlers.onFailed?.(detail);
+        }
+
+        /** Simulate DC/transport loss → L3 onTransportLost → recover. */
+        fireTransportLost(): void {
+            this.handlers.onTransportLost?.();
+        }
 
         dispose(): void {
             this.disposed = true;
@@ -327,7 +352,10 @@ describe("createChatTransportStack integration", () => {
         const { alice, bob } = createTwoPartyStacks(hub);
         await establishPair(hub, alice, bob);
 
-        const handleSpy = vi.spyOn(bob.stack.peerRegistry, "handleRemoteSignal");
+        const handleSpy = vi.spyOn(
+            bob.stack.peerRegistry,
+            "handleRemoteSignal",
+        );
 
         bob.rt.dispatch({
             t: "signal",
@@ -363,6 +391,50 @@ describe("createChatTransportStack integration", () => {
             "bob",
             "signaling_transport_lost",
         );
+        void bob;
+    });
+
+    it("transportLost recover restores usable peer and flushes pending send", async () => {
+        const hub = createTwoPartyHub();
+        const { alice, bob } = createTwoPartyStacks(hub);
+        await establishPair(hub, alice, bob);
+        hub.setPresence("bob", true);
+        expect(alice.stack.peerRegistry.getState("bob")).toBe("usable");
+
+        const pairId = pairIdFor("alice", "bob");
+        alice.rt.dispatch({
+            t: "transportLost",
+            sessionId: pairId,
+            participant: "bob",
+        });
+
+        // Recover drops the PC then renegotiates; mock peer re-opens DC.
+        await vi.advanceTimersByTimeAsync(0);
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(alice.stack.peerRegistry.getState("bob")).toBe("usable");
+
+        const { msgId } = await alice.stack.messaging.send({
+            spaceUuid: "space:dm",
+            recipient: "bob",
+            body: "after transportLost",
+        });
+        await Promise.resolve();
+
+        const alicePeer = mockPeers.find(
+            (p) =>
+                !p.isDisposed &&
+                p.selfAccount === "alice" &&
+                p.peerAccount === "bob",
+        );
+        expect(alicePeer?.drainPendingOutbound()).toEqual([
+            expect.objectContaining({
+                t: "chatMessage",
+                body: "after transportLost",
+                clientMsgId: msgId,
+            }),
+        ]);
         void bob;
     });
 
@@ -549,5 +621,176 @@ describe("createChatTransportStack integration", () => {
         transportWelcomeCalls = 0;
         rt.simulateReconnectWelcome();
         expect(transportWelcomeCalls).toBe(1);
+    });
+
+    it("pc_failed recover restores usable and flushes pending send", async () => {
+        const hub = createTwoPartyHub();
+        const { alice, bob } = createTwoPartyStacks(hub);
+        await establishPair(hub, alice, bob);
+        hub.setPresence("bob", true);
+        expect(alice.stack.peerRegistry.getState("bob")).toBe("usable");
+
+        const livePeer = mockPeers.find(
+            (p) =>
+                !p.isDisposed &&
+                p.selfAccount === "alice" &&
+                p.peerAccount === "bob",
+        );
+        expect(livePeer).toBeTruthy();
+        livePeer!.fireFailed("ice_failed");
+
+        await vi.advanceTimersByTimeAsync(0);
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(alice.stack.peerRegistry.getState("bob")).toBe("usable");
+
+        const { msgId } = await alice.stack.messaging.send({
+            spaceUuid: "space:dm",
+            recipient: "bob",
+            body: "after pc_failed",
+        });
+        await Promise.resolve();
+
+        const alicePeer = mockPeers.find(
+            (p) =>
+                !p.isDisposed &&
+                p.selfAccount === "alice" &&
+                p.peerAccount === "bob",
+        );
+        expect(alicePeer?.drainPendingOutbound()).toEqual([
+            expect.objectContaining({
+                t: "chatMessage",
+                body: "after pc_failed",
+                clientMsgId: msgId,
+            }),
+        ]);
+        void bob;
+    });
+
+    it("DC transportLost recover flushes a message queued while peer was dead", async () => {
+        const hub = createTwoPartyHub();
+        const { alice, bob } = createTwoPartyStacks(hub);
+        await establishPair(hub, alice, bob);
+        hub.setPresence("bob", true);
+
+        const livePeer = mockPeers.find(
+            (p) =>
+                !p.isDisposed &&
+                p.selfAccount === "alice" &&
+                p.peerAccount === "bob",
+        );
+        livePeer!.fireTransportLost();
+
+        // Queue while recovering (may be suspected_dead / negotiating).
+        const sendPromise = alice.stack.messaging.send({
+            spaceUuid: "space:dm",
+            recipient: "bob",
+            body: "queued-during-lost",
+        });
+        await vi.advanceTimersByTimeAsync(0);
+        await Promise.resolve();
+        await Promise.resolve();
+
+        const { msgId } = await sendPromise;
+        await Promise.resolve();
+
+        expect(alice.stack.peerRegistry.getState("bob")).toBe("usable");
+        const alicePeer = mockPeers.find(
+            (p) =>
+                !p.isDisposed &&
+                p.selfAccount === "alice" &&
+                p.peerAccount === "bob",
+        );
+        expect(alicePeer?.drainPendingOutbound()).toEqual([
+            expect.objectContaining({
+                body: "queued-during-lost",
+                clientMsgId: msgId,
+            }),
+        ]);
+        void bob;
+    });
+
+    it("welcome reconnect during in-flight ACK re-flushes without duplicating outbound", async () => {
+        const hub = createTwoPartyHub();
+        const { alice, bob } = createTwoPartyStacks(hub);
+        await establishPair(hub, alice, bob);
+        hub.setPresence("bob", true);
+
+        const { msgId } = await alice.stack.messaging.send({
+            spaceUuid: "space:dm",
+            recipient: "bob",
+            body: "in-flight-reconnect",
+        });
+        await Promise.resolve();
+
+        const peerBefore = mockPeers.find(
+            (p) =>
+                !p.isDisposed &&
+                p.selfAccount === "alice" &&
+                p.peerAccount === "bob",
+        );
+        expect(peerBefore?.drainPendingOutbound()).toEqual([
+            expect.objectContaining({ clientMsgId: msgId }),
+        ]);
+
+        // Mid-ACK: reconnect welcome. Pair re-joins; peer recovers to usable.
+        alice.rt.simulateReconnectWelcome();
+        bob.rt.simulateReconnectWelcome();
+        await vi.advanceTimersByTimeAsync(0);
+        await Promise.resolve();
+        await Promise.resolve();
+
+        // Force ensure so mock DC re-opens after welcome invalidation.
+        void alice.stack.peerLifecycle.ensure("bob", "message_enqueued");
+        await vi.advanceTimersByTimeAsync(0);
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(alice.stack.peerRegistry.getState("bob")).toBe("usable");
+        // Still pending (no ACK yet) — L4 may re-flush once on usable.
+        expect(alice.stack.messaging.getStatus(msgId)).not.toBe("FAILED");
+        expect(alice.stack.messaging.getStatus(msgId)).not.toBe("DELIVERED");
+
+        const peerAfter = mockPeers.find(
+            (p) =>
+                !p.isDisposed &&
+                p.selfAccount === "alice" &&
+                p.peerAccount === "bob",
+        );
+        const resent = peerAfter?.drainPendingOutbound() ?? [];
+        // At most one re-flush of the same clientMsgId (no unbounded storm).
+        expect(
+            resent.filter((e) => e.clientMsgId === msgId).length,
+        ).toBeLessThanOrEqual(1);
+        void bob;
+    });
+
+    it("duplicate inbound clientMsgId notifies onInbound twice; store owns dedupe", async () => {
+        const hub = createTwoPartyHub();
+        const { alice, bob } = createTwoPartyStacks(hub);
+        await establishPair(hub, alice, bob);
+
+        const inbound: string[] = [];
+        bob.stack.messaging.onInbound((envelope) => {
+            inbound.push(envelope.clientMsgId);
+        });
+
+        const svc = bob.stack.messaging as typeof bob.stack.messaging & {
+            handleWireFromRemote: (remote: string, raw: string) => void;
+        };
+        const raw = serializeChatDataMessage({
+            t: "chatMessage",
+            spaceUuid: "space:dm",
+            from: "alice",
+            body: "dup",
+            sendTimestamp: 1,
+            clientMsgId: "dup-wire-1",
+        });
+        svc.handleWireFromRemote("alice", raw);
+        svc.handleWireFromRemote("alice", raw);
+
+        expect(inbound).toEqual(["dup-wire-1", "dup-wire-1"]);
+        void alice;
     });
 });

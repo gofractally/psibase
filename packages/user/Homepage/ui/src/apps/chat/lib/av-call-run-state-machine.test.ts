@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+    type AvRunContext,
+    type AvRunMachineState,
     avTransition,
     deriveAvSnapshot,
     initialAvCallRunSnapshot,
     initialAvRunMachineState,
-    type AvRunContext,
-    type AvRunMachineState,
 } from "./av-call-run-state-machine";
 
 const SELF = "alice";
@@ -20,8 +20,7 @@ function ctx(
 ): AvRunContext {
     return {
         spaceUuid: SPACE,
-        members:
-            overrides.kind === "group" ? [SELF, BOB, CAROL] : [SELF, BOB],
+        members: overrides.kind === "group" ? [SELF, BOB, CAROL] : [SELF, BOB],
         self: SELF,
         presence: { [BOB]: "online", [CAROL]: "online" },
         liveMediaReady: {},
@@ -115,9 +114,7 @@ describe("av-call-run-state-machine", () => {
             );
             expect(result.state.tag).toBe("signaling");
             expect(
-                result.commands.some(
-                    (c) => c.type === "beginSignaling",
-                ),
+                result.commands.some((c) => c.type === "beginSignaling"),
             ).toBe(true);
             expect(
                 result.commands.some(
@@ -960,6 +957,39 @@ describe("av-call-run-state-machine", () => {
             ).toBe(true);
         });
 
+        it("DM sessionEnded declined from ready keeps declined lastError", () => {
+            const ready: AvRunMachineState = {
+                tag: "ready",
+                sessionId: SESSION,
+                peerSlots: { [BOB]: "ready" },
+                signalingJoined: true,
+            };
+            const result = avTransition(
+                ready,
+                {
+                    type: "sessionEnded",
+                    sessionId: SESSION,
+                    reason: "declined",
+                    by: BOB,
+                },
+                ctx({ kind: "dm", hasJoined: true }),
+            );
+            expect(result.state).toEqual({
+                tag: "failed",
+                sessionId: SESSION,
+                lastError: "declined",
+            });
+            expect(
+                deriveAvSnapshot(
+                    result.state,
+                    ctx({ kind: "dm", hasJoined: false }),
+                ),
+            ).toMatchObject({
+                phase: "failed",
+                lastError: "declined",
+            });
+        });
+
         it("group sessionEnded without by fully tears down", () => {
             const ready: AvRunMachineState = {
                 tag: "ready",
@@ -1053,9 +1083,9 @@ describe("av-call-run-state-machine", () => {
             expect(result.commands).toEqual([
                 { type: "beginSignaling", sessionId: SESSION },
             ]);
-            expect(
-                result.commands.some((c) => c.type === "runPipeline"),
-            ).toBe(false);
+            expect(result.commands.some((c) => c.type === "runPipeline")).toBe(
+                false,
+            );
         });
     });
 
@@ -1407,7 +1437,8 @@ describe("av-call-run-state-machine", () => {
             for (let trial = 0; trial < 200; trial++) {
                 let state: AvRunMachineState = initialAvRunMachineState();
                 for (let i = 0; i < 8; i++) {
-                    const e = events[Math.floor(Math.random() * events.length)]!;
+                    const e =
+                        events[Math.floor(Math.random() * events.length)]!;
                     const r = avTransition(state, e, ctx({ kind: "group" }));
                     state = r.state;
                     expect(

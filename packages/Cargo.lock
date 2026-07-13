@@ -4358,11 +4358,11 @@ checksum = "9edde0db4769d2dc68579893f2306b26c6ecfbe0ef499b013d731b7b9247e0b9"
 name = "x-webrtc-sig-pkg"
 version = "0.23.0"
 dependencies = [
- "x-webrtcsig",
+ "x-wrtcsig",
 ]
 
 [[package]]
-name = "x-webrtcsig"
+name = "x-wrtcsig"
 version = "0.23.0"
 dependencies = [
  "base64 0.22.1",

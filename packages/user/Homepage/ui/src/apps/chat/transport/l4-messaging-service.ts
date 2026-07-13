@@ -66,6 +66,11 @@ export interface MessagingService {
     ): Unsubscribe;
     hydrateFromStorage(): void;
     /**
+     * Focused conversation for flush priority (H28). Remotes with pending
+     * rows for this space flush before background remotes.
+     */
+    setFocusedSpace(spaceUuid: string | null | undefined): void;
+    /**
      * Ack an inbound message after the consumer accepted it. Acking on wire
      * parse would prune the sender's outbox even when the recipient drops
      * the message (e.g. contact gate), permanently losing it.
@@ -133,6 +138,7 @@ export function createMessagingService(
             rows,
         );
     };
+    // ACK-timer bookkeeping only — DeliveryCoordinator legs are SoT for delivery state.
     const inFlight = new Map<InFlightKey, InFlightRow>();
     const pendingAcks = new Map<
         PendingAckKey,
@@ -169,6 +175,8 @@ export function createMessagingService(
     restorePendingAcks();
     const validAttempts = new Map<InFlightKey, number>();
     const statusByMsg = new Map<string, MessageStatus>();
+    /** Normalized focused space; drives flushAll priority ordering. */
+    let focusedSpaceUuid: string | null = null;
 
     const emitStatus = (msgId: string, status: MessageStatus) => {
         statusByMsg.set(msgId, status);
@@ -295,7 +303,8 @@ export function createMessagingService(
         }
 
         const pingOk = await opts.peerRegistry.ping(recipient);
-        if (!pingOk) {
+        // Never dispose Meet-held peers for a single message ACK miss.
+        if (!pingOk && !opts.peerRegistry.isMeetHeld(recipient)) {
             opts.peerRegistry.dispose(recipient, "ack_timeout");
         }
 
@@ -427,7 +436,27 @@ export function createMessagingService(
     };
 
     const flushAll = () => {
-        for (const remote of outboxByRemote().keys()) {
+        const byRemote = outboxByRemote();
+        const remotes = [...byRemote.keys()];
+        if (!focusedSpaceUuid) {
+            for (const remote of remotes) {
+                void flushRemote(remote);
+            }
+            return;
+        }
+        const focused: string[] = [];
+        const others: string[] = [];
+        for (const remote of remotes) {
+            const rows = byRemote.get(remote) ?? [];
+            const inFocused = rows.some(
+                (row) =>
+                    spaceUuidFromPslackConversationId(row.conversationId) ===
+                    focusedSpaceUuid,
+            );
+            if (inFocused) focused.push(remote);
+            else others.push(remote);
+        }
+        for (const remote of [...focused, ...others]) {
             void flushRemote(remote);
         }
     };
@@ -573,6 +602,12 @@ export function createMessagingService(
             for (const { remote } of pendingAcks.values()) {
                 flushPendingAcks(remote);
             }
+        },
+
+        setFocusedSpace(spaceUuid) {
+            const next =
+                typeof spaceUuid === "string" ? spaceUuid.trim() : "";
+            focusedSpaceUuid = next.length > 0 ? next : null;
         },
 
         acknowledgeInbound(
