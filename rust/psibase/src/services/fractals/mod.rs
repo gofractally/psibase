@@ -141,22 +141,10 @@ pub mod Service {
     ///
     /// # Arguments
     /// * `fractal_account` - The account number for the new fractal.
-    /// * `legislature` - Legislature role account.
-    /// * `judiciary` - Judiciary role account.
-    /// * `executive` - Executive role account
-    /// * `recruitment` - Recruitment role account.
     /// * `name` - The name of the fractal.
     /// * `mission` - The mission statement of the fractal.
     #[action]
-    fn create_frac(
-        fractal_account: AccountNumber,
-        legislature: AccountNumber,
-        judiciary: AccountNumber,
-        executive: AccountNumber,
-        recruitment: AccountNumber,
-        name: String,
-        mission: String,
-    ) {
+    fn create_frac(fractal_account: AccountNumber, name: String, mission: String) {
         unimplemented!()
     }
 

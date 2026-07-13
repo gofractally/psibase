@@ -74,15 +74,7 @@ impl Fractal {
         Self::get_assert(sender)
     }
 
-    pub fn add(
-        fractal: AccountNumber,
-        legislature: AccountNumber,
-        judiciary: AccountNumber,
-        executive: AccountNumber,
-        recruitment: AccountNumber,
-        name: String,
-        mission: String,
-    ) -> Self {
+    pub fn add(fractal: AccountNumber, name: String, mission: String) -> Self {
         check_none(Self::get(fractal), "fractal already exists");
         let new_instance = Self::new(fractal, name, mission);
 
@@ -93,14 +85,14 @@ impl Fractal {
 
         let defacto_service = account!("fractals+2");
 
-        let create_role = |role_account: AccountNumber, role: FractalRole| {
-            Role::add(fractal, role_account, role, defacto_service)
+        let create_role = |role: u8| {
+            Role::add(fractal, role, defacto_service);
         };
 
-        create_role(legislature, Legislature);
-        create_role(judiciary, Judiciary);
-        create_role(executive, Executive);
-        create_role(recruitment, Recruitment);
+        create_role(Legislature.into());
+        create_role(Judiciary.into());
+        create_role(Executive.into());
+        create_role(Recruitment.into());
 
         create_managed_account(fractal, || {
             sites::Wrapper::call_as(fractal).setProxy(account!("fractal-cr"));
@@ -126,7 +118,7 @@ impl Fractal {
     }
 
     fn role_account(&self, role: FractalRole) -> AccountNumber {
-        Role::get_assert(self.account, role).account
+        Role::get_assert(self.account, role.into()).account()
     }
 
     pub fn get(fractal: AccountNumber) -> Option<Self> {
@@ -249,19 +241,19 @@ impl Fractal {
     }
 
     async fn legislature(&self) -> Role {
-        Role::get_assert(self.account, Legislature)
+        Role::get_assert(self.account, Legislature.into())
     }
 
     async fn judiciary(&self) -> Role {
-        Role::get_assert(self.account, Judiciary)
+        Role::get_assert(self.account, Judiciary.into())
     }
 
     async fn executive(&self) -> Role {
-        Role::get_assert(self.account, Executive)
+        Role::get_assert(self.account, Executive.into())
     }
 
     async fn recruitment(&self) -> Role {
-        Role::get_assert(self.account, Recruitment)
+        Role::get_assert(self.account, Recruitment.into())
     }
 
     async fn stream(&self) -> Option<RewardStream> {

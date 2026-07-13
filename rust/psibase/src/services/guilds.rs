@@ -81,13 +81,7 @@ pub mod Service {
     /// * `council_role` - Council role account.
     /// * `rep_role` - Representative role account.
     #[action]
-    fn create_guild(
-        fractal: AccountNumber,
-        guild_account: AccountNumber,
-        display_name: Memo,
-        council_role: AccountNumber,
-        rep_role: AccountNumber,
-    ) {
+    fn create_guild(fractal: AccountNumber, guild_account: AccountNumber, display_name: Memo) {
         unimplemented!()
     }
 

@@ -14,7 +14,6 @@ mod errors;
 mod graphql;
 mod helpers;
 
-use crate::bindings::accounts::plugin::api::gen_rand_account;
 use crate::bindings::exports::fractals::plugin::types;
 use crate::bindings::guilds::plugin as Guilds;
 use crate::bindings::transact::plugin::intf::set_propose_latch;
@@ -53,15 +52,7 @@ impl AdminFractal for FractallyPlugin {
 
         let fractal = fractal_account.parse().unwrap();
 
-        Fractals::add_to_tx().create_frac(
-            fractal,
-            gen_rand_account(Some("leg"))?.parse().unwrap(),
-            gen_rand_account(Some("jud"))?.parse().unwrap(),
-            gen_rand_account(Some("exec"))?.parse().unwrap(),
-            gen_rand_account(Some("rec"))?.parse().unwrap(),
-            name,
-            mission,
-        );
+        Fractals::add_to_tx().create_frac(fractal, name, mission);
 
         Guilds::admin_guild::create_guild("Genesis", &fractal_account, &guild_account)?;
         set_propose_latch(Some(&fractal_account))?;

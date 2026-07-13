@@ -1,47 +1,34 @@
-use crate::{
-    helpers::create_managed_account,
-    tables::tables::{Role, RoleTable},
-};
-use psibase::services::auth_dyn::policy::DynamicAuthPolicy;
-use psibase::services::fractals::FractalRole;
+use crate::tables::tables::{Role, RoleTable};
+use psibase::services::{accounts, auth_any, auth_delegate, auth_dyn};
 use psibase::{check, check_none, check_some, AccountNumber, ServiceWrapper, Table};
+use psibase::{services::auth_dyn::policy::DynamicAuthPolicy, Subaccount};
 
 impl Role {
-    fn new(
-        fractal: AccountNumber,
-        account: AccountNumber,
-        role: FractalRole,
-        occupation: AccountNumber,
-    ) -> Self {
+    fn new(fractal: AccountNumber, role_id: u8, occupation: AccountNumber) -> Self {
         Self {
             fractal,
-            account,
-            role_id: role.into(),
+            role_id,
             occupation,
         }
     }
 
-    fn get(fractal: AccountNumber, role: FractalRole) -> Option<Self> {
-        RoleTable::read()
-            .get_index_pk()
-            .get(&(fractal, role.into()))
+    pub fn get(fractal: AccountNumber, role_id: u8) -> Option<Self> {
+        RoleTable::read().get_index_pk().get(&(fractal, role_id))
     }
 
-    pub fn get_assert(fractal: AccountNumber, role: FractalRole) -> Self {
+    pub fn account(&self) -> AccountNumber {
+        self.fractal.with_subaccount(Subaccount(self.role_id))
+    }
+
+    pub fn get_assert(fractal: AccountNumber, role_id: u8) -> Self {
         check_some(
-            Self::get(fractal, role),
+            Self::get(fractal, role_id),
             &format!(
                 "role with id {} does not exist for fractal {}",
-                role as u8,
+                role_id,
                 fractal.to_string()
             ),
         )
-    }
-
-    pub fn get_by_role_account(role_account: AccountNumber) -> Option<Self> {
-        RoleTable::read()
-            .get_index_by_role_account()
-            .get(&role_account)
     }
 
     pub fn auth_policy(&self) -> DynamicAuthPolicy {
@@ -49,12 +36,7 @@ impl Role {
             .role_policy(self.fractal, self.role_id)
     }
 
-    pub fn add(
-        fractal: AccountNumber,
-        account: AccountNumber,
-        role: FractalRole,
-        occupation: AccountNumber,
-    ) -> Self {
+    pub fn add(fractal: AccountNumber, role: u8, occupation: AccountNumber) -> Self {
         check_none(
             Self::get(fractal, role),
             &format!(
@@ -68,10 +50,17 @@ impl Role {
             "occupation account does not exist",
         );
 
-        let new_instance = Self::new(fractal, account, role, occupation);
+        let new_instance = Self::new(fractal, role, occupation);
         new_instance.save();
+        let new_account = new_instance.account();
 
-        create_managed_account(account, || {});
+        accounts::Wrapper::call_as(fractal).newAccount(
+            new_account,
+            auth_any::Wrapper::SERVICE,
+            true,
+        );
+        auth_dyn::Wrapper::call_as(new_account).set_mgmt(new_account, psibase::get_service());
+        accounts::Wrapper::call_as(new_account).setAuthServ(auth_dyn::Wrapper::SERVICE);
 
         new_instance
     }

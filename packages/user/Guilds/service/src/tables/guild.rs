@@ -1,12 +1,16 @@
 use async_graphql::ComplexObject;
+use psibase::services::auth_any;
 use psibase::services::auth_dyn::policy::DynamicAuthPolicy;
 use psibase::services::auth_dyn::Wrapper as AuthDyn;
+
+use psibase::services::accounts::Wrapper as Accounts;
 use psibase::services::fractals::weighted_normalization::{
     curves::{get_curve, Curve},
     weighted_normalization,
 };
 use psibase::{
-    check, check_none, check_some, get_sender, AccountNumber, Flags, Memo, ServiceWrapper, Table,
+    check, check_none, check_some, get_sender, get_service, AccountNumber, Flags, Memo,
+    ServiceWrapper, Subaccount, Table,
 };
 
 use crate::constants::{
@@ -24,8 +28,6 @@ impl Guild {
         guild: AccountNumber,
         rep: AccountNumber,
         display_name: Memo,
-        council_role: AccountNumber,
-        rep_role: AccountNumber,
     ) -> Self {
         Self {
             account: guild,
@@ -34,8 +36,6 @@ impl Guild {
             display_name,
             rep: Some(rep),
             description: "".to_string(),
-            council_role,
-            rep_role,
             rank_ordering_threshold: DEFAULT_RANK_ORDERING_THRESHOLD,
             settings: 0,
             candidacy_cooldown: DEFAULT_CANDIDACY_COOLDOWN,
@@ -67,20 +67,24 @@ impl Guild {
         guild: AccountNumber,
         rep: AccountNumber,
         display_name: Memo,
-        council_role: AccountNumber,
-        rep_role: AccountNumber,
     ) -> Self {
         check_none(Self::get(guild), "guild already exists");
 
-        let new_guild_instance =
-            Self::new(fractal, guild, rep, display_name, council_role, rep_role);
+        let new_guild_instance = Self::new(fractal, guild, rep, display_name);
         new_guild_instance.save();
 
         GuildMember::add(new_guild_instance.account, rep);
 
-        AuthDyn::call().newAccount(council_role);
-        AuthDyn::call().newAccount(rep_role);
         AuthDyn::call().newAccount(guild);
+
+        let create_sub_account = |subaccount: Subaccount| {
+            let new_account = guild.with_subaccount(subaccount);
+            Accounts::call_as(guild).newAccount(new_account, auth_any::SERVICE, true);
+            AuthDyn::call_as(new_account).set_mgmt(new_account, get_service());
+            Accounts::call_as(new_account).setAuthServ(AuthDyn::SERVICE);
+        };
+        create_sub_account(Subaccount(1));
+        create_sub_account(Subaccount(2));
 
         new_guild_instance
     }
@@ -115,19 +119,31 @@ impl Guild {
         Self::get_assert(get_sender())
     }
 
+    pub fn by_council_sender() -> Self {
+        let (guild, sub_account) = get_sender().split();
+        let guild = Self::get_assert(guild);
+        check(
+            sub_account.0 == 1,
+            "sender must be council role account of guild",
+        );
+        guild
+    }
+
+    pub fn by_rep_sender() -> Self {
+        let (guild, sub_account) = get_sender().split();
+        let guild = Self::get_assert(guild);
+        check(
+            sub_account.0 == 2,
+            "sender must be representative role account of guild",
+        );
+        guild
+    }
+
     pub fn guilds_of_fractal(fractal: AccountNumber) -> Vec<Self> {
         GuildTable::read()
             .get_index_by_fractal()
             .range((fractal, AccountNumber::MIN)..=(fractal, AccountNumber::MAX))
             .collect()
-    }
-
-    pub fn get_by_council_role(council: AccountNumber) -> Option<Self> {
-        GuildTable::read().get_index_by_council().get(&council)
-    }
-
-    pub fn get_by_rep_role(rep: AccountNumber) -> Option<Self> {
-        GuildTable::read().get_index_by_rep().get(&rep)
     }
 
     pub fn evaluation(&self) -> Option<EvaluationInstance> {
@@ -196,9 +212,17 @@ impl Guild {
             .map(|rep| GuildMember::get_assert(self.account, rep))
     }
 
+    fn council_role(&self) -> AccountNumber {
+        self.account.with_subaccount(1.into())
+    }
+
+    fn rep_role(&self) -> AccountNumber {
+        self.account.with_subaccount(2.into())
+    }
+
     pub fn auth_policy(&self) -> DynamicAuthPolicy {
         DynamicAuthPolicy::from_sole_authorizer(
-            self.rep.map_or(self.council_role, |_| self.rep_role),
+            self.rep.map_or(self.council_role(), |_| self.rep_role()),
         )
     }
 

@@ -34,7 +34,7 @@ pub struct AccountNumber {
 
 serialize_as_str!(AccountNumber, "account number");
 
-pub struct Subaccount(u8);
+pub struct Subaccount(pub u8);
 
 impl From<u8> for Subaccount {
     fn from(value: u8) -> Self {

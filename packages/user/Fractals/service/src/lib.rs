@@ -63,7 +63,7 @@ pub mod service {
                 .find(|(_, name)| method.method == MethodNumber::from(*name))
                 .map(|(role, _)| *role);
             if let Some(role) = role {
-                return Some(Role::get_assert(account, role).auth_policy());
+                return Some(Role::get_assert(account, role.into()).auth_policy());
             }
         }
         None
@@ -80,24 +80,8 @@ pub mod service {
     /// * `name` - The name of the fractal.
     /// * `mission` - The mission statement of the fractal.
     #[action]
-    fn create_frac(
-        fractal_account: AccountNumber,
-        legislature: AccountNumber,
-        judiciary: AccountNumber,
-        executive: AccountNumber,
-        recruitment: AccountNumber,
-        name: String,
-        mission: String,
-    ) {
-        Fractal::add(
-            fractal_account,
-            legislature,
-            judiciary,
-            executive,
-            recruitment,
-            name,
-            mission,
-        );
+    fn create_frac(fractal_account: AccountNumber, name: String, mission: String) {
+        Fractal::add(fractal_account, name, mission);
 
         Wrapper::emit().history().created_fractal(fractal_account);
     }
@@ -232,9 +216,11 @@ pub mod service {
     fn account_policy(account: AccountNumber) -> Option<auth_dyn::policy::DynamicAuthPolicy> {
         Fractal::get(account)
             .map(|fractal| fractal.auth_policy())
-            .or(Role::get_by_role_account(account).map(|role| {
-                occu_wrapper::call_to(role.occupation).role_policy(role.fractal, role.role_id)
-            }))
+            .or(
+                Role::get(account.base(), account.subaccount().0).map(|role| {
+                    occu_wrapper::call_to(role.occupation).role_policy(role.fractal, role.role_id)
+                }),
+            )
     }
 
     /// Get policy action used by AuthDyn service.
