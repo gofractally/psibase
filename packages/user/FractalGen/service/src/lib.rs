@@ -50,10 +50,10 @@ mod service {
         let prods = Producers::call().getProducers();
         let producer = prods.first().unwrap();
 
-        let legislature = SYS_FRACTAL.with_subaccount(1.into());
-        let judiciary = SYS_FRACTAL.with_subaccount(2.into());
-        let executive = SYS_FRACTAL.with_subaccount(3.into());
-        let recruitment = SYS_FRACTAL.with_subaccount(4.into());
+        let legislature = SYS_FRACTAL.with_subaccount((FractalRole::Legislature as u8).into());
+        let judiciary = SYS_FRACTAL.with_subaccount((FractalRole::Judiciary as u8).into());
+        let executive = SYS_FRACTAL.with_subaccount((FractalRole::Executive as u8).into());
+        let recruitment = SYS_FRACTAL.with_subaccount((FractalRole::Recruitment as u8).into());
 
         Fractals::call_from(*producer).create_frac(
             SYS_FRACTAL,
