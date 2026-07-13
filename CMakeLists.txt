@@ -894,7 +894,7 @@ psibase_package(
     SERVICE events+3
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Nop.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Nop-schema.json
-    PACKAGE_DEPENDS "EventsService" "Transact(^${PSIBASE_VERSION}.0)" "TransactService(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "EventsService(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "TransactService(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
