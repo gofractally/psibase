@@ -34,6 +34,7 @@ pub struct AccountNumber {
 
 serialize_as_str!(AccountNumber, "account number");
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Subaccount(pub u8);
 
 impl From<u8> for Subaccount {

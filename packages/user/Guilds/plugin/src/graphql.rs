@@ -16,8 +16,6 @@ pub mod guild {
                     }}
                     account
                     fractal
-                    councilRole
-                        repRole
                     }}
                 }}"#,
             guild
@@ -46,8 +44,6 @@ pub mod guild {
         pub eval_instance: Option<EvalInstance>,
         pub fractal: AccountNumber,
         pub account: AccountNumber,
-        pub council_role: AccountNumber,
-        pub rep_role: AccountNumber,
     }
 
     #[derive(Serialize, Deserialize)]
@@ -73,15 +69,11 @@ pub mod guild {
         pub fractal: AccountNumber,
         pub guild: AccountNumber,
         pub evaluation_id: Option<u32>,
-        pub council_role: AccountNumber,
-        pub rep_role: AccountNumber,
     }
 
     impl From<GuildQuery> for Guild {
         fn from(value: GuildQuery) -> Self {
             Self {
-                council_role: value.council_role,
-                rep_role: value.rep_role,
                 guild: value.account,
                 fractal: value.fractal,
                 evaluation_id: value.eval_instance.map(|instance| instance.evaluation_id),
@@ -96,11 +88,9 @@ pub mod guild {
     impl From<Guild> for GuildWit {
         fn from(value: Guild) -> Self {
             Self {
-                council_role: value.council_role.to_string(),
                 evaluation_id: value.evaluation_id,
                 fractal: value.fractal.to_string(),
                 guild: value.guild.to_string(),
-                rep_role: value.rep_role.to_string(),
             }
         }
     }

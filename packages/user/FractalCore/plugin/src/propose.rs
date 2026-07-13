@@ -1,5 +1,6 @@
 use crate::bindings::guilds::plugin as GuildsPlugin;
 use crate::bindings::guilds::plugin::queries::Guild;
+use psibase::{AccountNumber, Subaccount};
 
 use crate::bindings::host::types::types::Error;
 use crate::bindings::{
@@ -23,9 +24,11 @@ pub fn guild(guild_account: &str) -> Result<(), Error> {
 }
 
 pub fn council(guild_account: &str) -> Result<(), Error> {
-    get_guild(guild_account).and_then(|guild| latch(&guild.council_role))
+    let guild_account = AccountNumber::from_str(guild_account).unwrap();
+    latch(&guild_account.with_subaccount(Subaccount(1)).to_string())
 }
 
 pub fn representative(guild_account: &str) -> Result<(), Error> {
-    get_guild(guild_account).and_then(|guild| latch(&guild.rep_role))
+    let guild_account = AccountNumber::from_str(guild_account).unwrap();
+    latch(&guild_account.with_subaccount(Subaccount(2)).to_string())
 }

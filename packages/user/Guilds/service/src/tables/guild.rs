@@ -21,6 +21,7 @@ use crate::helpers::{two_thirds_plus_one, RollingBits16};
 use crate::tables::tables::{
     EvaluationInstance, Guild, GuildFlags, GuildMember, GuildMemberTable, GuildTable,
 };
+use crate::tables::GuildRole;
 
 impl Guild {
     fn new(
@@ -83,8 +84,8 @@ impl Guild {
             AuthDyn::call_as(new_account).set_mgmt(new_account, get_service());
             Accounts::call_as(new_account).setAuthServ(AuthDyn::SERVICE);
         };
-        create_sub_account(Subaccount(1));
-        create_sub_account(Subaccount(2));
+        create_sub_account(GuildRole::Council.subaccount());
+        create_sub_account(GuildRole::Rep.subaccount());
 
         new_guild_instance
     }
@@ -123,7 +124,7 @@ impl Guild {
         let (guild, sub_account) = get_sender().split();
         let guild = Self::get_assert(guild);
         check(
-            sub_account.0 == 1,
+            sub_account == GuildRole::Council.subaccount(),
             "sender must be council role account of guild",
         );
         guild
@@ -133,7 +134,7 @@ impl Guild {
         let (guild, sub_account) = get_sender().split();
         let guild = Self::get_assert(guild);
         check(
-            sub_account.0 == 2,
+            sub_account == GuildRole::Rep.subaccount(),
             "sender must be representative role account of guild",
         );
         guild
@@ -212,17 +213,17 @@ impl Guild {
             .map(|rep| GuildMember::get_assert(self.account, rep))
     }
 
-    fn council_role(&self) -> AccountNumber {
-        self.account.with_subaccount(1.into())
-    }
-
-    fn rep_role(&self) -> AccountNumber {
-        self.account.with_subaccount(2.into())
+    fn authorizing_subaccount(&self) -> Subaccount {
+        if self.rep.is_some() {
+            GuildRole::Rep.subaccount()
+        } else {
+            GuildRole::Council.subaccount()
+        }
     }
 
     pub fn auth_policy(&self) -> DynamicAuthPolicy {
         DynamicAuthPolicy::from_sole_authorizer(
-            self.rep.map_or(self.council_role(), |_| self.rep_role()),
+            self.account.with_subaccount(self.authorizing_subaccount()),
         )
     }
 

@@ -1,3 +1,5 @@
+use psibase::Subaccount;
+
 mod evaluation_instance;
 mod fractal_settings;
 mod guild;
@@ -7,6 +9,19 @@ mod guild_invite;
 mod guild_member;
 mod ranking;
 mod role_map;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum GuildRole {
+    Council = 1,
+    Rep = 2,
+}
+
+impl GuildRole {
+    pub fn subaccount(self) -> Subaccount {
+        Subaccount(self as u8)
+    }
+}
 
 #[psibase::service_tables]
 pub mod tables {
