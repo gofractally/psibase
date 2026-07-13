@@ -56,7 +56,7 @@ const qs = {
     userSettings: (username: string) => `
         userSettings(user: "${username}") {
             settings {
-                manualDebit
+                autoDebit
             }
         }
     `,
@@ -83,7 +83,7 @@ const graphqlViaPlugin = async <T>(query: string): Promise<T> => {
 const zUserSettingsSchema = z.object({
     userSettings: z.object({
         settings: z.object({
-            manualDebit: z.boolean(),
+            autoDebit: z.boolean(),
         }),
     }),
 });

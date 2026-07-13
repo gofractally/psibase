@@ -25,11 +25,11 @@ pub mod tables {
             }
             table.put(&InitRow {}).unwrap();
 
-            Tokens::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
-            Nft::call().setUserConf(NftHolderFlags::MANUAL_DEBIT.index(), true);
+            Tokens::call().setUserConf(BalanceFlags::AUTO_DEBIT.index(), false);
+            Nft::call().setUserConf(NftHolderFlags::AUTO_DEBIT.index(), false);
 
-            Nft::call_as(crate::CRED_SYS).setUserConf(NftHolderFlags::MANUAL_DEBIT.index(), true);
-            Tokens::call_as(crate::CRED_SYS).setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
+            Nft::call_as(crate::CRED_SYS).setUserConf(NftHolderFlags::AUTO_DEBIT.index(), false);
+            Tokens::call_as(crate::CRED_SYS).setUserConf(BalanceFlags::AUTO_DEBIT.index(), false);
         }
     }
 
