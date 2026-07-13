@@ -9,7 +9,6 @@ pub mod service {
     pub use crate::tables::tables::{BalanceFlags, TokenFlags};
     use crate::tables::tables::{ConfigRow, SubAccount, *};
     use psibase::services::events;
-    use psibase::services::nft::{NftHolderFlags, Wrapper as Nfts};
     use psibase::services::tokens::{Decimal, Precision, Quantity};
     use psibase::{get_sender, AccountNumber, Memo};
 
@@ -26,11 +25,9 @@ pub mod service {
         if InitRow::get().is_none() {
             InitRow::init();
 
-            Nfts::call().setUserConf(NftHolderFlags::MANUAL_DEBIT.index(), true);
-
             let add_index = |method: &str, column: u8| {
                 events::Wrapper::call().addIndex(
-                    DbId::HistoryEvent,
+                    EventDb::HistoryEvent,
                     Wrapper::SERVICE,
                     MethodNumber::from(method),
                     column,
@@ -41,8 +38,6 @@ pub mod service {
             add_index("supplyChanged", 0);
             add_index("balChanged", 1);
             add_index("balChanged", 2);
-
-            UserConfig::get_or_new(Wrapper::SERVICE).set_flag(BalanceFlags::MANUAL_DEBIT, true);
         }
     }
 
@@ -103,7 +98,7 @@ pub mod service {
     ///                See `Configurations` for details
     ///
     /// Configurations:
-    /// * 0: manual_debit       - If enabled, any credits of this token must be manually debited by
+    /// * 0: auto_debit       - If enabled, any credits of this token will be automatically debited by
     ///                           the receiver.
     /// * 1: keep_zero_balances - If enabled, records with a balance of zero will still be kept in the
     ///                           balance table, and will not need to be recreated on the next deposit.
@@ -124,7 +119,7 @@ pub mod service {
     /// * `enabled`  - A `bool` indicating the intended value of the specified configuration flag
     ///
     /// Configurations:
-    /// * 0: manual_debit       - If enabled, any credits of this token must be manually debited by
+    /// * 0: auto_debit       - If enabled, any credits of this token will be automatically debited by
     ///                           the receiver.
     /// * 1: keep_zero_balances - If enabled, records with a balance of zero will still be kept in the
     ///                           balance table, and will not need to be recreated on the next deposit.
@@ -153,7 +148,7 @@ pub mod service {
     ///                See `Configurations` for details
     ///
     /// Configurations:
-    /// * 0: manual_debit       - If enabled, any credits of this token must be manually debited by
+    /// * 0: auto_debit       - If enabled, any credits of this token will be automatically debited by
     ///                           the receiver.
     /// * 1: keep_zero_balances - If enabled, records with a balance of zero will still be kept in the
     ///                           balance table, and will not need to be recreated on the next deposit.
@@ -173,7 +168,7 @@ pub mod service {
     /// * `enabled`  - A `bool` indicating the intended value of the specified configuration flag
     ///
     /// Configurations:
-    /// * 0: manual_debit       - If enabled, any credits of this token must be manually debited by
+    /// * 0: auto_debit       - If enabled, any credits of this token will be automatically debited by
     ///                           the receiver.
     /// * 1: keep_zero_balances - If enabled, records with a balance of zero will still be kept in the
     ///                           balance table, and will not need to be recreated on the next deposit.
@@ -344,9 +339,8 @@ pub mod service {
 
     /// Credit tokens to a debitor (recipient).
     ///
-    /// On credit, tokens are typically automatically debited by the debitor. However,
-    /// if the debitor has enabled `manual_debit`, then the tokens will be placed in an intermediate
-    /// "shared balance".
+    /// On credit, tokens are typically placed in the shared balance and debited by the debitor. However,
+    /// if the debitor has enabled `auto_debit`, then the tokens will be debited automatically.
     ///
     /// # Shared balance mechanics
     /// When in the shared balance, the tokens can be:
@@ -376,9 +370,8 @@ pub mod service {
 
     /// Uncredit tokens that were credited into a shared balance
     ///
-    /// On credit, tokens are typically automatically debited by the debitor. However,
-    /// if the debitor has enabled `manual_debit`, then the tokens will be placed in an intermediate
-    /// "shared balance".
+    /// On credit, tokens are typically placed in the shared balance and debited by the debitor. However,
+    /// if the debitor has enabled `auto_debit`, then the tokens will be debited automatically.
     ///
     /// # Shared balance mechanics
     /// When in the shared balance, the tokens can be:
@@ -409,9 +402,8 @@ pub mod service {
 
     /// Debit tokens that were credited into a shared balance
     ///
-    /// On credit, tokens are typically automatically debited by the debitor. However,
-    /// if the debitor has enabled `manual_debit`, then the tokens will be placed in an intermediate
-    /// "shared balance".
+    /// On credit, tokens are typically placed in the shared balance and debited by the debitor. However,
+    /// if the debitor has enabled `auto_debit`, then the tokens will be debited automatically.
     ///
     /// # Shared balance mechanics
     /// When in the shared balance, the tokens can be:
@@ -431,9 +423,8 @@ pub mod service {
 
     /// Rejects the shared balance between a creditor and a debitor
     ///
-    /// On credit, tokens are typically automatically debited by the debitor. However,
-    /// if the debitor has enabled `manual_debit`, then the tokens will be placed in an intermediate
-    /// "shared balance".
+    /// On credit, tokens are typically placed in the shared balance and debited by the debitor. However,
+    /// if the debitor has enabled `auto_debit`, then the tokens will be debited automatically.
     ///
     /// # Shared balance mechanics
     /// When in the shared balance, the tokens can be:

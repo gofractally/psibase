@@ -21,13 +21,13 @@ pub mod service {
         if InitRow::get().is_none() {
             InitRow::init();
 
-            Tokens::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
-            Nft::call().setUserConf(NftHolderFlags::MANUAL_DEBIT.index(), true);
+            Tokens::call().setUserConf(BalanceFlags::AUTO_DEBIT.index(), false);
+            Nft::call().setUserConf(NftHolderFlags::AUTO_DEBIT.index(), false);
         };
         let add_index = |method: &str, columns: Vec<u8>| {
             for column in columns {
                 events::Wrapper::call().addIndex(
-                    DbId::HistoryEvent,
+                    EventDb::HistoryEvent,
                     Wrapper::SERVICE,
                     MethodNumber::from(method),
                     column,

@@ -44,9 +44,6 @@ void psibase::raw::setRetval(const char* retval, std::uint32_t len)
    psibase::abortMessage("Tester does not support setRetval");
 }
 
-// PSIBASE_NATIVE(putSequential)
-// uint64_t putSequential(DbId db, const char* value, uint32_t valueLen);
-
 struct KvBucket
 {
    DbId              db;
@@ -89,11 +86,6 @@ uint32_t psibase::raw::kvGet(KvHandle db, const char* key, uint32_t keyLen)
    auto        fullKey = bucket->key(key, keyLen);
    return psibase::tester::raw::kvGet(psibase::tester::raw::getSelectedChain(), bucket->db,
                                       fullKey.data(), fullKey.size());
-}
-
-uint32_t psibase::raw::getSequential(DbId db, uint64_t id)
-{
-   return psibase::tester::raw::getSequential(psibase::tester::raw::getSelectedChain(), db, id);
 }
 
 uint32_t psibase::raw::kvGreaterEqual(KvHandle    db,

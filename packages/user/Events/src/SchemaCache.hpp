@@ -9,7 +9,7 @@ namespace UserService
    {
       SchemaCache();
       const psio::schema_types::CompiledType* getSchemaType(psibase::AccountNumber user,
-                                                            psibase::DbId          db,
+                                                            psibase::EventDb       db,
                                                             psibase::AccountNumber service,
                                                             psibase::MethodNumber  event);
 

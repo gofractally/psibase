@@ -14,9 +14,9 @@ use crate::{
     AccountNumber, Action, ActionFormatter, BlockTime, Caller, Checksum256, CodeByHashRow, CodeRow,
     DbId, DirectoryRegistry, Error, HostConfigRow, HttpBody, HttpHeader, HttpReply, HttpRequest,
     InnerTraceEnum, JointRegistry, KvHandle, KvMode, PackageOpFull, PackageRegistry,
-    PackagedService, RunMode, Schema, SchemaFetcher, SchemaMap, Seconds, SignedTransaction,
-    StatusRow, Table, TableRecord, Tapos, TimePointSec, TimePointUSec, ToKey, Transaction,
-    TransactionBuilder, TransactionTrace,
+    PackagedService, RunMode, Schema, SchemaFetcher, SchemaMap, Seconds, ServiceWrapper,
+    SignedTransaction, StatusRow, Table, TableRecord, Tapos, TimePointSec, TimePointUSec, ToKey,
+    Transaction, TransactionBuilder, TransactionTrace,
 };
 #[cfg(target_family = "wasm")]
 use crate::{MicroSeconds, PackageList};
@@ -572,7 +572,6 @@ impl Chain {
     /// this chain's database:
     ///
     /// * [`native_raw::kvGet`](crate::native_raw::kvGet)
-    /// * [`native_raw::getSequential`](crate::native_raw::getSequential)
     /// * [`native_raw::kvGreaterEqual`](crate::native_raw::kvGreaterEqual)
     /// * [`native_raw::kvLessThan`](crate::native_raw::kvLessThan)
     /// * [`native_raw::kvMax`](crate::native_raw::kvMax)
@@ -1116,6 +1115,68 @@ impl<'a> Caller for ChainPusher<'a> {
     }
 }
 
+pub trait Push: ServiceWrapper {
+    /// push transactions to [psibase::Chain](psibase::Chain).
+    ///
+    /// This method returns an object which has methods
+    /// (one per action) which push transactions to a test chain and return a
+    /// [psibase::ChainResult](psibase::ChainResult) or
+    /// [psibase::ChainEmptyResult](psibase::ChainEmptyResult). This final object
+    /// can verify success or failure and can retrieve the return value, if any.
+    ///
+    /// This method defaults both `sender` and `service` to Self::SERVICE
+    fn push<'a>(chain: &'a Chain) -> Self::Actions<ChainPusher<'a>> {
+        Self::push_from_to(chain, Self::SERVICE, Self::SERVICE)
+    }
+
+    /// push transactions to [psibase::Chain](psibase::Chain).
+    ///
+    /// This method returns an object which has methods
+    /// (one per action) which push transactions to a test chain and return a
+    /// [psibase::ChainResult](psibase::ChainResult) or
+    /// [psibase::ChainEmptyResult](psibase::ChainEmptyResult). This final object
+    /// can verify success or failure and can retrieve the return value, if any.
+    ///
+    /// This method defaults `sender` to Self::SERVICE
+    fn push_to<'a>(chain: &'a Chain, service: AccountNumber) -> Self::Actions<ChainPusher<'a>> {
+        Self::push_from_to(chain, Self::SERVICE, service)
+    }
+
+    /// push transactions to [psibase::Chain](psibase::Chain).
+    ///
+    /// This method returns an object which has methods
+    /// (one per action) which push transactions to a test chain and return a
+    /// [psibase::ChainResult](psibase::ChainResult) or
+    /// [psibase::ChainEmptyResult](psibase::ChainEmptyResult). This final object
+    /// can verify success or failure and can retrieve the return value, if any.
+    ///
+    /// This method defaults `service` to Self::SERVICE
+    fn push_from<'a>(chain: &'a Chain, sender: AccountNumber) -> Self::Actions<ChainPusher<'a>> {
+        Self::push_from_to(chain, sender, Self::SERVICE)
+    }
+
+    /// push transactions to [psibase::Chain](psibase::Chain).
+    ///
+    /// This method returns an object which has methods
+    /// (one per action) which push transactions to a test chain and return a
+    /// [psibase::ChainResult](psibase::ChainResult) or
+    /// [psibase::ChainEmptyResult](psibase::ChainEmptyResult). This final object
+    /// can verify success or failure and can retrieve the return value, if any.
+    fn push_from_to<'a>(
+        chain: &'a Chain,
+        sender: AccountNumber,
+        service: AccountNumber,
+    ) -> Self::Actions<ChainPusher<'a>> {
+        Self::with_caller(ChainPusher {
+            chain,
+            sender,
+            service,
+        })
+    }
+}
+
+impl<T: ServiceWrapper> Push for T {}
+
 #[cfg(target_family = "wasm")]
 #[allow(non_snake_case)]
 pub mod polyfill {
@@ -1205,10 +1266,6 @@ pub mod polyfill {
             full_key.as_ptr(),
             full_key.len() as u32,
         )
-    }
-
-    pub unsafe fn getSequential(db: DbId, id: u64) -> u32 {
-        return tester_raw::getSequential(get_selected_chain(), db, id);
     }
 
     pub unsafe fn getKey(dest: *mut u8, dest_size: u32) -> u32 {

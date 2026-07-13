@@ -8,13 +8,13 @@ import { supervisor } from "@shared/lib/supervisor";
 
 import { fetchUserSettings } from "../../lib/graphql/ui";
 
-export const useUserManualDebit = (user: string | null) => {
+export const useUserAutoDebit = (user: string | null) => {
     return useQuery<boolean>({
         queryKey: QueryKey.userSettings(user),
         enabled: !!user,
         queryFn: async () => {
             const res = await fetchUserSettings(zAccount.parse(user));
-            return res.manualDebit;
+            return res.autoDebit;
         },
     });
 };
@@ -23,9 +23,9 @@ const Args = z.object({
     enable: z.boolean(),
 });
 
-export const useToggleUserManualDebit = (user: string | null) => {
+export const useToggleUserAutoDebit = (user: string | null) => {
     return useMutation<void, Error, z.infer<typeof Args>>({
-        mutationKey: ["user-manual-debit"],
+        mutationKey: ["user-auto-debit"],
         mutationFn: (vars) => {
             const { enable } = Args.parse(vars);
 
@@ -33,7 +33,7 @@ export const useToggleUserManualDebit = (user: string | null) => {
                 service: "tokens",
                 plugin: "plugin",
                 intf: "userConfig",
-                method: "enableUserManualDebit",
+                method: "enableUserAutoDebit",
                 params: [enable],
             });
         },

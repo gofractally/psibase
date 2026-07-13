@@ -6,7 +6,8 @@ pub mod tables {
     use psibase::services::nft::{Wrapper as Nfts, NID};
     use psibase::services::tokens::{Decimal, Precision, Quantity};
     use psibase::{
-        abort_message, check, check_none, check_some, get_sender, AccountNumber, Memo, TableRecord,
+        abort_message, check, check_none, check_some, get_sender, AccountNumber, Memo,
+        ServiceWrapper, TableRecord,
     };
     use psibase::{define_flags, Flags};
     use psibase::{Fracpack, Table, ToSchema};
@@ -494,13 +495,11 @@ pub mod tables {
                 check(token.nft_holder() == get_sender(), "Token untradeable");
             }
 
-            let is_manual_debit = BalanceConfig::get(self.debitor, self.token_id)
-                .map(|holder| holder.get_flag(BalanceFlags::MANUAL_DEBIT))
-                .unwrap_or(
-                    UserConfig::get_or_new(self.debitor).get_flag(BalanceFlags::MANUAL_DEBIT),
-                );
+            let is_auto_debit = BalanceConfig::get(self.debitor, self.token_id)
+                .map(|holder| holder.get_flag(BalanceFlags::AUTO_DEBIT))
+                .unwrap_or(UserConfig::get_or_new(self.debitor).get_flag(BalanceFlags::AUTO_DEBIT));
 
-            if !is_manual_debit {
+            if is_auto_debit {
                 self.debit(quantity, memo);
             }
         }
@@ -608,7 +607,7 @@ pub mod tables {
     }
 
     define_flags!(BalanceFlags, u8, {
-        manual_debit,
+        auto_debit,
         keep_zero_balances,
     });
 

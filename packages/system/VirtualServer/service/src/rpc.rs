@@ -16,7 +16,7 @@ use psibase::{
         tokens::{Decimal, Quantity, Wrapper as Tokens},
         transact::ServiceMethod,
     },
-    AccountNumber, EventConnection, EventQuery, MethodNumber, Table,
+    AccountNumber, EventConnection, EventQuery, MethodNumber, ServiceWrapper, Table,
 };
 use serde::Deserialize;
 use serde_aux::field_attributes::deserialize_number_from_string;

@@ -10,7 +10,7 @@ namespace UserService
 {
    SchemaCache::SchemaCache() {}
    const CompiledType* SchemaCache::getSchemaType(AccountNumber user,
-                                                  DbId          db,
+                                                  EventDb       db,
                                                   AccountNumber service,
                                                   MethodNumber  event)
    {

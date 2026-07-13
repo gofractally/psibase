@@ -1,7 +1,7 @@
 use super::gql::Queryable;
 use crate::tables::{Attestation, AttestationStats};
 use crate::Wrapper as Identity;
-use psibase::AccountNumber;
+use psibase::{AccountNumber, Push, ServiceWrapper};
 use std::fmt::Debug;
 
 pub trait HasQueryFields {
@@ -48,30 +48,12 @@ impl HasQueryFields for AttestationStats {
         "subject, uniqueAttesters, numHighConfAttestations, mostRecentAttestation";
 }
 
-// Todo: implement a ServiceWrapper trait on the Wrapper itself, instead of needing a wrapper object
-pub trait IsServiceWrapper {
-    const SERVICE: psibase::AccountNumber;
-    fn push_from(
-        chain: &psibase::Chain,
-        account: AccountNumber,
-    ) -> crate::Actions<psibase::ChainPusher>;
-}
-impl IsServiceWrapper for Identity {
-    const SERVICE: psibase::AccountNumber = Identity::SERVICE;
-    fn push_from(
-        chain: &psibase::Chain,
-        account: AccountNumber,
-    ) -> crate::Actions<psibase::ChainPusher> {
-        Identity::push_from(chain, account)
-    }
-}
-
-pub struct ChainPusher<'a, T: IsServiceWrapper> {
+pub struct ChainPusher<'a, T: ServiceWrapper> {
     chain: &'a psibase::Chain,
     _marker: core::marker::PhantomData<T>,
 }
 
-impl<'a, T: IsServiceWrapper> ChainPusher<'a, T> {
+impl<'a, T: ServiceWrapper> ChainPusher<'a, T> {
     fn new(chain: &'a psibase::Chain) -> Self {
         ChainPusher::<T> {
             chain,
@@ -80,7 +62,7 @@ impl<'a, T: IsServiceWrapper> ChainPusher<'a, T> {
     }
 
     /// Push an action from the specified account
-    pub fn from(&self, account: &str) -> crate::Actions<psibase::ChainPusher> {
+    pub fn from(&self, account: &str) -> T::Actions<psibase::ChainPusher<'a>> {
         T::push_from(self.chain, account.parse().unwrap())
     }
 
@@ -94,7 +76,7 @@ impl<'a, T: IsServiceWrapper> ChainPusher<'a, T> {
     }
 }
 
-pub fn init_identity_svc(chain: &psibase::Chain) -> ChainPusher<Identity> {
+pub fn init_identity_svc<'a>(chain: &'a psibase::Chain) -> ChainPusher<'a, Identity> {
     chain.new_account(psibase::account!("alice")).unwrap();
     chain.new_account(psibase::account!("bob")).unwrap();
     ChainPusher::<Identity>::new(&chain)

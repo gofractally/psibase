@@ -98,8 +98,6 @@ export class Supervisor implements AppInterface {
         }
     }
 
-    private preloadLock: Promise<void> = Promise.resolve();
-
     // This step loads the full plugin tree (downloading + parsing + JCO transpiling)
     //
     // This does not instantiate wasms, with the exception of core system plugin wasms,
@@ -109,11 +107,7 @@ export class Supervisor implements AppInterface {
     // The caller should dispose of all instantiated plugins after the entry function
     //  finishes.
     private preload(plugins: QualifiedPluginId[]): Promise<void> {
-        const myPreload = this.preloadLock
-            .catch(() => {})
-            .then(() => this.doPreload(plugins));
-        this.preloadLock = myPreload.catch(() => {});
-        return myPreload;
+        return this.doPreload(plugins);
     }
 
     private async doPreload(plugins: QualifiedPluginId[]) {
@@ -349,6 +343,12 @@ export class Supervisor implements AppInterface {
         return ret;
     }
 
+    private cleanupSessionState(): void {
+        this.context = undefined;
+        this.parentOrigination = undefined;
+        this.embedder = undefined;
+    }
+
     // This is an entrypoint that returns the JSON interface for a plugin.
     async getJson(callerOrigin: string, id: string, plugin: QualifiedPluginId) {
         try {
@@ -361,6 +361,7 @@ export class Supervisor implements AppInterface {
             this.replyToParent(id, e);
         } finally {
             this.plugins.disposeAll();
+            this.cleanupSessionState();
         }
     }
 
@@ -382,6 +383,7 @@ export class Supervisor implements AppInterface {
         } finally {
             this.plugins.disposeAll();
             this.replyToParent(id, result);
+            this.cleanupSessionState();
         }
     }
 
@@ -428,8 +430,6 @@ export class Supervisor implements AppInterface {
 
             // Send plugin result to parent window
             this.replyToParent(id, result);
-
-            this.context = undefined;
         } catch (e) {
             const err = getRecoverableError(e);
             if (err) {
@@ -446,10 +446,9 @@ export class Supervisor implements AppInterface {
             } else {
                 this.replyToParent(id, e);
             }
-
-            this.context = undefined;
         } finally {
             this.plugins.disposeAll();
+            this.cleanupSessionState();
         }
     }
 }

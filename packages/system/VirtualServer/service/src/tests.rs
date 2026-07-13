@@ -6,6 +6,7 @@ mod tests {
     use p256::ecdsa::Signature;
     use p256::ecdsa::{signature::hazmat::PrehashSigner, SigningKey};
     use p256::pkcs8::DecodePrivateKey;
+    use psibase::FlagsType;
     use psibase::{
         account,
         fracpack::Pack,
@@ -19,8 +20,8 @@ mod tests {
             tokens::{self, Decimal, Precision, Quantity, Wrapper as Tokens},
             verify_sig,
         },
-        tester, AccountNumber, Action, ChainEmptyResult, Claim, MethodNumber, SignedTransaction,
-        Transaction,
+        tester, AccountNumber, Action, ChainEmptyResult, Claim, MethodNumber, Push,
+        SignedTransaction, Transaction,
     };
     use rand::Rng;
     use serde::Deserialize;
@@ -175,13 +176,26 @@ mod tests {
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
 
+        for acc in &[alice, bob, PRODUCER_ACCOUNT, symbol] {
+            Tokens::push_from(chain, *acc)
+                .setUserConf(
+                    psibase::services::tokens::BalanceFlags::AUTO_DEBIT.index(),
+                    true,
+                )
+                .get()?;
+
+            Nft::push_from(chain, *acc)
+                .setUserConf(
+                    psibase::services::nft::NftHolderFlags::AUTO_DEBIT.index(),
+                    true,
+                )
+                .get()?;
+        }
+
         let supply: u64 = 10_000_000_000_000_0000u64.into();
         let sys = tokens::Wrapper::push_from(chain, symbol)
             .create(Precision::new(4).unwrap(), Quantity::from(supply))
             .get()?;
-
-        let nid = Tokens::push(&chain).getToken(sys).get()?.nft_id;
-        Nft::push_from(chain, symbol).debit(nid, "".into()).get()?;
 
         Tokens::push_from(chain, tokens_service)
             .setSysToken(sys)
