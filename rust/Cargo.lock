@@ -4433,6 +4433,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "test-panic"
+version = "0.23.0"
+dependencies = [
+ "psibase",
+ "psibase-rust-workspace-hack",
+ "psibase_service",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "test_fracpack"
 version = "0.23.0"
 dependencies = [

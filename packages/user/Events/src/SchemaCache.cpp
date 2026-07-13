@@ -8,7 +8,7 @@ using namespace psio::schema_types;
 
 namespace UserService
 {
-   SchemaCache::SchemaCache(InstalledSchemaTable table) : table(std::move(table)) {}
+   SchemaCache::SchemaCache() {}
    const CompiledType* SchemaCache::getSchemaType(EventDb       db,
                                                   AccountNumber service,
                                                   MethodNumber  event)
@@ -16,9 +16,9 @@ namespace UserService
       auto pos = cache.find(service);
       if (pos == cache.end())
       {
-         if (auto schema = table.getIndex<0>().get(service))
+         if (auto schema = to<Packages>().getSchema(service))
          {
-            pos = cache.try_emplace(service, std::move(schema->schema)).first;
+            pos = cache.try_emplace(service, std::move(*schema)).first;
          }
          else
          {
@@ -38,7 +38,7 @@ namespace UserService
 
    SchemaCache& SchemaCache::instance()
    {
-      static SchemaCache result{Packages{}.open<InstalledSchemaTable>()};
+      static SchemaCache result{};
       return result;
    }
 }  // namespace UserService

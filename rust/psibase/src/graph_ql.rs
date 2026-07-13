@@ -1,6 +1,6 @@
 use crate::{
     get_key_bytes, kv_get, kv_greater_equal_bytes, kv_less_than_bytes, kv_max_bytes, BlockNum,
-    BlockTime, EventDb, MethodNumber, RawKey, TableIndex, TableRecord, ToKey,
+    BlockTime, EventDb, MethodNumber, RawKey, ServiceWrapper, TableIndex, TableRecord, ToKey,
 };
 use async_graphql::connection::{query_with, Connection, Edge, EmptyFields};
 use async_graphql::{ContainerType, OutputType, SimpleObject, TypeName};

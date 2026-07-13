@@ -6,7 +6,9 @@ pub mod tables {
     use psibase::services::nft::{Nft as NftRecord, Wrapper as Nft, NID};
     use psibase::services::tokens::Wrapper as Tokens;
     use psibase::services::tokens::{Decimal, Quantity, TokenRecord, TID};
-    use psibase::{check, check_some, get_sender, AccountNumber, Fracpack, Table, ToSchema};
+    use psibase::{
+        check, check_some, get_sender, AccountNumber, Fracpack, ServiceWrapper, Table, ToSchema,
+    };
     use psibase::{check_none, get_service};
     use serde::{Deserialize, Serialize};
 
@@ -298,8 +300,8 @@ pub mod service {
         if InitTable::read().get_index_pk().get(&()).is_none() {
             table.put(&InitRow {}).unwrap();
 
-            Tokens::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
-            Nft::call().setUserConf(NftHolderFlags::MANUAL_DEBIT.index(), true);
+            Tokens::call().setUserConf(BalanceFlags::AUTO_DEBIT.index(), false);
+            Nft::call().setUserConf(NftHolderFlags::AUTO_DEBIT.index(), false);
 
             let add_index = |method: &str, column: u8| {
                 events::Wrapper::call().addIndex(

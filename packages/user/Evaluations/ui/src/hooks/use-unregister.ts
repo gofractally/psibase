@@ -2,6 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 
 import { zUser } from "@/lib/graphql/get-users";
 
+import { EVALUATIONS_SERVICE } from "@shared/domains/fractal/lib/constants";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { queryClient } from "@shared/lib/query-client";
 import { supervisor } from "@shared/lib/supervisor";
@@ -16,7 +17,7 @@ export const useUnregister = () => {
 
             void (await supervisor.functionCall({
                 method: "unregister",
-                service: "evaluations",
+                service: EVALUATIONS_SERVICE,
                 intf: "user",
                 params: [id],
             }));

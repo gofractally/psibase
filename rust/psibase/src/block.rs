@@ -36,7 +36,7 @@ pub type BlockTime = TimePointUSec;
     PartialEq,
     Eq,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
+#[fracpack(fracpack_mod = "fracpack", custom = "Action")]
 #[to_key(psibase_mod = "crate")]
 #[graphql(input_name = "ActionInput")]
 pub struct Action {
@@ -54,7 +54,7 @@ pub struct Action {
 }
 
 #[derive(Debug, Clone, Default, Pack, Unpack, ToKey, ToSchema, Serialize)]
-#[fracpack(fracpack_mod = "fracpack")]
+#[fracpack(fracpack_mod = "fracpack", custom = "Action")]
 #[to_key(psibase_mod = "crate")]
 pub struct SharedAction<'a> {
     pub sender: AccountNumber,

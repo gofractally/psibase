@@ -22,8 +22,9 @@ use psibase::{
     FilteredRegistry, HTTPRegistry, HttpSchemaFetcher, JointRegistry, Meta, NullSchemaFetcher,
     PackageDataFile, PackageInfo, PackageList, PackageOp, PackageOpFull, PackageOrigin,
     PackagePreference, PackageRef, PackageRegistry, PackagedService, PrettyAction, SchemaFetcher,
-    SchemaMap, Seconds, ServiceInfo, SignedTransaction, StagedUpload, Tapos, TaposRefBlock,
-    TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace, Version,
+    SchemaMap, Seconds, ServiceInfo, ServiceWrapper, SignedTransaction, StagedUpload, Tapos,
+    TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace,
+    Version,
 };
 use regex::Regex;
 use reqwest::Url;
@@ -393,6 +394,10 @@ struct UpgradeArgs {
     /// Instead of installing to the chain, install local packages to a single node
     #[clap(long)]
     local: bool,
+
+    /// Automatically accept install confirmation
+    #[clap(short = 'y', long)]
+    yes: bool,
 
     /// Configure compression level to use for uploaded files
     /// (1=fastest, 11=most compression)
@@ -1843,6 +1848,44 @@ async fn do_install<T: Read + Seek>(
     Ok(())
 }
 
+fn confirm_install(yes: bool, to_install: &[PackageOp]) -> Result<bool, anyhow::Error> {
+    if to_install.is_empty() {
+        eprintln!("Nothing to install.");
+        return Ok(false);
+    } else {
+        eprintln!("The following changes will be applied:");
+        to_install
+            .iter()
+            .map(|op| match op {
+                PackageOp::Install(info) => format!("Install {}-{}", info.name, info.version),
+                PackageOp::Replace(old, new) => {
+                    if old.version == new.version {
+                        format!("Reinstall {} {}", old.name, old.version)
+                    } else {
+                        format!("Upgrade {} {} -> {}", old.name, old.version, new.version)
+                    }
+                }
+                PackageOp::Remove(meta) => format!("Remove {}-{}", meta.name, meta.version),
+            })
+            .for_each(|line| eprintln!("  {}", line));
+    }
+
+    if !yes {
+        let term = Term::stderr();
+        if term.is_term() {
+            let proceed = Confirm::new()
+                .with_prompt("Proceed?")
+                .default(true)
+                .interact_on(&term)?;
+            if !proceed {
+                eprintln!("Install aborted.");
+                return Ok(false);
+            }
+        }
+    }
+    Ok(true)
+}
+
 async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
     let mut client = build_client(&args.node_args.proxy).await?;
     let installed = if args.local {
@@ -1865,39 +1908,8 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
         .resolve_changes(&package_registry, &packages, args.reinstall, args.local)
         .await?;
 
-    if to_install.is_empty() {
-        println!("Nothing to install.");
+    if !confirm_install(args.yes, &to_install)? {
         return Ok(());
-    } else {
-        println!("The following changes will be applied:");
-        to_install
-            .iter()
-            .map(|op| match op {
-                PackageOp::Install(info) => format!("Install {}-{}", info.name, info.version),
-                PackageOp::Replace(old, new) => {
-                    if old.version == new.version {
-                        format!("Reinstall {} {}", old.name, old.version)
-                    } else {
-                        format!("Upgrade {} {} -> {}", old.name, old.version, new.version)
-                    }
-                }
-                PackageOp::Remove(meta) => format!("Remove {}-{}", meta.name, meta.version),
-            })
-            .for_each(|line| println!("  {}", line));
-    }
-
-    if !args.yes {
-        let term = Term::stderr();
-        if term.is_term() {
-            let proceed = Confirm::new()
-                .with_prompt("Proceed?")
-                .default(true)
-                .interact_on(&term)?;
-            if !proceed {
-                println!("Install aborted.");
-                return Ok(());
-            }
-        }
     }
 
     if args.local {
@@ -2200,6 +2212,10 @@ async fn upgrade(args: &UpgradeArgs) -> Result<(), anyhow::Error> {
             args.local,
         )
         .await?;
+
+    if !confirm_install(args.yes, &to_install)? {
+        return Ok(());
+    }
 
     if args.local {
         do_install_local(

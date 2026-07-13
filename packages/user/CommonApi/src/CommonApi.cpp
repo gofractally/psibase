@@ -112,9 +112,9 @@ namespace SystemService
             return to_json(to<HttpServer>().rootHost(request.host));
          if (request.target == "/common/tapos/head")
          {
-            auto [index, suffix] = headTapos();
+            auto [index, suffix] = to<Transact>().headTapos();
             auto json            = "{\"refBlockIndex\":" + std::to_string(index) +
-                        ",\"refBlockSuffix\":" + std::to_string(suffix) + "}";
+                                   ",\"refBlockSuffix\":" + std::to_string(suffix) + "}";
             return HttpReply{
                 .contentType = "application/json",
                 .body        = {json.begin(), json.end()},

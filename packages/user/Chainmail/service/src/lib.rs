@@ -17,7 +17,7 @@ mod service {
     use psibase::services::transact::Wrapper as TransactSvc;
     use psibase::{
         check, get_sender, serve_graphql, AccountNumber, EventDb, HttpReply, HttpRequest,
-        MethodNumber, RawKey, Table, TableQuery, TimePointSec,
+        MethodNumber, RawKey, ServiceWrapper, Table, TableQuery, TimePointSec,
     };
 
     #[action]

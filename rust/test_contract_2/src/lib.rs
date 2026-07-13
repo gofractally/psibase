@@ -156,7 +156,7 @@ mod service {
 #[psibase::test_case(packages("TestContract2"))]
 fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
     use psibase::services::http_server;
-    use psibase::{HttpBody, Table};
+    use psibase::{HttpBody, Push, Table};
     use serde_json::{json, Value};
     http_server::Wrapper::push_from(&chain, SERVICE).registerServer(SERVICE);
     let result = Wrapper::push(&chain).add(3, 4);
@@ -215,6 +215,7 @@ fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
 #[psibase::test_case(packages("TestContract2"))]
 fn test_add_events(chain: psibase::Chain) -> Result<(), psibase::Error> {
     use psibase::services::http_server;
+    use psibase::Push;
     use serde_json::{json, Value};
 
     http_server::Wrapper::push_from(&chain, SERVICE).registerServer(SERVICE);
@@ -430,6 +431,7 @@ fn test_add_events(chain: psibase::Chain) -> Result<(), psibase::Error> {
 #[psibase::test_case(packages("TestContract2"))]
 fn test_example_records(chain: psibase::Chain) -> Result<(), psibase::Error> {
     use psibase::services::http_server;
+    use psibase::Push;
     use serde_json::{json, Value};
 
     http_server::Wrapper::push_from(&chain, SERVICE).registerServer(SERVICE);
