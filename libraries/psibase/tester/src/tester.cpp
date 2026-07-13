@@ -790,6 +790,38 @@ std::string psibase::TestChain::login(AccountNumber user, AccountNumber service)
    return reply.access_token;
 }
 
+namespace
+{
+   struct TestChainSchemas
+   {
+      const psibase::TestChain&                                chain;
+      std::map<psibase::AccountNumber, psibase::ServiceSchema> schemas;
+      const psibase::ServiceSchema* operator()(psibase::AccountNumber service)
+      {
+         auto pos = schemas.find(service);
+         if (pos != schemas.end())
+            return &pos->second;
+
+         auto table = UserService::Packages{}.open<UserService::InstalledSchemaTable>();
+         if (auto row = table.get(service))
+         {
+            auto [pos, inserted] = schemas.try_emplace(service, std::move(row->schema));
+            return &pos->second;
+         }
+         return nullptr;
+      }
+   };
+}  // namespace
+
+void psibase::TestChain::show(bool include, const TransactionTrace& t) const
+{
+   if (include || t.error)
+   {
+      auto schemas = TestChainSchemas{*this};
+      std::cout << prettyTrace(t, std::ref(schemas)) << "\n";
+   }
+}
+
 std::optional<std::vector<char>> psibase::TestChain::kvGetRaw(psibase::DbId      db,
                                                               psio::input_stream key)
 {

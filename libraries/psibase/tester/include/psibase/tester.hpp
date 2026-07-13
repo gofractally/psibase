@@ -742,6 +742,8 @@ namespace psibase
          return ServiceUser<Other>(*this, Other::service, Other::service, KeyList{});
       }
 
+      void show(bool include, const TransactionTrace& trace) const;
+
       std::uint32_t nativeHandle() const { return id; }
 
       /// Get a key-value pair, if any
