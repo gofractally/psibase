@@ -203,7 +203,6 @@ namespace psibase
             }
          }
       }
-      dest += "\n";
       for (auto& inner : atrace.innerTraces)
          std::visit([&](auto& inner) { prettyTrace(dest, inner, schemas, indent + "    "); },
                     inner.inner);
