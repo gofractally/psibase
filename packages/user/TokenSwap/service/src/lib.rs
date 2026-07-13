@@ -27,7 +27,7 @@ pub mod service {
         let add_index = |method: &str, columns: Vec<u8>| {
             for column in columns {
                 events::Wrapper::call().addIndex(
-                    DbId::HistoryEvent,
+                    EventDb::HistoryEvent,
                     Wrapper::SERVICE,
                     MethodNumber::from(method),
                     column,

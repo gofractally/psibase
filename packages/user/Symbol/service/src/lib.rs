@@ -305,7 +305,7 @@ pub mod service {
 
             let add_index = |method: &str, column: u8| {
                 events::Wrapper::call().addIndex(
-                    DbId::HistoryEvent,
+                    EventDb::HistoryEvent,
                     Wrapper::SERVICE,
                     MethodNumber::from(method),
                     column,
