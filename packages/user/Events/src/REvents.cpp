@@ -2,11 +2,14 @@
 
 #include <alloca.h>
 #include <sqlite3.h>
+#include <psibase/HttpHeaders.hpp>
 #include <psibase/Table.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psio/schema.hpp>
 #include <regex>
+#include <services/local/XAdmin.hpp>
+#include <services/system/HttpServer.hpp>
 #include <services/user/EventIndex.hpp>
 #include <services/user/Events.hpp>
 #include <services/user/EventsTables.hpp>
@@ -1171,10 +1174,22 @@ std::vector<char> REvents::sqlQuery(const std::string&              squery,
    return sqlQueryImpl(getSender(), squery, params);
 }
 
-std::optional<HttpReply> REvents::serveSys(const HttpRequest& request)
+std::optional<HttpReply> REvents::serveSys(const HttpRequest&           request,
+                                           std::optional<std::int32_t>  socket,
+                                           std::optional<AccountNumber> user)
 {
+   check(getSender() == SystemService::HttpServer::service, "wrong sender");
+
    if (request.target != "/sql")
       return {};
+
+   if (!to<LocalService::XAdmin>().isAdmin(user, socket, forwardedFor(request)))
+   {
+      std::string_view msg = "Not authorized";
+      return HttpReply{.status      = user ? HttpStatus::forbidden : HttpStatus::unauthorized,
+                       .contentType = "text/html",
+                       .body        = std::vector(msg.begin(), msg.end())};
+   }
 
    return HttpReply{
        .contentType = "application/json",
