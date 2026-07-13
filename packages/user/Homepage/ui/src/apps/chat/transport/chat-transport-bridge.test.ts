@@ -8,6 +8,18 @@ const stackMock = vi.hoisted(() => {
         kickNegotiation: vi.fn(),
         on: vi.fn(() => () => {}),
     };
+    const peerLifecycle = {
+        ensure: vi.fn(async () => {}),
+        notifyRemoteReachable: vi.fn(),
+    };
+    const deliveryFabric = {
+        ensurePeer: vi.fn(async () => {}),
+        notifyRemoteReachable: vi.fn(),
+        sendPeerBytes: vi.fn(() => ({ ok: true })),
+        disposePeer: vi.fn(),
+        touchPeer: vi.fn(),
+        getPeerState: vi.fn(() => "absent"),
+    };
     const messaging = {
         hydrateFromStorage: vi.fn(),
         onInbound: vi.fn(),
@@ -17,6 +29,8 @@ const stackMock = vi.hoisted(() => {
     };
     const stack = {
         peerRegistry,
+        peerLifecycle,
+        deliveryFabric,
         messaging,
         notifyRemoteReachable: vi.fn(),
         wireRealtimeHandlers: vi.fn(),
@@ -25,6 +39,8 @@ const stackMock = vi.hoisted(() => {
     return {
         stack,
         peerRegistry,
+        peerLifecycle,
+        deliveryFabric,
         messaging,
         createChatTransportStack: vi.fn(() => stack),
     };
@@ -89,6 +105,8 @@ describe("ChatTransportBridge", () => {
         stackMock.messaging.onInbound.mockClear();
         stackMock.messaging.acknowledgeInbound.mockClear();
         stackMock.stack.notifyRemoteReachable.mockClear();
+        stackMock.deliveryFabric.notifyRemoteReachable.mockClear();
+        stackMock.deliveryFabric.ensurePeer.mockClear();
         stackMock.peerRegistry.kickNegotiation.mockClear();
     });
 
@@ -101,17 +119,16 @@ describe("ChatTransportBridge", () => {
         ) => void;
     }
 
-    it("routes presence online through roster coordinator", () => {
-        stackMock.stack.notifyRemoteReachable.mockClear();
+    it("routes presence online through delivery fabric / peer lifecycle", () => {
+        stackMock.deliveryFabric.notifyRemoteReachable.mockClear();
 
         const bridge = createBridge();
         bridge.start();
         bridge.onPeerOnline("bob");
 
-        expect(stackMock.stack.notifyRemoteReachable).toHaveBeenCalledWith(
-            "bob",
-            "presence_online",
-        );
+        expect(
+            stackMock.deliveryFabric.notifyRemoteReachable,
+        ).toHaveBeenCalledWith("bob", "presence_online");
         expect(stackMock.peerRegistry.kickNegotiation).not.toHaveBeenCalled();
     });
 
@@ -161,7 +178,7 @@ describe("ChatTransportBridge", () => {
     });
 
     it("ensureChatDataSession skips offline group members", () => {
-        stackMock.peerRegistry.ensure.mockClear();
+        stackMock.deliveryFabric.ensurePeer.mockClear();
 
         const bridge = new ChatTransportBridge({
             getRealtime: () =>
@@ -184,21 +201,17 @@ describe("ChatTransportBridge", () => {
                 account === "carol" ? "offline" : "online",
         });
         bridge.start();
-        bridge.ensureChatDataSession("space:group", [
-            "alice",
-            "bob",
-            "carol",
-        ]);
+        bridge.ensureChatDataSession("space:group", ["alice", "bob", "carol"]);
 
-        expect(stackMock.peerRegistry.ensure).toHaveBeenCalledTimes(1);
-        expect(stackMock.peerRegistry.ensure).toHaveBeenCalledWith(
+        expect(stackMock.deliveryFabric.ensurePeer).toHaveBeenCalledTimes(1);
+        expect(stackMock.deliveryFabric.ensurePeer).toHaveBeenCalledWith(
             "bob",
             "peer_focus",
         );
     });
 
     it("ensurePeer skips offline peers for peer_focus", () => {
-        stackMock.peerRegistry.ensure.mockClear();
+        stackMock.deliveryFabric.ensurePeer.mockClear();
 
         const bridge = new ChatTransportBridge({
             getRealtime: () =>
@@ -223,6 +236,6 @@ describe("ChatTransportBridge", () => {
         bridge.start();
         bridge.ensurePeer("carol", "peer_focus");
 
-        expect(stackMock.peerRegistry.ensure).not.toHaveBeenCalled();
+        expect(stackMock.deliveryFabric.ensurePeer).not.toHaveBeenCalled();
     });
 });

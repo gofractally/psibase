@@ -1,24 +1,27 @@
-import type { RealtimeClient } from "../lib/realtime-client";
 import type { IceServerConfig } from "../lib/protocol";
+import type { RealtimeClient } from "../lib/realtime-client";
+import type { PeerLifecycleCoordinator } from "./peer-lifecycle-coordinator";
+import type { RosterRenegotiationCoordinator } from "./roster-renegotiation-coordinator";
+import type { EnsureReason } from "./types";
+
 import { WebRtcSignalingClient } from "../lib/webrtc-signaling-client";
+import { type DeliveryFabric, createDeliveryFabric } from "./delivery-fabric";
 import { createRealtimeTransport } from "./l1-realtime-transport";
 import { createPairSignaling } from "./l2-pair-signaling";
 import { createPeerTransportRegistry } from "./l3-peer-registry";
 import {
-    createMessagingService,
     type MessagingService,
+    createMessagingService,
 } from "./l4-messaging-service";
 import { pairSessionId, parsePairSessionId } from "./pair-id";
-import {
-    createRosterRenegotiationCoordinator,
-    type RosterRenegotiationCoordinator,
-} from "./roster-renegotiation-coordinator";
-import type { EnsureReason } from "./types";
+import { createPeerLifecycleCoordinator } from "./peer-lifecycle-coordinator";
 
 export type ChatTransportStack = {
     messaging: MessagingService;
     pairSignaling: ReturnType<typeof createPairSignaling>;
     peerRegistry: ReturnType<typeof createPeerTransportRegistry>;
+    peerLifecycle: PeerLifecycleCoordinator;
+    deliveryFabric: DeliveryFabric;
     rosterCoordinator: RosterRenegotiationCoordinator;
     realtime: ReturnType<typeof createRealtimeTransport>;
     signaling: WebRtcSignalingClient;
@@ -89,7 +92,9 @@ export function createChatTransportStack(
     const stackUnsubs: Array<() => void> = [];
     stackUnsubs.push(realtime.on("welcome", () => resetPairRoster()));
 
-    const messagingRef: { current: MessagingService | null } = { current: null };
+    const messagingRef: { current: MessagingService | null } = {
+        current: null,
+    };
 
     const peerRegistry = createPeerTransportRegistry({
         localAccount: opts.localAccount,
@@ -111,35 +116,22 @@ export function createChatTransportStack(
         onSpaceMembershipHint: opts.onSpaceMembershipHint,
     });
 
-    const rosterCoordinator = createRosterRenegotiationCoordinator({
-        localAccount: opts.localAccount,
-        pairIdForRemote: (remote) =>
-            pairSessionId(opts.localAccount, remote),
-        remoteForPairId: (pairId) => {
-            const parsed = parsePairSessionId(pairId);
-            if (!parsed) return null;
-            return parsed[0] === opts.localAccount ? parsed[1] : parsed[0];
-        },
-        getSnapshot: (remote) => peerRegistry.getRosterSnapshot(remote),
-        actions: {
-            ensure: (remote, reason) => {
-                void peerRegistry.ensure(remote, reason);
+    const { lifecycle: peerLifecycle, roster: rosterCoordinator } =
+        createPeerLifecycleCoordinator({
+            localAccount: opts.localAccount,
+            registry: peerRegistry,
+            pairIdForRemote: (remote) =>
+                pairSessionId(opts.localAccount, remote),
+            remoteForPairId: (pairId) => {
+                const parsed = parsePairSessionId(pairId);
+                if (!parsed) return null;
+                return parsed[0] === opts.localAccount ? parsed[1] : parsed[0];
             },
-            resendOffer: (remote) => {
-                peerRegistry.resendOffer(remote);
-            },
-            retriggerHandshake: (remote) => {
-                peerRegistry.retriggerHandshake(remote);
-            },
-            recoverPeer: (remote, reason) => {
-                peerRegistry.recoverPeer(remote, reason);
-            },
-        },
-    });
+        });
 
     stackUnsubs.push(
         pairSignaling.on("joinsIdle", (completedPairId?: string) => {
-            rosterCoordinator.notifyJoinBatchIdle(completedPairId);
+            peerLifecycle.notifyJoinBatchIdle(completedPairId);
         }),
     );
 
@@ -148,9 +140,16 @@ export function createChatTransportStack(
         chainId: opts.chainId,
         realtime,
         peerRegistry,
+        peerLifecycle,
         isSpaceMember: opts.isSpaceMember,
     });
     messagingRef.current = messaging;
+
+    const deliveryFabric = createDeliveryFabric({
+        realtime,
+        peerRegistry,
+        peerLifecycle,
+    });
 
     const remoteFromSession = (sessionId: string): string | null => {
         const parsed = parsePairSessionId(sessionId);
@@ -170,11 +169,11 @@ export function createChatTransportStack(
             if (pairSignaling.hasPendingJoins()) return;
             const state = peerRegistry.getState(remote);
             if (state === "joining_pair") return;
-            rosterCoordinator.notifyPairRosterUpdate(remote, source);
+            peerLifecycle.notifyPairRosterUpdate(remote, source);
             return;
         }
         if (pairSignaling.hasPendingJoins()) return;
-        void peerRegistry.ensure(remote, "peer_joined");
+        void peerLifecycle.ensure(remote, "peer_joined");
     };
 
     const isPairSession = (sessionId: string) =>
@@ -237,18 +236,15 @@ export function createChatTransportStack(
             if (pairSignaling.hasPendingJoins()) return;
             const remote = frame.participant;
             if (remote === opts.localAccount) return;
-            rosterCoordinator.notifyPairRosterUpdate(remote, "peer_joined");
+            peerLifecycle.notifyPairRosterUpdate(remote, "peer_joined");
         },
-        transportLost: (frame: {
-            sessionId: string;
-            participant: string;
-        }) => {
+        transportLost: (frame: { sessionId: string; participant: string }) => {
             if (!isPairSession(frame.sessionId)) return;
             const remote = remoteFromSession(frame.sessionId);
             if (!remote || frame.participant !== remote) return;
             const state = peerRegistry.getState(remote);
             if (state === "absent" || state === "disposing") return;
-            peerRegistry.recoverPeer(remote, "signaling_transport_lost");
+            peerLifecycle.recoverPeer(remote, "signaling_transport_lost");
         },
         signal: (frame: {
             sessionId: string;
@@ -272,12 +268,7 @@ export function createChatTransportStack(
                 sdpMid: frame.sdpMid ?? undefined,
                 sdpMLineIndex: frame.sdpMLineIndex ?? undefined,
             });
-            handlers.signal?.(
-                frame.sessionId,
-                frame.from,
-                frame.kind,
-                frame,
-            );
+            handlers.signal?.(frame.sessionId, frame.from, frame.kind, frame);
         },
     });
 
@@ -307,15 +298,17 @@ export function createChatTransportStack(
         messaging,
         pairSignaling,
         peerRegistry,
+        peerLifecycle,
+        deliveryFabric,
         rosterCoordinator,
         realtime,
         signaling,
         notifyRemoteReachable: (remote, source) => {
-            rosterCoordinator.notifyRemoteReachable(remote, source);
+            peerLifecycle.notifyRemoteReachable(remote, source);
         },
         wireRealtimeHandlers,
         dispose() {
-            rosterCoordinator.dispose();
+            peerLifecycle.dispose();
             unregisterPairHandlers?.();
             unregisterPairHandlers = null;
             for (const unsub of stackUnsubs.splice(0)) {

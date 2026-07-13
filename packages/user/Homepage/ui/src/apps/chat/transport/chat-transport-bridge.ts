@@ -1,28 +1,26 @@
+import type { InboundMessageAcceptance } from "../lib/inbound-message-acceptance";
+import type { IceServerConfig } from "../lib/protocol";
+import type { EnsureReason } from "./types";
+
+import { chatDataLog, shortSpaceId } from "../lib/chat-data-debug";
 import {
-    parseChatDataWireEnvelope,
-    serializeChatDataWireEnvelope,
     type ChatDataMessageAckEnvelope,
     type ChatDataMessageEnvelope,
     type ChatHistorySyncEnvelope,
+    parseChatDataWireEnvelope,
+    serializeChatDataWireEnvelope,
 } from "../lib/chat-data-envelope";
-import { chatDataLog, shortSpaceId } from "../lib/chat-data-debug";
-import { recordThreadLifecycle } from "../lib/thread-lifecycle";
-import type { IceServerConfig } from "../lib/protocol";
-import { RealtimeClient } from "../lib/realtime-client";
-import { loadPendingMessages } from "../lib/pending-message-store";
 import {
-    enqueueInboundAcceptance,
+    type InboundAcceptanceRecord,
     clearInboundAcceptanceQueue,
     dequeueInboundAcceptance,
-    type InboundAcceptanceRecord,
+    enqueueInboundAcceptance,
 } from "../lib/inbound-acceptance-queue";
-import type { InboundMessageAcceptance } from "../lib/inbound-message-acceptance";
+import { loadPendingMessages } from "../lib/pending-message-store";
+import { RealtimeClient } from "../lib/realtime-client";
 import { spaceUuidFromPslackConversationId } from "../lib/space-bridge";
-import {
-    createChatTransportStack,
-    type ChatTransportStack,
-} from "./stack";
-import type { EnsureReason } from "./types";
+import { recordThreadLifecycle } from "../lib/thread-lifecycle";
+import { type ChatTransportStack, createChatTransportStack } from "./stack";
 
 export type ChatTransportBridgeDeps = {
     getRealtime: () => RealtimeClient | null;
@@ -105,10 +103,7 @@ export class ChatTransportBridge {
             realtimeClient: rt,
             iceServers: this.deps.getIceServers(),
             onInboundBytes: (remote, bytes) => {
-                this.handleInboundWire(
-                    remote,
-                    new TextDecoder().decode(bytes),
-                );
+                this.handleInboundWire(remote, new TextDecoder().decode(bytes));
             },
             onSpaceMembershipHint: (remote) => {
                 this.deps.onSpaceMembershipHint?.(remote);
@@ -172,17 +167,20 @@ export class ChatTransportBridge {
             }
         });
 
-        this.stack.messaging.onRecipientDelivered((msgId, recipient, conversationId) => {
-            this.recordDebug("recipient-delivered", { msgId, recipient });
-            const spaceUuid = spaceUuidFromPslackConversationId(conversationId);
-            if (!spaceUuid) return;
-            this.deps.onMessageAck(spaceUuid, {
-                t: "messageAck",
-                spaceUuid,
-                clientMsgId: msgId,
-                from: recipient,
-            });
-        });
+        this.stack.messaging.onRecipientDelivered(
+            (msgId, recipient, conversationId) => {
+                this.recordDebug("recipient-delivered", { msgId, recipient });
+                const spaceUuid =
+                    spaceUuidFromPslackConversationId(conversationId);
+                if (!spaceUuid) return;
+                this.deps.onMessageAck(spaceUuid, {
+                    t: "messageAck",
+                    spaceUuid,
+                    clientMsgId: msgId,
+                    from: recipient,
+                });
+            },
+        );
 
         this.stack.peerRegistry.on("usable", (remote) => {
             recordThreadLifecycle("webrtc-usable", { remote });
@@ -214,7 +212,7 @@ export class ChatTransportBridge {
         const toEnsure = [...this.pendingEnsures.entries()];
         this.pendingEnsures.clear();
         for (const [remote, reason] of toEnsure) {
-            void this.stack.peerRegistry.ensure(remote, reason);
+            void this.stack.peerLifecycle.ensure(remote, reason);
         }
 
         this.rehydratePendingOutbox();
@@ -300,7 +298,10 @@ export class ChatTransportBridge {
         }
     }
 
-    ensurePeer(remote: string, reason: EnsureReason = "message_enqueued"): void {
+    ensurePeer(
+        remote: string,
+        reason: EnsureReason = "message_enqueued",
+    ): void {
         if (this.suspended) return;
         if (
             (reason === "peer_focus" || reason === "roster_kick") &&
@@ -313,11 +314,14 @@ export class ChatTransportBridge {
             this.start();
             return;
         }
-        void this.stack.peerRegistry.ensure(remote, reason);
+        void this.stack.deliveryFabric.ensurePeer(remote, reason);
     }
 
     onPeerOnline(account: string): void {
-        this.stack?.notifyRemoteReachable(account, "presence_online");
+        this.stack?.deliveryFabric.notifyRemoteReachable(
+            account,
+            "presence_online",
+        );
     }
 
     /** Flush deferred inbound acks after contacts load and re-apply messages. */
@@ -359,9 +363,8 @@ export class ChatTransportBridge {
         _spaceUuid: string,
         envelope: ChatDataMessageEnvelope,
     ): boolean {
-        const recipient = envelope.from === this.deps.getSelf()
-            ? undefined
-            : undefined;
+        const recipient =
+            envelope.from === this.deps.getSelf() ? undefined : undefined;
         void recipient;
         void envelope;
         return false;
@@ -391,7 +394,7 @@ export class ChatTransportBridge {
         const bytes = new TextEncoder().encode(
             serializeChatDataWireEnvelope(envelope),
         );
-        return this.stack.peerRegistry.send(remote, bytes).ok;
+        return this.stack.deliveryFabric.sendPeerBytes(remote, bytes).ok;
     }
 
     /** Ask online peers to reload sidebar spaces after group membership changes. */
@@ -400,7 +403,7 @@ export class ChatTransportBridge {
         const bytes = new TextEncoder().encode(
             serializeChatDataWireEnvelope({ t: "spaceMembershipHint" }),
         );
-        return this.stack.peerRegistry.send(remote, bytes).ok;
+        return this.stack.deliveryFabric.sendPeerBytes(remote, bytes).ok;
     }
 
     notifySpaceMembershipHint(remoteAccounts: readonly string[]): void {
@@ -423,17 +426,29 @@ export class ChatTransportBridge {
     }
 
     releaseIdlePeer(remote: string): void {
-        this.stack?.peerRegistry.dispose(remote, "idle_release");
+        this.stack?.deliveryFabric.disposePeer(remote, "idle_release");
     }
 
     touchPeer(remote: string): void {
-        this.stack?.peerRegistry.touch(remote);
+        this.stack?.deliveryFabric.touchPeer(remote);
     }
 
     get messaging() {
         return this.stack?.messaging ?? null;
     }
 
+    get deliveryFabric() {
+        return this.stack?.deliveryFabric ?? null;
+    }
+
+    get peerLifecycle() {
+        return this.stack?.peerLifecycle ?? null;
+    }
+
+    /**
+     * @deprecated Prefer {@link deliveryFabric} for app ensure/send/media.
+     * Retained for debug globals and transitional Meet wiring.
+     */
     get peerRegistry() {
         return this.stack?.peerRegistry ?? null;
     }
@@ -495,7 +510,8 @@ export class ChatTransportBridge {
                         : null;
                 const peers = remotes.map((remote) => ({
                     remote,
-                    state: bridge.stack?.peerRegistry.getState(remote) ?? "absent",
+                    state:
+                        bridge.stack?.peerRegistry.getState(remote) ?? "absent",
                 }));
                 return {
                     started: bridge.stack != null,
@@ -560,8 +576,7 @@ export class ChatTransportBridge {
             },
             getMessageStatus: (msgId: string) =>
                 bridge.stack?.messaging.getStatus(msgId) ?? "UNKNOWN",
-            kickCounts: () =>
-                bridge.stack?.peerRegistry.getKickCounts() ?? {},
+            kickCounts: () => bridge.stack?.peerRegistry.getKickCounts() ?? {},
             resetKickCounts: () => {
                 bridge.stack?.peerRegistry.resetKickCounts();
             },
@@ -574,7 +589,10 @@ export class ChatTransportBridge {
             },
             kickPeers: (remotes: string[]) => {
                 for (const remote of remotes) {
-                    bridge.stack?.notifyRemoteReachable(remote, "presence_online");
+                    bridge.stack?.notifyRemoteReachable(
+                        remote,
+                        "presence_online",
+                    );
                 }
             },
         };

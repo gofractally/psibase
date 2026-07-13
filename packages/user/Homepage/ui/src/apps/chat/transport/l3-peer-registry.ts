@@ -1,32 +1,33 @@
-import {
-    parseChatDataWireEnvelope,
-    type ChatDataMessageAckEnvelope,
-    type ChatDataMessageEnvelope,
-    type ChatDataWireEnvelope,
-    type ChatHistorySyncEnvelope,
-} from "../lib/chat-data-envelope";
-import { ChatDataWebRtcPeer } from "../lib/chat-data-webrtc-peer";
 import type { IceServerConfig } from "../lib/protocol";
 import type {
     SignalKind,
     WebRtcSignalingClient,
 } from "../lib/webrtc-signaling-client";
-import { EventBus } from "./event-bus";
-import { chatDataRecord } from "../lib/chat-data-debug";
-import { recordTransportLifecycle } from "../lib/thread-lifecycle";
-import { isLexInitiator, pairSessionId } from "./pair-id";
 import type { RealtimeTransport } from "./l1-realtime-transport";
 import type { PairSignaling } from "./l2-pair-signaling";
-import { createNegotiationScheduler } from "./negotiation-scheduler";
 import type { PeerRosterSnapshot } from "./roster-renegotiation-coordinator";
+
+import { chatDataRecord } from "../lib/chat-data-debug";
 import {
+    type ChatDataMessageAckEnvelope,
+    type ChatDataMessageEnvelope,
+    type ChatDataWireEnvelope,
+    type ChatHistorySyncEnvelope,
+    parseChatDataWireEnvelope,
+} from "../lib/chat-data-envelope";
+import { ChatDataWebRtcPeer } from "../lib/chat-data-webrtc-peer";
+import { recordTransportLifecycle } from "../lib/thread-lifecycle";
+import { EventBus } from "./event-bus";
+import { createNegotiationScheduler } from "./negotiation-scheduler";
+import { isLexInitiator, pairSessionId } from "./pair-id";
+import {
+    type EnsureReason,
+    PEER_ESTABLISHING_STUCK_MS,
     PEER_IDLE_TTL_MS,
     PEER_JOIN_STUCK_MS,
     PEER_MAX_WARM,
-    PEER_ESTABLISHING_STUCK_MS,
     PEER_NEGOTIATION_STUCK_MS,
     PEER_STUCK_CHECK_MS,
-    type EnsureReason,
     type PeerState,
     type SendResult,
     type Unsubscribe,
@@ -208,9 +209,13 @@ export function createPeerTransportRegistry(
 
     const createPeerForEntry = (entry: PeerEntry) => {
         const impolite = isLexInitiator(opts.localAccount, entry.remote);
+        // Locked policy: lex-lower side is offer initiator + Perfect
+        // Negotiation impolite role (not roster join order).
         const pairSignaling = opts.pairSignaling;
         const routedSignaling = {
-            signal: (payload: Parameters<WebRtcSignalingClient["signal"]>[0]) => {
+            signal: (
+                payload: Parameters<WebRtcSignalingClient["signal"]>[0],
+            ) => {
                 pairSignaling.signal(entry.pairId, payload);
             },
         } as WebRtcSignalingClient;
@@ -392,8 +397,7 @@ export function createPeerTransportRegistry(
                 continue;
             }
 
-            const startedAt =
-                entry.negotiationStartedAt ?? entry.lastUsedAt;
+            const startedAt = entry.negotiationStartedAt ?? entry.lastUsedAt;
             const ageMs = now - startedAt;
             const establishing = isTransportEstablishing(peer);
             const stuckThreshold = establishing
@@ -418,7 +422,10 @@ export function createPeerTransportRegistry(
 
     const retryNegotiationOnRealtimeReady = () => {
         for (const entry of entries.values()) {
-            if (entry.state === "waiting_ws" || entry.state === "suspected_dead") {
+            if (
+                entry.state === "waiting_ws" ||
+                entry.state === "suspected_dead"
+            ) {
                 requestNegotiation(entry, "ws_ready");
                 continue;
             }
@@ -434,10 +441,7 @@ export function createPeerTransportRegistry(
     opts.realtime.on("ready", retryNegotiationOnRealtimeReady);
 
     const kickNegotiation = (remoteAccount: string) => {
-        kickCounts.set(
-            remoteAccount,
-            (kickCounts.get(remoteAccount) ?? 0) + 1,
-        );
+        kickCounts.set(remoteAccount, (kickCounts.get(remoteAccount) ?? 0) + 1);
         const entry = entries.get(remoteAccount);
         if (!entry) {
             void registryEnsure(remoteAccount, "roster_kick");
@@ -446,7 +450,9 @@ export function createPeerTransportRegistry(
         touchEntry(entry);
         if (entry.state === "usable") return;
         if (!entry.peer) {
-            if (negotiationScheduler.shouldDeferKick(entry.remote, entry.state)) {
+            if (
+                negotiationScheduler.shouldDeferKick(entry.remote, entry.state)
+            ) {
                 chatDataRecord("peer-registry-kick-deferred", {
                     remote: entry.remote,
                     state: entry.state,
@@ -531,10 +537,7 @@ export function createPeerTransportRegistry(
 
         send(remoteAccount, bytes) {
             const entry = entries.get(remoteAccount);
-            if (
-                !entry ||
-                !opts.pairSignaling.isRealtimeReady(entry.pairId)
-            ) {
+            if (!entry || !opts.pairSignaling.isRealtimeReady(entry.pairId)) {
                 return { ok: false, reason: "ws_not_ready" };
             }
             if (entry.state !== "usable" || !entry.peer) {
@@ -559,9 +562,7 @@ export function createPeerTransportRegistry(
             if (!ok && entry.state === "usable") {
                 recoverStuckPeer(entry, "send_failed");
             }
-            return ok
-                ? { ok: true }
-                : { ok: false, reason: "peer_not_ready" };
+            return ok ? { ok: true } : { ok: false, reason: "peer_not_ready" };
         },
 
         getRosterSnapshot(remoteAccount) {
@@ -572,10 +573,7 @@ export function createPeerTransportRegistry(
                 state: entry.state,
                 negotiationStartedAt: entry.negotiationStartedAt,
                 isJoined: opts.pairSignaling.isJoined(entry.pairId),
-                isInitiator: isLexInitiator(
-                    opts.localAccount,
-                    entry.remote,
-                ),
+                isInitiator: isLexInitiator(opts.localAccount, entry.remote),
                 hasPeer: entry.peer != null,
             };
         },
@@ -619,7 +617,9 @@ export function createPeerTransportRegistry(
             const entry = getOrCreateEntry(remoteAccount);
             if (!entry.peer) {
                 entry.pendingRemoteSignals.push(frame);
-                const selfJoinedOnServer = opts.pairSignaling.isJoined(entry.pairId);
+                const selfJoinedOnServer = opts.pairSignaling.isJoined(
+                    entry.pairId,
+                );
                 chatDataRecord("peer-registry-remote-signal-buffered", {
                     remote: entry.remote,
                     pairId: entry.pairId,

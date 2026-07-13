@@ -1,6 +1,7 @@
-import { MeetWebRtcPeer } from "./meet-webrtc-peer";
-import type { MeetPeerHandle } from "./meet-peer-handle";
 import type { AvCallOrchestratorHost } from "./av-call-session-types";
+import type { MeetPeerHandle } from "./meet-peer-handle";
+
+import { MeetWebRtcPeer } from "./meet-webrtc-peer";
 import { createSharedMeetPeer } from "./shared-meet-peer";
 
 export type MeetPeerFactoryHandlers = {
@@ -23,13 +24,29 @@ export type CreateMeetPeerParams = {
     handlers?: MeetPeerFactoryHandlers;
 };
 
-/** Same PC as chat when shared registry is wired; else standalone MeetWebRtcPeer. */
+/**
+ * Prefer DeliveryFabric shared pair PC. Standalone MeetWebRtcPeer remains only
+ * when fabric is unwired (tests / legacy); production Chat wires the fabric.
+ */
 export function createMeetPeerForRemote(
     params: CreateMeetPeerParams,
 ): MeetPeerHandle {
-    const registry = params.host.getSharedPeerRegistry?.() ?? null;
-    if (registry) {
-        return createSharedMeetPeer(registry, {
+    const fabric = params.host.getDeliveryFabric?.() ?? null;
+    if (fabric) {
+        return fabric.startPeerMedia({
+            remoteAccount: params.remoteAccount,
+            avCallSessionId: params.avCallSessionId,
+            wantVideo: params.wantVideo,
+            wantAudio: params.wantAudio,
+            sharedLocalStream: params.sharedLocalStream,
+            ...params.handlers,
+        });
+    }
+
+    // Legacy fallback when host has PeerMediaPort via deprecated registry path
+    const media = params.host.getPeerMediaPort?.() ?? null;
+    if (media) {
+        return createSharedMeetPeer(media, {
             remoteAccount: params.remoteAccount,
             avCallSessionId: params.avCallSessionId,
             wantVideo: params.wantVideo,

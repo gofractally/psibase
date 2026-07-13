@@ -1,7 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { PeerMediaPort } from "../transport/peer-media-port";
+
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createSharedMeetPeer } from "./shared-meet-peer";
-import type { PeerTransportRegistry } from "../transport/l3-peer-registry";
 
 function createMockChatPeer() {
     return {
@@ -17,18 +18,11 @@ function createMockChatPeer() {
     };
 }
 
-function createMockRegistry(
+function createMockMediaPort(
     peer: ReturnType<typeof createMockChatPeer> | null,
-): PeerTransportRegistry {
+): PeerMediaPort {
     return {
         ensure: vi.fn(async () => {}),
-        getState: vi.fn(() => "usable" as const),
-        send: vi.fn(() => ({ ok: false, reason: "peer_not_ready" as const })),
-        on: vi.fn(() => () => {}),
-        ping: vi.fn(async () => true),
-        touch: vi.fn(),
-        dispose: vi.fn(),
-        handleRemoteSignal: vi.fn(async () => {}),
         getChatPeer: vi.fn(() => peer as never),
         holdMeet: vi.fn(),
         releaseMeet: vi.fn(),
@@ -42,8 +36,8 @@ describe("SharedMeetPeer", () => {
 
     it("adds Meet media on the pair PC and releases hold on dispose", async () => {
         const chatPeer = createMockChatPeer();
-        const registry = createMockRegistry(chatPeer);
-        const peer = createSharedMeetPeer(registry, {
+        const media = createMockMediaPort(chatPeer);
+        const peer = createSharedMeetPeer(media, {
             remoteAccount: "bob",
             avCallSessionId: "wrtc:space-1",
             wantVideo: true,
@@ -52,21 +46,21 @@ describe("SharedMeetPeer", () => {
 
         await peer.start();
 
-        expect(registry.ensure).toHaveBeenCalledWith("bob", "meet_start");
-        expect(registry.holdMeet).toHaveBeenCalledWith("bob");
+        expect(media.ensure).toHaveBeenCalledWith("bob", "meet_start");
+        expect(media.holdMeet).toHaveBeenCalledWith("bob");
         expect(chatPeer.startMeetMedia).toHaveBeenCalled();
 
         peer.dispose();
 
         expect(chatPeer.stopMeetMedia).toHaveBeenCalled();
-        expect(registry.releaseMeet).toHaveBeenCalledWith("bob");
+        expect(media.releaseMeet).toHaveBeenCalledWith("bob");
         expect(peer.isDisposed).toBe(true);
     });
 
     it("does not close the underlying chat peer on dispose", async () => {
         const chatPeer = createMockChatPeer();
-        const registry = createMockRegistry(chatPeer);
-        const peer = createSharedMeetPeer(registry, {
+        const media = createMockMediaPort(chatPeer);
+        const peer = createSharedMeetPeer(media, {
             remoteAccount: "bob",
             avCallSessionId: "wrtc:space-1",
             wantVideo: false,
@@ -76,6 +70,7 @@ describe("SharedMeetPeer", () => {
         await peer.start();
         peer.dispose();
 
-        expect(registry.dispose).not.toHaveBeenCalled();
+        // Media port has no dispose — SharedMeetPeer must not tear down the PC.
+        expect(media.releaseMeet).toHaveBeenCalledWith("bob");
     });
 });

@@ -1,8 +1,8 @@
+import type { PeerTransportRegistry } from "../transport/l3-peer-registry";
 import type { MeetPeerHandle } from "./meet-peer-handle";
 import type { IceServerConfig } from "./protocol";
 import type { RealtimeClient } from "./realtime-client";
 import type { WebRtcSignalingClient } from "./webrtc-signaling-client";
-import type { PeerTransportRegistry } from "../transport/l3-peer-registry";
 
 /** Transport-recovery tunables (A4). Mirror of chat-data values; can be
  * tuned independently if av-call needs different backoff. */
@@ -12,7 +12,9 @@ export const AV_TRANSPORT_RECOVERY_MAX_MS = 30_000;
 
 /** User-visible copy for ICE / WebRTC connectivity failures (Meet av-call). */
 export function avCallConnectivityErrorMessage(detail: string): string {
-    if (/ice connection|webrtc connection|connectivity|ice-failed/i.test(detail)) {
+    if (
+        /ice connection|webrtc connection|connectivity|ice-failed/i.test(detail)
+    ) {
         return (
             "Could not establish a media connection. The node may have no TURN relay quota left, " +
             "or this network blocks direct and relay paths. Try another network or ask a node admin " +
@@ -125,7 +127,17 @@ export interface AvCallOrchestratorHost {
     getSignaling(): WebRtcSignalingClient | null;
     setSignaling(signaling: WebRtcSignalingClient): void;
 
-    /** Per-peer transport: one pair PC per remote for chat + Meet. */
+    /** App façade for ensure / peer bytes / Meet media (preferred). */
+    getDeliveryFabric?():
+        | import("../transport/delivery-fabric").DeliveryFabric
+        | null;
+    /** Narrow Meet media port when fabric is unavailable but shared PC is wired. */
+    getPeerMediaPort?():
+        | import("../transport/peer-media-port").PeerMediaPort
+        | null;
+    /**
+     * @deprecated Prefer {@link getDeliveryFabric}. Kept for tests that mock L3 directly.
+     */
     getSharedPeerRegistry?(): PeerTransportRegistry | null;
     usesSharedTransport?(): boolean;
 
@@ -173,12 +185,8 @@ export interface AvCallOrchestratorHost {
         sessionId: string,
         participant: string,
     ): void;
-    getAvCallSessionJoinedParticipants?(
-        sessionId: string,
-    ): readonly string[];
-    getAvCallSessionPendingParticipants?(
-        sessionId: string,
-    ): readonly string[];
+    getAvCallSessionJoinedParticipants?(sessionId: string): readonly string[];
+    getAvCallSessionPendingParticipants?(sessionId: string): readonly string[];
     /** Participant rejoined from pending roster; suppress stale leave echoes. */
     markAvCallPendingRejoin?(sessionId: string, participant: string): void;
     isAvCallPendingRejoin?(sessionId: string, participant: string): boolean;
@@ -196,7 +204,9 @@ export interface AvCallOrchestratorHost {
     /** Group Meet voluntary leave in progress or left-rejoinable — block invite re-arm. */
     isGroupMeetLeaveInProgress?(spaceUuid: string): boolean;
     shouldBlockGroupMeetRearm?(spaceUuid: string): boolean;
-    beginGroupMeetFreshStart?(spaceUuid: string): import("./group-meet-attempt-coordinator").GroupMeetFrameDecision;
+    beginGroupMeetFreshStart?(
+        spaceUuid: string,
+    ): import("./group-meet-attempt-coordinator").GroupMeetFrameDecision;
     beginGroupMeetRejoin?(
         spaceUuid: string,
         sessionId: string,
@@ -213,12 +223,16 @@ export interface AvCallOrchestratorHost {
     classifyGroupMeetSessionInvite?(
         spaceUuid: string,
         sessionId: string,
-        run: import("./group-meet-attempt-coordinator").GroupMeetRunContext | null,
+        run:
+            | import("./group-meet-attempt-coordinator").GroupMeetRunContext
+            | null,
     ): import("./group-meet-attempt-coordinator").GroupMeetFrameDecision;
     classifyGroupMeetParticipantJoined?(
         spaceUuid: string,
         sessionId: string,
-        run: import("./group-meet-attempt-coordinator").GroupMeetRunContext | null,
+        run:
+            | import("./group-meet-attempt-coordinator").GroupMeetRunContext
+            | null,
     ): import("./group-meet-attempt-coordinator").GroupMeetFrameDecision;
     classifyGroupMeetSessionEnded?(
         sessionId: string,

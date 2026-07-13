@@ -1,12 +1,9 @@
-import {
-    parseChatDataWireEnvelope,
-    serializeChatDataWireEnvelope,
-    type ChatDataMessageAckEnvelope,
-    type ChatDataMessageEnvelope,
-    type ChatDataWireEnvelope,
-    type ChatHistorySyncEnvelope,
-    type SpaceMembershipHintEnvelope,
-} from "./chat-data-envelope";
+import type { IceServerConfig } from "./protocol";
+import type {
+    SignalKind,
+    WebRtcSignalingClient,
+} from "./webrtc-signaling-client";
+
 import {
     chatDataRecord,
     logIceCandidate,
@@ -15,11 +12,18 @@ import {
     summarizePeerConnection,
     unregisterChatDataPeer,
 } from "./chat-data-debug";
-import { recordTransportLifecycle } from "./thread-lifecycle";
+import {
+    type ChatDataMessageAckEnvelope,
+    type ChatDataMessageEnvelope,
+    type ChatDataWireEnvelope,
+    type ChatHistorySyncEnvelope,
+    type SpaceMembershipHintEnvelope,
+    parseChatDataWireEnvelope,
+    serializeChatDataWireEnvelope,
+} from "./chat-data-envelope";
 import { buildRtcPeerConnectionConfig, iceServerSummary } from "./ice-config";
 import { acquireMeetLocalMedia } from "./local-media";
-import type { IceServerConfig } from "./protocol";
-import type { SignalKind, WebRtcSignalingClient } from "./webrtc-signaling-client";
+import { recordTransportLifecycle } from "./thread-lifecycle";
 import {
     isLocalDevWebRtcEnvironment,
     normalizeIceCandidateForEnvironment,
@@ -86,18 +90,19 @@ export class ChatDataWebRtcPeer {
     private readonly peerAccount: string;
 
     /**
-     * F2: who creates the SDP offer first / opens the data channel. Driven
-     * by the session roster ("most recent joiner sends the offer"), with
-     * lex order as a fallback when no roster is available.
+     * Offer initiator (opens data channel / first SDP offer). Locked to
+     * **lexicographic account order** (`isLexInitiator`) — stable for the
+     * life of the pair. Perfect Negotiation (`impolite`) uses the same lex
+     * rule so glare resolution stays deterministic when both sides race.
+     * (Historical F2 "most recent joiner" roster initiator is intentionally
+     * not used; see chat-data-transport-per-peer.md locked decisions.)
      */
     private readonly isInitiator: boolean;
 
     /**
      * Perfect Negotiation collision-resolution role. MUST be deterministic
-     * and the two ends MUST disagree — this is what makes glare safe. We
-     * keep this on the lex rule independent of `isInitiator` so glare
-     * resolution stays symmetric even when F2 makes the initiator the late
-     * joiner.
+     * and the two ends MUST disagree — this is what makes glare safe.
+     * Same lex rule as `isInitiator` (lex-lower = impolite).
      */
     private readonly impolite: boolean;
 
@@ -174,10 +179,8 @@ export class ChatDataWebRtcPeer {
         iceServers: IceServerConfig[] | null;
         signaling: WebRtcSignalingClient;
         /**
-         * F2: "this side creates the data channel and sends the first
-         * offer". Driven by roster: the most recent joiner is the
-         * initiator. Defaults to the lex-lower side when no roster
-         * information is available.
+         * Offer initiator: lex-lower account opens the data channel and
+         * sends the first offer (locked policy; not roster join order).
          */
         isInitiator: boolean;
         /**
@@ -353,15 +356,13 @@ export class ChatDataWebRtcPeer {
             localDevIceRewrite: isLocalDevWebRtcEnvironment(),
         });
 
-        // F2: the initiator side opens the data channel. (If both sides
-        // opened one we'd negotiate two streams instead of sharing one.)
-        // Creating the data channel sets the m-section in the local SDP,
-        // which fires `onnegotiationneeded` and starts the handshake.
+        // Lex initiator opens the data channel. (If both sides opened one we'd
+        // negotiate two streams instead of sharing one.) Creating the data
+        // channel sets the m-section in the local SDP, which fires
+        // `onnegotiationneeded` and starts the handshake.
         //
-        // The polite/impolite role for glare resolution is separate (lex
-        // order by default) and stays symmetric regardless of who opens
-        // the channel — Perfect Negotiation lets either side receive an
-        // offer at any time, including via `ondatachannel`.
+        // Perfect Negotiation (impolite = same lex rule) lets either side
+        // receive an offer at any time, including via `ondatachannel`.
         if (this.isInitiator) {
             const dc = pc.createDataChannel(CHAT_DATA_CHANNEL_LABEL, {
                 ordered: true,
@@ -380,9 +381,8 @@ export class ChatDataWebRtcPeer {
     }
 
     /**
-     * True while an SDP exchange is in flight. Used by the connection
-     * reconciler to avoid tearing down a peer when the roster-derived
-     * initiator role changes mid-handshake (H19).
+     * True while an SDP exchange is in flight. Used by recovery paths to
+     * avoid tearing down a peer mid-handshake.
      */
     get negotiationInProgress(): boolean {
         if (this.disposed || !this.pc) return false;
@@ -472,19 +472,15 @@ export class ChatDataWebRtcPeer {
     }
 
     setMeetAudioEnabled(on: boolean): void {
-        this.meetLocalStream
-            ?.getAudioTracks()
-            .forEach((t) => {
-                t.enabled = on;
-            });
+        this.meetLocalStream?.getAudioTracks().forEach((t) => {
+            t.enabled = on;
+        });
     }
 
     setMeetVideoEnabled(on: boolean): void {
-        this.meetLocalStream
-            ?.getVideoTracks()
-            .forEach((t) => {
-                t.enabled = on;
-            });
+        this.meetLocalStream?.getVideoTracks().forEach((t) => {
+            t.enabled = on;
+        });
     }
 
     /**
@@ -662,7 +658,8 @@ export class ChatDataWebRtcPeer {
     }
 
     private markMeetMediaConnected(): void {
-        if (this.disposed || this.meetMediaConnected || !this.meetActive) return;
+        if (this.disposed || this.meetMediaConnected || !this.meetActive)
+            return;
         this.meetMediaConnected = true;
         chatDataRecord("meet media connected", {
             sessionId: shortSessionId(this.sessionId),
@@ -771,9 +768,7 @@ export class ChatDataWebRtcPeer {
         return this.sendWireEnvelope(envelope);
     }
 
-    sendSpaceMembershipHint(
-        envelope: SpaceMembershipHintEnvelope,
-    ): boolean {
+    sendSpaceMembershipHint(envelope: SpaceMembershipHintEnvelope): boolean {
         return this.sendWireEnvelope(envelope);
     }
 
@@ -913,8 +908,7 @@ export class ChatDataWebRtcPeer {
             //   setRemoteDescription handles our outstanding offer).
             const readyForOffer =
                 !this.makingOffer &&
-                (pc.signalingState === "stable" ||
-                    this.isSettingRemoteAnswer);
+                (pc.signalingState === "stable" || this.isSettingRemoteAnswer);
             const offerCollision = !readyForOffer;
             const drop = this.impolite && offerCollision;
             chatDataRecord("applyRemote offer", {
@@ -1151,7 +1145,9 @@ export class ChatDataWebRtcPeer {
             }
         } catch (e) {
             const detail =
-                e instanceof Error ? e.message : "Could not create WebRTC offer";
+                e instanceof Error
+                    ? e.message
+                    : "Could not create WebRTC offer";
             void this.logFailureSnapshot(detail);
             this.handlers.onFailed?.(detail);
         } finally {

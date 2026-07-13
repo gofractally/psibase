@@ -1,34 +1,36 @@
+import type { RealtimeTransport } from "./l1-realtime-transport";
+import type { PeerTransportRegistry } from "./l3-peer-registry";
+import type { PeerLifecycleCoordinator } from "./peer-lifecycle-coordinator";
+
+import { chatDataRecord, shortSpaceId } from "../lib/chat-data-debug";
 import {
+    type ChatDataMessageAckEnvelope,
+    type ChatDataMessageEnvelope,
     parseChatDataWireEnvelope,
     serializeChatDataMessage,
     serializeChatDataWireEnvelope,
-    type ChatDataMessageAckEnvelope,
-    type ChatDataMessageEnvelope,
 } from "../lib/chat-data-envelope";
+import { composeTimingLog } from "../lib/dm-compose-timing";
 import {
+    type PendingAckRecord,
     loadPendingAcks,
     savePendingAcks,
-    type PendingAckRecord,
 } from "../lib/pending-ack-store";
 import {
+    type PendingChatMessage,
     loadPendingMessages,
     savePendingMessagesWithQuotaRecovery,
-    type PendingChatMessage,
 } from "../lib/pending-message-store";
-import { chatDataRecord, shortSpaceId } from "../lib/chat-data-debug";
-import { composeTimingLog } from "../lib/dm-compose-timing";
 import {
     pslackConversationIdFromSpaceUuid,
     spaceUuidFromPslackConversationId,
 } from "../lib/space-bridge";
-import type { RealtimeTransport } from "./l1-realtime-transport";
-import type { PeerTransportRegistry } from "./l3-peer-registry";
 import { createDeliveryCoordinator } from "./delivery-coordinator";
 import { EventBus } from "./event-bus";
 import {
     IN_FLIGHT_ACK_WAIT_MS,
-    MAX_VALID_ATTEMPTS,
     type InboundEnvelope,
+    MAX_VALID_ATTEMPTS,
     type MessageStatus,
     type PendingCount,
     type SendGroupRequest,
@@ -39,7 +41,11 @@ import {
 type MessagingEvents = {
     statusChange: (msgId: string, status: MessageStatus) => void;
     inbound: (envelope: InboundEnvelope) => void;
-    recipientDelivered: (msgId: string, recipient: string, conversationId: string) => void;
+    recipientDelivered: (
+        msgId: string,
+        recipient: string,
+        conversationId: string,
+    ) => void;
 };
 
 export interface MessagingService {
@@ -52,7 +58,11 @@ export interface MessagingService {
     ): Unsubscribe;
     onInbound(handler: (envelope: InboundEnvelope) => void): Unsubscribe;
     onRecipientDelivered(
-        handler: (msgId: string, recipient: string, conversationId: string) => void,
+        handler: (
+            msgId: string,
+            recipient: string,
+            conversationId: string,
+        ) => void,
     ): Unsubscribe;
     hydrateFromStorage(): void;
     /**
@@ -83,6 +93,11 @@ export type MessagingServiceOptions = {
     chainId: string;
     realtime: RealtimeTransport;
     peerRegistry: PeerTransportRegistry;
+    /**
+     * Preferred ensure path. When omitted (unit tests), falls back to
+     * `peerRegistry.ensure`.
+     */
+    peerLifecycle?: Pick<PeerLifecycleCoordinator, "ensure">;
     /** Returns true when `account` may receive for `spaceUuid`. */
     isSpaceMember?: (spaceUuid: string, account: string) => boolean;
     now?: () => number;
@@ -101,6 +116,11 @@ export function createMessagingService(
 ): MessagingService {
     const bus = new EventBus<MessagingEvents>();
     const now = opts.now ?? (() => Date.now());
+    const ensurePeer = (remote: string) =>
+        (opts.peerLifecycle ?? opts.peerRegistry).ensure(
+            remote,
+            "message_enqueued",
+        );
 
     let rows: PendingChatMessage[] = loadPendingMessages(
         opts.chainId,
@@ -190,7 +210,7 @@ export function createMessagingService(
                 pendingAcks.delete(key);
                 changed = true;
             } else {
-                void opts.peerRegistry.ensure(remote, "message_enqueued");
+                void ensurePeer(remote);
             }
         }
         if (changed) persistPendingAcks();
@@ -313,7 +333,11 @@ export function createMessagingService(
                 recipientOnline,
                 bodyPreview: row.body.slice(0, 48),
             });
-            return { ok: false, reason: "recipient_unreachable", retryable: true };
+            return {
+                ok: false,
+                reason: "recipient_unreachable",
+                retryable: true,
+            };
         }
 
         const key = inFlightKey(row.clientMsgId, recipient);
@@ -340,7 +364,7 @@ export function createMessagingService(
         );
         const result = opts.peerRegistry.send(recipient, bytes);
         if (!result.ok) {
-            void opts.peerRegistry.ensure(recipient, "message_enqueued");
+            void ensurePeer(recipient);
             return { ok: false, reason: result.reason, retryable: true };
         }
 
@@ -358,8 +382,7 @@ export function createMessagingService(
     };
 
     const deliveryCoordinator = createDeliveryCoordinator({
-        ensurePeer: (remote) =>
-            opts.peerRegistry.ensure(remote, "message_enqueued"),
+        ensurePeer: (remote) => ensurePeer(remote),
         trySend: (msgId, recipient) => {
             const row = findRow(msgId);
             if (!row) {
@@ -456,7 +479,9 @@ export function createMessagingService(
             const msgId = req.clientMsgId ?? newClientMsgId(now());
             const row: PendingChatMessage = {
                 clientMsgId: msgId,
-                conversationId: pslackConversationIdFromSpaceUuid(req.spaceUuid),
+                conversationId: pslackConversationIdFromSpaceUuid(
+                    req.spaceUuid,
+                ),
                 from: opts.localAccount,
                 body:
                     typeof req.body === "string"
@@ -482,7 +507,9 @@ export function createMessagingService(
             const msgId = req.clientMsgId ?? newClientMsgId(now());
             const row: PendingChatMessage = {
                 clientMsgId: msgId,
-                conversationId: pslackConversationIdFromSpaceUuid(req.spaceUuid),
+                conversationId: pslackConversationIdFromSpaceUuid(
+                    req.spaceUuid,
+                ),
                 from: opts.localAccount,
                 body:
                     typeof req.body === "string"
@@ -501,16 +528,18 @@ export function createMessagingService(
         getStatus(msgId) {
             return (
                 statusByMsg.get(msgId) ??
-                rowStatus(findRow(msgId) ?? {
-                    clientMsgId: msgId,
-                    conversationId: "",
-                    from: opts.localAccount,
-                    body: "",
-                    createdAt: 0,
-                    recipients: [],
-                    deliveredTo: [],
-                    status: "failed",
-                })
+                rowStatus(
+                    findRow(msgId) ?? {
+                        clientMsgId: msgId,
+                        conversationId: "",
+                        from: opts.localAccount,
+                        body: "",
+                        createdAt: 0,
+                        recipients: [],
+                        deliveredTo: [],
+                        status: "failed",
+                    },
+                )
             );
         },
 
@@ -563,7 +592,7 @@ export function createMessagingService(
                 ack,
             });
             persistPendingAcks();
-            void opts.peerRegistry.ensure(remote, "message_enqueued");
+            void ensurePeer(remote);
         },
 
         /** Wire inbound acks/messages from peer registry bytes path. */

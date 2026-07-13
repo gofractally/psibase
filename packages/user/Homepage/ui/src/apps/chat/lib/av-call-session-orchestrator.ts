@@ -1,16 +1,10 @@
+import type { PeerTransportRegistry } from "../transport/l3-peer-registry";
+import type { AvRunEvent } from "./av-call-run-state-machine";
 import type { ChatObjectiveCallEvent } from "./call-timeline-bridge";
-import {
-    closeAvCallSession,
-    createAvCallSession,
-    fetchActiveAvCallSession,
-    waitForActiveAvCallSession,
-    type ChatSessionEntry,
-} from "./chat-api";
-import {
-    buildGroupAvCallInviteFromActiveSession,
-    inferGroupCallInviter,
-    shouldDiscoverActiveGroupAvCall,
-} from "./group-contacts-meet-flow";
+import type { IceServerConfig } from "./protocol";
+import type { RealtimeClient } from "./realtime-client";
+import type { WebRtcSignalingClient } from "./webrtc-signaling-client";
+
 import {
     avCallLog,
     avCallRecord,
@@ -18,10 +12,6 @@ import {
     shortSessionId,
     shortSpaceId,
 } from "./av-call-debug";
-import {
-    commitAvCallParticipantLeft,
-    commitAvCallTimelineEvent,
-} from "./av-call-timeline-commit";
 import {
     beginSignalingDmAvCall,
     beginSignalingDmAvCallSkipChecks,
@@ -43,13 +33,7 @@ import {
     AvRunActor,
     createAvRunActor,
 } from "./av-call-run-actor";
-import type { AvRunEvent } from "./av-call-run-state-machine";
-import { AvCallTransportRecoveryManager } from "./av-call-transport-recovery";
 import {
-    dmPeerAccount,
-    isGroupMembers,
-    remoteMembers,
-    shouldInitiateOffer,
     type AvCallIncomingInvite,
     type AvCallOrchestratorHost,
     type AvCallSessionPhase,
@@ -57,17 +41,34 @@ import {
     type AvCallSpaceRun,
     type DmAvCallRun,
     type GroupAvCallRun,
+    dmPeerAccount,
+    isGroupMembers,
+    remoteMembers,
+    shouldInitiateOffer,
 } from "./av-call-session-types";
+import {
+    commitAvCallParticipantLeft,
+    commitAvCallTimelineEvent,
+} from "./av-call-timeline-commit";
+import { AvCallTransportRecoveryManager } from "./av-call-transport-recovery";
+import {
+    type ChatSessionEntry,
+    closeAvCallSession,
+    createAvCallSession,
+    fetchActiveAvCallSession,
+    waitForActiveAvCallSession,
+} from "./chat-api";
+import {
+    buildGroupAvCallInviteFromActiveSession,
+    inferGroupCallInviter,
+    shouldDiscoverActiveGroupAvCall,
+} from "./group-contacts-meet-flow";
 import {
     GroupMeetAttemptCoordinator,
     type GroupMeetFrameDecision,
     type GroupMeetRunContext,
     type GroupMeetSessionEndedContext,
 } from "./group-meet-attempt-coordinator";
-import type { IceServerConfig } from "./protocol";
-import type { RealtimeClient } from "./realtime-client";
-import type { WebRtcSignalingClient } from "./webrtc-signaling-client";
-import type { PeerTransportRegistry } from "../transport/l3-peer-registry";
 
 export type {
     AvCallIncomingInvite,
@@ -144,6 +145,9 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
         private readonly isGroupMeetLeaveInProgressFn?: (
             spaceUuid: string,
         ) => boolean,
+        private readonly getDeliveryFabricFn?: () =>
+            | import("../transport/delivery-fabric").DeliveryFabric
+            | null,
     ) {}
 
     isGroupMeetLeaveInProgress(spaceUuid: string): boolean {
@@ -205,12 +209,15 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
     }
 
     isGroupMeetRejoinAttempt(spaceUuid: string): boolean {
-        return this.groupMeetAttempts.getAttempt(spaceUuid)?.role === "rejoiner";
+        return (
+            this.groupMeetAttempts.getAttempt(spaceUuid)?.role === "rejoiner"
+        );
     }
 
     isGroupMeetFreshHostAttempt(spaceUuid: string): boolean {
         return (
-            this.groupMeetAttempts.getAttempt(spaceUuid)?.kind === "outgoingFresh"
+            this.groupMeetAttempts.getAttempt(spaceUuid)?.kind ===
+            "outgoingFresh"
         );
     }
 
@@ -420,10 +427,7 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
         }
     }
 
-    ensureDmAvCallSession(
-        spaceUuid: string,
-        members: readonly string[],
-    ): void {
+    ensureDmAvCallSession(spaceUuid: string, members: readonly string[]): void {
         ensureDmAvCallSession(this, spaceUuid, members);
     }
 
@@ -550,21 +554,19 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
             phase: run.snapshot.phase,
             hasJoined: run.hasJoined,
         });
-        return this.dispatchRunEventAndWait(run, { type: "hangup", reason }).then(
-            () => {
-                if (sessionId && self) {
-                    this.removeParticipantFromAvCallSessionRoster(
-                        sessionId,
-                        self,
-                    );
-                }
-                if (sessionId && run.kind === "dm") {
-                    this.retireAvCallSession(sessionId);
-                    this.avCallSessionRosters.delete(sessionId);
-                }
-                this.deleteRun(spaceUuid);
-            },
-        );
+        return this.dispatchRunEventAndWait(run, {
+            type: "hangup",
+            reason,
+        }).then(() => {
+            if (sessionId && self) {
+                this.removeParticipantFromAvCallSessionRoster(sessionId, self);
+            }
+            if (sessionId && run.kind === "dm") {
+                this.retireAvCallSession(sessionId);
+                this.avCallSessionRosters.delete(sessionId);
+            }
+            this.deleteRun(spaceUuid);
+        });
     }
 
     getPendingInvite(): AvCallIncomingInvite | null {
@@ -712,7 +714,10 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
             session.session_id,
             fallback,
         );
-        const invite = buildGroupAvCallInviteFromActiveSession(session, inviter);
+        const invite = buildGroupAvCallInviteFromActiveSession(
+            session,
+            inviter,
+        );
         avCallLog("discoverActiveGroupAvCallInvite", {
             space: shortSpaceId(spaceUuid),
             sessionId: shortSessionId(invite.sessionId),
@@ -834,12 +839,35 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
         return this.getPeerPresenceFn();
     }
 
+    getDeliveryFabric():
+        | import("../transport/delivery-fabric").DeliveryFabric
+        | null {
+        return this.getDeliveryFabricFn?.() ?? null;
+    }
+
+    getPeerMediaPort():
+        | import("../transport/peer-media-port").PeerMediaPort
+        | null {
+        const fabric = this.getDeliveryFabric();
+        if (fabric) return fabric.asPeerMediaPort();
+        const registry = this.getSharedPeerRegistryFn?.() ?? null;
+        if (!registry) return null;
+        return {
+            ensure: (remote, reason) => registry.ensure(remote, reason),
+            getChatPeer: (remote) => registry.getChatPeer(remote),
+            holdMeet: (remote) => registry.holdMeet(remote),
+            releaseMeet: (remote) => registry.releaseMeet(remote),
+        };
+    }
+
     getSharedPeerRegistry(): PeerTransportRegistry | null {
         return this.getSharedPeerRegistryFn?.() ?? null;
     }
 
     usesSharedTransport(): boolean {
-        return !!this.getSharedPeerRegistryFn?.();
+        return !!(
+            this.getDeliveryFabricFn?.() || this.getSharedPeerRegistryFn?.()
+        );
     }
 
     getSignaling(): WebRtcSignalingClient | null {
@@ -950,8 +978,7 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
             lastError: detail,
             signalingJoined: false,
             mediaConnected: run.kind === "dm" ? false : undefined,
-            meshPeerSignalingReady:
-                run.kind === "group" ? {} : undefined,
+            meshPeerSignalingReady: run.kind === "group" ? {} : undefined,
         });
     }
 
@@ -993,9 +1020,12 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
             run.snapshot = {
                 ...run.snapshot,
                 signalingJoined: false,
-                mediaConnected: run.kind === "dm" ? false : run.snapshot.mediaConnected,
+                mediaConnected:
+                    run.kind === "dm" ? false : run.snapshot.mediaConnected,
                 meshPeerSignalingReady:
-                    run.kind === "group" ? {} : run.snapshot.meshPeerSignalingReady,
+                    run.kind === "group"
+                        ? {}
+                        : run.snapshot.meshPeerSignalingReady,
             };
             run.onUpdate();
         }
@@ -1035,12 +1065,7 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
         const prev = this.avCallSessionRosters.get(sessionId);
         const clearing =
             joinedParticipants.length === 0 && pendingParticipants.length === 0;
-        if (
-            !clearing &&
-            epoch != null &&
-            prev != null &&
-            epoch <= prev.epoch
-        ) {
+        if (!clearing && epoch != null && prev != null && epoch <= prev.epoch) {
             return;
         }
         if (prev) {
@@ -1081,12 +1106,7 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
         const prev = this.avCallSessionRosters.get(sessionId);
         const clearing =
             joinedParticipants.length === 0 && pendingParticipants.length === 0;
-        if (
-            !clearing &&
-            epoch != null &&
-            prev != null &&
-            epoch <= prev.epoch
-        ) {
+        if (!clearing && epoch != null && prev != null && epoch <= prev.epoch) {
             if (epoch < prev.epoch) {
                 avCallLog("sessionSnapshot ignored (epoch regression)", {
                     sessionId: shortSessionId(sessionId),
@@ -1191,10 +1211,7 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
     }
 
     isAvCallRecentDeparture(sessionId: string, participant: string): boolean {
-        return this.groupMeetAttempts.isRecentDeparture(
-            sessionId,
-            participant,
-        );
+        return this.groupMeetAttempts.isRecentDeparture(sessionId, participant);
     }
 
     removeParticipantFromAvCallSessionRoster(
@@ -1349,10 +1366,7 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
                     ))
             ) {
                 run.hostFreshStart = false;
-                await this.recoverStaleAvCallSession(
-                    run,
-                    existing.session_id,
-                );
+                await this.recoverStaleAvCallSession(run, existing.session_id);
                 return;
             }
 

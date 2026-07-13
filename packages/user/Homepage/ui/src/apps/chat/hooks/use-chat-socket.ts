@@ -1,25 +1,32 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
-
-import { useChainId } from "@shared/hooks/use-chain-id";
-import {
-    useWebRtcSession,
-} from "@shared/domains/webrtc";
-
+import type {
+    ChatDataMessageEnvelope,
+    ChatHistorySyncEnvelope,
+} from "../lib/chat-data-envelope";
+import type {
+    PresenceUi,
+    PslackTimelineCallEventRow,
+    PslackTimelineMessageRow,
+    PslackTimelineRow,
+} from "../lib/chat-timeline-types";
+import type { InboundMessageAcceptance } from "../lib/inbound-message-acceptance";
 import type {
     CallTimelineEventType,
     ConversationSnapshot,
     IceServerConfig,
 } from "../lib/protocol";
 
-import { recordChurnTrace } from "../lib/churn-trace";
-import { chatDataRecord } from "../lib/chat-data-debug";
-import { RealtimeClient } from "../lib/realtime-client";
-import { getHomepageQueryToken } from "../lib/ws-auth";
-import { ChatTransportBridge } from "../transport/chat-transport-bridge";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
+
+import { useWebRtcSession } from "@shared/domains/webrtc";
+import { useChainId } from "@shared/hooks/use-chain-id";
+import { useContacts } from "@shared/hooks/use-contacts";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
+
+import { avCallTeardownLog } from "../lib/av-call-debug";
 import {
-    AvCallSessionOrchestrator,
     type AvCallIncomingInvite,
+    AvCallSessionOrchestrator,
     type AvCallSessionPhase,
     type AvCallSessionSnapshot,
 } from "../lib/av-call-session-orchestrator";
@@ -28,26 +35,131 @@ import {
     avCallTerminalUiMessage,
     isAvCallTerminalReason,
 } from "../lib/av-call-terminal";
+import { mergeObjectiveCallEventsIntoTimeline } from "../lib/call-timeline-bridge";
 import {
+    ensureDm,
+    ensureGroup,
+    fetchActiveAvCallSession,
+    fetchSpaceCallEvents,
+} from "../lib/chat-api";
+import { chatDataRecord } from "../lib/chat-data-debug";
+import {
+    chatDataLog,
+    installChatDataDebugGlobal,
+    shortSpaceId,
+} from "../lib/chat-data-debug";
+import {
+    pendingRecipientCount,
+    pendingToTimelineRow,
+    sortTimelineRows,
+} from "../lib/chat-timeline-types";
+import { recordChurnTrace } from "../lib/churn-trace";
+import {
+    conversationVisibleToUser,
+    isInboundContactPeer,
+} from "../lib/contacts-policy";
+import {
+    isDeliveryOpenPeer,
+    markDeliveryOpenPeer,
+    seedDeliveryOpenPeersFromGroupHistory,
+    seedDeliveryOpenPeersFromHistory,
+} from "../lib/delivery-open-peers";
+import { composeTimingLog } from "../lib/dm-compose-timing";
+import { dmComposerDisabledReason } from "../lib/dm-compose-ux";
+import {
+    findVisibleDmWithPeer,
+    needsSpaceReloadForAvCallInvite,
+    resolveVisibleConversation,
+    shouldAcceptAvCallInvite,
+} from "../lib/dm-contacts-meet-flow";
+import {
+    dmMembersForPendingPeer,
+    findDmConversationWithPeer,
+    resolveComposeSurfaceConversationId,
+    shouldQueueFirstDmUntilSpace,
+} from "../lib/dm-first-message-send";
+import {
+    envelopesToHistorySyncMessages,
+    historySyncToDmEnvelopes,
+} from "../lib/dm-history-sync";
+import {
+    buildDmEnvelope,
+    dmPeerAccount,
+    getDmMessageHistoryStore,
+} from "../lib/dm-message-history-store";
+import { mergeTimelineMessagesBySendTimestamp } from "../lib/dm-message-history-ui";
+import {
+    findVisibleGroupWithMembers,
+    memberCanonicalKey,
+    shouldAcceptGroupAvCallInvite,
+} from "../lib/group-contacts-meet-flow";
+import {
+    historySyncToGroupEnvelopes,
+    isGroupHistorySyncSpace,
+    resolveGroupMembersForHistorySync,
+} from "../lib/group-history-sync";
+import {
+    type GroupMeetLifecycleBySpace,
+    beginGroupMeetLeave,
+    clearGroupMeetLifecycle,
+    completeGroupMeetLeave,
+    getGroupMeetLifecycle,
+    isGroupMeetLeaveInProgress,
+    markGroupMeetActive,
+    rejoinHintFromLifecycle,
+    shouldBlockGroupMeetRearm,
+} from "../lib/group-meet-lifecycle-ui";
+import {
+    type GroupMeetParticipant,
     anyGroupMeetJoined,
     buildGroupMeetParticipants,
     buildGroupMeetRemoteStreamMap,
     groupMeetDisplayPeer,
     groupMeetFullyConnected,
     groupMeetStatusLabel,
-    type GroupMeetParticipant,
 } from "../lib/group-meet-ui-state";
 import {
-    markGroupMeetActive,
-    beginGroupMeetLeave,
-    clearGroupMeetLifecycle,
-    completeGroupMeetLeave,
-    getGroupMeetLifecycle,
-    isGroupMeetLeaveInProgress,
-    rejoinHintFromLifecycle,
-    shouldBlockGroupMeetRearm,
-    type GroupMeetLifecycleBySpace,
-} from "../lib/group-meet-lifecycle-ui";
+    consumeVoluntaryGroupMeetLeave,
+    markVoluntaryGroupMeetLeave,
+    peekVoluntaryGroupMeetLeave,
+} from "../lib/group-meet-voluntary-leave";
+import {
+    buildGroupEnvelope,
+    getGroupMessageHistoryStore,
+} from "../lib/group-message-history-store";
+import { mergeTimelineMessagesWithGroupHistory } from "../lib/group-message-history-ui";
+import {
+    dequeueHistorySyncPush,
+    enqueueHistorySyncPush,
+    historySyncPushForPeer,
+} from "../lib/history-sync-push-queue";
+import { inboundMessageAcceptance } from "../lib/inbound-message-acceptance";
+import { listInboundAckTargets } from "../lib/inbound-message-ack";
+import {
+    type PendingChatMessage,
+    type PendingMessageStoreError,
+    loadPendingMessages,
+    savePendingMessagesWithQuotaRecovery,
+} from "../lib/pending-message-store";
+import { RealtimeClient } from "../lib/realtime-client";
+import {
+    type GraphqlSpaceEntry,
+    deriveSpaceUuidForCanonicalMembers,
+    pslackConversationIdFromSpaceUuid,
+    spaceEntryToConversation,
+    spaceUuidFromPslackConversationId,
+} from "../lib/space-bridge";
+import {
+    installThreadLifecycleGlobal,
+    peerStatesForRemotes,
+    recordThreadLifecycle,
+    threadLifecycleSnapshot,
+} from "../lib/thread-lifecycle";
+import { getHomepageQueryToken } from "../lib/ws-auth";
+import { ChatTransportBridge } from "../transport/chat-transport-bridge";
+import { createChatTransportBridge } from "./chat/use-chat-orchestrator";
+import { useConversationSelection } from "./chat/use-conversation-selection";
+import { useObjectiveSpaces } from "./chat/use-objective-spaces";
 
 function shouldBlockGroupMeetUiRearm(
     lifecycle: GroupMeetLifecycleBySpace,
@@ -57,108 +169,6 @@ function shouldBlockGroupMeetUiRearm(
     if (shouldBlockGroupMeetRearm(lifecycle, spaceUuid)) return true;
     return orch?.shouldBlockGroupMeetRearm?.(spaceUuid) ?? false;
 }
-import { avCallTeardownLog } from "../lib/av-call-debug";
-import {
-    consumeVoluntaryGroupMeetLeave,
-    markVoluntaryGroupMeetLeave,
-    peekVoluntaryGroupMeetLeave,
-} from "../lib/group-meet-voluntary-leave";
-import {
-    chatDataLog,
-    installChatDataDebugGlobal,
-    shortSpaceId,
-} from "../lib/chat-data-debug";
-import type { ChatDataMessageEnvelope, ChatHistorySyncEnvelope } from "../lib/chat-data-envelope";
-
-import { ensureDm, ensureGroup, fetchActiveAvCallSession, fetchSpaceCallEvents } from "../lib/chat-api";
-
-import { useObjectiveSpaces } from "./chat/use-objective-spaces";
-import { useConversationSelection } from "./chat/use-conversation-selection";
-import { createChatTransportBridge } from "./chat/use-chat-orchestrator";
-import { mergeObjectiveCallEventsIntoTimeline } from "../lib/call-timeline-bridge";
-import {
-    conversationVisibleToUser,
-    isInboundContactPeer,
-} from "../lib/contacts-policy";
-import {
-    findVisibleDmWithPeer,
-    needsSpaceReloadForAvCallInvite,
-    resolveVisibleConversation,
-    shouldAcceptAvCallInvite,
-} from "../lib/dm-contacts-meet-flow";
-import {
-    findVisibleGroupWithMembers,
-    memberCanonicalKey,
-    shouldAcceptGroupAvCallInvite,
-} from "../lib/group-contacts-meet-flow";
-import {
-    isDeliveryOpenPeer,
-    markDeliveryOpenPeer,
-    seedDeliveryOpenPeersFromGroupHistory,
-    seedDeliveryOpenPeersFromHistory,
-} from "../lib/delivery-open-peers";
-import {
-    buildDmEnvelope,
-    dmPeerAccount,
-    getDmMessageHistoryStore,
-} from "../lib/dm-message-history-store";
-import {
-    envelopesToHistorySyncMessages,
-    historySyncToDmEnvelopes,
-} from "../lib/dm-history-sync";
-import {
-    historySyncToGroupEnvelopes,
-    isGroupHistorySyncSpace,
-    resolveGroupMembersForHistorySync,
-} from "../lib/group-history-sync";
-import { listInboundAckTargets } from "../lib/inbound-message-ack";
-import { inboundMessageAcceptance } from "../lib/inbound-message-acceptance";
-import type { InboundMessageAcceptance } from "../lib/inbound-message-acceptance";
-import {
-    dequeueHistorySyncPush,
-    enqueueHistorySyncPush,
-    historySyncPushForPeer,
-} from "../lib/history-sync-push-queue";
-import { dmComposerDisabledReason } from "../lib/dm-compose-ux";
-import { composeTimingLog } from "../lib/dm-compose-timing";
-import {
-    installThreadLifecycleGlobal,
-    peerStatesForRemotes,
-    recordThreadLifecycle,
-    threadLifecycleSnapshot,
-} from "../lib/thread-lifecycle";
-import {
-    dmMembersForPendingPeer,
-    findDmConversationWithPeer,
-    resolveComposeSurfaceConversationId,
-    shouldQueueFirstDmUntilSpace,
-} from "../lib/dm-first-message-send";
-import {
-    mergeTimelineMessagesBySendTimestamp,
-} from "../lib/dm-message-history-ui";
-import {
-    buildGroupEnvelope,
-    getGroupMessageHistoryStore,
-} from "../lib/group-message-history-store";
-import {
-    mergeTimelineMessagesWithGroupHistory,
-} from "../lib/group-message-history-ui";
-import {
-    deriveSpaceUuidForCanonicalMembers,
-    pslackConversationIdFromSpaceUuid,
-    spaceEntryToConversation,
-    spaceUuidFromPslackConversationId,
-    type GraphqlSpaceEntry,
-} from "../lib/space-bridge";
-import {
-    loadPendingMessages,
-    savePendingMessagesWithQuotaRecovery,
-    type PendingChatMessage,
-    type PendingMessageStoreError,
-} from "../lib/pending-message-store";
-
-import { useContacts } from "@shared/hooks/use-contacts";
-import { useCurrentUser } from "@shared/hooks/use-current-user";
 
 const TERMINAL_CALL_TIMELINE_EVENTS = new Set<CallTimelineEventType>([
     "declined",
@@ -171,18 +181,6 @@ const TERMINAL_CALL_TIMELINE_EVENTS = new Set<CallTimelineEventType>([
 /** Cleared-call IDs — suppress spurious `bad-call` from late signaling after teardown (decline, hangup, etc.). */
 const SIGNALING_TEARDOWN_SUPPRESS_MS = 12_000;
 const AV_CALL_TERMINAL_DISMISS_MS = 2_500;
-
-import type {
-    PslackTimelineCallEventRow,
-    PslackTimelineMessageRow,
-    PslackTimelineRow,
-    PresenceUi,
-} from "../lib/chat-timeline-types";
-import {
-    pendingRecipientCount,
-    pendingToTimelineRow,
-    sortTimelineRows,
-} from "../lib/chat-timeline-types";
 
 export type {
     PslackMessageStatus,
@@ -246,9 +244,7 @@ function canonicalDmMembers(
 ): [string, string] | null {
     if (recipients.length !== 1) return null;
     const peer = recipients[0]!;
-    return self.localeCompare(peer) < 0
-        ? [self, peer]
-        : [peer, self];
+    return self.localeCompare(peer) < 0 ? [self, peer] : [peer, self];
 }
 
 function userMessageForServerError(code: string, reason: string): string {
@@ -385,7 +381,9 @@ export function useChatSocket(options?: UseChatSocketOptions) {
 
     const iceServersRef = useRef<IceServerConfig[] | null>(null);
 
-    const [lastInboundError, setLastInboundError] = useState<string | null>(null);
+    const [lastInboundError, setLastInboundError] = useState<string | null>(
+        null,
+    );
     /** Plan C4: pending-message storage quota exceeded; cleared by next clean save. */
     const [pendingStorageQuotaExceeded, setPendingStorageQuotaExceeded] =
         useState(false);
@@ -407,9 +405,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         }
     }, [connectionState]);
 
-    const transportBridgeRef = useRef<ChatTransportBridge | null>(
-        null,
-    );
+    const transportBridgeRef = useRef<ChatTransportBridge | null>(null);
     const avCallOrchestratorRef = useRef<AvCallSessionOrchestrator | null>(
         null,
     );
@@ -489,16 +485,13 @@ export function useChatSocket(options?: UseChatSocketOptions) {
     avCallVideoMutedRef.current = avCallVideoMuted;
     const recentSignalingTeardownIdsRef = useRef<Set<string>>(new Set());
 
-    const markSignalingTeardown = useCallback(
-        (callId: string | undefined) => {
-            if (!callId) return;
-            recentSignalingTeardownIdsRef.current.add(callId);
-            globalThis.setTimeout(() => {
-                recentSignalingTeardownIdsRef.current.delete(callId);
-            }, SIGNALING_TEARDOWN_SUPPRESS_MS);
-        },
-        [],
-    );
+    const markSignalingTeardown = useCallback((callId: string | undefined) => {
+        if (!callId) return;
+        recentSignalingTeardownIdsRef.current.add(callId);
+        globalThis.setTimeout(() => {
+            recentSignalingTeardownIdsRef.current.delete(callId);
+        }, SIGNALING_TEARDOWN_SUPPRESS_MS);
+    }, []);
 
     objectiveSpacesRef.current = objectiveSpaces;
 
@@ -629,18 +622,15 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         [],
     );
 
-    const selectSpaceByMembers = useCallback(
-        (members: readonly string[]) => {
-            const key = memberCanonicalKey(members);
-            const match = conversationsRef.current.find(
-                (row) => memberCanonicalKey(row.members) === key,
-            );
-            if (match) {
-                setSelectedConversationId(match.conversationId);
-            }
-        },
-        [],
-    );
+    const selectSpaceByMembers = useCallback((members: readonly string[]) => {
+        const key = memberCanonicalKey(members);
+        const match = conversationsRef.current.find(
+            (row) => memberCanonicalKey(row.members) === key,
+        );
+        if (match) {
+            setSelectedConversationId(match.conversationId);
+        }
+    }, []);
 
     const persistDmHistoryMessage = useCallback(
         async (input: {
@@ -662,9 +652,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     (row) => row.conversationId === input.spaceUuid,
                 );
             const members =
-                space && "members" in space
-                    ? space.members
-                    : undefined;
+                space && "members" in space ? space.members : undefined;
             if (!members) return;
             const peer = dmPeerAccount(members, self);
             if (!peer) return;
@@ -842,91 +830,95 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         void restoreDmHistoryFromStore(selfAccount);
     }, [chainId, selfAccount, objectiveSpaces, restoreDmHistoryFromStore]);
 
-    const restoreGroupHistoryFromStore = useCallback(async (account: string) => {
-        const chain = chainIdRef.current;
-        if (!chain) return;
+    const restoreGroupHistoryFromStore = useCallback(
+        async (account: string) => {
+            const chain = chainIdRef.current;
+            if (!chain) return;
 
-        const groupSpaces = objectiveSpacesRef.current.filter(
-            (space) => space.kind === "GROUP",
-        );
-        if (groupSpaces.length === 0) return;
+            const groupSpaces = objectiveSpacesRef.current.filter(
+                (space) => space.kind === "GROUP",
+            );
+            if (groupSpaces.length === 0) return;
 
-        try {
-            const store = getGroupMessageHistoryStore(chain, account);
-            const historyBySpace = await Promise.all(
-                groupSpaces.map(async (space) => ({
+            try {
+                const store = getGroupMessageHistoryStore(chain, account);
+                const historyBySpace = await Promise.all(
+                    groupSpaces.map(async (space) => ({
+                        spaceUuid: space.space_uuid,
+                        envelopes: await store.listBySpace(space.space_uuid),
+                    })),
+                );
+
+                const pendingClientMsgIds = new Set(
+                    Object.values(pendingMessagesRef.current)
+                        .filter((row) => row.status === "pending")
+                        .map((row) => row.clientMsgId),
+                );
+                const groupSpacesForSeed = groupSpaces.map((space) => ({
                     spaceUuid: space.space_uuid,
-                    envelopes: await store.listBySpace(space.space_uuid),
-                })),
-            );
+                    members: space.members,
+                }));
+                const seeded = seedDeliveryOpenPeersFromGroupHistory(
+                    chain,
+                    account,
+                    historyBySpace.flatMap((row) => row.envelopes),
+                    groupSpacesForSeed,
+                    {
+                        pendingClientMsgIds,
+                        pendingDeliveredTo: Object.values(
+                            pendingMessagesRef.current,
+                        ),
+                    },
+                );
+                if (seeded > 0) {
+                    globalThis.setTimeout(
+                        () => flushPendingMessagesRef.current(),
+                        0,
+                    );
+                }
 
-            const pendingClientMsgIds = new Set(
-                Object.values(pendingMessagesRef.current)
-                    .filter((row) => row.status === "pending")
-                    .map((row) => row.clientMsgId),
-            );
-            const groupSpacesForSeed = groupSpaces.map((space) => ({
-                spaceUuid: space.space_uuid,
-                members: space.members,
-            }));
-            const seeded = seedDeliveryOpenPeersFromGroupHistory(
-                chain,
-                account,
-                historyBySpace.flatMap((row) => row.envelopes),
-                groupSpacesForSeed,
-                {
-                    pendingClientMsgIds,
-                    pendingDeliveredTo: Object.values(
-                        pendingMessagesRef.current,
-                    ),
-                },
-            );
-            if (seeded > 0) {
-                globalThis.setTimeout(
-                    () => flushPendingMessagesRef.current(),
-                    0,
+                setTimelineByConversation((prev) => {
+                    const next = { ...prev };
+                    for (const { spaceUuid, envelopes } of historyBySpace) {
+                        if (envelopes.length === 0) continue;
+                        const existing = prev[spaceUuid] ?? [];
+                        const callEvents = existing.filter(
+                            (row) => row.kind === "callEvent",
+                        );
+                        const existingMessages = existing.filter(
+                            (row): row is PslackTimelineMessageRow =>
+                                row.kind === "message",
+                        );
+                        const mergedMessages =
+                            mergeTimelineMessagesWithGroupHistory(
+                                existingMessages,
+                                envelopes,
+                            ).map(
+                                (row) =>
+                                    ({
+                                        ...row,
+                                        kind: "message" as const,
+                                    }) satisfies PslackTimelineMessageRow,
+                            );
+                        next[spaceUuid] = sortTimelineRows([
+                            ...callEvents,
+                            ...mergedMessages,
+                        ]);
+                    }
+                    return next;
+                });
+            } catch (e) {
+                const detail =
+                    e instanceof Error
+                        ? e.message
+                        : "Could not restore group message history.";
+                setLastInboundError(
+                    `Group history storage is unavailable or corrupted: ${detail}. Prior messages cannot be restored in this browser.`,
                 );
             }
-
-            setTimelineByConversation((prev) => {
-                const next = { ...prev };
-                for (const { spaceUuid, envelopes } of historyBySpace) {
-                    if (envelopes.length === 0) continue;
-                    const existing = prev[spaceUuid] ?? [];
-                    const callEvents = existing.filter(
-                        (row) => row.kind === "callEvent",
-                    );
-                    const existingMessages = existing.filter(
-                        (row): row is PslackTimelineMessageRow =>
-                            row.kind === "message",
-                    );
-                    const mergedMessages = mergeTimelineMessagesWithGroupHistory(
-                        existingMessages,
-                        envelopes,
-                    ).map(
-                        (row) =>
-                            ({
-                                ...row,
-                                kind: "message" as const,
-                            }) satisfies PslackTimelineMessageRow,
-                    );
-                    next[spaceUuid] = sortTimelineRows([
-                        ...callEvents,
-                        ...mergedMessages,
-                    ]);
-                }
-                return next;
-            });
-        } catch (e) {
-            const detail =
-                e instanceof Error
-                    ? e.message
-                    : "Could not restore group message history.";
-            setLastInboundError(
-                `Group history storage is unavailable or corrupted: ${detail}. Prior messages cannot be restored in this browser.`,
-            );
-        }
-    }, []);
+        },
+        [],
+    );
 
     useEffect(() => {
         if (!chainId || !selfAccount) return;
@@ -954,10 +946,11 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                         (row): row is PslackTimelineMessageRow =>
                             row.kind === "message",
                     );
-                    const mergedObjective = mergeObjectiveCallEventsIntoTimeline(
-                        objectiveExisting,
-                        events,
-                    );
+                    const mergedObjective =
+                        mergeObjectiveCallEventsIntoTimeline(
+                            objectiveExisting,
+                            events,
+                        );
                     return {
                         ...prev,
                         [spaceUuid]: sortTimelineRows([
@@ -985,9 +978,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         if (spaces.length === 0) return;
         await Promise.all(
             spaces.map((space) =>
-                refreshObjectiveCallEventsForSpaceRef.current(
-                    space.space_uuid,
-                ),
+                refreshObjectiveCallEventsForSpaceRef.current(space.space_uuid),
             ),
         );
     }, []);
@@ -1000,15 +991,13 @@ export function useChatSocket(options?: UseChatSocketOptions) {
     const markConversationSendFailed = useCallback(
         (conversationId: string | undefined, detail: string) => {
             if (!conversationId) return;
-            const spaceConvId = spaceUuidFromPslackConversationId(conversationId);
+            const spaceConvId =
+                spaceUuidFromPslackConversationId(conversationId);
             setTimelineByConversation((prev) => {
                 const arr = [...(prev[spaceConvId] ?? [])];
                 for (let i = arr.length - 1; i >= 0; i--) {
                     const row = arr[i];
-                    if (
-                        row?.kind === "message" &&
-                        row.status === "pending"
-                    ) {
+                    if (row?.kind === "message" && row.status === "pending") {
                         arr[i] = {
                             ...row,
                             status: "failed",
@@ -1234,7 +1223,11 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 serverMsgId: frame.serverMsgId,
             });
         },
-        [persistDmHistoryMessage, setComposePendingDmPeer, setSelectedConversationId],
+        [
+            persistDmHistoryMessage,
+            setComposePendingDmPeer,
+            setSelectedConversationId,
+        ],
     );
 
     const applyInboundChatMessageRef = useRef(applyInboundChatMessage);
@@ -1343,10 +1336,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 clientMsgId: envelope.clientMsgId,
             });
 
-            globalThis.setTimeout(
-                () => flushPendingMessagesRef.current(),
-                0,
-            );
+            globalThis.setTimeout(() => flushPendingMessagesRef.current(), 0);
             return "accepted";
         },
         [persistGroupHistoryMessage],
@@ -1453,10 +1443,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 };
             });
 
-            globalThis.setTimeout(
-                () => flushPendingMessagesRef.current(),
-                0,
-            );
+            globalThis.setTimeout(() => flushPendingMessagesRef.current(), 0);
         },
         [],
     );
@@ -1540,10 +1527,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 };
             });
 
-            globalThis.setTimeout(
-                () => flushPendingMessagesRef.current(),
-                0,
-            );
+            globalThis.setTimeout(() => flushPendingMessagesRef.current(), 0);
         },
         [],
     );
@@ -1566,11 +1550,8 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 };
                 const bridge = transportBridgeRef.current;
                 const sent =
-                    bridge?.sendHistorySync(
-                        spaceUuid,
-                        peerAccount,
-                        payload,
-                    ) ?? false;
+                    bridge?.sendHistorySync(spaceUuid, peerAccount, payload) ??
+                    false;
                 if (!sent) {
                     enqueueHistorySyncPush(chain, self, {
                         peerAccount,
@@ -1688,7 +1669,9 @@ export function useChatSocket(options?: UseChatSocketOptions) {
     const applyInboundDmHistorySyncRef = useRef(applyInboundDmHistorySync);
     applyInboundDmHistorySyncRef.current = applyInboundDmHistorySync;
 
-    const applyInboundGroupHistorySyncRef = useRef(applyInboundGroupHistorySync);
+    const applyInboundGroupHistorySyncRef = useRef(
+        applyInboundGroupHistorySync,
+    );
     applyInboundGroupHistorySyncRef.current = applyInboundGroupHistorySync;
 
     const pushDmHistorySyncRef = useRef(pushDmHistorySync);
@@ -1710,7 +1693,9 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             replacePendingMessages((prev) => {
                 const cur = prev[clientMsgId];
                 if (!cur) return prev;
-                const deliveredTo = [...new Set([...cur.deliveredTo, recipient])];
+                const deliveredTo = [
+                    ...new Set([...cur.deliveredTo, recipient]),
+                ];
                 const complete = cur.recipients.every((r) =>
                     deliveredTo.includes(r),
                 );
@@ -1780,9 +1765,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
     const flushPendingMessagesRef = useRef(flushPendingMessages);
     flushPendingMessagesRef.current = flushPendingMessages;
 
-    const flushDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(
-        null,
-    );
+    const flushDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const schedulePendingFlush = useCallback(() => {
         if (leavingChatRef.current) return;
         flushPendingMessagesRef.current();
@@ -1888,10 +1871,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     setActiveCall(null);
                     clearAvCallMedia();
                 }
-                if (
-                    snap.phase !== "idle" &&
-                    snap.phase !== "failed"
-                ) {
+                if (snap.phase !== "idle" && snap.phase !== "failed") {
                     return;
                 }
             }
@@ -2101,8 +2081,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                   ) ?? [])
                 : [];
             const remoteJoined =
-                peerAccount != null &&
-                joinedParticipants.includes(peerAccount);
+                peerAccount != null && joinedParticipants.includes(peerAccount);
             const direction =
                 activeCallRef.current?.conversationId === spaceUuid &&
                 activeCallRef.current.source === "av-call"
@@ -2235,12 +2214,11 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     const liveRemoteCount = Object.values(remoteStreams).filter(
                         (stream) => stream != null,
                     ).length;
-                    const rosterJoined =
-                        sessionId
-                            ? (avCallOrchestratorRef.current?.getAvCallSessionJoinedParticipants(
-                                  sessionId,
-                              ) ?? [])
-                            : [];
+                    const rosterJoined = sessionId
+                        ? (avCallOrchestratorRef.current?.getAvCallSessionJoinedParticipants(
+                              sessionId,
+                          ) ?? [])
+                        : [];
                     const remotesInSession = conversation.members.filter(
                         (member) =>
                             member !== self && rosterJoined.includes(member),
@@ -2304,9 +2282,11 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     const sessionId = run?.snapshot.sessionId;
                     const remoteJoined =
                         sessionId != null &&
-                        (avCallOrchestratorRef.current?.getAvCallSessionJoinedParticipants(
-                            sessionId,
-                        ) ?? []).includes(info.peerAccount);
+                        (
+                            avCallOrchestratorRef.current?.getAvCallSessionJoinedParticipants(
+                                sessionId,
+                            ) ?? []
+                        ).includes(info.peerAccount);
                     const dmConnected =
                         direction !== "outgoing" ||
                         remoteJoined ||
@@ -2322,9 +2302,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                         startedAt: Date.now(),
                         status: dmConnected ? "connected" : "ringing",
                         source: "av-call",
-                        lastFrame: dmConnected
-                            ? "Connected"
-                            : "Ringing…",
+                        lastFrame: dmConnected ? "Connected" : "Ringing…",
                         callKind: "dm",
                     };
                 }
@@ -2336,14 +2314,15 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     run?.kind === "dm" || run?.kind === "group"
                         ? run.wantAudio
                         : prev.wantAudio;
-                const direction =
-                    prev.direction ?? avCallDirectionRef.current;
+                const direction = prev.direction ?? avCallDirectionRef.current;
                 const sessionId = run?.snapshot.sessionId;
                 const remoteJoined =
                     sessionId != null &&
-                    (avCallOrchestratorRef.current?.getAvCallSessionJoinedParticipants(
-                        sessionId,
-                    ) ?? []).includes(info.peerAccount);
+                    (
+                        avCallOrchestratorRef.current?.getAvCallSessionJoinedParticipants(
+                            sessionId,
+                        ) ?? []
+                    ).includes(info.peerAccount);
                 const dmConnected =
                     direction !== "outgoing" ||
                     remoteJoined ||
@@ -2363,9 +2342,11 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             const sessionId = run?.snapshot.sessionId;
             const remoteJoined =
                 sessionId != null &&
-                (avCallOrchestratorRef.current?.getAvCallSessionJoinedParticipants(
-                    sessionId,
-                ) ?? []).includes(info.peerAccount);
+                (
+                    avCallOrchestratorRef.current?.getAvCallSessionJoinedParticipants(
+                        sessionId,
+                    ) ?? []
+                ).includes(info.peerAccount);
             const direction =
                 activeCallRef.current?.direction ?? avCallDirectionRef.current;
             const dmConnected =
@@ -2394,9 +2375,8 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             const self = selfRef.current;
             if (!self || participant === self) return;
 
-            const run = avCallOrchestratorRef.current?.findRunBySessionId(
-                sessionId,
-            );
+            const run =
+                avCallOrchestratorRef.current?.findRunBySessionId(sessionId);
             if (!run) return;
 
             const spaceUuid = run.spaceUuid;
@@ -2434,7 +2414,9 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         (audioMuted: boolean, videoMuted: boolean) => {
             const ac = activeCallRef.current;
             if (ac?.source !== "av-call" || ac.status !== "connected") return;
-            const run = avCallOrchestratorRef.current?.getRun(ac.conversationId);
+            const run = avCallOrchestratorRef.current?.getRun(
+                ac.conversationId,
+            );
             const sessionId = run?.snapshot.sessionId;
             if (!run?.hasJoined || !sessionId) return;
             avCallOrchestratorRef.current
@@ -2453,31 +2435,24 @@ export function useChatSocket(options?: UseChatSocketOptions) {
 
     useEffect(() => {
         if (!contactsLoaded || !selfAccount) return;
-        transportBridgeRef.current?.flushDeferredInboundAcceptance(
-            (record) => {
-                const envelope: ChatDataMessageEnvelope = {
-                    t: "chatMessage",
-                    spaceUuid: record.spaceUuid,
-                    from: record.from,
-                    body: record.body,
-                    sendTimestamp: record.sendTimestamp,
-                    clientMsgId: record.clientMsgId,
-                };
-                const conversation = conversationsRef.current.find(
-                    (row) => row.conversationId === record.spaceUuid,
-                );
-                if (conversation?.kind === "group") {
-                    return applyInboundGroupDataChannelMessageRef.current(
-                        envelope,
-                    );
-                }
-                return applyInboundDmDataChannelMessageRef.current(envelope);
-            },
-        );
-        globalThis.setTimeout(
-            () => flushPendingMessagesRef.current(),
-            0,
-        );
+        transportBridgeRef.current?.flushDeferredInboundAcceptance((record) => {
+            const envelope: ChatDataMessageEnvelope = {
+                t: "chatMessage",
+                spaceUuid: record.spaceUuid,
+                from: record.from,
+                body: record.body,
+                sendTimestamp: record.sendTimestamp,
+                clientMsgId: record.clientMsgId,
+            };
+            const conversation = conversationsRef.current.find(
+                (row) => row.conversationId === record.spaceUuid,
+            );
+            if (conversation?.kind === "group") {
+                return applyInboundGroupDataChannelMessageRef.current(envelope);
+            }
+            return applyInboundDmDataChannelMessageRef.current(envelope);
+        });
+        globalThis.setTimeout(() => flushPendingMessagesRef.current(), 0);
     }, [contactsLoaded, selfAccount]);
 
     useEffect(() => {
@@ -2528,10 +2503,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 void restoreGroupHistoryFromStore(frame.user);
                 void restoreObjectiveCallEvents();
                 for (const conv of conversationsRef.current) {
-                    if (
-                        conv.kind === "group" &&
-                        conv.members.length > 2
-                    ) {
+                    if (conv.kind === "group" && conv.members.length > 2) {
                         void discoverActiveGroupAvCallInviteRef.current(
                             conv.conversationId,
                             conv.members,
@@ -2564,10 +2536,13 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                             conversation.members,
                         );
                     } else {
-                        recordChurnTrace("ws-welcome-no-selected-conversation", {
-                            selected,
-                            conversationKind: conversation?.kind ?? null,
-                        });
+                        recordChurnTrace(
+                            "ws-welcome-no-selected-conversation",
+                            {
+                                selected,
+                                conversationKind: conversation?.kind ?? null,
+                            },
+                        );
                     }
                 }
                 void loadObjectiveSpacesRef.current();
@@ -2661,8 +2636,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 const nextStatus: PresenceUi =
                     frame.status === "online" ? "online" : "offline";
                 const wasOnline =
-                    presenceByAccountRef.current[frame.account] ===
-                    "online";
+                    presenceByAccountRef.current[frame.account] === "online";
                 patchPresenceRef(frame.account, nextStatus);
                 setPresenceByAccount((prev) => {
                     if (prev[frame.account] === nextStatus) return prev;
@@ -2684,21 +2658,15 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                             if (!pending.recipients.includes(frame.account)) {
                                 continue;
                             }
-                            const spaceId =
-                                spaceUuidFromPslackConversationId(
-                                    pending.conversationId,
-                                );
-                            const conversation =
-                                conversationsRef.current.find(
-                                    (row) =>
-                                        row.conversationId === spaceId,
-                                );
+                            const spaceId = spaceUuidFromPslackConversationId(
+                                pending.conversationId,
+                            );
+                            const conversation = conversationsRef.current.find(
+                                (row) => row.conversationId === spaceId,
+                            );
                             const dmMembers =
                                 conversation?.members ??
-                                canonicalDmMembers(
-                                    self,
-                                    pending.recipients,
-                                );
+                                canonicalDmMembers(self, pending.recipients);
                             if (dmMembers) {
                                 transportBridgeRef.current?.ensureChatDataSession(
                                     spaceId,
@@ -2715,12 +2683,8 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                             }
                         }
                     }
-                    transportBridgeRef.current?.onPeerOnline(
-                        frame.account,
-                    );
-                    avCallOrchestratorRef.current?.onPeerOnline(
-                        frame.account,
-                    );
+                    transportBridgeRef.current?.onPeerOnline(frame.account);
+                    avCallOrchestratorRef.current?.onPeerOnline(frame.account);
                     const selected = selectedConversationIdRef.current;
                     if (selected) {
                         const conversation = conversationsRef.current.find(
@@ -2744,12 +2708,8 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                         0,
                     );
                 } else {
-                    transportBridgeRef.current?.onPeerOffline(
-                        frame.account,
-                    );
-                    avCallOrchestratorRef.current?.onPeerOffline(
-                        frame.account,
-                    );
+                    transportBridgeRef.current?.onPeerOffline(frame.account);
+                    avCallOrchestratorRef.current?.onPeerOffline(frame.account);
                 }
             },
             error: (frame) => {
@@ -2764,112 +2724,114 @@ export function useChatSocket(options?: UseChatSocketOptions) {
 
         if (!transportBridgeRef.current) {
             transportBridgeRef.current = createChatTransportBridge({
-            getRealtime: () => realtimeClientRef.current,
-            getSelf: () => selfRef.current,
-            getChainId: () => chainIdRef.current,
-            getIceServers: () => iceServersRef.current,
-            onInboundMessage: (envelope) => {
-                const self = selfRef.current;
-                let conversation = conversationsRef.current.find(
-                    (row) => row.conversationId === envelope.spaceUuid,
-                );
-                if (!conversation && self) {
-                    reloadSpacesIfMissing(envelope.spaceUuid);
-                    conversation = resolveVisibleConversation(
-                        envelope.spaceUuid,
-                        self,
-                        objectiveSpacesRef.current,
-                        contactAccountsRef.current,
-                        contactsLoadedRef.current,
+                getRealtime: () => realtimeClientRef.current,
+                getSelf: () => selfRef.current,
+                getChainId: () => chainIdRef.current,
+                getIceServers: () => iceServersRef.current,
+                onInboundMessage: (envelope) => {
+                    const self = selfRef.current;
+                    let conversation = conversationsRef.current.find(
+                        (row) => row.conversationId === envelope.spaceUuid,
                     );
-                }
-                if (conversation?.kind === "group") {
-                    return applyInboundGroupDataChannelMessageRef.current(
-                        envelope,
-                    );
-                }
-                return applyInboundDmDataChannelMessageRef.current(envelope);
-            },
-            onInboundHistorySync: (envelope) => {
-                reloadSpacesIfMissing(envelope.spaceUuid);
-                if (
-                    isGroupHistorySyncSpace(
-                        envelope.spaceUuid,
-                        conversationsRef.current,
-                        objectiveSpacesRef.current,
-                    )
-                ) {
-                    void applyInboundGroupHistorySyncRef.current(envelope);
-                } else {
-                    void applyInboundDmHistorySyncRef.current(envelope);
-                }
-            },
-            onPeerUsable: (peerAccount) => {
-                const self = selfRef.current;
-                if (!self) return;
-                void drainHistorySyncPushForPeerRef.current(peerAccount);
-                for (const conv of conversationsRef.current) {
-                    if (
-                        conv.kind === "group" &&
-                        conv.members.includes(peerAccount)
-                    ) {
-                        void pushGroupHistorySyncRef.current(
-                            conv.conversationId,
-                            peerAccount,
-                        );
-                    } else if (
-                        conv.kind === "dm" &&
-                        conv.members.includes(peerAccount)
-                    ) {
-                        void pushDmHistorySyncRef.current(
-                            conv.conversationId,
-                            peerAccount,
-                        );
-                    }
-                }
-            },
-            onSessionInvite: (spaceUuid) => {
-                const self = selfRef.current;
-                if (!self) return;
-                void loadObjectiveSpacesRef.current().then((spaces) => {
-                    const stillMissing =
-                        resolveVisibleConversation(
-                            spaceUuid,
+                    if (!conversation && self) {
+                        reloadSpacesIfMissing(envelope.spaceUuid);
+                        conversation = resolveVisibleConversation(
+                            envelope.spaceUuid,
                             self,
-                            spaces,
+                            objectiveSpacesRef.current,
                             contactAccountsRef.current,
                             contactsLoadedRef.current,
-                        ) === undefined;
-                    if (!stillMissing) return;
-                    globalThis.setTimeout(() => {
-                        void loadObjectiveSpacesRef.current();
-                    }, 800);
-                });
-            },
-            onSpaceMembershipHint: () => {
-                void loadObjectiveSpacesRef.current();
-            },
-            onMessageAck: (spaceUuid, envelope) => {
-                reloadSpacesIfMissing(spaceUuid);
-                chatDataLog("message ack received", {
-                    space: shortSpaceId(spaceUuid),
-                    from: envelope.from,
-                    clientMsgId: envelope.clientMsgId,
-                });
-                markDmPendingDeliveredRef.current(
-                    envelope.clientMsgId,
-                    envelope.from,
-                    spaceUuid,
-                );
-            },
-            getRemotePresence: (account) => {
-                const presence = presenceByAccountRef.current[account];
-                if (presence === "online" || presence === "offline") {
-                    return presence;
-                }
-                return undefined;
-            },
-        });
+                        );
+                    }
+                    if (conversation?.kind === "group") {
+                        return applyInboundGroupDataChannelMessageRef.current(
+                            envelope,
+                        );
+                    }
+                    return applyInboundDmDataChannelMessageRef.current(
+                        envelope,
+                    );
+                },
+                onInboundHistorySync: (envelope) => {
+                    reloadSpacesIfMissing(envelope.spaceUuid);
+                    if (
+                        isGroupHistorySyncSpace(
+                            envelope.spaceUuid,
+                            conversationsRef.current,
+                            objectiveSpacesRef.current,
+                        )
+                    ) {
+                        void applyInboundGroupHistorySyncRef.current(envelope);
+                    } else {
+                        void applyInboundDmHistorySyncRef.current(envelope);
+                    }
+                },
+                onPeerUsable: (peerAccount) => {
+                    const self = selfRef.current;
+                    if (!self) return;
+                    void drainHistorySyncPushForPeerRef.current(peerAccount);
+                    for (const conv of conversationsRef.current) {
+                        if (
+                            conv.kind === "group" &&
+                            conv.members.includes(peerAccount)
+                        ) {
+                            void pushGroupHistorySyncRef.current(
+                                conv.conversationId,
+                                peerAccount,
+                            );
+                        } else if (
+                            conv.kind === "dm" &&
+                            conv.members.includes(peerAccount)
+                        ) {
+                            void pushDmHistorySyncRef.current(
+                                conv.conversationId,
+                                peerAccount,
+                            );
+                        }
+                    }
+                },
+                onSessionInvite: (spaceUuid) => {
+                    const self = selfRef.current;
+                    if (!self) return;
+                    void loadObjectiveSpacesRef.current().then((spaces) => {
+                        const stillMissing =
+                            resolveVisibleConversation(
+                                spaceUuid,
+                                self,
+                                spaces,
+                                contactAccountsRef.current,
+                                contactsLoadedRef.current,
+                            ) === undefined;
+                        if (!stillMissing) return;
+                        globalThis.setTimeout(() => {
+                            void loadObjectiveSpacesRef.current();
+                        }, 800);
+                    });
+                },
+                onSpaceMembershipHint: () => {
+                    void loadObjectiveSpacesRef.current();
+                },
+                onMessageAck: (spaceUuid, envelope) => {
+                    reloadSpacesIfMissing(spaceUuid);
+                    chatDataLog("message ack received", {
+                        space: shortSpaceId(spaceUuid),
+                        from: envelope.from,
+                        clientMsgId: envelope.clientMsgId,
+                    });
+                    markDmPendingDeliveredRef.current(
+                        envelope.clientMsgId,
+                        envelope.from,
+                        spaceUuid,
+                    );
+                },
+                getRemotePresence: (account) => {
+                    const presence = presenceByAccountRef.current[account];
+                    if (presence === "online" || presence === "offline") {
+                        return presence;
+                    }
+                    return undefined;
+                },
+            });
         }
         const chatBridge = transportBridgeRef.current;
         chatBridge?.start();
@@ -2938,6 +2900,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     groupMeetLifecycleRef.current,
                     spaceUuid,
                 ),
+            () => transportBridgeRef.current?.deliveryFabric ?? null,
         );
         avCallOrchestratorRef.current.start();
 
@@ -2960,11 +2923,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             setIncomingAvCallInvite(null);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps -- chat handlers read latest state via refs
-    }, [
-        webrtcClient,
-        registerHandlers,
-        markSignalingTeardown,
-    ]);
+    }, [webrtcClient, registerHandlers, markSignalingTeardown]);
 
     const pendingDeliveryCount = useMemo(
         () =>
@@ -3070,10 +3029,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         const conversation = conversations.find(
             (row) => row.conversationId === selectedConversationId,
         );
-        if (
-            conversation?.kind === "dm" &&
-            conversation.members.length === 2
-        ) {
+        if (conversation?.kind === "dm" && conversation.members.length === 2) {
             scheduleDmChatDataSession(
                 conversation.conversationId,
                 conversation.members,
@@ -3081,10 +3037,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             return;
         }
 
-        if (
-            conversation?.kind === "group" &&
-            conversation.members.length > 2
-        ) {
+        if (conversation?.kind === "group" && conversation.members.length > 2) {
             scheduleGroupChatDataSession(
                 conversation.conversationId,
                 conversation.members,
@@ -3143,8 +3096,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
 
     const location = useLocation();
     const onChatRoute =
-        location.pathname === "/chat" ||
-        location.pathname.startsWith("/chat/");
+        location.pathname === "/chat" || location.pathname.startsWith("/chat/");
 
     // chainId resolves async from GraphQL; retry stack start once it is available.
     useEffect(() => {
@@ -3278,17 +3230,11 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             leavingChat: leavingChatRef.current,
         });
         teardownChatRealtime();
-    }, [
-        onChatRoute,
-        teardownChatRealtime,
-        location.pathname,
-    ]);
+    }, [onChatRoute, teardownChatRealtime, location.pathname]);
 
     useEffect(() => {
         if (!contactsLoaded) return;
-        transportBridgeRef.current?.setFocusedSpace(
-            selectedConversationId,
-        );
+        transportBridgeRef.current?.setFocusedSpace(selectedConversationId);
         releaseIdleChatDataForSelection();
     }, [
         contactsLoaded,
@@ -3301,81 +3247,88 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         reconnectWebRtcSession();
     }, [reconnectWebRtcSession]);
 
-    const openOrFocusDm = useCallback((otherAccount: string) => {
-        const self = selfRef.current;
-        if (!self) return;
+    const openOrFocusDm = useCallback(
+        (otherAccount: string) => {
+            const self = selfRef.current;
+            if (!self) return;
 
-        if (otherAccount === self) {
-            pendingDmMemberRef.current = null;
-            setLastInboundError(
-                "Direct messages are for another account. Choose a contact other than yourself.",
-            );
-            return;
-        }
-
-        const existing = conversationsRef.current.find(
-            (row) =>
-                row.kind === "dm" &&
-                row.members.includes(otherAccount) &&
-                row.members.includes(self),
-        );
-
-        if (existing) {
-            pendingDmMemberRef.current = null;
-            setComposePendingDmPeer(null);
-            recordThreadLifecycle("compose-wake", {
-                mode: "existing-dm",
-                peer: otherAccount,
-                spaceId: shortSpaceId(existing.conversationId),
-            });
-            setSelectedConversationId(existing.conversationId, "openOrFocusDm-existing");
-        } else {
-            pendingDmMemberRef.current = otherAccount;
-            setComposePendingDmPeer(otherAccount);
-            recordThreadLifecycle("compose-wake", {
-                mode: "pending-peer",
-                peer: otherAccount,
-            });
-            composeTimingLog("openOrFocusDm-pending-peer", { peer: otherAccount });
-        }
-
-        setLastInboundError(null);
-
-        void (async () => {
-            try {
-                await ensureDm(otherAccount);
-                await loadObjectiveSpaces();
-            } catch (e) {
-                const detail =
-                    e instanceof Error
-                        ? e.message
-                        : "Could not create DM space.";
-                setLastInboundError(detail);
+            if (otherAccount === self) {
+                pendingDmMemberRef.current = null;
+                setLastInboundError(
+                    "Direct messages are for another account. Choose a contact other than yourself.",
+                );
                 return;
             }
 
-            const refreshed = findVisibleDmWithPeer(
-                otherAccount,
-                self,
-                objectiveSpacesRef.current,
-                contactAccountsRef.current,
-                contactsLoadedRef.current,
+            const existing = conversationsRef.current.find(
+                (row) =>
+                    row.kind === "dm" &&
+                    row.members.includes(otherAccount) &&
+                    row.members.includes(self),
             );
 
-            if (refreshed) {
-                if (pendingDmMemberRef.current !== otherAccount) {
-                    return;
-                }
+            if (existing) {
                 pendingDmMemberRef.current = null;
                 setComposePendingDmPeer(null);
+                recordThreadLifecycle("compose-wake", {
+                    mode: "existing-dm",
+                    peer: otherAccount,
+                    spaceId: shortSpaceId(existing.conversationId),
+                });
                 setSelectedConversationId(
-                    refreshed.conversationId,
-                    "openOrFocusDm-created",
+                    existing.conversationId,
+                    "openOrFocusDm-existing",
                 );
+            } else {
+                pendingDmMemberRef.current = otherAccount;
+                setComposePendingDmPeer(otherAccount);
+                recordThreadLifecycle("compose-wake", {
+                    mode: "pending-peer",
+                    peer: otherAccount,
+                });
+                composeTimingLog("openOrFocusDm-pending-peer", {
+                    peer: otherAccount,
+                });
             }
 
-        })();
-    }, [loadObjectiveSpaces]);
+            setLastInboundError(null);
+
+            void (async () => {
+                try {
+                    await ensureDm(otherAccount);
+                    await loadObjectiveSpaces();
+                } catch (e) {
+                    const detail =
+                        e instanceof Error
+                            ? e.message
+                            : "Could not create DM space.";
+                    setLastInboundError(detail);
+                    return;
+                }
+
+                const refreshed = findVisibleDmWithPeer(
+                    otherAccount,
+                    self,
+                    objectiveSpacesRef.current,
+                    contactAccountsRef.current,
+                    contactsLoadedRef.current,
+                );
+
+                if (refreshed) {
+                    if (pendingDmMemberRef.current !== otherAccount) {
+                        return;
+                    }
+                    pendingDmMemberRef.current = null;
+                    setComposePendingDmPeer(null);
+                    setSelectedConversationId(
+                        refreshed.conversationId,
+                        "openOrFocusDm-created",
+                    );
+                }
+            })();
+        },
+        [loadObjectiveSpaces],
+    );
 
     /**
      * Open a group chat: `others` must be **other** accounts only (not the current user).
@@ -3488,9 +3441,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                         });
                     }
                 })();
-            } else if (
-                !persistPendingMessages(pendingMessagesRef.current)
-            ) {
+            } else if (!persistPendingMessages(pendingMessagesRef.current)) {
                 const failed = {
                     ...pending,
                     status: "failed" as const,
@@ -3609,8 +3560,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 return;
             }
 
-            const dmSendIntent =
-                dmMembers !== null && recipients.length === 1;
+            const dmSendIntent = dmMembers !== null && recipients.length === 1;
             const selectedIsDm =
                 conversation?.kind === "dm" &&
                 conversation.members.length === 2;
@@ -3689,7 +3639,9 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 composeTimingLog("send-derived-dm-space", {
                     pendingPeer,
                     recipientCount: sendRecipients.length,
-                    reason: selectedIsDm ? "missing-conv-id" : "selected-non-dm",
+                    reason: selectedIsDm
+                        ? "missing-conv-id"
+                        : "selected-non-dm",
                     selectedKind: conversation?.kind,
                     selectedConvId: convId ? shortSpaceId(convId) : undefined,
                 });
@@ -3773,7 +3725,6 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         ],
     );
 
-
     const startMeetCall = useCallback(() => {
         const self = selfRef.current;
         if (!self) return;
@@ -3788,11 +3739,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 : undefined;
 
             const pendingPeer = composePendingDmPeerRef.current;
-            if (
-                !conversation &&
-                pendingPeer &&
-                pendingPeer !== self
-            ) {
+            if (!conversation && pendingPeer && pendingPeer !== self) {
                 try {
                     await ensureDm(pendingPeer);
                     await loadObjectiveSpaces();
@@ -3822,7 +3769,11 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 }
             }
 
-            if (!convId || !conversation || !conversation.members.includes(self)) {
+            if (
+                !convId ||
+                !conversation ||
+                !conversation.members.includes(self)
+            ) {
                 return;
             }
 
@@ -4028,104 +3979,107 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         }
     }, [loadObjectiveSpaces, setSelectedConversationId]);
 
-    const declineIncomingCall = useCallback(
-        (reason: "user" | "timeout") => {
-            const avInvite = avCallOrchestratorRef.current?.getPendingInvite();
-            if (avInvite) {
-                if (avCallUiArmedRef.current === avInvite.spaceUuid) {
-                    setIncomingAvCallInvite(null);
-                    return;
-                }
-                const active = activeCallRef.current;
-                const run = avCallOrchestratorRef.current?.getRun(
-                    avInvite.spaceUuid,
-                );
-                if (
-                    active?.source === "av-call" &&
-                    active.conversationId === avInvite.spaceUuid
-                ) {
-                    setIncomingAvCallInvite(null);
-                    return;
-                }
-                if (
-                    run &&
-                    run.hasJoined &&
-                    run.snapshot.phase !== "idle" &&
-                    run.snapshot.phase !== "failed"
-                ) {
-                    setIncomingAvCallInvite(null);
-                    return;
-                }
-                avCallOrchestratorRef.current?.declineIncomingInvite(reason);
+    const declineIncomingCall = useCallback((reason: "user" | "timeout") => {
+        const avInvite = avCallOrchestratorRef.current?.getPendingInvite();
+        if (avInvite) {
+            if (avCallUiArmedRef.current === avInvite.spaceUuid) {
                 setIncomingAvCallInvite(null);
                 return;
             }
-            setIncomingCall(null);
-        },
-        [],
-    );
-
-    const rejoinGroupMeetCall = useCallback((spaceUuid: string) => {
-        const self = selfRef.current;
-        const orch = avCallOrchestratorRef.current;
-        if (!self || !orch) return;
-
-        const conversation = conversationsRef.current.find(
-            (row) => row.conversationId === spaceUuid,
-        );
-        if (
-            !conversation ||
-            conversation.kind !== "group" ||
-            !conversation.members.includes(self)
-        ) {
+            const active = activeCallRef.current;
+            const run = avCallOrchestratorRef.current?.getRun(
+                avInvite.spaceUuid,
+            );
+            if (
+                active?.source === "av-call" &&
+                active.conversationId === avInvite.spaceUuid
+            ) {
+                setIncomingAvCallInvite(null);
+                return;
+            }
+            if (
+                run &&
+                run.hasJoined &&
+                run.snapshot.phase !== "idle" &&
+                run.snapshot.phase !== "failed"
+            ) {
+                setIncomingAvCallInvite(null);
+                return;
+            }
+            avCallOrchestratorRef.current?.declineIncomingInvite(reason);
+            setIncomingAvCallInvite(null);
             return;
         }
+        setIncomingCall(null);
+    }, []);
 
-        setGroupMeetRejoinHint(null);
-        const rejoinHint =
-            groupMeetRejoinHintRef.current?.spaceUuid === spaceUuid
-                ? groupMeetRejoinHintRef.current
-                : rejoinHintFromLifecycle(
-                      groupMeetLifecycleRef.current,
-                      spaceUuid,
-                  );
-        if (rejoinHint) {
-            orch.beginGroupMeetRejoin(
-                spaceUuid,
-                rejoinHint.sessionId,
-                rejoinHint.joinedCount,
+    const rejoinGroupMeetCall = useCallback(
+        (spaceUuid: string) => {
+            const self = selfRef.current;
+            const orch = avCallOrchestratorRef.current;
+            if (!self || !orch) return;
+
+            const conversation = conversationsRef.current.find(
+                (row) => row.conversationId === spaceUuid,
             );
-        }
-        groupMeetLifecycleRef.current = markGroupMeetActive(
-            clearGroupMeetLifecycle(groupMeetLifecycleRef.current, spaceUuid),
-            spaceUuid,
-        );
-        orch.markGroupMeetActive(spaceUuid);
-        avCallDirectionRef.current = "incoming";
-        avCallUiArmedRef.current = spaceUuid;
-        setSelectedConversationId(spaceUuid, "rejoinGroupMeet");
-        setActiveCall({
-            callId: "",
-            conversationId: spaceUuid,
-            peerAccount: conversation.members.find((m) => m !== self) ?? "",
-            direction: "incoming",
-            wantVideo: true,
-            wantAudio: true,
-            startedAt: Date.now(),
-            status: "ringing",
-            source: "av-call",
-            lastFrame: "Connecting…",
-            callKind: "group",
-            groupParticipants: buildGroupMeetParticipants(
-                conversation.members,
-                self,
-                presenceByAccountRef.current,
-                {},
-                "signaling",
-            ),
-        });
-        orch.rejoinGroupMeetSession(spaceUuid, conversation.members);
-    }, [setSelectedConversationId]);
+            if (
+                !conversation ||
+                conversation.kind !== "group" ||
+                !conversation.members.includes(self)
+            ) {
+                return;
+            }
+
+            setGroupMeetRejoinHint(null);
+            const rejoinHint =
+                groupMeetRejoinHintRef.current?.spaceUuid === spaceUuid
+                    ? groupMeetRejoinHintRef.current
+                    : rejoinHintFromLifecycle(
+                          groupMeetLifecycleRef.current,
+                          spaceUuid,
+                      );
+            if (rejoinHint) {
+                orch.beginGroupMeetRejoin(
+                    spaceUuid,
+                    rejoinHint.sessionId,
+                    rejoinHint.joinedCount,
+                );
+            }
+            groupMeetLifecycleRef.current = markGroupMeetActive(
+                clearGroupMeetLifecycle(
+                    groupMeetLifecycleRef.current,
+                    spaceUuid,
+                ),
+                spaceUuid,
+            );
+            orch.markGroupMeetActive(spaceUuid);
+            avCallDirectionRef.current = "incoming";
+            avCallUiArmedRef.current = spaceUuid;
+            setSelectedConversationId(spaceUuid, "rejoinGroupMeet");
+            setActiveCall({
+                callId: "",
+                conversationId: spaceUuid,
+                peerAccount: conversation.members.find((m) => m !== self) ?? "",
+                direction: "incoming",
+                wantVideo: true,
+                wantAudio: true,
+                startedAt: Date.now(),
+                status: "ringing",
+                source: "av-call",
+                lastFrame: "Connecting…",
+                callKind: "group",
+                groupParticipants: buildGroupMeetParticipants(
+                    conversation.members,
+                    self,
+                    presenceByAccountRef.current,
+                    {},
+                    "signaling",
+                ),
+            });
+            orch.rejoinGroupMeetSession(spaceUuid, conversation.members);
+        },
+        [setSelectedConversationId],
+    );
 
     const rejoinGroupMeetCallRef = useRef(rejoinGroupMeetCall);
     rejoinGroupMeetCallRef.current = rejoinGroupMeetCall;
@@ -4478,8 +4432,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         );
     }, [lastRealtimeError]);
 
-    const chatTransportReady =
-        connectionState === "connected" && presenceReady;
+    const chatTransportReady = connectionState === "connected" && presenceReady;
 
     const composeSurfaceConversationId = useMemo(
         () =>
@@ -4540,7 +4493,9 @@ export function useChatSocket(options?: UseChatSocketOptions) {
 
     const selectedConversation = useMemo(
         () =>
-            conversations.find((c) => c.conversationId === selectedConversationId),
+            conversations.find(
+                (c) => c.conversationId === selectedConversationId,
+            ),
         [conversations, selectedConversationId],
     );
 
@@ -4560,7 +4515,8 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         }
         if (spacesLoadError)
             return `Could not load chat spaces: ${spacesLoadError}`;
-        if (authLost) return "Session expired — refresh the page to sign in again.";
+        if (authLost)
+            return "Session expired — refresh the page to sign in again.";
         if (connectionState === "offline") return "Disconnected.";
         if (connectionState === "reconnecting") return "Reconnecting…";
         if (!chatTransportReady) return "Waiting for sync…";
@@ -4599,14 +4555,14 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             return;
         }
         const readPeerUsability = () => {
-            const registry = transportBridgeRef.current?.peerRegistry;
-            if (!registry) {
+            const fabric = transportBridgeRef.current?.deliveryFabric;
+            if (!fabric) {
                 setThreadPeersUsable(false);
                 return;
             }
             const rows = peerStatesForRemotes(
                 threadRemoteRecipients,
-                (remote) => registry.getState(remote),
+                (remote) => fabric.getPeerState(remote),
             );
             for (const row of rows) {
                 const prev = prevPeerStatesRef.current.get(row.remote);
@@ -4619,9 +4575,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     });
                 }
             }
-            setThreadPeersUsable(
-                rows.every((row) => row.state === "usable"),
-            );
+            setThreadPeersUsable(rows.every((row) => row.state === "usable"));
         };
         readPeerUsability();
         const id = window.setInterval(readPeerUsability, 400);
@@ -4640,13 +4594,12 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         const establishing = threadEstablishingConnection;
         const was = prevEstablishingRef.current;
         if (establishing && !was) {
-            const registry = transportBridgeRef.current?.peerRegistry;
+            const fabric = transportBridgeRef.current?.deliveryFabric;
             recordThreadLifecycle("establishing-start", {
                 recipients: threadRemoteRecipients,
-                peerStates: registry
-                    ? peerStatesForRemotes(
-                          threadRemoteRecipients,
-                          (remote) => registry.getState(remote),
+                peerStates: fabric
+                    ? peerStatesForRemotes(threadRemoteRecipients, (remote) =>
+                          fabric.getPeerState(remote),
                       )
                     : [],
             });
@@ -4665,13 +4618,12 @@ export function useChatSocket(options?: UseChatSocketOptions) {
 
     useEffect(() => {
         if (threadPeersUsable && !prevPeersUsableRef.current) {
-            const registry = transportBridgeRef.current?.peerRegistry;
+            const fabric = transportBridgeRef.current?.deliveryFabric;
             recordThreadLifecycle("mesh-live", {
                 recipients: threadRemoteRecipients,
-                peerStates: registry
-                    ? peerStatesForRemotes(
-                          threadRemoteRecipients,
-                          (remote) => registry.getState(remote),
+                peerStates: fabric
+                    ? peerStatesForRemotes(threadRemoteRecipients, (remote) =>
+                          fabric.getPeerState(remote),
                       )
                     : [],
             });
@@ -4775,9 +4727,8 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 (selected ? resolveConversationSync(selected) : undefined);
             const registry = transportBridgeRef.current?.peerRegistry;
             const peerStates = registry
-                ? peerStatesForRemotes(
-                      threadRemoteRecipients,
-                      (remote) => registry.getState(remote),
+                ? peerStatesForRemotes(threadRemoteRecipients, (remote) =>
+                      registry.getState(remote),
                   )
                 : [];
             const thread = threadLifecycleSnapshot({
@@ -4818,7 +4769,8 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     transportBridgeRef.current?.isNavigationSuspended() ??
                     false,
                 realtimeState: realtimeClientRef.current?.state ?? null,
-                realtimeReady: realtimeClientRef.current?.isSessionReady ?? null,
+                realtimeReady:
+                    realtimeClientRef.current?.isSessionReady ?? null,
                 realtimeLastError: realtimeClientRef.current?.lastError ?? null,
                 eventLoopLag: churnLagRef.current,
                 thread,

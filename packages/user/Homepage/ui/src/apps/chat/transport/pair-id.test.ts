@@ -28,4 +28,18 @@ describe("pair-id", () => {
         expect(isLexInitiator("alice", "bob")).toBe(true);
         expect(isLexInitiator("bob", "alice")).toBe(false);
     });
+
+    it("lex initiator is antisymmetric (glare-safe late join)", () => {
+        // Late joiner does not become initiator — both sides always agree
+        // on who is impolite regardless of join order.
+        const pairs: Array<[string, string]> = [
+            ["alice", "bob"],
+            ["carol", "alice"],
+            ["bob", "zack"],
+        ];
+        for (const [a, b] of pairs) {
+            expect(isLexInitiator(a, b)).not.toBe(isLexInitiator(b, a));
+            expect(isLexInitiator(a, b)).toBe(a.localeCompare(b) <= 0);
+        }
+    });
 });

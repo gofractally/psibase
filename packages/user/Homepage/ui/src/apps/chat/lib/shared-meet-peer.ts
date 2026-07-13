@@ -1,7 +1,8 @@
+import type { PeerMediaPort } from "../transport/peer-media-port";
 import type { ChatDataWebRtcPeer } from "./chat-data-webrtc-peer";
 import type { MeetPeerHandle } from "./meet-peer-handle";
-import type { PeerTransportRegistry } from "../transport/l3-peer-registry";
 
+export type { PeerMediaPort };
 export type SharedMeetPeerOptions = {
     remoteAccount: string;
     /** Objective av-call session id (timeline / invites); not used for WebRTC SDP. */
@@ -18,7 +19,7 @@ export type SharedMeetPeerOptions = {
 
 /**
  * Meet on the existing chat-data pair PC (architecture: same PC per remote).
- * WebRTC SDP flows on the pair session via {@link PeerTransportRegistry}.
+ * Obtains the PC via {@link PeerMediaPort} from DeliveryFabric — not raw L3.
  */
 export class SharedMeetPeer implements MeetPeerHandle {
     readonly sessionId: string;
@@ -28,7 +29,7 @@ export class SharedMeetPeer implements MeetPeerHandle {
     private disposed = false;
 
     constructor(
-        private readonly registry: PeerTransportRegistry,
+        private readonly media: PeerMediaPort,
         private readonly opts: SharedMeetPeerOptions,
     ) {
         this.sessionId = opts.avCallSessionId;
@@ -44,14 +45,14 @@ export class SharedMeetPeer implements MeetPeerHandle {
 
     async start(): Promise<void> {
         if (this.disposed) return;
-        await this.registry.ensure(this.opts.remoteAccount, "meet_start");
-        const peer = this.registry.getChatPeer(this.opts.remoteAccount);
+        await this.media.ensure(this.opts.remoteAccount, "meet_start");
+        const peer = this.media.getChatPeer(this.opts.remoteAccount);
         if (!peer || this.disposed) {
             this.opts.onFailed?.("Shared pair PC not ready for Meet");
             return;
         }
         this.chatPeer = peer;
-        this.registry.holdMeet(this.opts.remoteAccount);
+        this.media.holdMeet(this.opts.remoteAccount);
         try {
             await peer.startMeetMedia({
                 wantVideo: this.opts.wantVideo,
@@ -64,7 +65,7 @@ export class SharedMeetPeer implements MeetPeerHandle {
                 onTransportLost: (d) => this.opts.onTransportLost?.(d),
             });
         } catch (e) {
-            this.registry.releaseMeet(this.opts.remoteAccount);
+            this.media.releaseMeet(this.opts.remoteAccount);
             const detail =
                 e instanceof Error ? e.message : "Could not start Meet media";
             this.opts.onFailed?.(detail);
@@ -77,7 +78,7 @@ export class SharedMeetPeer implements MeetPeerHandle {
         this.disposed = true;
         this.chatPeer?.stopMeetMedia();
         this.chatPeer = null;
-        this.registry.releaseMeet(this.opts.remoteAccount);
+        this.media.releaseMeet(this.opts.remoteAccount);
     }
 
     resendOffer(): void {
@@ -106,8 +107,8 @@ export class SharedMeetPeer implements MeetPeerHandle {
 }
 
 export function createSharedMeetPeer(
-    registry: PeerTransportRegistry,
+    media: PeerMediaPort,
     opts: SharedMeetPeerOptions,
 ): SharedMeetPeer {
-    return new SharedMeetPeer(registry, opts);
+    return new SharedMeetPeer(media, opts);
 }
