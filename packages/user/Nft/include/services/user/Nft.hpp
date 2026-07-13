@@ -15,8 +15,8 @@ namespace UserService
      public:
       using Tables = psibase::ServiceTables<NftConfigTable, NftTable, NftHolderTable, CreditTable>;
 
-      static constexpr auto         service     = psibase::AccountNumber("nft");
-      static constexpr std::uint8_t manualDebit = 0;
+      static constexpr auto         service   = psibase::AccountNumber("nft");
+      static constexpr std::uint8_t autoDebit = 0;
 
       Nft(psio::shared_view_ptr<psibase::Action> action);
 
