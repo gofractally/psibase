@@ -91,6 +91,26 @@ namespace psibase
          PruneFormatter{psio::string_stream{dest}}(value);
       }
 
+      bool hideAction(const Action& action)
+      {
+         return action.service == AccountNumber{"db"} && action.method == MethodNumber("open") ||
+                action.service == AccountNumber{"transact"} &&
+                    action.method == MethodNumber("kvNotify");
+      }
+
+      bool hideTrace(const ActionTrace& trace)
+      {
+         return hideAction(trace.action);
+      }
+      bool hideTrace(const ConsoleTrace& trace)
+      {
+         return false;
+      }
+      bool hideTrace(const EventTrace& trace)
+      {
+         return false;
+      }
+
       struct ActionFormatter
       {
          static bool match(const psio::schema_types::CompiledType*)
@@ -293,8 +313,13 @@ namespace psibase
          }
       }
       for (auto& inner : atrace.innerTraces)
-         std::visit([&](auto& inner) { prettyTrace(dest, inner, schemas, indent + "    "); },
-                    inner.inner);
+         std::visit(
+             [&](auto& inner)
+             {
+                if (!hideTrace(inner))
+                   prettyTrace(dest, inner, schemas, indent + "    ");
+             },
+             inner.inner);
    }
 
    void prettyTrace(std::string&            dest,
@@ -303,7 +328,10 @@ namespace psibase
                     const std::string&      indent)
    {
       for (auto& a : ttrace.actionTraces)
-         prettyTrace(dest, a, schemas, indent);
+      {
+         if (!hideTrace(a))
+            prettyTrace(dest, a, schemas, indent);
+      }
       if (!!ttrace.error)
       {
          dest += indent + "error:     ";
