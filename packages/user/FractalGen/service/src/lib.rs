@@ -39,7 +39,7 @@ mod service {
     use psibase::*;
 
     const SYS_FRACTAL: AccountNumber = account!("core-fract");
-    const SYS_GUILD: AccountNumber = account!("core-gld-1");
+    const SYS_GUILD: AccountNumber = account!("guild-one");
     const ROOT: AccountNumber = account!("root");
 
     /// Re-link FractalCore plugin deps for an existing system fractal.
@@ -97,10 +97,10 @@ mod service {
         let prods = Producers::call().getProducers();
         let producer = prods.first().unwrap();
 
-        let legislature = account!("legislatur");
-        let judiciary = account!("judiciar-a");
-        let executive = account!("executiv-a");
-        let recruitment = account!("recruitm-a");
+        let legislature = SYS_FRACTAL.with_subaccount((FractalRole::Legislature as u8).into());
+        let judiciary = SYS_FRACTAL.with_subaccount((FractalRole::Judiciary as u8).into());
+        let executive = SYS_FRACTAL.with_subaccount((FractalRole::Executive as u8).into());
+        let recruitment = SYS_FRACTAL.with_subaccount((FractalRole::Recruitment as u8).into());
 
         Fractals::call_from(*producer).create_frac(
             SYS_FRACTAL,
@@ -117,8 +117,8 @@ mod service {
             SYS_FRACTAL,
             SYS_GUILD,
             "Genesis".into(),
-            account!("c-role-001"),
-            account!("r-role-001"),
+            SYS_GUILD.with_subaccount(1.into()),
+            SYS_GUILD.with_subaccount(2.into()),
         );
 
         let map_sys_guild_to_role_occ = |role: FractalRole| {
