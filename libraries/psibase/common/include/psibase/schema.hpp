@@ -153,8 +153,7 @@ namespace psibase
       }
 
       template <typename T, auto... E>
-      static constexpr std::span<const std::string_view> makeEventsAccess(T*,
-                                                                          psio::MemberList<E...>*)
+      static std::span<const std::string_view> makeEventsAccess(T*, psio::MemberList<E...>*)
       {
          if constexpr (sizeof...(E) > 0)
          {
@@ -173,8 +172,8 @@ namespace psibase
                              EventMap&                                  out,
                              std::vector<psio::schema_types::AnyType*>& eventTypes)
       {
-         std::size_t    i = 0;
-         constexpr auto access =
+         std::size_t i = 0;
+         auto        access =
              makeEventsAccess((T*)nullptr, (typename psio::reflect<T>::member_functions*)nullptr);
          psio::for_each_member_type(
              (typename psio::reflect<T>::member_functions*)nullptr,
