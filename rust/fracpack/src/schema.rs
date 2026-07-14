@@ -1239,6 +1239,23 @@ impl<'a> CompiledSchema<'a> {
             _ => ty,
         }
     }
+
+    pub fn matches_u64(&self, id: usize) -> bool {
+        matches!(
+            self.unwrap_struct(self.get_by_id(id)),
+            CompiledType::Int {
+                bits: 64,
+                is_signed: false
+            }
+        )
+    }
+    pub fn matches_bytes(&self, id: usize) -> bool {
+        if let CompiledType::List(item) = self.unwrap_struct(self.get_by_id(id)) {
+            matches!(self.get_by_id(*item), CompiledType::Int { bits: 8, .. })
+        } else {
+            false
+        }
+    }
 }
 
 #[derive(Debug)]

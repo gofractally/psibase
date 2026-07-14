@@ -373,15 +373,13 @@ namespace psibase
       }
 
      private:
-      const EventMap* getDb(psibase::DbId db) const
+      const EventMap* getDb(psibase::EventDb db) const
       {
          switch (db)
          {
-            case psibase::DbId::uiEvent:
-               return &ui;
-            case psibase::DbId::merkleEvent:
+            case psibase::EventDb::merkleEvent:
                return &merkle;
-            case psibase::DbId::historyEvent:
+            case psibase::EventDb::historyEvent:
                return &history;
             default:
                return nullptr;
@@ -389,7 +387,7 @@ namespace psibase
       }
 
      public:
-      const psio::schema_types::AnyType* getType(psibase::DbId db, MethodNumber event)
+      const psio::schema_types::AnyType* getType(psibase::EventDb db, MethodNumber event)
       {
          if (const auto* dbTypes = getDb(db))
             if (auto pos = dbTypes->find(event); pos != dbTypes->end())

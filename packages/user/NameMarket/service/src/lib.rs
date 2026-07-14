@@ -76,7 +76,7 @@ pub mod service {
     fn register_prem_acct_event_indices() {
         let add_index = |method: &str, column: u8| {
             events::Wrapper::call().addIndex(
-                DbId::HistoryEvent,
+                EventDb::HistoryEvent,
                 get_service(),
                 MethodNumber::from(method),
                 column,
@@ -107,8 +107,8 @@ pub mod service {
         let table = InitTable::new();
 
         table.put(&InitRow {}).unwrap();
-        Tokens::Wrapper::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
-        Nfts::Wrapper::call().setUserConf(NftHolderFlags::MANUAL_DEBIT.index(), true);
+        Tokens::Wrapper::call().setUserConf(BalanceFlags::AUTO_DEBIT.index(), false);
+        Nfts::Wrapper::call().setUserConf(NftHolderFlags::AUTO_DEBIT.index(), false);
 
         register_prem_acct_event_indices();
     }

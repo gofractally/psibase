@@ -125,8 +125,8 @@ mod service {
 
         InitRow::init();
 
-        Nft::call().setUserConf(NftHolderFlags::MANUAL_DEBIT.index(), true);
-        Tokens::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
+        Nft::call().setUserConf(NftHolderFlags::AUTO_DEBIT.index(), false);
+        Tokens::call().setUserConf(BalanceFlags::AUTO_DEBIT.index(), false);
         Wrapper::call().set_specs(MIN_SERVER_SPECS);
         Transact::call().resMonitoring(true);
 
@@ -135,9 +135,9 @@ mod service {
         BandwidthPricing::initialize(CPU, 5, 600, 1800, 1_000_000);
 
         // Event indexes
-        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("consumed"), 0);
-        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("subsidized"), 0);
-        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("subsidized"), 1);
+        events::Wrapper::call().addIndex(EventDb::HistoryEvent, SERVICE, method!("consumed"), 0);
+        events::Wrapper::call().addIndex(EventDb::HistoryEvent, SERVICE, method!("subsidized"), 0);
+        events::Wrapper::call().addIndex(EventDb::HistoryEvent, SERVICE, method!("subsidized"), 1);
 
         // TODO: Iterate over the system service tables and aggregate code rows as pre-allocated objective disk space
         // (the accounts service init already does such iterating, use as reference.)

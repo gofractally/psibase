@@ -36,10 +36,8 @@ pub mod service {
     ) {
         let sender = get_sender();
 
-        let sender_is_fractal_member = ::fractals::tables::tables::FractalMemberTable::read()
-            .get_index_pk()
-            .get(&(fractal, sender))
-            .is_some();
+        let sender_is_fractal_member =
+            psibase::services::fractals::Wrapper::call().is_member(fractal, sender);
 
         check(
             sender_is_fractal_member,

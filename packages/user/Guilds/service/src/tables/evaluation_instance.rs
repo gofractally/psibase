@@ -1,6 +1,5 @@
 use std::collections::{HashMap, HashSet};
 
-use ::evaluations::service::{Evaluation, EvaluationTable, User, UserTable};
 use psibase::services::evaluations;
 use psibase::{check_some, get_service, AccountNumber, ServiceWrapper, Table};
 
@@ -50,42 +49,20 @@ impl EvaluationInstance {
         }
     }
 
-    fn internal(&self) -> Option<Evaluation> {
-        EvaluationTable::with_service(evaluations::SERVICE)
-            .get_index_pk()
-            .get(&(get_service(), self.evaluation_id))
+    /// Returns the `(registration, deliberation, submission, finish_by)` timestamps of the
+    /// underlying evaluation, if it still exists in the evaluations service.
+    fn schedule(&self) -> Option<(u32, u32, u32, u32)> {
+        evaluations::Wrapper::call().get_sched(get_service(), self.evaluation_id)
     }
 
-    pub fn users(&self, group_number: Option<u32>) -> Vec<User> {
-        let fractals_service = get_service();
-        let evaluation_id = self.evaluation_id;
+    pub fn users(&self, group_number: Option<u32>) -> Vec<AccountNumber> {
+        let owner = get_service();
 
-        let table = UserTable::with_service(evaluations::SERVICE);
         match group_number {
-            Some(group_number) => table
-                .get_index_by_group()
-                .range(
-                    (
-                        fractals_service,
-                        evaluation_id,
-                        Some(group_number),
-                        AccountNumber::MIN,
-                    )
-                        ..=(
-                            fractals_service,
-                            evaluation_id,
-                            Some(group_number),
-                            AccountNumber::MAX,
-                        ),
-                )
-                .collect(),
-            None => table
-                .get_index_pk()
-                .range(
-                    (fractals_service, evaluation_id, AccountNumber::MIN)
-                        ..=(fractals_service, evaluation_id, AccountNumber::MAX),
-                )
-                .collect(),
+            Some(group_number) => {
+                evaluations::Wrapper::call().get_grp_users(owner, self.evaluation_id, group_number)
+            }
+            None => evaluations::Wrapper::call().get_users(owner, self.evaluation_id),
         }
     }
 
@@ -129,17 +106,17 @@ impl EvaluationInstance {
     pub fn schedule_next_evaluation(&mut self) {
         let interval = self.interval;
 
-        let evaluation = check_some(
-            self.internal(),
+        let (registration, deliberation, submission, finish_by) = check_some(
+            self.schedule(),
             "expected existing evaluation to set the next one",
         );
 
         Self::create_evaluation(
             self.guild,
-            evaluation.registration_starts + interval,
-            evaluation.deliberation_starts + interval,
-            evaluation.submission_starts + interval,
-            evaluation.finish_by + interval,
+            registration + interval,
+            deliberation + interval,
+            submission + interval,
+            finish_by + interval,
             interval,
         );
     }
@@ -187,11 +164,8 @@ impl EvaluationInstance {
     fn close_pending_levels(&self, forced_pending_level: Option<u8>) {
         let guild_member_table = GuildMemberTable::read_write();
 
-        let evaluation_participants: HashSet<AccountNumber> = self
-            .users(None)
-            .into_iter()
-            .map(|account| account.user)
-            .collect();
+        let evaluation_participants: HashSet<AccountNumber> =
+            self.users(None).into_iter().collect();
 
         guild_member_table
             .get_index_pk()
@@ -217,11 +191,7 @@ impl EvaluationInstance {
     pub fn award_group_scores(&self, group_number: u32, vanilla_group_result: Vec<u8>) {
         let guild_member_table = GuildMemberTable::read_write();
 
-        let group_members: Vec<_> = self
-            .users(Some(group_number))
-            .into_iter()
-            .map(|user| user.user)
-            .collect();
+        let group_members = self.users(Some(group_number));
 
         let fractal_group_result =
             parse_rank_to_accounts(vanilla_group_result, group_members.clone());

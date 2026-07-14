@@ -9,7 +9,7 @@ using namespace psio::schema_types;
 namespace UserService
 {
    SchemaCache::SchemaCache() {}
-   const CompiledType* SchemaCache::getSchemaType(DbId          db,
+   const CompiledType* SchemaCache::getSchemaType(EventDb       db,
                                                   AccountNumber service,
                                                   MethodNumber  event)
    {

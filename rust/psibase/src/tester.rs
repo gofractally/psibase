@@ -572,7 +572,6 @@ impl Chain {
     /// this chain's database:
     ///
     /// * [`native_raw::kvGet`](crate::native_raw::kvGet)
-    /// * [`native_raw::getSequential`](crate::native_raw::getSequential)
     /// * [`native_raw::kvGreaterEqual`](crate::native_raw::kvGreaterEqual)
     /// * [`native_raw::kvLessThan`](crate::native_raw::kvLessThan)
     /// * [`native_raw::kvMax`](crate::native_raw::kvMax)
@@ -1267,10 +1266,6 @@ pub mod polyfill {
             full_key.as_ptr(),
             full_key.len() as u32,
         )
-    }
-
-    pub unsafe fn getSequential(db: DbId, id: u64) -> u32 {
-        return tester_raw::getSequential(get_selected_chain(), db, id);
     }
 
     pub unsafe fn getKey(dest: *mut u8, dest_size: u32) -> u32 {

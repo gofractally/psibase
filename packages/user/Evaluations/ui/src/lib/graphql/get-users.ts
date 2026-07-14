@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { EVALUATIONS_SERVICE } from "@shared/domains/fractal/lib/constants";
 import { graphql } from "@shared/lib/graphql";
 import { type Account, zAccount } from "@shared/lib/schemas/account";
 
@@ -63,7 +64,7 @@ export const getUsersAndGroups = async (
                 }
             }
         }`,
-        { service: "evaluations" },
+        { service: EVALUATIONS_SERVICE },
     );
 
     const response = z

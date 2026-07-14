@@ -8,6 +8,7 @@
 #include <psio/schema.hpp>
 #include <regex>
 #include <services/user/EventIndex.hpp>
+#include <services/user/Events.hpp>
 #include <services/user/EventsTables.hpp>
 
 #include "SchemaCache.hpp"
@@ -111,7 +112,7 @@ void getColumns(const CompiledType* type, auto& stream)
 
 struct EventVTab : sqlite3_vtab
 {
-   EventVTab(DbId db, AccountNumber service, MethodNumber event, const CompiledType* type)
+   EventVTab(EventDb db, AccountNumber service, MethodNumber event, const CompiledType* type)
        : index{db, service, event}, rowType(type)
    {
       auto secondary = SecondaryIndexTable(
@@ -145,7 +146,13 @@ struct EventCursor : sqlite3_vtab_cursor
    std::size_t       prefixLen;
    bool              descending = false;
    EventIndexHandle  handle{KvMode::read};
-   EventCursor(const EventVTab& vtab) : key(vtab.key()), prefixLen(key.size() + 1) {}
+   EventTable        events;
+   EventCursor(const EventVTab& vtab)
+       : key(vtab.key()),
+         prefixLen(key.size() + 1),
+         events(EventConfig{}.openEvents(vtab.index.db, KvMode::read))
+   {
+   }
    EventVTab* vtab() { return static_cast<EventVTab*>(pVtab); }
    int        setEof()
    {
@@ -169,74 +176,17 @@ struct EventCursor : sqlite3_vtab_cursor
             setEof();
          else
          {
-            sz = psibase::raw::getSequential(vtab()->index.db, eventId());
-            if (sz == 0xffffffffu)
+            auto row = events.getView(eventId());
+            if (!row)
             {
                check(false, "Internal error: indexed event does not exist");
             }
-            data.resize(sz);
-            psibase::raw::getResult(data.data(), data.size(), 0);
             // Extract just the data
-            psio::FracStream stream{data};
-            std::uint16_t    fixed_size;
-            if (!stream.unpack<true, true>(&fixed_size))
-            {
-               check(false, "Internal error: malformed event");
-            }
-            std::uint32_t fixed_end = stream.pos + fixed_size;
-            if (fixed_end > stream.end_pos || fixed_end < stream.pos)
-            {
-               check(false, "Internal error: fixed size out-of-bounds");
-            }
-            std::uint32_t heap_end = stream.end_pos;
-            stream.end_pos         = fixed_end;
-            AccountNumber eventService;
-            if (!stream.unpack<true, true>(&eventService))
-            {
-               check(false, "Internal error: event missing service");
-            }
-            if (eventService != vtab()->index.service)
+            if (row->service() != vtab()->index.service)
             {
                check(false, "Internal error: event service does not match index");
             }
-            std::uint32_t typePtr;
-            if (!stream.unpack<true, true>(&typePtr) || typePtr == 1)
-            {
-               check(false, "Internal error: event missing type");
-            }
-            std::uint32_t valuePtr;
-            if (!stream.unpack<true, true>(&valuePtr) || typePtr == 1)
-            {
-               check(false, "Internal error: event mising data");
-            }
-            std::uint32_t valueStart = stream.pos - 4 + valuePtr;
-            if (valueStart < valuePtr || valueStart > heap_end)
-            {
-               check(false, "Internal error: event data out-of-bounds");
-            }
-            // Find the end of the event data (either the end of the wrapper,
-            // or the start of the next heap object)
-            std::uint32_t nextPtr;
-            while (true)
-            {
-               if (!stream.unpack<true, true>(&nextPtr))
-               {
-                  nextPtr = heap_end;
-                  break;
-               }
-               else if (nextPtr > 1)
-               {
-                  nextPtr = stream.pos - 4 + nextPtr;
-                  if (nextPtr > heap_end || nextPtr < stream.pos)
-                  {
-                     check(false, "extension out-of-bounds");
-                  }
-                  break;
-               }
-            }
-
-            data.erase(data.begin() + nextPtr, data.end());
-            data.erase(data.begin(), data.begin() + valueStart);
+            data = row->rawData();
          }
       }
    }
@@ -494,7 +444,7 @@ int event_connect(sqlite3*           db,
 {
    AccountNumber service  = {};
    MethodNumber  event    = {};
-   DbId          event_db = DbId::historyEvent;
+   EventDb       event_db = EventDb::historyEvent;
    for (int i = 3; i < args; ++i)
    {
       std::string_view arg = argv[i];
@@ -506,15 +456,11 @@ int event_connect(sqlite3*           db,
       {
          if (arg == "db=history")
          {
-            event_db = DbId::historyEvent;
-         }
-         else if (arg == "db=ui")
-         {
-            event_db = DbId::uiEvent;
+            event_db = EventDb::historyEvent;
          }
          else if (arg == "db=merkle")
          {
-            event_db = DbId::merkleEvent;
+            event_db = EventDb::merkleEvent;
          }
          else
          {
@@ -848,7 +794,7 @@ KeyResult account_to_key(const CompiledType* type, sqlite3_value* key, std::vect
 {
    psio::vector_stream stream(out);
    auto                s = std::string_view{reinterpret_cast<const char*>(sqlite3_value_text(key)),
-                             static_cast<std::size_t>(sqlite3_value_bytes(key))};
+                                            static_cast<std::size_t>(sqlite3_value_bytes(key))};
    to_key(AccountNumber{s}, stream);
    return KeyResult::exact;
 }

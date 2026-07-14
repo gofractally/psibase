@@ -118,26 +118,26 @@ TEST_CASE("events")
    expect(testService.to<TestService>().send(42, 1.414, std::vector{1}, "a").trace());
    expect(testService.to<TestService>().send(72, 3.14159, std::vector{2}, "b").trace());
    expect(testService.to<Events>()
-              .addIndex(DbId::historyEvent, TestService::service, MethodNumber{"testevent"}, 0)
+              .addIndex(EventDb::historyEvent, TestService::service, MethodNumber{"testevent"}, 0)
               .trace());
    expect(testService.to<Events>()
-              .addIndex(DbId::historyEvent, TestService::service, MethodNumber{"testevent"}, 1)
+              .addIndex(EventDb::historyEvent, TestService::service, MethodNumber{"testevent"}, 1)
               .trace());
    expect(testService.to<TestService>().send(42, 2.718, std::vector{3}, "c").trace());
    expect(testService.to<TestService>().send(91, 1.618, std::vector{4}, "d").trace());
 
    expect(testService.to<Events>()
-              .addIndex(DbId::historyEvent, TestService::service, MethodNumber{"opt"}, 0)
+              .addIndex(EventDb::historyEvent, TestService::service, MethodNumber{"opt"}, 0)
               .trace());
 
    CHECK(mallory.to<Events>()
-             .addIndex(DbId::historyEvent, TestService::service, MethodNumber{"opt"}, 0)
+             .addIndex(EventDb::historyEvent, TestService::service, MethodNumber{"opt"}, 0)
              .failed("Wrong sender"));
    CHECK(testService.to<Events>()
-             .addIndex(DbId::historyEvent, TestService::service, MethodNumber{"missing"}, 0)
+             .addIndex(EventDb::historyEvent, TestService::service, MethodNumber{"missing"}, 0)
              .failed("Unknown event"));
    CHECK(testService.to<Events>()
-             .addIndex(DbId::historyEvent, TestService::service, MethodNumber{"testevent"}, 42)
+             .addIndex(EventDb::historyEvent, TestService::service, MethodNumber{"testevent"}, 42)
              .failed("Unknown column"));
 
    explain(
@@ -159,13 +159,12 @@ TEST_CASE("events")
 
    constexpr std::string_view descendingSql =
        R"""(SELECT i FROM "history.test-svc.testevent" ORDER BY ROWID DESC)""";
-   CHECK(query<TestEvent>(chain, descendingSql) ==
-         std::vector<TestEvent>{{91}, {42}, {72}, {42}});
+   CHECK(query<TestEvent>(chain, descendingSql) == std::vector<TestEvent>{{91}, {42}, {72}, {42}});
 
    {
       std::string plan;
-      for (const auto& row :
-           query<ExplainQueryPlan>(chain, std::string("EXPLAIN QUERY PLAN ") + std::string(descendingSql)))
+      for (const auto& row : query<ExplainQueryPlan>(
+               chain, std::string("EXPLAIN QUERY PLAN ") + std::string(descendingSql)))
       {
          if (!plan.empty())
             plan += '\n';
@@ -195,7 +194,7 @@ TEST_CASE("events")
 
    // optional with 8-bit value
    expect(testService.to<Events>()
-              .addIndex(DbId::historyEvent, TestService::service, MethodNumber{"optb"}, 0)
+              .addIndex(EventDb::historyEvent, TestService::service, MethodNumber{"optb"}, 0)
               .trace());
    expect(testService.to<TestService>().sendOptional8(std::nullopt).trace());
    expect(testService.to<TestService>().sendOptional8(42).trace());
@@ -213,7 +212,7 @@ TEST_CASE("events")
 
    // string keys
    expect(testService.to<Events>()
-              .addIndex(DbId::historyEvent, TestService::service, MethodNumber{"str"}, 0)
+              .addIndex(EventDb::historyEvent, TestService::service, MethodNumber{"str"}, 0)
               .trace());
    expect(testService.to<TestService>().sendString("").trace());
    expect(testService.to<TestService>().sendString("a").trace());
@@ -237,7 +236,7 @@ TEST_CASE("events")
          std::vector<Acct>{{AccountNumber{"tkucanun"}}, {AccountNumber{"t1201"}}});
    // repeat the query using an index
    expect(testService.to<Events>()
-              .addIndex(DbId::historyEvent, TestService::service, MethodNumber{"account"}, 0)
+              .addIndex(EventDb::historyEvent, TestService::service, MethodNumber{"account"}, 0)
               .trace());
    CHECK(query<Acct>(
              chain,
@@ -278,23 +277,20 @@ TEST_CASE("events snapshot")
    expect(testService.to<TestService>().send(42, 1.414, std::vector{1}, "a").trace());
    expect(testService.to<TestService>().send(72, 3.14159, std::vector{2}, "b").trace());
    expect(testService.to<Events>()
-              .addIndex(DbId::historyEvent, TestService::service, MethodNumber{"testevent"}, 0)
+              .addIndex(EventDb::historyEvent, TestService::service, MethodNumber{"testevent"}, 0)
               .trace());
 
    chain.finishBlock();
 
    // Wipe writeOnly and event databases to simulate the state after loading a snapshot
    clearDb(DbId::writeOnly);
-   clearDb(DbId::historyEvent);
-   clearDb(DbId::uiEvent);
-   clearDb(DbId::merkleEvent);
    tester::raw::commitState(chain.nativeHandle());
 
    chain.startBlock();
 
    expect(testService.to<TestService>().send(42, 2.718, std::vector{3}, "c").trace());
    expect(testService.to<Events>()
-              .addIndex(DbId::historyEvent, TestService::service, MethodNumber{"testevent"}, 1)
+              .addIndex(EventDb::historyEvent, TestService::service, MethodNumber{"testevent"}, 1)
               .trace());
    expect(testService.to<TestService>().send(91, 1.618, std::vector{4}, "d").trace());
 
