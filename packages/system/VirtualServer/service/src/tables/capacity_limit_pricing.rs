@@ -55,13 +55,12 @@ use async_graphql::ComplexObject;
 use psibase::services::tokens::{Decimal, Precision, Quantity, Wrapper as Tokens};
 use psibase::*;
 
-// Note: `pub(crate)` is used so the functions are available for the unit tests
+pub(crate) fn relay_sub_account(resource: ResourceType) -> Option<String> {
+    Some(format!("{}:relay", resource.name().to_lowercase()))
+}
 
 fn relay_sub(resource: ResourceType) -> String {
-    UserSettings::to_sub_account_key(
-        crate::Wrapper::SERVICE,
-        Some(format!("{}:relay", resource.name().to_lowercase())),
-    )
+    UserSettings::to_sub_account_key(crate::Wrapper::SERVICE, relay_sub_account(resource))
 }
 
 /// This is a constant product curve, where the fundamental equation is XY = k. In this case,
@@ -231,6 +230,7 @@ pub(crate) fn check_curve_params(max_reserve: u64, max_capacity: u64, curve_d: u
     }
 }
 
+use psibase::services::transact::Wrapper as Transact;
 impl CapacityPricing {
     pub(crate) fn resource(&self) -> ResourceType {
         ResourceType::from_id(self.resource_id)
@@ -459,11 +459,21 @@ impl CapacityPricing {
     pub(crate) fn settle_relay(resource: ResourceType, delta: i128) {
         let sys = BillingConfig::get_assert().sys;
         let sub = relay_sub(resource);
+        if delta == 0 {
+            return;
+        }
+
+        // [DB WRITE] Possible allocation - Therefore must be attributed to the system account.
+        // Consider finding a way to guarantee avoiding this allocation, which would avoid the need to
+        // attribute it to the system account.
+        const RELAY_BALANCE_RECORD_BYTES: u64 = 64;
+        Transact::call().systemWrite(RELAY_BALANCE_RECORD_BYTES);
         if delta > 0 {
             Tokens::call().toSub(sys, sub, Quantity::new(delta as u64));
         } else if delta < 0 {
             Tokens::call().fromSub(sys, sub, Quantity::new((-delta) as u64));
         }
+        Transact::call().systemWrite(0);
     }
 
     /// Settles the relay drift using up to `available` tokens, returning the leftover.

@@ -701,6 +701,11 @@ namespace SystemService
       Actor<CpuLimit> cpuLimit(Transact::service, CpuLimit::service, CallFlags::runModeRpc);
       Actor<Accounts> accounts(Transact::service, Accounts::service);
 
+      if (enforceAuth && isResMonitoring())
+      {
+         to<VirtualServer>().prestartTx(trxSender.value());
+      }
+
       for (auto act : trx.actions())
       {
          if (enforceAuth)

@@ -437,6 +437,13 @@ mod service {
         unimplemented!()
     }
 
+    /// A notification called before the start of a transaction that specifies the primary
+    /// actor responsible for the transaction. Used for any pre-tx initialization.
+    #[action]
+    fn prestartTx(actor: AccountNumber) {
+        unimplemented!()
+    }
+
     /// This action specifies which account is primarily responsible for
     /// paying the bill for any consumed resources.
     ///
