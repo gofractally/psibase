@@ -32,7 +32,6 @@ world = "impl"
 "invite:plugin" = { path = "../../../../user/Invite/plugin/wit/redemption.wit" }
 "auth-sig:plugin" = { path = "../../../AuthSig/plugin/wit/world.wit" }
 "name-market:plugin" = { path = "../../../../user/NameMarket/plugin/wit/world.wit" }
-"tokens:plugin" = { path = "../../../../user/Tokens/plugin/wit/world.wit" }
 "host:crypto" = { path = "../../../../user/Host/plugin/crypto/wit/world.wit" }
 
 [package.metadata.component.bindings]

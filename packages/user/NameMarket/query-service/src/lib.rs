@@ -2,42 +2,12 @@
 #[allow(non_snake_case)]
 mod service {
     use async_graphql::{connection::Connection, *};
-    use name_market::tables::{AuctionsTable, PurchasedAccount, PurchasedAccountsTable};
+    use name_market::tables::{Auction, AuctionsTable, PurchasedAccount, PurchasedAccountsTable};
     use name_market::Wrapper as NameMarketService;
-    use psibase::services::diff_adjust::{RateLimitTable, Wrapper as DiffAdjust};
-    use psibase::services::tokens::{Decimal, Quantity, Wrapper as TokensWrapper};
+    use psibase::services::tokens::Wrapper as TokensWrapper;
     use psibase::*;
     use serde::Deserialize;
     use serde_aux::field_attributes::deserialize_number_from_string;
-
-    const PPM_PER_PCT: u32 = 10_000;
-
-    fn ppm_to_pct(ppm: u32) -> u8 {
-        ((ppm + PPM_PER_PCT / 2) / PPM_PER_PCT) as u8
-    }
-
-    #[derive(SimpleObject)]
-    struct MarketParams {
-        length: u8,
-        enabled: bool,
-        #[graphql(name = "initialPrice")]
-        initial_price: String,
-        target: u32,
-        #[graphql(name = "floorPrice")]
-        floor_price: Decimal,
-        #[graphql(name = "windowSeconds")]
-        window_seconds: u32,
-        #[graphql(name = "increasePct")]
-        increase_pct: u8,
-        #[graphql(name = "decreasePct")]
-        decrease_pct: u8,
-    }
-
-    #[derive(SimpleObject)]
-    struct MarketPrice {
-        length: u8,
-        price: Decimal,
-    }
 
     #[derive(Deserialize, SimpleObject)]
     #[graphql(complex)]
@@ -84,67 +54,25 @@ mod service {
     impl Query {
         /// Current prices for each configured and enabled market (sparse list)
         /// If no system token configured, returns empty list
-        async fn current_prices(&self) -> Vec<MarketPrice> {
-            let Some(token) = TokensWrapper::call().getSysToken() else {
+        async fn current_prices(&self) -> Vec<Auction> {
+            if TokensWrapper::call().getSysToken().is_none() {
                 return vec![];
-            };
-            let precision = token.precision;
-            let auctions_table = AuctionsTable::read();
-            let rate_table = RateLimitTable::read();
-            let mut rows: Vec<MarketPrice> = auctions_table
+            }
+            let mut rows: Vec<Auction> = AuctionsTable::read()
                 .get_index_pk()
                 .iter()
                 .filter(|auction| auction.enabled)
-                .map(|auction| {
-                    // Delegate effective difficulty to DiffAdjust (same as `get_diff` action).
-                    let mut price_raw = DiffAdjust::call().get_diff(auction.nft_id);
-                    // Defensive: in edge cases active can read 0; fall back to stored floor.
-                    if price_raw == 0 {
-                        price_raw = rate_table
-                            .get_index_pk()
-                            .get(&auction.nft_id)
-                            .map(|r| r.floor_difficulty)
-                            .unwrap_or(0);
-                    }
-                    MarketPrice {
-                        length: auction.length,
-                        price: Decimal::new(Quantity::from(price_raw), precision),
-                    }
-                })
                 .collect();
             rows.sort_by_key(|r| r.length);
             rows
         }
 
         /// All configured name markets (sparse list): status plus pricing parameters.
-        async fn market_params(&self) -> Vec<MarketParams> {
-            let Some(token) = TokensWrapper::call().getSysToken() else {
+        async fn market_params(&self) -> Vec<Auction> {
+            if TokensWrapper::call().getSysToken().is_none() {
                 return vec![];
-            };
-            let precision = token.precision;
-            let auctions_table = AuctionsTable::read();
-            let rate_table = RateLimitTable::read();
-            let rows: Vec<MarketParams> = auctions_table
-                .get_index_pk()
-                .iter()
-                .filter_map(|auction| {
-                    let rate_limit = rate_table.get_index_pk().get(&auction.nft_id)?;
-                    Some(MarketParams {
-                        length: auction.length,
-                        enabled: auction.enabled,
-                        initial_price: Decimal::new(auction.initial_price, precision).to_string(),
-                        target: rate_limit.target_min, // target_min == target_max in our usage
-                        floor_price: Decimal::new(
-                            Quantity::from(rate_limit.floor_difficulty),
-                            precision,
-                        ),
-                        window_seconds: rate_limit.window_seconds,
-                        increase_pct: ppm_to_pct(rate_limit.increase_ppm),
-                        decrease_pct: ppm_to_pct(rate_limit.decrease_ppm),
-                    })
-                })
-                .collect();
-            rows
+            }
+            AuctionsTable::read().get_index_pk().iter().collect()
         }
 
         /// Bought-but-unclaimed account records for the authenticated user
@@ -172,18 +100,22 @@ mod service {
         /// Events: account **name** history for `owner`
         async fn name_events(
             &self,
+            owner: AccountNumber,
             first: Option<i32>,
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<EventConnection<AccountEvent>> {
-            let user = self.require_authenticated()?;
+            check(
+                get_sender() == owner.clone(),
+                "permission denied: an authorized session is required for this query.",
+            )?;
 
             EventQuery::new(format!(
                 "history.{}.nameMktEvent",
                 NameMarketService::SERVICE
             ))
-            .condition(format!("owner = '{}'", user))
+            .condition(format!("owner = '{}'", owner))
             .first(first)
             .last(last)
             .before(before)
