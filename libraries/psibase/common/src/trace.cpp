@@ -90,6 +90,21 @@ namespace psibase
          PruneFormatter{psio::string_stream{dest}}(value);
       }
 
+      const std::string& prettyMethod(const GetSchemaFn& schemas,
+                                      AccountNumber      service,
+                                      const std::string& method)
+      {
+         if (auto* schema = schemas(service))
+         {
+            auto pos = schema->actions.find(method);
+            if (pos != schema->actions.end())
+            {
+               return pos->first;
+            }
+         }
+         return method;
+      }
+
       bool hideAction(const Action& action)
       {
          return action.service == AccountNumber{"db"} && action.method == MethodNumber("open") ||
@@ -124,6 +139,22 @@ namespace psibase
             Action act;
             if (!in.unpack<true, true>(&act))
                return false;
+
+            const psio::Schema*                     types        = nullptr;
+            ServiceSchema::ActionMap::const_pointer actionSchema = nullptr;
+            if (schemas)
+            {
+               if (auto* schema = (*schemas)(act.service))
+               {
+                  types    = &schema->types;
+                  auto pos = schema->actions.find(act.method.str());
+                  if (pos != schema->actions.end())
+                  {
+                     actionSchema = &*pos;
+                  }
+               }
+            }
+
             out.write('{');
             to_json("sender", out);
             write_colon(out);
@@ -135,30 +166,24 @@ namespace psibase
             out.write(',');
             to_json("method", out);
             write_colon(out);
-            to_json(act.method, out);
+            if (actionSchema)
+               to_json(actionSchema->first, out);
+            else
+               to_json(act.method, out);
             out.write(',');
-            bool hasData = false;
-            if (schemas)
+            if (actionSchema)
             {
-               if (auto* schema = (*schemas)(act.service))
-               {
-                  auto pos = schema->actions.find(act.method.str());
-                  if (pos != schema->actions.end())
-                  {
-                     auto& ty      = pos->second.params;
-                     auto  cschema = psio::schema_types::CompiledSchema{
-                         schema->types, trace_types(schemas), {&ty}};
-                     auto* cty = cschema.get(ty.resolve(schema->types));
-                     to_json("data", out);
-                     write_colon(out);
-                     auto parser = psio::schema_types::FracParser{psio::FracStream{act.rawData},
-                                                                  cty, cschema.builtin};
-                     to_json(parser, out);
-                     hasData = true;
-                  }
-               }
+               auto& ty = actionSchema->second.params;
+               auto  cschema =
+                   psio::schema_types::CompiledSchema{*types, trace_types(schemas), {&ty}};
+               auto* cty = cschema.get(ty.resolve(*types));
+               to_json("data", out);
+               write_colon(out);
+               auto parser = psio::schema_types::FracParser{psio::FracStream{act.rawData}, cty,
+                                                            cschema.builtin};
+               to_json(parser, out);
             }
-            if (!hasData)
+            else
             {
                to_json("rawData", out);
                write_colon(out);
@@ -250,7 +275,8 @@ namespace psibase
    {
       dest += indent + "action:\n";
       dest += indent + "    " + atrace.action.sender.str() + " => " + atrace.action.service.str() +
-              "::" + atrace.action.method.str() + "\n";
+              "::" + prettyMethod(schemas, atrace.action.service, atrace.action.method.str()) +
+              "\n";
       if (auto schema = schemas(atrace.action.service))
       {
          auto pos = schema->actions.find(atrace.action.method.str());
