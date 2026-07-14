@@ -38,6 +38,20 @@ mod service {
         user: Option<AccountNumber>,
     }
 
+    fn auth_err(user: AccountNumber) -> async_graphql::Result<()> {
+        Err(async_graphql::Error::new(format!(
+            "permission denied: '{}' must authorize your app to make this query.",
+            user
+        )))
+    }
+
+    fn serve_sys() -> services::transact::ServiceMethod {
+        services::transact::ServiceMethod {
+            service: crate::Wrapper::SERVICE,
+            method: MethodNumber::from(crate::action_structs::serveSys::ACTION_NAME),
+        }
+    }
+
     impl Query {
         fn require_authenticated(&self) -> async_graphql::Result<AccountNumber> {
             self.user.ok_or_else(|| {
@@ -47,6 +61,15 @@ mod service {
             })?;
 
             Ok(self.user.unwrap().clone())
+        }
+
+        fn check_user_auth(&self, user: AccountNumber) -> async_graphql::Result<()> {
+            let authorizers = self.user.map(|u| vec![u]).unwrap_or_default();
+            if self.user == Some(user) || is_auth(user, Some(serve_sys()), authorizers) {
+                Ok(())
+            } else {
+                auth_err(user)
+            }
         }
     }
 
@@ -106,10 +129,7 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<EventConnection<AccountEvent>> {
-            check(
-                get_sender() == owner.clone(),
-                "permission denied: an authorized session is required for this query.",
-            )?;
+            self.check_user_auth(owner.clone())?;
 
             EventQuery::new(format!(
                 "history.{}.nameMktEvent",
