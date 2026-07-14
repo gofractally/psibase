@@ -1,5 +1,6 @@
 #include <psibase/trace.hpp>
 
+#include <psibase/nativeTables.hpp>
 #include <psibase/schema.hpp>
 #include <psio/to_json.hpp>
 
@@ -125,6 +126,46 @@ namespace psibase
          return false;
       }
 
+      struct PrettyServiceMethod
+      {
+         AccountNumber service;
+         std::string   method;
+         PSIO_REFLECT(PrettyServiceMethod, service, method)
+      };
+
+      struct ServiceMethodFormatter
+      {
+         static bool match(const psio::schema_types::CompiledType* ty)
+         {
+            return psio::schema_types::matchCustomType(ty, (ServiceMethod*)nullptr);
+         }
+         static bool frac2json(const GetSchemaFn* schemas,
+                               const psio::schema_types::CompiledType*,
+                               psio::FracStream& in,
+                               psio::StreamBase& out)
+         {
+            ServiceMethod act;
+            if (!in.unpack<true, true>(&act))
+               return false;
+            to_json(PrettyServiceMethod{.service = act.service,
+                                        .method =
+                                            prettyMethod(*schemas, act.service, act.method.str())},
+                    out);
+            return true;
+         }
+         static void json2frac(const psio::schema_types::CompiledType*,
+                               const psio::json::any& in,
+                               psio::StreamBase&      out)
+         {
+            abortMessage("not implemented");
+         }
+         static bool is_empty_container(const psio::schema_types::CompiledType*,
+                                        const psio::json::any& in)
+         {
+            return false;
+         }
+      };
+
       struct ActionFormatter
       {
          static bool match(const psio::schema_types::CompiledType* ty)
@@ -208,6 +249,8 @@ namespace psibase
       psio::schema_types::CustomTypes trace_types(const GetSchemaFn* schemas)
       {
          auto result = psibase_types();
+         result.insert("ServiceMethod",
+                       psio::schema_types::CustomHandler{ServiceMethodFormatter{}, schemas});
          result.insert("Action", psio::schema_types::CustomHandler{ActionFormatter{}, schemas});
          return result;
       }
