@@ -434,8 +434,10 @@ mod service {
     /// billable account.
     #[action]
     fn bill_to_sub(sub_account: String) {
-        let billable_account =
-            check_some(tx_cache::get_billable_account(), "Billable account not set");
+        let billable_account = check_some(
+            tx_cache::billable::get_billable_account(),
+            "Billable account not set",
+        );
 
         check(
             !sub_account.is_empty(),
@@ -451,7 +453,7 @@ mod service {
             "Billable sub-account does not exist",
         );
 
-        tx_cache::set_sub(sender, sub_account.clone());
+        tx_cache::billable::set_sub(sender, sub_account.clone());
 
         if sender == billable_account {
             CpuLimit::rpc().setCpuLimit(get_cpu_limit(sender, Some(sub_account.clone())));
@@ -660,7 +662,7 @@ mod service {
         );
 
         let amount_bits = check_some(amount_bytes.checked_mul(8), "network usage overflow");
-        let sub = tx_cache::get_sub(user);
+        let sub = tx_cache::billable::get_sub(user);
         let raw_cost = RateLimitPricing::get_assert(Net).consume(amount_bits);
         let cost = if is_billing_enabled() { raw_cost } else { 0 };
         accrual::rate_limited::consume(Net, user, sub, cost);
@@ -684,7 +686,7 @@ mod service {
             "[useCpuSys] Unauthorized",
         );
 
-        let sub = tx_cache::get_sub(user);
+        let sub = tx_cache::billable::get_sub(user);
         let raw_cost = RateLimitPricing::get_assert(Cpu).consume(amount_ns);
         let cost = if is_billing_enabled() { raw_cost } else { 0 };
         accrual::rate_limited::consume(Cpu, user, sub, cost);
@@ -703,7 +705,7 @@ mod service {
     fn finishTx() {
         check(get_sender() == Transact::SERVICE, "[finishTx] Unauthorized");
 
-        for (disk_user, disk_amount, disk_cost) in tx_cache::drain_disk_usage() {
+        for (disk_user, disk_amount, disk_cost) in tx_cache::disk::drain_disk_usage() {
             if disk_amount == 0 && disk_cost == 0 {
                 continue;
             }
@@ -748,7 +750,7 @@ mod service {
         }
 
         let billing = is_billing_enabled();
-        let sub = tx_cache::get_sub(user);
+        let sub = tx_cache::billable::get_sub(user);
 
         let cost = match db_id {
             DbId::Service | DbId::Native => {
@@ -789,7 +791,7 @@ mod service {
 
         // Avoiding a flood of events for writing individual records. Accumulate in the tx_cache and emit
         // one event at the end of the tx (using `finishTx` as the tx end hook)
-        tx_cache::add_disk_usage(user, amount_bytes, cost);
+        tx_cache::disk::add_disk_usage(user, amount_bytes, cost);
     }
 
     #[action]
@@ -883,7 +885,7 @@ mod service {
     fn setBillableAcc(account: AccountNumber) {
         check(get_sender() == Transact::SERVICE, "Unauthorized");
 
-        tx_cache::set_billable_account(account);
+        tx_cache::billable::set_billable_account(account);
 
         CpuLimit::rpc().setCpuLimit(get_cpu_limit(account, None));
     }

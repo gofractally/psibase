@@ -3,14 +3,11 @@
 use std::cell::RefCell;
 use std::thread::LocalKey;
 
-mod billable;
-mod disk;
+pub mod billable;
+pub mod disk;
 
 pub mod accrual;
 pub mod balance_cache;
-
-pub use billable::{get_billable_account, get_sub, set_billable_account, set_sub};
-pub use disk::{add_disk_usage, drain_disk_usage};
 
 /// Mutably access a billing cache
 pub(crate) fn with_cache<T: 'static, R>(
