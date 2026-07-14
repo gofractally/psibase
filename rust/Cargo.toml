@@ -7,7 +7,6 @@ members = [
     "gen-cpp-doc",
     "md2man",
     "psibase",
-    "psibase_package_naming",
     "psibase_macros",
     "psibase_plugin",
     "psibase_service",
@@ -58,7 +57,6 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.135"
 serde-aux = "4.5"
 psibase = { path = "./psibase", version = "0.23.0" }
-psibase_package_naming = { path = "./psibase_package_naming", version = "0.23.0" }
 psibase_names = { path = "./psibase_names", version = "0.23.0" }
 psibase_plugin = { path = "./psibase_plugin", version = "0.23.0" }
 psibase_macros = { path = "./psibase_macros", version = "0.23.0" }
