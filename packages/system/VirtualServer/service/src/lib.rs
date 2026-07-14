@@ -1164,27 +1164,25 @@ mod service {
     // balances may be queried. This is called outside of the transaction context, allowing
     // any such queries during the tx to hit the cache instead of triggering an inline action
     // call.
-    fn warm_billable_account_caches(user_accounts: Vec<AccountNumber>) {
+    fn warm_billable_account_caches(user_account: AccountNumber) {
         if !is_billing_enabled() {
             return;
         }
 
-        for actor in user_accounts {
-            let _ = balance_cache::get_available(actor, None);
-        }
+        let _ = balance_cache::get_available(user_account, None);
 
         for pricing in &CapacityPricingTable::read().get_index_pk() {
             let _ = accrual::capacity_limited::get_collateral(pricing.resource());
         }
     }
 
-    /// A notification called before the start of a transaction with the specified top-level
-    /// action senders. Used for any pre-tx initialization.
+    /// A notification called before the start of a transaction that specifies the primary
+    /// actor responsible for the transaction. Used for any pre-tx initialization.
     #[action]
-    fn prestartTx(actors: Vec<AccountNumber>) {
+    fn prestartTx(actor: AccountNumber) {
         check(get_sender() == Transact::SERVICE, "Unauthorized");
 
-        warm_billable_account_caches(actors);
+        warm_billable_account_caches(actor);
     }
 
     /// This action specifies which `account` is primarily responsible for paying the

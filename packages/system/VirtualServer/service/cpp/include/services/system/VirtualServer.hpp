@@ -377,9 +377,9 @@ namespace SystemService
 
       void notifyBlock(psibase::BlockNum block_num);
 
-      /// A notification called before the start of a transaction with the specified top-level
-      /// action senders. Used for any pre-tx initialization.
-      void prestartTx(std::vector<psibase::AccountNumber> actors);
+      /// A notification called before the start of a transaction that specifies the primary
+      /// actor responsible for the transaction. Used for any pre-tx initialization.
+      void prestartTx(psibase::AccountNumber actor);
 
       /// This action specifies which account is primarily responsible for
       /// paying the bill for any consumed resources.
@@ -446,7 +446,7 @@ namespace SystemService
                 method(useDiskSys, user, db_id, amount_bytes),
                 method(get_resources, user),
                 method(notifyBlock, block_num),
-                method(prestartTx, actors),
+                method(prestartTx, actor),
                 method(setBillableAcc, account),
                 method(serveSys, request, socket, user))
 
