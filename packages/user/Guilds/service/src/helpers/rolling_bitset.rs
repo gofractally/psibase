@@ -22,7 +22,7 @@ impl RollingBits16 {
     /// - `0` = most recently pushed bit (LSB)
     /// - `15` = oldest bit still in the window
     pub fn get(self, positions_ago: usize) -> bool {
-        psibase::check(positions_ago < 16, "positions_ago must be in range 0..16");
+        assert!(positions_ago < 16, "positions_ago must be in range 0..16");
         ((self.0 >> positions_ago) & 1) != 0
     }
 
@@ -34,7 +34,7 @@ impl RollingBits16 {
     /// Counts the number of 1-bits among the most recently pushed `n` bits.
     /// Panics if `n > 16`.
     pub fn count_recent_ones(self, n: usize) -> u16 {
-        psibase::check(n <= 16, "n cannot exceed 16");
+        assert!(n <= 16, "n cannot exceed 16");
         if n == 0 {
             return 0;
         }

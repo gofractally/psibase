@@ -1,6 +1,6 @@
 use std::u64;
 
-use psibase::{check_none, check_some, AccountNumber, ServiceWrapper, Table};
+use psibase::{AccountNumber, ServiceWrapper, Table};
 
 use crate::{
     constants::DEFAULT_RECRUITMENT_PPM,
@@ -45,8 +45,8 @@ impl FractalMember {
         account: AccountNumber,
         recruiter: Option<AccountNumber>,
     ) -> Self {
-        check_none(
-            FractalExile::get(fractal, account),
+        assert!(
+            FractalExile::get(fractal, account).is_none(),
             "member has been exiled from this fractal",
         );
         if let Some(existing) = Self::get(fractal, account) {
@@ -79,7 +79,7 @@ impl FractalMember {
     }
 
     pub fn get_assert(fractal: AccountNumber, account: AccountNumber) -> Self {
-        check_some(Self::get(fractal, account), "member does not exist")
+        Self::get(fractal, account).expect("member does not exist")
     }
 
     pub fn exile(&self) {

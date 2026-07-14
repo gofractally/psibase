@@ -70,12 +70,12 @@ pub mod service {
         num_options: u8,
         use_hooks: bool,
     ) -> u32 {
-        check(
+        assert!(
             registration < deliberation && deliberation < submission && submission < finish_by,
             "invalid times",
         );
 
-        check(
+        assert!(
             allowed_group_sizes.iter().all(|size| *size > 1),
             "allowable group sizes must be greater than 1",
         );
@@ -160,12 +160,10 @@ pub mod service {
 
         let sender = get_sender();
 
-        let group_number = check_some(
-            evaluation
-                .get_user(sender)
-                .and_then(|user| user.group_number),
-            "user not found or not grouped",
-        );
+        let group_number = evaluation
+            .get_user(sender)
+            .and_then(|user| user.group_number)
+            .expect("user not found or not grouped");
 
         let mut group = evaluation.get_group(group_number).expect("group not found");
         group.set_key_submitter(sender);
@@ -192,7 +190,7 @@ pub mod service {
                 .all(|group| group.get_result().is_some())
         };
 
-        check(
+        assert!(
             is_closed || has_all_results(),
             "evaluation is still in progress",
         );
@@ -225,7 +223,7 @@ pub mod service {
         let evaluation = Evaluation::get_assert(get_sender(), evaluation_id);
         if !force {
             let phase = evaluation.get_current_phase();
-            check(
+            assert!(
                 phase == EvaluationStatus::Pending || phase == EvaluationStatus::Closed,
                 "evaluation is not deletable unless pending, closed or force is true",
             );
@@ -246,9 +244,9 @@ pub mod service {
 
         let sender = get_sender();
         let user = evaluation.get_user(sender);
-        let mut user = psibase::check_some(user, format!("user {} not found", sender).as_str());
+        let mut user = user.expect(format!("user {} not found", sender).as_str());
 
-        check(
+        assert!(
             evaluation
                 .get_group(user.group_number.unwrap())
                 .expect("group not found")
@@ -274,7 +272,7 @@ pub mod service {
         let ranks_within_scope = attestation
             .iter()
             .all(|rank| rank <= &evaluation.num_options);
-        check(ranks_within_scope, "attestation is out of scope");
+        assert!(ranks_within_scope, "attestation is out of scope");
 
         evaluation.assert_status(EvaluationStatus::Submission);
 
@@ -302,15 +300,12 @@ pub mod service {
         evaluation.assert_status(EvaluationStatus::Registration);
 
         let sender = get_sender();
-        check(
+        assert!(
             sender == registrant || sender == evaluation.owner,
             "user is not allowed to register",
         );
 
-        check_some(
-            UserSettings::get(registrant),
-            "user must have a pre-existing key to be registered",
-        );
+        UserSettings::get(registrant).expect("user must have a pre-existing key to be registered");
 
         evaluation.register_user(registrant);
     }
@@ -327,7 +322,7 @@ pub mod service {
         evaluation.assert_status(EvaluationStatus::Registration);
 
         let sender = get_sender();
-        check(
+        assert!(
             sender == registrant || sender == evaluation.owner,
             "user is not allowed to unregister",
         );

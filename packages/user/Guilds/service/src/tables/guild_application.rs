@@ -1,7 +1,7 @@
 use async_graphql::ComplexObject;
 use async_graphql::{connection::Connection, SimpleObject};
 
-use psibase::{check_none, check_some, AccountNumber, RawKey, ServiceWrapper, Table, TableQuery};
+use psibase::{AccountNumber, RawKey, ServiceWrapper, Table, TableQuery};
 
 use crate::{
     constants::{GUILD_APP_ENDORSEMENT_THRESHOLD, GUILD_APP_REJECT_THRESHOLD},
@@ -42,10 +42,13 @@ impl GuildApplication {
         extra_info: String,
         inviter: Option<AccountNumber>,
     ) -> Self {
-        check_some(Guild::get(guild), "guild does not exist");
-        check_none(Self::get(guild, applicant), "application already exists");
-        check_none(
-            GuildMember::get(guild, applicant),
+        Guild::get(guild).expect("guild does not exist");
+        assert!(
+            Self::get(guild, applicant).is_none(),
+            "application already exists"
+        );
+        assert!(
+            GuildMember::get(guild, applicant).is_none(),
             "user is already a guild member",
         );
         let new_instance = Self::new(guild, applicant, extra_info, inviter);
@@ -60,10 +63,7 @@ impl GuildApplication {
     }
 
     pub fn get_assert(guild: AccountNumber, applicant: AccountNumber) -> Self {
-        check_some(
-            Self::get(guild, applicant),
-            "guild application does not exist",
-        )
+        Self::get(guild, applicant).expect("guild application does not exist")
     }
 
     pub fn set_extra_info(&mut self, extra_info: String) {

@@ -19,17 +19,17 @@ pub mod tables {
 
     impl ConfigRow {
         pub fn check_init() {
-            check(
+            assert!(
                 ConfigTable::read().get_index_pk().get(&()).is_some(),
-                "service not initialized",
+                "service not initialized"
             );
         }
 
         pub fn get_sys_tid() -> TID {
-            let record = check_some(
-                ConfigTable::read().get_index_pk().get(&()),
-                "service not initialized",
-            );
+            let record = ConfigTable::read()
+                .get_index_pk()
+                .get(&())
+                .expect("service not initialized");
             record.token_id
         }
     }
@@ -51,7 +51,7 @@ mod service {
 
     #[action]
     fn create_token() {
-        check(get_sender() == Tokens::SERVICE, "Unauthorized");
+        assert_eq!(get_sender(), Tokens::SERVICE, "Unauthorized");
         let twenty_one_billion = 21_000_000_000_0000_u64;
         let id = Tokens::call().create(Precision::new(4).unwrap(), twenty_one_billion.into());
         Nft::call().debit(Tokens::call().getToken(id).nft_id, Memo::default());
@@ -71,7 +71,7 @@ mod service {
 
     #[action]
     fn set_symbol() {
-        check(get_sender() == Symbol::SERVICE, "Unauthorized");
+        assert_eq!(get_sender(), Symbol::SERVICE, "Unauthorized");
 
         let tid = ConfigRow::get_sys_tid();
 

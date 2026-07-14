@@ -1,6 +1,6 @@
 use psibase::services::fractals::weighted_normalization::HasScore;
 use psibase::services::tokens::{Decimal, Precision};
-use psibase::{check, AccountNumber, Table};
+use psibase::{AccountNumber, Table};
 
 use crate::{
     constants::MAX_RANKED_GUILDS,
@@ -45,7 +45,7 @@ impl Ranking {
     pub fn set_ranked_guilds(fractal: AccountNumber, new_ranked_guilds: Vec<AccountNumber>) {
         let ranked_guilds_length = new_ranked_guilds.len();
 
-        check(
+        assert!(
             ranked_guilds_length <= MAX_RANKED_GUILDS as usize,
             "too many ranked guilds",
         );

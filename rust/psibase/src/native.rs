@@ -45,28 +45,6 @@ pub fn abort_message(message: &str) -> ! {
     abort_message_bytes(message.as_bytes());
 }
 
-/// Abort with message if condition is false
-pub fn check(condition: bool, message: &str) {
-    if !condition {
-        abort_message_bytes(message.as_bytes());
-    }
-}
-
-/// Abort with message if optional value is empty
-pub fn check_some<T>(opt_value: Option<T>, message: &str) -> T {
-    if opt_value.is_none() {
-        abort_message_bytes(message.as_bytes());
-    }
-    opt_value.unwrap()
-}
-
-/// Abort with message if optional has value
-pub fn check_none<T>(opt_value: Option<T>, message: &str) {
-    if opt_value.is_some() {
-        abort_message_bytes(message.as_bytes());
-    }
-}
-
 /// Get the most-recent result when the size is known in advance
 ///
 /// Other functions set the result.
