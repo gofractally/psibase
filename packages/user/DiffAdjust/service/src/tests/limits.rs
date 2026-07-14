@@ -1,4 +1,4 @@
-use super::ONE_MILLION;
+use super::{enable_nft_auto_debit, ONE_MILLION};
 use crate::Wrapper;
 use psibase::*;
 
@@ -11,6 +11,7 @@ fn test_max_ppm_unclamped(mut chain: psibase::Chain) -> Result<(), psibase::Erro
 
     let alice = account!("alice");
     chain.new_account(alice).unwrap();
+    enable_nft_auto_debit(&chain, alice);
 
     let max_ppm = u32::MAX;
 
@@ -58,6 +59,7 @@ fn test_decrease_ppm_rejected_above_100_percent(
 
     let alice = account!("alice");
     chain.new_account(alice).unwrap();
+    enable_nft_auto_debit(&chain, alice);
 
     Wrapper::push_from(&chain, alice)
         .create(8000, 0, 10, 10, 500, 50_000, 50_000)
