@@ -437,10 +437,10 @@ mod service {
         unimplemented!()
     }
 
-    /// A notification called before the start of a transaction that specifies any actors
-    /// responsible for activity within a tx. Used for any pre-tx initialization.
+    /// A notification called before the start of a transaction that specifies the primary
+    /// actor responsible for the transaction. Used for any pre-tx initialization.
     #[action]
-    fn prestartTx(actors: Vec<AccountNumber>) {
+    fn prestartTx(actor: AccountNumber) {
         unimplemented!()
     }
 

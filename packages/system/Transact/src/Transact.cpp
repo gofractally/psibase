@@ -703,10 +703,7 @@ namespace SystemService
 
       if (enforceAuth && isResMonitoring())
       {
-         auto actors = std::vector<AccountNumber>();
-         actors.reserve(1);
-         actors.push_back(trxSender.value());
-         to<VirtualServer>().prestartTx(actors);
+         to<VirtualServer>().prestartTx(trxSender.value());
       }
 
       for (auto act : trx.actions())
