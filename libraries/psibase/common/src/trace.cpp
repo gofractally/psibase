@@ -112,10 +112,9 @@ namespace psibase
 
       struct ActionFormatter
       {
-         static bool match(const psio::schema_types::CompiledType*)
+         static bool match(const psio::schema_types::CompiledType* ty)
          {
-            // TODO:
-            return true;
+            return psio::schema_types::matchCustomType(ty, (Action*)nullptr);
          }
          static bool frac2json(const GetSchemaFn* schemas,
                                const psio::schema_types::CompiledType*,
