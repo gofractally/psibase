@@ -298,8 +298,8 @@ namespace SystemService
 
       void notifyBlock(psibase::BlockNum block_num);
 
-      /// A notification called before the start of a transaction with the specified top-level
-      /// action senders. Used for any pre-tx initialization.
+      /// A notification called before the start of a transaction that specifies any actors
+      /// responsible for activity within a tx. Used for any pre-tx initialization.
       void prestartTx(std::vector<psibase::AccountNumber> actors);
 
       /// This action specifies which account is primarily responsible for

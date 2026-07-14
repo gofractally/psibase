@@ -1110,8 +1110,8 @@ mod service {
         }
     }
 
-    /// A notification called before the start of a transaction with the specified top-level
-    /// action senders. Used for any pre-tx initialization.
+    /// A notification called before the start of a transaction that specifies any actors
+    /// responsible for activity within a tx. Used for any pre-tx initialization.
     #[action]
     fn prestartTx(actors: Vec<AccountNumber>) {
         check(get_sender() == Transact::SERVICE, "Unauthorized");
