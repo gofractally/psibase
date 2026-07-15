@@ -1,0 +1,25 @@
+[package]
+name = "chat"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[package.metadata.psibase]
+server = "r-chat"
+plugin = "chat-plugin"
+postinstall = [
+    { sender = "chat", service = "chat", method = "init", data = {} },
+]
+
+[dependencies]
+psibase.workspace = true
+psibase_macros.workspace = true
+psibase_service.workspace = true
+async-graphql.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+psibase-user-workspace-hack.workspace = true
+
+[dev-dependencies]
+chat-pkg = { path = "..", version = "0.23.0" }

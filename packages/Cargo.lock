@@ -2475,6 +2475,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "psibase_service"
+version = "0.23.0"
+dependencies = [
+ "psibase",
+ "psibase-rust-workspace-hack",
+]
+
+[[package]]
 name = "quinn"
 version = "0.11.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3019,6 +3027,17 @@ dependencies = [
  "psibase",
  "psibase-plugin-workspace-hack",
  "wit-bindgen-rt",
+]
+
+[[package]]
+name = "sha1"
+version = "0.10.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3bf829a2d51ab4a5ddf1352d8470c140cadc8301b2ae1789db023f01cedd6ba"
+dependencies = [
+ "cfg-if",
+ "cpufeatures",
+ "digest",
 ]
 
 [[package]]
@@ -4334,6 +4353,26 @@ name = "writeable"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9edde0db4769d2dc68579893f2306b26c6ecfbe0ef499b013d731b7b9247e0b9"
+
+[[package]]
+name = "x-webrtc-sig-pkg"
+version = "0.23.0"
+dependencies = [
+ "x-wrtcsig",
+]
+
+[[package]]
+name = "x-wrtcsig"
+version = "0.23.0"
+dependencies = [
+ "base64 0.22.1",
+ "psibase",
+ "psibase_service",
+ "serde",
+ "serde_json",
+ "sha1",
+ "x-webrtc-sig-pkg",
+]
 
 [[package]]
 name = "yoke"

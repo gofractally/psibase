@@ -51,3 +51,6 @@ if(DEFINED IS_WASM)
     add_subdirectory(XTimer)
     add_subdirectory(XTransact)
 endif()
+
+# Always processed: XWebRtcSig registers Rust unit tests (not Python e2e).
+add_subdirectory(XWebRtcSig)

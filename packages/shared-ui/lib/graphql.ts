@@ -36,6 +36,8 @@ export type GraphQLUrlOptions = {
     baseUrl?: string | null;
     service?: z.infer<typeof zAccount> | null;
     path?: string | null;
+    headers?: Record<string, string>;
+    variables?: Record<string, unknown>;
 };
 
 interface GraphqlResponse<T> {
@@ -47,12 +49,19 @@ export const graphql = async <T>(
     query: string,
     options: GraphQLUrlOptions = {},
 ): Promise<T> => {
-    const { baseUrl, service, path } = options;
+    const { baseUrl, service, path, headers: extraHeaders, variables } =
+        options;
     const host = service ? siblingUrl(baseUrl, service, path) : "";
+    const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        ...extraHeaders,
+    };
     const res = await fetch(`${host}/graphql`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query }),
+        headers,
+        body: JSON.stringify(
+            variables === undefined ? { query } : { query, variables },
+        ),
     });
 
     let body: unknown;

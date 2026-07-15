@@ -92,6 +92,16 @@ const TransactStats = z.object({
 });
 export type TransactStatsType = z.infer<typeof TransactStats>;
 
+export const openRelayStatusSchema = z
+    .object({
+        configured: z.boolean(),
+        hasIceServers: z.boolean(),
+        appName: z.string(),
+    })
+    .strict();
+
+export type OpenRelayStatus = z.infer<typeof openRelayStatusSchema>;
+
 class Chain {
     public async getPeers(): Promise<z.infer<typeof Peers>> {
         const url = siblingUrl(null, "x-peers", "/graphql");
@@ -263,6 +273,25 @@ class Chain {
     public async getTransactStats(): Promise<TransactStatsType> {
         const url = siblingUrl(null, "transact", "/stats");
         return TransactStats.parse(await getJson(url));
+    }
+
+    public async getOpenRelay(): Promise<OpenRelayStatus> {
+        return openRelayStatusSchema.parse(
+            await getJson("/chat/openrelay"),
+        );
+    }
+
+    public async putOpenRelay(body: {
+        appName?: string;
+        apiKey?: string;
+        iceServers?: unknown;
+    }): Promise<void> {
+        const res = await putJson("/chat/openrelay", body);
+        if (!res.ok) {
+            throw new Error(
+                `Saving TURN/OpenRelay settings failed (HTTP ${res.status})`,
+            );
+        }
     }
 
     public async installNodeLocalPackage(file: File): Promise<{

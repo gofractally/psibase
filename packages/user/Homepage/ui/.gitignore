@@ -19,4 +19,5 @@ dist-ssr
 *.ntvs*
 *.njsproj
 *.sln
-*.sw?
+test-results/
+playwright-report/
