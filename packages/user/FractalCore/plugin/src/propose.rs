@@ -1,7 +1,5 @@
 use std::str::FromStr;
 
-use crate::bindings::guilds::plugin as GuildsPlugin;
-use crate::bindings::guilds::plugin::queries::Guild;
 use psibase::{AccountNumber, Subaccount};
 
 use crate::bindings::host::types::types::Error;
@@ -11,10 +9,6 @@ use crate::bindings::{
 
 fn latch(account: &str) -> Result<(), Error> {
     set_propose_latch(Some(account))
-}
-
-fn get_guild(guild_account: &str) -> Result<Guild, Error> {
-    GuildsPlugin::queries::get_guild(guild_account)
 }
 
 pub fn fractal() -> Result<(), Error> {

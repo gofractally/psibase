@@ -1,5 +1,5 @@
 use crate::tables::tables::{Role, RoleTable};
-use psibase::services::{accounts, auth_any, auth_delegate, auth_dyn};
+use psibase::services::{accounts, auth_any, auth_dyn};
 use psibase::{check, check_none, check_some, AccountNumber, ServiceWrapper, Table};
 use psibase::{services::auth_dyn::policy::DynamicAuthPolicy, Subaccount};
 

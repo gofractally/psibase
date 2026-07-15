@@ -484,9 +484,7 @@ pub mod service {
         let (base, subaccount) = account.split();
 
         let guild = Guild::get(base)?;
-        let subaccount = GuildSubaccount::from_subaccount(subaccount)?;
-
-        Some(match subaccount {
+        GuildSubaccount::from_subaccount(subaccount).map(|subaccount| match subaccount {
             GuildSubaccount::Base => guild.auth_policy(),
             GuildSubaccount::Council => guild.council_role_auth(),
             GuildSubaccount::Rep => guild.rep_role_auth(),

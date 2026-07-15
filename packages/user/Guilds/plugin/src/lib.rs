@@ -3,7 +3,6 @@ mod bindings;
 
 use std::str::FromStr;
 
-use bindings::accounts;
 use bindings::evaluations::plugin::{admin::close, user as EvaluationsUser};
 use bindings::exports::guilds::plugin::{
     admin_fractal::Guest as AdminFractal,
