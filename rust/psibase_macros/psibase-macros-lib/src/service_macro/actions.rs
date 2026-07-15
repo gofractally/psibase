@@ -114,9 +114,9 @@ pub fn process_action_args(
     if let Some(db) = event_db {
         *new_items = quote! {
             #new_items
-            impl #psibase_mod::EventDb for #fn_name {
-                fn db() -> #psibase_mod::DbId {
-                    #psibase_mod::DbId::#db
+            impl #psibase_mod::GetEventDb for #fn_name {
+                fn db() -> #psibase_mod::EventDb {
+                    #psibase_mod::EventDb::#db
                 }
             }
         }

@@ -25,6 +25,7 @@ Makefile
 node_modules
 temp
 dist
+.direnv
 vite.config.ts.timestamp-*.mjs
 .pnpm-store
 .env
