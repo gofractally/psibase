@@ -87,7 +87,7 @@ mod service {
         body: String,
         datetime: i64,
     ) {
-        assert_eq!(get_sender(), receiver, "only receiver of email can save it",);
+        assert_eq!(get_sender(), receiver, "only receiver of email can save it");
 
         let saved_messages_table = SavedMessageTable::new();
         saved_messages_table

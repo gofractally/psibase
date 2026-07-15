@@ -86,7 +86,7 @@ pub mod tables {
         }
 
         pub fn get_assert(pool_id: TID, token_id: TID) -> Self {
-            Self::get(pool_id, token_id).expect(format!("reserve does not exist").as_str())
+            Self::get(pool_id, token_id).expect("reserve does not exist")
         }
 
         pub fn get_reserves_of_pool(pool_id: TID) -> (Self, Self) {
@@ -222,7 +222,7 @@ pub mod tables {
         }
 
         fn new(token_a_id: TID, token_b_id: TID, nft_id: Option<NID>) -> Self {
-            assert_ne!(token_a_id, token_b_id, "reserve tokens cannot be the same",);
+            assert_ne!(token_a_id, token_b_id, "reserve tokens cannot be the same");
             let tokens = psibase::services::tokens::Wrapper::call();
             tokens.getToken(token_a_id);
             tokens.getToken(token_b_id);
