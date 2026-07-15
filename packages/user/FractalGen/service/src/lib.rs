@@ -87,9 +87,6 @@ mod service {
         check(get_sender() == Wrapper::SERVICE, "Unauthorized");
 
         if ConfigRow::is_init() {
-            // Upgrade path for chains that already created core-fract
-            // before dyn-ld was linked on fractal accounts.
-            link_core_fractal_plugin_deps();
             return;
         }
         ConfigRow::init();
