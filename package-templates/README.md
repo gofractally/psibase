@@ -29,4 +29,6 @@ This will run a CLI wizard to set up the new app in the `./packages/user/` direc
 
 # Additional resources
 
-[Advice from actual usage](https://thoughtbot.com/blog/cargo-generate-lessons)
+- [Building Packages](../doc/src/development/services/rust-service/package.md#package-naming) —
+  package, service, plugin, and on-chain naming (what must match vs convention)
+- [Advice from actual usage](https://thoughtbot.com/blog/cargo-generate-lessons)
