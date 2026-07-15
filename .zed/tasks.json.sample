@@ -1,25 +1,25 @@
 [
   {
     "label": "Build",
-    "command": "$ZED_WORKTREE_ROOT/.vscode/scripts/build.sh",
+    "command": "$ZED_WORKTREE_ROOT/scripts/build.sh",
     "allow_concurrent_runs": false,
     "reveal": "always"
   },
   {
     "label": "Launch",
-    "command": "$ZED_WORKTREE_ROOT/.vscode/scripts/launch.sh 8080 myprod $HOST_IP",
+    "command": "$ZED_WORKTREE_ROOT/scripts/launch.sh 8080 myprod $HOST_IP",
     "allow_concurrent_runs": false,
     "reveal": "always"
   },
   {
     "label": "Launch Secure",
-    "command": "$ZED_WORKTREE_ROOT/.vscode/scripts/slaunch.sh 8080 myprod $HOST_IP /usr/lib/softhsm/libsofthsm2.so",
+    "command": "$ZED_WORKTREE_ROOT/scripts/slaunch.sh 8080 myprod $HOST_IP /usr/lib/softhsm/libsofthsm2.so",
     "allow_concurrent_runs": false,
     "reveal": "always"
   },
   {
     "label": "Continue",
-    "command": "$ZED_WORKTREE_ROOT/.vscode/scripts/continue.sh 8080 myprod $HOST_IP",
+    "command": "$ZED_WORKTREE_ROOT/scripts/continue.sh 8080 myprod $HOST_IP",
     "allow_concurrent_runs": false,
     "reveal": "always"
   }

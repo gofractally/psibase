@@ -95,7 +95,7 @@
       {
         "label": "Build",
         "type": "shell",
-        "command": "../scripts/build.sh 1",
+        "command": "../../scripts/build.sh 1",
         "group": {
           "kind": "build",
           "isDefault": true,
@@ -109,7 +109,7 @@
       {
         "label": "Launch",
         "type": "shell",
-        "command": "../scripts/launch.sh $HOST_IP myprod 8080",
+        "command": "../../scripts/launch.sh $HOST_IP myprod 8080",
         "options": {
           "statusbar": {
             "label": "$(play) Launch",
@@ -119,7 +119,7 @@
       {
         "label": "Launch Secure",
         "type": "shell",
-        "command": "../scripts/launch_secure.sh $HOST_IP myprod 8080 /usr/lib/softhsm/libsofthsm2.so",
+        "command": "../../scripts/slaunch.sh $HOST_IP myprod 8080 /usr/lib/softhsm/libsofthsm2.so",
         "options": {
           "statusbar": {
             "label": "$(play)$(lock) Launch Secure",
