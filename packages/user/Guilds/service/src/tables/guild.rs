@@ -30,6 +30,10 @@ impl Guild {
         rep: AccountNumber,
         display_name: Memo,
     ) -> Self {
+        assert!(
+            !guild.is_subaccount(),
+            "guild account cannot be a subaccount"
+        );
         Self {
             account: guild,
             fractal,

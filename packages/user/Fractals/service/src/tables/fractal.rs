@@ -34,6 +34,10 @@ use psibase::{check, get_sender, RawKey, TableQuery, TimePointSec};
 
 impl Fractal {
     fn new(account: AccountNumber, name: String, mission: String) -> Self {
+        assert!(
+            !account.is_subaccount(),
+            "fractal account cannot be a subaccount"
+        );
         let now = TransactSvc::call().currentBlock().time.seconds();
 
         let max_supply: Quantity = TOKEN_SUPPLY.into();
