@@ -71,10 +71,14 @@ export const ImportPrompt = ({ isPrompt }: { isPrompt?: boolean }) => {
         } catch (e) {
             console.error("Import and login failed");
             console.error(e);
-            form.fieldInfo.privateKey.instance?.setErrorMap({
-                onSubmit:
-                    "Error signing in. Check your private key and try again.",
-            });
+            const message =
+                "Error signing in. Check your private key and try again.";
+            form.setFieldMeta("privateKey", (prev) => ({
+                ...prev,
+                isTouched: true,
+                errors: [message],
+                errorMap: { onSubmit: message },
+            }));
         }
     };
 

@@ -1,6 +1,7 @@
 use crate::{serialize_as_str, Pack, ToKey, ToSchema, Unpack};
 use custom_error::custom_error;
 use psibase_names::{account_number_from_str, account_number_to_string};
+pub use psibase_names::{MAX_ACCOUNT_NAME_LENGTH, MIN_ACCOUNT_NAME_LENGTH};
 use std::{num::ParseIntError, str::FromStr};
 
 custom_error! { pub AccountNumberError
@@ -161,7 +162,7 @@ mod tests {
     }
 
     #[test]
-    fn name_longer_than_limit_of_18_is_zero() {
+    fn name_longer_than_limit_of_10_is_zero() {
         assert_eq!(
             AccountNumber::from_str("abcdefghijklmnopqrstuvwxyz").unwrap(),
             AccountNumber::new(0)

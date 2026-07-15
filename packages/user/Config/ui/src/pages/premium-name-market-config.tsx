@@ -7,16 +7,12 @@ import { useConfigurePremiumNameMarket } from "@/hooks/premium-name-markets/use-
 import { useConfiguredPremiumNameMarkets } from "@/hooks/premium-name-markets/use-configured-markets";
 import { useDisablePremiumNameMarket } from "@/hooks/premium-name-markets/use-disable-market";
 import { useEnablePremiumNameMarket } from "@/hooks/premium-name-markets/use-enable-market";
-import {
-    DEFAULT_MAX_PREMIUM_NAME_LENGTH_MARKET,
-    DEFAULT_MIN_PREMIUM_NAME_LENGTH_MARKET,
-} from "@/lib/premium-name-market-defaults";
 
 import { PageContainer } from "@shared/components/page-container";
 import {
     MAX_ACCOUNT_NAME_LENGTH,
     MIN_ACCOUNT_NAME_LENGTH,
-} from "@shared/lib/schemas/account";
+} from "@shared/constants";
 import { useSystemToken } from "@shared/hooks/use-system-token";
 import { cn } from "@shared/lib/utils";
 import {
@@ -71,11 +67,15 @@ export const PremiumNameMarketConfig = () => {
         useBootstrapDefaultPremiumNameMarkets();
 
     const savingLength =
-        savingConfig && saveVars !== undefined ? saveVars[0] : null;
+        savingConfig && saveVars !== undefined ? saveVars.row.length : null;
     const disablingLength =
-        disablingPurchases && disableVars !== undefined ? disableVars[0] : null;
+        disablingPurchases && disableVars !== undefined
+            ? disableVars.length
+            : null;
     const enablingLength =
-        enablingPurchases && enableVars !== undefined ? enableVars[0] : null;
+        enablingPurchases && enableVars !== undefined
+            ? enableVars.length
+            : null;
 
     const [showAdd, setShowAdd] = useState(false);
 
@@ -104,10 +104,10 @@ export const PremiumNameMarketConfig = () => {
                 </h2>
                 <ul className="text-muted-foreground list-disc space-y-1.5 pl-5 text-sm">
                     <li>
-                        Each row is a premium account name length (1–
-                        {DEFAULT_MAX_PREMIUM_NAME_LENGTH_MARKET} characters).
-                        When you add a market, you set the initial price; it
-                        cannot be changed later.
+                        Each row is a premium account name length (
+                        {MIN_ACCOUNT_NAME_LENGTH}–{MAX_ACCOUNT_NAME_LENGTH}{" "}
+                        characters). When you add a market, you set the initial
+                        price; it cannot be changed later.
                     </li>
                     <li>
                         Use the switch on each row to turn purchases on or off
@@ -115,8 +115,8 @@ export const PremiumNameMarketConfig = () => {
                     </li>
                     <li>
                         Expand a row to edit floor price, target sales per
-                        30-day window, and increase/decrease PPM (Save). Saving
-                        always uses a 30-day DiffAdjust window.
+                        30-day window, and increase/decrease percent (Save).
+                        Saving always uses a 30-day DiffAdjust window.
                     </li>
                     <li>
                         Disabling purchases blocks new buys for that length;
@@ -184,7 +184,7 @@ export const PremiumNameMarketConfig = () => {
                     >
                         {bootstrapping
                             ? "Configuring…"
-                            : `Configure name markets ${DEFAULT_MIN_PREMIUM_NAME_LENGTH_MARKET}-${DEFAULT_MAX_PREMIUM_NAME_LENGTH_MARKET} with defaults`}
+                            : `Configure name markets ${MIN_ACCOUNT_NAME_LENGTH}-${MAX_ACCOUNT_NAME_LENGTH} with defaults`}
                     </Button>
                 </div>
             ) : null}
@@ -251,13 +251,9 @@ export const PremiumNameMarketConfig = () => {
                                                 aria-label={`Purchases for length-${row.length} names`}
                                                 onCheckedChange={(enable) => {
                                                     if (enable) {
-                                                        enablePurchases([
-                                                            row.length,
-                                                        ]);
+                                                        enablePurchases(row);
                                                     } else {
-                                                        disablePurchases([
-                                                            row.length,
-                                                        ]);
+                                                        disablePurchases(row);
                                                     }
                                                 }}
                                             />

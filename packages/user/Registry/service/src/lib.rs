@@ -5,7 +5,6 @@ mod tables;
 #[allow(non_snake_case)]
 pub mod service {
     pub use crate::tables::tables::*;
-    use async_graphql::*;
     use psibase::*;
     use services::events::Wrapper as EventsSvc;
 

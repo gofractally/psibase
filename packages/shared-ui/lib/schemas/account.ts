@@ -1,7 +1,11 @@
 import { z } from "zod";
 
-export const MIN_ACCOUNT_NAME_LENGTH = 1;
-export const MAX_ACCOUNT_NAME_LENGTH = 18;
+import {
+    MAX_ACCOUNT_NAME_LENGTH,
+    MIN_ACCOUNT_NAME_LENGTH,
+} from "../../constants";
+
+export { MAX_ACCOUNT_NAME_LENGTH, MIN_ACCOUNT_NAME_LENGTH };
 
 export const zAccount = z
     .string()
