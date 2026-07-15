@@ -16,8 +16,8 @@ mod service {
     use psibase::services::sites::Wrapper as SitesSvc;
     use psibase::services::transact::Wrapper as TransactSvc;
     use psibase::{
-        check, get_sender, serve_graphql, AccountNumber, DbId, HttpReply, HttpRequest,
-        MethodNumber, RawKey, Table, TableQuery, TimePointSec,
+        check, get_sender, serve_graphql, AccountNumber, EventDb, HttpReply, HttpRequest,
+        MethodNumber, RawKey, ServiceWrapper, Table, TableQuery, TimePointSec,
     };
 
     #[action]
@@ -27,8 +27,18 @@ mod service {
 
         SitesSvc::call().enableSpa(true);
 
-        EventsSvc::call().addIndex(DbId::HistoryEvent, SERVICE, MethodNumber::from("sent"), 0);
-        EventsSvc::call().addIndex(DbId::HistoryEvent, SERVICE, MethodNumber::from("sent"), 1);
+        EventsSvc::call().addIndex(
+            EventDb::HistoryEvent,
+            SERVICE,
+            MethodNumber::from("sent"),
+            0,
+        );
+        EventsSvc::call().addIndex(
+            EventDb::HistoryEvent,
+            SERVICE,
+            MethodNumber::from("sent"),
+            1,
+        );
     }
 
     /// Send message

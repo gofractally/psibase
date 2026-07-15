@@ -2,8 +2,9 @@
 
 use crate::{
     AccountNumber, Action, BlockHeader, BlockInfo, BlockNum, Checksum256, Claim, DbId, Hex,
-    JointConsensus, MethodNumber, MicroSeconds, Pack, ToSchema, Unpack,
+    JointConsensus, MethodNumber, MicroSeconds, Pack, ToKey, ToSchema, Unpack,
 };
+use async_graphql::{InputObject, SimpleObject};
 use serde::{Deserialize, Serialize};
 
 pub type NativeTable = u16;
@@ -405,11 +406,32 @@ impl RunMode {
 
 pub type RunToken = Vec<u8>;
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
-#[fracpack(fracpack_mod = "fracpack")]
-pub struct BoundMethod {
-    service: AccountNumber,
-    method: MethodNumber,
+/// Identify a service and method
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    Pack,
+    Unpack,
+    ToKey,
+    ToSchema,
+    Serialize,
+    Deserialize,
+    SimpleObject,
+    InputObject,
+)]
+#[fracpack(fracpack_mod = "fracpack", custom = "ServiceMethod")]
+#[to_key(psibase_mod = "crate")]
+#[graphql(input_name = "ServiceMethodInput")]
+pub struct ServiceMethod {
+    pub service: AccountNumber,
+    pub method: MethodNumber,
+}
+
+impl ServiceMethod {
+    pub fn new(service: AccountNumber, method: MethodNumber) -> Self {
+        Self { service, method }
+    }
 }
 
 #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
@@ -419,7 +441,7 @@ pub struct RunRow {
     mode: RunMode,
     maxTime: MicroSeconds,
     action: Action,
-    continuation: BoundMethod,
+    continuation: ServiceMethod,
 }
 
 impl RunRow {

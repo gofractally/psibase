@@ -330,7 +330,7 @@ psibase_package(
         FLAGS isPrivileged
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Transact/src/postinstall.json
     DEPENDS wasm
-    PACKAGE_DEPENDS "AccountsService(^${PSIBASE_VERSION}.0)" "CpuLimit(^${PSIBASE_VERSION}.0)" "Db(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "AccountsService(^${PSIBASE_VERSION}.0)" "CpuLimit(^${PSIBASE_VERSION}.0)" "Db(^${PSIBASE_VERSION}.0)" "EventsService(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -865,8 +865,8 @@ psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/Events.psi
-    NAME Events
+    OUTPUT ${SERVICE_DIR}/EventsService.psi
+    NAME EventsService
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Indexes events and provides querying"
     SERVICE events
@@ -879,9 +879,24 @@ psibase_package(
     SERVICE events+1
         WASM ${CMAKE_CURRENT_BINARY_DIR}/REvents.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/REvents-schema.json
-        POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Events/src/postinstall.json
     DEPENDS wasm
-    PACKAGE_DEPENDS "Transact(^${PSIBASE_VERSION}.0)" "TransactService(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/Events.psi
+    NAME Events
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Indexes events and provides querying"
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Events/src/postinstall.json
+    DEPENDS wasm
+    # FIXME: The existence of this service forces anything that depends
+    # on Events to be installed after it. Figure out a way to represent
+    # this constraint more directly.
+    SERVICE events+3
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/Nop.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Nop-schema.json
+    PACKAGE_DEPENDS "EventsService(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "TransactService(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -1043,7 +1058,7 @@ psibase_package(
     NAME TokenUsers
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Creates accounts alice & bob, and gives each some system tokens. Not for production use."
-    PACKAGE_DEPENDS "AccountsService(^${PSIBASE_VERSION}.0)" "FaucetTok(^${PSIBASE_VERSION}.0)" 
+    PACKAGE_DEPENDS "AccountsService(^${PSIBASE_VERSION}.0)" "FaucetTok(^${PSIBASE_VERSION}.0)" "Tokens(^${PSIBASE_VERSION}.0)" 
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Tokens/src/TokenUsers.json
 )
 
@@ -1285,15 +1300,15 @@ function(write_package_index target dir)
     add_custom_command(
         OUTPUT ${dir}/index.json
         DEPENDS ${deps}
-        COMMAND /bin/bash ${CMAKE_CURRENT_SOURCE_DIR}/make_package_index.sh ${CMAKE_COMMAND} ${dir} ${ARGN} >${dir}/index.json
+        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/make_package_index.sh ${CMAKE_COMMAND} ${dir} ${ARGN} >${dir}/index.json
     )
     add_custom_target(${target} ALL DEPENDS ${dir}/index.json)
 endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
     Accounts AccountsService Aes AuthAny AuthDyn AuthDelegate AuthDelegateService AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
-    Docs DiffAdjust DynLd Events Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry
-    Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket DevNameMarkets Transact TransactService Homepage VirtualServer WebCrypto Workshop Config
+    Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry
+    Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage VirtualServer WebCrypto Workshop Config
     XAdmin XBasic XDb XDefault XHttp XPackages XPeers XProxy XRun XSites XTimer XTransact)
 
 install(
@@ -1324,6 +1339,7 @@ install(
           ${SERVICE_DIR}/Docs.psi
           ${SERVICE_DIR}/DynLd.psi
           ${SERVICE_DIR}/Events.psi
+          ${SERVICE_DIR}/EventsService.psi
           ${SERVICE_DIR}/Evaluations.psi
           ${SERVICE_DIR}/Explorer.psi
           ${SERVICE_DIR}/FaucetTok.psi

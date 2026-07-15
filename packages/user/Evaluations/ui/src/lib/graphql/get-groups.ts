@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { EVALUATIONS_SERVICE } from "@shared/domains/fractal/lib/constants";
 import { graphql } from "@shared/lib/graphql";
 import { Account } from "@shared/lib/schemas/account";
 
@@ -41,7 +42,7 @@ export const getGroups = async (
 ): Promise<Group[]> => {
     const res = await graphql(
         `{ getGroups(owner: "${owner}", evaluationId: ${evaluationId}) { nodes { owner number evaluationId keySubmitter result } } }`,
-        { service: "evaluations" },
+        { service: EVALUATIONS_SERVICE },
     );
 
     const response = GraphqlResponse.parse(res);

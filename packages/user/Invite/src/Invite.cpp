@@ -70,13 +70,13 @@ void Invite::init()
    auto init      = (initTable.get({}));
    initTable.put(InitializedRecord{});
 
-   // Configure manual debit for self on Token and NFT
-   to<Nft>().setUserConf(Nft::manualDebit, true);
-   to<Tokens>().setUserConf(Tokens::manualDebit, true);
+   // Configure auto debit for self on Token and NFT
+   to<Nft>().setUserConf(Nft::autoDebit, false);
+   to<Tokens>().setUserConf(Tokens::autoDebit, false);
 
    // Register event indices
-   to<EventConfig>().addIndex(DbId::historyEvent, Invite::service, "updated"_m, 0);
-   to<EventConfig>().addIndex(DbId::historyEvent, Invite::service, "updated"_m, 1);
+   to<EventConfig>().addIndex(EventDb::historyEvent, Invite::service, "updated"_m, 0);
+   to<EventConfig>().addIndex(EventDb::historyEvent, Invite::service, "updated"_m, 1);
 }
 
 namespace

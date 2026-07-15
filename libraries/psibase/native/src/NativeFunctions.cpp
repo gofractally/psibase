@@ -44,18 +44,6 @@ namespace psibase
          return self.dbMode.isSubjective;
       }
 
-      DbId getDbReadSequential(NativeFunctions& self, uint32_t db)
-      {
-         if (db == uint32_t(DbId::historyEvent) || db == uint32_t(DbId::uiEvent) ||
-             db == uint32_t(DbId::merkleEvent))
-         {
-            check(isSubjectiveContext(self),
-                  "subjective databases cannot be read in a deterministic context");
-            return (DbId)db;
-         }
-         throw std::runtime_error("service may not read this db, or must use another intrinsic");
-      }
-
       bool keyHasServicePrefix(DbId db)
       {
          return db == DbId::service || db == DbId::writeOnly || db == DbId::subjective ||
@@ -87,25 +75,6 @@ namespace psibase
          }
          throw std::runtime_error("service may not write this db (" +
                                   std::to_string(static_cast<std::uint32_t>(db)) +
-                                  "), or must use another intrinsic");
-      }
-
-      // Caution: All sequential databases are currently non-refundable. If this
-      //          changes, then this function needs to return Writable and the
-      //          functions which call it need to adjust their logic.
-      DbId getDbWriteSequential(NativeFunctions& self, uint32_t db)
-      {
-         check(!isSubjectiveContext(self),
-               "sequential database cannot be written in subjective context");
-         check(self.dbMode.isSync, "sequential database cannot be written in async context");
-
-         if (db == uint32_t(DbId::historyEvent))
-            return (DbId)db;
-         if (db == uint32_t(DbId::uiEvent))
-            return (DbId)db;
-         if (db == uint32_t(DbId::merkleEvent))
-            return (DbId)db;
-         throw std::runtime_error("service may not write this db (" + std::to_string(db) +
                                   "), or must use another intrinsic");
       }
 
@@ -715,9 +684,6 @@ namespace psibase
             check(!isWrite || dbMode.isSync, "database cannot be written in async context");
             break;
          // Subjective databases that follow forks
-         case DbId::historyEvent:
-         case DbId::uiEvent:
-         case DbId::merkleEvent:
          case DbId::blockLog:
          case DbId::writeOnly:
             check(!isRead || isSubjectiveContext(*this),
@@ -846,44 +812,6 @@ namespace psibase
           });
    }
 
-   uint64_t NativeFunctions::putSequential(uint32_t db, eosio::vm::span<const char> value)
-   {
-      return timeDb(  //
-          *this,
-          [&]
-          {
-             check(value.size() <= transactionContext.config.maxValueSize, "value is too big");
-             clearResult(*this);
-             auto m = getDbWriteSequential(*this, db);
-
-             std::span<const char>     v{value.data(), value.size()};
-             std::tuple<AccountNumber> service;
-             if (!psio::from_frac(service, v) || std::get<0>(service) != code.codeNum)
-             {
-                check(false,
-                      "value of putSequential must have service account as its first member");
-             }
-
-             auto dbStatus =
-                 database.kvGet<DatabaseStatusRow>(DatabaseStatusRow::db, databaseStatusKey());
-             check(!!dbStatus, "databaseStatus not set");
-
-             uint64_t indexNumber;
-             if (db == uint32_t(DbId::historyEvent))
-                indexNumber = dbStatus->nextHistoryEventNumber++;
-             else if (db == uint32_t(DbId::uiEvent))
-                indexNumber = dbStatus->nextUIEventNumber++;
-             else if (db == uint32_t(DbId::merkleEvent))
-                indexNumber = dbStatus->nextMerkleEventNumber++;
-             else
-                check(false, "putSequential: unsupported db");
-             database.kvPut(DatabaseStatusRow::db, dbStatus->key(), *dbStatus);
-
-             database.kvPutRaw(m, psio::convert_to_key(indexNumber), {value.data(), value.size()});
-             return indexNumber;
-          });
-   }  // putSequential()
-
    void NativeFunctions::kvRemove(uint32_t handle, eosio::vm::span<const char> key)
    {
       timeDbVoid(*this,
@@ -928,17 +856,6 @@ namespace psibase
                 abortMessage("Cannot read from this db handle " + bucket.to_string());
              auto fullKey = bucket.key(key);
              return setResult(*this, database.kvGetRaw(bucket.db, fullKey));
-          });
-   }
-
-   uint32_t NativeFunctions::getSequential(uint32_t db, uint64_t indexNumber)
-   {
-      return timeDb(  //
-          *this,
-          [&]
-          {
-             auto m = getDbReadSequential(*this, db);
-             return setResult(*this, database.kvGetRaw(m, psio::convert_to_key(indexNumber)));
           });
    }
 

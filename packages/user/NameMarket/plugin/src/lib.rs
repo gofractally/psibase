@@ -1,7 +1,6 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::accounts::plugin::api as AccountsApi;
 use bindings::exports::name_market::plugin::api::Guest as Api;
 use bindings::exports::name_market::plugin::authorized::Guest as Authorized;
 use bindings::exports::name_market::plugin::market_admin::Guest as MarketAdmin;
@@ -19,12 +18,6 @@ use psibase_plugin::{
     trust::{Capabilities, TrustConfig},
     Error, Transact,
 };
-
-const PPM_PER_PCT: u32 = 10_000;
-
-fn pct_to_ppm(pct: u8) -> u32 {
-    (pct as u32) * PPM_PER_PCT
-}
 
 fn validate_adjust_pcts(increase_pct: u8, decrease_pct: u8) -> Result<(), Error> {
     if increase_pct == 0 || decrease_pct == 0 {
@@ -67,8 +60,8 @@ impl MarketAdmin for NameMarketPlugin {
             window_seconds,
             target,
             Quantity::from(floor_price),
-            pct_to_ppm(increase_pct),
-            pct_to_ppm(decrease_pct),
+            name_market::pct_to_ppm(increase_pct),
+            name_market::pct_to_ppm(decrease_pct),
         );
         Ok(())
     }
@@ -91,8 +84,8 @@ impl MarketAdmin for NameMarketPlugin {
             window_seconds,
             target,
             Quantity::from(floor_price),
-            pct_to_ppm(increase_pct),
-            pct_to_ppm(decrease_pct),
+            name_market::pct_to_ppm(increase_pct),
+            name_market::pct_to_ppm(decrease_pct),
         );
         Ok(())
     }
@@ -141,8 +134,8 @@ impl MarketAdmin for NameMarketPlugin {
                     cfg.window_seconds,
                     cfg.target,
                     Quantity::from(floor_price),
-                    pct_to_ppm(cfg.increase_pct),
-                    pct_to_ppm(cfg.decrease_pct),
+                    name_market::pct_to_ppm(cfg.increase_pct),
+                    name_market::pct_to_ppm(cfg.decrease_pct),
                 );
 
                 if !cfg.enabled {
@@ -162,8 +155,8 @@ impl MarketAdmin for NameMarketPlugin {
                 cfg.window_seconds,
                 cfg.target,
                 Quantity::from(floor_price),
-                pct_to_ppm(cfg.increase_pct),
-                pct_to_ppm(cfg.decrease_pct),
+                name_market::pct_to_ppm(cfg.increase_pct),
+                name_market::pct_to_ppm(cfg.decrease_pct),
             );
 
             if current.enabled == cfg.enabled {
@@ -184,10 +177,6 @@ impl MarketAdmin for NameMarketPlugin {
 impl Api for NameMarketPlugin {
     #[psibase_plugin::authorized(None)]
     fn can_create_account() -> bool {
-        if !AccountsApi::is_logged_in() {
-            return false;
-        }
-
         let Ok(overview) = markets_overview() else {
             return false;
         };

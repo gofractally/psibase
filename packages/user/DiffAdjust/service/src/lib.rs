@@ -3,7 +3,8 @@ pub mod tables {
     use psibase::services::nft::Wrapper as Nft;
     use psibase::services::transact::Wrapper as TransactSvc;
     use psibase::{
-        check, check_some, get_sender, AccountNumber, Fracpack, Table, TimePointSec, ToSchema,
+        check, check_some, get_sender, AccountNumber, Fracpack, ServiceWrapper, Table,
+        TimePointSec, ToSchema,
     };
 
     use async_graphql::{ComplexObject, SimpleObject};
@@ -18,7 +19,7 @@ pub mod tables {
         #[primary_key]
         pub nft_id: u32,
         pub window_seconds: u32,
-        pub counter: u32,
+        pub activity_count: u32,
         pub target_min: u32,
         pub target_max: u32,
         pub floor_difficulty: u64,
@@ -45,7 +46,7 @@ pub mod tables {
             Self {
                 nft_id,
                 active_difficulty: initial_difficulty,
-                counter: 0,
+                activity_count: 0,
                 floor_difficulty,
                 target_min,
                 target_max,
@@ -57,16 +58,7 @@ pub mod tables {
             }
         }
 
-        fn check_ppm_change(ppm: u32) {
-            check(
-                ppm > 0 && ppm < ONE_MILLION,
-                "ppm must be between 0 - 1,000,000",
-            );
-        }
-
         fn check_targets(target_min: u32, target_max: u32) {
-            check(target_min > 0, "target_min must be above 0");
-            check(target_max > 0, "target_max must be above 0");
             check(
                 target_min <= target_max,
                 "target_min must not exceed target_max",
@@ -75,6 +67,13 @@ pub mod tables {
 
         fn check_window_seconds(seconds: u32) {
             check(seconds > 0, "window seconds must be above 0");
+        }
+
+        fn check_decrease_ppm(decrease_ppm: u32) {
+            check(
+                decrease_ppm <= ONE_MILLION,
+                "decrease_ppm must not exceed 1_000_000",
+            );
         }
 
         pub fn add(
@@ -86,17 +85,16 @@ pub mod tables {
             increase_ppm: u32,
             decrease_ppm: u32,
         ) -> Self {
+            Self::check_targets(target_min, target_max);
+            Self::check_window_seconds(window_seconds);
+            Self::check_decrease_ppm(decrease_ppm);
+
             let nft_id = Nft::call().mint();
             let sender = get_sender();
             Nft::call().credit(nft_id, sender, "RateLimit administration NFT".into());
 
             let last_updated =
                 TransactSvc::call().currentBlock().time.seconds() + psibase::Seconds::new(1); // See comment in check_difficulty_increase
-
-            Self::check_targets(target_min, target_max);
-            Self::check_ppm_change(increase_ppm);
-            Self::check_ppm_change(decrease_ppm);
-            Self::check_window_seconds(window_seconds);
 
             let new_instance = Self::new(
                 nft_id,
@@ -123,44 +121,98 @@ pub mod tables {
             self.decrease_ppm as f64 / ONE_MILLION as f64
         }
 
+        fn apply_increase(difficulty: u64, factor: f64, times: u32) -> u64 {
+            if times == 0 || difficulty == u64::MAX || factor <= 1.0 {
+                return difficulty;
+            }
+            // `powi` takes i32, so `times` beyond i32::MAX can't be cast; saturate to infinity.
+            let powered = if times > i32::MAX as u32 {
+                f64::INFINITY
+            } else {
+                factor.powi(times as i32)
+            };
+            // Large exponents can overflow to inf or NaN on wasm; increases saturate, never collapse to zero.
+            if !powered.is_finite() || powered >= u64::MAX as f64 {
+                return u64::MAX;
+            }
+            let diff_as_f64 = difficulty as f64 * powered;
+            check(
+                !diff_as_f64.is_nan(),
+                "diffadjust increase computation resulted in NaN",
+            );
+            diff_as_f64 as u64
+        }
+
+        fn apply_decrease(mut difficulty: u64, factor: f64, times: u32, floor: u64) -> u64 {
+            if times == 0 {
+                return difficulty;
+            }
+            let factor = factor.max(0.0);
+            if factor == 0.0 {
+                return floor;
+            }
+            if factor == 1.0 {
+                return difficulty;
+            }
+            // Per-window truncate + floor so batching N windows matches N single-window steps.
+            for _ in 0..times {
+                let diff_as_f64 = difficulty as f64 * factor;
+                check(
+                    !diff_as_f64.is_nan(),
+                    "diffadjust decrease computation resulted in NaN",
+                );
+                difficulty = (diff_as_f64 as u64).max(floor);
+            }
+            difficulty
+        }
+
         pub fn check_difficulty_decrease(&mut self) -> u64 {
             let now = TransactSvc::call().currentBlock().time.seconds();
             let seconds_elapsed = (now.seconds - self.last_update.seconds).max(0) as u32;
             let windows_elapsed = seconds_elapsed / self.window_seconds;
             if windows_elapsed > 0 {
-                let below_target = self.counter < self.target_min;
+                let below_target = self.activity_count < self.target_min;
                 let seconds_remainder = seconds_elapsed % self.window_seconds;
-                self.counter = 0;
+                self.activity_count = 0;
                 self.last_update = TimePointSec::from(now.seconds - seconds_remainder as i64);
                 if below_target {
-                    let mut new_difficulty = self.active_difficulty;
                     let factor = 1.0 - self.ratio_decrease();
-                    for _ in 0..windows_elapsed {
-                        let temp = new_difficulty as f64 * factor;
-                        new_difficulty = (temp as u64).max(self.floor_difficulty);
-                    }
-                    self.active_difficulty = new_difficulty;
+                    self.active_difficulty = Self::apply_decrease(
+                        self.active_difficulty,
+                        factor,
+                        windows_elapsed,
+                        self.floor_difficulty,
+                    );
                 }
             }
             self.active_difficulty
         }
 
         fn check_difficulty_increase(&mut self, clamp_increase: bool) -> u64 {
-            if self.counter > self.target_max {
+            if self.activity_count > self.target_max {
                 let factor = 1.0 + self.ratio_increase();
-                let mut times_over_target = self.counter / self.target_max;
+                // `target_max` activity accumulates with no adjustment; the next unit triggers
+                //   one. So one adjustment is applied per `target_max + 1` activity, and the
+                //   cumulative adjustments for `activity_count` in a window is
+                //   floor(activity_count / (target_max + 1)).
+                // The remainder is carried in `activity_count` so a batched
+                //   increment produces the same result as the equivalent single increments.
+                // (u64 math avoids overflow when target_max == u32::MAX.)
+                let activity_per_adjustment = self.target_max as u64 + 1;
+                let mut adjustments = (self.activity_count as u64 / activity_per_adjustment) as u32;
                 if clamp_increase {
-                    times_over_target = times_over_target.min(1);
+                    adjustments = adjustments.min(1);
                 }
-                let mut difficulty = self.active_difficulty as f64;
-                for _ in 0..times_over_target {
-                    difficulty = difficulty * factor;
-                }
-                self.active_difficulty = difficulty.min(u64::MAX as f64) as u64;
-                self.counter = 0;
+                self.active_difficulty =
+                    Self::apply_increase(self.active_difficulty, factor, adjustments);
+                self.activity_count = if clamp_increase {
+                    0
+                } else {
+                    (self.activity_count as u64 % activity_per_adjustment) as u32
+                };
                 // The update is happening "mid block", so we round up to the next second. In other words,
                 // updates happens at the "end" of the block. Without this, a one-second block window would
-                // cause a decrease every block, because an increase zeroes out the counter, so each block
+                // cause a decrease every block, because an increase zeroes out the activity_count, so each block
                 // would consider a window to have elapsed.
                 self.last_update =
                     TransactSvc::call().currentBlock().time.seconds() + psibase::Seconds::new(1);
@@ -180,10 +232,10 @@ pub mod tables {
             check(self.consumer == get_sender(), "must be consumer");
         }
 
-        pub fn increment(&mut self, increment_amount: u32) -> u64 {
+        pub fn increment(&mut self, activity: u32) -> u64 {
             self.check_sender_is_consumer();
             let difficulty = self.check_difficulty_decrease();
-            self.counter += increment_amount;
+            self.activity_count = self.activity_count.saturating_add(activity);
             self.check_difficulty_increase(false);
             self.save();
             difficulty
@@ -210,9 +262,8 @@ pub mod tables {
 
         pub fn set_ppm(&mut self, increase_ppm: u32, decrease_ppm: u32) {
             self.check_sender_has_nft();
+            Self::check_decrease_ppm(decrease_ppm);
             self.check_difficulty_decrease();
-            Self::check_ppm_change(increase_ppm);
-            Self::check_ppm_change(decrease_ppm);
             self.increase_ppm = increase_ppm;
             self.decrease_ppm = decrease_ppm;
             self.save();
@@ -306,7 +357,7 @@ pub mod service {
 
     /// Increment RateLimit instance, potentially increasing the difficulty.
     ///
-    /// The difficulty may increase multiple times if the counter exceeds `target_max`
+    /// The difficulty may increase multiple times if the `activity_count` exceeds `target_max`
     ///   by more than one multiple of `target_max`.
     ///
     /// Returns the difficulty before any difficulty adjustment due to the increment.
@@ -315,7 +366,7 @@ pub mod service {
     ///
     /// # Arguments
     /// * `nft_id` - RateLimit / NFT ID
-    /// * `amount` - Amount to increment the counter by
+    /// * `amount` - Amount to increment the activity_count by
     #[action]
     fn increment(nft_id: u32, amount: u32) -> u64 {
         RateLimit::get_assert(nft_id).increment(amount)
@@ -327,8 +378,8 @@ pub mod service {
     ///
     /// # Arguments
     /// * `nft_id` - RateLimit / NFT ID
-    /// * `target_min` - Minimum target difficulty
-    /// * `target_max` - Maximum target difficulty
+    /// * `target_min` - Minimum target activity
+    /// * `target_max` - Maximum target activity
     #[action]
     fn set_targets(nft_id: u32, target_min: u32, target_max: u32) {
         RateLimit::get_assert(nft_id).set_targets(target_min, target_max);

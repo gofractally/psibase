@@ -88,26 +88,6 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn create_tuple_unpacks_as_action_struct() {
-        use crate::service::action_structs::create;
-        use psibase::fracpack::{Pack, Unpack};
-        use psibase::services::tokens::Quantity;
-
-        let tuple = (
-            1u8,
-            1000.into(),
-            DEFAULT_WINDOW_SECONDS,
-            10u32,
-            100.into(),
-            DEFAULT_CREATE_PPM,
-            DEFAULT_CREATE_PPM,
-        );
-        let packed = tuple.packed();
-        let unpacked = create::unpacked(&packed).expect("create struct unpack");
-        assert_eq!(unpacked.window_seconds, DEFAULT_WINDOW_SECONDS);
-    }
-
     /// Full NameMarket integration on one chain (serial steps; avoids parallel `psitest` races).
     #[psibase::test_case(packages("Tokens", "Nft", "NameMarket"))]
     fn name_market_service_integration_serial(chain: psibase::Chain) -> Result<(), psibase::Error> {

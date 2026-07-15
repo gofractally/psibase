@@ -12,7 +12,6 @@ world impl {
     include sites:plugin/imports;
 
     import accounts:plugin/admin;
-    import name-market:plugin/authorized;
     import name-market:plugin/market-admin;
     import tokens:plugin/admin;
     import packages:plugin/private-api;

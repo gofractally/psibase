@@ -6,7 +6,7 @@ use psibase::fracpack::Pack;
 use psibase::services::tokens::{Quantity, Wrapper as Tokens};
 use psibase::{
     new_account_action, preapprove_action, ActionFormatter, AnyPrivateKey, HttpSchemaFetcher,
-    PackageList, TraceFormat,
+    PackageList, ServiceWrapper, TraceFormat,
 };
 
 const ACCOUNTS_PER_SETUP: usize = 10;

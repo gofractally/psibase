@@ -1,8 +1,0 @@
-package accounts:plugin;
-
-interface api {
-    use host:types/types.{error};
-
-    /// Sets the auth service used to authenticate the currently logged-in user
-    set-auth-service: func(service-name: string) -> result<_, error>;
-}

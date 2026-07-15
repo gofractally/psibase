@@ -8,12 +8,7 @@ namespace SystemService
    /// Identify a service and method
    ///
    /// An empty `service` or `method` indicates a wildcard.
-   struct ServiceMethod
-   {
-      psibase::AccountNumber service;
-      psibase::MethodNumber  method;
-   };
-   PSIO_REFLECT(ServiceMethod, service, method)
+   using psibase::ServiceMethod;
 
    /// Authenticate actions
    ///
@@ -138,41 +133,49 @@ namespace SystemService
       // TODO: Return error message instead?
       void canAuthUserSys(psibase::AccountNumber user);
 
+      /// Get the accounts this auth service delegates authority to for a sender.
+      ///
+      /// * `sender`: The account whose delegations are being queried.
+      /// * `method`: The service and method being authorized. Delegations may vary by method.
+      ///
+      /// Returns the accounts that must be consulted before this sender can be authorized.
+      /// An empty result means the sender does not delegate to other accounts.
+      std::vector<psibase::AccountNumber> getDlgsSys(psibase::AccountNumber       sender,
+                                                     std::optional<ServiceMethod> method);
+
       /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
       /// transaction from a specified sender.
       ///
       /// * `sender`: The sender account for the transaction potentially being authorized.
       /// * `authorizers`: The set of accounts that have already authorized the execution of the transaction.
-      /// * `authSet`: The set of accounts that are already being checked for authorization. If
-      ///              the sender is already in this set, then the function should return false.
+      /// * `method`: The service and method being authorized.
       ///
       /// Returns:
       /// * `true`: The authorizers are sufficient to authorize a transaction from the sender.
       /// * `false`: The authorizers are not sufficient to authorize a transaction from the sender.
-      bool isAuthSys(psibase::AccountNumber                             sender,
-                     std::vector<psibase::AccountNumber>                authorizers,
-                     std::optional<ServiceMethod>                       method,
-                     std::optional<std::vector<psibase::AccountNumber>> authSet);
+      bool isAuthSys(psibase::AccountNumber              sender,
+                     std::vector<psibase::AccountNumber> authorizers, 
+                     std::optional<ServiceMethod> method);
 
       /// Check whether a specified set of rejecter accounts are sufficient to reject (cancel) a
       /// transaction from a specified sender.
       ///
       /// * `sender`: The sender account for the transaction potentially being rejected.
-      /// * `rejecters`: The set of accounts that have already authorized the rejection of the transaction.
-      /// * `authSet`: The set of accounts that are already being checked for authorization. If
-      ///              the sender is already in this set, then the function should return false.
+      /// * `rejecters`: The set of accounts that have already authorized the rejection of the
+      ///               transaction.
+      /// * `method`: The service and method being rejected.
       ///
       /// Returns:
       /// * `true`: The rejecters are sufficient to reject a transaction from the sender.
       /// * `false`: The rejecters are not sufficient to reject a transaction from the sender.
-      bool isRejectSys(psibase::AccountNumber                             sender,
-                       std::vector<psibase::AccountNumber>                rejecters,
-                       std::optional<ServiceMethod>                       method,
-                       std::optional<std::vector<psibase::AccountNumber>> authSet);
+      bool isRejectSys(psibase::AccountNumber              sender,
+                       std::vector<psibase::AccountNumber> rejecters, 
+                       std::optional<ServiceMethod> method);
    };
    PSIO_REFLECT(AuthInterface,
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                 method(canAuthUserSys, user),
+                method(getDlgsSys, sender),
                 method(isAuthSys, sender, authorizers, method),
                 method(isRejectSys, sender, rejecters, method)
                 //
@@ -180,10 +183,13 @@ namespace SystemService
 
    struct EventIndexerInterface
    {
+      void startBlock();
       /// Indexes all new events. This is run automatically at the end of every transaction.
       void sync();
+      // Gets the eventMerkle root and writes back any cached state
+      auto saveMerkle() -> psibase::Checksum256;
    };
-   PSIO_REFLECT(EventIndexerInterface, method(sync))
+   PSIO_REFLECT(EventIndexerInterface, method(startBlock), method(sync), method(saveMerkle))
 
    struct VerifyInterface
    {
@@ -459,6 +465,10 @@ namespace SystemService
       /// TODO: remove
       psibase::BlockTime headBlockTime() const;
 
+      /// Returns the tapos `refBlockIndex` and `refBlockSuffix`
+      /// for the head block.
+      std::pair<uint8_t, uint32_t> headTapos();
+
       struct Events
       {
          struct History
@@ -492,6 +502,7 @@ namespace SystemService
                 method(currentBlock),
                 method(headBlock),
                 method(headBlockTime),
+                method(headTapos)
                 //
    )
 
