@@ -78,8 +78,6 @@ pub mod Service {
     /// * `fractal` - Fractal to serve as jurisdiction of guild.
     /// * `guild_account` - The account number for the new guild.
     /// * `display_name` - The display name of the guild.
-    /// * `council_role` - Council role account.
-    /// * `rep_role` - Representative role account.
     #[action]
     fn create_guild(fractal: AccountNumber, guild_account: AccountNumber, display_name: Memo) {
         unimplemented!()
