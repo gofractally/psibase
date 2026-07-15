@@ -106,9 +106,6 @@ export class Supervisor implements AppInterface {
     //
     // The caller should dispose of all instantiated plugins after the entry function
     //  finishes.
-    //
-    // Callers must ensure exclusive access (via window-messaging serialize) so that
-    // disposeAll from one session cannot race instantiate/call from another.
     private preload(plugins: QualifiedPluginId[]): Promise<void> {
         return this.doPreload(plugins);
     }
