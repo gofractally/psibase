@@ -21,7 +21,7 @@ use crate::helpers::{two_thirds_plus_one, RollingBits16};
 use crate::tables::tables::{
     EvaluationInstance, Guild, GuildFlags, GuildMember, GuildMemberTable, GuildTable,
 };
-use crate::tables::GuildSubaccount;
+use psibase::services::guilds::GuildSubaccount;
 
 impl Guild {
     fn new(

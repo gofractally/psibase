@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use psibase::{AccountNumber, Subaccount};
+use psibase::{services::guilds::GuildSubaccount, AccountNumber};
 
 use crate::bindings::host::types::types::Error;
 use crate::bindings::{
@@ -21,10 +21,18 @@ pub fn guild(guild_account: &str) -> Result<(), Error> {
 
 pub fn council(guild_account: &str) -> Result<(), Error> {
     let guild_account = AccountNumber::from_str(guild_account).unwrap();
-    latch(&guild_account.with_subaccount(Subaccount(1)).to_string())
+    latch(
+        &guild_account
+            .with_subaccount(GuildSubaccount::Council.subaccount())
+            .to_string(),
+    )
 }
 
 pub fn representative(guild_account: &str) -> Result<(), Error> {
     let guild_account = AccountNumber::from_str(guild_account).unwrap();
-    latch(&guild_account.with_subaccount(Subaccount(2)).to_string())
+    latch(
+        &guild_account
+            .with_subaccount(GuildSubaccount::Rep.subaccount())
+            .to_string(),
+    )
 }

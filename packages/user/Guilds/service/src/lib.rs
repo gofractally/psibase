@@ -5,17 +5,15 @@ pub mod tables;
 pub mod service {
     use crate::{
         helpers::RollingBits16,
-        tables::{
-            tables::{
-                EvaluationInstance, FractalSettings, Guild, GuildApplication, GuildAttest,
-                GuildInvite, GuildMember, GuildMemberTable, Ranking, RoleMap,
-            },
-            GuildSubaccount,
+        tables::tables::{
+            EvaluationInstance, FractalSettings, Guild, GuildApplication, GuildAttest, GuildInvite,
+            GuildMember, GuildMemberTable, Ranking, RoleMap,
         },
     };
     use psibase::{
         services::{
             auth_dyn::{self, policy::DynamicAuthPolicy},
+            guilds::GuildSubaccount,
             transact::ServiceMethod,
         },
         *,

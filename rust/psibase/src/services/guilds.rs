@@ -1,3 +1,25 @@
+use crate::Subaccount;
+
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum GuildSubaccount {
+    Base = 0,
+    Council = 1,
+    Rep = 2,
+}
+
+impl GuildSubaccount {
+    pub fn subaccount(self) -> Subaccount {
+        Subaccount(self as u8)
+    }
+
+    pub fn from_subaccount(subaccount: Subaccount) -> Option<Self> {
+        [Self::Base, Self::Council, Self::Rep]
+            .into_iter()
+            .find(|candidate| candidate.subaccount() == subaccount)
+    }
+}
+
 #[crate::service(name = "guilds", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 pub mod Service {
