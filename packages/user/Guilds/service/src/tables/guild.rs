@@ -127,8 +127,9 @@ impl Guild {
     pub fn by_council_sender() -> Self {
         let (guild, sub_account) = get_sender().split();
         let guild = Self::get_assert(guild);
-        check(
-            sub_account == GuildSubaccount::Council.subaccount(),
+        assert_eq!(
+            sub_account,
+            GuildSubaccount::Council.subaccount(),
             "sender must be council role account of guild",
         );
         guild
