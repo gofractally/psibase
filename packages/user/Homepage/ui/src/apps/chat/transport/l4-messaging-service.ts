@@ -22,8 +22,8 @@ import {
     savePendingMessagesWithQuotaRecovery,
 } from "../lib/pending-message-store";
 import {
-    pslackConversationIdFromSpaceUuid,
-    spaceUuidFromPslackConversationId,
+    conversationIdFromSpaceUuid,
+    spaceUuidFromConversationId,
 } from "../lib/space-bridge";
 import { createDeliveryCoordinator } from "./delivery-coordinator";
 import { EventBus } from "./event-bus";
@@ -317,7 +317,7 @@ export function createMessagingService(
         recipient: string,
     ): ChatDataMessageEnvelope => ({
         t: "chatMessage",
-        spaceUuid: spaceUuidFromPslackConversationId(row.conversationId),
+        spaceUuid: spaceUuidFromConversationId(row.conversationId),
         from: row.from,
         body: row.body,
         sendTimestamp: row.createdAt,
@@ -358,7 +358,7 @@ export function createMessagingService(
             return { ok: false, reason: "in_flight", retryable: true };
         }
 
-        const spaceUuid = spaceUuidFromPslackConversationId(row.conversationId);
+        const spaceUuid = spaceUuidFromConversationId(row.conversationId);
         if (opts.isSpaceMember && !opts.isSpaceMember(spaceUuid, recipient)) {
             return {
                 ok: false,
@@ -403,7 +403,7 @@ export function createMessagingService(
             }
             const memberCheck = opts.isSpaceMember
                 ? opts.isSpaceMember(
-                      spaceUuidFromPslackConversationId(row.conversationId),
+                      spaceUuidFromConversationId(row.conversationId),
                       recipient,
                   )
                 : true;
@@ -450,7 +450,7 @@ export function createMessagingService(
             const rows = byRemote.get(remote) ?? [];
             const inFocused = rows.some(
                 (row) =>
-                    spaceUuidFromPslackConversationId(row.conversationId) ===
+                    spaceUuidFromConversationId(row.conversationId) ===
                     focusedSpaceUuid,
             );
             if (inFocused) focused.push(remote);
@@ -508,7 +508,7 @@ export function createMessagingService(
             const msgId = req.clientMsgId ?? newClientMsgId(now());
             const row: PendingChatMessage = {
                 clientMsgId: msgId,
-                conversationId: pslackConversationIdFromSpaceUuid(
+                conversationId: conversationIdFromSpaceUuid(
                     req.spaceUuid,
                 ),
                 from: opts.localAccount,
@@ -536,7 +536,7 @@ export function createMessagingService(
             const msgId = req.clientMsgId ?? newClientMsgId(now());
             const row: PendingChatMessage = {
                 clientMsgId: msgId,
-                conversationId: pslackConversationIdFromSpaceUuid(
+                conversationId: conversationIdFromSpaceUuid(
                     req.spaceUuid,
                 ),
                 from: opts.localAccount,

@@ -1,17 +1,26 @@
-import { chainScopedStorageKey } from "./chat-chain-storage";
+import {
+    chainScopedStorageKey,
+    readMigratingLocalStorage,
+} from "./chat-chain-storage";
+import { chatAppStorageFeatureKey } from "./chat-service";
 import type { DmMessageEnvelope } from "./dm-message-history-store";
 import type { GroupMessageEnvelope } from "./group-message-history-store";
 
 /** Peers with at least one successful chat delivery in either direction (§7). */
-const STORAGE_PREFIX = "pslack.deliveryOpenPeers.v1";
+const STORAGE_FEATURE = chatAppStorageFeatureKey("deliveryOpenPeers");
+const LEGACY_STORAGE_FEATURE = "pslack.deliveryOpenPeers.v1";
 
 function storageKey(chainId: string, account: string): string {
-    return chainScopedStorageKey(chainId, `${STORAGE_PREFIX}.${account}`);
+    return chainScopedStorageKey(chainId, `${STORAGE_FEATURE}.${account}`);
 }
 
 function readPeers(chainId: string, account: string): Set<string> {
     try {
-        const raw = globalThis.localStorage.getItem(storageKey(chainId, account));
+        const raw = readMigratingLocalStorage(
+            chainId,
+            `${STORAGE_FEATURE}.${account}`,
+            `${LEGACY_STORAGE_FEATURE}.${account}`,
+        );
         if (!raw) return new Set();
         const data = JSON.parse(raw) as unknown;
         if (!Array.isArray(data)) return new Set();

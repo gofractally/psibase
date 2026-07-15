@@ -5,11 +5,11 @@ import { Mic, MicOff, PhoneOff, Video, VideoOff } from "lucide-react";
 import { Button } from "@shared/shadcn/ui/button";
 import { cn } from "@shared/lib/utils";
 
-import type { PslackActiveCall } from "@/apps/chat/hooks/use-chat-socket";
+import type { ActiveCall } from "@/apps/chat/hooks/use-chat-socket";
 import type { GroupMeetParticipantStatus } from "@/apps/chat/lib/group-meet-ui-state";
 
 type Props = {
-    call: PslackActiveCall;
+    call: ActiveCall;
     onEnd: () => void;
     localStream: MediaStream | null;
     remoteStream: MediaStream | null;

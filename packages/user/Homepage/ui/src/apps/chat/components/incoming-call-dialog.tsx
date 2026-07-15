@@ -11,10 +11,10 @@ import {
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
 
-import type { PslackIncomingCall } from "@/apps/chat/hooks/use-chat-socket";
+import type { IncomingCall } from "@/apps/chat/hooks/use-chat-socket";
 
 type Props = {
-    call: PslackIncomingCall | null;
+    call: IncomingCall | null;
     onAccept: () => void;
     /** User closed the dialog or pressed Decline, or the ring timer fired. */
     onDecline: (reason: "user" | "timeout") => void;
@@ -24,7 +24,7 @@ const RING_SECONDS = 20;
 /** Group invites can sit open while other members connect first (e2e + real UX). */
 const GROUP_RING_SECONDS = 180;
 
-function ringSecondsForCall(call: PslackIncomingCall | null): number {
+function ringSecondsForCall(call: IncomingCall | null): number {
     if (call?.groupParticipantCount && call.groupParticipantCount > 2) {
         return GROUP_RING_SECONDS;
     }

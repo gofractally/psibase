@@ -4,9 +4,9 @@ import type {
 } from "../lib/chat-data-envelope";
 import type {
     PresenceUi,
-    PslackTimelineCallEventRow,
-    PslackTimelineMessageRow,
-    PslackTimelineRow,
+    ChatTimelineCallEventRow,
+    ChatTimelineMessageRow,
+    ChatTimelineRow,
 } from "../lib/chat-timeline-types";
 import type { InboundMessageAcceptance } from "../lib/inbound-message-acceptance";
 import type {
@@ -145,9 +145,9 @@ import { RealtimeClient } from "../lib/realtime-client";
 import {
     type GraphqlSpaceEntry,
     deriveSpaceUuidForCanonicalMembers,
-    pslackConversationIdFromSpaceUuid,
+    conversationIdFromSpaceUuid,
     spaceEntryToConversation,
-    spaceUuidFromPslackConversationId,
+    spaceUuidFromConversationId,
 } from "../lib/space-bridge";
 import {
     installThreadLifecycleGlobal,
@@ -183,15 +183,15 @@ const SIGNALING_TEARDOWN_SUPPRESS_MS = 12_000;
 const AV_CALL_TERMINAL_DISMISS_MS = 2_500;
 
 export type {
-    PslackMessageStatus,
-    PslackUiMessage,
-    PslackTimelineMessageRow,
-    PslackTimelineCallEventRow,
-    PslackTimelineRow,
+    ChatMessageStatus,
+    ChatUiMessage,
+    ChatTimelineMessageRow,
+    ChatTimelineCallEventRow,
+    ChatTimelineRow,
     PresenceUi,
 } from "../lib/chat-timeline-types";
 
-export type PslackIncomingCall = {
+export type IncomingCall = {
     callId: string;
     conversationId: string;
     from: string;
@@ -204,7 +204,7 @@ export type PslackIncomingCall = {
     groupParticipantCount?: number;
 };
 
-export type PslackActiveCall = {
+export type ActiveCall = {
     callId: string;
     conversationId: string;
     peerAccount: string;
@@ -350,7 +350,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
     }, []);
 
     const [timelineByConversation, setTimelineByConversation] = useState<
-        Record<string, PslackTimelineRow[]>
+        Record<string, ChatTimelineRow[]>
     >({});
     const [pendingMessages, setPendingMessages] = useState<
         Record<string, PendingChatMessage>
@@ -358,10 +358,10 @@ export function useChatSocket(options?: UseChatSocketOptions) {
     const [unreadByConversation, setUnreadByConversation] = useState<
         Record<string, number>
     >({});
-    const [incomingCall, setIncomingCall] = useState<PslackIncomingCall | null>(
+    const [incomingCall, setIncomingCall] = useState<IncomingCall | null>(
         null,
     );
-    const [activeCall, setActiveCall] = useState<PslackActiveCall | null>(null);
+    const [activeCall, setActiveCall] = useState<ActiveCall | null>(null);
     const [avCallLocalStream, setAvCallLocalStream] =
         useState<MediaStream | null>(null);
     const [avCallRemoteStreamsByAccount, setAvCallRemoteStreamsByAccount] =
@@ -448,7 +448,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         typeof globalThis.setTimeout
     > | null>(null);
 
-    const activeCallRef = useRef<PslackActiveCall | null>(null);
+    const activeCallRef = useRef<ActiveCall | null>(null);
     const hangupInitiatedCallIdRef = useRef<string | null>(null);
     /** Space whose av-call hangup is in flight — blocks snapshot UI re-arm. */
     const hangupInProgressSpaceRef = useRef<string | null>(null);
@@ -551,9 +551,9 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         [],
     );
 
-    const pslackIdsForSpaces = useCallback((spaces: GraphqlSpaceEntry[]) => {
+    const conversationIdsForSpaces = useCallback((spaces: GraphqlSpaceEntry[]) => {
         return spaces.map((space) =>
-            pslackConversationIdFromSpaceUuid(space.space_uuid),
+            conversationIdFromSpaceUuid(space.space_uuid),
         );
     }, []);
 
@@ -569,13 +569,13 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                   ),
               )
             : [];
-        conversationIdsRef.current = pslackIdsForSpaces(visible);
+        conversationIdsRef.current = conversationIdsForSpaces(visible);
     }, [
         objectiveSpaces,
         selfAccount,
         contactAccounts,
         contactsLoaded,
-        pslackIdsForSpaces,
+        conversationIdsForSpaces,
     ]);
 
     const syncKnownConversations = useCallback(() => {
@@ -589,7 +589,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         hangupInitiatedCallIdRef.current = null;
     }
 
-    const incomingCallRef = useRef<PslackIncomingCall | null>(null);
+    const incomingCallRef = useRef<IncomingCall | null>(null);
     incomingCallRef.current = incomingCall;
 
     const trySelectPendingConversation = useCallback(
@@ -782,7 +782,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                         (row) => row.kind === "callEvent",
                     );
                     const existingMessages = existing.filter(
-                        (row): row is PslackTimelineMessageRow =>
+                        (row): row is ChatTimelineMessageRow =>
                             row.kind === "message",
                     );
                     const mergedMessages = mergeTimelineMessagesBySendTimestamp(
@@ -800,11 +800,11 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                                   ...row,
                                   ...pending,
                                   kind: "message" as const,
-                              } satisfies PslackTimelineMessageRow)
+                              } satisfies ChatTimelineMessageRow)
                             : ({
                                   ...row,
                                   kind: "message" as const,
-                              } satisfies PslackTimelineMessageRow);
+                              } satisfies ChatTimelineMessageRow);
                     });
                     next[spaceUuid] = sortTimelineRows([
                         ...callEvents,
@@ -886,7 +886,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                             (row) => row.kind === "callEvent",
                         );
                         const existingMessages = existing.filter(
-                            (row): row is PslackTimelineMessageRow =>
+                            (row): row is ChatTimelineMessageRow =>
                                 row.kind === "message",
                         );
                         const mergedMessages =
@@ -898,7 +898,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                                     ({
                                         ...row,
                                         kind: "message" as const,
-                                    }) satisfies PslackTimelineMessageRow,
+                                    }) satisfies ChatTimelineMessageRow,
                             );
                         next[spaceUuid] = sortTimelineRows([
                             ...callEvents,
@@ -933,17 +933,17 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 setTimelineByConversation((prev) => {
                     const existing = prev[spaceUuid] ?? [];
                     const wsCallEvents = existing.filter(
-                        (row): row is PslackTimelineCallEventRow =>
+                        (row): row is ChatTimelineCallEventRow =>
                             row.kind === "callEvent" &&
                             !row.key.startsWith("obj-"),
                     );
                     const objectiveExisting = existing.filter(
-                        (row): row is PslackTimelineCallEventRow =>
+                        (row): row is ChatTimelineCallEventRow =>
                             row.kind === "callEvent" &&
                             row.key.startsWith("obj-"),
                     );
                     const messages = existing.filter(
-                        (row): row is PslackTimelineMessageRow =>
+                        (row): row is ChatTimelineMessageRow =>
                             row.kind === "message",
                     );
                     const mergedObjective =
@@ -992,7 +992,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         (conversationId: string | undefined, detail: string) => {
             if (!conversationId) return;
             const spaceConvId =
-                spaceUuidFromPslackConversationId(conversationId);
+                spaceUuidFromConversationId(conversationId);
             setTimelineByConversation((prev) => {
                 const arr = [...(prev[spaceConvId] ?? [])];
                 for (let i = arr.length - 1; i >= 0; i--) {
@@ -1094,7 +1094,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
     const upsertPendingTimelineRow = useCallback(
         (pending: PendingChatMessage) => {
             const row = pendingToTimelineRow(pending);
-            const spaceId = spaceUuidFromPslackConversationId(
+            const spaceId = spaceUuidFromConversationId(
                 pending.conversationId,
             );
             setTimelineByConversation((prev) => {
@@ -1130,7 +1130,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             const self = selfRef.current;
             if (!self || frame.from === self) return;
 
-            const spaceId = spaceUuidFromPslackConversationId(
+            const spaceId = spaceUuidFromConversationId(
                 frame.conversationId,
             );
             const selectedId = selectedConversationIdRef.current;
@@ -1169,7 +1169,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                             m.clientMsgId === clientMsgId,
                     );
                     if (ix >= 0) {
-                        const cur = prevList[ix] as PslackTimelineMessageRow;
+                        const cur = prevList[ix] as ChatTimelineMessageRow;
                         prevList[ix] = {
                             ...cur,
                             kind: "message",
@@ -1251,7 +1251,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 markDeliveryOpenPeer(chain, self, envelope.from);
             }
             applyInboundChatMessageRef.current({
-                conversationId: pslackConversationIdFromSpaceUuid(
+                conversationId: conversationIdFromSpaceUuid(
                     envelope.spaceUuid,
                 ),
                 from: envelope.from,
@@ -1298,7 +1298,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     (row) => row.kind === "callEvent",
                 );
                 const existingMessages = existing.filter(
-                    (row): row is PslackTimelineMessageRow =>
+                    (row): row is ChatTimelineMessageRow =>
                         row.kind === "message",
                 );
                 const inboundEnvelope = buildGroupEnvelope({
@@ -1317,7 +1317,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                         ({
                             ...row,
                             kind: "message" as const,
-                        }) satisfies PslackTimelineMessageRow,
+                        }) satisfies ChatTimelineMessageRow,
                 );
                 return {
                     ...prev,
@@ -1410,7 +1410,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     (row) => row.kind === "callEvent",
                 );
                 const existingMessages = existing.filter(
-                    (row): row is PslackTimelineMessageRow =>
+                    (row): row is ChatTimelineMessageRow =>
                         row.kind === "message",
                 );
                 const mergedMessages = mergeTimelineMessagesBySendTimestamp(
@@ -1428,11 +1428,11 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                               ...row,
                               ...pending,
                               kind: "message" as const,
-                          } satisfies PslackTimelineMessageRow)
+                          } satisfies ChatTimelineMessageRow)
                         : ({
                               ...row,
                               kind: "message" as const,
-                          } satisfies PslackTimelineMessageRow);
+                          } satisfies ChatTimelineMessageRow);
                 });
                 return {
                     ...prev,
@@ -1505,7 +1505,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     (row) => row.kind === "callEvent",
                 );
                 const existingMessages = existing.filter(
-                    (row): row is PslackTimelineMessageRow =>
+                    (row): row is ChatTimelineMessageRow =>
                         row.kind === "message",
                 );
                 const mergedMessages = mergeTimelineMessagesWithGroupHistory(
@@ -1516,7 +1516,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                         ({
                             ...row,
                             kind: "message" as const,
-                        }) satisfies PslackTimelineMessageRow,
+                        }) satisfies ChatTimelineMessageRow,
                 );
                 return {
                     ...prev,
@@ -1720,7 +1720,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                             m.clientMsgId === clientMsgId,
                     );
                     if (ix < 0) continue;
-                    const cur = prevList[ix] as PslackTimelineMessageRow;
+                    const cur = prevList[ix] as ChatTimelineMessageRow;
                     prevList[ix] = {
                         ...cur,
                         status: nextPending ? "pending" : "sent",
@@ -1738,7 +1738,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                             m.clientMsgId === clientMsgId,
                     );
                     if (ix >= 0) {
-                        const cur = prevList[ix] as PslackTimelineMessageRow;
+                        const cur = prevList[ix] as ChatTimelineMessageRow;
                         prevList[ix] = {
                             ...cur,
                             status: nextPending ? "pending" : "sent",
@@ -2647,7 +2647,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     if (pending.status !== "pending") continue;
                     for (const recipient of pending.recipients) {
                         if (merged[recipient] !== "online") continue;
-                        const spaceId = spaceUuidFromPslackConversationId(
+                        const spaceId = spaceUuidFromConversationId(
                             pending.conversationId,
                         );
                         const conversation = conversationsRef.current.find(
@@ -2714,7 +2714,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                             if (!pending.recipients.includes(frame.account)) {
                                 continue;
                             }
-                            const spaceId = spaceUuidFromPslackConversationId(
+                            const spaceId = spaceUuidFromConversationId(
                                 pending.conversationId,
                             );
                             const conversation = conversationsRef.current.find(
@@ -3105,7 +3105,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             return;
         }
 
-        const spaceId = spaceUuidFromPslackConversationId(
+        const spaceId = spaceUuidFromConversationId(
             selectedConversationId,
         );
         if (!spaceId.startsWith("space:")) return;
@@ -3461,7 +3461,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             const createdAt = Date.now();
             const pending: PendingChatMessage = {
                 clientMsgId,
-                conversationId: pslackConversationIdFromSpaceUuid(convId),
+                conversationId: conversationIdFromSpaceUuid(convId),
                 from,
                 body: trimmed,
                 createdAt,
@@ -4720,7 +4720,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         for (const pending of Object.values(pendingMessages)) {
             const count = pendingRecipientCount(pending);
             if (count <= 0) continue;
-            const spaceId = spaceUuidFromPslackConversationId(
+            const spaceId = spaceUuidFromConversationId(
                 pending.conversationId,
             );
             counts[spaceId] = (counts[spaceId] ?? 0) + count;
@@ -4732,7 +4732,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         !!selectedConversationId &&
         (undeliveredByConversation[selectedConversationId] ?? 0) > 0;
 
-    const incomingCallForDialog = useMemo((): PslackIncomingCall | null => {
+    const incomingCallForDialog = useMemo((): IncomingCall | null => {
         if (incomingCall) return incomingCall;
         if (!incomingAvCallInvite || !selfAccount) return null;
         const active = activeCallRef.current;

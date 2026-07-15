@@ -21,6 +21,3 @@ export async function acquireMeetLocalMedia(
         throw new Error("media_denied");
     }
 }
-
-/** @deprecated use acquireMeetLocalMedia (T-054 cutover) */
-export const acquirePslackMeetLocalMedia = acquireMeetLocalMedia;

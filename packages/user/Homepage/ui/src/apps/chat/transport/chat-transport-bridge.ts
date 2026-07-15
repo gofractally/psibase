@@ -18,7 +18,7 @@ import {
 } from "../lib/inbound-acceptance-queue";
 import { loadPendingMessages } from "../lib/pending-message-store";
 import { RealtimeClient } from "../lib/realtime-client";
-import { spaceUuidFromPslackConversationId } from "../lib/space-bridge";
+import { spaceUuidFromConversationId } from "../lib/space-bridge";
 import { recordThreadLifecycle } from "../lib/thread-lifecycle";
 import { type ChatTransportStack, createChatTransportStack } from "./stack";
 
@@ -171,7 +171,7 @@ export class ChatTransportBridge {
             (msgId, recipient, conversationId) => {
                 this.recordDebug("recipient-delivered", { msgId, recipient });
                 const spaceUuid =
-                    spaceUuidFromPslackConversationId(conversationId);
+                    spaceUuidFromConversationId(conversationId);
                 if (!spaceUuid) return;
                 this.deps.onMessageAck(spaceUuid, {
                     t: "messageAck",

@@ -22,6 +22,7 @@ export {
 
 export {
     REALTIME_AUTH_SUBPROTOCOL_PREFIX,
+    REALTIME_SERVICE,
     REALTIME_SUBPROTOCOL_V1,
     parseServerRealtimeFrame,
     parseServerRealtimeFrameText,

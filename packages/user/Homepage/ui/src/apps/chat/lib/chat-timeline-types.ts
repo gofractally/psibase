@@ -1,10 +1,10 @@
 import type { CallTimelineEventType } from "./protocol";
 import type { PendingChatMessage } from "./pending-message-store";
 
-export type PslackMessageStatus = "pending" | "sent" | "failed";
+export type ChatMessageStatus = "pending" | "sent" | "failed";
 
 /** One plain chat bubble row (outbound correlates via clientMsgId). */
-export type PslackUiMessage = {
+export type ChatUiMessage = {
     /** Stable React key — clientMsgId for optimistic rows, else `srv-${serverMsgId}`. */
     key: string;
     clientMsgId?: string;
@@ -12,14 +12,14 @@ export type PslackUiMessage = {
     from: string;
     body: string;
     serverTime: number;
-    status: PslackMessageStatus;
+    status: ChatMessageStatus;
     errorReason?: string;
     pendingRecipientCount?: number;
 };
 
-export type PslackTimelineMessageRow = PslackUiMessage & { kind: "message" };
+export type ChatTimelineMessageRow = ChatUiMessage & { kind: "message" };
 
-export type PslackTimelineCallEventRow = {
+export type ChatTimelineCallEventRow = {
     kind: "callEvent";
     key: string;
     conversationId: string;
@@ -32,13 +32,13 @@ export type PslackTimelineCallEventRow = {
     serverTime: number;
 };
 
-export type PslackTimelineRow =
-    | PslackTimelineMessageRow
-    | PslackTimelineCallEventRow;
+export type ChatTimelineRow =
+    | ChatTimelineMessageRow
+    | ChatTimelineCallEventRow;
 
 export type PresenceUi = "online" | "offline" | "unknown";
 
-export function sortTimelineRows(rows: PslackTimelineRow[]): PslackTimelineRow[] {
+export function sortTimelineRows(rows: ChatTimelineRow[]): ChatTimelineRow[] {
     return rows.sort((a, b) => a.serverTime - b.serverTime);
 }
 
@@ -50,7 +50,7 @@ export function pendingRecipientCount(pending: PendingChatMessage): number {
 
 export function pendingToTimelineRow(
     pending: PendingChatMessage,
-): PslackTimelineMessageRow {
+): ChatTimelineMessageRow {
     return {
         kind: "message",
         key: pending.clientMsgId,

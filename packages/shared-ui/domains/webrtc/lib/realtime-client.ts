@@ -4,6 +4,7 @@ import {
     type ClientRealtimeFrame,
     type ParseResult,
     REALTIME_AUTH_SUBPROTOCOL_PREFIX,
+    REALTIME_SERVICE,
     REALTIME_SUBPROTOCOL_V1,
     type ServerRealtimeFrame,
     parseServerRealtimeFrameText,
@@ -131,7 +132,8 @@ function newClientInstanceId(): string {
 }
 
 /**
- * Websocket client for `x-wrtcsig` `/ws` with subprotocol `psibase.realtime.v1`.
+ * Websocket client for {@link REALTIME_SERVICE} `/ws` with
+ * subprotocol {@link REALTIME_SUBPROTOCOL_V1}.
  * (Architecture docs say `x-webrtc-sig`; that is not a valid psibase account name.)
  */
 export class RealtimeClient {
@@ -295,7 +297,7 @@ export class RealtimeClient {
     }
 
     private wsUrl(): string {
-        const http = siblingUrl(this.baseUrl, "x-wrtcsig", "/ws");
+        const http = siblingUrl(this.baseUrl, REALTIME_SERVICE, "/ws");
         return siblingHttpToWsUrl(http);
     }
 
@@ -720,7 +722,7 @@ export class RealtimeClient {
                 }
                 if (typeof ev.data !== "string") {
                     this._lastError =
-                        "x-wrtcsig websocket message was not UTF-16 text";
+                        `${REALTIME_SERVICE} websocket message was not UTF-16 text`;
                     return;
                 }
                 this.receive(ev.data);

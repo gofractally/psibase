@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RealtimeClient } from "./realtime-client";
+import { REALTIME_SERVICE } from "./realtime-protocol";
 
 const WELCOME = JSON.stringify({
     t: "welcome",
@@ -252,14 +253,16 @@ describe("RealtimeClient reconnect", () => {
         expect(client.state).toBe("connected");
     });
 
-    it("connects to x-wrtcsig subdomain (AccountNumber max 10; hyphens allowed)", async () => {
+    it("connects to realtime service subdomain (AccountNumber max 10; hyphens allowed)", async () => {
         const client = makeClient({
             baseUrl: "https://network.psibase.localhost:8080/",
         });
         client.connect();
         await flushAsync();
         const ws = MockWebSocket.instances.at(-1)!;
-        expect(ws.url).toBe("wss://x-wrtcsig.psibase.localhost:8080/ws");
+        expect(ws.url).toBe(
+            `wss://${REALTIME_SERVICE}.psibase.localhost:8080/ws`,
+        );
         expect(ws.url).not.toContain("x-webrtc-sig");
         expect(ws.url).not.toContain("xwebrtcsig");
     });

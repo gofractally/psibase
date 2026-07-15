@@ -1,12 +1,17 @@
-import { chainScopedStorageKey } from "./chat-chain-storage";
+import {
+    chainScopedStorageKey,
+    readMigratingLocalStorage,
+} from "./chat-chain-storage";
+import { chatAppStorageFeatureKey } from "./chat-service";
 
-const STORAGE_PREFIX = "pslack.lastOpenChat.v1";
+const STORAGE_FEATURE = chatAppStorageFeatureKey("lastOpenChat");
+const LEGACY_STORAGE_FEATURE = "pslack.lastOpenChat.v1";
 
 export function lastOpenChatStorageKey(
     chainId: string,
     account: string,
 ): string {
-    return chainScopedStorageKey(chainId, `${STORAGE_PREFIX}.${account}`);
+    return chainScopedStorageKey(chainId, `${STORAGE_FEATURE}.${account}`);
 }
 
 export function readLastOpenChatId(
@@ -14,8 +19,10 @@ export function readLastOpenChatId(
     account: string,
 ): string | undefined {
     try {
-        const raw = globalThis.localStorage.getItem(
-            lastOpenChatStorageKey(chainId, account),
+        const raw = readMigratingLocalStorage(
+            chainId,
+            `${STORAGE_FEATURE}.${account}`,
+            `${LEGACY_STORAGE_FEATURE}.${account}`,
         );
         if (!raw) return undefined;
         return typeof raw === "string" && raw.length > 0 ? raw : undefined;

@@ -4,10 +4,10 @@ export {
 } from "./use-chat-socket";
 
 export type {
-    PslackActiveCall,
-    PslackIncomingCall,
-    PslackTimelineRow,
-    PslackUiMessage,
+    ActiveCall,
+    IncomingCall,
+    ChatTimelineRow,
+    ChatUiMessage,
     PresenceUi,
     UseChatSocketOptions,
 } from "./use-chat-socket";

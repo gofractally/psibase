@@ -1,13 +1,12 @@
 import { AppConfigType } from "@/configured-apps";
 import { MessagesSquare } from "lucide-react";
 
-import { zAccount } from "@shared/lib/schemas/account";
-
 import { ChatAppShell } from "./chat-app-shell";
+import { CHAT_SERVICE } from "./lib/chat-service";
 import { ChatPage } from "./pages/chat-page";
 
 export const chatConfig: AppConfigType = {
-    service: zAccount.parse("chat"),
+    service: CHAT_SERVICE,
     name: "Chat",
     description: "Direct and group chat.",
     icon: <MessagesSquare className="h-6 w-6" />,

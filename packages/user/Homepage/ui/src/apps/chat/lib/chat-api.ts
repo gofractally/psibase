@@ -1,14 +1,14 @@
 import { siblingUrl } from "@psibase/common-lib";
 import { z } from "zod";
 
-import { zAccount } from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";
 
+import { CHAT_SERVICE } from "./chat-service";
 import type { GraphqlSpaceEntry } from "./space-bridge";
 import type { CallTimelineEventType } from "./protocol";
 import { getHomepageQueryToken } from "./ws-auth";
 
-const CHAT_SERVICE = zAccount.parse("chat");
+export { CHAT_SERVICE } from "./chat-service";
 
 const zSpaceKind = z.enum(["DM", "GROUP"]);
 

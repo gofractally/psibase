@@ -4,6 +4,7 @@ import type { ServerRealtimeFrame } from "./realtime-protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AvCallSessionOrchestrator } from "./av-call-session-orchestrator";
+import { CHAT_SERVICE } from "./chat-service";
 import {
     createAvCallSession,
     fetchActiveAvCallSession,
@@ -310,7 +311,7 @@ describe("AvCallSessionOrchestrator — DM lifecycle", () => {
         rt.dispatch({
             t: "sessionInvite",
             sessionId: SESSION_ID,
-            appService: "chat",
+            appService: CHAT_SERVICE,
             appSessionId: SESSION_ID,
             purpose: "av-call",
             from: PEER,
@@ -396,7 +397,7 @@ describe("AvCallSessionOrchestrator — DM lifecycle", () => {
         rt.dispatch({
             t: "sessionInvite",
             sessionId: SESSION_ID,
-            appService: "chat",
+            appService: CHAT_SERVICE,
             appSessionId: SESSION_ID,
             purpose: "av-call",
             from: SELF,
@@ -438,7 +439,7 @@ describe("AvCallSessionOrchestrator — DM lifecycle", () => {
         rt.dispatch({
             t: "sessionInvite",
             sessionId: SESSION_ID,
-            appService: "chat",
+            appService: CHAT_SERVICE,
             appSessionId: SESSION_ID,
             purpose: "av-call",
             from: PEER,
@@ -667,7 +668,7 @@ describe("AvCallSessionOrchestrator — group lifecycle", () => {
         rt.dispatch({
             t: "sessionInvite",
             sessionId: SESSION_GROUP,
-            appService: "chat",
+            appService: CHAT_SERVICE,
             appSessionId: SESSION_GROUP,
             purpose: "av-call",
             from: PEER,
@@ -693,7 +694,7 @@ describe("AvCallSessionOrchestrator — group lifecycle", () => {
         const inviteFrame = {
             t: "sessionInvite" as const,
             sessionId: SESSION_GROUP,
-            appService: "chat",
+            appService: CHAT_SERVICE,
             appSessionId: SESSION_GROUP,
             purpose: "av-call" as const,
             from: PEER,

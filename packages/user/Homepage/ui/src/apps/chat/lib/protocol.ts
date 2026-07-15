@@ -1,9 +1,5 @@
 import { z } from "zod";
 
-/** Legacy interim group-chat websocket subprotocols (pre-realtime.v1). */
-export const PSLACK_SUBPROTOCOL_V1 = "psibase.pslack.v1";
-export const PSLACK_SUBPROTOCOL_V2 = "psibase.pslack.v2";
-
 /** Psibase account string (syntax validated server-side). */
 const zAccountStr = z.string();
 

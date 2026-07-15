@@ -2,8 +2,8 @@
 
 """Integration tests for x-wrtcsig / Chat (T-006, T-021, T-055).
 
-Supersedes legacy test_pslack*.py: auth, presence, chat-data and av-call
-signaling delegate to x-wrtcsig (psibase.realtime.v1), not x-pslack.
+Auth, presence, chat-data and av-call signaling use x-wrtcsig
+(`psibase.realtime.v1`).
 """
 
 import json

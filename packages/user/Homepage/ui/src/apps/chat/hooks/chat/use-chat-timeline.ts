@@ -5,6 +5,6 @@ export {
 } from "../../lib/chat-timeline-types";
 
 export type {
-    PslackTimelineMessageRow,
-    PslackTimelineRow,
+    ChatTimelineMessageRow,
+    ChatTimelineRow,
 } from "../../lib/chat-timeline-types";

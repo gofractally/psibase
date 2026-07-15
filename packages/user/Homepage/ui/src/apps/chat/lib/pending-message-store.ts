@@ -16,9 +16,28 @@
  *        Reading v1 rows is supported via {@link migratePendingMessages}.
  */
 
-import { chainScopedStorageKey } from "./chat-chain-storage";
+import {
+    chainScopedStorageKey,
+    readMigratingLocalStorage,
+} from "./chat-chain-storage";
+import { chatAppStorageFeatureKey } from "./chat-service";
 
-const PENDING_STORAGE_PREFIX = "pslack.pendingMessages.v1";
+const PENDING_STORAGE_FEATURE = chatAppStorageFeatureKey("pendingMessages");
+/** Pre-rename localStorage feature key (one-shot migrate on read). */
+const LEGACY_PENDING_STORAGE_FEATURE = "pslack.pendingMessages.v1";
+
+/** Storage key for a (chain, account) pair. */
+export function pendingStorageKey(chainId: string, account: string): string {
+    return chainScopedStorageKey(
+        chainId,
+        `${PENDING_STORAGE_FEATURE}.${account}`,
+    );
+}
+
+function legacyPendingStorageKey(chainId: string, account: string): string {
+    return `${LEGACY_PENDING_STORAGE_FEATURE}.${account}`;
+}
+
 /** Schema-version embedded in a wrapper envelope for v2+ writes. */
 export const PENDING_MESSAGE_SCHEMA_VERSION = 2;
 
@@ -73,14 +92,6 @@ export function isQuotaExceededError(e: unknown): boolean {
     if (err.code === 22 || err.code === 1014) return true;
     if (err.number === -2147024882) return true;
     return false;
-}
-
-/** Storage key for a (chain, account) pair. */
-export function pendingStorageKey(chainId: string, account: string): string {
-    return chainScopedStorageKey(
-        chainId,
-        `${PENDING_STORAGE_PREFIX}.${account}`,
-    );
 }
 
 function isStringArray(v: unknown): v is string[] {
@@ -230,8 +241,10 @@ export function loadPendingMessages(
     account: string,
 ): PendingChatMessage[] {
     try {
-        const raw = globalThis.localStorage.getItem(
-            pendingStorageKey(chainId, account),
+        const raw = readMigratingLocalStorage(
+            chainId,
+            `${PENDING_STORAGE_FEATURE}.${account}`,
+            legacyPendingStorageKey(chainId, account),
         );
         return parsePendingMessages(raw);
     } catch {

@@ -50,7 +50,7 @@ Automated unit tests in `m3-m4-meet-regression.test.ts` cover delivery-open seed
 group history-sync predicates, pending flush planning, compose-first UX, and chat-data
 transport retention while Meet is active. Before M5 sign-off item #3, repeat the M3
 and M4 manual spot checks from `.agent-team/milestones.md` on the **final stack**
-(with Meet enabled — same Homepage `/chat` session, no `x-pslack` message path).
+(with Meet enabled — same Homepage `/chat` session, no legacy interim message path).
 
 ### M3 DM spot checks (two Contacts users, same node)
 

@@ -9,3 +9,27 @@ export function chainScopedStorageKey(
 ): string {
     return `${chainId}:${suffix}`;
 }
+
+/**
+ * Read a chain-scoped key; if missing, copy from a legacy unscoped-prefix key
+ * (pre-rename) once, then remove the legacy entry.
+ */
+export function readMigratingLocalStorage(
+    chainId: string,
+    suffix: string,
+    legacySuffix: string,
+): string | null {
+    const key = chainScopedStorageKey(chainId, suffix);
+    try {
+        const current = globalThis.localStorage.getItem(key);
+        if (current != null) return current;
+        const legacyKey = chainScopedStorageKey(chainId, legacySuffix);
+        const legacy = globalThis.localStorage.getItem(legacyKey);
+        if (legacy == null) return null;
+        globalThis.localStorage.setItem(key, legacy);
+        globalThis.localStorage.removeItem(legacyKey);
+        return legacy;
+    } catch {
+        return null;
+    }
+}

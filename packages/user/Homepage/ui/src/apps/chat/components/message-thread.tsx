@@ -7,13 +7,13 @@ import { ScrollArea } from "@shared/shadcn/ui/scroll-area";
 import { cn } from "@shared/lib/utils";
 
 import type {
-    PslackTimelineCallEventRow,
-    PslackTimelineMessageRow,
-    PslackTimelineRow,
+    ChatTimelineCallEventRow,
+    ChatTimelineMessageRow,
+    ChatTimelineRow,
 } from "@/apps/chat/hooks/use-chat-socket";
 
 type Props = {
-    timeline: PslackTimelineRow[];
+    timeline: ChatTimelineRow[];
     selfAccount: string | null;
 };
 
@@ -25,7 +25,7 @@ function formatCallEventReason(reason: string | undefined): string | undefined {
     return reason;
 }
 
-function callEventLabel(row: PslackTimelineCallEventRow) {
+function callEventLabel(row: ChatTimelineCallEventRow) {
     const verb =
         row.event === "started"
             ? "Call started"
@@ -55,7 +55,7 @@ function callEventLabel(row: PslackTimelineCallEventRow) {
 function CallEventRow({
     row,
 }: {
-    row: PslackTimelineCallEventRow;
+    row: ChatTimelineCallEventRow;
 }) {
     const label = callEventLabel(row);
     return (
@@ -77,7 +77,7 @@ function MessageBubbleRow({
     m,
     selfAccount,
 }: {
-    m: PslackTimelineMessageRow;
+    m: ChatTimelineMessageRow;
     selfAccount: string | null;
 }) {
     const mine = selfAccount !== null && m.from === selfAccount;
