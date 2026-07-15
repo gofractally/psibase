@@ -184,6 +184,10 @@ While `waiting_ws`, L3 does **not** poll on an interval; it holds the transition
 
 ### L1 — `RealtimeTransport` (WebSocket)
 
+Wraps shared-ui `RealtimeClient` (`@shared/domains/webrtc`). Client frames are
+`ClientRealtimeFrame` (`clientReady`, `ping`, `joinSession`, `signal`, …) — not
+the removed Chat-local WS unions that used to live in `lib/protocol.ts`.
+
 ```typescript
 interface RealtimeTransport {
     connect(): void;
@@ -194,7 +198,7 @@ interface RealtimeTransport {
         event: "ready" | "welcome" | "closed" | "presence",
         handler,
     ): Unsubscribe;
-    send(frame: ClientFrame): void; // clientReady, ping, etc.
+    send(frame: ClientRealtimeFrame): void;
 }
 ```
 
@@ -345,7 +349,7 @@ class ChatTransportBridge {
     resumeAfterNavigation(): void;
     setFocusedSpace(spaceUuid): void;
 
-    /** Maps members → ensurePeer for each remote (legacy ensureChatDataSession name). */
+    /** Space-scoped helper: maps members → ensurePeer for each remote. */
     ensureChatDataSession(spaceUuid, members): void;
     ensurePeer(remote, reason?): void;
     onPeerOnline(account): void;

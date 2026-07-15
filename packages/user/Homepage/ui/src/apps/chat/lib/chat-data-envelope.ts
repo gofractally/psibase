@@ -1,10 +1,11 @@
+import { zAccount } from "@shared/lib/schemas/account";
 import { z } from "zod";
 
-/** Wire envelope for DM chat payloads on the ordered `chat` data channel (architecture §5.3). */
+/** Wire envelope for DM chat payloads on the ordered `chat` data channel. */
 export const chatDataMessageEnvelopeSchema = z.object({
     t: z.literal("chatMessage"),
     spaceUuid: z.string().min(1),
-    from: z.string().min(1),
+    from: zAccount,
     body: z.string(),
     sendTimestamp: z.number().finite(),
     clientMsgId: z.string().min(1),
@@ -15,13 +16,13 @@ export type ChatDataMessageEnvelope = z.infer<
 >;
 
 const chatHistorySyncMessageSchema = z.object({
-    from: z.string().min(1),
+    from: zAccount,
     body: z.string(),
     sendTimestamp: z.number().finite(),
     clientMsgId: z.string().min(1),
 });
 
-/** Batch DM history pushed by the existing peer on data channel connect (T-019). */
+/** Batch DM history pushed by the existing peer on data channel connect. */
 export const chatHistorySyncEnvelopeSchema = z.object({
     t: z.literal("chatHistorySync"),
     spaceUuid: z.string().min(1),
@@ -33,7 +34,7 @@ export type ChatHistorySyncEnvelope = z.infer<
 >;
 
 /**
- * Application-level delivery acknowledgement (Plan F7).
+ * Application-level delivery acknowledgement.
  *
  * Without this, a `chatMessage` is marked "delivered" the moment the local
  * data channel write succeeds — but the underlying SCTP send is fire-and-
@@ -53,7 +54,7 @@ export const chatDataMessageAckEnvelopeSchema = z.object({
     spaceUuid: z.string().min(1),
     clientMsgId: z.string().min(1),
     /** Account confirming receipt (i.e. the original recipient). */
-    from: z.string().min(1),
+    from: zAccount,
 });
 
 export type ChatDataMessageAckEnvelope = z.infer<

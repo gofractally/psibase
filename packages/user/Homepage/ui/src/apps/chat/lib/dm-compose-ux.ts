@@ -1,5 +1,5 @@
 /**
- * Compose-first chat UX (M3 T-018 DM, M4 T-028 group): message input stays enabled
+ * Compose-first chat UX: message input stays enabled
  * while chat-data session and data channels establish in the background.
  */
 

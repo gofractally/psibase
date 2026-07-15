@@ -64,7 +64,7 @@ export type InferDeliveryOpenPeersOptions = {
 };
 
 /**
- * Infer delivery-open peers from durable DM history (M3 T-020).
+ * Infer delivery-open peers from durable DM history.
  * Inbound from peer, or outbound confirmed (serverMsgId or no longer pending).
  */
 export function inferDeliveryOpenPeersFromHistory(
@@ -135,7 +135,7 @@ export function inferDeliveryOpenPeersFromPendingDelivered(
 }
 
 /**
- * Infer delivery-open peers from durable group history (M4 T-028, extends T-020).
+ * Infer delivery-open peers from durable group history.
  * Inbound from a member, or outbound confirmed (not still pending).
  */
 export function inferDeliveryOpenPeersFromGroupHistory(

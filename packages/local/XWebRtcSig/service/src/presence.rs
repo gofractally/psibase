@@ -1,7 +1,7 @@
-//! Contact-scoped presence fanout (architecture §11.2).
+//! Contact-scoped presence fanout.
 //!
-//! M1 uses node-local online session accounts as presence peers. Clients merge
-//! snapshot/delta frames with Contacts-app data (T-004); server-side Contacts
+//! Presence peers are other accounts with live websockets on this node.
+//! Clients merge snapshot/delta frames with Contacts-app data; Contacts
 //! plugin storage is client-local and not readable from this service.
 
 use psibase::AccountNumber;
@@ -11,7 +11,7 @@ use crate::state::{active_session_accounts_except, sessions_for_user};
 
 /// Accounts that should receive presence deltas about `subject`.
 ///
-/// Contact-scoped for M1: other users currently connected on this node. The UI
+/// Contact-scoped: other users currently connected on this node. The UI
 /// filters to Contacts-app entries when rendering the sidebar.
 pub fn peer_accounts_for_presence(subject: AccountNumber) -> Vec<AccountNumber> {
     active_session_accounts_except(subject)
@@ -43,7 +43,7 @@ pub fn presence_delta_frame(user: AccountNumber, status: PresenceStatus) -> Serv
     }
 }
 
-/// Snapshot of online peers for the connecting user (architecture §5.1).
+/// Snapshot of online peers for the connecting user.
 pub fn presence_snapshot_frame(for_user: AccountNumber) -> ServerFrame {
     let contacts = peer_accounts_for_presence(for_user)
         .into_iter()

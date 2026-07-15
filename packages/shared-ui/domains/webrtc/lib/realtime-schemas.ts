@@ -1,13 +1,11 @@
+import { zAccount } from "@shared/lib/schemas/account";
 import { z } from "zod";
-
-/** Psibase account string (syntax validated server-side). */
-const zAccountStr = z.string();
 
 export const presenceStatusSchema = z.enum(["online", "offline"]);
 
 export const contactPresenceSchema = z
     .object({
-        account: zAccountStr,
+        account: zAccount,
         presence: presenceStatusSchema,
     })
     .strict();

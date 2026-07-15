@@ -40,9 +40,9 @@ export type AvCallSessionSnapshot = {
     sessionId?: string;
     /** True once joinSession completed for the current attempt. */
     signalingJoined: boolean;
-    /** True once DM peer connection carries media (T-034). */
+    /** True once DM peer connection carries media. */
     mediaConnected?: boolean;
-    /** Group mesh: per-remote-member media connected (T-035). */
+    /** Group mesh: per-remote-member media connected. */
     meshPeerSignalingReady?: Record<string, boolean>;
     lastError?: string;
 };
@@ -53,7 +53,7 @@ export type AvCallIncomingInvite = {
     from: string;
     wantVideo: boolean;
     wantAudio: boolean;
-    /** N-party participant set from sessionInvite (architecture §6.2). */
+    /** N-party participant set from sessionInvite. */
     participants?: readonly string[];
 };
 

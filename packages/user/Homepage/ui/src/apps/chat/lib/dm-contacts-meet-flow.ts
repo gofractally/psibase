@@ -63,7 +63,7 @@ export function findVisibleDmWithPeer(
     return undefined;
 }
 
-/** Contacts policy gate for inbound av-call sessionInvite (architecture §7). */
+/** Contacts policy gate for inbound av-call sessionInvite. */
 export function shouldAcceptAvCallInvite(
     from: string,
     acceptInboundFrom: (account: string) => boolean,

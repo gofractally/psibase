@@ -48,7 +48,7 @@ describe("chat data channel wire envelopes", () => {
     });
 
     /**
-     * Plan F7: the receiver→sender delivery acknowledgement is the only
+     * The receiver→sender delivery acknowledgement is the only
      * signal that flips a recipient from "pending" to "delivered". The
      * wire schema must round-trip identically so multi-version peers
      * during a rollout don't drop acks silently.

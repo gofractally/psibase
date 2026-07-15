@@ -1,8 +1,16 @@
-# WebRTC session (shared-ui)
+# WebRTC session (`packages/shared-ui/domains/webrtc`)
 
-Reusable client infrastructure for psibase apps that need **x-webrtc-sig** websocket transport, contact presence, and WebRTC signaling.
+Reusable client infrastructure for psibase apps that need **x-wrtcsig**
+websocket transport, contact presence, and WebRTC signaling.
 
-Mount {@link WebRtcSessionProvider} at your **app root for one page load**. It owns the websocket lifecycle for that document only — it does **not** survive subdomain navigation, tab close, or cross-origin hops. Delivery after those events depends on **cold rejoin + peer pending flush**, not on keeping this connection alive.
+**New client?** Start with [`webrtc-client-doc.md`](./webrtc-client-doc.md) —
+APIs, feature set, and Homepage/Chat reference files to copy or adapt.
+
+Mount `WebRtcSessionProvider` at your **app root for one page load**. It owns
+the websocket lifecycle for that document only — it does **not** survive
+subdomain navigation, tab close, or cross-origin hops. Delivery after those
+events depends on cold rejoin + peer pending flush, not on keeping this
+connection alive.
 
 ## Usage
 

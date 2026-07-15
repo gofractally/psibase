@@ -8,7 +8,7 @@ type Props = {
     connectionState: RealtimeConnectionState;
     lastRealtimeError: string | null;
     lastInboundError: string | null;
-    /** Plan C4: surfaces "outbox storage is full" with a specific tone. */
+    /** Surfaces "outbox storage is full" with a specific tone. */
     pendingStorageQuotaExceeded?: boolean;
     authLost: boolean;
     presenceReady: boolean;

@@ -1,13 +1,11 @@
 /**
  * Client-local durable outbox for pending chat messages.
  *
- * Plan C extraction: previously inline in `use-chat-socket.ts`. Encapsulated
- * here so the schema, persistence backend, retry/expiry metadata, and quota
- * recovery can evolve independently of the React hook.
+ * Owns schema, persistence, retry/expiry metadata, and quota recovery so those
+ * can evolve independently of the React hook.
  *
- * Backend: localStorage today (no behavior change vs the original inline
- * implementation). Plan C2 introduces an IndexedDB primary + localStorage
- * fallback; this module is the seam where that swap will land.
+ * Backend: localStorage (IndexedDB primary + localStorage fallback is the
+ * intended next persistence step; this module is the seam).
  *
  * Schema versions:
  *   v1 — original shape (clientMsgId, conversationId, from, body, createdAt,
@@ -61,11 +59,11 @@ export type PendingChatMessage = {
     deliveredTo: string[];
     status: PendingMessageStatus;
     errorReason?: string;
-    /** Plan C2: number of send attempts so far (across all recipients). */
+    /** Number of send attempts so far (across all recipients). */
     attempts?: number;
-    /** Plan C2: timestamp (ms) of the last attempt. */
+    /** Timestamp (ms) of the last attempt. */
     lastAttemptAt?: number;
-    /** Plan C2: TTL hint — promote to `failed` if `Date.now() > expireAfter`. */
+    /** TTL hint — promote to `failed` if `Date.now() > expireAfter`. */
     expireAfter?: number;
 };
 
@@ -255,7 +253,7 @@ export function loadPendingMessages(
 /**
  * Save the pending outbox. Returns `{ ok: true }` on success or an error
  * object on quota / IO failure. Callers can subscribe to write errors via
- * the `events` parameter to surface a UI banner (Plan C4).
+ * the `events` parameter to surface a UI banner.
  */
 export function savePendingMessages(
     chainId: string,
@@ -284,7 +282,7 @@ export function savePendingMessages(
 
 /**
  * Promote the oldest `pending` rows to `failed` to free space, then retry the
- * save once. Used by quota-recovery (Plan C4): never silently lose messages —
+ * save once. Used by quota recovery: never silently lose messages —
  * surface them via the failed state and a UI banner.
  */
 export function savePendingMessagesWithQuotaRecovery(

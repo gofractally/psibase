@@ -51,7 +51,7 @@ export function findVisibleGroupWithMembers(
     return undefined;
 }
 
-/** Contacts policy gate for inbound group av-call sessionInvite (architecture §7). */
+/** Contacts policy gate for inbound group av-call sessionInvite. */
 export function shouldAcceptGroupAvCallInvite(
     invite: Pick<AvCallIncomingInvite, "from" | "participants">,
     self: string,

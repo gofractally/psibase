@@ -1,4 +1,4 @@
-/** @deprecated use {@link MeetWebRtcPeer} from ./meet-webrtc-peer (T-054 cutover) */
+/** @deprecated use {@link MeetWebRtcPeer} from ./meet-webrtc-peer */
 export {
     MeetWebRtcPeer as AvCallDmWebRtcPeer,
     type MeetWebRtcPeerHandlers as AvCallDmPeerHandlers,

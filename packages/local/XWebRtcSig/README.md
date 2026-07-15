@@ -1,26 +1,38 @@
-# x-wrtcsig
+# x-wrtcsig (`packages/local/XWebRtcSig`)
 
 Node-local subjective websocket service for WebRTC signaling, presence, and ICE
-relay (architecture §5–§6). M1: `/ws` auth, welcome, presence. M3: `chat-data`
-session join/signal routing validated against objective Chat `authorizeSessionJoin`,
-with `webrtcSessionEvent` lifecycle wire-back. Chat message bodies are not sent on
-this websocket.
+relay. Chat message bodies are not sent on this websocket.
 
-## M4 manual review gate (ChatABC)
+## Role
 
-Automated coverage for group mesh signaling lives in `tests/python/test_xwebrtcsig.py`
-(T-023/T-029) and Chat/XWebRtcSig service tests. There is no automated 3-browser harness;
-before M4 sign-off, run the manual scenarios in `.agent-team/milestones.md` §M4 User review
-with three users (A, B, C) in group Space **ChatABC**:
+- Authenticate `/ws` connections and send `welcome` (including ICE servers).
+- Fan out contact-scoped presence snapshots/deltas.
+- Route `joinSession` / `signal` / `leaveSession` against objective Chat
+  `authorizeSessionJoin`, and wire lifecycle events back via
+  `webrtcSessionEvent`.
 
-1. A and B online: exchange messages; C sees nothing yet.
-2. C joins online: C receives history from B including messages A sent while offline.
-3. All three online: send from each; confirm order by send time despite out-of-order delivery.
-4. A offline; B and C chat; A returns and catches up.
-5. Send while no peer path exists; confirm pending state; confirm delivery when a peer returns.
+## Layout
 
-Optional devtools check: websocket frames must not carry chat message bodies (`chatMessage` /
-`say` rejected; see `test_client_ready_ping_no_chat_frames`).
+| Path | Purpose |
+| --- | --- |
+| `service/src/lib.rs` | Thin `#[psibase::service]` actions (`serveSys` / `recv` / `close` / `errSys`) |
+| `service/src/http/` | Routing, WS handshake, frame delivery, socket cleanup |
+| `service/src/protocol/` | `psibase.realtime.v1` frame types + codec |
+| `service/src/signaling/` | Join / signal / leave / roster fanout / teardown |
+| `service/src/state/` | Subjective socket/session tables + tx wrappers |
+| `service/src/cleanup.rs` | Stale ringing/session sweep |
+| `service/src/presence.rs` | Online presence fanout |
+| `service/src/ice_config.rs` | Default STUN + node TURN merge |
+| `tests/python/` | Slow integration/e2e (not in default ctest) |
 
-Service account: `x-wrtcsig` (hyphens are valid in `AccountNumber`; max length is 10, so
-`x-webrtcsig` does not fit). Subprotocol target: `psibase.realtime.v1`.
+Service account: `x-wrtcsig` (`AccountNumber` max length is 10). Subprotocol:
+`psibase.realtime.v1`.
+
+TURN credentials are stored node-locally by `x-admin`; this service reads ICE
+JSON via `turnIceServersJson` and merges it with default STUN for welcome.
+
+## Tests
+
+- **Unit (ctest `rs-test-XWebRtcSig`):** `cargo-psibase test` on `service/`.
+- **E2E:** `tests/python/test_xwebrtcsig.py` — run manually; not wired into CMake
+  (see repo-root `webrtc-test-plan.md`).

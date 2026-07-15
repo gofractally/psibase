@@ -175,7 +175,7 @@ mod service {
             })
         }
 
-        /// Call lifecycle timeline for a Space (av-call sessions; architecture §6.4).
+        /// Call lifecycle timeline for a Space (av-call sessions).
         async fn call_events(
             &self,
             space_uuid: String,

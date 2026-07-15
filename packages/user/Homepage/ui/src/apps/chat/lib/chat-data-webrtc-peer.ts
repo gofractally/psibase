@@ -38,10 +38,10 @@ export type ChatDataPeerHandlers = {
     onChatMessage?: (envelope: ChatDataMessageEnvelope) => void;
     onChatHistorySync?: (envelope: ChatHistorySyncEnvelope) => void;
     /**
-     * Plan F7: peer received a delivery ack from the remote end. The
-     * orchestrator uses this to mark the pending row as delivered to
-     * that recipient (the only authoritative signal — sender-side data
-     * channel writes are not reliable on their own).
+     * Peer received a delivery ack from the remote end. The orchestrator
+     * uses this to mark the pending row as delivered to that recipient
+     * (the only authoritative signal — sender-side data channel writes are
+     * not reliable on their own).
      */
     onMessageAck?: (envelope: ChatDataMessageAckEnvelope) => void;
     /** Peer created or joined a group on chain — reload sidebar spaces. */
@@ -762,8 +762,8 @@ export class ChatDataWebRtcPeer {
     }
 
     /**
-     * Plan F7: confirm receipt of a chatMessage to the sender. Called by
-     * the orchestrator immediately after `onChatMessage` has finished
+     * Confirm receipt of a chatMessage to the sender. Called by the
+     * orchestrator immediately after `onChatMessage` has finished
      * persisting the message locally.
      */
     sendMessageAck(envelope: ChatDataMessageAckEnvelope): boolean {

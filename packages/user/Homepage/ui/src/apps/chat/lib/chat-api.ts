@@ -1,11 +1,15 @@
-import { siblingUrl } from "@psibase/common-lib";
 import { z } from "zod";
 
+import { zAccount } from "@shared/lib/schemas/account";
+import { graphql } from "@shared/lib/graphql";
 import { supervisor } from "@shared/lib/supervisor";
 
 import { CHAT_SERVICE } from "./chat-service";
 import type { GraphqlSpaceEntry } from "./space-bridge";
-import type { CallTimelineEventType } from "./protocol";
+import {
+    callTimelineEventSchema,
+    type CallTimelineEventType,
+} from "./protocol";
 import { getHomepageQueryToken } from "./ws-auth";
 
 export { CHAT_SERVICE } from "./chat-service";
@@ -16,7 +20,7 @@ const zMySpacesResponse = z.object({
     mySpaces: z.array(
         z.object({
             spaceUuid: z.string(),
-            members: z.array(z.string()),
+            members: z.array(zAccount),
             kind: zSpaceKind,
         }),
     ),
@@ -28,7 +32,7 @@ const zActiveSessionResponse = z.object({
             sessionId: z.string(),
             spaceUuid: z.string(),
             purpose: z.string(),
-            participants: z.array(z.string()),
+            participants: z.array(zAccount),
             lifecycle: z.number(),
             expiresAt: z.number(),
             createdAt: z.number(),
@@ -41,15 +45,8 @@ const zCallEventsResponse = z.object({
         z.object({
             spaceUuid: z.string(),
             sessionId: z.string(),
-            event: z.enum([
-                "started",
-                "ended",
-                "missed",
-                "declined",
-                "cancelled",
-                "failed",
-            ]),
-            account: z.string(),
+            event: callTimelineEventSchema,
+            account: zAccount,
             reason: z.string(),
             at: z.number(),
         }),
@@ -90,61 +87,20 @@ export function canonicalChatParticipants(members: readonly string[]): string[] 
     return [...new Set(members)].sort((a, b) => a.localeCompare(b));
 }
 
-function extractGraphQLErrorMessage(body: unknown): string | null {
-    if (typeof body !== "object" || body === null) return null;
-    const obj = body as Record<string, unknown>;
-    const errors = obj.errors;
-    if (Array.isArray(errors) && errors.length > 0) {
-        const first = errors[0];
-        if (typeof first === "object" && first !== null) {
-            const err = first as { message?: string };
-            if (typeof err.message === "string") return err.message;
-        }
-    }
-    if (typeof obj.message === "string") return obj.message;
-    return null;
-}
-
 /** GraphQL to chat query-service with the Homepage session bearer token. */
 async function authenticatedChatGraphql<T>(
     query: string,
     variables?: Record<string, unknown>,
 ): Promise<T> {
     const token = await getHomepageQueryToken();
-    const host = siblingUrl(null, CHAT_SERVICE, null);
-    const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-    };
-    if (token) {
-        headers.Authorization = `Bearer ${token}`;
+    if (!token) {
+        throw new Error("Chat GraphQL requires an authenticated Homepage session");
     }
-
-    const res = await fetch(`${host}/graphql`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ query, variables }),
+    return graphql<T>(query, {
+        service: CHAT_SERVICE,
+        headers: { Authorization: `Bearer ${token}` },
+        variables,
     });
-
-    let body: unknown;
-    try {
-        const text = await res.text();
-        body = text ? JSON.parse(text) : null;
-    } catch {
-        throw new Error(
-            res.ok ? "Invalid JSON response" : `Request failed with status ${res.status}`,
-        );
-    }
-
-    const graphqlMessage = extractGraphQLErrorMessage(body);
-    if (graphqlMessage) {
-        throw new Error(graphqlMessage);
-    }
-
-    if (!res.ok) {
-        throw new Error(`Request failed with status ${res.status}`);
-    }
-
-    return (body as { data: T }).data;
 }
 
 export async function fetchMySpaces(): Promise<GraphqlSpaceEntry[]> {
@@ -165,18 +121,6 @@ export async function fetchMySpaces(): Promise<GraphqlSpaceEntry[]> {
     }));
 }
 
-/**
- * Plan D (out-of-scope follow-up roadmap): direct chain calls to `ensureDm` /
- * `ensureGroup` are kept as designed. `space_uuid = "space:" + sha256(canonical
- * member list)` is deterministic; both methods are idempotent on-chain; the
- * compose-first UX in `dm-first-message-send.ts` already lets the user type
- * before the chain round-trip returns. There are 4 direct callsites today
- * (use-chat-socket.ts:2853, 2901, 3067, 3138) and the small follow-ups
- * (concurrent-tx dedup, optimistic sidebar from client-derived space_uuid,
- * consolidating the open / first-send / Meet UI paths) are <1 day of polish
- * each — see plan §D for the full justification. Filed as backlog rather than
- * a plan.
- */
 export async function ensureDm(contact: string): Promise<void> {
     await supervisor.functionCall({
         service: CHAT_SERVICE,
@@ -325,7 +269,7 @@ export async function fetchActiveAvCallSession(
     };
 }
 
-/** Objective av-call timeline events for a Space (architecture §6.4). */
+/** Objective av-call timeline events for a Space. */
 export async function fetchSpaceCallEvents(
     spaceUuid: string,
 ): Promise<ChatObjectiveCallEvent[]> {

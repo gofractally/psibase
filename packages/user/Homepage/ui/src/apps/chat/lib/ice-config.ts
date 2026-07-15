@@ -1,5 +1,5 @@
 /**
- * Client-side ICE helpers for `x-webrtc-sig` welcome payloads (architecture §11.4).
+ * Client-side ICE helpers for `x-webrtc-sig` welcome payloads.
  *
  * STUN defaults and TURN merge happen server-side in the `welcome` frame; clients
  * validate entries and map them to `RTCPeerConnection` configuration.

@@ -743,7 +743,7 @@ export function avTransition(
 
         case "discoveredActiveInvite": {
             // Same as sessionInvite but synthesized from objective state
-            // (M5 path for offline users discovering an active group call).
+            // (offline user discovering an active group call).
             const existingSessionId = currentSessionId(state);
             if (
                 existingSessionId &&

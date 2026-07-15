@@ -23,7 +23,7 @@ export type WebRtcSignalingClientOptions = {
 };
 
 /**
- * Narrow client for x-webrtc-sig session join and SDP/ICE relay (architecture §11.6).
+ * Narrow client for x-webrtc-sig session join and SDP/ICE relay.
  * Uses the same websocket as {@link RealtimeClient}.
  */
 export class WebRtcSignalingClient {

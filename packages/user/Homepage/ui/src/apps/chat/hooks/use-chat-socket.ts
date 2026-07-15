@@ -263,7 +263,7 @@ export type UseChatSocketOptions = {
     urlConversationId?: string;
 };
 
-/** Chat UI state: objective Spaces (GraphQL) + x-wrtcsig presence/realtime + interim group websocket for group/call coordination (M3 DMs use data channel). */
+/** Chat UI state: objective Spaces (GraphQL) + x-wrtcsig presence/realtime; DMs use the data channel. */
 export function useChatSocket(options?: UseChatSocketOptions) {
     const {
         client: webrtcClient,
@@ -384,7 +384,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
     const [lastInboundError, setLastInboundError] = useState<string | null>(
         null,
     );
-    /** Plan C4: pending-message storage quota exceeded; cleared by next clean save. */
+    /** Pending-message storage quota exceeded; cleared by next clean save. */
     const [pendingStorageQuotaExceeded, setPendingStorageQuotaExceeded] =
         useState(false);
 

@@ -1,5 +1,5 @@
 /**
- * Client-local durable group message history (architecture §5.3).
+ * Client-local durable group message history.
  * IndexedDB with localStorage fallback; independent of signaling.
  * Keyed by space_uuid (not per-DM-peer). No objective message bodies.
  */

@@ -1,6 +1,6 @@
 import { chainScopedStorageKey } from "./chat-chain-storage";
 
-/** Chain-scoped JSON persistence (localStorage today; IndexedDB seam for Plan C2). */
+/** Chain-scoped JSON persistence (localStorage; IndexedDB-ready seam). */
 export function durableStorageKey(
     chainId: string,
     account: string,

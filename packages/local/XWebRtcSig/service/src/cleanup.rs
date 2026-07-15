@@ -1,4 +1,4 @@
-//! Stale ringing/session sweep and subjective cleanup (architecture §11.5).
+//! Stale ringing/session sweep and subjective cleanup.
 
 use psibase::services::chat;
 use psibase::AccountNumber;

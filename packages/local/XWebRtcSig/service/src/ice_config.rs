@@ -1,4 +1,4 @@
-//! ICE server merge and client validation (architecture §11.4).
+//! ICE server merge and client validation.
 //!
 //! Default STUN entries and TURN entries from node admin JSON are merged for the
 //! `welcome` frame. TURN secrets remain in `x-admin`; only `x-webrtc-sig` reads them.

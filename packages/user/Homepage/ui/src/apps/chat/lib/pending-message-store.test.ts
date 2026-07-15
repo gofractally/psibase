@@ -1,6 +1,6 @@
 /**
- * Plan C tests: pending-message-store extraction (C1), schema migration
- * framework (C2), and quota recovery (C4).
+ * pending-message-store: schema migration (v1→v2), quota recovery, and
+ * load/save round-trips.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

@@ -7,7 +7,7 @@ import {
 import type { ConversationSnapshot } from "./protocol";
 import type { GraphqlSpaceEntry } from "./space-bridge";
 
-/** Existing online peer pushes; late-joiner waits for inbound sync (architecture §5.3). */
+/** Existing online peer pushes; late-joiner waits for inbound sync. */
 export function shouldPushGroupHistoryOnConnect(
     peerWasOnlineAtSessionStart: boolean,
     options?: {

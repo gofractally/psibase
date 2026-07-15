@@ -80,8 +80,8 @@ export type {
 
 /**
  * Lazy per-space background orchestration: objective createSession(av-call)
- * then x-wrtcsig joinSession + signaling (architecture §7).
- * DM: one peer; group: mesh A/V peer connections per online member (§5.3).
+ * then x-wrtcsig joinSession + signaling.
+ * DM: one peer; group: mesh A/V peer connections per online member.
  */
 export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
     private readonly runs = new Map<string, AvCallSpaceRun>();
@@ -676,7 +676,7 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
 
     /**
      * Surface a pending group Meet invite when an active av-call exists but the
-     * user missed the websocket sessionInvite while offline (M5 partial join).
+     * user missed the websocket sessionInvite while offline.
      */
     async discoverActiveGroupAvCallInvite(
         spaceUuid: string,

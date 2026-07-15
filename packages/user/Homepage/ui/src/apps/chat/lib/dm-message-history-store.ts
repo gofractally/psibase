@@ -1,5 +1,5 @@
 /**
- * Client-local durable DM message history (architecture §5.3).
+ * Client-local durable DM message history.
  * IndexedDB with localStorage fallback; independent of signaling.
  * Keys are scoped by chain id (Host bucket / Supervisor localStorage convention).
  */

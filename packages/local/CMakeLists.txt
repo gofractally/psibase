@@ -52,5 +52,5 @@ if(DEFINED IS_WASM)
     add_subdirectory(XTransact)
 endif()
 
-# Always processed: XWebRtcSig owns its native Python integration tests.
+# Always processed: XWebRtcSig registers Rust unit tests (not Python e2e).
 add_subdirectory(XWebRtcSig)

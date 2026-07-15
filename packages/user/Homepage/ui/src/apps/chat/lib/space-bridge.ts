@@ -1,6 +1,6 @@
 import type { ConversationSnapshot } from "./protocol";
 
-/** Objective Chat `space_uuid` prefix (architecture §4.2). */
+/** Objective Chat `space_uuid` prefix (`space:`). */
 export const SPACE_UUID_PREFIX = "space:";
 
 /**

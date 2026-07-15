@@ -17,9 +17,9 @@ export type MeetWebRtcPeerHandlers = {
 };
 
 /**
- * Meet WebRTC peer helper (architecture §10.2, §11.6): audio/video media tracks
- * with SDP/ICE relay via {@link WebRtcSignalingClient}. Shared by DM and group
- * Meet flows; no data channels (architecture §5.3).
+ * Meet WebRTC peer helper: audio/video media tracks with SDP/ICE relay via
+ * {@link WebRtcSignalingClient}. Shared by DM and group Meet flows; no data
+ * channels.
  */
 export class MeetWebRtcPeer {
     readonly sessionId: string;
