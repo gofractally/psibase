@@ -1,0 +1,33 @@
+// Zed tasks — the equivalent of .vscode/tasks.json.sample.
+//
+// To use: duplicate this file as `.zed/tasks.json` (which is gitignored) and
+// customize locally. Run tasks with the `task: spawn` action from the command
+// palette, or bind them to keys (see .zed/README.md).
+//
+// These reuse the editor-agnostic scripts in .vscode/scripts/.
+[
+  {
+    "label": "Build",
+    "command": "$ZED_WORKTREE_ROOT/.vscode/scripts/build.sh",
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Launch",
+    "command": "$ZED_WORKTREE_ROOT/.vscode/scripts/launch.sh 8080 myprod $HOST_IP",
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Launch Secure",
+    "command": "$ZED_WORKTREE_ROOT/.vscode/scripts/slaunch.sh 8080 myprod $HOST_IP /usr/lib/softhsm/libsofthsm2.so",
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Continue",
+    "command": "$ZED_WORKTREE_ROOT/.vscode/scripts/continue.sh 8080 myprod $HOST_IP",
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  }
+]
