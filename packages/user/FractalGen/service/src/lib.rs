@@ -42,46 +42,6 @@ mod service {
     const SYS_GUILD: AccountNumber = account!("guild-onee");
     const ROOT: AccountNumber = account!("root");
 
-    /// Re-link FractalCore plugin deps for an existing system fractal.
-    /// Keep in sync with Fractals `link_fractal_core_plugin_deps`.
-    fn link_core_fractal_plugin_deps() {
-        let deps = vec![
-            DynDep {
-                name: "host".into(),
-                service: account!("host"),
-            },
-            DynDep {
-                name: "transact".into(),
-                service: account!("transact"),
-            },
-            DynDep {
-                name: "permissions".into(),
-                service: account!("perms"),
-            },
-            DynDep {
-                name: "fractals".into(),
-                service: account!("fractals"),
-            },
-            DynDep {
-                name: "guilds".into(),
-                service: account!("guilds"),
-            },
-            DynDep {
-                name: "staged-tx".into(),
-                service: account!("staged-tx"),
-            },
-            DynDep {
-                name: "accounts".into(),
-                service: account!("accounts"),
-            },
-            DynDep {
-                name: "sites".into(),
-                service: account!("sites"),
-            },
-        ];
-        dyn_ld::Wrapper::call_as(SYS_FRACTAL).link("FractalCore".into(), deps);
-    }
-
     #[action]
     fn create_frac() {
         check(get_sender() == Wrapper::SERVICE, "Unauthorized");
