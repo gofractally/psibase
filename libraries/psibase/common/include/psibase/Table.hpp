@@ -882,7 +882,7 @@ namespace psibase
       ///
       /// This is equivalent to looking an object up by the key, then
       /// calling [remove] if found. The key must be the primary key.
-      template <compatible_key<key_type> Key>
+      template <compatible_key<key_type> Key = key_type>
       void erase(Key&& key)
       {
          if constexpr (sizeof...(Secondary) == 0)
