@@ -138,8 +138,9 @@ impl Guild {
     pub fn by_rep_sender() -> Self {
         let (guild, sub_account) = get_sender().split();
         let guild = Self::get_assert(guild);
-        check(
-            sub_account == GuildSubaccount::Rep.subaccount(),
+        assert_eq!(
+            sub_account,
+            GuildSubaccount::Rep.subaccount(),
             "sender must be representative role account of guild",
         );
         guild
