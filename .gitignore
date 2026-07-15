@@ -4,6 +4,7 @@
 .DS_Store
 .nyc_output
 .vscode
+.zed/tasks.json
 .trunk
 .cursor
 .cursorignore
