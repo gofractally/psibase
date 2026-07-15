@@ -5,9 +5,12 @@ pub mod tables;
 pub mod service {
     use crate::{
         helpers::RollingBits16,
-        tables::tables::{
-            EvaluationInstance, FractalSettings, Guild, GuildApplication, GuildAttest, GuildInvite,
-            GuildMember, GuildMemberTable, Ranking, RoleMap,
+        tables::{
+            tables::{
+                EvaluationInstance, FractalSettings, Guild, GuildApplication, GuildAttest,
+                GuildInvite, GuildMember, GuildMemberTable, Ranking, RoleMap,
+            },
+            GuildSubaccount,
         },
     };
     use psibase::{
@@ -480,11 +483,13 @@ pub mod service {
     fn account_policy(account: AccountNumber) -> Option<auth_dyn::policy::DynamicAuthPolicy> {
         let (base, subaccount) = account.split();
 
-        Guild::get(base).and_then(|guild| match subaccount.0 {
-            0 => Some(guild.auth_policy()),
-            1 => Some(guild.council_role_auth()),
-            2 => Some(guild.rep_role_auth()),
-            _ => None,
+        let guild = Guild::get(base)?;
+        let subaccount = GuildSubaccount::from_subaccount(subaccount)?;
+
+        Some(match subaccount {
+            GuildSubaccount::Base => guild.auth_policy(),
+            GuildSubaccount::Council => guild.council_role_auth(),
+            GuildSubaccount::Rep => guild.rep_role_auth(),
         })
     }
 

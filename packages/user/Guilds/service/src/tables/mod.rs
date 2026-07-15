@@ -12,14 +12,21 @@ mod role_map;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]
-pub enum GuildRole {
+pub enum GuildSubaccount {
+    Base = 0,
     Council = 1,
     Rep = 2,
 }
 
-impl GuildRole {
+impl GuildSubaccount {
     pub fn subaccount(self) -> Subaccount {
         Subaccount(self as u8)
+    }
+
+    pub fn from_subaccount(subaccount: Subaccount) -> Option<Self> {
+        [Self::Base, Self::Council, Self::Rep]
+            .into_iter()
+            .find(|candidate| candidate.subaccount() == subaccount)
     }
 }
 
