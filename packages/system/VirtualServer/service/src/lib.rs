@@ -293,15 +293,9 @@ mod tx_cache {
                     return 0;
                 }
                 let collateral = get_collateral(resource);
-
-                let (gross, clamped_fee, refund) = if total_out > collateral {
-                    // Clamp the fee and the refund (keeping fee_ppm ratio)
-                    // if the payout exceeds available collateral.
-                    let clamped_fee = (fee as u128 * collateral as u128 / total_out as u128) as u64;
-                    (collateral, clamped_fee, collateral - clamped_fee)
-                } else {
-                    (total_out, fee, user_refund)
-                };
+                let refund = user_refund.min(collateral);
+                let clamped_fee = fee.min(collateral.saturating_sub(refund));
+                let gross = refund + clamped_fee;
 
                 with(resource, |a| {
                     a.relay_delta -= gross as i128;
@@ -409,47 +403,50 @@ mod tx_cache {
 /// frees bytes:
 ///
 /// ```text
-///             .---------------.
-///            (   free bytes    )
-///             '-------+-------'
-///                     |
-///                     v
-///          +--------------------------+
-///          | Reduces curve shortfall  |
-///          +-----------+--------------+
-///                      |
-///                      v
-///                 .----------.
-///                /            \
-///       No      /   curve has  \     Yes
-///     .--------(   collateral?  )--------.
-///     |         \              /          |
-///     |          \            /           |
-///     v           '----------'            v
-///  .-----.                      +--------------------+
-/// (  End  )                     |  Calc user refund  |
-///  '-----'                      +---------+----------+
-///                                         |
-///                                         v
-///                               +----------------------+
-///                               | Take fee from refund |
-///                               +---------+------------+
-///                                         |
-///                                         v
-///                               +--------------------+
-///                               |  Send user refund  |
-///                               +---------+----------+
-///                                         |
-///                                         v
-///                                .-----------------.
-///                               /                   \
-///                   yes        /    Curve under-     \        no
-///                 .-----------(   collateralized?     )-----------.
-///                 |            \                     /            |
-///                 v             '-------------------'             v
-///       +--------------------+                        +--------------------------+
-///       |  Add fee to relay  |                        | Send fee to fee receiver |
-///       +--------------------+                        +--------------------------+
+///            .---------------.
+///           (   free bytes    )
+///            '-------+-------'
+///                    |
+///                    v
+///      +--------------------------+
+///      | Reduce curve shortfall   |
+///      +------------+-------------+
+///                   |
+///                   v
+///      +--------------------------+
+///      |  Split gross-refund into |
+///      |  refund + fee            |
+///      +----+----------------+----+
+///           |                |
+///           |                v
+///           |     +-------------------------------+
+///           |     | Calculate final refund:       |
+///           |     | min(refund, collateral)       |
+///           |     +-----+-------------+-----------+
+///           |           |             |
+///           |           |             v
+///           |           |      +---------------------------+
+///           |           |      | Send final refund to user |
+///           |           |      +---------------------------+
+///           v           v
+///      +-------------------------------------------+
+///      | Calculate final fee:                      |
+///      | min(fee, collateral - final refund)       |
+///      +-----------------+-------------------------+
+///                        |
+///                        v
+///               .-----------------.
+///              /                   \
+///      yes    /  Is curve under-    \     no
+///    .-------(   collateralized?     )-------.
+///    |        \                     /        |
+///    |         \                   /         |
+///    v          '-----------------'          v
+/// +----------------------+     +----------------------+
+/// | Fee covers shortfall |     | Send full fee to fee |
+/// | (remainder sent to   |     | receiver             |
+/// | fee receiver)        |     +----------------------+
+/// +----------------------+
 /// ```
 ///
 #[psibase::service(name = "vserver", recursive = "true", tables = "tables::tables")]
