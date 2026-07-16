@@ -95,7 +95,7 @@ pub mod tables {
             let now = Transact::call().currentBlock().time.seconds();
 
             let table = CredentialTable::read_write();
-            check(
+            assert!(
                 table.get_index_by_pkh().get(&pubkey_fingerprint).is_none(),
                 "Credential already exists",
             );

@@ -229,8 +229,9 @@ pub mod service {
         account: AccountNumber,
         method: Option<ServiceMethod>,
     ) -> auth_dyn::policy::DynamicAuthPolicy {
-        let policy = method_policy(account, method).or_else(|| account_policy(account));
-        check_some(policy, "account not supported")
+        method_policy(account, method)
+            .or_else(|| account_policy(account))
+            .expect("account not supported")
     }
 
     /// Has policy action used by AuthDyn service.

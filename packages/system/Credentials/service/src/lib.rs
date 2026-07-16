@@ -23,7 +23,7 @@ pub mod service {
     #[pre_action(exclude(init))]
     fn check_init() {
         let table = InitTable::read();
-        check(
+        assert!(
             table.get_index_pk().get(&()).is_some(),
             "service not inited",
         );
@@ -32,9 +32,9 @@ pub mod service {
     #[action]
     #[allow(non_snake_case)]
     fn canAuthUserSys(user: AccountNumber) {
-        check(
-            user == CRED_SYS,
-            &format!("only {} can use credentials as an auth service", CRED_SYS),
+        assert_eq!(
+            user, CRED_SYS,
+            "only {CRED_SYS} can use credentials as an auth service",
         );
     }
 
@@ -62,30 +62,28 @@ pub mod service {
         let auth_type = flags & REQUEST_MASK;
         match auth_type {
             RUN_AS_REQUESTER_REQ | RUN_AS_MATCHED_REQ => return true,
-            RUN_AS_MATCHED_EXPANDED_REQ => check(false, "runAs: caller attempted to expand powers"),
+            RUN_AS_MATCHED_EXPANDED_REQ => panic!("runAs: caller attempted to expand powers"),
             RUN_AS_OTHER_REQ => {
                 if requester == Wrapper::SERVICE {
                     // This allows credentials service to call actions on behalf of any credential
                     return true;
                 } else {
-                    check(false, "runAs: caller is not authorized")
+                    panic!("runAs: caller is not authorized")
                 }
             }
-            t if t != TOP_ACTION_REQ => check(false, "unsupported auth type"),
+            t if t != TOP_ACTION_REQ => panic!("unsupported auth type"),
             _ => {}
         }
 
-        check(sender == CRED_SYS, &format!("sender must be {}", CRED_SYS));
+        assert_eq!(sender, CRED_SYS, "sender must be {}", CRED_SYS);
 
-        check(claims.len() == 1, "Must be exactly one claim");
+        assert_eq!(claims.len(), 1, "Must be exactly one claim");
         let claim = &claims[0];
 
-        let credential = check_some(
-            CredentialTable::read()
-                .get_index_by_pkh()
-                .get(&psibase::sha256(&claim.rawData)),
-            "Claim uses an invalid credential",
-        );
+        let credential = CredentialTable::read()
+            .get_index_by_pkh()
+            .get(&psibase::sha256(&claim.rawData))
+            .expect("Claim uses an invalid credential");
 
         // FIRST_AUTH_FLAG is set when this check is running for the top-level action and
         // we are NOT executing speculatively.
@@ -93,21 +91,23 @@ pub mod service {
             VirtualServer::call_as(CRED_SYS).bill_to_sub(credential.id.to_string());
         }
 
-        check(
-            claim.service == psibase::services::verify_sig::SERVICE,
+        assert_eq!(
+            claim.service,
+            psibase::services::verify_sig::SERVICE,
             "Claim must use verify-sig",
         );
 
-        check(
-            action.service == credential.issuer,
+        assert_eq!(
+            action.service, credential.issuer,
             "Can only call actions on the credential issuer service",
         );
-        check(
+        assert!(
             credential.allowed_actions.contains(&action.method),
-            &format!("Action {} not allowed using this credential", action.method),
+            "Action {} not allowed using this credential",
+            action.method
         );
 
-        check(
+        assert!(
             credential.expiry_date.is_none() || credential.expiry_date.unwrap() > now(),
             "Credential expired",
         );
@@ -159,11 +159,14 @@ pub mod service {
     /// the credited tokens will not be aplied to a particular credential.
     #[action]
     fn resource(id: u32, amount: Quantity) {
-        let credential = CredentialTable::read().get_index_pk().get(&id);
-        let credential = check_some(credential, "Credential not found");
+        let credential = CredentialTable::read()
+            .get_index_pk()
+            .get(&id)
+            .expect("Credential not found");
 
-        check(
-            credential.issuer == get_sender(),
+        assert_eq!(
+            credential.issuer,
+            get_sender(),
             "Only the issuer can credit this credential",
         );
         let sys = Tokens::call()
@@ -209,11 +212,11 @@ pub mod service {
         let now = Transact::call().currentBlock().time.seconds();
         for claim in claims {
             if let Some(credential) = table.get(&psibase::sha256(&claim.rawData)) {
-                check(
+                assert!(
                     active_id.is_none(),
                     "Only one active credential is supported",
                 );
-                check(
+                assert!(
                     credential.expiry_date.is_none() || credential.expiry_date.unwrap() > now,
                     "Credential expired",
                 );
@@ -230,8 +233,8 @@ pub mod service {
     fn consume(id: u32) {
         let table = CredentialTable::read_write();
 
-        let credential = check_some(table.get_index_pk().get(&id), "Credential DNE");
-        check(credential.issuer == get_sender(), "Unauthorized");
+        let credential = table.get_index_pk().get(&id).expect("Credential DNE");
+        assert_eq!(credential.issuer, get_sender(), "Unauthorized");
         table.remove(&credential);
 
         // Avoid orphaned resources

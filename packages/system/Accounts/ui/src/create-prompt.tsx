@@ -83,18 +83,17 @@ export const CreatePrompt = () => {
             console.error(
                 error instanceof Error ? error.message : "Unknown error",
             );
-            if (
+            const message =
                 error instanceof Error &&
                 error.message.includes("Invalid account name")
-            ) {
-                createForm.fieldInfo.account.instance?.setErrorMap({
-                    onSubmit: "This account name is not available",
-                });
-            } else {
-                createForm.fieldInfo.account.instance?.setErrorMap({
-                    onSubmit: "An unknown error occurred",
-                });
-            }
+                    ? "This account name is not available"
+                    : "An unknown error occurred";
+            createForm.setFieldMeta("account", (prev) => ({
+                ...prev,
+                isTouched: true,
+                errors: [message],
+                errorMap: { onSubmit: message },
+            }));
         }
     };
 
@@ -158,10 +157,14 @@ export const CreatePrompt = () => {
         } catch (e) {
             console.error("Import and login failed");
             console.error(e);
-            importForm.fieldInfo.privateKey.instance?.setErrorMap({
-                onSubmit:
-                    "Error signing in. Check your private key and try again.",
-            });
+            const message =
+                "Error signing in. Check your private key and try again.";
+            importForm.setFieldMeta("privateKey", (prev) => ({
+                ...prev,
+                isTouched: true,
+                errors: [message],
+                errorMap: { onSubmit: message },
+            }));
         }
     };
 

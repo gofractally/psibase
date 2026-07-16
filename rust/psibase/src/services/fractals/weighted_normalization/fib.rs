@@ -244,7 +244,7 @@ fn decimal_to_scaled_units(d: Decimal) -> u32 {
         .checked_mul(EXTERNAL_S)
         .expect("continuous_fibonacci: quantity * EXTERNAL_S overflow");
     let x_scaled = div_rounded(prod, denom);
-    crate::check(
+    assert!(
         x_scaled <= u128::from(MAX_INPUT_SCALED),
         "continuous_fibonacci: x out of bounds",
     );

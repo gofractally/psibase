@@ -1,7 +1,12 @@
-use crate::tables::tables::{Role, RoleTable};
+use crate::{
+    helpers::create_managed_account,
+    tables::tables::{Role, RoleTable},
+};
+use psibase::services::fractals::FractalRole;
 use psibase::services::{accounts, auth_any, auth_dyn};
 use psibase::{check, check_none, check_some, AccountNumber, ServiceWrapper, Table};
 use psibase::{services::auth_dyn::policy::DynamicAuthPolicy, Subaccount};
+use psibase::{AccountNumber, ServiceWrapper, Table};
 
 impl Role {
     fn new(fractal: AccountNumber, role_id: u8, occupation: AccountNumber) -> Self {
@@ -21,14 +26,19 @@ impl Role {
     }
 
     pub fn get_assert(fractal: AccountNumber, role_id: u8) -> Self {
-        check_some(
-            Self::get(fractal, role_id),
-            &format!(
-                "role with id {} does not exist for fractal {}",
-                role_id,
-                fractal.to_string()
-            ),
-        )
+        Self::get(fractal, role_id).expect(&format!(
+            "role with id {} does not exist for fractal {}",
+            role_id,
+            fractal.to_string()
+        ))
+    }
+
+    pub fn get_assert(fractal: AccountNumber, role: FractalRole) -> Self {
+        Self::get(fractal, role).expect(&format!(
+            "role with id {} does not exist for fractal {}",
+            role as u8,
+            fractal.to_string()
+        ))
     }
 
     pub fn auth_policy(&self) -> DynamicAuthPolicy {
@@ -37,15 +47,13 @@ impl Role {
     }
 
     pub fn add(fractal: AccountNumber, role: u8, occupation: AccountNumber) -> Self {
-        check_none(
-            Self::get(fractal, role),
-            &format!(
-                "role with id {} already exists for fractal {}",
-                role as u8,
-                fractal.to_string()
-            ),
+        assert!(
+            Self::get(fractal, role).is_none(),
+            "role with id {} already exists for fractal {}",
+            role as u8,
+            fractal.to_string()
         );
-        check(
+        assert!(
             psibase::services::accounts::Wrapper::call().exists(occupation),
             "occupation account does not exist",
         );
@@ -66,7 +74,7 @@ impl Role {
     }
 
     pub fn set_occupation(&mut self, new_occupation: AccountNumber) {
-        check(
+        assert!(
             psibase::services::fractals::occu_wrapper::call_to(new_occupation)
                 .is_role_ok(self.fractal, self.role_id),
             "occupation does not support role",

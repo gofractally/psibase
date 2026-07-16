@@ -130,21 +130,20 @@ pub mod impls {
     use psibase::fracpack::Pack;
     use psibase::services::transact::ServiceMethod;
     use psibase::services::{accounts::Wrapper as Accounts, transact::Wrapper as Transact};
-    use psibase::{check, get_sender, AccountNumber, Action, Checksum256, ServiceWrapper, Table};
+    use psibase::{get_sender, AccountNumber, Action, Checksum256, ServiceWrapper, Table};
 
     impl StagedTx {
         pub fn add(actions: Vec<Action>, auto_exec: bool) -> Self {
-            check(
+            assert!(
                 actions.len() > 0,
                 "Staged transaction must contain at least one action",
             );
 
             if auto_exec {
                 let sender = actions[0].sender;
-                check(
-                    Accounts::call().getAccount(sender).is_some(),
-                    "Sender account in staged tx is invalid",
-                );
+                Accounts::call()
+                    .getAccount(sender)
+                    .expect("Sender account in staged tx is invalid");
             }
 
             let monotonic_id = LastUsed::get_next_id();
@@ -172,11 +171,13 @@ pub mod impls {
         }
 
         pub fn get(id: u32, txid: Checksum256) -> Self {
-            let staged_tx = StagedTxTable::new().get_index_pk().get(&id);
-            check(staged_tx.is_some(), "Unknown staged tx");
-            let staged_tx = staged_tx.unwrap();
-            check(
-                staged_tx.txid == txid.into(),
+            let staged_tx = StagedTxTable::new()
+                .get_index_pk()
+                .get(&id)
+                .expect("Unknown staged tx");
+            assert_eq!(
+                staged_tx.txid,
+                txid.into(),
                 "specified txid must match staged tx txid",
             );
 

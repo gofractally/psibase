@@ -23,14 +23,13 @@ use crate::tables::tables::{
     RoleTable,
 };
 use psibase::{
-    account, check_none, check_some, services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber,
-    ServiceWrapper, Table,
+    account, services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber, ServiceWrapper, Table,
 };
 
 use psibase::services::fractals::{self, occu_wrapper};
 use psibase::services::tokens::Wrapper as Tokens;
 use psibase::services::transact::Wrapper as TransactSvc;
-use psibase::{check, get_sender, RawKey, TableQuery, TimePointSec};
+use psibase::{get_sender, RawKey, TableQuery, TimePointSec};
 
 impl Fractal {
     fn new(account: AccountNumber, name: String, mission: String) -> Self {
@@ -56,11 +55,11 @@ impl Fractal {
     }
 
     pub fn set_distribution_interval(&mut self, seconds: u32) {
-        check(
+        assert!(
             seconds >= MIN_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS,
             "distribution interval too short",
         );
-        check(
+        assert!(
             seconds <= MAX_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS,
             "distribution interval too long",
         );
@@ -79,7 +78,7 @@ impl Fractal {
     }
 
     pub fn add(fractal: AccountNumber, name: String, mission: String) -> Self {
-        check_none(Self::get(fractal), "fractal already exists");
+        assert!(Self::get(fractal).is_none(), "fractal already exists");
         let new_instance = Self::new(fractal, name, mission);
 
         // Save the fractal first prior to creating an account for it
@@ -113,7 +112,7 @@ impl Fractal {
 
     pub fn set_genesis_time(&mut self, new_time: TimePointSec) {
         // Genesis time can only be moved earlier, not later, to prevent abuse / delay of token distribution
-        check(
+        assert!(
             new_time.seconds < self.genesis_time.seconds,
             "genesis time can only be moved earlier, not later",
         );
@@ -130,17 +129,15 @@ impl Fractal {
     }
 
     pub fn get_assert(fractal: AccountNumber) -> Self {
-        check_some(
-            Self::get(fractal),
-            &format!("fractal {} does not exist", fractal.to_string()),
-        )
+        Self::get(fractal).expect(&format!("fractal {} does not exist", fractal.to_string()))
     }
 
     pub fn init_token(&self) {
         let tokens = psibase::services::tokens::Wrapper::call();
 
-        check(
-            tokens.getToken(self.token_id).issued_supply.value == 0,
+        assert_eq!(
+            tokens.getToken(self.token_id).issued_supply.value,
+            0,
             "token already initialised",
         );
         let stream = RewardStream::add_fractal(self.account, self.token_id);
@@ -150,10 +147,7 @@ impl Fractal {
     }
 
     fn reward_stream(&self) -> RewardStream {
-        check_some(
-            RewardStream::get(self.account, self.account),
-            "fractal does not have reward stream",
-        )
+        RewardStream::get(self.account, self.account).expect("fractal does not have reward stream")
     }
 
     pub fn distribute_tokens(&self) {

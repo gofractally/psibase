@@ -9,10 +9,10 @@
 #![cfg_attr(not(target_family = "wasm"), allow(unused_imports, dead_code))]
 
 use crate::{
-    self as psibase, account, actions::login_action, check, create_boot_transactions,
-    fetch_packages, get_optional_result_bytes, get_result_bytes, services, status_key, tester_raw,
-    AccountNumber, Action, ActionFormatter, BlockTime, Caller, Checksum256, CodeByHashRow, CodeRow,
-    DbId, DirectoryRegistry, Error, HostConfigRow, HttpBody, HttpHeader, HttpReply, HttpRequest,
+    self as psibase, account, actions::login_action, create_boot_transactions, fetch_packages,
+    get_optional_result_bytes, get_result_bytes, services, status_key, tester_raw, AccountNumber,
+    Action, ActionFormatter, BlockTime, Caller, Checksum256, CodeByHashRow, CodeRow, DbId,
+    DirectoryRegistry, Error, HostConfigRow, HttpBody, HttpHeader, HttpReply, HttpRequest,
     InnerTraceEnum, JointRegistry, KvHandle, KvMode, PackageOpFull, PackageRegistry,
     PackagedService, RunMode, Schema, SchemaFetcher, SchemaMap, Seconds, ServiceWrapper,
     SignedTransaction, StatusRow, Table, TableRecord, Tapos, TimePointSec, TimePointUSec, ToKey,
@@ -339,7 +339,7 @@ impl Chain {
                 .into(),
             });
         }
-        check(
+        assert!(
             unsafe { tester_raw::commitSubjective(self.chain_handle) },
             "Failed to commit changes",
         );
@@ -372,7 +372,7 @@ impl Chain {
             tester_raw::checkoutSubjective(self.chain_handle);
         }
         self.kv_put(DbId::NativeSession, &row.key(), &row);
-        check(
+        assert!(
             unsafe { tester_raw::commitSubjective(self.chain_handle) },
             "Failed to commit changes",
         );

@@ -32,9 +32,10 @@ pub mod service {
         let sender_is_fractal_member =
             psibase::services::fractals::Wrapper::call().is_member(fractal, sender);
 
-        check(
+        assert!(
             sender_is_fractal_member,
-            &format!("sender {} is not a member of fractal {}", sender, fractal),
+            "sender {} is not a member of fractal {}",
+            sender, fractal
         );
 
         Guild::add(fractal, guild_account, sender, display_name);
@@ -50,7 +51,7 @@ pub mod service {
 
         let guild_member_table = GuildMemberTable::read();
 
-        check(
+        assert!(
             Guild::guilds_of_fractal(fractal).iter().any(|guild| {
                 guild_member_table
                     .get_index_pk()
@@ -294,10 +295,9 @@ pub mod service {
     /// * `guild_account` - The account number for the guild.
     #[action]
     fn start_eval(guild_account: AccountNumber) {
-        let evaluation = check_some(
-            Guild::get_assert(guild_account).evaluation(),
-            "evaluation instance does not exist for guild",
-        );
+        let evaluation = Guild::get_assert(guild_account)
+            .evaluation()
+            .expect("evaluation instance does not exist for guild");
         evaluation.open_pending_levels();
 
         psibase::services::evaluations::Wrapper::call().start(evaluation.evaluation_id);
@@ -337,10 +337,7 @@ pub mod service {
     fn on_ev_reg(evaluation_id: u32, account: AccountNumber) {
         check_is_sender(psibase::services::evaluations::SERVICE);
         let evaluation = EvaluationInstance::get_by_evaluation_id(evaluation_id);
-        check_some(
-            GuildMember::get(evaluation.guild, account),
-            "account must be member of guild",
-        );
+        GuildMember::get(evaluation.guild, account).expect("account must be member of guild");
     }
 
     /// Called when an evaluation in a fractal is finalized.
@@ -370,10 +367,7 @@ pub mod service {
     fn on_ev_unreg(_evaluation_id: u32, _account: AccountNumber) {}
 
     fn check_is_sender(account: AccountNumber) {
-        check(
-            get_sender() == account,
-            &format!("sender must be {}", account),
-        );
+        assert_eq!(get_sender(), account, "sender must be {}", account);
     }
 
     /// Called when a user submits an attestation for decrypted proposals in a fractal evaluation.
@@ -397,7 +391,7 @@ pub mod service {
         let is_valid_attestation = attestation
             .iter()
             .all(|num| *num as usize <= acceptable_numbers);
-        check(is_valid_attestation, "invalid attestation");
+        assert!(is_valid_attestation, "invalid attestation");
     }
 
     /// Forcibly remove the current representative of the guild.
@@ -467,10 +461,7 @@ pub mod service {
     #[action]
     fn role_policy(fractal: AccountNumber, role_id: u8) -> auth_dyn::policy::DynamicAuthPolicy {
         use psibase::services::fractals::FractalRole;
-        let role = check_some(
-            RoleMap::get(fractal, role_id),
-            "no role map set by fractal for role_id",
-        );
+        let role = RoleMap::get(fractal, role_id).expect("no role map set by fractal for role_id");
         if FractalRole::Recruitment == role_id.into() {
             auth_dyn::policy::DynamicAuthPolicy::from_sole_authorizer(get_service())
         } else {
@@ -503,7 +494,7 @@ pub mod service {
         use psibase::services::setcode as SetCode;
         use psibase::services::staged_tx as StagedTx;
 
-        let policy = check_some(account_policy(account), "account not supported");
+        let policy = account_policy(account).expect("account not supported");
 
         if method.is_some_and(|method| {
             let banned_service_methods: Vec<ServiceMethod> = vec![

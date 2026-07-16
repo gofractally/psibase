@@ -20,7 +20,7 @@ pub fn two_thirds_plus_one(count: u8) -> u8 {
 /// ```
 pub fn assign_decreasing_levels<T>(items: Vec<T>, from_level: Option<usize>) -> Vec<(usize, T)> {
     let from_level = from_level.map_or(items.len(), |from_level| {
-        psibase::check(
+        assert!(
             from_level >= items.len(),
             "from level should be equal to or higher than items length",
         );
