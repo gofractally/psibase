@@ -167,9 +167,10 @@ pub mod impls {
         }
 
         pub fn attest(&mut self, attestation: Vec<u8>, use_hook: bool) {
-            psibase::check(
+            assert!(
                 self.attestation.is_none(),
-                format!("user {} has already submitted", self.user).as_str(),
+                "user {} has already submitted",
+                self.user
             );
 
             if use_hook {
@@ -362,7 +363,7 @@ pub mod impls {
         }
 
         pub fn register_user(&self, new_user: AccountNumber) {
-            psibase::check_none(self.get_user(new_user), "user already registered");
+            assert!(self.get_user(new_user).is_none(), "user already registered");
 
             User::add(self.owner, self.id, new_user);
 
@@ -377,8 +378,9 @@ pub mod impls {
         }
 
         pub fn create_groups(&self) {
-            psibase::check(
-                self.get_groups().len() == 0,
+            assert_eq!(
+                self.get_groups().len(),
+                0,
                 "groups have already been created",
             );
 
@@ -452,8 +454,8 @@ pub mod impls {
 
         pub fn add(owner: AccountNumber, evaluation_id: u32, number: u32) {
             let group = Group::new(owner, evaluation_id, number);
-            psibase::check_none(
-                GroupTable::new().get_index_pk().get(&group.pk()),
+            assert!(
+                GroupTable::new().get_index_pk().get(&group.pk()).is_none(),
                 "group already exists",
             );
 
@@ -503,7 +505,10 @@ pub mod impls {
         }
 
         pub fn set_key_submitter(&mut self, submitter: AccountNumber) {
-            psibase::check_none(self.key_submitter, "group key has already been submitted");
+            assert!(
+                self.key_submitter.is_none(),
+                "group key has already been submitted"
+            );
             self.key_submitter = Some(submitter);
             self.save();
         }

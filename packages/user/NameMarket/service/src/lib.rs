@@ -14,7 +14,7 @@ pub mod tables {
     use psibase::services::diff_adjust::{RateLimit, RateLimitTable, Wrapper as DiffAdjust};
     use psibase::services::tokens::{Decimal, Precision, Quantity, Wrapper as Tokens};
     use psibase::AccountNumber;
-    use psibase::{check_some, Fracpack, ServiceWrapper, Table, ToSchema};
+    use psibase::{Fracpack, ServiceWrapper, Table, ToSchema};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "InitTable", index = 0)]
@@ -44,7 +44,10 @@ pub mod tables {
         }
 
         fn sys_precision() -> Precision {
-            check_some(Tokens::call().getSysToken(), "system token must be defined").precision
+            Tokens::call()
+                .getSysToken()
+                .expect("system token must be defined")
+                .precision
         }
     }
 
@@ -123,19 +126,18 @@ pub mod service {
     use psibase::{MAX_ACCOUNT_NAME_LENGTH, MIN_ACCOUNT_NAME_LENGTH};
 
     fn require_caller_is_self() {
-        check(
+        assert!(
             get_sender() == get_service(),
             "caller must be NameMarket service",
         );
     }
 
     fn check_market_length(length: u8) {
-        check(
+        assert!(
             length >= MIN_ACCOUNT_NAME_LENGTH && length <= MAX_ACCOUNT_NAME_LENGTH,
-            &format!(
-                "market name length must be {}-{}",
-                MIN_ACCOUNT_NAME_LENGTH, MAX_ACCOUNT_NAME_LENGTH,
-            ),
+            "market name length must be {}-{}",
+            MIN_ACCOUNT_NAME_LENGTH,
+            MAX_ACCOUNT_NAME_LENGTH,
         );
     }
 
@@ -182,7 +184,7 @@ pub mod service {
     #[pre_action(exclude(init))]
     fn check_init() {
         let table = InitTable::new();
-        check(
+        assert!(
             table.get_index_pk().get(&()).is_some(),
             "service not inited",
         );
@@ -196,20 +198,19 @@ pub mod service {
     fn buy(account: AccountNumber) {
         let length = account.to_string().len() as u8;
 
-        let sys_token_id: TID = check_some(
-            Tokens::Wrapper::call().getSysToken(),
-            "system token must be defined",
-        )
-        .id;
+        let sys_token_id: TID = Tokens::Wrapper::call()
+            .getSysToken()
+            .expect("system token must be defined")
+            .id;
 
         let sender = get_sender();
 
-        let auction = check_some(
-            AuctionsTable::new().get_index_pk().get(&length),
-            "auction not found for this length",
-        );
+        let auction = AuctionsTable::new()
+            .get_index_pk()
+            .get(&length)
+            .expect("auction not found for this length");
 
-        check(auction.enabled, "market is disabled");
+        assert!(auction.enabled, "market is disabled");
 
         // Alert the DiffAdjust service to the purchase
         let current_price = Quantity::from(DiffAdjust::call().increment(auction.nft_id, 1));
@@ -238,13 +239,14 @@ pub mod service {
     fn claim(account: AccountNumber) {
         let purchased_accounts_table = PurchasedAccountsTable::new();
 
-        let purchased_account = check_some(
-            purchased_accounts_table.get_index_pk().get(&account),
-            "account not purchased",
-        );
+        let purchased_account = purchased_accounts_table
+            .get_index_pk()
+            .get(&account)
+            .expect("account not purchased");
 
-        check(
-            purchased_account.owner == get_sender(),
+        assert_eq!(
+            purchased_account.owner,
+            get_sender(),
             "account not purchased by sender",
         );
 
@@ -281,10 +283,9 @@ pub mod service {
 
         check_market_length(length);
 
-        check_some(
-            Tokens::Wrapper::call().getSysToken(),
-            "system token must be defined",
-        );
+        Tokens::Wrapper::call()
+            .getSysToken()
+            .expect("system token must be defined");
 
         let auctions_table = AuctionsTable::new();
         if let Some(auction) = auctions_table.get_index_pk().get(&length) {
@@ -345,10 +346,10 @@ pub mod service {
         check_market_length(length);
 
         let auctions_table = AuctionsTable::new();
-        let auction = check_some(
-            auctions_table.get_index_pk().get(&length),
-            "auction not found for this length",
-        );
+        let auction = auctions_table
+            .get_index_pk()
+            .get(&length)
+            .expect("auction not found for this length");
         apply_diff_adjust_configure(
             auction.nft_id,
             window_seconds,
@@ -364,10 +365,10 @@ pub mod service {
 
         check_market_length(length);
         let auctions_table = AuctionsTable::new();
-        let mut auction = check_some(
-            auctions_table.get_index_pk().get(&length),
-            "auction not found for this length",
-        );
+        let mut auction = auctions_table
+            .get_index_pk()
+            .get(&length)
+            .expect("auction not found for this length");
         if auction.enabled == enabled {
             return;
         }

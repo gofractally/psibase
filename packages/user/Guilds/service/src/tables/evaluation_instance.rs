@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use psibase::services::evaluations;
-use psibase::{check_some, get_service, AccountNumber, ServiceWrapper, Table};
+use psibase::{get_service, AccountNumber, ServiceWrapper, Table};
 
 use crate::constants::GUILD_EVALUATION_GROUP_SIZE;
 use crate::helpers::assign_decreasing_levels;
@@ -32,12 +32,10 @@ impl EvaluationInstance {
     }
 
     pub fn get_by_evaluation_id(eval_id: u32) -> Self {
-        let table = EvaluationInstanceTable::read();
-
-        check_some(
-            table.get_index_by_evaluation().get(&eval_id),
-            "failed finding by eval id",
-        )
+        EvaluationInstanceTable::read()
+            .get_index_by_evaluation()
+            .get(&eval_id)
+            .expect("failed finding by eval id")
     }
 
     pub fn finish_evaluation(&self) {
@@ -106,10 +104,9 @@ impl EvaluationInstance {
     pub fn schedule_next_evaluation(&mut self) {
         let interval = self.interval;
 
-        let (registration, deliberation, submission, finish_by) = check_some(
-            self.schedule(),
-            "expected existing evaluation to set the next one",
-        );
+        let (registration, deliberation, submission, finish_by) = self
+            .schedule()
+            .expect("expected existing evaluation to set the next one");
 
         Self::create_evaluation(
             self.guild,

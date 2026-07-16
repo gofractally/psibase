@@ -17,7 +17,7 @@ fn init() {
 #[pre_action(exclude(init))]
 fn check_init() {
     let table = InitTable::new();
-    check(
+    assert!(
         table.get_index_pk().get(&()).is_some(),
         "service not initialized",
     );

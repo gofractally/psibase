@@ -4,8 +4,8 @@ pub mod tables {
     use psibase::services::auth_dyn::int_wrapper;
     use psibase::services::transact::ServiceMethod;
     use psibase::{
-        check, check_some, services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber, Fracpack,
-        ServiceWrapper, Table, ToSchema,
+        services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber, Fracpack, ServiceWrapper,
+        Table, ToSchema,
     };
     use serde::{Deserialize, Serialize};
 
@@ -32,7 +32,7 @@ pub mod tables {
         }
 
         pub fn get_assert(account: AccountNumber) -> Self {
-            check_some(Self::get(account), "failed to find management")
+            Self::get(account).expect("failed to find management")
         }
 
         pub fn has_policy(&self) -> bool {
@@ -50,7 +50,7 @@ pub mod tables {
         }
 
         pub fn assert_has_policy(&self) {
-            check(
+            assert!(
                 self.has_policy(),
                 "management service does not support user",
             )
@@ -76,8 +76,9 @@ pub mod service {
             // Idempotency safety: if management already exists, only the current
             // manager may call this again — prevents other callers from being
             // misled into thinking they now manage the account.
-            check(
-                management.manager == get_sender(),
+            assert_eq!(
+                management.manager,
+                get_sender(),
                 "new manager conflicts with pre-existing manager",
             );
         } else {
@@ -88,22 +89,22 @@ pub mod service {
 
     #[action]
     fn set_mgmt(account: AccountNumber, manager: AccountNumber) {
-        check(Accounts::call().exists(account), "account does not exist");
+        assert!(Accounts::call().exists(account), "account does not exist");
 
         let sender = get_sender();
         let existing_management = Management::get(account);
         if let Some(existing_management) = existing_management {
-            check(
-                sender == existing_management.manager,
+            assert_eq!(
+                sender, existing_management.manager,
                 "existing managements must be updated by management account",
             )
         } else {
-            check(
+            assert!(
                 Accounts::call().exists(manager),
                 "manager account does not exist",
             );
-            check(
-                sender == account,
+            assert_eq!(
+                sender, account,
                 "new policies must be created by user account",
             );
         }
@@ -130,10 +131,7 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn getDlgsSys(
-        sender: AccountNumber,
-        method: Option<ServiceMethod>,
-    ) -> Vec<AccountNumber> {
+    fn getDlgsSys(sender: AccountNumber, method: Option<ServiceMethod>) -> Vec<AccountNumber> {
         Management::get_assert(sender)
             .dynamic_policy(method)
             .authorizers
@@ -169,7 +167,7 @@ pub mod service {
         is_approval: bool,
     ) -> bool {
         let policy = Management::get_assert(sender).dynamic_policy(method);
-        check(policy.threshold != 0, "multi auth threshold cannot be 0");
+        assert_ne!(policy.threshold, 0, "multi auth threshold cannot be 0");
 
         let total_possible_weight = policy
             .authorizers
@@ -198,7 +196,7 @@ pub mod service {
     #[action]
     #[allow(non_snake_case)]
     fn canAuthUserSys(user: AccountNumber) {
-        let management = check_some(Management::get(user), "no manager set for user");
+        let management = Management::get(user).expect("no manager set for user");
         management.assert_has_policy();
     }
 }

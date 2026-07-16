@@ -3,8 +3,7 @@ pub mod tables {
     use psibase::services::nft::Wrapper as Nft;
     use psibase::services::transact::Wrapper as TransactSvc;
     use psibase::{
-        check, check_some, get_sender, AccountNumber, Fracpack, ServiceWrapper, Table,
-        TimePointSec, ToSchema,
+        get_sender, AccountNumber, Fracpack, ServiceWrapper, Table, TimePointSec, ToSchema,
     };
 
     use async_graphql::{ComplexObject, SimpleObject};
@@ -59,18 +58,18 @@ pub mod tables {
         }
 
         fn check_targets(target_min: u32, target_max: u32) {
-            check(
+            assert!(
                 target_min <= target_max,
                 "target_min must not exceed target_max",
             );
         }
 
         fn check_window_seconds(seconds: u32) {
-            check(seconds > 0, "window seconds must be above 0");
+            assert!(seconds > 0, "window seconds must be above 0");
         }
 
         fn check_decrease_ppm(decrease_ppm: u32) {
-            check(
+            assert!(
                 decrease_ppm <= ONE_MILLION,
                 "decrease_ppm must not exceed 1_000_000",
             );
@@ -136,7 +135,7 @@ pub mod tables {
                 return u64::MAX;
             }
             let diff_as_f64 = difficulty as f64 * powered;
-            check(
+            assert!(
                 !diff_as_f64.is_nan(),
                 "diffadjust increase computation resulted in NaN",
             );
@@ -157,7 +156,7 @@ pub mod tables {
             // Per-window truncate + floor so batching N windows matches N single-window steps.
             for _ in 0..times {
                 let diff_as_f64 = difficulty as f64 * factor;
-                check(
+                assert!(
                     !diff_as_f64.is_nan(),
                     "diffadjust decrease computation resulted in NaN",
                 );
@@ -222,14 +221,15 @@ pub mod tables {
         }
 
         fn check_sender_has_nft(&self) {
-            check(
-                Nft::call().getNft(self.nft_id).owner == get_sender(),
+            assert_eq!(
+                Nft::call().getNft(self.nft_id).owner,
+                get_sender(),
                 "must be owner of rate limiter",
             );
         }
 
         fn check_sender_is_consumer(&self) {
-            check(self.consumer == get_sender(), "must be consumer");
+            assert_eq!(self.consumer, get_sender(), "must be consumer");
         }
 
         pub fn increment(&mut self, activity: u32) -> u64 {
@@ -293,7 +293,7 @@ pub mod tables {
         }
 
         pub fn get_assert(nft_id: u32) -> Self {
-            check_some(Self::get(nft_id), "rate limit of NFT ID does not exist")
+            Self::get(nft_id).expect("rate limit of NFT ID does not exist")
         }
     }
 
