@@ -27,10 +27,10 @@ export function parsePositiveInt(raw: string): number | null {
     return n;
 }
 
-export function parsePpm(raw: string): number | null {
+export function parsePct(raw: string): number | null {
     const t = raw.trim();
     if (!t || !/^\d+$/.test(t)) return null;
     const n = Number.parseInt(t, 10);
-    if (!Number.isFinite(n) || n < 1 || n >= 1_000_000) return null;
+    if (!Number.isFinite(n) || n < 1 || n > 255) return null;
     return n;
 }
