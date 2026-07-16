@@ -1,14 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import {
-    fetchTokenMeta,
-    fetchUserTokenBalances,
-} from "@/apps/tokens/lib/graphql/ui";
+import { fetchTokenMeta } from "@/apps/tokens/lib/graphql/ui";
 
 import QueryKey from "@/lib/query-keys";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { fetchUserTokenBalances } from "@shared/lib/graphql/tokens";
 import { Quantity } from "@shared/lib/quantity";
 import { queryClient } from "@shared/lib/query-client";
 import { type Account, zAccount } from "@shared/lib/schemas/account";

@@ -36,7 +36,6 @@ set(UI_PROJECTS
     user/Homepage/ui:Homepage_js
     user/Identity/ui:Identity_js
     user/Permissions/ui:Permissions_js
-    user/NameMarket/ui:NameMarket_js
     user/Supervisor/ui:Supervisor_js
     user/Workshop/ui:Workshop_js
     user/Config/ui:Config_js
