@@ -51,11 +51,17 @@ export function parseWindowSeconds(
     return seconds;
 }
 
-export function parsePositiveInt(raw: string): number | null {
+export function parseNonNegativeInt(raw: string): number | null {
     const t = raw.trim();
     if (!t || !/^\d+$/.test(t)) return null;
     const n = Number.parseInt(t, 10);
-    if (!Number.isFinite(n) || n < 1) return null;
+    if (!Number.isFinite(n) || n < 0) return null;
+    return n;
+}
+
+export function parsePositiveInt(raw: string): number | null {
+    const n = parseNonNegativeInt(raw);
+    if (n === null || n < 1) return null;
     return n;
 }
 

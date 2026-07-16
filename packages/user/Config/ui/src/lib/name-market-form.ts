@@ -6,8 +6,8 @@ import { z } from "zod";
 
 import { NAME_MARKET_DEFAULT_PARAMS } from "@/lib/name-market-defaults";
 import {
+    parseNonNegativeInt,
     parsePercentToPct,
-    parsePositiveInt,
     parseSystemTokenAmount,
     parseWindowSeconds,
     secondsToWindowForm,
@@ -94,10 +94,10 @@ const zDirtyMarketRow = (systemToken: SystemTokenInfo) =>
                 });
             }
 
-            if (parsePositiveInt(row.target) === null) {
+            if (parseNonNegativeInt(row.target) === null) {
                 ctx.addIssue({
                     code: "custom",
-                    message: "Enter a positive integer",
+                    message: "Enter an integer >= 0",
                     path: ["target"],
                 });
             }
@@ -194,7 +194,7 @@ export function toMarketConfig(
     row: NameMarketFormRow,
     systemToken: SystemTokenInfo,
 ): MarketConfigParam {
-    const target = parsePositiveInt(row.target);
+    const target = parseNonNegativeInt(row.target);
     const increasePct = parsePercentToPct(row.increasePct);
     const decreasePct = parsePercentToPct(row.decreasePct, 99);
     const floorPrice = parseSystemTokenAmount(row.floorPrice, systemToken);

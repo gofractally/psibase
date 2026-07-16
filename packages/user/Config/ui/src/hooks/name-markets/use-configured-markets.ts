@@ -17,7 +17,7 @@ const zRow = z.object({
         .min(MIN_ACCOUNT_NAME_LENGTH)
         .max(MAX_ACCOUNT_NAME_LENGTH),
     enabled: z.boolean(),
-    target: z.number().int().min(1),
+    target: z.number().int().min(0),
     floorPrice: z.string(),
     increasePct: z.number().int().min(1).max(99),
     decreasePct: z.number().int().min(1).max(99),
