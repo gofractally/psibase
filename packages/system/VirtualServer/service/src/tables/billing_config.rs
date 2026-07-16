@@ -38,10 +38,13 @@ impl BillingConfig {
         BillingConfigTable::read().get_index_pk().get(&()).is_some()
     }
 
-    pub fn enable(enabled: bool) {
+    pub fn enable() {
         let table = BillingConfigTable::read_write();
         let mut config = check_some(table.get_index_pk().get(&()), "Billing not yet initialized");
-        config.enabled = enabled;
+        if config.enabled {
+            return;
+        }
+        config.enabled = true;
         table.put(&config).unwrap();
     }
 

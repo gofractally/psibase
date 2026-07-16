@@ -6,7 +6,7 @@ import { queryClient } from "@shared/lib/query-client";
 import { usePluginMutation } from "./use-plugin-mutation";
 
 export const useSetEnableBilling = () =>
-    usePluginMutation<[boolean]>(
+    usePluginMutation<[]>(
         {
             service: CONFIG,
             method: "enableBilling",
@@ -17,21 +17,19 @@ export const useSetEnableBilling = () =>
             loading: "Setting enable billing.",
             success: "Set enable billing",
             isStagable: true,
-            onSuccess: (params, _status) => {
-                const enabled = params[0];
+            onSuccess: () => {
                 const updater = (
                     old:
                         | { feeReceiver: string | null; enabled: boolean }
                         | undefined,
                 ) => {
-                    if (!old) return { feeReceiver: null, enabled };
-                    return { ...old, enabled };
+                    if (!old) return { feeReceiver: null, enabled: true };
+                    return { ...old, enabled: true };
                 };
                 queryClient.setQueryData(
                     [...QueryKey.virtualServer(), "billingConfig"],
                     updater,
                 );
-                // useBillingConfig (shared) uses key ["billingConfig"]; keep cache in sync
                 queryClient.setQueryData(["billingConfig"], updater);
             },
         },

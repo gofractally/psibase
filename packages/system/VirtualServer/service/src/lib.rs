@@ -240,6 +240,7 @@ mod tx_cache {
             use super::is_system_user;
             use crate::resource_type::ResourceType;
             use crate::tables::capacity_limit_pricing::relay_sub_account;
+            use crate::tables::tables::CapacityPricing;
             use crate::tx_cache::{balance_cache, drain_cache, with_cache};
             use crate::Wrapper;
             use psibase::AccountNumber;
@@ -287,18 +288,26 @@ mod tx_cache {
                 sub: Option<String>,
                 user_refund: u64,
                 fee: u64,
-            ) {
-                let gross = user_refund + fee;
-                if is_system_user(user) || gross == 0 {
-                    return;
+            ) -> u64 {
+                let total_out = user_refund + fee;
+                if is_system_user(user) || total_out == 0 {
+                    return 0;
                 }
+                let collateral = get_collateral(resource);
+                let refund = user_refund.min(collateral);
+
+                // Fee only comes from collateral beyond the refund and what the curve must keep.
+                let required_reserve = CapacityPricing::get_assert(resource).required_reserve();
+                let fee = fee.min(collateral.saturating_sub(refund + required_reserve));
+
                 with(resource, |a| {
-                    a.relay_delta -= gross as i128;
+                    a.relay_delta -= (refund + fee) as i128;
                     a.fee += fee;
                 });
-                if user_refund > 0 {
-                    balance_cache::refund(user, sub, user_refund);
+                if refund > 0 {
+                    balance_cache::refund(user, sub, refund);
                 }
+                refund
             }
 
             pub fn drain() -> Vec<(ResourceType, Accrual)> {
@@ -308,7 +317,7 @@ mod tx_cache {
     }
 }
 
-/// Virtual Server Service
+/// # Virtual Server Service
 ///
 /// This service defines a "virtual server" that represents the subset of a real server that
 /// a node operator dedicates to running their network node. A user then interacts with one
@@ -368,11 +377,9 @@ mod tx_cache {
 /// 2 - Call `init_billing`: Initializes the billing system. To call this, the system token
 ///     must have already been set in the `Tokens` service. The specified `fee_receiver` will
 ///     receive all of the system token fees paid for resources by users.
-/// 3 - Call `enable_billing(true, Some(payer))`: When ready, calling this action enables the
-///     billing system. Two requirements: (a) the caller must have already filled their resource
-///     buffer because this action is itself billed, and (b) `payer` must have credited sufficient
-///     system tokens to this service to settle any net disk consumption that accumulated while
-///     billing was disabled (see the `enableBillingCost` GraphQL query for the required amount).
+/// 3 - Call `enable_billing`: When ready, calling this action enables the
+///     billing system. The caller must have already filled their resource buffer because
+///     this action is itself billed.
 ///
 /// > Note: typically, step 1 should be called at system boot, and therefore the network should
 /// >       always at least have some server specs and derived network specs.
@@ -380,6 +387,64 @@ mod tx_cache {
 /// After each of the above steps, the billing service will be enabled, and users will be
 /// required to buy resources to transact with the network. Use the other actions in this
 /// service to manage server specs, network variables, and billing parameters, as needed.
+///
+/// ## Curve under-collateralization
+///
+/// Capacity limited resources are managed via a constant-product curve that reports the quantity
+/// of reserve tokens required to be held as collateral for the current utilization levels of the
+/// resource.
+///
+/// This service attempts to balance the required collateral as reported by the state of the curve
+/// with the actual collateral as measured by the relay subaccount token balance. The curve for a
+/// capacity-limited resource can be undercollateralized in certain well-defined scenarios (e.g.
+/// consumption before billing is enabled).
+///
+/// An undercollateralized curve recollateralizes as users free bytes: a free sells bytes
+/// back to the relay, reducing the required reserve. The user's refund is still paid (if
+/// collateral allows), but the fee portion is retained in the curve rather than paid out.
+/// The fee receiver is paid only once the curve is fully collateralized.
+///
+/// Example disk recollateralization flow diagram (simplified for clarity) for a transaction that
+/// frees bytes:
+///
+/// ```text
+///                                                                 Example values:
+///                                                                 Total collateral: $15
+///                                                                 Required reserve: $100
+///
+///            .---------------.
+///           (   free bytes    )                                   Total free: $20
+///            '-------+-------'                                    Required reserve: $80
+///                    |
+///                    v
+///      +--------------------------+
+///      |  Split gross-refund into |                               Refund: $10
+///      |  refund + fee            |                               Fee: $10
+///      +----+----------------+----+
+///           |                |
+///           |                v
+///           |     +-------------------------------+
+///           |     | Calculate final refund:       |               Final refund:
+///           |     | min(refund, collateral)       |               min(10, 15) = $10
+///           |     +-----+-------------+-----------+
+///           |           |             |
+///           |           |             v
+///           |           |      +---------------------------+
+///           |           |      | Send final refund to user |
+///           |           |      +---------------------------+
+///           v           v
+///      +----------------------------------------------------+
+///      | Calculate final fee:                               |     Final fee:
+///      | Final fee can only come from collateral left over  |     min(fee, max(collateral - final refund - required reserve, 0))
+///      | after the refund and the curve's required reserve. |     min(10, max(15 - 10 - 80, 0)) = $0
+///      +-----------------+----------------------------------+
+///                        |
+///                        v
+///        +--------------------------------+
+///        | Send final fee to fee receiver |
+///        +--------------------------------+          
+/// ```
+///
 #[psibase::service(name = "vserver", recursive = "true", tables = "tables::tables")]
 mod service {
     use crate::billing;
@@ -456,13 +521,13 @@ mod service {
 
         // `InitRow`, `NetworkSpecs`, and `CapacityPricing` are necessarily written
         // after the db scan, and before resMonitoring is enabled. Therefore we must
-        // explicitly add their exact footprints to the baseline.
-        let used_bytes = get_prealloc()
+        // explicitly add their exact footprints into the prealloc.
+        let prealloc = get_prealloc()
             + row_size(&InitTable::new(), &InitRow::default())
             + row_size(&NetworkSpecsTable::new(), &NetworkSpecs::default())
             + row_size(&CapacityPricingTable::new(), &CapacityPricing::default());
 
-        InitRow::init(used_bytes);
+        InitRow::init(prealloc);
 
         // Must run after `InitRow::init` because it transitively depends on `InitRow::used_bytes()`
         NetworkSpecs::update();
@@ -483,6 +548,14 @@ mod service {
         events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("consumed"), 0);
         events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("subsidized"), 0);
         events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("subsidized"), 1);
+
+        CapacityPricing::get_assert(Disk).consume(prealloc);
+        Wrapper::emit().history().consumed(
+            AccountNumber::new(0),
+            Disk.as_id(),
+            to_i64(prealloc, "preallocated disk space"),
+            0,
+        );
     }
 
     #[pre_action(exclude(init))]
@@ -546,25 +619,12 @@ mod service {
             .set_capacity(NetworkSpecs::get_assert().obj_storage_bytes);
     }
 
-    /// Enable or disable the billing system
-    ///
-    /// If billing is disabled, resource consumption will still be tracked, but the resources will
-    /// not be automatically metered by the network. This is insecure and allows users to abuse
-    /// the network by consuming all of the network's resources.
-    ///
-    /// `payer` is required only when `enabled = true`: that account must have previously credited
-    /// sufficient system tokens to this service to cover the settlement cost of any net disk
-    /// consumption that occurred while billing was disabled.
+    /// Enable the billing system
     #[action]
-    fn enable_billing(enabled: bool, payer: Option<AccountNumber>) {
+    fn enable_billing() {
         check(get_sender() == get_service(), "Unauthorized");
 
-        if enabled {
-            let payer = check_some(payer, "payer is required when enabling billing");
-            billing::settle_relay_balance(Disk, payer);
-        }
-
-        BillingConfig::enable(enabled);
+        BillingConfig::enable();
     }
 
     /// Returns whether the billing system has been enabled
@@ -1009,8 +1069,9 @@ mod service {
                     let (user_refund, fee) =
                         CapacityPricing::get_assert(Disk).free((-amount_bytes) as u64);
                     if billing {
-                        accrual::capacity_limited::free(Disk, user, sub, user_refund, fee);
-                        -(to_i64(user_refund, "Disk refund"))
+                        let refund =
+                            accrual::capacity_limited::free(Disk, user, sub, user_refund, fee);
+                        -(to_i64(refund, "Disk refund"))
                     } else {
                         0
                     }
@@ -1031,7 +1092,7 @@ mod service {
         };
 
         // Avoiding a flood of events for writing individual records. Accumulate in the tx_cache and emit
-        // one event at the end of the tx (using `finishTx` as the tx end hook)
+        // one event at the end of the tx (`finishTx`).
         tx_cache::add_disk_usage(user, amount_bytes, cost);
     }
 

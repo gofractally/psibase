@@ -99,13 +99,10 @@ interface virtual-server {
     /// * `variables` - The network variables
     set-network-variables: func(variables: network-variables) -> result<_, error>;
 
-    /// Enable the billing system
+    /// Enable the billing system.
     /// This must be called after the billing system has been initialized and the
     /// system token has been set.
-    ///
-    /// Parameters:
-    /// * `enabled` - Whether to enable the billing system
-    enable-billing: func(enabled: bool) -> result<_, error>;
+    enable-billing: func() -> result<_, error>;
 
     /// Set the virtual server specs
     /// It is from these specs that the pricing for network resources is derived.

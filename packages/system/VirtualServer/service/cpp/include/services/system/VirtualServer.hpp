@@ -36,19 +36,47 @@ namespace SystemService
 
    /// Virtual Server Service
    ///
-   /// This service defines a "virtual server" that represents the "server" with which
-   /// a user interacts when they connect to any full node on the network.
+   /// This service defines a "virtual server" that represents the subset of a real server that
+   /// a node operator dedicates to running their network node. A user then interacts with one
+   /// or more virtual servers that are peered together to form a network. The network has
+   /// effective specifications that are derived from (and necessarily lower than) the virtual
+   /// server specs. The difference in specs comes from various overhead costs incurred by the
+   /// management of the network.
    ///
-   /// This service distinguishes between the specs of the network itself, and
-   /// the specs of an individual node that runs the virtual server. The actual node
-   /// specs must meet or exceed the specs defined for the virtual server. And the
-   /// derived network specs will always be less than the virtual server specs to account
-   /// for various overheads (e.g. from running a distributed network, desired replay
-   /// speed, etc).
+   /// Example diagram:
    ///
-   /// This service also defines a billing system that allows for the network to meter
-   /// the consumption of resources by users. A user must send system tokens to this service,
-   /// which are then held in reserve for the user.
+   /// .------------------------.  .------------------------.  .------------------------.
+   /// |     Actual Server 1    |  |     Actual Server 2    |  |     Actual Server 3    |
+   /// |                        |  |                        |  |                        |
+   /// |    100 Gbps network    |  |    50 Gbps network     |  |    100 Gbps network    |
+   /// |       2 TB disk        |  |       1 TB disk        |  |      300 GB disk       |
+   /// |                        |  |                        |  |                        |
+   /// | .--------------------. |  | .--------------------. |  | .--------------------. |
+   /// | |  Virtual Server 1  | |  | |  Virtual Server 2  | |  | |  Virtual Server 3  | |
+   /// | |  10 Gbps network   | |  | |  10 Gbps network   | |  | |  10 Gbps network   | |
+   /// | |    100 GB disk     | |  | |    100 GB disk     | |  | |    100 GB disk     | |
+   /// | '---------+----------' |  | '---------+----------' |  | '---------+----------' |
+   /// '-----------|------------'  '-----------|------------'  '-----------|------------'
+   ///             |                           |                           |
+   ///             |                           V                           |
+   ///             |        .--------------------------------------.       |
+   ///             |        |               Network                |       |
+   ///             +------->|  .--------------------------------.  |<------+
+   ///                      |  |            1 Gbps              |  |
+   ///                      |  |    50 GB replicated storage    |  |
+   ///                      |  |    50 GB node-local storage    |  |
+   ///                      |  '-------------------------------'   |
+   ///                      '-------------------^------------------'
+   ///                                          |
+   ///                                          v
+   ///                                    .-----------.
+   ///                                    |   User    |
+   ///                                    '-----------'
+   ///
+   /// This service also manages monitoring all of the network's resource consumption, and exposes
+   /// an interface that can be used to tune a billing system for rate-limiting per-account resource
+   /// consumption. Users can send system tokens into a "reserve" that can be subsequently redeemed for
+   /// resource consumption.
    ///
    /// As physical resources (CPU, disk space, network bandwidth, etc.) are consumed, the
    /// real-time price of the resource is billed to the user's reserved balance. Reserved system
@@ -66,11 +94,9 @@ namespace SystemService
    /// 2 - Call `init_billing`: Initializes the billing system. To call this, the system token
    ///     must have already been set in the `Tokens` service. The specified `fee_receiver` will
    ///     receive all of the system token fees paid for resources by users.
-   /// 3 - Call `enable_billing(true, Some(payer))`: When ready, calling this action enables the
-   ///     billing system. Two requirements: (a) the caller must have already filled their resource
-   ///     buffer because this action is itself billed, and (b) `payer` must have credited sufficient
-   ///     system tokens to this service to settle any net disk consumption that accumulated while
-   ///     billing was disabled (see the `enableBillingCost` GraphQL query for the required amount).
+   /// 3 - Call `enable_billing`: When ready, calling this action enables the
+   ///     billing system. The caller must have already filled their resource buffer because
+   ///     this action is itself billed.
    ///
    /// > Note: typically, step 1 should be called at system boot, and therefore the network should
    /// >       always at least have some server specs and derived network specs.
@@ -78,6 +104,67 @@ namespace SystemService
    /// After each of the above steps, the billing service will be enabled, and users will be
    /// required to buy resources to transact with the network. Use the other actions in this
    /// service to manage server specs, network variables, and billing parameters, as needed.
+   ///
+   /// ## Curve under-collateralization
+   ///
+   /// Capacity limited resources are managed via a constant-product curve that reports the quantity
+   /// of reserve tokens required to be held as collateral for the current utilization levels of the
+   /// resource.
+   ///
+   /// This service attempts to balance the required collateral as reported by the state of the curve
+   /// with the actual collateral as measured by the relay subaccount token balance. The curve for a
+   /// capacity-limited resource can be undercollateralized in certain well-defined scenarios (e.g.
+   /// consumption before billing is enabled).
+   ///
+   /// An undercollateralized curve is recollateralized over time using the fees that would otherwise
+   /// be sent to the fee receiver.
+   ///
+   /// Example disk recollateralization flow diagram (simplified for clarity) for a transaction that
+   /// frees bytes:
+   ///
+   /// ```text
+   ///             .---------------.
+   ///            (   free bytes    )
+   ///             '-------+-------'
+   ///                     |
+   ///                     v
+   ///          +--------------------------+
+   ///          | Reduces curve shortfall  |
+   ///          +-----------+--------------+
+   ///                      |
+   ///                      v
+   ///                 .----------.
+   ///                /            \
+   ///       No      /   curve has  \     Yes
+   ///     .--------(   collateral?  )--------.
+   ///     |         \              /          |
+   ///     |          \            /           |
+   ///     v           '----------'            v
+   ///  .-----.                      +--------------------+
+   /// (  End  )                     |  Calc user refund  |
+   ///  '-----'                      +---------+----------+
+   ///                                         |
+   ///                                         v
+   ///                               +----------------------+
+   ///                               | Take fee from refund |
+   ///                               +---------+------------+
+   ///                                         |
+   ///                                         v
+   ///                               +--------------------+
+   ///                               |  Send user refund  |
+   ///                               +---------+----------+
+   ///                                         |
+   ///                                         v
+   ///                                .-----------------.
+   ///                               /                   \
+   ///                   yes        /    Curve under-     \        no
+   ///                 .-----------(   collateralized?     )-----------.
+   ///                 |            \                     /            |
+   ///                 v             '-------------------'             v
+   ///       +--------------------+                        +--------------------------+
+   ///       |  Add fee to relay  |                        | Send fee to fee receiver |
+   ///       +--------------------+                        +--------------------------+
+   /// ```
    struct VirtualServer : public psibase::Service
    {
       static constexpr auto service = psibase::AccountNumber("vserver");
@@ -111,16 +198,8 @@ namespace SystemService
       /// functionality.
       void set_network_variables(NetworkVariables variables);
 
-      /// Enable or disable the billing system
-      ///
-      /// If billing is disabled, resource consumption will still be tracked, but the resources will
-      /// not be automatically metered by the network. This is insecure and allows users to abuse
-      /// the network by consuming all of the network's resources.
-      ///
-      /// `payer` is required only when `enabled = true`: that account must have previously credited
-      /// sufficient system tokens to this service to cover the settlement cost of any net disk
-      /// consumption that occurred while billing was disabled.
-      void enable_billing(bool enabled, std::optional<psibase::AccountNumber> payer);
+      /// Enable the billing system
+      void enable_billing();
 
       /// Returns whether the billing system has been enabled
       bool is_billing_enabled();
@@ -339,7 +418,7 @@ namespace SystemService
                 method(get_fee_receiver),
                 method(set_specs, specs),
                 method(set_network_variables, variables),
-                method(enable_billing, enabled, payer),
+                method(enable_billing),
                 method(is_billing_enabled),
                 method(buy_res_for, amount, for_user, memo),
                 method(buy_res_sub, amount, sub_account),

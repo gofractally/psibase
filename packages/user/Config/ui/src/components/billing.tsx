@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 
 import { useSetEnableBilling } from "@/hooks/use-set-enable-billing";
 import { useSetFeeReceiverAccount } from "@/hooks/use-set-fee-receiver-account";
@@ -16,7 +16,6 @@ interface SystemTokenInfo {
 }
 
 interface BillingFormData {
-    enableBilling: boolean;
     tokenFeeReceiverAccount: { account: string };
 }
 
@@ -41,32 +40,17 @@ export const Billing = ({ systemToken, systemTokenLoading }: BillingProps) => {
     const { data: billingConfig, isLoading: billingConfigLoading } =
         useBillingConfig();
 
-    // Track the submitted/initial value of enableBilling for comparison
-    const [submittedEnableBilling, setSubmittedEnableBilling] = useState<
-        boolean | null
-    >(null);
-
     const computedInitialValues = useMemo<BillingFormData>(() => {
         if (billingConfig) {
             return {
-                enableBilling: billingConfig.enabled,
                 tokenFeeReceiverAccount: {
                     account: billingConfig.feeReceiver || "",
                 },
             };
         }
         return {
-            enableBilling: false,
             tokenFeeReceiverAccount: { account: "" },
         };
-    }, [billingConfig]);
-
-    useEffect(() => {
-        if (billingConfig) {
-            setSubmittedEnableBilling(billingConfig.enabled);
-        } else {
-            setSubmittedEnableBilling(false);
-        }
     }, [billingConfig]);
 
     const billingForm = useAppForm({
@@ -96,11 +80,9 @@ export const Billing = ({ systemToken, systemTokenLoading }: BillingProps) => {
         );
     }, [billingConfig?.feeReceiver]);
 
-    const handleApplyEnableBilling = async () => {
+    const handleEnableBilling = async () => {
         resetEnableBilling();
-        await setEnableBilling([billingForm.state.values.enableBilling]);
-        setSubmittedEnableBilling(billingForm.state.values.enableBilling);
-        billingForm.reset(billingForm.state.values);
+        await setEnableBilling([]);
     };
 
     if (billingConfigLoading) {
@@ -190,55 +172,27 @@ export const Billing = ({ systemToken, systemTokenLoading }: BillingProps) => {
                     </div>
                 </form>
 
-                <form
-                    onSubmit={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleApplyEnableBilling();
-                    }}
-                >
-                    <billingForm.AppField name="enableBilling">
-                        {(field) => (
-                            <>
-                                <field.CheckboxField
-                                    label="Enable billing"
-                                    disabled={!hasFeeReceiverAccount}
-                                />
-                                <billingForm.Subscribe
-                                    selector={(state) =>
-                                        state.values.enableBilling
-                                    }
-                                >
-                                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                                    {(enableBilling: any) => {
-                                        const isApplyEnabled =
-                                            submittedEnableBilling !== null &&
-                                            enableBilling !==
-                                                submittedEnableBilling;
-                                        return (
-                                            <div className="mt-2">
-                                                {enableBillingTxError && (
-                                                    <p className="text-destructive mb-2 text-sm">
-                                                        {enableBillingTxError}
-                                                    </p>
-                                                )}
-                                                <Button
-                                                    type="submit"
-                                                    disabled={
-                                                        !hasFeeReceiverAccount ||
-                                                        !isApplyEnabled
-                                                    }
-                                                >
-                                                    Apply
-                                                </Button>
-                                            </div>
-                                        );
-                                    }}
-                                </billingForm.Subscribe>
-                            </>
+                {billingConfig?.enabled ? (
+                    <div>
+                        <Label>Billing</Label>
+                        <p className="mt-1 text-sm">Enabled</p>
+                    </div>
+                ) : (
+                    <div>
+                        {enableBillingTxError && (
+                            <p className="text-destructive mb-2 text-sm">
+                                {enableBillingTxError}
+                            </p>
                         )}
-                    </billingForm.AppField>
-                </form>
+                        <Button
+                            type="button"
+                            disabled={!hasFeeReceiverAccount}
+                            onClick={handleEnableBilling}
+                        >
+                            Enable billing
+                        </Button>
+                    </div>
+                )}
             </div>
         </div>
     );

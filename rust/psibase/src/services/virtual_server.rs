@@ -40,7 +40,7 @@ pub struct BufferConfig {
     pub capacity: u64,
 }
 
-/// Virtual Server Service
+/// # Virtual Server Service
 ///
 /// This service defines a "virtual server" that represents the subset of a real server that
 /// a node operator dedicates to running their network node. A user then interacts with one
@@ -61,8 +61,8 @@ pub struct BufferConfig {
 /// | |  Virtual Server 1  | |  | |  Virtual Server 2  | |  | |  Virtual Server 3  | |
 /// | |  10 Gbps network   | |  | |  10 Gbps network   | |  | |  10 Gbps network   | |
 /// | |    100 GB disk     | |  | |    100 GB disk     | |  | |    100 GB disk     | |
-/// | '---------+----------' |  | '---------+----------' |  | '--------------------' |
-/// '-----------|------------'  '-----------|------------'  '-----------+------------'
+/// | '---------+----------' |  | '---------+----------' |  | '---------+----------' |
+/// '-----------|------------'  '-----------|------------'  '-----------|------------'
 ///             |                           |                           |
 ///             |                           V                           |
 ///             |        .--------------------------------------.       |
@@ -100,11 +100,9 @@ pub struct BufferConfig {
 /// 2 - Call `init_billing`: Initializes the billing system. To call this, the system token
 ///     must have already been set in the `Tokens` service. The specified `fee_receiver` will
 ///     receive all of the system token fees paid for resources by users.
-/// 3 - Call `enable_billing(true, Some(payer))`: When ready, calling this action enables the
-///     billing system. Two requirements: (a) the caller must have already filled their resource
-///     buffer because this action is itself billed, and (b) `payer` must have credited sufficient
-///     system tokens to this service to settle any net disk consumption that accumulated while
-///     billing was disabled (see the `enableBillingCost` GraphQL query for the required amount).
+/// 3 - Call `enable_billing`: When ready, calling this action enables the
+///     billing system. The caller must have already filled their resource buffer because
+///     this action is itself billed.
 ///
 /// > Note: typically, step 1 should be called at system boot, and therefore the network should
 /// >       always at least have some server specs and derived network specs.
@@ -112,6 +110,67 @@ pub struct BufferConfig {
 /// After each of the above steps, the billing service will be enabled, and users will be
 /// required to buy resources to transact with the network. Use the other actions in this
 /// service to manage server specs, network variables, and billing parameters, as needed.
+///
+/// ## Curve under-collateralization
+///
+/// Capacity limited resources are managed via a constant-product curve that reports the quantity
+/// of reserve tokens required to be held as collateral for the current utilization levels of the
+/// resource.
+///
+/// This service attempts to balance the required collateral as reported by the state of the curve
+/// with the actual collateral as measured by the relay subaccount token balance. The curve for a
+/// capacity-limited resource can be undercollateralized in certain well-defined scenarios (e.g.
+/// consumption before billing is enabled).
+///
+/// An undercollateralized curve is recollateralized over time using the fees that would otherwise
+/// be sent to the fee receiver.
+///
+/// Example disk recollateralization flow diagram (simplified for clarity) for a transaction that
+/// frees bytes:
+///
+/// ```text
+///             .---------------.
+///            (   free bytes    )
+///             '-------+-------'
+///                     |
+///                     v
+///          +--------------------------+
+///          | Reduces curve shortfall  |
+///          +-----------+--------------+
+///                      |
+///                      v
+///                 .----------.
+///                /            \
+///       No      /   curve has  \     Yes
+///     .--------(   collateral?  )--------.
+///     |         \              /          |
+///     |          \            /           |
+///     v           '----------'            v
+///  .-----.                      +--------------------+
+/// (  End  )                     |  Calc user refund  |
+///  '-----'                      +---------+----------+
+///                                         |
+///                                         v
+///                               +----------------------+
+///                               | Take fee from refund |
+///                               +---------+------------+
+///                                         |
+///                                         v
+///                               +--------------------+
+///                               |  Send user refund  |
+///                               +---------+----------+
+///                                         |
+///                                         v
+///                                .-----------------.
+///                               /                   \
+///                   yes        /    Curve under-     \        no
+///                 .-----------(   collateralized?     )-----------.
+///                 |            \                     /            |
+///                 v             '-------------------'             v
+///       +--------------------+                        +--------------------------+
+///       |  Add fee to relay  |                        | Send fee to fee receiver |
+///       +--------------------+                        +--------------------------+
+/// ```
 #[crate::service(name = "vserver", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
@@ -168,17 +227,9 @@ mod service {
         unimplemented!()
     }
 
-    /// Enable or disable the billing system
-    ///
-    /// If billing is disabled, resource consumption will still be tracked, but the resources will
-    /// not be automatically metered by the network. This is insecure and allows users to abuse
-    /// the network by consuming all of the network's resources.
-    ///
-    /// `payer` is required only when `enabled = true`: that account must have previously credited
-    /// sufficient system tokens to this service to cover the settlement cost of any net disk
-    /// consumption that occurred while billing was disabled.
+    /// Enable the billing system
     #[action]
-    fn enable_billing(enabled: bool, payer: Option<AccountNumber>) {
+    fn enable_billing() {
         unimplemented!()
     }
 
