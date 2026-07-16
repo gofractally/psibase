@@ -28,13 +28,9 @@ pub mod tables {
 mod service {
     use crate::tables::ConfigRow;
     use psibase::services::{
-        auth_delegate::Wrapper as AuthDelegate,
-        dyn_ld::{self, DynDep},
-        fractals::FractalRole,
-        fractals::Wrapper as Fractals,
-        guilds::Wrapper as Guilds,
-        guilds::SERVICE as GUILDS_SERVICE,
-        producers::Wrapper as Producers,
+        auth_delegate::Wrapper as AuthDelegate, fractals::FractalRole,
+        fractals::Wrapper as Fractals, guilds::Wrapper as Guilds,
+        guilds::SERVICE as GUILDS_SERVICE, producers::Wrapper as Producers,
     };
     use psibase::*;
 

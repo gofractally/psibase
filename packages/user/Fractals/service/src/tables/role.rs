@@ -4,7 +4,6 @@ use crate::{
 };
 use psibase::services::fractals::FractalRole;
 use psibase::services::{accounts, auth_any, auth_dyn};
-use psibase::{check, check_none, check_some, AccountNumber, ServiceWrapper, Table};
 use psibase::{services::auth_dyn::policy::DynamicAuthPolicy, Subaccount};
 use psibase::{AccountNumber, ServiceWrapper, Table};
 
@@ -29,14 +28,6 @@ impl Role {
         Self::get(fractal, role_id).expect(&format!(
             "role with id {} does not exist for fractal {}",
             role_id,
-            fractal.to_string()
-        ))
-    }
-
-    pub fn get_assert(fractal: AccountNumber, role: FractalRole) -> Self {
-        Self::get(fractal, role).expect(&format!(
-            "role with id {} does not exist for fractal {}",
-            role as u8,
             fractal.to_string()
         ))
     }

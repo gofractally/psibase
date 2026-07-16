@@ -9,7 +9,7 @@ use psibase::services::fractals::weighted_normalization::{
     weighted_normalization,
 };
 use psibase::{
-    check, check_none, check_some, get_sender, get_service, AccountNumber, Flags, Memo,
+    get_sender, get_service, AccountNumber, Flags, Memo,
     ServiceWrapper, Subaccount, Table,
 };
 
