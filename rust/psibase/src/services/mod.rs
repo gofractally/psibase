@@ -7,6 +7,7 @@ pub mod auth_dyn;
 pub mod auth_sig;
 pub mod brotli_svc;
 pub mod chainmail;
+pub mod chat;
 pub mod common_api;
 pub mod cpu_limit;
 pub mod credentials;
