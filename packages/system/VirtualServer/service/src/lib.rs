@@ -240,6 +240,7 @@ mod tx_cache {
             use super::is_system_user;
             use crate::resource_type::ResourceType;
             use crate::tables::capacity_limit_pricing::relay_sub_account;
+            use crate::tables::tables::CapacityPricing;
             use crate::tx_cache::{balance_cache, drain_cache, with_cache};
             use crate::Wrapper;
             use psibase::AccountNumber;
@@ -294,12 +295,14 @@ mod tx_cache {
                 }
                 let collateral = get_collateral(resource);
                 let refund = user_refund.min(collateral);
-                let clamped_fee = fee.min(collateral.saturating_sub(refund));
-                let gross = refund + clamped_fee;
+
+                // Fee only comes from collateral beyond the refund and what the curve must keep.
+                let required_reserve = CapacityPricing::get_assert(resource).required_reserve();
+                let fee = fee.min(collateral.saturating_sub(refund + required_reserve));
 
                 with(resource, |a| {
-                    a.relay_delta -= gross as i128;
-                    a.fee += clamped_fee;
+                    a.relay_delta -= (refund + fee) as i128;
+                    a.fee += fee;
                 });
                 if refund > 0 {
                     balance_cache::refund(user, sub, refund);
@@ -396,32 +399,33 @@ mod tx_cache {
 /// capacity-limited resource can be undercollateralized in certain well-defined scenarios (e.g.
 /// consumption before billing is enabled).
 ///
-/// An undercollateralized curve is recollateralized over time using the fees that would otherwise
-/// be sent to the fee receiver.
+/// An undercollateralized curve recollateralizes as users free bytes: a free sells bytes
+/// back to the relay, reducing the required reserve. The user's refund is still paid (if
+/// collateral allows), but the fee portion is retained in the curve rather than paid out.
+/// The fee receiver is paid only once the curve is fully collateralized.
 ///
 /// Example disk recollateralization flow diagram (simplified for clarity) for a transaction that
 /// frees bytes:
 ///
 /// ```text
+///                                                                 Example values:
+///                                                                 Total collateral: $15
+///                                                                 Required reserve: $100
+///
 ///            .---------------.
-///           (   free bytes    )
-///            '-------+-------'
+///           (   free bytes    )                                   Total free: $20
+///            '-------+-------'                                    Required reserve: $80
 ///                    |
 ///                    v
 ///      +--------------------------+
-///      | Reduce curve shortfall   |
-///      +------------+-------------+
-///                   |
-///                   v
-///      +--------------------------+
-///      |  Split gross-refund into |
-///      |  refund + fee            |
+///      |  Split gross-refund into |                               Refund: $10
+///      |  refund + fee            |                               Fee: $10
 ///      +----+----------------+----+
 ///           |                |
 ///           |                v
 ///           |     +-------------------------------+
-///           |     | Calculate final refund:       |
-///           |     | min(refund, collateral)       |
+///           |     | Calculate final refund:       |               Final refund:
+///           |     | min(refund, collateral)       |               min(10, 15) = $10
 ///           |     +-----+-------------+-----------+
 ///           |           |             |
 ///           |           |             v
@@ -429,24 +433,16 @@ mod tx_cache {
 ///           |           |      | Send final refund to user |
 ///           |           |      +---------------------------+
 ///           v           v
-///      +-------------------------------------------+
-///      | Calculate final fee:                      |
-///      | min(fee, collateral - final refund)       |
-///      +-----------------+-------------------------+
+///      +----------------------------------------------------+
+///      | Calculate final fee:                               |     Final fee:
+///      | Final fee can only come from collateral left over  |     min(fee, max(collateral - final refund - required reserve, 0))
+///      | after the refund and the curve's required reserve. |     min(10, max(15 - 10 - 80, 0)) = $0
+///      +-----------------+----------------------------------+
 ///                        |
 ///                        v
-///               .-----------------.
-///              /                   \
-///      yes    /  Is curve under-    \     no
-///    .-------(   collateralized?     )-------.
-///    |        \                     /        |
-///    |         \                   /         |
-///    v          '-----------------'          v
-/// +----------------------+     +----------------------+
-/// | Fee covers shortfall |     | Send full fee to fee |
-/// | (remainder sent to   |     | receiver             |
-/// | fee receiver)        |     +----------------------+
-/// +----------------------+
+///        +--------------------------------+
+///        | Send final fee to fee receiver |
+///        +--------------------------------+          
 /// ```
 ///
 #[psibase::service(name = "vserver", recursive = "true", tables = "tables::tables")]
@@ -1096,7 +1092,7 @@ mod service {
         };
 
         // Avoiding a flood of events for writing individual records. Accumulate in the tx_cache and emit
-        // one event at the end of the tx (using `finishTx` as the tx end hook)
+        // one event at the end of the tx (`finishTx`).
         tx_cache::add_disk_usage(user, amount_bytes, cost);
     }
 
