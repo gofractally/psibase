@@ -1,7 +1,6 @@
-import type { LocalContact } from "@/apps/chat/contacts/types";
 import type { PresenceUi } from "@/apps/chat/hooks/use-chat-socket";
 
-import { ChevronDown, ChevronLeft, ChevronRight, PhoneCall } from "lucide-react";
+import { ChevronLeft, PhoneCall } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useMediaQuery } from "usehooks-ts";
@@ -21,133 +20,19 @@ import { IncomingCallDialog } from "@/apps/chat/components/incoming-call-dialog"
 import { MessageThread } from "@/apps/chat/components/message-thread";
 import { TwoColumnSelect } from "@/apps/chat/components/two-column-select";
 import { NewContactDialog } from "@/apps/chat/contacts/components/new-contact-dialog";
-import { formatNames } from "@/apps/chat/contacts/utils/format-names";
 import { useChatSocket } from "@/apps/chat/hooks/use-chat-socket";
 import { useChatUrlSpaceSync } from "@/apps/chat/hooks/chat/use-chat-url-space-sync";
+import {
+    ContactWithPresenceRow,
+    PresenceDot,
+    SectionToggle,
+} from "@/apps/chat/pages/chat-page-contact-row";
 
 import { Avatar } from "@shared/components/avatar";
 import { useContacts } from "@shared/hooks/use-contacts";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
-import { useProfile } from "@shared/hooks/use-profile";
-import { cn } from "@shared/lib/utils";
 import { Button } from "@shared/shadcn/ui/button";
-import { Checkbox } from "@shared/shadcn/ui/checkbox";
 import { ScrollArea } from "@shared/shadcn/ui/scroll-area";
-
-const SectionToggle = ({
-    children,
-    expanded,
-    onToggle,
-}: {
-    children: React.ReactNode;
-    expanded: boolean;
-    onToggle: () => void;
-}) => (
-    <button
-        type="button"
-        onClick={onToggle}
-        className="text-muted-foreground flex w-full items-center gap-1 px-4 pb-1 pt-3 text-left text-xs font-semibold uppercase tracking-wide hover:text-foreground"
-        aria-expanded={expanded}
-    >
-        {expanded ? (
-            <ChevronDown className="size-3.5" aria-hidden />
-        ) : (
-            <ChevronRight className="size-3.5" aria-hidden />
-        )}
-        {children}
-    </button>
-);
-
-const PresenceDot = ({ status }: { status: PresenceUi }) => {
-    const color =
-        status === "online"
-            ? "bg-emerald-500"
-            : status === "offline"
-              ? "bg-muted-foreground/40"
-              : "bg-muted-foreground/25";
-    const title =
-        status === "online"
-            ? "Online"
-            : status === "offline"
-              ? "Offline"
-              : "Unknown";
-
-    return (
-        <span
-            className={cn("inline-block size-2 shrink-0 rounded-full", color)}
-            title={title}
-        />
-    );
-};
-
-const ContactWithPresenceRow = ({
-    contact,
-    isSelected,
-    onSelect,
-    presence,
-    groupPickMode,
-    groupSelected,
-    setGroupIncluded,
-}: {
-    contact: LocalContact;
-    isSelected: boolean;
-    onSelect: () => void;
-    presence: PresenceUi;
-    groupPickMode: boolean;
-    groupSelected: boolean;
-    setGroupIncluded: (included: boolean) => void;
-}) => {
-    const { data: profile } = useProfile(contact.account, true, {});
-    const [primaryName] = formatNames(
-        contact.nickname,
-        profile?.profile?.displayName,
-        contact.account,
-    );
-
-    return (
-        <div
-            className={cn(
-                "flex w-full items-center justify-between gap-2 rounded-sm px-3 py-1.5",
-                isSelected && !groupPickMode ? "bg-muted" : "hover:bg-muted/60",
-            )}
-        >
-            {groupPickMode ? (
-                <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
-                    <Checkbox
-                        checked={groupSelected}
-                        onCheckedChange={(v) => {
-                            if (v === "indeterminate") return;
-                            setGroupIncluded(v);
-                        }}
-                        aria-label={`Include ${primaryName} in group`}
-                    />
-                    <Avatar
-                        account={contact.account}
-                        className="size-8 shrink-0"
-                    />
-                    <span className="truncate text-[14px] font-medium leading-snug">
-                        {primaryName}
-                    </span>
-                </label>
-            ) : (
-                <button
-                    type="button"
-                    onClick={onSelect}
-                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                >
-                    <Avatar
-                        account={contact.account}
-                        className="size-8 shrink-0"
-                    />
-                    <span className="truncate text-[14px] font-medium leading-snug">
-                        {primaryName}
-                    </span>
-                </button>
-            )}
-            <PresenceDot status={presence} />
-        </div>
-    );
-};
 
 export const ChatPage = () => {
     const { data: currentUser } = useCurrentUser();

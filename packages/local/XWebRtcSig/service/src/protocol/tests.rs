@@ -284,3 +284,69 @@ fn rejects_legacy_call_media_state_frame() {
         Err(ProtocolError::UnknownFrameType(_))
     ));
 }
+
+/// Golden fixtures shared with the TypeScript Zod schemas (P2.3): see
+/// `packages/shared-ui/domains/webrtc/fixtures/golden/README.md`. Both
+/// sides deserialize the *same* JSON so the wire contract can't drift.
+mod golden_fixtures {
+    use super::*;
+
+    const WELCOME: &str =
+        include_str!("../../../../../shared-ui/domains/webrtc/fixtures/golden/welcome.json");
+    const PRESENCE_SNAPSHOT: &str = include_str!(
+        "../../../../../shared-ui/domains/webrtc/fixtures/golden/presence-snapshot.json"
+    );
+    const SESSION_SNAPSHOT: &str = include_str!(
+        "../../../../../shared-ui/domains/webrtc/fixtures/golden/session-snapshot.json"
+    );
+
+    #[test]
+    fn deserializes_golden_welcome_frame() {
+        let frame = decode_server_frame_json(WELCOME).unwrap();
+        match frame {
+            ServerFrame::Welcome {
+                user,
+                active_sessions,
+                ..
+            } => {
+                assert_eq!(user, "alice".parse().unwrap());
+                let sessions = active_sessions.expect("golden welcome has activeSessions");
+                assert_eq!(sessions[0].session_id, "wrtc:pair:alice:bob");
+                assert_eq!(sessions[0].epoch, Some(3));
+            }
+            other => panic!("expected Welcome, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn deserializes_golden_presence_snapshot_frame() {
+        let frame = decode_server_frame_json(PRESENCE_SNAPSHOT).unwrap();
+        match frame {
+            ServerFrame::PresenceSnapshot { contacts } => {
+                assert_eq!(contacts.len(), 2);
+                assert_eq!(contacts[0].account, "bob".parse().unwrap());
+                assert_eq!(contacts[0].presence, PresenceStatus::Online);
+            }
+            other => panic!("expected PresenceSnapshot, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn deserializes_golden_session_snapshot_frame() {
+        let frame = decode_server_frame_json(SESSION_SNAPSHOT).unwrap();
+        match frame {
+            ServerFrame::SessionSnapshot {
+                session_id,
+                epoch,
+                joined_participants,
+                pending_participants,
+            } => {
+                assert_eq!(session_id, "wrtc:pair:alice:bob");
+                assert_eq!(epoch, 2);
+                assert_eq!(joined_participants, vec!["alice".parse().unwrap()]);
+                assert_eq!(pending_participants, vec!["bob".parse().unwrap()]);
+            }
+            other => panic!("expected SessionSnapshot, got {other:?}"),
+        }
+    }
+}

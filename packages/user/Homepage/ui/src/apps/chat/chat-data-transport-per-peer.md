@@ -3,8 +3,8 @@
 > **Living internal stack doc (2026-07-14).**  
 > Keep L1→L2→L3→L4 as the internal module map (confirmed in [`webrtc-code-review.md`](../../../../../../../webrtc-code-review.md) §0). Status vs current code:
 >
-> - **Landed:** `PeerLifecycleCoordinator` (sole ensure/kick/recover owner), thin `DeliveryFabric` façade (`delivery-fabric.ts`), Meet as sibling of L4 on shared L3 PCs (hard-fail without fabric/media port).
-> - **Still open:** dual `joinedPairs` (stack vs L2) — fixed when M5 lands; L3 still special-cases chat `t:` dispatch (M4).
+> - **Landed:** `PeerLifecycleCoordinator` (sole ensure/kick/recover owner), thin `DeliveryFabric` façade (`delivery-fabric.ts`), Meet as sibling of L4 on shared L3 PCs (hard-fail without fabric/media port). **M5:** dual `joinedPairs` resolved — `stack.ts` reads `pairSignaling.isJoined()` from L2; no separate stack-side copy. **M4:** L3 (`l3-peer-registry.ts`) no longer special-cases chat `t:` dispatch; `chatMessage` / `chatHistorySync` / `messageAck` framing lives at L4 (`l4-messaging-service.ts`) and the `ChatTransportBridge` adapter — L3 moves opaque bytes only.
+> - **Still open:** none tracked here beyond the historical P1–P4 welcome-recovery bundle below (superseded by v2 event-driven flush, already landed).
 > - Opening “Today / Proposed” framing — **per-remote PCs are largely implemented**; treat locked decisions + layer FSMs as the living parts.
 > - “Apps see only **L4**” — too chat-centric; Meet is a **sibling** app protocol. Prefer thin shared façade + dependency rule (see `chat-meet-comms-architecture.md`).
 > - Locked constants (TTL, ACK, initiator=lex, etc.) remain authoritative unless code deliberately changes them.

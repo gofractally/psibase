@@ -191,20 +191,19 @@ pub fn space_with_members(row: SpaceRow) -> crate::tables::Space {
 #[cfg(test)]
 mod unit_tests {
     use super::*;
-    use psibase::AccountNumber;
 
     #[test]
     fn canonical_space_members_sorts_and_dedupes() {
-        let bob = AccountNumber::from("bob");
-        let alice = AccountNumber::from("alice");
+        let bob: psibase::AccountNumber = "bob".parse().unwrap();
+        let alice: psibase::AccountNumber = "alice".parse().unwrap();
         let members = canonical_space_members([bob, alice, bob]);
         assert_eq!(members, vec![alice, bob]);
     }
 
     #[test]
     fn space_uuid_is_stable_for_canonical_member_set() {
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
         let members_a = canonical_space_members([bob, alice]);
         let members_b = canonical_space_members([alice, bob]);
         let uuid_a = space_uuid_for_members(&members_a).unwrap();
@@ -215,31 +214,31 @@ mod unit_tests {
 
     #[test]
     fn validate_space_members_requires_two() {
-        let alice = AccountNumber::from("alice");
+        let alice = "alice".parse().unwrap();
         let err = validate_space_members(&[alice]).unwrap_err();
         assert!(err.message().contains("at least two members"));
     }
 
     #[test]
     fn dm_members_rejects_self_dm() {
-        let alice = AccountNumber::from("alice");
+        let alice = "alice".parse().unwrap();
         let err = dm_members(alice, alice).unwrap_err();
         assert!(err.message().contains("different account"));
     }
 
     #[test]
     fn validate_group_members_requires_three() {
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
         let err = validate_group_members(&[alice, bob]).unwrap_err();
         assert!(err.message().contains("at least three members"));
     }
 
     #[test]
     fn space_kind_dm_vs_group() {
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
-        let carol = AccountNumber::from("carol");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
+        let carol = "carol".parse().unwrap();
         assert_eq!(
             space_kind_for_members(&[alice, bob]).unwrap(),
             SPACE_KIND_DM

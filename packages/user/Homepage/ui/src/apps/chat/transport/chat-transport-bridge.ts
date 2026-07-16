@@ -7,7 +7,6 @@ import {
     type ChatDataMessageAckEnvelope,
     type ChatDataMessageEnvelope,
     type ChatHistorySyncEnvelope,
-    parseChatDataWireEnvelope,
     serializeChatDataWireEnvelope,
 } from "../lib/chat-data-envelope";
 import {
@@ -105,15 +104,21 @@ export class ChatTransportBridge {
             onInboundBytes: (remote, bytes) => {
                 this.handleInboundWire(remote, new TextDecoder().decode(bytes));
             },
-            onSpaceMembershipHint: (remote) => {
-                this.deps.onSpaceMembershipHint?.(remote);
-            },
         });
 
         this.stack.wireRealtimeHandlers({
             sessionSnapshot: (sessionId) => {
                 void sessionId;
             },
+        });
+
+        this.stack.messaging.onHistorySync((remote, envelope) => {
+            void remote;
+            this.deps.onInboundHistorySync(envelope);
+        });
+
+        this.stack.messaging.onSpaceMembershipHint((remote) => {
+            this.deps.onSpaceMembershipHint?.(remote);
         });
 
         this.stack.messaging.onInbound((envelope) => {
@@ -465,17 +470,8 @@ export class ChatTransportBridge {
         return this.stack?.peerRegistry ?? null;
     }
 
+    /** Pass opaque wire to L4 demux (history/hint/message/ack). */
     handleInboundWire(remote: string, raw: string): void {
-        const parsed = parseChatDataWireEnvelope(raw);
-        if (!parsed) return;
-        if (parsed.t === "chatHistorySync") {
-            this.deps.onInboundHistorySync(parsed);
-            return;
-        }
-        if (parsed.t === "spaceMembershipHint") {
-            this.deps.onSpaceMembershipHint?.(remote);
-            return;
-        }
         const svc = this.stack?.messaging as
             | { handleWireFromRemote?: (remote: string, raw: string) => void }
             | undefined;

@@ -1,4 +1,3 @@
-import type { PeerTransportRegistry } from "../transport/l3-peer-registry";
 import type { MeetPeerHandle } from "./meet-peer-handle";
 import type { IceServerConfig } from "./protocol";
 import type { RealtimeClient } from "./realtime-client";
@@ -135,10 +134,6 @@ export interface AvCallOrchestratorHost {
     getPeerMediaPort?():
         | import("../transport/peer-media-port").PeerMediaPort
         | null;
-    /**
-     * @deprecated Prefer {@link getDeliveryFabric}. Kept for tests that mock L3 directly.
-     */
-    getSharedPeerRegistry?(): PeerTransportRegistry | null;
     usesSharedTransport?(): boolean;
 
     getRun(spaceUuid: string): AvCallSpaceRun | undefined;

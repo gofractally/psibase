@@ -108,7 +108,6 @@ export type PeerTransportRegistryOptions = {
     signaling: WebRtcSignalingClient;
     iceServers: IceServerConfig[] | null;
     onInboundBytes?: (remote: string, bytes: Uint8Array) => void;
-    onSpaceMembershipHint?: (remote: string) => void;
 };
 
 export function createPeerTransportRegistry(

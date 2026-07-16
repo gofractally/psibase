@@ -35,9 +35,11 @@ const stackMock = vi.hoisted(() => {
     const messaging = {
         hydrateFromStorage: vi.fn(),
         setFocusedSpace: vi.fn(),
-        onInbound: vi.fn(),
-        onRecipientDelivered: vi.fn(),
-        onStatusChange: vi.fn(),
+        onInbound: vi.fn(() => () => {}),
+        onHistorySync: vi.fn(() => () => {}),
+        onSpaceMembershipHint: vi.fn(() => () => {}),
+        onRecipientDelivered: vi.fn(() => () => {}),
+        onStatusChange: vi.fn(() => () => {}),
         acknowledgeInbound: vi.fn(),
     };
     const stack = {

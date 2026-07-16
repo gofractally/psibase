@@ -10,7 +10,11 @@ export type {
     WebRtcSignalingClientOptions,
 } from "@shared/domains/webrtc/lib/webrtc-signaling-client";
 
-/** Chat-local signaling client with chat-data debug logging. */
+/**
+ * Chat-local signaling client with chat-data debug logging.
+ * Intentionally kept chat-local (not moved to shared-ui): it adds the
+ * session-joined deferred-signal gate that only the chat transport stack needs.
+ */
 export class WebRtcSignalingClient extends SharedWebRtcSignalingClient {
     private sessionJoinedGate: ((sessionId: string) => boolean) | null = null;
 

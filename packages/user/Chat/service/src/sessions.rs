@@ -538,7 +538,6 @@ pub fn close_session(
 #[cfg(test)]
 mod unit_tests {
     use super::*;
-    use psibase::AccountNumber;
 
     #[test]
     fn validate_purpose_accepts_chat_data_and_av_call() {
@@ -549,9 +548,9 @@ mod unit_tests {
 
     #[test]
     fn participants_for_session_uses_all_members_for_group_chat_data() {
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
-        let carol = AccountNumber::from("carol");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
+        let carol = "carol".parse().unwrap();
         let members = vec![alice, bob, carol];
 
         let resolved =
@@ -561,8 +560,8 @@ mod unit_tests {
 
     #[test]
     fn participants_for_session_keeps_explicit_list_for_dm_chat_data() {
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
         let members = vec![alice, bob];
 
         let resolved = participants_for_session(
@@ -576,9 +575,9 @@ mod unit_tests {
 
     #[test]
     fn participants_for_session_uses_all_members_for_group_av_call() {
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
-        let carol = AccountNumber::from("carol");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
+        let carol = "carol".parse().unwrap();
         let members = vec![alice, bob, carol];
 
         let resolved =
@@ -588,8 +587,8 @@ mod unit_tests {
 
     #[test]
     fn participants_for_session_keeps_explicit_list_for_dm_av_call() {
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
         let members = vec![alice, bob];
 
         let resolved = participants_for_session(
@@ -603,9 +602,9 @@ mod unit_tests {
 
     #[test]
     fn validate_session_participants_requires_sender_and_space_members() {
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
-        let carol = AccountNumber::from("carol");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
+        let carol = "carol".parse().unwrap();
         let members = vec![alice, bob];
 
         let ok = validate_session_participants(alice, &members, &[bob, alice]).unwrap();
@@ -620,8 +619,8 @@ mod unit_tests {
 
     #[test]
     fn allocate_pair_session_id_is_lex_ordered() {
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
         let id = allocate_pair_session_id(bob, alice);
         assert_eq!(id, "wrtc:pair:alice:bob");
         assert_eq!(allocate_pair_session_id(alice, bob), id);
@@ -629,8 +628,8 @@ mod unit_tests {
 
     #[test]
     fn parse_pair_session_id_round_trip() {
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
         let id = allocate_pair_session_id(alice, bob);
         let parsed = parse_pair_session_id(&id).unwrap();
         assert_eq!(parsed, vec![alice, bob]);
@@ -638,8 +637,8 @@ mod unit_tests {
 
     #[test]
     fn authorize_pair_session_join_allows_e2e_group_pair_names() {
-        let alice = AccountNumber::from("e2ealicegc");
-        let carol = AccountNumber::from("e2ecarolgc");
+        let alice = "e2ealicegc".parse().unwrap();
+        let carol = "e2ecarolgc".parse().unwrap();
         let id = "wrtc:pair:e2ealicegc:e2ecarolgc";
         let parsed = parse_pair_session_id(id).unwrap();
         assert_eq!(parsed, vec![alice, carol]);
@@ -654,9 +653,9 @@ mod unit_tests {
 
     #[test]
     fn authorize_pair_session_join_allows_participants_only() {
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
-        let carol = AccountNumber::from("carol");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
+        let carol = "carol".parse().unwrap();
         let id = allocate_pair_session_id(alice, bob);
 
         let alice_auth = authorize_session_join(&id, alice, 0);
@@ -674,8 +673,8 @@ mod unit_tests {
 
     #[test]
     fn allocate_session_id_is_stable_prefix() {
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
         let id = allocate_session_id("space:abc", PURPOSE_CHAT_DATA, &[alice, bob], 1, alice);
         assert!(id.starts_with("wrtc:"));
         let id2 = allocate_session_id("space:abc", PURPOSE_CHAT_DATA, &[alice, bob], 1, alice);
@@ -693,7 +692,7 @@ mod unit_tests {
             lifecycle: SESSION_LIFECYCLE_ACTIVE,
             created_at: 0,
             expires_at: 1_000,
-            created_by: AccountNumber::from("alice"),
+            created_by: "alice".parse().unwrap(),
         };
         assert!(!session_is_expired(&row, 999));
         assert!(session_is_expired(&row, 1_000));
@@ -711,7 +710,7 @@ mod unit_tests {
             lifecycle: SESSION_LIFECYCLE_ACTIVE,
             created_at: 0,
             expires_at: 0,
-            created_by: AccountNumber::from("alice"),
+            created_by: "alice".parse().unwrap(),
         };
         assert!(!session_is_expired(&row, i64::MAX / 2));
     }

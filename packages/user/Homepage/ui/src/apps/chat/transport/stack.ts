@@ -50,7 +50,6 @@ export type ChatTransportStackOptions = {
     iceServers: IceServerConfig[] | null;
     isSpaceMember?: (spaceUuid: string, account: string) => boolean;
     onInboundBytes?: (remote: string, bytes: Uint8Array) => void;
-    onSpaceMembershipHint?: (remote: string) => void;
     /** Delay between consecutive pair joinSession sends on the same socket. */
     pairJoinStaggerMs?: number;
     /** Retry pair joinSession until snapshot (default 2000ms; 0 disables). */
@@ -109,7 +108,6 @@ export function createChatTransportStack(
             };
             svc.handleWireFromRemote?.(remote, raw);
         },
-        onSpaceMembershipHint: opts.onSpaceMembershipHint,
     });
 
     const { lifecycle: peerLifecycle, roster: rosterCoordinator } =
@@ -205,9 +203,8 @@ export function createChatTransportStack(
                 frame.sessionId,
                 frame.joinedParticipants,
             );
-            if (frame.joinedParticipants.includes(opts.localAccount)) {
-                signaling.flushDeferredSignals(frame.sessionId);
-            }
+            // Deferred SDP flush runs solely via L2 onServerJoined →
+            // flushDeferredSignals (single path; avoids dual flush with stack).
             notifyRemoteFromRoster(
                 frame.sessionId,
                 frame.joinedParticipants,

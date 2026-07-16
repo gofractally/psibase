@@ -6,6 +6,7 @@ import { chatDataRecord, shortSpaceId } from "../lib/chat-data-debug";
 import {
     type ChatDataMessageAckEnvelope,
     type ChatDataMessageEnvelope,
+    type ChatHistorySyncEnvelope,
     parseChatDataWireEnvelope,
     serializeChatDataMessage,
     serializeChatDataWireEnvelope,
@@ -46,6 +47,10 @@ type MessagingEvents = {
         recipient: string,
         conversationId: string,
     ) => void;
+    /** History catch-up envelope (demuxed from opaque wire; M4). */
+    historySync: (remote: string, envelope: ChatHistorySyncEnvelope) => void;
+    /** Peer created/joined a group — reload sidebar spaces. */
+    spaceMembershipHint: (remote: string) => void;
 };
 
 export interface MessagingService {
@@ -57,6 +62,10 @@ export interface MessagingService {
         handler: (msgId: string, status: MessageStatus) => void,
     ): Unsubscribe;
     onInbound(handler: (envelope: InboundEnvelope) => void): Unsubscribe;
+    onHistorySync(
+        handler: (remote: string, envelope: ChatHistorySyncEnvelope) => void,
+    ): Unsubscribe;
+    onSpaceMembershipHint(handler: (remote: string) => void): Unsubscribe;
     onRecipientDelivered(
         handler: (
             msgId: string,
@@ -588,6 +597,14 @@ export function createMessagingService(
             return bus.on("inbound", handler);
         },
 
+        onHistorySync(handler) {
+            return bus.on("historySync", handler);
+        },
+
+        onSpaceMembershipHint(handler) {
+            return bus.on("spaceMembershipHint", handler);
+        },
+
         onRecipientDelivered(handler) {
             return bus.on("recipientDelivered", handler);
         },
@@ -630,7 +647,7 @@ export function createMessagingService(
             void ensurePeer(remote);
         },
 
-        /** Wire inbound acks/messages from peer registry bytes path. */
+        /** Demux opaque wire bytes into L4 events (M4 — no chat framing in L3). */
         handleWireFromRemote(remote: string, raw: string) {
             const parsed = parseChatDataWireEnvelope(raw);
             if (!parsed) return;
@@ -639,7 +656,11 @@ export function createMessagingService(
                 return;
             }
             if (parsed.t === "chatHistorySync") {
-                void parsed;
+                bus.emit("historySync", remote, parsed);
+                return;
+            }
+            if (parsed.t === "spaceMembershipHint") {
+                bus.emit("spaceMembershipHint", remote);
                 return;
             }
             if (parsed.t === "chatMessage") {

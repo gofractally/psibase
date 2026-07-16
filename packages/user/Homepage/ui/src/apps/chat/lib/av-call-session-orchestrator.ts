@@ -1,4 +1,3 @@
-import type { PeerTransportRegistry } from "../transport/l3-peer-registry";
 import type { AvRunEvent } from "./av-call-run-state-machine";
 import type { ChatObjectiveCallEvent } from "./call-timeline-bridge";
 import type { IceServerConfig } from "./protocol";
@@ -33,6 +32,7 @@ import {
     AvRunActor,
     createAvRunActor,
 } from "./av-call-run-actor";
+import { AvCallSessionRosterStore } from "./av-call-session-roster";
 import {
     type AvCallIncomingInvite,
     type AvCallOrchestratorHost,
@@ -106,10 +106,13 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
     private readonly groupMeetAttempts = new GroupMeetAttemptCoordinator();
 
     /** Latest x-wrtcsig roster per objective av-call session (not pair sessions). */
-    private readonly avCallSessionRosters = new Map<
-        string,
-        { joined: string[]; pending: string[]; epoch: number }
-    >();
+    private readonly rosterStore = new AvCallSessionRosterStore({
+        getSelf: () => this.getSelf(),
+        findRunBySessionId: (sessionId) => this.findRunBySessionId(sessionId),
+        dispatchRunEventAndWait: (run, event) =>
+            this.dispatchRunEventAndWait(run, event),
+        groupMeetAttempts: this.groupMeetAttempts,
+    });
 
     constructor(
         private readonly getRealtimeFn: () => RealtimeClient | null,
@@ -140,7 +143,6 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
                 videoMuted?: boolean;
             },
         ) => void,
-        private readonly getSharedPeerRegistryFn?: () => PeerTransportRegistry | null,
         private readonly getSharedSignalingFn?: () => WebRtcSignalingClient | null,
         private readonly isGroupMeetLeaveInProgressFn?: (
             spaceUuid: string,
@@ -563,7 +565,7 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
             }
             if (sessionId && run.kind === "dm") {
                 this.retireAvCallSession(sessionId);
-                this.avCallSessionRosters.delete(sessionId);
+                this.rosterStore.delete(sessionId);
             }
             this.deleteRun(spaceUuid);
         });
@@ -812,7 +814,7 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
         }
         this.runs.clear();
         this.actors.clear();
-        this.avCallSessionRosters.clear();
+        this.rosterStore.clear();
         this.realtimeHandlersInstalled = false;
         this.transportRecovery.dispose();
         if (this.reconcileAfterReconnectTimer != null) {
@@ -848,26 +850,11 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
     getPeerMediaPort():
         | import("../transport/peer-media-port").PeerMediaPort
         | null {
-        const fabric = this.getDeliveryFabric();
-        if (fabric) return fabric.asPeerMediaPort();
-        const registry = this.getSharedPeerRegistryFn?.() ?? null;
-        if (!registry) return null;
-        return {
-            ensure: (remote, reason) => registry.ensure(remote, reason),
-            getChatPeer: (remote) => registry.getChatPeer(remote),
-            holdMeet: (remote) => registry.holdMeet(remote),
-            releaseMeet: (remote) => registry.releaseMeet(remote),
-        };
-    }
-
-    getSharedPeerRegistry(): PeerTransportRegistry | null {
-        return this.getSharedPeerRegistryFn?.() ?? null;
+        return this.getDeliveryFabric()?.asPeerMediaPort() ?? null;
     }
 
     usesSharedTransport(): boolean {
-        return !!(
-            this.getDeliveryFabricFn?.() || this.getSharedPeerRegistryFn?.()
-        );
+        return !!this.getDeliveryFabricFn?.();
     }
 
     getSignaling(): WebRtcSignalingClient | null {
@@ -1061,39 +1048,12 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
         pendingParticipants: string[],
         epoch?: number,
     ): void {
-        if (sessionId.startsWith("wrtc:pair:")) return;
-        const prev = this.avCallSessionRosters.get(sessionId);
-        const clearing =
-            joinedParticipants.length === 0 && pendingParticipants.length === 0;
-        if (!clearing && epoch != null && prev != null && epoch <= prev.epoch) {
-            return;
-        }
-        if (prev) {
-            for (const participant of joinedParticipants) {
-                if (
-                    prev.pending.includes(participant) &&
-                    !prev.joined.includes(participant) &&
-                    !this.isAvCallRecentDeparture(sessionId, participant)
-                ) {
-                    this.clearAvCallPendingRejoin(sessionId, participant);
-                } else if (prev.joined.includes(participant)) {
-                    this.clearAvCallPendingRejoin(sessionId, participant);
-                }
-            }
-            for (const participant of pendingParticipants) {
-                if (prev.joined.includes(participant)) {
-                    this.markAvCallPendingRejoin(sessionId, participant);
-                }
-            }
-        }
-        this.avCallSessionRosters.set(sessionId, {
-            joined: [...joinedParticipants],
-            pending: [...pendingParticipants],
-            epoch: epoch ?? (prev?.epoch ?? 0) + 1,
-        });
-        if (clearing) {
-            this.groupMeetAttempts.clearSessionRejoinState(sessionId);
-        }
+        this.rosterStore.recordSnapshot(
+            sessionId,
+            joinedParticipants,
+            pendingParticipants,
+            epoch,
+        );
     }
 
     applyAvCallSessionSnapshotFromRealtime(
@@ -1102,66 +1062,7 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
         pendingParticipants: string[],
         epoch?: number,
     ): void {
-        if (sessionId.startsWith("wrtc:pair:")) return;
-        const prev = this.avCallSessionRosters.get(sessionId);
-        const clearing =
-            joinedParticipants.length === 0 && pendingParticipants.length === 0;
-        if (!clearing && epoch != null && prev != null && epoch <= prev.epoch) {
-            if (epoch < prev.epoch) {
-                avCallLog("sessionSnapshot ignored (epoch regression)", {
-                    sessionId: shortSessionId(sessionId),
-                    epoch,
-                    prevEpoch: prev.epoch,
-                });
-            }
-            return;
-        }
-
-        const self = this.getSelf();
-        if (prev && self && !clearing) {
-            const joined = joinedParticipants;
-            const pending = pendingParticipants;
-            for (const participant of prev.joined) {
-                if (participant === self) continue;
-                if (joined.includes(participant)) continue;
-                if (pending.includes(participant)) {
-                    this.markAvCallPendingRejoin(sessionId, participant);
-                    const run = this.findRunBySessionId(sessionId);
-                    if (
-                        run &&
-                        this.dispatchRunEventAndWait &&
-                        !this.isAvCallRecentDeparture(sessionId, participant)
-                    ) {
-                        avCallLog("sessionSnapshot: roster moved to pending", {
-                            sessionId: shortSessionId(sessionId),
-                            participant,
-                        });
-                        void this.dispatchRunEventAndWait(run, {
-                            type: "sessionEnded",
-                            sessionId,
-                            reason: "left",
-                            by: participant,
-                        }).then(() => run.onUpdate());
-                    }
-                    continue;
-                }
-                const run = this.findRunBySessionId(sessionId);
-                if (run && this.dispatchRunEventAndWait) {
-                    avCallLog("sessionSnapshot: roster departure", {
-                        sessionId: shortSessionId(sessionId),
-                        participant,
-                    });
-                    void this.dispatchRunEventAndWait(run, {
-                        type: "sessionEnded",
-                        sessionId,
-                        reason: "left",
-                        by: participant,
-                    }).then(() => run.onUpdate());
-                }
-            }
-        }
-
-        this.recordAvCallSessionSnapshot(
+        this.rosterStore.applySnapshotFromRealtime(
             sessionId,
             joinedParticipants,
             pendingParticipants,
@@ -1173,69 +1074,37 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
         sessionId: string,
         participant: string,
     ): void {
-        if (sessionId.startsWith("wrtc:pair:")) return;
-        const roster = this.avCallSessionRosters.get(sessionId);
-        if (!roster) {
-            this.avCallSessionRosters.set(sessionId, {
-                joined: [participant],
-                pending: [],
-                epoch: 1,
-            });
-            this.clearAvCallPendingRejoin(sessionId, participant);
-            return;
-        }
-        const joined = new Set(roster.joined);
-        joined.add(participant);
-        this.avCallSessionRosters.set(sessionId, {
-            joined: [...joined],
-            pending: roster.pending.filter((p) => p !== participant),
-            epoch: roster.epoch,
-        });
-        if (!this.isAvCallRecentDeparture(sessionId, participant)) {
-            this.clearAvCallPendingRejoin(sessionId, participant);
-        }
-        this.groupMeetAttempts.noteRosterPromotion(sessionId, participant);
+        this.rosterStore.promoteParticipantToJoined(sessionId, participant);
     }
 
     markAvCallPendingRejoin(sessionId: string, participant: string): void {
-        if (sessionId.startsWith("wrtc:pair:")) return;
-        this.groupMeetAttempts.markPendingRejoin(sessionId, participant);
+        this.rosterStore.markPendingRejoin(sessionId, participant);
     }
 
     isAvCallPendingRejoin(sessionId: string, participant: string): boolean {
-        return this.groupMeetAttempts.isPendingRejoin(sessionId, participant);
+        return this.rosterStore.isPendingRejoin(sessionId, participant);
     }
 
     clearAvCallPendingRejoin(sessionId: string, participant: string): void {
-        this.groupMeetAttempts.clearPendingRejoin(sessionId, participant);
+        this.rosterStore.clearPendingRejoin(sessionId, participant);
     }
 
     isAvCallRecentDeparture(sessionId: string, participant: string): boolean {
-        return this.groupMeetAttempts.isRecentDeparture(sessionId, participant);
+        return this.rosterStore.isRecentDeparture(sessionId, participant);
     }
 
     removeParticipantFromAvCallSessionRoster(
         sessionId: string,
         participant: string,
     ): void {
-        if (sessionId.startsWith("wrtc:pair:")) return;
-        const roster = this.avCallSessionRosters.get(sessionId);
-        if (!roster) return;
-        this.avCallSessionRosters.set(sessionId, {
-            joined: roster.joined.filter((p) => p !== participant),
-            pending: roster.pending.filter((p) => p !== participant),
-            epoch: roster.epoch,
-        });
-        this.groupMeetAttempts.markRecentDeparture(sessionId, participant);
+        this.rosterStore.removeParticipant(sessionId, participant);
     }
 
     private othersStillJoinedInAvCallSession(
         sessionId: string,
         self: string,
     ): boolean {
-        const roster = this.avCallSessionRosters.get(sessionId);
-        if (!roster) return false;
-        return roster.joined.some((p) => p !== self);
+        return this.rosterStore.othersStillJoined(sessionId, self);
     }
 
     /** Whether other participants remain in an active group Meet session. */
@@ -1244,15 +1113,15 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
     }
 
     getAvCallSessionRosterJoinedCount(sessionId: string): number {
-        return this.avCallSessionRosters.get(sessionId)?.joined.length ?? 0;
+        return this.rosterStore.getJoinedCount(sessionId);
     }
 
     getAvCallSessionJoinedParticipants(sessionId: string): readonly string[] {
-        return this.avCallSessionRosters.get(sessionId)?.joined ?? [];
+        return this.rosterStore.getJoinedParticipants(sessionId);
     }
 
     getAvCallSessionPendingParticipants(sessionId: string): readonly string[] {
-        return this.avCallSessionRosters.get(sessionId)?.pending ?? [];
+        return this.rosterStore.getPendingParticipants(sessionId);
     }
 
     /**
@@ -1272,7 +1141,7 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
         });
 
         this.retireAvCallSession(staleSessionId);
-        this.avCallSessionRosters.delete(staleSessionId);
+        this.rosterStore.delete(staleSessionId);
         if (signal.aborted) return;
 
         run.hasJoined = false;

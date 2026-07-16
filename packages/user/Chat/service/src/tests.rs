@@ -10,7 +10,7 @@ mod tests {
 
     fn setup_chat_http(chain: &Chain) -> Result<(), psibase::Error> {
         http_server::Wrapper::push_from(chain, Wrapper::SERVICE)
-            .registerServer(account!("chat+1"))
+            .registerServer("chat+1".parse().unwrap())
             .get()?;
         chain.finish_block();
         Ok(())
@@ -20,9 +20,9 @@ mod tests {
     fn test_ensure_dm_and_group(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
 
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
-        let carol = AccountNumber::from("carol");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
+        let carol = "carol".parse().unwrap();
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         chain.new_account(carol).unwrap();
@@ -40,7 +40,7 @@ mod tests {
             .get()?;
         assert_eq!(group.members.len(), 3);
 
-        let dave = AccountNumber::from("dave");
+        let dave = "dave".parse().unwrap();
         chain.new_account(dave).unwrap();
 
         let dm_dave = Wrapper::push_from(&chain, alice).ensureDm(dave).get()?;
@@ -54,9 +54,9 @@ mod tests {
     fn test_ensure_space_dm_and_group(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
 
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
-        let carol = AccountNumber::from("carol");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
+        let carol = "carol".parse().unwrap();
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         chain.new_account(carol).unwrap();
@@ -88,8 +88,8 @@ mod tests {
     ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
 
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
 
@@ -106,9 +106,9 @@ mod tests {
     fn test_spaces_persist_after_blocks(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
 
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
-        let carol = AccountNumber::from("carol");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
+        let carol = "carol".parse().unwrap();
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         chain.new_account(carol).unwrap();
@@ -143,9 +143,9 @@ mod tests {
         Wrapper::push(&chain).init();
         setup_chat_http(&chain)?;
 
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
-        let carol = AccountNumber::from("carol");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
+        let carol = "carol".parse().unwrap();
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         chain.new_account(carol).unwrap();
@@ -210,9 +210,9 @@ mod tests {
     fn test_create_group_chat_data_session(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
 
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
-        let carol = AccountNumber::from("carol");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
+        let carol = "carol".parse().unwrap();
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         chain.new_account(carol).unwrap();
@@ -260,10 +260,10 @@ mod tests {
     ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
 
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
-        let carol = AccountNumber::from("carol");
-        let dave = AccountNumber::from("dave");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
+        let carol = "carol".parse().unwrap();
+        let dave = "dave".parse().unwrap();
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         chain.new_account(carol).unwrap();
@@ -296,9 +296,9 @@ mod tests {
         Wrapper::push(&chain).init();
         setup_chat_http(&chain)?;
 
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
-        let carol = AccountNumber::from("carol");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
+        let carol = "carol".parse().unwrap();
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         chain.new_account(carol).unwrap();
@@ -381,10 +381,10 @@ mod tests {
     ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
 
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
-        let carol = AccountNumber::from("carol");
-        let sig = account!("x-wrtcsig");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
+        let carol = "carol".parse().unwrap();
+        let sig = "x-wrtcsig".parse().unwrap();
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         chain.new_account(carol).unwrap();
@@ -471,10 +471,10 @@ mod tests {
     ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
 
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
-        let carol = AccountNumber::from("carol");
-        let dave = AccountNumber::from("dave");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
+        let carol = "carol".parse().unwrap();
+        let dave = "dave".parse().unwrap();
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         chain.new_account(carol).unwrap();
@@ -503,8 +503,8 @@ mod tests {
     fn test_create_chat_data_session(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
 
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
 
@@ -543,9 +543,9 @@ mod tests {
     ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
 
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
-        let carol = AccountNumber::from("carol");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
+        let carol = "carol".parse().unwrap();
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         chain.new_account(carol).unwrap();
@@ -569,8 +569,8 @@ mod tests {
     ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
 
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
 
@@ -589,9 +589,9 @@ mod tests {
     ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
 
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
-        let sig = account!("x-wrtcsig");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
+        let sig = "x-wrtcsig".parse().unwrap();
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         chain.new_account(sig).unwrap();
@@ -646,8 +646,8 @@ mod tests {
     ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
 
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
 
@@ -676,8 +676,8 @@ mod tests {
     ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
 
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
 
@@ -705,9 +705,9 @@ mod tests {
     ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
 
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
-        let carol = AccountNumber::from("carol");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
+        let carol = "carol".parse().unwrap();
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         chain.new_account(carol).unwrap();
@@ -740,9 +740,9 @@ mod tests {
     ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
 
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
-        let carol = AccountNumber::from("carol");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
+        let carol = "carol".parse().unwrap();
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         chain.new_account(carol).unwrap();
@@ -772,8 +772,8 @@ mod tests {
     fn test_close_session_by_participant(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
 
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
 
@@ -807,9 +807,9 @@ mod tests {
     ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
 
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
-        let carol = AccountNumber::from("carol");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
+        let carol = "carol".parse().unwrap();
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         chain.new_account(carol).unwrap();
@@ -837,9 +837,9 @@ mod tests {
     ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
 
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
-        let carol = AccountNumber::from("carol");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
+        let carol = "carol".parse().unwrap();
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         chain.new_account(carol).unwrap();
@@ -862,8 +862,8 @@ mod tests {
         Wrapper::push(&chain).init();
         setup_chat_http(&chain)?;
 
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
 
@@ -932,9 +932,9 @@ mod tests {
     ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
 
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
-        let sig = account!("x-wrtcsig");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
+        let sig = "x-wrtcsig".parse().unwrap();
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         chain.new_account(sig).unwrap();
@@ -968,9 +968,9 @@ mod tests {
     ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
 
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
-        let sig = account!("x-wrtcsig");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
+        let sig = "x-wrtcsig".parse().unwrap();
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         chain.new_account(sig).unwrap();
@@ -1008,8 +1008,8 @@ mod tests {
     fn test_create_av_call_session(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
 
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
 
@@ -1050,9 +1050,9 @@ mod tests {
     fn test_create_group_av_call_session(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
 
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
-        let carol = AccountNumber::from("carol");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
+        let carol = "carol".parse().unwrap();
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         chain.new_account(carol).unwrap();
@@ -1087,9 +1087,9 @@ mod tests {
     ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
 
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
-        let carol = AccountNumber::from("carol");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
+        let carol = "carol".parse().unwrap();
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         chain.new_account(carol).unwrap();
@@ -1113,10 +1113,10 @@ mod tests {
     ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
 
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
-        let carol = AccountNumber::from("carol");
-        let dave = AccountNumber::from("dave");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
+        let carol = "carol".parse().unwrap();
+        let dave = "dave".parse().unwrap();
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         chain.new_account(carol).unwrap();
@@ -1148,9 +1148,9 @@ mod tests {
     ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
 
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
-        let sig = account!("x-wrtcsig");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
+        let sig = "x-wrtcsig".parse().unwrap();
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         chain.new_account(sig).unwrap();
@@ -1212,9 +1212,9 @@ mod tests {
         Wrapper::push(&chain).init();
         setup_chat_http(&chain)?;
 
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
-        let sig = account!("x-wrtcsig");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
+        let sig = "x-wrtcsig".parse().unwrap();
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         chain.new_account(sig).unwrap();
@@ -1274,9 +1274,9 @@ mod tests {
         Wrapper::push(&chain).init();
         setup_chat_http(&chain)?;
 
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
-        let carol = AccountNumber::from("carol");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
+        let carol = "carol".parse().unwrap();
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         chain.new_account(carol).unwrap();
@@ -1339,8 +1339,8 @@ mod tests {
     ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
 
-        let alice = AccountNumber::from("alice");
-        let bob = AccountNumber::from("bob");
+        let alice = "alice".parse().unwrap();
+        let bob = "bob".parse().unwrap();
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
 

@@ -18,7 +18,6 @@ import {
     type ChatDataWireEnvelope,
     type ChatHistorySyncEnvelope,
     type SpaceMembershipHintEnvelope,
-    parseChatDataWireEnvelope,
     serializeChatDataWireEnvelope,
 } from "./chat-data-envelope";
 import { buildRtcPeerConnectionConfig, iceServerSummary } from "./ice-config";
@@ -33,19 +32,11 @@ const CHAT_DATA_CHANNEL_LABEL = "chat";
 
 export type ChatDataPeerHandlers = {
     onDataChannelOpen?: () => void;
-    /** Opaque wire path — when set, skips typed envelope dispatch. */
-    onWireMessage?: (raw: string) => void;
-    onChatMessage?: (envelope: ChatDataMessageEnvelope) => void;
-    onChatHistorySync?: (envelope: ChatHistorySyncEnvelope) => void;
     /**
-     * Peer received a delivery ack from the remote end. The orchestrator
-     * uses this to mark the pending row as delivered to that recipient
-     * (the only authoritative signal — sender-side data channel writes are
-     * not reliable on their own).
+     * Opaque wire path (M4). Chat `t:` framing is demuxed at L4 / bridge —
+     * this peer never parses envelopes.
      */
-    onMessageAck?: (envelope: ChatDataMessageAckEnvelope) => void;
-    /** Peer created or joined a group on chain — reload sidebar spaces. */
-    onSpaceMembershipHint?: () => void;
+    onWireMessage?: (raw: string) => void;
     onFailed?: (detail: string) => void;
     /** Peer or datachannel lost but session may resume (peer navigated away, ICE drop, etc.). */
     onTransportLost?: (detail: string) => void;
@@ -1086,21 +1077,7 @@ export class ChatDataWebRtcPeer {
                       ? new TextDecoder().decode(ev.data)
                       : null;
             if (raw === null) return;
-            if (this.handlers.onWireMessage) {
-                this.handlers.onWireMessage(raw);
-                return;
-            }
-            const envelope = parseChatDataWireEnvelope(raw);
-            if (!envelope) return;
-            if (envelope.t === "chatMessage") {
-                this.handlers.onChatMessage?.(envelope);
-            } else if (envelope.t === "chatHistorySync") {
-                this.handlers.onChatHistorySync?.(envelope);
-            } else if (envelope.t === "messageAck") {
-                this.handlers.onMessageAck?.(envelope);
-            } else if (envelope.t === "spaceMembershipHint") {
-                this.handlers.onSpaceMembershipHint?.();
-            }
+            this.handlers.onWireMessage?.(raw);
         };
     }
 

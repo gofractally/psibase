@@ -101,7 +101,6 @@ pub fn call_events_for_space(space_uuid: &str) -> Vec<CallEvent> {
 #[cfg(test)]
 mod unit_tests {
     use super::*;
-    use psibase::AccountNumber;
 
     #[test]
     fn map_session_event_kinds_to_call_timeline_kinds() {
@@ -109,7 +108,7 @@ mod unit_tests {
             map_session_event_to_call_timeline(&SessionEventRow {
                 session_id: "wrtc:1".into(),
                 kind: SESSION_EVENT_PARTICIPANT_JOINED,
-                account: AccountNumber::from("bob"),
+                account: "bob".parse().unwrap(),
                 reason: "joined".into(),
                 at: 1,
             }),
@@ -119,7 +118,7 @@ mod unit_tests {
             map_session_event_to_call_timeline(&SessionEventRow {
                 session_id: "wrtc:1".into(),
                 kind: SESSION_EVENT_CALL_STARTED,
-                account: AccountNumber::from("alice"),
+                account: "alice".parse().unwrap(),
                 reason: "started".into(),
                 at: 0,
             }),

@@ -20,10 +20,18 @@ UI for Chat lives under Homepage at
 ## Build / test
 
 ```bash
-# from packages/user/Chat
-cargo-psibase package
-cargo-psibase test   # in service/
+# Prefer nix develop so rustc/cargo are on PATH.
+# If cargo-component fails with EXDEV (cross-device link), put --target-dir on
+# the same filesystem as the process temp dir (often /tmp/...):
+cargo-psibase test \
+  --manifest-path packages/user/Chat/service/Cargo.toml \
+  --target-dir /tmp/psibase-chat-target \
+  --psitest=build/psitest
 ```
+
+Registered in default `ctest` as `rs-test-Chat` (see
+`add_usr_cargo_psibase_test(Chat)` in `packages/CMakeLists.txt`, alongside
+Identity/Tokens/etc.).
 
 Query GraphiQL is available on the `chat` subdomain at `/graphiql` when the
 package is installed.

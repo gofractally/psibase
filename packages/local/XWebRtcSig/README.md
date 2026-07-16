@@ -36,3 +36,42 @@ JSON via `turnIceServersJson` and merges it with default STUN for welcome.
 - **Unit (ctest `rs-test-XWebRtcSig`):** `cargo-psibase test` on `service/`.
 - **E2E:** `tests/python/test_xwebrtcsig.py` — run manually; not wired into CMake
   (see repo-root `webrtc-test-plan.md`).
+
+### Python E2E: smoke subset vs full suite
+
+`tests/python/test_xwebrtcsig.py` has two classes:
+
+- `TestXWebRtcSig` — WS auth, presence, and join/signal/leave cases against a
+  real `psinode`. No extra Python deps beyond `programs/psinode/tests/`.
+- `TestChatDataP2pHarness(TestXWebRtcSig)` — adds real aiortc P2P cases
+  (`test_chat_data_p2p_*`); requires `pip install aiortc` or those cases
+  self-skip (`aiortc_available()` guard). Since it subclasses
+  `TestXWebRtcSig`, running this class also re-runs every base case.
+
+For a fast PR2-style smoke pass (auth + presence + one join), run just:
+
+- `TestXWebRtcSig.test_ws_bearer_auth_welcome` — authed WS handshake gets `welcome`
+- `TestXWebRtcSig.test_ws_unauthenticated_rejected` — unauthenticated upgrade rejected
+- `TestXWebRtcSig.test_presence_fanout_on_connect` — presence delta fans out to peers
+- `TestXWebRtcSig.test_chat_data_join_session_invite` — one `joinSession` → `sessionInvite` case
+
+```bash
+PYTHONPATH=programs/psinode/tests \
+PSIBASE_PACKAGE_DIR=build/share/psibase/packages \
+python packages/local/XWebRtcSig/tests/python/test_xwebrtcsig.py \
+  --psinode=build/psinode \
+  TestXWebRtcSig.test_ws_bearer_auth_welcome \
+  TestXWebRtcSig.test_ws_unauthenticated_rejected \
+  TestXWebRtcSig.test_presence_fanout_on_connect \
+  TestXWebRtcSig.test_chat_data_join_session_invite
+```
+
+Full suite (all WS cases plus aiortc P2P mesh/group/rejoin/catch-up cases —
+slower, needs `aiortc` for full coverage):
+
+```bash
+PYTHONPATH=programs/psinode/tests \
+PSIBASE_PACKAGE_DIR=build/share/psibase/packages \
+python packages/local/XWebRtcSig/tests/python/test_xwebrtcsig.py \
+  --psinode=build/psinode
+```

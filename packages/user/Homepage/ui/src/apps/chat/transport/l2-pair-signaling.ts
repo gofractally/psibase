@@ -65,8 +65,8 @@ export function createPairSignaling(
 ): PairSignaling {
     const bus = new EventBus<PairSignalingEvents>();
     const activePairs = new Set<string>();
+    /** Sole source of truth for "self joined on server" (M5). */
     const joinedPairs = new Set<string>();
-    const serverJoined = new Map<string, boolean>();
     const awaitingSnapshot = new Set<string>();
     const joinQueue: string[] = [];
     let joinDrainTimer: ReturnType<typeof setTimeout> | null = null;
@@ -81,7 +81,6 @@ export function createPairSignaling(
 
     const emitPairJoined = (pairId: string) => {
         joinedPairs.add(pairId);
-        serverJoined.set(pairId, true);
         awaitingSnapshot.delete(pairId);
         joinRetryCounts.delete(pairId);
         opts.onServerJoined?.(pairId);
@@ -225,7 +224,6 @@ export function createPairSignaling(
     const invalidateJoinState = () => {
         for (const pairId of activePairs) {
             joinedPairs.delete(pairId);
-            serverJoined.set(pairId, false);
             awaitingSnapshot.delete(pairId);
             joinRetryCounts.delete(pairId);
             const idx = joinQueue.indexOf(pairId);
@@ -273,7 +271,6 @@ export function createPairSignaling(
         leavePair(pairId, reason) {
             activePairs.delete(pairId);
             joinedPairs.delete(pairId);
-            serverJoined.delete(pairId);
             awaitingSnapshot.delete(pairId);
             const idx = joinQueue.indexOf(pairId);
             if (idx >= 0) joinQueue.splice(idx, 1);
@@ -318,7 +315,6 @@ export function createPairSignaling(
             // beginNegotiation; remote may still be pending.
             if (!selfOnRoster) {
                 joinedPairs.delete(pairId);
-                serverJoined.set(pairId, false);
             } else if (!joinedPairs.has(pairId)) {
                 markJoined(pairId);
             }
