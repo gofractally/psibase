@@ -1,10 +1,10 @@
 use std::fmt;
 
 use crate::{
-    method, schema_types,
+    field_names, field_types, method, schema_types,
     services::{db, transact},
-    AccountNumber, Action, Hex, MethodNumber, MethodString, Schema, SchemaMap, ServiceMethod,
-    SharedAction,
+    AccountNumber, Action, CustomPrettyAction, Hex, MethodNumber, MethodString, Schema, SchemaMap,
+    ServiceMethod, SharedAction, TypeMatchExt,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -217,7 +217,7 @@ fn format_action_trace(
         let mut custom = schema_types();
         let service_method = CustomResolvedServiceMethod::new(schemas, std::mem::drop);
         custom.insert("ServiceMethod".to_string(), &service_method);
-        let custom_action = CustomActionCollector::new(&*schemas, drop_action);
+        let custom_action = CustomPrettyAction::new(&*schemas);
         custom.insert("Action".to_string(), &custom_action);
         let mut cschema = CompiledSchema::new(&schema.unwrap().types, &custom);
         if !atrace.action.rawData.is_empty() {
@@ -442,7 +442,7 @@ impl<'a, F: SchemaFetcher + 'a> ActionFormatter<'a, F> {
                 });
             custom.insert("ServiceMethod".to_string(), &service_method);
             let nested_actions = RefCell::new(nested_actions);
-            let custom_action = CustomActionCollector::new(&*schemas, |inner: SharedAction| {
+            let custom_action = CustomActionCollector::new(|inner: SharedAction| {
                 if let Some(raw_data) = restore_lifetime(act.rawData.0, inner.rawData.0) {
                     nested_actions.borrow_mut().push(SharedAction {
                         sender: inner.sender,
@@ -680,7 +680,7 @@ impl<'a, 'b> Serialize for UnpackedTrace<'a, &'b ActionTrace> {
             let mut custom = schema_types();
             let service_method = CustomResolvedServiceMethod::new(self.schemas, std::mem::drop);
             custom.insert("ServiceMethod".to_string(), &service_method);
-            let custom_action = CustomActionCollector::new(&self.schemas, drop_action);
+            let custom_action = CustomPrettyAction::new(&self.schemas);
             custom.insert("Action".to_string(), &custom_action);
             let mut cschema = CompiledSchema::new(&schema.unwrap().types, &custom);
             if !atrace.action.rawData.is_empty() {
@@ -776,22 +776,6 @@ impl<'a, F> CustomResolvedServiceMethod<'a, F> {
     }
 }
 
-fn field_types<const N: usize>(ty: &CompiledType) -> Option<[usize; N]> {
-    if let CompiledType::Object { children } = ty {
-        let children: &[_; N] = children[..].try_into().ok()?;
-        return Some(children.each_ref().map(|child| child.1));
-    }
-    None
-}
-
-fn field_names<const N: usize>(ty: &CompiledType) -> Option<[&str; N]> {
-    if let CompiledType::Object { children } = ty {
-        let children: &[_; N] = children[..].try_into().ok()?;
-        return Some(children.each_ref().map(|child| child.0.as_str()));
-    }
-    None
-}
-
 impl<'b, F: Fn(ServiceMethod) -> ()> CustomHandler for CustomResolvedServiceMethod<'b, F> {
     fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool {
         if let Some([service, method]) = field_types::<2>(ty) {
@@ -859,67 +843,28 @@ impl<'b, F: Fn(ServiceMethod) -> ()> CustomHandler for CustomResolvedServiceMeth
     }
 }
 
-struct CustomActionCollector<'a, F> {
+struct CustomActionCollector<F> {
     f: F,
-    schemas: &'a HashMap<AccountNumber, Schema>,
 }
 
-impl<'a, F> CustomActionCollector<'a, F> {
-    fn new(schemas: &'a SchemaMap, f: F) -> Self {
-        Self { f, schemas }
+impl<F> CustomActionCollector<F> {
+    fn new(f: F) -> Self {
+        Self { f }
     }
 }
 
-// std::mem::drop doesn't handle lifetimes generically enough
-fn drop_action<'b>(_act: SharedAction<'b>) {}
-
-impl<'b, F: Fn(SharedAction) -> ()> CustomHandler for CustomActionCollector<'b, F> {
+impl<F: Fn(SharedAction) -> ()> CustomHandler for CustomActionCollector<F> {
     fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool {
-        if let Some([sender_type, service_type, method_type, raw_data_type]) = field_types::<4>(ty)
-        {
-            schema.matches_u64(sender_type)
-                && schema.matches_u64(service_type)
-                && schema.matches_u64(method_type)
-                && schema.matches_bytes(raw_data_type)
-        } else {
-            false
-        }
+        schema.matches_action(ty)
     }
     fn frac2json(
         &self,
         _schema: &CompiledSchema,
-        ty: &CompiledType,
-        src: &mut FracInputStream,
+        _ty: &CompiledType,
+        _src: &mut FracInputStream,
         _allow_empty_container: bool,
     ) -> Result<serde_json::Value, fracpack::Error> {
-        let [sender_name, service_name, method_name, raw_data_name] = field_names::<4>(ty).unwrap();
-        let value = SharedAction::unpack(src)?;
-        let mut method = MethodString(value.method.to_string());
-        let mut data = None;
-        if let Some(schema) = self.schemas.get(&value.service) {
-            if let Some((key, action_type)) = schema.actions.get_key_value(&method) {
-                method = key.clone();
-
-                let mut custom = schema_types();
-                let service_method = CustomResolvedServiceMethod::new(self.schemas, std::mem::drop);
-                custom.insert("ServiceMethod".to_string(), &service_method);
-                let custom_action = CustomActionCollector::new(&self.schemas, drop_action);
-                custom.insert("Action".to_string(), &custom_action);
-                let mut cschema = CompiledSchema::new(&schema.types, &custom);
-                cschema.extend(&action_type.params);
-                data = cschema.to_value(&action_type.params, value.rawData.0).ok();
-            }
-        }
-        let mut result = serde_json::Map::with_capacity(4);
-        result.insert(sender_name.to_owned(), value.sender.to_string().into());
-        result.insert(service_name.to_owned(), value.service.to_string().into());
-        result.insert(method_name.to_owned(), method.0.into());
-        if let Some(data) = data {
-            result.insert("data".to_string(), data);
-        } else {
-            result.insert(raw_data_name.to_owned(), value.rawData.to_string().into());
-        }
-        Ok(result.into())
+        unimplemented!()
     }
     fn json2frac(
         &self,

@@ -1,4 +1,4 @@
-use crate::{AccountNumber, DbId, MethodNumber};
+use crate::{AccountNumber, Action, DbId, Hex, MethodNumber, SchemaMap, SharedAction};
 use fracpack::{
     AnyType, CompiledSchema, CompiledType, CustomHandler, CustomTypes, FracInputStream,
     FunctionType, Pack, SchemaBuilder, ToSchema, Unpack, VisitTypes,
@@ -383,6 +383,164 @@ pub fn schema_types() -> CustomTypes<'static> {
     result.insert("AccountNumber".to_string(), &ACCOUNT_NUMBER);
     result.insert("MethodNumber".to_string(), &METHOD_NUMBER);
     result
+}
+
+pub fn field_types<const N: usize>(ty: &CompiledType) -> Option<[usize; N]> {
+    if let CompiledType::Object { children } = ty {
+        let children: &[_; N] = children[..].try_into().ok()?;
+        return Some(children.each_ref().map(|child| child.1));
+    }
+    None
+}
+
+pub fn field_names<const N: usize>(ty: &CompiledType) -> Option<[&str; N]> {
+    if let CompiledType::Object { children } = ty {
+        let children: &[_; N] = children[..].try_into().ok()?;
+        return Some(children.each_ref().map(|child| child.0.as_str()));
+    }
+    None
+}
+
+pub trait TypeMatchExt {
+    fn matches_action(&self, ty: &CompiledType) -> bool;
+}
+
+impl TypeMatchExt for CompiledSchema<'_> {
+    fn matches_action(&self, ty: &CompiledType) -> bool {
+        if let Some([sender_type, service_type, method_type, raw_data_type]) = field_types::<4>(ty)
+        {
+            self.matches_u64(sender_type)
+                && self.matches_u64(service_type)
+                && self.matches_u64(method_type)
+                && self.matches_bytes(raw_data_type)
+        } else {
+            false
+        }
+    }
+}
+
+pub struct CustomPrettyAction<'a> {
+    schemas: &'a SchemaMap,
+}
+
+impl<'a> CustomPrettyAction<'a> {
+    pub fn new(schemas: &'a SchemaMap) -> Self {
+        Self { schemas }
+    }
+}
+
+pub fn deserialize_pretty_action<'a>(
+    ty: &'a CompiledType,
+    val: &serde_json::Value,
+) -> Result<(AccountNumber, AccountNumber, MethodNumber, &'a str), serde_json::Error> {
+    use serde::de::Error;
+    let [sender_name, service_name, method_name, raw_data_name] = field_names::<4>(ty).unwrap();
+    let Some(object) = val.as_object() else {
+        Err(serde_json::Error::custom("expected object"))?
+    };
+
+    let sender = AccountNumber::deserialize(
+        object
+            .get(sender_name)
+            .ok_or_else(|| serde_json::Error::custom(format!("missing field {}", sender_name)))?,
+    )?;
+    let service =
+        AccountNumber::deserialize(object.get(service_name).ok_or_else(|| {
+            serde_json::Error::custom(format!("missing field {}", service_name))
+        })?)?;
+    let method = MethodNumber::deserialize(
+        object
+            .get(method_name)
+            .ok_or_else(|| serde_json::Error::custom(format!("missing field {}", method_name)))?,
+    )?;
+    Ok((sender, service, method, raw_data_name))
+}
+
+impl<'a> CustomHandler for CustomPrettyAction<'a> {
+    fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool {
+        schema.matches_action(ty)
+    }
+    fn frac2json(
+        &self,
+        parent_schema: &CompiledSchema,
+        ty: &CompiledType,
+        src: &mut FracInputStream,
+        _allow_empty_container: bool,
+    ) -> Result<serde_json::Value, fracpack::Error> {
+        let [sender_name, service_name, method_name, raw_data_name] = field_names::<4>(ty).unwrap();
+        let value = SharedAction::unpack(src)?;
+        let mut method = MethodString(value.method.to_string());
+        let mut data = None;
+        if let Some(schema) = self.schemas.get(&value.service) {
+            if let Some((key, action_type)) = schema.actions.get_key_value(&method) {
+                method = key.clone();
+
+                let mut cschema = CompiledSchema::new(&schema.types, parent_schema.get_custom());
+                cschema.extend(&action_type.params);
+                data = cschema.to_value(&action_type.params, value.rawData.0).ok();
+            }
+        }
+        let mut result = serde_json::Map::with_capacity(4);
+        result.insert(sender_name.to_owned(), value.sender.to_string().into());
+        result.insert(service_name.to_owned(), value.service.to_string().into());
+        result.insert(method_name.to_owned(), method.0.into());
+        if let Some(data) = data {
+            result.insert("data".to_string(), data);
+        } else {
+            result.insert(raw_data_name.to_owned(), value.rawData.to_string().into());
+        }
+        Ok(result.into())
+    }
+    fn json2frac(
+        &self,
+        parent_schema: &CompiledSchema,
+        ty: &CompiledType,
+        val: &serde_json::Value,
+        dest: &mut Vec<u8>,
+    ) -> Result<(), serde_json::Error> {
+        use serde::de::Error;
+        let (sender, service, method, raw_data_name) = deserialize_pretty_action(ty, val)?;
+
+        let mut raw_data = None;
+        if let Some(data) = val.get("data") {
+            if let Some(schema) = self.schemas.get(&service) {
+                if let Some(action_type) = schema.actions.get(&MethodString(method.to_string())) {
+                    let mut cschema =
+                        CompiledSchema::new(&schema.types, parent_schema.get_custom());
+                    cschema.extend(&action_type.params);
+                    raw_data = Some(Hex(cschema.from_value(&action_type.params, data)?));
+                }
+            }
+        }
+        let raw_data = if let Some(raw_data) = raw_data {
+            raw_data
+        } else {
+            <Hex<Vec<u8>>>::deserialize(
+                val.get(raw_data_name)
+                    .ok_or_else(|| serde_json::Error::custom(format!("missing field data")))?,
+            )?
+        };
+        Action {
+            sender,
+            service,
+            method,
+            rawData: raw_data,
+        }
+        .pack(dest);
+        Ok(())
+    }
+    fn fracpack_verify(
+        &self,
+        _schema: &CompiledSchema,
+        _ty: &CompiledType,
+        src: &mut FracInputStream,
+        _allow_empty_container: bool,
+    ) -> Result<(), fracpack::Error> {
+        SharedAction::verify(src)
+    }
+    fn is_empty_container(&self, _ty: &CompiledType, _value: &serde_json::Value) -> bool {
+        false
+    }
 }
 
 pub fn create_schema<T: ToServiceSchema>() -> Schema {

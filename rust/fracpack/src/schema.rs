@@ -1256,6 +1256,10 @@ impl<'a> CompiledSchema<'a> {
             false
         }
     }
+
+    pub fn get_custom(&self) -> &'a CustomTypes<'a> {
+        self.custom
+    }
 }
 
 #[derive(Debug)]
