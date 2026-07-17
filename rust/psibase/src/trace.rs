@@ -339,6 +339,15 @@ pub trait SchemaFetcher {
     async fn fetch_schema(&self, service: AccountNumber) -> Result<Schema, anyhow::Error>;
 }
 
+pub struct NullSchemaFetcher;
+
+#[async_trait(?Send)]
+impl SchemaFetcher for NullSchemaFetcher {
+    async fn fetch_schema(&self, _service: AccountNumber) -> Result<Schema, anyhow::Error> {
+        Err(anyhow::anyhow!("Schema fetching disabled"))
+    }
+}
+
 pub struct DisplayTransactionTrace<'a> {
     schemas: &'a RefCell<HashMap<AccountNumber, Schema>>,
     trace: &'a TransactionTrace,

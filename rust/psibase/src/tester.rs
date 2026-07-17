@@ -13,10 +13,10 @@ use crate::{
     get_optional_result_bytes, get_result_bytes, services, status_key, tester_raw, AccountNumber,
     Action, ActionFormatter, BlockTime, Caller, Checksum256, CodeByHashRow, CodeRow, DbId,
     DirectoryRegistry, Error, HostConfigRow, HttpBody, HttpHeader, HttpReply, HttpRequest,
-    InnerTraceEnum, JointRegistry, KvHandle, KvMode, PackageOpFull, PackageRegistry,
-    PackagedService, RunMode, Schema, SchemaFetcher, SchemaMap, Seconds, ServiceWrapper,
-    SignedTransaction, StatusRow, Table, TableRecord, Tapos, TimePointSec, TimePointUSec, ToKey,
-    Transaction, TransactionBuilder, TransactionTrace,
+    InnerTraceEnum, JointRegistry, KvHandle, KvMode, PackageOpFull, PackageRegistry, RunMode,
+    Schema, SchemaFetcher, SchemaMap, Seconds, ServiceWrapper, SignedTransaction, StatusRow, Table,
+    TableRecord, Tapos, TimePointSec, TimePointUSec, ToKey, Transaction, TransactionBuilder,
+    TransactionTrace,
 };
 #[cfg(target_family = "wasm")]
 use crate::{MicroSeconds, PackageList};
@@ -29,9 +29,8 @@ use psibase_macros::account_raw;
 use serde::{de::DeserializeOwned, Deserialize};
 use sha2::{Digest, Sha256};
 use std::cell::{Cell, RefCell};
-use std::collections::HashSet;
 use std::fs::File;
-use std::io::{BufReader, Read, Seek};
+use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::{marker::PhantomData, ptr::null_mut};
 
@@ -679,29 +678,6 @@ impl Chain {
         Ok(())
     }
 
-    fn load_schemas<R: Read + Seek>(
-        &self,
-        package: &mut PackagedService<R>,
-        schemas: &mut SchemaMap,
-    ) -> Result<(), anyhow::Error> {
-        use crate::Table;
-        package.get_all_schemas(schemas)?;
-        let mut required = HashSet::new();
-        package.get_required_schemas(&mut required)?;
-        let index = self
-            .open::<services::packages::InstalledSchema, services::packages::InstalledSchemaTable>()
-            .get_index_pk();
-        for account in required {
-            if !schemas.contains_key(&account) {
-                let Some(schema) = index.get(&account) else {
-                    Err(anyhow!("Could not find schema for {account}"))?
-                };
-                schemas.insert(account, schema.schema);
-            }
-        }
-        Ok(())
-    }
-
     pub fn install<R: PackageRegistry>(
         &self,
         reg: &R,
@@ -715,17 +691,22 @@ impl Chain {
             installed.insert_installed(p)
         }
         let packages = block_on(installed.resolve_changes(reg, packages, false, false))?;
-        let packages = block_on(fetch_packages(reg, packages, &installed))?;
+        let mut schemas = SchemaMap::new();
+        let packages = block_on(fetch_packages(
+            reg,
+            packages,
+            &installed,
+            &ChainSchemaFetcher { chain: self },
+            &mut schemas,
+        ))?;
         let updated_packages = installed.into_updated(&packages, sender);
 
-        let mut schemas = SchemaMap::new();
         const TARGET_SIZE: usize = 1024 * 1024;
         const COMPRESSION_LEVEL: u32 = 4;
         for op in packages {
             match op {
                 PackageOpFull::Install(mut package) => {
                     let mut builder = TransactionBuilder::new(TARGET_SIZE, |actions| Ok(actions));
-                    self.load_schemas(&mut package, &mut schemas)?;
                     builder.set_label(format!(
                         "Installing {}-{}",
                         package.name(),

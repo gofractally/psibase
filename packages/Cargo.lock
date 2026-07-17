@@ -2042,7 +2042,9 @@ name = "packages"
 version = "0.23.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "chrono",
+ "futures",
  "getrandom 0.3.4",
  "psibase",
  "psibase-plugin-workspace-hack",

@@ -1110,7 +1110,7 @@ impl<R: Read + Seek> PackagedService<R> {
     }
 
     pub async fn load_schemas<F: SchemaFetcher>(
-        &mut self,
+        &self,
         fetcher: &F,
         schemas: &mut SchemaMap,
     ) -> Result<(), anyhow::Error> {
@@ -1593,6 +1593,30 @@ impl<R: Read + Seek> PackageOpFull<R> {
     }
 }
 
+pub async fn fetch_all_schemas<R: Read + Seek, F: SchemaFetcher>(
+    packages: &Vec<PackageOpFull<R>>,
+    fetcher: &F,
+    schemas: &mut SchemaMap,
+) -> Result<(), anyhow::Error> {
+    for op in packages {
+        match op {
+            PackageOpFull::Install(package) | PackageOpFull::Replace(_, package) => {
+                package.get_all_schemas(schemas)?
+            }
+            _ => {}
+        }
+    }
+    for op in packages {
+        match op {
+            PackageOpFull::Install(package) | PackageOpFull::Replace(_, package) => {
+                package.load_schemas(fetcher, schemas).await?
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
 pub async fn fetch_packages<R: PackageRegistry + ?Sized, F: SchemaFetcher>(
     reg: &R,
     ops: Vec<PackageOp>,
@@ -1610,16 +1634,7 @@ pub async fn fetch_packages<R: PackageRegistry + ?Sized, F: SchemaFetcher>(
             PackageOp::Remove(meta) => PackageOpFull::Remove(meta),
         })
     }
-    for op in &mut result {
-        if let Some(package) = op.new() {
-            package.get_all_schemas(schemas)?
-        }
-    }
-    for op in &mut result {
-        if let Some(package) = op.new() {
-            package.load_schemas(fetcher, schemas).await?
-        }
-    }
+    fetch_all_schemas(&result, fetcher, schemas).await?;
     // add all schemas required by packages
     sort_package_ops(&mut result, existing, schemas)?;
     Ok(result)
