@@ -860,7 +860,8 @@ impl<R: Read + Seek> PackagedService<R> {
                 .postinstall
                 .iter()
                 .map(|act| act.to_action(schemas))
-                .collect::<Result<Vec<Action>, anyhow::Error>>()?,
+                .collect::<Result<Vec<Action>, anyhow::Error>>()
+                .with_context(|| format!("Invalid postinstall script for {}", self.meta.name))?,
         );
         Ok(())
     }
@@ -1281,17 +1282,13 @@ impl<R: Read + Seek> PackagedService<R> {
 }
 
 pub fn get_schemas<T: Read + Seek>(
-    packages: &mut [PackagedService<T>],
-) -> Result<(SchemaMap, HashSet<AccountNumber>), anyhow::Error> {
-    let mut accounts = HashSet::new();
-    for package in &mut packages[..] {
-        package.get_required_schemas(&mut accounts)?
-    }
+    packages: &[PackagedService<T>],
+) -> Result<SchemaMap, anyhow::Error> {
     let mut schemas = HashMap::new();
-    for package in &mut packages[..] {
-        package.get_schemas(&mut accounts, &mut schemas)?
+    for package in &packages[..] {
+        package.get_all_schemas(&mut schemas)?
     }
-    Ok((schemas, accounts))
+    Ok(schemas)
 }
 
 pub trait ActionGroup {

@@ -270,7 +270,7 @@ pub fn create_boot_transactions<R: Read + Seek>(
     ),
     anyhow::Error,
 > {
-    let (schemas, _) = get_schemas(&mut service_packages[..])?;
+    let schemas = get_schemas(&mut service_packages[..])?;
     validate_dependencies(service_packages, &schemas)?;
     let mut boot_transactions = vec![genesis_transaction(expiration, service_packages)?];
 

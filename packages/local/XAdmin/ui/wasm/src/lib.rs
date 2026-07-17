@@ -51,7 +51,11 @@ impl Boot for XAdminPlugin {
                 PackagedService::new(Cursor::new(s)).map_err(|e| e.to_string())?,
             ));
         }
-        sort_package_ops(&mut ops, &PackageList::new()).map_err(|e| e.to_string())?;
+        let mut schemas = SchemaMap::new();
+        for op in &mut ops {
+            op.new().unwrap().get_all_schemas(&mut schemas);
+        }
+        sort_package_ops(&mut ops, &PackageList::new(), &schemas).map_err(|e| e.to_string())?;
 
         let mut packages: Vec<_> = ops
             .into_iter()

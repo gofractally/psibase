@@ -502,22 +502,29 @@ impl<'a> CustomHandler for CustomPrettyAction<'a> {
         let (sender, service, method, raw_data_name) = deserialize_pretty_action(ty, val)?;
 
         let mut raw_data = None;
-        if let Some(data) = val.get("data") {
+        let err = if let Some(data) = val.get("data") {
             if let Some(schema) = self.schemas.get(&service) {
                 if let Some(action_type) = schema.actions.get(&MethodString(method.to_string())) {
                     let mut cschema =
                         CompiledSchema::new(&schema.types, parent_schema.get_custom());
                     cschema.extend(&action_type.params);
                     raw_data = Some(Hex(cschema.from_value(&action_type.params, data)?));
+                    String::new()
+                } else {
+                    format!("Missing action {service}::{method}")
                 }
+            } else {
+                format!("missing schema for {service}")
             }
-        }
+        } else {
+            format!("missing field data")
+        };
         let raw_data = if let Some(raw_data) = raw_data {
             raw_data
         } else {
             <Hex<Vec<u8>>>::deserialize(
                 val.get(raw_data_name)
-                    .ok_or_else(|| serde_json::Error::custom(format!("missing field data")))?,
+                    .ok_or_else(|| serde_json::Error::custom(err))?,
             )?
         };
         Action {
