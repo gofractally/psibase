@@ -12,9 +12,7 @@ namespace
 {
    bool isResMonitoring()
    {
-      auto table  = Transact::Tables(Transact::service).open<ResMonitoringConfigTable>();
-      auto config = table.get({});
-      return config && config->enabled;
+      return to<Transact>().isResMonitoring();
    }
 
    void skipBilling()

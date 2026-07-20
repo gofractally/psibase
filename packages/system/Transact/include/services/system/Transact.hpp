@@ -444,6 +444,9 @@ namespace SystemService
       /// Enable/disable resource monitoring
       void resMonitoring(bool enable);
 
+      /// Returns true if resource monitoring is enabled
+      bool isResMonitoring();
+
       /// Suppress billing/tracking for the next `numWrites` disk writes.
       ///
       /// Intended for wrapping privileged-service writes that are modified
@@ -517,6 +520,7 @@ namespace SystemService
                 method(runAs, action, allowedActions),
                 method(checkFirstAuth, id, transaction),
                 method(resMonitoring, enable),
+                method(isResMonitoring),
                 method(skipBilling, numWrites),
                 method(endSkipBilling),
                 method(systemWrite, numBytes),

@@ -25,7 +25,7 @@ namespace SystemService
 
    namespace
    {
-      bool isResMonitoring()
+      bool resMonitoringEnabled()
       {
          auto table  = Transact::Tables(Transact::service).open<ResMonitoringConfigTable>();
          auto config = table.get({});
@@ -186,7 +186,7 @@ namespace SystemService
          snap.put({stat.head->header.time, psibase::Seconds{0}});
       }
 
-      if (isResMonitoring())
+      if (resMonitoringEnabled())
       {
          auto _ = recurse();
          to<VirtualServer>().notifyBlock(stat.current.blockNum);
@@ -590,7 +590,7 @@ namespace SystemService
          {
             flags |= AuthInterface::firstAuthFlag;
 
-            if (isResMonitoring())
+            if (resMonitoringEnabled())
             {
                // If resMonitoring is disabled, no CPU limit is set for the transaction
                to<VirtualServer>().setBillableAcc(act.sender());
@@ -647,6 +647,11 @@ namespace SystemService
           .put({.enabled = enable});
    }
 
+   bool Transact::isResMonitoring()
+   {
+      return resMonitoringEnabled();
+   }
+
    void Transact::skipBilling(uint32_t numWrites)
    {
       checkPrivilegedSender();
@@ -700,7 +705,7 @@ namespace SystemService
       Actor<CpuLimit> cpuLimit(Transact::service, CpuLimit::service, CallFlags::runModeRpc);
       Actor<Accounts> accounts(Transact::service, Accounts::service);
 
-      if (enforceAuth && isResMonitoring())
+      if (enforceAuth && resMonitoringEnabled())
       {
          to<VirtualServer>().prestartTx(trxSender.value());
       }
@@ -717,7 +722,7 @@ namespace SystemService
                // Anything that could be billed should be done after first auth, because first
                //   auth may set a billable subaccount on the VirtualServer.
 
-               if (isResMonitoring())
+               if (resMonitoringEnabled())
                {
                   uint64_t      netUsage = t.size();
                   AccountNumber sender   = act.sender();
@@ -753,7 +758,7 @@ namespace SystemService
       check(!trx.actions().empty(), "transaction must have at least one action");
       if (enforceAuth)
       {
-         if (isResMonitoring())
+         if (resMonitoringEnabled())
          {
             std::chrono::nanoseconds cpuUsage = cpuLimit.getCpuTime();
             to<VirtualServer>().useCpuSys(trx.actions()[0].sender(), cpuUsage.count());
@@ -802,7 +807,7 @@ namespace SystemService
       constexpr std::uint32_t DNE = static_cast<std::uint32_t>(-1);
       check(!(oldValueLen == DNE && newValueLen == DNE), "Invalid kv notify");
 
-      if (isResMonitoring())
+      if (resMonitoringEnabled())
       {
          if (skipDiskWrites.has_value())
          {

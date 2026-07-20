@@ -333,6 +333,12 @@ mod service {
         unimplemented!()
     }
 
+    /// Returns true if resource monitoring is enabled
+    #[action]
+    fn isResMonitoring() -> bool {
+        unimplemented!()
+    }
+
     /// The next `numWrites` db writes will not be billed.
     ///
     /// This may only be called by privileged services, and must be paired
