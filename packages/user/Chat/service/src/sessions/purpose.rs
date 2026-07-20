@@ -1,7 +1,6 @@
 use psibase::AccountNumber;
 
 use crate::spaces::canonical_space_members;
-use crate::tables::SPACE_KIND_GROUP;
 
 use super::types::{SessionError, PURPOSE_AV_CALL, PURPOSE_CHAT_DATA};
 
@@ -19,19 +18,20 @@ pub fn validate_purpose(purpose: &str) -> Result<(), SessionError> {
     }
 }
 
-/// For group `chat-data` and `av-call` sessions, objective metadata always includes all
-/// Space members (N-party mesh). DM and other purposes use the explicit participant list.
+/// Resolve session participants at create time.
+///
+/// For `chat-data` / `av-call`, always use the full Space membership (DM or group).
+/// The action's explicit list is ignored so a DM cannot be created with only one side.
 pub fn participants_for_session(
-    space_kind: u8,
+    _space_kind: u8,
     purpose: &str,
     space_members: &[AccountNumber],
     explicit_participants: &[AccountNumber],
 ) -> Vec<AccountNumber> {
-    if space_kind == SPACE_KIND_GROUP
-        && (purpose == PURPOSE_CHAT_DATA || purpose == PURPOSE_AV_CALL)
-    {
+    if purpose == PURPOSE_CHAT_DATA || purpose == PURPOSE_AV_CALL {
         canonical_space_members(space_members.iter().copied())
     } else {
+        // Unreachable after `validate_purpose`; keep explicit list for safety.
         canonical_space_members(explicit_participants.iter().copied())
     }
 }

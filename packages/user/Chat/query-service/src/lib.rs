@@ -5,7 +5,9 @@ mod service {
     use chat::call_timeline;
     use chat::sessions;
     use chat::spaces::{space_with_members, spaces_for_user};
-    use chat::tables::{SpaceRow, SPACE_KIND_DM, SPACE_KIND_GROUP};
+    use chat::tables::{
+        Session, SessionJoinAuth, SpaceRow, SPACE_KIND_DM, SPACE_KIND_GROUP,
+    };
     use psibase::services::transact::Wrapper as TransactSvc;
     use psibase::*;
 
@@ -28,39 +30,18 @@ mod service {
         }
     }
 
+    /// GraphQL shape adds `kind` enum; differs from `tables::Space`.
     #[derive(SimpleObject)]
     struct SpaceEntry {
-        space_uuid: String,
+        space_id: String,
         members: Vec<AccountNumber>,
         kind: SpaceKind,
     }
 
-    #[derive(SimpleObject)]
-    struct SessionEntry {
-        session_id: String,
-        space_uuid: String,
-        purpose: String,
-        participants: Vec<AccountNumber>,
-        status: u8,
-        expires_at: i64,
-        created_at: i64,
-    }
-
-    #[derive(SimpleObject)]
-    struct SessionJoinAuthEntry {
-        session_id: String,
-        authorized: bool,
-        purpose: String,
-        space_uuid: String,
-        participants: Vec<AccountNumber>,
-        status: u8,
-        expires_at: i64,
-        expired: bool,
-    }
-
+    /// GraphQL shape maps `kind` → UI `event` string; differs from `tables::CallEvent`.
     #[derive(SimpleObject)]
     struct CallEventEntry {
-        space_uuid: String,
+        space_id: String,
         session_id: String,
         event: String,
         account: AccountNumber,
@@ -69,19 +50,14 @@ mod service {
     }
 
     fn now_micros() -> i64 {
-        TransactSvc::call()
-            .currentBlock()
-            .time
-            .seconds()
-            .microseconds()
-            .microseconds
+        TransactSvc::call().currentBlock().time.microseconds
     }
 
     fn space_entry_from_row(row: SpaceRow) -> SpaceEntry {
         let space = space_with_members(row.clone());
         let member_count = space.members.len();
         SpaceEntry {
-            space_uuid: space.space_uuid,
+            space_id: space.space_id,
             members: space.members,
             kind: SpaceKind::from_row_kind(row.kind, member_count),
         }
@@ -119,79 +95,50 @@ mod service {
         /// Active objective session for a Space and purpose (e.g. chat-data), if any.
         async fn active_session(
             &self,
-            space_uuid: String,
+            space_id: String,
             purpose: String,
-        ) -> async_graphql::Result<Option<SessionEntry>> {
+        ) -> async_graphql::Result<Option<Session>> {
             let _ = self.require_authenticated()?;
-            let row = sessions::active_session_for_space(&space_uuid, &purpose);
-            Ok(row.map(|r| {
-                let view = sessions::session_to_view(r);
-                SessionEntry {
-                    session_id: view.session_id,
-                    space_uuid: view.space_uuid,
-                    purpose: view.purpose,
-                    participants: view.participants,
-                    status: view.status,
-                    expires_at: view.expires_at,
-                    created_at: view.created_at,
-                }
-            }))
+            Ok(sessions::active_session_for_space(&space_id, &purpose)
+                .map(sessions::session_to_view))
         }
 
         /// Objective session metadata for x-webrtc-sig join authorization (no SDP/ICE).
-        async fn session(&self, session_id: String) -> async_graphql::Result<Option<SessionEntry>> {
+        async fn session(&self, session_id: String) -> async_graphql::Result<Option<Session>> {
             let _ = self.require_authenticated()?;
-            let row = sessions::session_row(&session_id);
-            Ok(row.map(|r| {
-                let view = sessions::session_to_view(r);
-                SessionEntry {
-                    session_id: view.session_id,
-                    space_uuid: view.space_uuid,
-                    purpose: view.purpose,
-                    participants: view.participants,
-                    status: view.status,
-                    expires_at: view.expires_at,
-                    created_at: view.created_at,
-                }
-            }))
+            Ok(sessions::session_row(&session_id).map(sessions::session_to_view))
         }
 
         /// Whether the authenticated account may join this session (active, unexpired, participant).
         async fn session_join_auth(
             &self,
             session_id: String,
-        ) -> async_graphql::Result<SessionJoinAuthEntry> {
+        ) -> async_graphql::Result<SessionJoinAuth> {
             let user = self.require_authenticated()?;
-            let auth = sessions::authorize_session_join(&session_id, user, now_micros());
-            Ok(SessionJoinAuthEntry {
-                session_id: auth.session_id,
-                authorized: auth.authorized,
-                purpose: auth.purpose,
-                space_uuid: auth.space_uuid,
-                participants: auth.participants,
-                status: auth.status,
-                expires_at: auth.expires_at,
-                expired: auth.expired,
-            })
+            Ok(sessions::authorize_session_join(
+                &session_id,
+                user,
+                now_micros(),
+            ))
         }
 
         /// Call timeline for a Space (av-call sessions).
         async fn call_events(
             &self,
-            space_uuid: String,
+            space_id: String,
         ) -> async_graphql::Result<Vec<CallEventEntry>> {
             let user = self.require_authenticated()?;
-            if !chat::spaces::is_space_member(&space_uuid, user) {
+            if !chat::spaces::is_space_member(&space_id, user) {
                 return Err(async_graphql::Error::new(
                     "permission denied: account is not a member of this space",
                 ));
             }
-            Ok(call_timeline::call_events_for_space(&space_uuid)
+            Ok(call_timeline::call_events_for_space(&space_id)
                 .into_iter()
                 .filter_map(|row| {
                     call_timeline::call_timeline_ui_event(row.kind, &row.reason).map(|event| {
                         CallEventEntry {
-                            space_uuid: row.space_uuid,
+                            space_id: row.space_id,
                             session_id: row.session_id,
                             event: event.into(),
                             account: row.account,

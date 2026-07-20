@@ -1,11 +1,11 @@
 use psibase::{sha256, AccountNumber, Table};
 
-use crate::tables::{SessionParticipantTable, SessionRow, SessionTable};
+use crate::tables::{Session, SessionParticipantTable, SessionRow, SessionTable};
 
-use super::types::{Session, SESSION_STATUS_ACTIVE};
+use super::types::SESSION_STATUS_ACTIVE;
 
 pub fn allocate_session_id(
-    space_uuid: &str,
+    space_id: &str,
     purpose: &str,
     participants: &[AccountNumber],
     created_at: i64,
@@ -13,7 +13,7 @@ pub fn allocate_session_id(
 ) -> String {
     let encoded_participants: Vec<String> = participants.iter().map(ToString::to_string).collect();
     let bytes = serde_json::to_vec(&(
-        space_uuid,
+        space_id,
         purpose,
         encoded_participants,
         created_at,
@@ -25,7 +25,7 @@ pub fn allocate_session_id(
 
 /// Objective session ids hash creation time; bump `created_at` until unused.
 pub fn allocate_unique_session_id(
-    space_uuid: &str,
+    space_id: &str,
     purpose: &str,
     participants: &[AccountNumber],
     mut created_at: i64,
@@ -33,7 +33,7 @@ pub fn allocate_unique_session_id(
 ) -> (String, i64) {
     loop {
         let session_id =
-            allocate_session_id(space_uuid, purpose, participants, created_at, created_by);
+            allocate_session_id(space_id, purpose, participants, created_at, created_by);
         if session_row(&session_id).is_none() {
             return (session_id, created_at);
         }
@@ -64,7 +64,7 @@ pub fn session_to_view(row: SessionRow) -> Session {
     let session_id = row.session_id.clone();
     Session {
         session_id: row.session_id,
-        space_uuid: row.space_uuid,
+        space_id: row.space_id,
         purpose: row.purpose,
         participants: participants_of_session(&session_id),
         status: row.status,
@@ -73,16 +73,16 @@ pub fn session_to_view(row: SessionRow) -> Session {
     }
 }
 
-pub fn active_session_for_space(space_uuid: &str, purpose: &str) -> Option<SessionRow> {
-    sessions_for_space(space_uuid, purpose)
+pub fn active_session_for_space(space_id: &str, purpose: &str) -> Option<SessionRow> {
+    sessions_for_space(space_id, purpose)
         .into_iter()
         .find(|row| row.status == SESSION_STATUS_ACTIVE)
 }
 
-pub fn sessions_for_space(space_uuid: &str, purpose: &str) -> Vec<SessionRow> {
+pub fn sessions_for_space(space_id: &str, purpose: &str) -> Vec<SessionRow> {
     SessionTable::read()
         .get_index_pk()
         .iter()
-        .filter(|row| row.space_uuid == space_uuid && row.purpose == purpose)
+        .filter(|row| row.space_id == space_id && row.purpose == purpose)
         .collect()
 }

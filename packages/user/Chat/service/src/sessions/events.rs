@@ -1,13 +1,15 @@
 use psibase::{AccountNumber, Table};
 
-use crate::tables::{SessionEventRow, SessionEventTable, SessionTable};
+use crate::tables::{
+    SessionEventRow, SessionEventTable, SessionTable, WebRtcSessionEvent,
+};
 
 use super::authorize::is_session_participant;
 use super::lookup::session_row;
 use super::types::{
-    SessionError, WebRtcSessionEvent, SESSION_EVENT_PARTICIPANT_JOINED,
-    SESSION_EVENT_PARTICIPANT_LEFT, SESSION_EVENT_SESSION_ENDED, SESSION_EVENT_SESSION_FAILED,
-    SESSION_STATUS_ACTIVE, SESSION_STATUS_ENDED, SESSION_STATUS_FAILED,
+    SessionError, SESSION_EVENT_PARTICIPANT_JOINED, SESSION_EVENT_PARTICIPANT_LEFT,
+    SESSION_EVENT_SESSION_ENDED, SESSION_EVENT_SESSION_FAILED, SESSION_STATUS_ACTIVE,
+    SESSION_STATUS_ENDED, SESSION_STATUS_FAILED,
 };
 
 pub fn append_session_event(

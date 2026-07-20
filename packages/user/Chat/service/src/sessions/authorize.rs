@@ -1,10 +1,10 @@
 use psibase::{AccountNumber, Table};
 
-use crate::tables::SessionParticipantTable;
+use crate::tables::{SessionJoinAuth, SessionParticipantTable};
 
 use super::lookup::{participants_of_session, session_is_expired, session_row};
 use super::pair::authorize_pair_session_join;
-use super::types::{SessionJoinAuth, SESSION_STATUS_ACTIVE};
+use super::types::SESSION_STATUS_ACTIVE;
 
 pub fn is_session_participant(session_id: &str, account: AccountNumber) -> bool {
     SessionParticipantTable::read()
@@ -27,7 +27,7 @@ pub fn authorize_session_join(
             session_id: session_id.to_owned(),
             authorized: false,
             purpose: String::new(),
-            space_uuid: String::new(),
+            space_id: String::new(),
             participants: vec![],
             status: 0,
             expires_at: 0,
@@ -43,7 +43,7 @@ pub fn authorize_session_join(
         session_id: session_id.to_owned(),
         authorized,
         purpose: row.purpose,
-        space_uuid: row.space_uuid,
+        space_id: row.space_id,
         participants,
         status: row.status,
         expires_at: row.expires_at,

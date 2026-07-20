@@ -23,7 +23,7 @@ fn test_ensure_dm_and_group(chain: psibase::Chain) -> Result<(), psibase::Error>
     assert!(dm.members.contains(&bob));
 
     let dm_again = Wrapper::push_from(&chain, alice).ensureDm(bob).get()?;
-    assert_eq!(dm.space_uuid, dm_again.space_uuid);
+    assert_eq!(dm.space_id, dm_again.space_id);
 
     let group = Wrapper::push_from(&chain, alice)
         .ensureGroup(vec![bob, carol])
@@ -57,7 +57,7 @@ fn test_ensure_space_dm_and_group(chain: psibase::Chain) -> Result<(), psibase::
     assert_eq!(dm.members.len(), 2);
 
     let dm_via_action = Wrapper::push_from(&chain, alice).ensureDm(bob).get()?;
-    assert_eq!(dm.space_uuid, dm_via_action.space_uuid);
+    assert_eq!(dm.space_id, dm_via_action.space_id);
 
     let group = Wrapper::push_from(&chain, alice)
         .ensureSpace(vec![carol, alice, bob])
@@ -67,7 +67,7 @@ fn test_ensure_space_dm_and_group(chain: psibase::Chain) -> Result<(), psibase::
     let group_via_action = Wrapper::push_from(&chain, alice)
         .ensureGroup(vec![bob, carol])
         .get()?;
-    assert_eq!(group.space_uuid, group_via_action.space_uuid);
+    assert_eq!(group.space_id, group_via_action.space_id);
 
     Ok(())
 }
@@ -112,18 +112,18 @@ fn test_spaces_persist_after_blocks(chain: psibase::Chain) -> Result<(), psibase
 
     let listed = Wrapper::push_from(&chain, alice).spacesForSender().get()?;
     assert_eq!(listed.len(), 2);
-    let uuids: Vec<_> = listed.iter().map(|s| s.space_uuid.clone()).collect();
-    assert!(uuids.contains(&dm.space_uuid));
-    assert!(uuids.contains(&group.space_uuid));
+    let ids: Vec<_> = listed.iter().map(|s| s.space_id.clone()).collect();
+    assert!(ids.contains(&dm.space_id));
+    assert!(ids.contains(&group.space_id));
 
     let reloaded_dm = Wrapper::push_from(&chain, alice)
-        .getSpace(dm.space_uuid.clone())
+        .getSpace(dm.space_id.clone())
         .get()?
         .expect("dm space should still exist");
     assert_eq!(reloaded_dm.members, dm.members);
 
     let dm_again = Wrapper::push_from(&chain, alice).ensureDm(bob).get()?;
-    assert_eq!(dm_again.space_uuid, dm.space_uuid);
+    assert_eq!(dm_again.space_id, dm.space_id);
 
     Ok(())
 }
@@ -151,7 +151,7 @@ fn test_my_spaces_graphql_authed(chain: psibase::Chain) -> Result<(), psibase::E
         Wrapper::SERVICE,
         r#"query {
             mySpaces {
-                spaceUuid
+                spaceId
                 members
                 kind
             }
@@ -167,7 +167,7 @@ fn test_my_spaces_graphql_authed(chain: psibase::Chain) -> Result<(), psibase::E
 
     let dm_entry = spaces
         .iter()
-        .find(|entry| entry.get("spaceUuid") == Some(&json!(dm.space_uuid)))
+        .find(|entry| entry.get("spaceId") == Some(&json!(dm.space_id)))
         .expect("dm space in mySpaces");
     assert_eq!(dm_entry.get("kind"), Some(&json!("DM")));
     assert_eq!(
@@ -179,7 +179,7 @@ fn test_my_spaces_graphql_authed(chain: psibase::Chain) -> Result<(), psibase::E
     );
 
     let unauth: Value =
-        chain.graphql(Wrapper::SERVICE, r#"query { mySpaces { spaceUuid } }"#)?;
+        chain.graphql(Wrapper::SERVICE, r#"query { mySpaces { spaceId } }"#)?;
     let errors = unauth
         .pointer("/errors")
         .and_then(|v| v.as_array())

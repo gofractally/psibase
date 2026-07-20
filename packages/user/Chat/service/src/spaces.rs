@@ -4,21 +4,14 @@ use crate::tables::{
     SpaceMemberRow, SpaceMemberTable, SpaceRow, SpaceTable, SPACE_KIND_DM, SPACE_KIND_GROUP,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum SpaceError {
+    #[error("{0}")]
     InvalidMemberSet(String),
+    #[error("{0}")]
     UnknownSpace(String),
+    #[error("{0}")]
     NotMember(String),
-}
-
-impl SpaceError {
-    pub fn message(&self) -> String {
-        match self {
-            SpaceError::InvalidMemberSet(msg) => msg.clone(),
-            SpaceError::UnknownSpace(msg) => msg.clone(),
-            SpaceError::NotMember(msg) => msg.clone(),
-        }
-    }
 }
 
 pub fn canonical_space_members(
@@ -55,7 +48,7 @@ pub fn space_kind_for_members(members: &[AccountNumber]) -> Result<u8, SpaceErro
     })
 }
 
-pub fn space_uuid_for_members(members: &[AccountNumber]) -> Result<String, SpaceError> {
+pub fn space_id_for_members(members: &[AccountNumber]) -> Result<String, SpaceError> {
     validate_space_members(members)?;
     let encoded_members: Vec<String> = members.iter().map(ToString::to_string).collect();
     let bytes = serde_json::to_vec(&encoded_members)
@@ -95,14 +88,14 @@ pub fn sender_is_member(members: &[AccountNumber], sender: AccountNumber) -> boo
     members.iter().any(|member| *member == sender)
 }
 
-pub fn space_exists(space_uuid: &str) -> bool {
-    space_row(space_uuid).is_some()
+pub fn space_exists(space_id: &str) -> bool {
+    space_row(space_id).is_some()
 }
 
-pub fn space_row(space_uuid: &str) -> Option<SpaceRow> {
+pub fn space_row(space_id: &str) -> Option<SpaceRow> {
     SpaceTable::read()
         .get_index_pk()
-        .get(&space_uuid.to_owned())
+        .get(&space_id.to_owned())
 }
 
 pub fn open_space(members: Vec<AccountNumber>, created_at: i64) -> Result<SpaceRow, SpaceError> {
@@ -111,15 +104,15 @@ pub fn open_space(members: Vec<AccountNumber>, created_at: i64) -> Result<SpaceR
     if kind == SPACE_KIND_GROUP {
         validate_group_members(&members)?;
     }
-    let space_uuid = space_uuid_for_members(&members)?;
+    let space_id = space_id_for_members(&members)?;
     let space_table = SpaceTable::new();
 
-    if let Some(existing) = space_table.get_index_pk().get(&space_uuid) {
+    if let Some(existing) = space_table.get_index_pk().get(&space_id) {
         return Ok(existing);
     }
 
     let row = SpaceRow {
-        space_uuid: space_uuid.clone(),
+        space_id: space_id.clone(),
         kind,
         created_at,
     };
@@ -129,7 +122,7 @@ pub fn open_space(members: Vec<AccountNumber>, created_at: i64) -> Result<SpaceR
     for member in members {
         member_table
             .put(&SpaceMemberRow {
-                space_uuid: space_uuid.clone(),
+                space_id: space_id.clone(),
                 member,
             })
             .unwrap();
@@ -138,33 +131,33 @@ pub fn open_space(members: Vec<AccountNumber>, created_at: i64) -> Result<SpaceR
     Ok(row)
 }
 
-pub fn ensure_sender_is_member(space_uuid: &str, sender: AccountNumber) -> Result<(), SpaceError> {
-    if !space_exists(space_uuid) {
+pub fn ensure_sender_is_member(space_id: &str, sender: AccountNumber) -> Result<(), SpaceError> {
+    if !space_exists(space_id) {
         return Err(SpaceError::UnknownSpace(format!(
-            "unknown space {space_uuid}"
+            "unknown space {space_id}"
         )));
     }
-    if is_space_member(space_uuid, sender) {
+    if is_space_member(space_id, sender) {
         Ok(())
     } else {
         Err(SpaceError::NotMember(format!(
-            "account is not a member of space {space_uuid}"
+            "account is not a member of space {space_id}"
         )))
     }
 }
 
-pub fn is_space_member(space_uuid: &str, member: AccountNumber) -> bool {
+pub fn is_space_member(space_id: &str, member: AccountNumber) -> bool {
     SpaceMemberTable::read()
         .get_index_pk()
-        .get(&(space_uuid.to_owned(), member))
+        .get(&(space_id.to_owned(), member))
         .is_some()
 }
 
-pub fn members_of(space_uuid: &str) -> Vec<AccountNumber> {
+pub fn members_of(space_id: &str) -> Vec<AccountNumber> {
     SpaceMemberTable::read()
         .get_index_pk()
         .iter()
-        .filter(|row| row.space_uuid == space_uuid)
+        .filter(|row| row.space_id == space_id)
         .map(|row| row.member)
         .collect()
 }
@@ -176,15 +169,15 @@ pub fn spaces_for_user(user: AccountNumber) -> Vec<SpaceRow> {
         .get_index_by_member_space()
         .iter()
         .filter(|row| row.member == user)
-        .filter_map(|row| space_table.get_index_pk().get(&row.space_uuid))
+        .filter_map(|row| space_table.get_index_pk().get(&row.space_id))
         .collect()
 }
 
 pub fn space_with_members(row: SpaceRow) -> crate::tables::Space {
-    let space_uuid = row.space_uuid.clone();
+    let space_id = row.space_id.clone();
     crate::tables::Space {
-        space_uuid: row.space_uuid,
-        members: members_of(&space_uuid),
+        space_id: row.space_id,
+        members: members_of(&space_id),
     }
 }
 
@@ -201,29 +194,29 @@ mod unit_tests {
     }
 
     #[test]
-    fn space_uuid_is_stable_for_canonical_member_set() {
+    fn space_id_is_stable_for_canonical_member_set() {
         let alice = "alice".parse().unwrap();
         let bob = "bob".parse().unwrap();
         let members_a = canonical_space_members([bob, alice]);
         let members_b = canonical_space_members([alice, bob]);
-        let uuid_a = space_uuid_for_members(&members_a).unwrap();
-        let uuid_b = space_uuid_for_members(&members_b).unwrap();
-        assert_eq!(uuid_a, uuid_b);
-        assert!(uuid_a.starts_with("space:"));
+        let id_a = space_id_for_members(&members_a).unwrap();
+        let id_b = space_id_for_members(&members_b).unwrap();
+        assert_eq!(id_a, id_b);
+        assert!(id_a.starts_with("space:"));
     }
 
     #[test]
     fn validate_space_members_requires_two() {
         let alice = "alice".parse().unwrap();
         let err = validate_space_members(&[alice]).unwrap_err();
-        assert!(err.message().contains("at least two members"));
+        assert!(err.to_string().contains("at least two members"));
     }
 
     #[test]
     fn dm_members_rejects_self_dm() {
         let alice = "alice".parse().unwrap();
         let err = dm_members(alice, alice).unwrap_err();
-        assert!(err.message().contains("different account"));
+        assert!(err.to_string().contains("different account"));
     }
 
     #[test]
@@ -231,7 +224,7 @@ mod unit_tests {
         let alice = "alice".parse().unwrap();
         let bob = "bob".parse().unwrap();
         let err = validate_group_members(&[alice, bob]).unwrap_err();
-        assert!(err.message().contains("at least three members"));
+        assert!(err.to_string().contains("at least three members"));
     }
 
     #[test]
