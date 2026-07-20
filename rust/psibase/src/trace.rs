@@ -331,7 +331,6 @@ fn collect_direct_disk<'a>(
                 c.action.service == transact::SERVICE && c.action.method == method!("kvNotify");
             if let Some(amount) = use_disk_sys_amount(&c.action) {
                 deltas.push(amount);
-                collect_direct_disk(c, deltas, shown_children);
             } else if is_kv_notify {
                 collect_direct_disk(c, deltas, shown_children);
             } else if has_disk_activity(c) {
