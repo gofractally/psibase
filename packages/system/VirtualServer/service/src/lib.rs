@@ -466,9 +466,15 @@ mod service {
     use crate::resource_type::ResourceType;
     use ResourceType::{Cpu, Disk, Net};
 
+    /// Open a DB handle via native `kvOpen` to bypass the `db` service prefix checks.
+    fn open_direct(db: DbId) -> KvHandle {
+        let prefix: &[u8] = &[];
+        unsafe { KvHandle::from_raw(native_raw::kvOpen(db, prefix.as_ptr(), 0, KvMode::Read)) }
+    }
+
     /// Sum of every row's `key + value` bytes in a database.
     fn db_used_bytes(db: DbId) -> u64 {
-        let handle = KvHandle::new(db, &[], KvMode::Read);
+        let handle = open_direct(db);
         let mut total: u64 = 0;
         let mut key: Vec<u8> = Vec::new();
         while let Some(value_size) = kv_greater_equal_value_size(&handle, &key, 0) {
@@ -480,7 +486,7 @@ mod service {
     }
 
     fn status_row_bytes() -> u64 {
-        let native = KvHandle::new(DbId::Native, &[], KvMode::Read);
+        let native = open_direct(DbId::Native);
         let key = status_key().to_key();
         kv_get_bytes(&native, &key)
             .map(|value| key.len() as u64 + value.len() as u64)

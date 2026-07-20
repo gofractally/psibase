@@ -71,16 +71,13 @@ UniqueKvHandle Db::open(DbId db, psio::view<const std::vector<char>> prefixView,
       }
       else
       {
-         if (!isPrivileged(sender))
+         auto expected = psio::convert_to_key(sender);
+         // Subaccounts of the same primary account, all have
+         // shared read access
+         expected.pop_back();
+         if (!std::ranges::starts_with(prefix, expected))
          {
-            auto expected = psio::convert_to_key(sender);
-            // Subaccounts of the same primary account, all have
-            // shared read access
-            expected.pop_back();
-            if (!std::ranges::starts_with(prefix, expected))
-            {
-               prefixError(sender, prefix, "read from");
-            }
+            prefixError(sender, prefix, "read from");
          }
       }
    }
