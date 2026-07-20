@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use crate::{FracInputStream, Result, Unpack};
 use std::marker::PhantomData;
 use std::ops::{Deref, Index};
@@ -6,57 +8,131 @@ use std::{cell::RefCell, rc::Rc, sync::Arc};
 #[repr(transparent)]
 pub struct ViewData<T> {
     _phantom: PhantomData<T>,
-    data: [u8],
+    pub data: [u8],
 }
 
-trait MakeView {
-    type ViewType;
+pub trait MakeView {
+    type ViewType: ?Sized;
 }
 
-unsafe trait ViewExt<'a> {
-    type ValueType;
-    fn new_unchecked(data: &'a [u8]) -> &'a Self {
-        unsafe { &*(data as *const [u8] as *const View<T>) }
-    }
-    pub fn new(data: &'a [u8]) -> Result<&'a View<T>> {
-        T::verify_no_extra(data)?;
+pub trait ViewExt<'a> {
+    type ValueType: Unpack<'a>;
+    fn new_unchecked(data: &'a [u8]) -> &'a Self;
+    fn get_data(&'a self) -> &'a [u8];
+    fn new(data: &'a [u8]) -> Result<&'a Self> {
+        Self::ValueType::verify_no_extra(data)?;
         Ok(Self::new_unchecked(data))
     }
-    pub fn unpack(&'a self) -> ValueType {
-        let mut stream = FracInputStream::new(&self.data);
-        if T::IS_OPTIONAL {
+    fn unpack(&'a self) -> Self::ValueType {
+        let mut stream = FracInputStream::new(self.get_data());
+        if Self::ValueType::IS_OPTIONAL {
             stream.known_end = false;
             let mut fixed_pos = 0;
-            T::embedded_unpack(&mut stream, &mut fixed_pos).unwrap()
+            Self::ValueType::embedded_unpack(&mut stream, &mut fixed_pos).unwrap()
         } else {
-            T::unpack(&mut stream).unwrap()
+            Self::ValueType::unpack(&mut stream).unwrap()
         }
     }
 }
 
-type View<T> = MakeView<T>::ViewType;
+pub type View<T> = <T as MakeView>::ViewType;
 
+macro_rules! view {
+    ( $vis:vis $name:ident : $value:ty ) => {
+        #[repr(transparent)]
+        pub struct $name([u8]);
+        impl $crate::MakeView for $value {
+            type ViewType = $name;
+        }
+        impl<'a> $crate::ViewExt<'a> for $name {
+            type ValueType = $value;
+            fn new_unchecked(data: &'a [u8]) -> &'a Self {
+                unsafe { &*(data as *const [u8] as *const Self) }
+            }
+            fn get_data(&'a self) -> &'a [u8] {
+                return &self.0;
+            }
+        }
+    };
+    ( $vis:vis $name:ident<$($param:ident),+> : $value:ty ) => {
+        #[repr(transparent)]
+        pub struct $name<$($param:ident),+> {
+            _phantom: PhantomData<($($param),+)>,
+            data: [u8],
+        };
+        impl<$($param:ident),+> $crate::MakeView for $value {
+            type ViewType = $name;
+        }
+        impl<'a, $($param:ident),+> $crate::ViewExt<'a> for $name {
+            type ValueType = $value<$($param:ident),+>;
+            fn new_unchecked(data: &'a [u8]) -> &'a Self {
+                unsafe { &*(data as *const [u8] as *const Self) }
+            }
+            fn get_data(&'a self) -> &'a [u8] {
+                return &self.data;
+            }
+        }
+    };
+    ( $vis:vis <$l:lifetime> $name:ident : $value:ty ) => {
+        #[repr(transparent)]
+        pub struct $name([u8]);
+        impl<$l> $crate::MakeView for $value {
+            type ViewType = $name;
+        }
+        impl<$l> $crate::ViewExt<$l> for $name {
+            type ValueType = $value;
+            fn new_unchecked(data: &$l [u8]) -> &$l Self {
+                unsafe { &*(data as *const [u8] as *const Self) }
+            }
+            fn get_data(&$l self) -> &$l [u8] {
+                return &self.0;
+            }
+        }
+    }
+}
+
+view!(pub StringView: String);
+
+/*
 #[repr(transparent)]
-struct StringView(ViewData<String>);
+pub struct StringView(ViewData<String>);
 impl MakeView for String {
     type ViewType = StringView;
 }
-unsafe impl ViewExt for StringView {
+impl<'a> ViewExt<'a> for StringView {
     type ValueType = String;
+    fn new_unchecked(data: &'a [u8]) -> &'a Self {
+        unsafe { &*(data as *const [u8] as *const Self) }
+    }
+    fn get_data(&'a self) -> &'a [u8] {
+        return &self.0.data;
+    }
 }
+*/
 
 impl Deref for StringView {
     type Target = str;
     fn deref(&self) -> &str {
-        let mut stream = FracInputStream::new(&self.data);
+        let mut stream = FracInputStream::new(self.get_data());
         <&str>::unpack(&mut stream).unwrap()
     }
 }
 
+view!(pub <'a> StrView: &'a str);
+
+impl Deref for StrView {
+    type Target = str;
+    fn deref(&self) -> &str {
+        let mut stream = FracInputStream::new(self.get_data());
+        <&str>::unpack(&mut stream).unwrap()
+    }
+}
+
+view!(pub VecView<T>: Vec<T>);
+
 // Usage should be &View<T>
 
-// view!(BoxView<T>: Box<T>)
-
+// view!(pub BoxView<T>: Box<T>);
 
 /*
 impl<T> View<T> {

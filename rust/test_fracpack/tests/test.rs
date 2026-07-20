@@ -1,4 +1,4 @@
-use fracpack::{CompiledSchema, Pack, Result, SchemaBuilder, Unpack, UnpackOwned, View};
+use fracpack::{CompiledSchema, Pack, Result, SchemaBuilder, Unpack, UnpackOwned, View, ViewExt};
 use serde::Deserialize;
 use test_fracpack::*;
 
@@ -903,7 +903,11 @@ fn test_view() {
         let data = "asdf".to_string().packed();
         let v = <View<String>>::new(&data).unwrap();
         assert_eq!(v.find('d'), Some(2));
-        assert!(v.is_empty());
+    }
+    {
+        let data = "asdf".to_string().packed();
+        let v = <View<&str>>::new(&data).unwrap();
+        assert_eq!(v.find('d'), Some(2));
     }
     /*
     {
