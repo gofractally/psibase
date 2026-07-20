@@ -88,7 +88,7 @@ pub fn call_events_for_session(session_id: &str) -> Vec<CallEvent> {
     events
 }
 
-/// All av-call timeline events for a Space (all objective sessions, any lifecycle).
+/// All av-call timeline events for a Space (all objective sessions, any status).
 pub fn call_events_for_space(space_uuid: &str) -> Vec<CallEvent> {
     let mut events: Vec<CallEvent> = sessions_for_space(space_uuid, PURPOSE_AV_CALL)
         .into_iter()

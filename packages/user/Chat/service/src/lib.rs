@@ -56,7 +56,7 @@ pub mod tables {
         pub session_id: String,
         pub space_uuid: String,
         pub purpose: String,
-        pub lifecycle: u8,
+        pub status: u8,
         pub created_at: i64,
         pub expires_at: i64,
         pub created_by: AccountNumber,
@@ -109,7 +109,7 @@ pub mod tables {
         pub space_uuid: String,
         pub purpose: String,
         pub participants: Vec<AccountNumber>,
-        pub lifecycle: u8,
+        pub status: u8,
         pub expires_at: i64,
         pub created_at: i64,
     }
@@ -129,7 +129,7 @@ pub mod tables {
         pub purpose: String,
         pub space_uuid: String,
         pub participants: Vec<AccountNumber>,
-        pub lifecycle: u8,
+        pub status: u8,
         pub expires_at: i64,
         pub expired: bool,
     }
@@ -180,7 +180,7 @@ pub mod service {
             space_uuid: session.space_uuid,
             purpose: session.purpose,
             participants: session.participants,
-            lifecycle: session.lifecycle,
+            status: session.status,
             expires_at: session.expires_at,
             created_at: session.created_at,
         }
@@ -358,7 +358,7 @@ pub mod service {
             purpose: auth.purpose,
             space_uuid: auth.space_uuid,
             participants: auth.participants,
-            lifecycle: auth.lifecycle,
+            status: auth.status,
             expires_at: auth.expires_at,
             expired: auth.expired,
         }

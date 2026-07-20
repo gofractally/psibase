@@ -36,7 +36,7 @@ fn parse_members(members: Vec<String>) -> Result<Vec<AccountNumber>, Error> {
         .iter()
         .map(|m| {
             AccountNumber::from_str(m)
-                .map_err(|_| ErrorType::InvalidAccountNumber(m.to_string()).into())
+                .map_err(|_| Error::from(ErrorType::InvalidAccountNumber(m.to_string())))
         })
         .collect()
 }
@@ -67,7 +67,7 @@ impl Spaces for ChatPlugin {
             vec!["homepage".into()],
         )?;
         let contact = AccountNumber::from_str(&contact)
-            .map_err(|_| ErrorType::InvalidAccountNumber(contact).into())?;
+            .map_err(|_| Error::from(ErrorType::InvalidAccountNumber(contact)))?;
         let packed = chat::action_structs::ensureDm { contact }.packed();
         add_action_to_transaction(chat::action_structs::ensureDm::ACTION_NAME, &packed).unwrap();
         Ok(())

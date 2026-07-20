@@ -41,7 +41,7 @@ mod service {
         space_uuid: String,
         purpose: String,
         participants: Vec<AccountNumber>,
-        lifecycle: u8,
+        status: u8,
         expires_at: i64,
         created_at: i64,
     }
@@ -53,7 +53,7 @@ mod service {
         purpose: String,
         space_uuid: String,
         participants: Vec<AccountNumber>,
-        lifecycle: u8,
+        status: u8,
         expires_at: i64,
         expired: bool,
     }
@@ -131,7 +131,7 @@ mod service {
                     space_uuid: view.space_uuid,
                     purpose: view.purpose,
                     participants: view.participants,
-                    lifecycle: view.lifecycle,
+                    status: view.status,
                     expires_at: view.expires_at,
                     created_at: view.created_at,
                 }
@@ -149,7 +149,7 @@ mod service {
                     space_uuid: view.space_uuid,
                     purpose: view.purpose,
                     participants: view.participants,
-                    lifecycle: view.lifecycle,
+                    status: view.status,
                     expires_at: view.expires_at,
                     created_at: view.created_at,
                 }
@@ -169,13 +169,13 @@ mod service {
                 purpose: auth.purpose,
                 space_uuid: auth.space_uuid,
                 participants: auth.participants,
-                lifecycle: auth.lifecycle,
+                status: auth.status,
                 expires_at: auth.expires_at,
                 expired: auth.expired,
             })
         }
 
-        /// Call lifecycle timeline for a Space (av-call sessions).
+        /// Call timeline for a Space (av-call sessions).
         async fn call_events(
             &self,
             space_uuid: String,

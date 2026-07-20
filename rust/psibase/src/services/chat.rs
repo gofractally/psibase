@@ -24,7 +24,7 @@ mod service {
         pub purpose: String,
         pub space_uuid: String,
         pub participants: Vec<AccountNumber>,
-        pub lifecycle: u8,
+        pub status: u8,
         pub expires_at: i64,
         pub expired: bool,
     }
