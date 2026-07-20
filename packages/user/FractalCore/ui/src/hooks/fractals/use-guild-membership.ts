@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { getGuildMembership } from "@/lib/graphql/fractals/getGuildMembership";
-import QueryKey, { OptionalAccount } from "@/lib/queryKeys";
+import { getGuildMembership } from "@/lib/graphql/fractals/get-guild-membership";
+import QueryKey, { OptionalAccount } from "@/lib/query-keys";
 
-import { useCurrentUser } from "../use-current-user";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
+
 import { useGuildAccount } from "../use-guild-account";
 
 export const useGuildMembership = (
@@ -20,16 +21,11 @@ export const useGuildMembership = (
         queryKey: QueryKey.guildMembership(guildAccount, memberAccount),
         enabled: !!memberAccount && !!guildAccount,
         queryFn: async () => {
-            try {
-                const res = await getGuildMembership(
-                    guildAccount!,
-                    memberAccount!,
-                );
-                return res;
-            } catch (e) {
-                console.error("bad", e);
-                throw new Error("f");
-            }
+            const res = await getGuildMembership(
+                guildAccount!,
+                memberAccount!,
+            );
+            return res;
         },
     });
 };

@@ -80,7 +80,7 @@ mod service {
         action: ServiceMethod,
         allowedActions: Vec<ServiceMethod>,
         claims: Vec<Claim>,
-    ) {
+    ) -> bool {
         unimplemented!()
     }
 
@@ -102,6 +102,12 @@ mod service {
     /// submits a transaction.
     #[action]
     fn setKey(key: SubjectPublicKeyInfo) {
+        unimplemented!()
+    }
+
+    /// Get the accounts this auth service delegates authority to for a sender.
+    #[action]
+    fn getDlgsSys(sender: AccountNumber) -> Vec<AccountNumber> {
         unimplemented!()
     }
 
@@ -129,7 +135,7 @@ mod service {
     /// * `true`: If the sender is among the rejecters
     /// * `false`: If the sender is not among the rejecters
     #[action]
-    fn isRejectSys(sender: AccountNumber, authorizers: Vec<AccountNumber>) -> bool {
+    fn isRejectSys(sender: AccountNumber, rejecters: Vec<AccountNumber>) -> bool {
         unimplemented!()
     }
 

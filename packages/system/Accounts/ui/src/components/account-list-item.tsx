@@ -31,13 +31,13 @@ export const AccountListItem = ({
     return (
         <li
             className={cn(
-                "flex select-none items-center rounded-md px-2 py-4",
+                "flex select-none items-center rounded-md",
                 canLogin && "hover:bg-sidebar-accent",
             )}
         >
             <button
                 onClick={onLogin}
-                className="flex flex-1 items-center gap-2"
+                className="flex flex-1 items-center gap-2 px-2 py-5"
             >
                 <Avatar account={name} className="size-6" />
                 {name}

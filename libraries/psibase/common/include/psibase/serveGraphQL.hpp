@@ -129,6 +129,80 @@ namespace psibase
       return ConnectionName.c_str();
    }
 
+   /// Block context for an event row.
+   struct EventBlockInfo
+   {
+      std::optional<psibase::BlockNum>  blockNum;
+      std::optional<psibase::BlockTime> blockTime;
+      PSIO_REFLECT(EventBlockInfo, blockNum, blockTime)
+   };
+
+   namespace detail
+   {
+      template <typename T>
+      consteval bool has_block_member()
+      {
+         for (const char* n : psio::reflect<T>::data_member_names)
+            if (std::string_view{n} == "block")
+               return true;
+         return false;
+      }
+   }  // namespace detail
+
+   /// Wraps a node type with block context for event queries.
+   template <typename T>
+   struct WithBlockContext
+   {
+      static_assert(!detail::has_block_member<T>(),
+                    "WithBlockContext<T>: T already has a 'block' field");
+      EventBlockInfo block;
+      T              data;
+      PSIO_REFLECT(WithBlockContext, block, data)
+   };
+
+   template <typename T>
+   const char* get_type_name(const WithBlockContext<T>*)
+   {
+      static constexpr auto name = psio::reflect<T>::name + "WithBlockContext";
+      return name.c_str();
+   }
+
+   // Flatten T's fields alongside `block` in the schema for WithBlockContext<T>.
+   template <typename T, typename S>
+   void fill_gql_schema_members(const WithBlockContext<T>*, S& stream, bool is_input)
+   {
+      psio::write_str("    block: ", stream);
+      psio::write_str(psio::generate_gql_whole_name((EventBlockInfo*)nullptr, is_input), stream);
+      psio::write_str("\n", stream);
+      psio::fill_gql_schema_members((T*)nullptr, stream, is_input);
+   }
+
+   // Resolve `block` from value.block, T's fields from value.data.
+   template <typename T, typename OS, typename E>
+   auto gql_query_inline(WithBlockContext<T>*,
+                         const WithBlockContext<T>& value,
+                         psio::gql_stream&          input_stream,
+                         OS&                        output_stream,
+                         const E&                   error,
+                         bool                       allow_unknown_members,
+                         bool&                      first)
+   {
+      auto resolve_data =
+          psio::make_field_resolver(value.data, input_stream, output_stream, error, first);
+      return psio::gql_query_inline(
+          psio::generate_gql_partial_name((const WithBlockContext<T>*)nullptr, false),
+          [&](std::string_view field_name, std::string_view alias) -> bool
+          {
+             if (field_name == "block")
+             {
+                psio::detail::write_field_name(alias, first, output_stream);
+                return gql_query(value.block, input_stream, output_stream, error, false);
+             }
+             return resolve_data(field_name, alias);
+          },
+          input_stream, output_stream, error, first);
+   }
+
    /// GraphQL Pagination through TableIndex
    ///
    /// You rarely need to call this directly; see [the example](#makeconnection-example).
@@ -534,348 +608,6 @@ namespace psibase
       return &detail::makeTransformedConnection<Connection, TableIndex<T, Key>, F, Key>;
    }  // gql_callable_fn
 
-   // These fields are in snake_case and have the event_ prefix
-   // to avoid conflict with event argument names, which
-   // should be in mixedCase to match common GraphQL convention.
-   struct EventDecoderStatus
-   {
-      uint32_t      event_db;
-      uint64_t      event_id;
-      bool          event_found;
-      AccountNumber event_service;
-      bool          event_supported_service;
-      MethodNumber  event_type;
-      bool          event_unpack_ok;
-      PSIO_REFLECT(EventDecoderStatus,
-                   event_db,
-                   event_id,
-                   event_found,
-                   event_service,
-                   event_supported_service,
-                   event_type,
-                   event_unpack_ok)
-   };
-
-   /// GraphQL support for decoding an event
-   ///
-   /// If a GraphQL query function returns this type, then the system
-   /// fetches and decodes an event.
-   ///
-   /// The GraphQL result is an object with these fields, plus more:
-   ///
-   /// ```text
-   /// type MyService_EventsUi {
-   ///     event_db: Float!                   # Database ID (uint32_t)
-   ///     event_id: String!                  # Event ID (uint64_t)
-   ///     event_found: Boolean!              # Was the event found in db?
-   ///     event_service: String!             # Service that created the event
-   ///     event_supported_service: Boolean!  # Is this service the one
-   ///                                        #    that created it?
-   ///     event_type: String!                # Event type
-   ///     event_unpack_ok: Boolean!          # Did it decode OK?
-   /// }
-   /// ```
-   ///
-   /// `EventDecoder` will only attempt to decode an event which meets all of the following:
-   /// * It's found in the `EventDecoder::db` database (`event_found` will be true)
-   /// * Was written by the service which matches the `EventDecoder::service` field (`event_supported_service` will be true)
-   /// * Has a type which matches one of the definitions in the `Events` template argument
-   ///
-   /// If decoding is successful, `EventDecoder` will set the GraphQL `event_unpack_ok`
-   /// field to true. It will include any event fields which were in the query request.
-   /// It will include all event fields if the query request includes the special field
-   /// `event_all_content`. `EventDecoder` silently ignores any requested fields which
-   /// don't match the fields of the decoded event.
-   ///
-   /// #### EventDecoder example
-   ///
-   /// This example assumes you're already [serving GraphQL](#psibaseservegraphql) and
-   /// have [defined events](services-events.md#defining-events) for your service.
-   /// It's rare to define a query method like this one; use [EventQuery] instead,
-   /// which handles history, ui, and merkle events.
-   ///
-   /// ```c++
-   /// struct Query
-   /// {
-   ///    psibase::AccountNumber service;
-   ///
-   ///    auto getUiEvent(uint64_t eventId) const
-   ///    {
-   ///       return EventDecoder<MyService::Events::Ui>{
-   ///          DbId::uiEvent, eventId, service};
-   ///    }
-   /// };
-   /// PSIO_REFLECT(Query, method(getUiEvent, eventId))
-   /// ```
-   ///
-   /// Example query:
-   ///
-   /// ```text
-   /// {
-   ///   getUiEvent(eventId: "13") {
-   ///     event_id
-   ///     event_type
-   ///     event_all_content
-   ///   }
-   /// }
-   /// ```
-   ///
-   /// Example reply:
-   ///
-   /// ```text
-   /// {
-   ///   "data": {
-   ///     "getUiEvent": {
-   ///       "event_id": "13",
-   ///       "event_type": "credited",
-   ///       "tokenId": 1,
-   ///       "sender": "symbol",
-   ///       "receiver": "alice",
-   ///       "amount": {
-   ///         "value": "100000000000"
-   ///       },
-   ///       "memo": {
-   ///         "contents": "memo"
-   ///       }
-   ///     }
-   ///   }
-   /// }
-   /// ```
-   template <typename Events>
-   struct EventDecoder
-   {
-      DbId          db;
-      uint64_t      eventId;
-      AccountNumber service;
-   };
-
-   template <typename Events>
-   auto get_type_name(const EventDecoder<Events>*)
-   {
-      return psio::get_type_name<Events>();
-   }
-
-   template <typename Events>
-   auto get_gql_name(EventDecoder<Events>*)
-   {
-      return psio::get_type_name<Events>();
-   }
-
-   template <typename Events, typename S>
-   void fill_gql_schema(EventDecoder<Events>*,
-                        S&                                          stream,
-                        std::set<std::pair<std::type_index, bool>>& defined_types,
-                        bool                                        is_input,
-                        bool                                        is_query_root = false)
-   {
-      psio::fill_gql_schema_as((EventDecoder<Events>*)nullptr, (EventDecoderStatus*)nullptr, stream,
-                               defined_types, is_input, is_query_root);
-   }
-
-   template <int i, typename T, typename F>
-   void get_event_all_content(const T& value, std::span<const char* const> field_names, F&& f)
-   {
-      if constexpr (i < std::tuple_size_v<T>)
-         if (i < field_names.size())
-         {
-            f(field_names[i], std::get<i>(value));
-            get_event_all_content<i + 1>(value, field_names, std::move(f));
-         }
-   }
-
-   template <int i, typename T, typename F>
-   void get_event_field(const T&                     value,
-                        std::string_view             name,
-                        std::string_view             alias,
-                        std::span<const char* const> field_names,
-                        F&&                          f)
-   {
-      if constexpr (i < std::tuple_size_v<T>)
-         if (i < field_names.size())
-         {
-            if (name == field_names[i])
-               f(alias, std::get<i>(value));
-            else
-               get_event_field<i + 1>(value, name, alias, field_names, std::move(f));
-         }
-   }
-
-   template <typename Events, typename T, typename F>
-   void get_event_field(const EventDecoder<Events>&  decoder,
-                        MethodNumber                 type,
-                        const T&                     value,
-                        std::string_view             name,
-                        std::string_view             alias,
-                        std::span<const char* const> field_names,
-                        F&&                          f)
-   {
-      if (name == "event_db")
-         f(alias, (uint32_t)decoder.db);
-      else if (name == "event_id")
-         f(alias, decoder.eventId);
-      else if (name == "event_found")
-         f(alias, true);
-      else if (name == "event_service")
-         f(alias, decoder.service);
-      else if (name == "event_supported_service")
-         f(alias, true);
-      else if (name == "event_type")
-         f(alias, type);
-      else if (name == "event_unpack_ok")
-         f(alias, true);
-      else if (name == "event_all_content")
-         get_event_all_content<0>(value, field_names, f);
-      else
-         get_event_field<0>(value, name, alias, field_names, f);
-   }
-
-   template <typename Events, typename T, typename OS, typename E>
-   auto gql_query_decoder_value(const EventDecoder<Events>&  decoder,
-                                MethodNumber                 type,
-                                const T&                     value,
-                                psio::gql_stream&            input_stream,
-                                OS&                          output_stream,
-                                const E&                     error,
-                                std::span<const char* const> field_names)
-   {
-      if (input_stream.current_punctuator != '{')
-         return error("expected {");
-      input_stream.skip();
-      bool first = true;
-      output_stream.write('{');
-      while (input_stream.current_type == psio::gql_stream::name)
-      {
-         bool found      = false;
-         bool ok         = true;
-         auto alias      = input_stream.current_value;
-         auto field_name = alias;
-         input_stream.skip();
-         if (input_stream.current_punctuator == ':')
-         {
-            input_stream.skip();
-            if (input_stream.current_type != psio::gql_stream::name)
-               return error("expected name after :");
-            field_name = input_stream.current_value;
-            input_stream.skip();
-         }
-
-         get_event_field(decoder, type, value, field_name, alias, field_names,
-                         [&](auto alias, const auto& field_value)
-                         {
-                            found = true;
-                            if (first)
-                            {
-                               increase_indent(output_stream);
-                               first = false;
-                            }
-                            else
-                            {
-                               output_stream.write(',');
-                            }
-                            write_newline(output_stream);
-                            to_json(alias, output_stream);
-                            write_colon(output_stream);
-
-                            // Allow fields to be treated normally or as scalars
-                            if (input_stream.current_punctuator == '(' ||
-                                input_stream.current_punctuator == '{')
-                               ok &= gql_query(field_value, input_stream, output_stream, error);
-                            else
-                               to_json(field_value, output_stream);
-                         });
-
-         if (!ok)
-            return false;
-         if (!found)
-         {
-            if (!gql_skip_args(input_stream, error))
-               return false;
-            if (!gql_skip_selection_set(input_stream, error))
-               return false;
-         }
-      }
-      if (input_stream.current_punctuator != '}')
-         return error("expected }");
-      input_stream.skip();
-      if (!first)
-      {
-         decrease_indent(output_stream);
-         write_newline(output_stream);
-      }
-      output_stream.write('}');
-      return true;
-   }  // gql_query_decoder_value
-
-   template <typename Events, typename OS, typename E>
-   auto gql_query(const EventDecoder<Events>& decoder,
-                  psio::gql_stream&           input_stream,
-                  OS&                         output_stream,
-                  const E&                    error,
-                  bool                        allow_unknown_members = false)
-   {
-      auto v = getSequentialRaw(decoder.db, decoder.eventId);
-
-      if (!v)
-         return gql_query(
-             EventDecoderStatus{
-                 .event_db                = (uint32_t)decoder.db,
-                 .event_id                = decoder.eventId,
-                 .event_found             = false,
-                 .event_service           = {},
-                 .event_supported_service = false,
-                 .event_type              = {},
-                 .event_unpack_ok         = false,
-             },
-             input_stream, output_stream, error, true);
-
-      SequentialRecord<MethodNumber> header = {};
-      if (!psio::from_frac(header, *v) || header.service != decoder.service)
-         return gql_query(
-             EventDecoderStatus{
-                 .event_db                = (uint32_t)decoder.db,
-                 .event_id                = decoder.eventId,
-                 .event_found             = true,
-                 .event_service           = header.service,
-                 .event_supported_service = false,
-                 .event_type              = *header.type,
-                 .event_unpack_ok         = false,
-             },
-             input_stream, output_stream, error, true);
-
-      bool ok    = true;
-      bool found = false;
-      psio::get_member_function_type<Events>(
-          header.type->value,
-          [&](auto member, std::span<const char* const> names)
-          {
-             using MT = psio::MemberPtrType<decltype(member)>;
-             static_assert(MT::isFunction);
-             using TT = typename psio::make_param_value_tuple<decltype(member)>::type;
-             SequentialRecord<MethodNumber, TT> eventData = {};
-             if (psio::from_frac(eventData, *v))
-             {
-                found = true;
-                ok = gql_query_decoder_value(decoder, *header.type, *eventData.value, input_stream,
-                                             output_stream, error, names.subspan(1));
-             }
-          });
-
-      if (!found)
-         return gql_query(
-             EventDecoderStatus{
-                 .event_db                = (uint32_t)decoder.db,
-                 .event_id                = decoder.eventId,
-                 .event_found             = true,
-                 .event_service           = header.service,
-                 .event_supported_service = true,
-                 .event_type              = *header.type,
-                 .event_unpack_ok         = false,
-             },
-             input_stream, output_stream, error, true);
-
-      return ok;
-   }  // gql_query(EventDecoder)
-
    struct EventQueryInterface
    {
       std::string sqlQuery(const std::string& squery, const std::vector<std::string>& params);
@@ -889,6 +621,74 @@ namespace psibase
       T        data;
       PSIO_REFLECT(SqlRow, rowid, data)
    };
+
+   struct RowBlockStart
+   {
+      uint64_t  rowIndex;
+      BlockNum  blockNum;
+      BlockTime blockTime;
+      PSIO_REFLECT(RowBlockStart, rowIndex, blockNum, blockTime)
+   };
+
+   namespace detail
+   {
+      inline std::string sql_query(const std::string&              query,
+                                   const std::vector<std::string>& params,
+                                   bool                            debug)
+      {
+         if (debug)
+         {
+            printf("SQL query str: %s\n", query.c_str());
+            printf("SQL params: [");
+            for (size_t i = 0; i < params.size(); ++i)
+            {
+               if (i > 0)
+                  printf(", ");
+               printf("\"%s\"", params[i].c_str());
+            }
+            printf("]\n");
+         }
+
+         auto json_str = to<EventQueryInterface>("events+1"_a).sqlQuery(query, params);
+
+         if (debug)
+         {
+            printf("Raw JSON response: %s\n", json_str.c_str());
+         }
+
+         return json_str;
+      }
+
+      inline std::vector<RowBlockStart> fetchBlockStarts(const std::vector<uint64_t>& rowids,
+                                                         bool                         debug)
+      {
+         if (rowids.empty())
+            return {};
+
+         std::string values;
+         for (size_t i = 0; i < rowids.size(); ++i)
+         {
+            if (i)
+               values += ", ";
+            std::format_to(std::back_inserter(values), "({}, {})", i, rowids[i]);
+         }
+
+         auto sql = std::format(
+             "WITH rows(rowIndex, rowId) AS (VALUES {})"
+             " SELECT r.rowIndex, m.blockNum, m.blockTime"
+             " FROM rows r"
+             " JOIN \"history.transact.blockStart\" m ON m.ROWID = ("
+             "   SELECT ROWID"
+             "   FROM \"history.transact.blockStart\""
+             "   WHERE ROWID <= r.rowId"
+             "   ORDER BY ROWID DESC"
+             "   LIMIT 1"
+             " )",
+             values);
+         auto json = sql_query(sql, {}, debug);
+         return psio::convert_from_json<std::vector<RowBlockStart>>(json);
+      }
+   }  // namespace detail
 
    /// GraphQL Pagination through Event tables
    ///
@@ -994,30 +794,44 @@ namespace psibase
          return *this;
       }
 
-      /// Execute the query and return a Connection containing the results
+      /// Execute the query and return a Connection containing the results.
       ///
+      /// Each node is wrapped in WithBlockContext<T> carrying block metadata.
       /// Returns error if both first and last are specified.
-      Connection<T, psio::reflect<T>::name + "Connection", psio::reflect<T>::name + "Edge"> query()
-          const
+      Connection<WithBlockContext<T>,
+                 psio::reflect<T>::name + "Connection",
+                 psio::reflect<T>::name + "Edge">
+      query() const
       {
          auto [rows, has_next_page, has_prev_page] = all_edges();
 
-         using EdgeType = Edge<T, psio::reflect<T>::name + "Edge">;
-         using ConnType =
-             Connection<T, psio::reflect<T>::name + "Connection", psio::reflect<T>::name + "Edge">;
+         using ConnType = Connection<WithBlockContext<T>, psio::reflect<T>::name + "Connection",
+                                     psio::reflect<T>::name + "Edge">;
+         using EdgeType = typename ConnType::Edge;
+
+         std::vector<uint64_t> rowids;
+         rowids.reserve(rows.size());
+         for (const auto& row : rows)
+            rowids.push_back(row.rowid);
+
+         auto                        blockStarts = detail::fetchBlockStarts(rowids, _debug);
+         std::vector<EventBlockInfo> blockInfos(rows.size());
+         for (const auto& bs : blockStarts)
+         {
+            check(bs.rowIndex < rows.size(), "rowIndex out of range");
+            blockInfos[bs.rowIndex] = EventBlockInfo{bs.blockNum, bs.blockTime};
+         }
 
          ConnType connection;
          connection.pageInfo.hasNextPage     = has_next_page;
          connection.pageInfo.hasPreviousPage = has_prev_page;
-
-         for (const auto& row : rows)
+         for (size_t i = 0; i < rows.size(); ++i)
          {
             EdgeType edge;
-            edge.node   = row.data;
-            edge.cursor = std::to_string(row.rowid);
+            edge.node   = WithBlockContext<T>{blockInfos[i], std::move(rows[i].data)};
+            edge.cursor = std::to_string(rows[i].rowid);
             connection.edges.push_back(std::move(edge));
          }
-
          if (!connection.edges.empty())
          {
             connection.pageInfo.startCursor = connection.edges.front().cursor;
@@ -1044,7 +858,7 @@ namespace psibase
          }
 
          auto query_str = generate_sql_query(limit_plus_one, descending, _before, _after);
-         auto json_str  = sql_query(query_str, _params, _debug);
+         auto json_str  = detail::sql_query(query_str, _params, _debug);
          auto rows      = psio::convert_from_json<std::vector<SqlRow<T>>>(json_str);
 
          if (_debug)
@@ -1084,11 +898,10 @@ namespace psibase
          return {rows, has_next_page, has_prev_page};
       }
 
-      uint64_t extract_cursor(std::optional<std::string> cursor) const
+      uint64_t extract_cursor(std::string_view c) const
       {
-         uint64_t         b{};
-         std::string_view c = *cursor;
-         auto [ptr, ec]     = std::from_chars(c.data(), c.data() + c.size(), b);
+         uint64_t b{};
+         auto [ptr, ec] = std::from_chars(c.data(), c.data() + c.size(), b);
          check(ec == std::errc{}, "Invalid cursor");
          check(ptr == c.data() + c.size(), "Invalid cursor: not all characters consumed");
          return b;
@@ -1108,12 +921,12 @@ namespace psibase
 
          if (before.has_value())
          {
-            filters.push_back(std::format("ROWID < {}", extract_cursor(before)));
+            filters.push_back(std::format("ROWID < {}", extract_cursor(*before)));
          }
 
          if (after.has_value())
          {
-            filters.push_back(std::format("ROWID > {}", extract_cursor(after)));
+            filters.push_back(std::format("ROWID > {}", extract_cursor(*after)));
          }
 
          auto order = descending ? "DESC" : "ASC";
@@ -1140,33 +953,6 @@ namespace psibase
          }
 
          return query;
-      }
-
-      static std::string sql_query(const std::string&              query,
-                                   const std::vector<std::string>& params,
-                                   bool                            debug)
-      {
-         if (debug)
-         {
-            printf("[EventQuery] SQL query str: %s\n", query.c_str());
-            printf("[EventQuery] SQL params: [");
-            for (size_t i = 0; i < params.size(); ++i)
-            {
-               if (i > 0)
-                  printf(", ");
-               printf("\"%s\"", params[i].c_str());
-            }
-            printf("]\n");
-         }
-
-         auto json_str = to<EventQueryInterface>("r-events"_a).sqlQuery(query, params);
-
-         if (debug)
-         {
-            printf("[EventQuery] Raw JSON response: %s\n", json_str.c_str());
-         }
-
-         return json_str;
       }
 
       std::string                _table_name;

@@ -5,7 +5,7 @@ if(ENABLE_SSL)
     find_package(OpenSSL REQUIRED SSL)
 endif()
 
-add_executable(psinode main.cpp connection.cpp connect.cpp init.cpp)
+add_executable(psinode main.cpp init.cpp)
 
 target_link_libraries(psinode
     services_system
@@ -75,6 +75,8 @@ if(Python_Interpreter_FOUND)
     add_psinode_test(test_websocket)
     add_psinode_test(test_timer)
 endif()
+
+configure_file(config.in ${ROOT_BINARY_DIR}/share/psibase/config.in COPYONLY)
 
 include(GNUInstallDirs)
 install(FILES config.in DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase COMPONENT ServerData)

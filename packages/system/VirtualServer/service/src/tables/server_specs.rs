@@ -40,7 +40,7 @@ impl ServerSpecs {
     }
 
     fn check_range(value: u64, min: u64, max: u64, field_name: &str) {
-        check(value >= min, &format!("{} too low", field_name));
-        check(value <= max, &format!("{} too high", field_name));
+        assert!(value >= min, "{} too low", field_name);
+        assert!(value <= max, "{} too high", field_name);
     }
 }

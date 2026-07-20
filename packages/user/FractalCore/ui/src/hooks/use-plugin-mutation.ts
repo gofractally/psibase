@@ -3,9 +3,9 @@ import z from "zod";
 
 import { siblingUrl } from "@psibase/common-lib";
 
-import { TxStatus, checkLastTx } from "@/lib/checkStaging";
 import { PluginCall } from "@/lib/plugin";
 
+import { TxStatus, checkLastTx } from "@shared/lib/staging/check-staging";
 import { supervisor } from "@shared/lib/supervisor";
 import { toast } from "@shared/shadcn/ui/sonner";
 
@@ -14,18 +14,18 @@ type Meta<TParams extends unknown[]> = {
     loading?: string;
     success?: string;
 } & (
-    | {
-          isStagable?: false | undefined;
-          onSuccess?: (params: TParams) => void | Promise<void>;
-      }
-    | {
-          isStagable: true;
-          onSuccess?: (
-              params: TParams,
-              status: TxStatus,
-          ) => void | Promise<void>;
-      }
-);
+        | {
+            isStagable?: false | undefined;
+            onSuccess?: (params: TParams) => void | Promise<void>;
+        }
+        | {
+            isStagable: true;
+            onSuccess?: (
+                params: TParams,
+                status: TxStatus,
+            ) => void | Promise<void>;
+        }
+    );
 
 export const usePluginMutation = <TCall extends PluginCall>(
     call: TCall,

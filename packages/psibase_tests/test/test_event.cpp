@@ -3,6 +3,7 @@
 #include <psibase/DefaultTestChain.hpp>
 #include <psibase/serveGraphQL.hpp>
 #include <services/system/Transact.hpp>
+#include <services/user/Events.hpp>
 
 #include <catch2/catch_all.hpp>
 
@@ -127,35 +128,21 @@ auto gql(DefaultTestChain& t, const std::string& query_str)
    return psio::convert_from_json<QueryRoot>(body);
 }
 
-TEST_CASE("test events")
-{
-   DefaultTestChain t;
-   auto             event_service =
-       t.from(t.addService(EmitEvents::service, "EmitEvents.wasm")).to<EmitEvents>();
-   REQUIRE(event_service.init().succeeded());
-
-   auto evId = event_service.foo("antidisestablishmentarianism", 42).returnVal();
-
-   {
-      auto [s, i] = EmitEvents().events().history().e(evId);
-      CHECK(s == "antidisestablishmentarianism"s);
-      CHECK(i == 42);
-   }
-}
-
 TEST_CASE("test merkle events")
 {
    DefaultTestChain t;
    t.addService(EmitEvents::service, "EmitEvents.wasm");
    auto event_service = t.from(EmitEvents::service).to<EmitEvents>();
    t.setAutoBlockStart(false);
+   auto events = UserService::Events{}.openEvents(EventDb::merkleEvent, KvMode::read);
    t.startBlock();
    {
       auto id   = event_service.emitMerkle("a").returnVal();
-      auto data = getSequentialRaw(DbId::merkleEvent, id);
+      auto data = events.get(id);
+      ;
       REQUIRE(!!data);
       Merkle merkle;
-      merkle.push(EventInfo{id, *data});
+      merkle.push(*data);
       auto expected_root = merkle.root();
       t.startBlock();
       auto actual_root = SystemService::getStatus().head->header.eventMerkleRoot;
@@ -164,13 +151,13 @@ TEST_CASE("test merkle events")
    {
       auto id1   = event_service.emitMerkle("a").returnVal();
       auto id2   = event_service.emitMerkle("b").returnVal();
-      auto data1 = getSequentialRaw(DbId::merkleEvent, id1);
-      auto data2 = getSequentialRaw(DbId::merkleEvent, id2);
+      auto data1 = events.get(id1);
+      auto data2 = events.get(id2);
       REQUIRE(!!data1);
       REQUIRE(!!data2);
       Merkle merkle;
-      merkle.push(EventInfo{id1, *data1});
-      merkle.push(EventInfo{id2, *data2});
+      merkle.push(*data1);
+      merkle.push(*data2);
       auto expected_root = merkle.root();
       t.startBlock();
       auto actual_root = SystemService::getStatus().head->header.eventMerkleRoot;
@@ -184,6 +171,8 @@ TEST_CASE("test event in failed transaction")
 
    auto event_service =
        t.from(t.addService(EmitEvents::service, "EmitEvents.wasm")).to<EmitEvents>();
+
+   t.setAutoBlockStart(false);  // Avoid blockStart events
 
    auto id1 = event_service.foo("a", 1).returnVal();
    auto id2 = event_service.foo("b", 2).returnVal();

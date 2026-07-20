@@ -172,6 +172,28 @@ fn get_import_fid(
         })
 }
 
+fn get_export_fid(
+    function_module: &str,
+    name: &str,
+    wasm_module: &Module,
+) -> Result<Option<FunctionId>, anyhow::Error> {
+    if function_module != "polyfill" {
+        Ok(None)
+    } else {
+        wasm_module
+            .exports
+            .iter()
+            .find(|&i| &i.name == name)
+            .map_or_else(
+                || Err(anyhow!("Cannot find function {name}")),
+                |i| match i.item {
+                    walrus::ExportItem::Function(fid) => Ok(Some(fid)),
+                    _ => Err(anyhow!("Import kind mismatch")),
+                },
+            )
+    }
+}
+
 /// Get the corresponding FunctionID in the `dest` module for a given FunctionID from the `source`
 /// module. If the function does not exist in the `dest` module, it will be added.
 fn to_dest_func(
@@ -194,6 +216,12 @@ fn to_dest_func(
                 // The import already exists in the dest
                 if dest.func_type(dest_fid) != source.func_type(source_fid) {
                     return Err(anyhow!("Type mismatch between imports"));
+                }
+                dest_fid
+            } else if let Some(dest_fid) = get_export_fid(module, name, &dest)? {
+                // The dest exports the function
+                if dest.func_type(dest_fid) != source.func_type(source_fid) {
+                    return Err(anyhow!("Type mismatch between import/export"));
                 }
                 dest_fid
             } else {

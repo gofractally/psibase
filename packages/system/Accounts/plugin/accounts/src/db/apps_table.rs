@@ -1,8 +1,26 @@
-use crate::bindings::clientdata::plugin::keyvalue as Keyvalue;
 use crate::bindings::host::auth::api as HostAuth;
+use crate::bindings::host::db::store::{Bucket, Database, DbMode, StorageDuration};
 use psibase::fracpack::{Pack, Unpack};
 
-use crate::db::keys::DbKeys;
+fn logged_in_user_table() -> Bucket {
+    Bucket::new(
+        Database {
+            mode: DbMode::NonTransactional,
+            duration: StorageDuration::Persistent,
+        },
+        "logged_in_user",
+    )
+}
+
+fn connected_accounts_table() -> Bucket {
+    Bucket::new(
+        Database {
+            mode: DbMode::NonTransactional,
+            duration: StorageDuration::Persistent,
+        },
+        "connected_accounts",
+    )
+}
 
 #[derive(Pack, Unpack, Default)]
 struct ConnectedAccounts {
@@ -34,44 +52,30 @@ impl AppsTable {
         Self { app: app.clone() }
     }
 
-    fn prefix(&self) -> String {
-        // App data is namespaced by protocol/port because plugins
-        //  are loaded on the same protocol that the supervisor uses.
-        //  e.g. https supervisor will load https plugins and store
-        //  https data.
-
-        self.app.clone()
-    }
-
-    fn prefixed_key(&self, key: &str) -> String {
-        self.prefix() + "." + key
-    }
-
     pub fn get_logged_in_user(&self) -> Option<String> {
-        Keyvalue::get(&self.prefixed_key(DbKeys::LOGGED_IN)).map(|a| String::from_utf8(a).unwrap())
+        logged_in_user_table()
+            .get(&self.app)
+            .map(|a| String::from_utf8(a).unwrap())
     }
 
     pub fn login(&self, user: &str) {
-        Keyvalue::set(&self.prefixed_key(DbKeys::LOGGED_IN), user.as_bytes());
+        logged_in_user_table().set(&self.app, user.as_bytes());
 
         self.connect(user);
     }
 
     pub fn connect(&self, user: &str) {
-        let connected_accounts = Keyvalue::get(&self.prefixed_key(DbKeys::CONNECTED_ACCOUNTS));
+        let connected_accounts = connected_accounts_table().get(&self.app);
         let mut connected_accounts = connected_accounts
             .map(|c| <ConnectedAccounts>::unpacked(&c).unwrap())
             .unwrap_or_default();
         connected_accounts.add(user);
 
-        Keyvalue::set(
-            &self.prefixed_key(DbKeys::CONNECTED_ACCOUNTS),
-            &connected_accounts.packed(),
-        );
+        connected_accounts_table().set(&self.app, &connected_accounts.packed());
     }
 
     pub fn disconnect(&self, user: &str) {
-        let connected_accounts = Keyvalue::get(&self.prefixed_key(DbKeys::CONNECTED_ACCOUNTS));
+        let connected_accounts = connected_accounts_table().get(&self.app);
         let mut connected_accounts = connected_accounts
             .map(|c| <ConnectedAccounts>::unpacked(&c).unwrap())
             .unwrap_or_default();
@@ -84,21 +88,18 @@ impl AppsTable {
             self.logout();
         }
 
-        Keyvalue::set(
-            &self.prefixed_key(DbKeys::CONNECTED_ACCOUNTS),
-            &connected_accounts.packed(),
-        );
+        connected_accounts_table().set(&self.app, &connected_accounts.packed());
     }
 
     pub fn logout(&self) {
         if let Some(user) = self.get_logged_in_user() {
             HostAuth::log_out_user(&user, &self.app);
         }
-        Keyvalue::delete(&self.prefixed_key(DbKeys::LOGGED_IN));
+        logged_in_user_table().delete(&self.app);
     }
 
     pub fn get_connected_accounts(&self) -> Vec<String> {
-        let connected_accounts = Keyvalue::get(&self.prefixed_key(DbKeys::CONNECTED_ACCOUNTS));
+        let connected_accounts = connected_accounts_table().get(&self.app);
         connected_accounts
             .map(|c| <ConnectedAccounts>::unpacked(&c).unwrap())
             .unwrap_or_default()

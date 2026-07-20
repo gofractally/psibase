@@ -1,6 +1,6 @@
 [package]
 name = "virtual-server"
-version.workspace = true
+version = "0.23.1"
 rust-version.workspace = true
 edition.workspace = true
 publish.workspace = true
@@ -8,10 +8,11 @@ publish.workspace = true
 [package.metadata.psibase]
 server = "virtual-server"
 plugin = "virtual-server-plugin"
-postinstall = [{ sender = "virtual-server", service = "virtual-server", method = "init" }]
+postinstall = [{ sender = "vserver", service = "vserver", method = "init" }]
 
 [dependencies]
 psibase.workspace = true
+psibase_service.workspace = true
 psibase_macros.workspace = true
 serde.workspace = true
 serde_json.workspace = true

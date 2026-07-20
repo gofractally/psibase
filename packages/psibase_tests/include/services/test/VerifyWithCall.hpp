@@ -7,7 +7,7 @@ namespace TestService
 {
    struct VerifyWithCall : psibase::Service
    {
-      static constexpr auto service = psibase::AccountNumber{"verify-call"};
+      static constexpr auto service = psibase::AccountNumber{"verifycall"};
       static constexpr auto flags   = psibase::CodeRow::isVerify;
       void                  verifySys(psibase::Checksum256 transactionHash,
                                       psibase::Claim       claim,

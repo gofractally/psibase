@@ -1,4 +1,4 @@
-import type { PendingBalance } from "../../hooks/tokensPlugin/use-pending-balances";
+import type { PendingBalance } from "../../hooks/tokens-plugin/use-pending-balances";
 import type { PendingActionProps } from "../../pending";
 
 import { ArrowDown, Loader2 } from "lucide-react";
@@ -24,7 +24,7 @@ import {
     TooltipTrigger,
 } from "@shared/shadcn/ui/tooltip";
 
-import { useDebit } from "../../hooks/tokensPlugin/use-debit";
+import { useDebit } from "../../hooks/tokens-plugin/use-debit";
 import { zTransferFormMemo } from "../../lib/transfer-form-schema";
 
 export const AcceptButton = ({

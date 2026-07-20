@@ -127,3 +127,13 @@ pub unsafe extern "C" fn fd_write(
 pub unsafe extern "C" fn fd_close(fd: Fd) -> Errno {
     ERRNO_BADF.raw()
 }
+
+#[link(wasm_import_module = "polyfill")]
+extern "C" {
+    pub fn psibase_proxy_kv_open_impl(db: u32, prefix: *const u8, prefix_len: u32, mode: u8) -> u32;
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn psibase_proxy_kv_open(db: u32, prefix: *const u8, prefix_len: u32, mode: u8) -> u32 {    
+    psibase_proxy_kv_open_impl(db, prefix, prefix_len, mode)
+}

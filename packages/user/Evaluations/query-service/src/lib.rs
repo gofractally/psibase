@@ -1,4 +1,4 @@
-#[psibase::service]
+#[psibase::service(name = "evaluation+1")]
 #[allow(non_snake_case)]
 mod service {
     use async_graphql::connection::Connection;
@@ -40,7 +40,6 @@ mod service {
         evaluation_id: u32,
     }
 
-
     #[derive(Deserialize, SimpleObject)]
     struct NewGroup {
         owner: AccountNumber,
@@ -55,7 +54,6 @@ mod service {
 
     #[Object]
     impl Query {
-
         async fn get_groups_created(
             &self,
             evaluation_owner: AccountNumber,
@@ -64,8 +62,8 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, NewGroup>> {
-            EventQuery::new("history.evaluations.new_group")
+        ) -> async_graphql::Result<EventConnection<NewGroup>> {
+            EventQuery::new("history.evaluation.new_group")
                 .condition(format!(
                     "owner = '{}' AND evaluation_id = {}",
                     evaluation_owner, evaluation_id
@@ -82,8 +80,8 @@ mod service {
             evaluation_owner: AccountNumber,
             evaluation_id: u32,
             group_number: u32,
-        ) -> async_graphql::Result<Connection<u64, KeysSet>> {
-            EventQuery::new("history.evaluations.keysset")
+        ) -> async_graphql::Result<EventConnection<KeysSet>> {
+            EventQuery::new("history.evaluation.keysset")
                 .condition(format!(
                     "owner = '{}' AND evaluation_id = {} AND group_number = {}",
                     evaluation_owner, evaluation_id, group_number
@@ -96,7 +94,7 @@ mod service {
             evaluation_owner: AccountNumber,
             evaluation_id: u32,
             group_number: Option<u32>,
-        ) -> async_graphql::Result<Connection<u64, GroupFinish>> {
+        ) -> async_graphql::Result<EventConnection<GroupFinish>> {
             let mut conditions = vec![
                 format!("owner = '{}'", evaluation_owner),
                 format!("evaluation_id = {}", evaluation_id),
@@ -106,7 +104,7 @@ mod service {
                 conditions.push(format!("group_number = {}", group_num));
             }
 
-            EventQuery::new("history.evaluations.group_fin")
+            EventQuery::new("history.evaluation.group_fin")
                 .condition(conditions.join(" AND "))
                 .query()
         }

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 CMAKE_COMMAND="$1"
 DIR="$2"

@@ -1,4 +1,5 @@
 import { Button } from "@shared/shadcn/ui/button";
+import { Spinner } from "@shared/shadcn/ui/spinner";
 
 import { useFormContext } from "../app-form";
 
@@ -8,10 +9,12 @@ export const SubmitButton = ({
     labels = ["Save", "Saving..."],
     onClick,
     disabled,
+    loading,
 }: {
     labels?: SubmitButtonLabels;
     onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
     disabled?: boolean;
+    loading?: boolean;
 }) => {
     const form = useFormContext();
     const [label, submittingLabel] = labels;
@@ -24,9 +27,14 @@ export const SubmitButton = ({
                 return (
                     <Button
                         type="submit"
-                        disabled={!canSubmit || isSubmitting || disabled}
+                        disabled={
+                            !canSubmit || isSubmitting || loading || disabled
+                        }
                         onClick={onClick}
                     >
+                        {loading || isSubmitting ? (
+                            <Spinner data-icon="inline-start" />
+                        ) : null}
                         {isSubmitting ? submittingLabel : label}
                     </Button>
                 );

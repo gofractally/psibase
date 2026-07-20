@@ -57,9 +57,9 @@ class TestFetch(unittest.TestCase):
     def test_proxy(self, cluster):
         (a,) = cluster.complete(*testutil.generate_names(1))
 
-        XAdmin(a).install(os.path.join(testutil.test_packages(), "XProxy.psi"))
+        a.install_local(['XProxy'])
 
-        with a.post('/set_origin_server', service='x-proxy', json={"host":"x-admin.%s" % a.hostname, "endpoint": a.socketpath, "spin": 100000}) as reply:
+        with a.post('/set_origin_server', service='x-proxy', json={"subdomain":"x-proxy", "host":"x-admin.%s" % a.hostname, "endpoint": a.socketpath, "spin": 100000}) as reply:
             reply.raise_for_status()
 
         with a.get('/config', service='x-proxy') as reply:
@@ -72,14 +72,14 @@ class TestFetch(unittest.TestCase):
     def test_http(self, cluster):
         (a,) = cluster.complete(*testutil.generate_names(1))
 
-        XAdmin(a).install(os.path.join(testutil.test_packages(), "XProxy.psi"))
+        a.install_local(['XProxy'])
 
         server = HTTPServer(('', 0), RequestHandler)
 
         t = threading.Thread(target=server.serve_forever)
         t.start()
         try:
-            with a.post('/set_origin_server', service='x-proxy', json={"host":"localhost:%d" % server.server_address[1]}) as reply:
+            with a.post('/set_origin_server', service='x-proxy', json={"subdomain":"x-proxy", "host":"localhost:%d" % server.server_address[1]}) as reply:
                 reply.raise_for_status()
 
             with a.get('/', service='x-proxy') as reply:
@@ -99,14 +99,14 @@ class TestFetch(unittest.TestCase):
 
         (a,) = cluster.complete(*testutil.generate_names(1), trustfile=certfile)
 
-        XAdmin(a).install(os.path.join(testutil.test_packages(), "XProxy.psi"))
+        a.install_local(['XProxy'])
 
         server = HTTPSServer(certfile)
 
         t = threading.Thread(target=server.serve_forever)
         t.start()
         try:
-            with a.post('/set_origin_server', service='x-proxy', json={"host":"localhost:%d" % server.server_address[1], "tls": {}}) as reply:
+            with a.post('/set_origin_server', service='x-proxy', json={"subdomain":"x-proxy", "host":"localhost:%d" % server.server_address[1], "tls": {}}) as reply:
                 reply.raise_for_status()
 
             with a.get('/', service='x-proxy') as reply:
@@ -126,14 +126,14 @@ class TestFetch(unittest.TestCase):
 
         (a,) = cluster.complete(*testutil.generate_names(1))
 
-        XAdmin(a).install(os.path.join(testutil.test_packages(), "XProxy.psi"))
+        a.install_local(['XProxy'])
 
         server = HTTPSServer(certfile)
 
         t = threading.Thread(target=server.serve_forever)
         t.start()
         try:
-            with a.post('/set_origin_server', service='x-proxy', json={"host":"localhost:%d" % server.server_address[1], "tls": {}}) as reply:
+            with a.post('/set_origin_server', service='x-proxy', json={"subdomain":"x-proxy", "host":"localhost:%d" % server.server_address[1], "tls": {}}) as reply:
                 reply.raise_for_status()
 
             with a.get('/', service='x-proxy', timeout=4) as reply:

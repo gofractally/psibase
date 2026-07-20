@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { getEvaluationResults } from "@/lib/graphql/fractals/getEvaluationResults.ts";
-import QueryKey, { OptionalNumber } from "@/lib/queryKeys";
+import { getEvaluationResults } from "@/lib/graphql/fractals/get-evaluation-results.ts";
+import QueryKey, { OptionalNumber } from "@/lib/query-keys";
 
 export const useEvaluationResults = (evaluationId: OptionalNumber) =>
     useQuery({

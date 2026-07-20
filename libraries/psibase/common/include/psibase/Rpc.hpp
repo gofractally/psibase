@@ -108,6 +108,8 @@ namespace psibase
       std::string_view scheme;
       std::string_view host;
       std::string_view path;
+
+      std::string_view domain() const;
    };
    SplitURL splitURL(std::string_view url);
 
@@ -133,7 +135,7 @@ namespace psibase
       seeOther                    = 303,
       notModified                 = 304,
       temporaryRedirect           = 307,
-      permanentRedirecct          = 308,
+      permanentRedirect           = 308,
       badRequest                  = 400,
       unauthorized                = 401,
       forbidden                   = 403,
@@ -208,6 +210,9 @@ namespace psibase
    std::vector<HttpHeader> allowCors(const HttpRequest& req,
                                      AccountNumber      account,
                                      bool               hostIsSubdomain = true);
+   std::vector<HttpHeader> allowCors(const HttpRequest&                req,
+                                     const std::vector<AccountNumber>& accounts,
+                                     bool                              hostIsSubdomain = true);
    std::vector<HttpHeader> allowCorsSubdomains(const HttpRequest& req, bool hostIsSubdomain = true);
 
    using HttpReply = BasicHttpReply<std::vector<char>>;

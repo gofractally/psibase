@@ -26,6 +26,7 @@ namespace SystemService
    {
       uint32_t               id;
       psibase::AccountNumber account;
+      uint64_t               seq;
       bool                   accepted;
    };
    PSIO_REFLECT(Response, id, account, accepted)

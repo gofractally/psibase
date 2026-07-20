@@ -5,7 +5,8 @@ import { Loader } from "@/pages/loader";
 
 import { AppExists } from "@/components/app-exists";
 import { Layout } from "@/components/layout";
-import { ProtectedRoute } from "@/components/protected-route";
+
+import { ProtectedRoute } from "@shared/components/protected-route";
 
 import { Browse } from "./pages/global/browse";
 

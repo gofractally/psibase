@@ -1,21 +1,10 @@
 import { z } from "zod";
 
-import { graphql } from "@/lib/graphql";
-import { supervisor } from "@/supervisor";
-import { zAccount } from "@/lib/zod/Account";
+import { graphql } from "@shared/lib/graphql";
+import { callPluginFunction, tokens } from "@shared/lib/plugins";
+import { zAccount } from "@shared/lib/schemas/account";
 
 const qs = {
-    userTokenBalances: (username: string) => `
-        userBalances(user: "${username}") {
-            nodes {
-                tokenId
-                balance
-                symbol
-                precision
-                account
-            }
-        }	
-    `,
     tokenMeta: (tokenId: string) => `
         token(tokenId: "${tokenId}") {
             id
@@ -56,22 +45,19 @@ const qs = {
     userSettings: (username: string) => `
         userSettings(user: "${username}") {
             settings {
-                manualDebit
+                autoDebit
             }
         }
     `,
 };
 
 const graphqlViaPlugin = async <T>(query: string): Promise<T> => {
-    const result = await supervisor.functionCall({
-        service: "tokens",
-        plugin: "plugin",
-        intf: "authorized",
-        method: "graphql",
-        params: [query],
-    });
-    const response = JSON.parse(result) as { data: T; errors?: Array<{ message: string }> };
-    if (response.errors) {
+    const result = await callPluginFunction(tokens.authorized.graphql, [query]);
+    const response = JSON.parse(result) as {
+        data: T;
+        errors?: Array<{ message: string }>;
+    };
+    if (response.errors?.length) {
         throw new Error(response.errors[0].message);
     }
     return response.data;
@@ -80,46 +66,25 @@ const graphqlViaPlugin = async <T>(query: string): Promise<T> => {
 const zUserSettingsSchema = z.object({
     userSettings: z.object({
         settings: z.object({
-            manualDebit: z.boolean(),
+            autoDebit: z.boolean(),
         }),
     }),
 });
 
 export const fetchUserSettings = async (username: string) => {
     const query = `{${qs.userSettings(username)}}`;
-    const res = await graphql<z.infer<typeof zUserSettingsSchema>>(
-        query,
-        "tokens",
-    );
+    const res = await graphql<z.infer<typeof zUserSettingsSchema>>(query, {
+        service: "tokens",
+    });
     const parsed = zUserSettingsSchema.parse(res);
     return parsed.userSettings.settings;
 };
 
-// User Token Balances
-export const zUserTokenBalanceNodeSchema = z.object({
-    tokenId: z.number(),
-    balance: z.string(),
-    symbol: z.string().nullable(),
-    precision: z.number(),
-    account: zAccount,
-});
-
-const zUserTokenBalanceSchema = z.object({
-    userBalances: z.object({
-        nodes: z.array(zUserTokenBalanceNodeSchema),
-    }),
-});
-
-export type UserTokenBalanceNode = z.infer<typeof zUserTokenBalanceNodeSchema>;
-
-export const fetchUserTokenBalances = async (username: string) => {
-    const query = `{${qs.userTokenBalances(username)}}`;
-    const res = await graphqlViaPlugin<z.infer<typeof zUserTokenBalanceSchema>>(
-        query,
-    );
-    const parsed = zUserTokenBalanceSchema.parse(res);
-    return parsed.userBalances.nodes;
-};
+export {
+    fetchUserTokenBalances,
+    zUserTokenBalanceNodeSchema,
+    type UserTokenBalanceNode,
+} from "@shared/lib/graphql/tokens";
 
 const zTokenMetaNodeSchema = z.object({
     id: z.number(),
@@ -137,10 +102,9 @@ export type TokenMetaNode = z.infer<typeof zTokenMetaNodeSchema>;
 
 export const fetchTokenMeta = async (tokenId: string) => {
     const query = `{${qs.tokenMeta(tokenId)}}`;
-    const res = await graphql<z.infer<typeof zTokenMetaSchema>>(
-        query,
-        "tokens",
-    );
+    const res = await graphql<z.infer<typeof zTokenMetaSchema>>(query, {
+        service: "tokens",
+    });
     const parsed = zTokenMetaSchema.parse(res);
     return parsed.token;
 };
@@ -171,9 +135,8 @@ export const fetchUserTokenBalanceChanges = async (
     tokenId: number,
 ) => {
     const query = `{${qs.userTokenBalanceChanges(username, tokenId)}}`;
-    const res = await graphqlViaPlugin<z.infer<typeof zBalChangeResSchema>>(
-        query,
-    );
+    const res =
+        await graphqlViaPlugin<z.infer<typeof zBalChangeResSchema>>(query);
     const parsed = zBalChangeResSchema.parse(res);
     return parsed.balChanges.nodes;
 };
@@ -206,13 +169,19 @@ const zOpenLinesOfCreditResSchema = z.object({
 
 export type PendingBalanceNode = z.infer<typeof zPendingBalanceNodeSchema>;
 
-export const fetchOpenLinesOfCredit = async (username: string, tokenId: number | undefined) => {
+export const fetchOpenLinesOfCredit = async (
+    username: string,
+    tokenId: number | undefined,
+) => {
     const query = `{
         ${qs.userPending(username, tokenId)}
     }`;
 
-    const res = await graphqlViaPlugin<z.infer<typeof zOpenLinesOfCreditResSchema>>(
-        query,
-    );
-    return zOpenLinesOfCreditResSchema.parse(res).userPending.nodes.map((node: PendingBalanceNode) => node.sharedBal);
+    const res =
+        await graphqlViaPlugin<z.infer<typeof zOpenLinesOfCreditResSchema>>(
+            query,
+        );
+    return zOpenLinesOfCreditResSchema
+        .parse(res)
+        .userPending.nodes.map((node: PendingBalanceNode) => node.sharedBal);
 };

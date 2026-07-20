@@ -1,13 +1,15 @@
+import { ListTodo } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-import { EmptyBlock } from "@/components/EmptyBlock";
-import { ErrorCard } from "@/components/error-card";
 import { LoadingBlock } from "@/components/loading-block";
 
 import { useStagedTransactions } from "@/hooks/use-staged-transactions";
-import { generateAvatar } from "@/lib/createIdenticon";
 
+import { EmptyBlock } from "@shared/components/empty-block";
+import { ErrorCard } from "@shared/components/error-card";
+import { PageContainer } from "@shared/components/page-container";
 import { useChainId } from "@shared/hooks/use-chain-id";
+import { generateAvatar } from "@shared/lib/create-identicon";
 import { Avatar, AvatarImage } from "@shared/shadcn/ui/avatar";
 import { Button } from "@shared/shadcn/ui/button";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
@@ -26,10 +28,11 @@ export const PendingTransactions = () => {
     if (error) return <ErrorCard error={error} />;
 
     return (
-        <div className="mx-auto w-full max-w-screen-lg space-y-6 px-2">
+        <PageContainer className="space-y-6">
             <div className="flex flex-col gap-2">
                 {transactions?.length == 0 && (
                     <EmptyBlock
+                        Icon={ListTodo}
                         title="No pending transactions."
                         description="Proposed changes will appear here."
                     />
@@ -93,6 +96,6 @@ export const PendingTransactions = () => {
                     </div>
                 ))}
             </div>
-        </div>
+        </PageContainer>
     );
 };

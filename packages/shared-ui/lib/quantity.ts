@@ -219,6 +219,26 @@ export class Quantity {
     }
 
     /**
+     * Multiply this quantity by an amount
+     */
+    public multiply(by: QuantityInput): Quantity {
+        Decimal.parse(by);
+        const amountToMultiply = typeof by === "string" ? Number(by) : by;
+
+        const newAmount = this.amount * amountToMultiply;
+        if (!Number.isFinite(newAmount)) {
+            throw new Error("Multiplication would overflow");
+        }
+
+        return new Quantity(
+            newAmount,
+            this.precision,
+            this.tokenNumber,
+            this.tokenSymbol,
+        );
+    }
+
+    /**
      * Create a new Quantity with a different amount but same token properties
      */
     public withAmount(newAmount: QuantityInput): Quantity {

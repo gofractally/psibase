@@ -13,7 +13,7 @@ import {
 } from "@tanstack/react-table";
 import * as React from "react";
 
-import { getId } from "@/lib/getId";
+import { getId } from "@/lib/get-id";
 import { PackageInfo } from "@/types";
 
 import { Checkbox } from "@shared/shadcn/ui/checkbox";

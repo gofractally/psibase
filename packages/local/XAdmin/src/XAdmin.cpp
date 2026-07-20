@@ -1,10 +1,13 @@
 #include <services/local/XAdmin.hpp>
 
+#include <charconv>
 #include <psibase/HttpHeaders.hpp>
 #include <psibase/dispatch.hpp>
 #include <psio/json/any.hpp>
+#include <services/local/XBasic.hpp>
 #include <services/local/XDb.hpp>
 #include <services/local/XHttp.hpp>
+#include <services/local/XPeers.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/RTransact.hpp>
 
@@ -254,6 +257,61 @@ namespace LocalService
          return false;
       }
 
+      bool parseOption(std::string_view name, auto& iter, auto end, bool& result)
+      {
+         if (iter != end && parseOption(name, *iter, result))
+         {
+            ++iter;
+            return true;
+         }
+         else
+         {
+            return false;
+         }
+      }
+
+      bool parseOption(std::string_view name, auto& iter, auto end, std::vector<std::string>& value)
+      {
+         auto pos = iter;
+         if (pos == end)
+            return false;
+         if (!pos->starts_with(name))
+            return false;
+
+         auto arg = std::string_view{*pos}.substr(name.size());
+         if (arg.empty())
+         {
+            ++pos;
+            if (pos == end)
+               return false;
+            value.push_back(std::string(*pos));
+         }
+         else if (name.size() == 2)
+         {
+            value.push_back(std::string(arg));
+         }
+         else if (arg.starts_with('='))
+         {
+            value.push_back(std::string(arg.substr(1)));
+         }
+         else
+         {
+            return false;
+         }
+         ++pos;
+
+         iter = pos;
+         return true;
+      }
+      bool parseOption(std::string_view name1,
+                       std::string_view name2,
+                       auto&            iter,
+                       auto             end,
+                       auto&            value)
+      {
+         return parseOption(name1, iter, end, value) || parseOption(name2, iter, end, value);
+      }
+
       bool parseOption(const psio::json::any& opt, bool default_)
       {
          if (auto* b = opt.get_if<bool>())
@@ -261,6 +319,31 @@ namespace LocalService
          else if (auto* s = opt.get_if<std::string>())
          {
             return parseOptionValue(*s, default_);
+         }
+         return default_;
+      }
+      std::uint32_t parseOption(const psio::json::any& opt, std::uint32_t default_)
+      {
+         if (auto* i = opt.get_if<std::int32_t>())
+         {
+            if (*i >= 0 &&
+                static_cast<std::uint32_t>(*i) <= std::numeric_limits<std::uint32_t>::max())
+               return static_cast<std::uint32_t>(*i);
+         }
+         if (auto* i = opt.get_if<std::int64_t>())
+         {
+            if (*i >= 0 &&
+                static_cast<std::uint64_t>(*i) <= std::numeric_limits<std::uint32_t>::max())
+               return static_cast<std::uint32_t>(*i);
+         }
+         else if (auto* s = opt.get_if<std::string>())
+         {
+            std::uint32_t result;
+            const char*   p   = s->data();
+            const char*   end = s->data() + s->size();
+            auto          res = std::from_chars(p, end, result);
+            if (res.ec == std::errc{} && res.ptr == end)
+               return result;
          }
          return default_;
       }
@@ -306,6 +389,53 @@ namespace LocalService
          {
             return parseOption(opt, default_);
          }
+      }
+
+      std::optional<std::string> guessUrl(const psio::json::any& listen, std::string&& host)
+      {
+         std::string   proto;
+         std::uint16_t port;
+         if (auto* l = listen.get_if<psio::json::any_array>())
+         {
+            for (const auto& item : *l)
+            {
+               if (auto* o = item.get_if<psio::json::any_object>())
+               {
+                  std::string   newProto;
+                  std::uint32_t newPort = 0;
+                  for (const auto& [key, value] : *o)
+                  {
+                     if (key == "protocol")
+                     {
+                        newProto = parseOption(value, std::string());
+                     }
+                     else if (key == "port")
+                     {
+                        newPort = parseOption(value, static_cast<std::uint32_t>(65536));
+                     }
+                  }
+                  if ((newProto == "http" || newProto == "https") && newPort < 65536)
+                  {
+                     if (newPort == 0)
+                     {
+                        if (newProto == "http")
+                           newPort = 80;
+                        else if (newProto == "https")
+                           newPort = 443;
+                     }
+
+                     proto = std::move(newProto);
+                     port  = newPort;
+                     if (proto == "https")
+                        break;
+                  }
+               }
+            }
+         }
+         if (proto.empty())
+            return {};
+         else
+            return proto + "://" + std::move(host) + ':' + std::to_string(port);
       }
 
       struct PsinodeConfig
@@ -384,7 +514,7 @@ namespace LocalService
                // because they are used by the UI, which is part of this
                // service. Unknown host options will not be displayed and
                // will be round-tripped unmodified.
-               if (entry.key == "hosts")
+               if (entry.key == "hosts" || entry.key == "peers")
                   continue;
                else if (psio::get_data_member<AdminOptionsRow>(entry.key, [](auto) {}) ||
                         // In the unlikely event that the host has a option that
@@ -397,6 +527,8 @@ namespace LocalService
          result.push_back({"p2p", adminOpts.p2p});
          result.push_back({"hosts", psio::convert_from_json<psio::json::any>(
                                         psio::convert_to_json(adminOpts.hosts))});
+         result.push_back({"peers", psio::convert_from_json<psio::json::any>(
+                                        psio::convert_to_json(adminOpts.peers))});
          return psio::convert_to_json(psio::json::any{std::move(result)});
       }
       void writeConfig(std::string config)
@@ -424,7 +556,15 @@ namespace LocalService
                {
                   adminConfig.hosts = psio::convert_from_json<std::vector<std::string>>(
                       psio::convert_to_json(entry.value));
-                  host.push_back(std::move(entry));
+                  entry.key = "host";
+                  service.push_back(std::move(entry));
+               }
+               else if (entry.key == "peers")
+               {
+                  adminConfig.peers = psio::convert_from_json<std::vector<std::string>>(
+                      psio::convert_to_json(entry.value));
+                  entry.key = "peer";
+                  service.push_back(std::move(entry));
                }
                else
                {
@@ -442,11 +582,85 @@ namespace LocalService
             XAdmin{}.open<AdminOptionsTable>().put(adminConfig);
          }
       }
+
+      AuthResult checkAuthChain(const HttpRequest& req, std::optional<std::int32_t> socket)
+      {
+         if (chainIsBooted())
+         {
+            if (auto user = to<RTransact>().getUser(req))
+            {
+               return Auth::Account{*user};
+            }
+            else
+            {
+               bool hasAccounts;
+               PSIBASE_SUBJECTIVE_TX
+               {
+                  if (!XAdmin{}.open<AdminAccountTable>().getIndex<0>().empty())
+                  {
+                     return Auth::Unauthenticated{{"Bearer realm=\"psibase\""}};
+                  }
+               }
+            }
+         }
+         return Auth::Unauthenticated{};
+      }
+
+      struct Authenticator
+      {
+         std::vector<HttpHeader> challenges;
+         bool                    hasUser = false;
+         bool                    operator()(Auth::Account&& account)
+         {
+            hasUser = true;
+            bool result;
+            PSIBASE_SUBJECTIVE_TX
+            {
+               result = XAdmin{}.open<AdminAccountTable>().get(account.value).has_value();
+            }
+            return result;
+         }
+         bool operator()(Auth::LocalUsername&& username)
+         {
+            hasUser = true;
+            return true;
+         }
+         bool operator()(Auth::Unauthenticated&& unauth)
+         {
+            for (auto& challenge : unauth.challenges)
+            {
+               challenges.push_back({"WWW-Authenticate", std::move(challenge)});
+            }
+            return false;
+         }
+         bool add(AuthResult&& result) { return std::visit(*this, std::move(result)); }
+         std::optional<HttpReply> getError() &&
+         {
+            if (hasUser)
+               return HttpReply{.status      = HttpStatus::forbidden,
+                                .contentType = "text/html",
+                                .body        = toVec("Not authorized")};
+            else
+               return HttpReply{.status      = HttpStatus::unauthorized,
+                                .contentType = "text/html",
+                                .body        = toVec("Not authorized"),
+                                .headers     = std::move(challenges)};
+         }
+      };
+
+      struct ServiceFlags
+      {
+         std::string isPrivileged  = "0";
+         std::string isReplacement = "0";
+         PSIO_REFLECT(ServiceFlags, isPrivileged, isReplacement)
+      };
    }  // namespace
 
    void XAdmin::startSession()
    {
       check(getSender() == XHttp::service, "Wrong sender");
+      bool                       isBooted = chainIsBooted();
+      std::optional<std::string> setupMessage;
       PSIBASE_SUBJECTIVE_TX
       {
          HostConfigRow hostConfig = Native::session().open<HostConfigTable>().get({}).value();
@@ -457,6 +671,10 @@ namespace LocalService
          {
             adminOpts.hosts = parseOptionList(*hosts, std::vector<std::string>());
          }
+         if (auto* peers = json.hostOption("peers"))
+         {
+            adminOpts.peers = parseOptionList(*peers, std::vector<std::string>());
+         }
          if (auto* config = json.serviceConfig())
          {
             for (const auto& entry : *config)
@@ -465,31 +683,80 @@ namespace LocalService
                {
                   adminOpts.p2p = parseOptionList(entry.value, false);
                }
+               else if (entry.key == "host")
+               {
+                  adminOpts.hosts = parseOptionList(entry.value, std::vector<std::string>());
+               }
+               else if (entry.key == "peer")
+               {
+                  adminOpts.peers = parseOptionList(entry.value, std::vector<std::string>());
+               }
                else
                {
                   abortMessage(std::format("Unknown option: {}", entry.key));
                }
             }
          }
-         for (const auto& opt : json.serviceArgv())
          {
-            if (!parseOption("--p2p", opt, adminOpts.p2p))
+            // Buffer list options that should hide config file options
+            AdminOptionsRow cli;
+            auto            opts = json.serviceArgv();
+            auto            iter = opts.begin();
+            auto            end  = opts.end();
+            while (iter != end)
             {
-               abortMessage(std::format("Unknown option: {}", opt));
+               if (!parseOption("-o", "--host", iter, end, cli.hosts) &&
+                   !parseOption("--peer", iter, end, cli.peers) &&
+                   !parseOption("--p2p", iter, end, adminOpts.p2p))
+               {
+                  abortMessage(std::format("Unknown option: {}", *iter));
+               }
             }
+            if (!cli.hosts.empty())
+               adminOpts.hosts = std::move(cli.hosts);
+            if (!cli.peers.empty())
+               adminOpts.peers = std::move(cli.peers);
+         }
+         if (!isBooted && adminOpts.peers.empty())
+         {
+            std::string message = "Node is not connected to any psibase network.";
+            if (!adminOpts.hosts.empty())
+            {
+               std::string xAdminSubdomain = XAdmin::service.str() + "." + adminOpts.hosts.front();
+               if (auto* listen = json.hostOption("listen"))
+               {
+                  if (auto url = guessUrl(*listen, std::move(xAdminSubdomain)))
+                  {
+                     message += " Visit '" + *url + "' for node setup.";
+                  }
+               }
+            }
+            setupMessage = std::move(message);
+         }
+         else
+         {
+            setupMessage.reset();
          }
          open<AdminOptionsTable>().put(adminOpts);
+      }
+      to<XBasic>().startSession();
+      recurse().to<XPeers>().onConfig();
+      if (setupMessage)
+      {
+         to<XHttp>().log(LogMessage::Severity::notice, std::move(*setupMessage));
       }
    }
 
    AdminOptionsRow XAdmin::options()
    {
-      check(getSender() == XHttp::service, "Wrong sender");
+      auto sender = getSender();
+      check(sender == XHttp::service || sender == XPeers::service, "Wrong sender");
+      std::optional<AdminOptionsRow> result;
       PSIBASE_SUBJECTIVE_TX
       {
-         return open<AdminOptionsTable>().get({}).value_or(AdminOptionsRow{});
+         result = open<AdminOptionsTable>().get({});
       }
-      __builtin_unreachable();
+      return result.value_or(AdminOptionsRow{});
    }
 
    // Returns nullopt on success, an appropriate error on failure
@@ -499,24 +766,19 @@ namespace LocalService
       if (isAdminSocket(socket, req))
          return {};
 
-      if (chainIsBooted())
-      {
-         if (auto user = to<RTransact>().getUser(req))
-         {
-            PSIBASE_SUBJECTIVE_TX
-            {
-               if (open<AdminAccountTable>().get(*user).has_value())
-                  return {};
-            }
-            return HttpReply{.status      = HttpStatus::forbidden,
-                             .contentType = "text/html",
-                             .body        = toVec("Not authorized")};
-         }
-      }
+      Authenticator authenticator;
+      HttpRequest   subrequest{.host        = req.host,
+                               .method      = req.method,
+                               .target      = req.target,
+                               .contentType = req.contentType,
+                               .headers     = req.headers};
 
-      return HttpReply{.status      = HttpStatus::unauthorized,
-                       .contentType = "text/html",
-                       .body        = toVec("Not authorized")};
+      if (authenticator.add(checkAuthChain(subrequest, socket)))
+         return std::nullopt;
+      if (authenticator.add(to<XBasic>().checkAuth(subrequest, socket)))
+         return std::nullopt;
+
+      return std::move(authenticator).getError();
    }
 
    bool XAdmin::isAdmin(std::optional<AccountNumber>          account,
@@ -573,6 +835,7 @@ namespace LocalService
                };
             }
             writeConfig(std::string(req.body.begin(), req.body.end()));
+            recurse().to<XPeers>().onConfig();
             return HttpReply{
                 .status = HttpStatus::ok,
             };
@@ -648,6 +911,16 @@ namespace LocalService
             auto native          = Native::subjective(KvMode::readWrite);
             auto codeByHashTable = native.open<CodeByHashTable>();
             auto codeTable       = native.open<CodeTable>();
+            auto parsedFlags     = req.query<ServiceFlags>();
+            auto flags           = std::uint64_t{0};
+            if (parsedFlags.isPrivileged == "1")
+            {
+               flags |= CodeRow::isPrivileged;
+            }
+            if (parsedFlags.isReplacement == "1")
+            {
+               flags |= CodeRow::isReplacement;
+            }
             PSIBASE_SUBJECTIVE_TX
             {
                auto account = codeTable.get(service);
@@ -661,7 +934,7 @@ namespace LocalService
                constexpr std::uint8_t vmVersion = 0;
 
                if (vmType == account->vmType && vmVersion == account->vmVersion &&
-                   codeHash == account->codeHash)
+                   codeHash == account->codeHash && flags == account->flags)
                   return HttpReply{};
 
                // decrement old reference count
@@ -672,7 +945,7 @@ namespace LocalService
                }
 
                account->codeHash  = codeHash;
-               account->flags     = CodeRow::isPrivileged;
+               account->flags     = flags;
                account->vmType    = vmType;
                account->vmVersion = vmVersion;
                codeTable.put(*account);
@@ -715,6 +988,38 @@ namespace LocalService
             // MUST delete all data to avoid exposing node secrets to on-chain services
          }
          return HttpReply::methodNotAllowed(req);
+      }
+      else if (target.starts_with("/packages/"))
+      {
+         if (target.find("/.") != std::string_view::npos)
+            return {};
+         if (req.method != "GET")
+            return HttpReply::methodNotAllowed(req);
+         auto datadir = getEnv("PSIBASE_DATADIR");
+         if (datadir)
+         {
+            auto path = std::move(*datadir);
+            path += target;
+            HttpReply result{.status = HttpStatus::ok};
+            if (target.ends_with(".psi"))
+            {
+               result.contentType = "application/zip";
+            }
+            else if (target.ends_with(".json"))
+            {
+               result.contentType = "application/json";
+            }
+            else
+            {
+               return {};
+            }
+            auto sz = raw::readFile(path.data(), path.size());
+            if (sz == -1)
+               return {};
+            result.body    = getResult();
+            result.headers = allowCors(req, AccountNumber{"config"});
+            return result;
+         }
       }
       else if (target == "/admin_accounts")
       {

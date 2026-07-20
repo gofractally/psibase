@@ -1,17 +1,15 @@
-import { queryClient } from "@/queryClient";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { supervisor } from "@/supervisor";
-
-import { Account } from "@/lib/zodTypes";
-
+import { queryClient } from "@shared/lib/query-client";
+import { zAccount } from "@shared/lib/schemas/account";
+import { supervisor } from "@shared/lib/supervisor";
 import { toast } from "@shared/shadcn/ui/sonner";
 
-import { SiteConfigResponse, siteConfigQueryKey } from "./useSiteConfig";
+import { SiteConfigResponse, siteConfigQueryKey } from "./use-site-config";
 
 const Params = z.object({
-    account: Account,
+    account: zAccount,
     path: z.string(),
 });
 

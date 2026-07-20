@@ -69,6 +69,22 @@ pub unsafe fn set_sender(_acc: AccountNumber) {
     SENDER = _acc;
 }
 
+#[doc(hidden)]
+#[cfg(target_family = "wasm")]
+pub fn service_start() {
+    std::panic::set_hook(Box::new(|info| {
+        let payload = info.payload();
+        let msg: &str = if let Some(s) = payload.downcast_ref::<&str>() {
+            *s
+        } else if let Some(s) = payload.downcast_ref::<String>() {
+            &*s
+        } else {
+            ""
+        };
+        crate::abort_message(msg)
+    }))
+}
+
 pub trait ProcessActionStruct {
     type Output;
 
@@ -175,6 +191,156 @@ impl Caller for ActionPacker {
             method,
             rawData: args.packed().into(),
         }
+    }
+}
+
+pub trait ServiceWrapper {
+    const SERVICE: AccountNumber;
+    type Actions<T: Caller>;
+    fn with_caller<T: Caller>(caller: T) -> Self::Actions<T>;
+
+    /// Call another service.
+    ///
+    /// This method returns an object which has methods
+    /// (one per action) which call another service and return the result from the call.
+    /// This method is only usable by services.
+    ///
+    /// This method defaults `sender` to [`psibase::get_sender`] and `service` to `Self::SERVICE`.
+    fn call() -> Self::Actions<ServiceCaller> {
+        Self::call_from_to(get_service(), Self::SERVICE)
+    }
+
+    /// Call another service.
+    ///
+    /// This method returns an object which has methods
+    /// (one per action) which call another service and return the result from the call.
+    /// This method is only usable by services.
+    ///
+    /// This method defaults `sender` to [`psibase::get_sender`].
+    fn call_to(service: AccountNumber) -> Self::Actions<ServiceCaller> {
+        Self::call_from_to(get_service(), service)
+    }
+
+    /// Call another service.
+    ///
+    /// This method returns an object which has methods
+    /// (one per action) which call another service and return the result from the call.
+    /// This method is only usable by services.
+    ///
+    /// This method defaults `service` to `Self::SERVICE`.
+    fn call_from(sender: AccountNumber) -> Self::Actions<ServiceCaller> {
+        Self::call_from_to(sender, Self::SERVICE)
+    }
+
+    /// Call another service.
+    ///
+    /// This method returns an object which has methods
+    /// (one per action) which call another service and return the result from the call.
+    /// This method is only usable by services.
+    fn call_from_to(sender: AccountNumber, service: AccountNumber) -> Self::Actions<ServiceCaller> {
+        Self::with_caller(ServiceCaller {
+            sender,
+            service,
+            flags: 0,
+        })
+    }
+
+    /// Call another service using [runAs](psibase::services::transact::Actions::runAs).
+    ///
+    /// This method returns an object which has methods
+    /// (one per action) which call another service via `runAs` and return the result from the call.
+    /// The action will run with `sender` set to the provided account and `service` to `Self::SERVICE`.
+    ///
+    /// This will fail unless certain conditions are met. See [runAs](psibase::services::transact::Actions::runAs)
+    /// documentation for more details.
+    fn call_as(sender: AccountNumber) -> Self::Actions<RunAsCaller> {
+        Self::call_as_extend(sender, Vec::new())
+    }
+
+    /// Call another service using [runAs](psibase::services::transact::Actions::runAs).
+    ///
+    /// This method returns an object which has methods
+    /// (one per action) which call another service via `runAs` and return the result from the call.
+    /// The action will run with `sender` set to the provided account and `service` to `Self::SERVICE`.
+    ///
+    /// This will fail unless certain conditions are met. See [runAs](psibase::services::transact::Actions::runAs)
+    /// documentation for more details.
+    ///
+    /// This method also accepts `allowedActions` for nested `runAs` calls.
+    fn call_as_extend(
+        sender: AccountNumber,
+        allowed_actions: Vec<ServiceMethod>,
+    ) -> Self::Actions<RunAsCaller> {
+        Self::with_caller(RunAsCaller {
+            sender,
+            service: Self::SERVICE,
+            allowed_actions,
+        })
+    }
+
+    /// Call another service in RPC mode.
+    ///
+    /// This method returns an object which has methods
+    /// (one per action) which call another service and return the result from the call.
+    /// This method is only usable by services.
+    ///
+    /// This method defaults `sender` to [`psibase::get_sender`] and `service` to `Self::SERVICE`.
+    fn rpc() -> Self::Actions<ServiceCaller> {
+        Self::with_caller(ServiceCaller {
+            sender: get_service(),
+            service: Self::SERVICE,
+            flags: 1,
+        })
+    }
+
+    /// Pack actions into [psibase::Action](psibase::Action).
+    ///
+    /// This method returns an object which has methods
+    /// (one per action) which pack the action's arguments using [fracpack] and
+    /// return a [psibase::Action](psibase::Action). The `pack_*` series of
+    /// functions is mainly useful to applications which push transactions
+    /// to blockchains.
+    ///
+    /// This method defaults both `sender` and `service` to `Self::SERVICE`.
+    fn pack() -> Self::Actions<ActionPacker> {
+        Self::pack_from_to(Self::SERVICE, Self::SERVICE)
+    }
+
+    /// Pack actions into [psibase::Action](psibase::Action).
+    ///
+    /// This method returns an object which has methods
+    /// (one per action) which pack the action's arguments using [fracpack] and
+    /// return a [psibase::Action](psibase::Action). The `pack_*` series of
+    /// functions is mainly useful to applications which push transactions
+    /// to blockchains.
+    ///
+    /// This method defaults `sender` to `Self::SERVICE`.
+    fn pack_to(service: AccountNumber) -> Self::Actions<ActionPacker> {
+        Self::pack_from_to(Self::SERVICE, service)
+    }
+
+    /// Pack actions into [psibase::Action](psibase::Action).
+    ///
+    /// This method returns an object which has methods
+    /// (one per action) which pack the action's arguments using [fracpack] and
+    /// return a [psibase::Action](psibase::Action). The `pack_*` series of
+    /// functions is mainly useful to applications which push transactions
+    /// to blockchains.
+    ///
+    /// This method defaults `service` to `Self::SERVICE`.
+    fn pack_from(sender: AccountNumber) -> Self::Actions<ActionPacker> {
+        Self::pack_from_to(sender, Self::SERVICE)
+    }
+
+    /// Pack actions into [psibase::Action](psibase::Action).
+    ///
+    /// This method returns an object which has methods
+    /// (one per action) which pack the action's arguments using [fracpack] and
+    /// return a [psibase::Action](psibase::Action). The `pack_*` series of
+    /// functions is mainly useful to applications which push transactions
+    /// to blockchains.
+    fn pack_from_to(sender: AccountNumber, service: AccountNumber) -> Self::Actions<ActionPacker> {
+        Self::with_caller(ActionPacker { sender, service })
     }
 }
 

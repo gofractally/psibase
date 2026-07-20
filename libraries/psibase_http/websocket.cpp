@@ -27,9 +27,9 @@ namespace
 }  // namespace
 
 WebSocket::WebSocket(server_state& server, SocketInfo&& info)
-    : server(server), savedInfo(toWebSocketInfo(std::move(info)))
+    : channel("http"), server(server), savedInfo(toWebSocketInfo(std::move(info)))
 {
-   logger.add_attribute("Channel", boost::log::attributes::constant(std::string("http")));
+   logger.add_attribute("Channel", channel);
    if (savedInfo.endpoint)
    {
       logger.add_attribute("RemoteEndpoint", boost::log::attributes::constant<std::string>(
@@ -37,11 +37,12 @@ WebSocket::WebSocket(server_state& server, SocketInfo&& info)
    }
 }
 
-void WebSocket::handleMessage(CloseLock&& l)
+void WebSocket::handleMessage(CloseLock&& l, bool binary)
 {
    auto inbuffer    = input.cdata();
    auto data        = std::span{static_cast<const char*>(inbuffer.data()), inbuffer.size()};
    auto clearBuffer = psio::finally{[this] { input.consume(input.size()); }};
+   auto flags       = binary ? WebSocketFlags::binary : WebSocketFlags::text;
 
    auto system = server.sharedState->getSystemContext();
 
@@ -60,7 +61,7 @@ void WebSocket::handleMessage(CloseLock&& l)
    Action action{
        .sender  = AccountNumber(),
        .service = proxyServiceNum,
-       .rawData = psio::convert_to_frac(std::tuple(this->id, data)),
+       .rawData = psio::convert_to_frac(std::tuple(this->Socket::id, data, flags)),
    };
 
    try
@@ -75,4 +76,32 @@ void WebSocket::handleMessage(CloseLock&& l)
       BOOST_LOG_SCOPED_LOGGER_TAG(logger, "Trace", std::move(trace));
       PSIBASE_LOG(logger, warning) << proxyServiceNum.str() << "::recv failed: " << e.what();
    }
+}
+
+bool WebSocket::handleP2P()
+{
+   auto inbuffer = input.cdata();
+   auto msg      = std::span{static_cast<const char*>(inbuffer.data()), inbuffer.size()};
+   if (!msg.empty() && static_cast<unsigned char>(msg[0]) < 64)
+   {
+      std::unique_lock l{mutex};
+      using P2PState = WebSocket::P2PState;
+      if (readCallback)
+      {
+         l.unlock();
+         auto readCallback  = std::move(this->readCallback);
+         this->readCallback = nullptr;
+         p2pState           = P2PState::running;
+         auto data          = std::vector(msg.begin(), msg.end());
+         input.consume(input.size());
+         readCallback(std::error_code{}, std::move(data));
+         return true;
+      }
+      else if (p2pState == P2PState::reading)
+      {
+         p2pState == P2PState::messageReady;
+         return true;
+      }
+   }
+   return false;
 }

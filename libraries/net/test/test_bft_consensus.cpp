@@ -198,8 +198,8 @@ TEST_CASE("commit before prepare", "[bft]")
    };
    auto boot_block = nodes.nodes[0]->head();
 
-   auto block1 = makeBlock(boot_block, "b", 4);
-   auto block2 = makeBlock(boot_block, "c", 5);
+   auto block1 = makeBlock(boot_block, "b", 5);
+   auto block2 = makeBlock(boot_block, "c", 6);
    send(block1.block);
    send(block2.block);
 
@@ -216,11 +216,11 @@ TEST_CASE("view change update head", "[bft]")
    TEST_START(logger);
    SingleNode<node_type> node({"a", "b", "c", "d"});
    auto                  boot_block = node.headState();
-   auto                  block1     = makeBlock(boot_block, "b", 4);
+   auto                  block1     = makeBlock(boot_block, "b", 5);
    node.send(block1);
    CHECK(node.head().blockId == boot_block.first->info.blockId);
-   node.send(makeViewChange("b", 4));
-   node.send(makeViewChange("c", 4));
+   node.send(makeViewChange("b", 5));
+   node.send(makeViewChange("c", 6));
    CHECK(node.head().blockId == block1.id());
 }
 
@@ -234,14 +234,14 @@ TEST_CASE("fork before invalid 1", "[bft]")
    // The final block is ordered between the parent of the
    // invalid block and the invalid block
    auto root    = node.headState();
-   auto block1  = makeBlock(root, "b", 4);
-   auto block2  = makeBlock(root, "c", 5);
-   auto invalid = makeBlock(block1, "d", 6, Transaction{.actions = {Action{}}});
+   auto block1  = makeBlock(root, "b", 5);
+   auto block2  = makeBlock(root, "c", 6);
+   auto invalid = makeBlock(block1, "d", 7, Transaction{.actions = {Action{}}});
    node.send(block1);
    node.send(block2);
    node.send(invalid);
-   node.send(makeViewChange("b", 6));
-   node.send(makeViewChange("d", 6));
+   node.send(makeViewChange("b", 7));
+   node.send(makeViewChange("d", 7));
    CHECK(node.head().blockId == block2.id());
 }
 
@@ -255,14 +255,14 @@ TEST_CASE("fork before invalid 2", "[bft]")
    // The final block is ordered between the invalid block
    // and a descendant of the invalid block
    auto root    = node.headState();
-   auto invalid = makeBlock(root, "b", 4, Transaction{.actions = {Action{}}});
-   auto block1  = makeBlock(root, "c", 5);
-   auto block2  = makeBlock(invalid, "d", 6);
+   auto invalid = makeBlock(root, "b", 5, Transaction{.actions = {Action{}}});
+   auto block1  = makeBlock(root, "c", 6);
+   auto block2  = makeBlock(invalid, "d", 7);
    node.send(invalid);
    node.send(block1);
    node.send(block2);
-   node.send(makeViewChange("b", 6));
-   node.send(makeViewChange("d", 6));
+   node.send(makeViewChange("b", 7));
+   node.send(makeViewChange("d", 7));
    CHECK(node.head().blockId == block1.id());
 }
 
@@ -277,21 +277,21 @@ TEST_CASE("truncated fork switch", "[bft]")
    SingleNode<node_type> node({"a", "b", "c", "d"});
    //
    auto root    = node.headState();
-   auto block1a = makeBlock(root, "b", 4);
-   auto block1b = makeBlock(block1a, "b", 4);
-   auto block1c = makeBlock(block1b, "b", 4);
-   auto block2  = makeBlock(root, "c", 5, setProducers(bft("a", "b", "c", "e")));
-   auto invalid = makeBlock(block2, "c", 5, Transaction{.actions = {Action{}}});
+   auto block1a = makeBlock(root, "b", 5);
+   auto block1b = makeBlock(block1a, "b", 5);
+   auto block1c = makeBlock(block1b, "b", 5);
+   auto block2  = makeBlock(root, "c", 6, setProducers(bft("a", "b", "c", "e")));
+   auto invalid = makeBlock(block2, "c", 6, Transaction{.actions = {Action{}}});
    node.addClient();
    node.send(block1a);
-   node.send(makeViewChange("b", 4));
-   node.send(makeViewChange("c", 4));
+   node.send(makeViewChange("b", 5));
+   node.send(makeViewChange("c", 5));
    node.send0(block1b);
    node.send0(block1c);
    node.send0(block2);
    node.send0(invalid);
-   node.send0(makeViewChange("b", 5));
-   node.send0(makeViewChange("c", 5));
+   node.send0(makeViewChange("b", 6));
+   node.send0(makeViewChange("c", 6));
    node.poll();
    CHECK(node.head().blockId == block2.id());
 }
@@ -306,14 +306,14 @@ TEST_CASE("fork after invalid", "[bft]")
    // If there are multiple forks that descend from an invalid
    // block, they should all get blacklisted.
    auto root    = node.headState();
-   auto invalid = makeBlock(root, "b", 4, Transaction{.actions = {Action{}}});
-   auto block1  = makeBlock(invalid, "b", 4);
-   auto block2  = makeBlock(invalid, "c", 5);
+   auto invalid = makeBlock(root, "b", 5, Transaction{.actions = {Action{}}});
+   auto block1  = makeBlock(invalid, "b", 5);
+   auto block2  = makeBlock(invalid, "c", 6);
    node.send(invalid);
    node.send(block1);
    node.send(block2);
-   node.send(makeViewChange("b", 5));
-   node.send(makeViewChange("c", 5));
+   node.send(makeViewChange("b", 6));
+   node.send(makeViewChange("c", 6));
    CHECK(node.head().blockId == root.first->info.blockId);
 }
 
@@ -326,20 +326,20 @@ TEST_CASE("producer fork 1", "[bft]")
    SingleNode<node_type> node({"a", "b", "c", "d"});
 
    auto root    = node.headState();
-   auto fork1   = makeBlock(root, "b", 4);
-   auto invalid = makeBlock(fork1, "b", 4, Transaction{.actions = {Action{}}});
+   auto fork1   = makeBlock(root, "b", 5);
+   auto invalid = makeBlock(fork1, "b", 5, Transaction{.actions = {Action{}}});
    // start block production for "a"
-   node.send(makeViewChange("b", 7));
-   node.send(makeViewChange("c", 7));
+   node.send(makeViewChange("b", 8));
+   node.send(makeViewChange("c", 8));
    CHECK(!!node.nodes[0].chain().getBlockContext());
    runFor(node.ctx, 1s);
    node.send(fork1);
    node.send(invalid);
    // Force switch to fork 1
    BlockInfo fork1info{fork1.info()};
-   node.send(makeViewChange("b", 11, fork1info, {"b", "c", "d"}));
-   node.send(makeViewChange("c", 11, fork1info, {"b", "c", "d"}));
-   node.send(makeViewChange("d", 11, fork1info, {"b", "c", "d"}));
+   node.send(makeViewChange("b", 12, fork1info, {"b", "c", "d"}));
+   node.send(makeViewChange("c", 12, fork1info, {"b", "c", "d"}));
+   node.send(makeViewChange("d", 12, fork1info, {"b", "c", "d"}));
    CHECK(node.head().blockId == fork1info.blockId);
    runFor(node.ctx, 1s);
    // The block should be built off fork1
@@ -356,15 +356,15 @@ TEST_CASE("producer cancel fork switch")
    SingleNode<node_type> node({"a", "b", "c", "d"});
 
    auto root    = node.headState();
-   auto fork1   = makeBlock(root, "b", 4);
-   auto fork2   = makeBlock(root, "c", 5);
-   auto invalid = makeBlock(fork2, "a", 7, Transaction{.actions = {Action{}}});
+   auto fork1   = makeBlock(root, "b", 5);
+   auto fork2   = makeBlock(root, "c", 6);
+   auto invalid = makeBlock(fork2, "a", 8, Transaction{.actions = {Action{}}});
    node.send(fork1);
-   node.send(makeViewChange("b", 4));
-   node.send(makeViewChange("c", 4));
+   node.send(makeViewChange("b", 5));
+   node.send(makeViewChange("c", 5));
    // start block production for "a"
-   node.send(makeViewChange("b", 7));
-   node.send(makeViewChange("c", 7));
+   node.send(makeViewChange("b", 8));
+   node.send(makeViewChange("c", 8));
    // We should not switch forks, because the pending block is better fork2
    node.send(fork2);
    CHECK(node.head().blockId == fork1.id());
@@ -384,15 +384,15 @@ TEST_CASE("better block after commit", "[bft]")
    SingleNode<node_type> node({"a", "b", "c", "d"});
    // fork2 should be excluded after fork1 is prepared
    auto root  = node.headState();
-   auto fork1 = makeBlock(root, "b", 4);
-   auto fork2 = makeBlock(root, "c", 5);
-   node.send(makeViewChange("b", 4));
-   node.send(makeViewChange("c", 4));
+   auto fork1 = makeBlock(root, "b", 5);
+   auto fork2 = makeBlock(root, "c", 6);
+   node.send(makeViewChange("b", 5));
+   node.send(makeViewChange("c", 5));
    node.send(fork1);
    node.send(makePrepare(fork1, "b"));
    node.send(makePrepare(fork1, "c"));
-   node.send(makeViewChange("b", 5));
-   node.send(makeViewChange("c", 5));
+   node.send(makeViewChange("b", 6));
+   node.send(makeViewChange("c", 6));
    node.send(fork2);
    CHECK(node.head().blockId == fork1.id());
 }
@@ -403,20 +403,20 @@ TEST_CASE("return to previous fork", "[bft]")
    SingleNode<node_type> node({"a", "b", "c", "d"});
 
    auto root   = node.headState();
-   auto fork1  = makeBlock(root, "b", 4);
-   auto fork2  = makeBlock(root, "c", 5);
-   auto fork1b = makeBlock(fork1, "b", 4);
-   node.send(makeViewChange("b", 4));
-   node.send(makeViewChange("c", 4));
-   node.send(fork1);
+   auto fork1  = makeBlock(root, "b", 5);
+   auto fork2  = makeBlock(root, "c", 6);
+   auto fork1b = makeBlock(fork1, "b", 5);
    node.send(makeViewChange("b", 5));
    node.send(makeViewChange("c", 5));
+   node.send(fork1);
+   node.send(makeViewChange("b", 6));
+   node.send(makeViewChange("c", 6));
    node.send(fork2);
    CHECK(node.head().blockId == fork2.id());
    // return to the worse fork
    node.send(fork1b);
-   node.send(makeViewChange("b", 6, fork1.info(), {"b", "c", "d"}));
-   node.send(makeViewChange("d", 6, fork1.info(), {"b", "c", "d"}));
+   node.send(makeViewChange("b", 7, fork1.info(), {"b", "c", "d"}));
+   node.send(makeViewChange("d", 7, fork1.info(), {"b", "c", "d"}));
    node.send(makePrepare(fork1b, "b"));
    node.send(makePrepare(fork1b, "d"));
    CHECK(node.head().blockId == fork1b.id());
@@ -426,8 +426,8 @@ TEST_CASE("return to previous fork", "[bft]")
    node.send(makeCommit(fork1b, "c"));
    node.send(makeCommit(fork1b, "d"));
 
-   node.send(makeViewChange("b", 7, fork2.info(), {"b", "c", "d"}));
-   node.send(makeViewChange("c", 7, fork2.info(), {"b", "c", "d"}));
+   node.send(makeViewChange("b", 8, fork2.info(), {"b", "c", "d"}));
+   node.send(makeViewChange("c", 8, fork2.info(), {"b", "c", "d"}));
 
    // should switch to fork 2
    CHECK(node.head().blockId == fork2.id());
@@ -439,12 +439,12 @@ TEST_CASE("highest view change inconsistent with commit", "[bft]")
    SingleNode<node_type> node({"a", "b", "c", "d"});
 
    auto root  = node.headState();
-   auto fork1 = makeBlock(root, "b", 4);
-   auto fork2 = makeBlock(root, "c", 5);
-   // Make sure that we're on term 5
-   node.send(makeViewChange("a", 5));
-   node.send(makeViewChange("b", 5));
-   node.send(makeViewChange("c", 5));
+   auto fork1 = makeBlock(root, "b", 5);
+   auto fork2 = makeBlock(root, "c", 6);
+   // Make sure that we're on term 6
+   node.send(makeViewChange("a", 6));
+   node.send(makeViewChange("b", 6));
+   node.send(makeViewChange("c", 6));
    node.send(fork1);
    node.send(fork2);
    // Commit fork2
@@ -455,9 +455,9 @@ TEST_CASE("highest view change inconsistent with commit", "[bft]")
 
    // This view change refers to a block which conflicts with the committed fork2,
    // but is better than any block referenced by any other view change.
-   node.send(makeViewChange("d", 5, fork1.info(), {"a", "b", "d"}));
-   // this view change makes term 5 non-viable
-   node.send(makeViewChange("b", 6, fork2.info(), {"a", "b", "c"}));
+   node.send(makeViewChange("d", 6, fork1.info(), {"a", "b", "d"}));
+   // this view change makes term 6 non-viable
+   node.send(makeViewChange("b", 7, fork2.info(), {"a", "b", "c"}));
    CHECK(node.head().blockId == fork2.id());
 }
 
@@ -550,10 +550,10 @@ TEST_CASE("invalid prepared block 1", "[bft]")
    SingleNode<node_type> node({"a", "b", "c", "d"});
 
    auto root    = node.headState();
-   auto invalid = makeBlock(root, "b", 4, Transaction{.actions = {Action{}}});
+   auto invalid = makeBlock(root, "b", 5, Transaction{.actions = {Action{}}});
    node.send(invalid);
-   node.send(makeViewChange("b", 4));
-   node.send(makeViewChange("c", 4));
+   node.send(makeViewChange("b", 5));
+   node.send(makeViewChange("c", 5));
    node.send(makePrepare(invalid, "b"));
    node.send(makePrepare(invalid, "c"));
    try
@@ -572,11 +572,11 @@ TEST_CASE("invalid prepared block 2", "[bft]")
    SingleNode<node_type> node({"a", "b", "c", "d"});
 
    auto root    = node.headState();
-   auto invalid = makeBlock(root, "b", 4, Transaction{.actions = {Action{}}});
-   auto block1  = makeBlock(root, "c", 5);
+   auto invalid = makeBlock(root, "b", 5, Transaction{.actions = {Action{}}});
+   auto block1  = makeBlock(root, "c", 6);
    node.send(block1);
-   node.send(makeViewChange("b", 5));
-   node.send(makeViewChange("c", 5));
+   node.send(makeViewChange("b", 6));
+   node.send(makeViewChange("c", 6));
    node.send(invalid);
    node.send(makePrepare(invalid, "b"));
    node.send(makePrepare(invalid, "c"));
@@ -595,10 +595,10 @@ TEST_CASE("invalid committed block", "[bft]")
    SingleNode<node_type> node({"a", "b", "c", "d"});
 
    auto root    = node.headState();
-   auto invalid = makeBlock(root, "b", 4, Transaction{.actions = {Action{}}});
+   auto invalid = makeBlock(root, "b", 5, Transaction{.actions = {Action{}}});
    node.send(invalid);
-   node.send(makeViewChange("b", 4));
-   node.send(makeViewChange("c", 4));
+   node.send(makeViewChange("b", 5));
+   node.send(makeViewChange("c", 5));
    node.send(makeCommit(invalid, "b"));
    node.send(makeCommit(invalid, "c"));
    CHECK_THROWS_AS(node.send(makeCommit(invalid, "d")), consensus_failure);
@@ -610,8 +610,8 @@ TEST_CASE("double commit 1", "[bft]")
    SingleNode<node_type> node({"a", "b", "c", "d"});
 
    auto root   = node.headState();
-   auto block1 = makeBlock(root, "b", 4);
-   auto block2 = makeBlock(root, "c", 5);
+   auto block1 = makeBlock(root, "b", 5);
+   auto block2 = makeBlock(root, "c", 6);
    node.send(block1);
    node.send(block2);
 
@@ -639,9 +639,9 @@ TEST_CASE("double commit 2", "[bft]")
    SingleNode<node_type> node({"a", "b", "c", "d"});
 
    auto root    = node.headState();
-   auto block1a = makeBlock(root, "b", 4);
-   auto block1b = makeBlock(block1a, "b", 4);
-   auto block2  = makeBlock(root, "c", 5);
+   auto block1a = makeBlock(root, "b", 5);
+   auto block1b = makeBlock(block1a, "b", 5);
+   auto block2  = makeBlock(root, "c", 6);
    node.send(block1a);
    node.send(block1b);
    node.send(block2);

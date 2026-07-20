@@ -244,7 +244,7 @@ namespace psibase::net
       {
          ProducerMulticastSocket(blocknet* self) : self(self) {}
          blocknet* self;
-         void      send(Writer&, std::span<const char> data)
+         void      send(Writer&, std::span<const char> data, std::uint32_t flags) override
          {
             boost::asio::post(
                 self->_ioctx,
@@ -263,7 +263,7 @@ namespace psibase::net
                    }
                 });
          }
-         SocketInfo info() const { return ProducerMulticastSocketInfo{}; }
+         SocketInfo info() const override { return ProducerMulticastSocketInfo{}; }
       };
 
       producer_id                  self = null_producer;

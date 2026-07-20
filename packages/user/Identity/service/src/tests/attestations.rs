@@ -1,4 +1,4 @@
-use psibase::AccountNumber;
+use psibase::account;
 
 use crate::tables::{Attestation, AttestationStats};
 use crate::tests::helpers::test_helpers::{
@@ -10,10 +10,10 @@ use crate::tests::helpers::test_helpers::{
 pub fn test_attest_first_high_conf(chain: psibase::Chain) -> Result<(), psibase::Error> {
     let svc = init_identity_svc(&chain);
 
-    chain.new_account("alice".into())?;
-    chain.new_account("bob".into())?;
+    chain.new_account(account!("alice"))?;
+    chain.new_account(account!("bob"))?;
 
-    svc.from("alice").attest("bob".into(), 95).get()?;
+    svc.from("alice").attest(account!("bob"), 95).get()?;
 
     let exp_results = vec![PartialAttestation::new("alice".into(), "bob".into(), 95)];
     let results = svc.query::<Vec<Attestation>>(r#"attestationsBySubject(subject: "bob")"#);
@@ -31,12 +31,12 @@ pub fn test_attest_first_high_conf(chain: psibase::Chain) -> Result<(), psibase:
 pub fn test_attest_first_low_conf(chain: psibase::Chain) -> Result<(), psibase::Error> {
     let svc = init_identity_svc(&chain);
 
-    let alice = AccountNumber::from("alice");
+    let alice = account!("alice");
     chain.new_account(alice).unwrap();
-    let bob = AccountNumber::from("bob");
+    let bob = account!("bob");
     chain.new_account(bob).unwrap();
 
-    svc.from("alice").attest("bob".into(), 75).get()?;
+    svc.from("alice").attest(account!("bob"), 75).get()?;
 
     let exp_results = vec![PartialAttestation::new("alice".into(), "bob".into(), 75)];
     let results = svc.query::<Vec<Attestation>>(r#"attestationsBySubject(subject: "bob")"#);

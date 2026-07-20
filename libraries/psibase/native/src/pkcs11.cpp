@@ -663,7 +663,7 @@ namespace psibase::pkcs11
             result.resize(n);
             return result;
          }
-         else if (err = error::buffer_too_small)
+         else if (err == error::buffer_too_small)
          {
             result.resize(n);
          }

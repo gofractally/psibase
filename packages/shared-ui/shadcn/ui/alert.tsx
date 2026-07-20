@@ -11,6 +11,8 @@ const alertVariants = cva(
         default: "bg-card text-card-foreground",
         destructive:
           "text-destructive bg-card [&>svg]:text-current *:data-[slot=alert-description]:text-destructive/90",
+        warning:
+          "border-orange-200/70 bg-orange-50 text-orange-950 dark:bg-orange-950/30 dark:border-orange-800/50 dark:text-orange-100 [&>svg]:text-orange-600 dark:[&>svg]:text-orange-400",
       },
     },
     defaultVariants: {
@@ -34,12 +36,17 @@ function Alert({
   )
 }
 
-function AlertTitle({ className, ...props }: React.ComponentProps<"div">) {
+function AlertTitle({
+  className,
+  variant,
+  ...props
+}: React.ComponentProps<"div"> & { variant?: "default" | "destructive" | "warning" }) {
   return (
     <div
       data-slot="alert-title"
       className={cn(
         "col-start-2 line-clamp-1 min-h-4 font-medium tracking-tight",
+        variant === "warning" && "text-orange-900 dark:text-orange-100",
         className
       )}
       {...props}
@@ -49,18 +56,19 @@ function AlertTitle({ className, ...props }: React.ComponentProps<"div">) {
 
 function AlertDescription({
   className,
+  variant,
   ...props
-}: React.ComponentProps<"div">) {
+}: React.ComponentProps<"div"> & { variant?: "default" | "destructive" | "warning" }) {
   return (
     <div
       data-slot="alert-description"
       className={cn(
         "text-muted-foreground col-start-2 grid justify-items-start gap-1 text-sm [&_p]:leading-relaxed",
+        variant === "warning" && "text-orange-800/90 dark:text-orange-200/90",
         className
       )}
       {...props}
     />
   )
 }
-
 export { Alert, AlertTitle, AlertDescription }

@@ -143,4 +143,3 @@ Calling service methods directly (e.g. `this->doSomething()`) don't count in thi
 {{#cpp-doc ::psibase::to}}
 {{#cpp-doc ::psibase::from}}
 {{#cpp-doc ::psibase::EventEmitter}}
-{{#cpp-doc ::psibase::EventReader}}

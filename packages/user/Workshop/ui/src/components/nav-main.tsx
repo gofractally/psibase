@@ -1,6 +1,9 @@
 import { FolderUp, LifeBuoy, Settings } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
+import { useAppMetadata } from "@/hooks/use-app-metadata";
+import { useCurrentApp } from "@/hooks/use-current-app";
+
 import { cn } from "@shared/lib/utils";
 import {
     SidebarGroup,
@@ -35,15 +38,23 @@ export const appMenus = [
 
 export function NavMain() {
     const location = useLocation();
-
     const appName = location.pathname.split("/")[2];
+
+    const currentApp = useCurrentApp();
+    const { data: app } = useAppMetadata(currentApp);
 
     return (
         <SidebarGroup>
-            <SidebarGroupLabel>App configuration</SidebarGroupLabel>
+            <SidebarGroupLabel>
+                {app?.name ?? currentApp} config
+            </SidebarGroupLabel>
             <SidebarMenu>
                 {appMenus.map((item) => (
-                    <NavLink to={`/app/${appName}/${item.path}`} end>
+                    <NavLink
+                        to={`/app/${appName}/${item.path}`}
+                        key={item.path}
+                        end
+                    >
                         {({ isActive }) => (
                             <SidebarMenuItem
                                 className={cn({

@@ -1,24 +1,28 @@
 import { createBrowserRouter } from "react-router-dom";
 
-import { ActiveAndUpcoming } from "@/pages/fractal/evaluations/active-and-upcoming";
-import { Completed } from "@/pages/fractal/evaluations/completed";
-import { AllMembers } from "@/pages/fractal/membership/all-members";
-import { MyMembership } from "@/pages/fractal/membership/my-membership";
+import { Members } from "@/pages/fractal/members";
+import { ActiveAndUpcoming } from "@/pages/guilds/evaluations/active-and-upcoming";
+import { GuildEvaluationsLayout } from "@/pages/guilds/evaluations/layout";
+import { PastEvaluations } from "@/pages/guilds/evaluations/past";
 
 import { Layout } from "@/components/layout";
-import { ProtectedRoute } from "@/components/protected-route";
 
-import { Judicial } from "./pages/fractal/branches/judicial";
-import { Legislative } from "./pages/fractal/branches/legislative";
-import { EvaluationDeliberation } from "./pages/fractal/evaluations/evaluation-deliberation";
-import { EvaluationResult } from "./pages/fractal/evaluations/evaluation-result";
-import { AllGuildMembers } from "./pages/fractal/guild-membership/all-guild-members";
-import { MyGuildMembership } from "./pages/fractal/guild-membership/my-guild-membership";
-import { Guilds } from "./pages/fractal/guilds";
-import { ApplicationDetail } from "./pages/fractal/membership/application-detail";
-import { Applications } from "./pages/fractal/membership/applications";
-import { Settings } from "./pages/settings";
-import { Leadership } from "./pages/leadership";
+import { ProtectedRoute } from "@shared/components/protected-route";
+
+import { Judicial } from "./pages/fractal/governance/judicial";
+import { Legislative } from "./pages/fractal/governance/legislative";
+import { Guilds } from "./pages/fractal/guilds/index";
+import { Overview } from "./pages/fractal/overview/index";
+import { ApplicationDetail } from "./pages/guilds/application-detail/index";
+import { EvaluationDeliberation } from "./pages/guilds/evaluations/evaluation-deliberation";
+import { EvaluationResult } from "./pages/guilds/evaluations/evaluation-result";
+import { Leadership } from "./pages/guilds/leadership";
+import { GuildApplicants } from "./pages/guilds/membership/applicants";
+import { GuildMembershipLayout } from "./pages/guilds/membership/layout";
+import { GuildMembers } from "./pages/guilds/membership/members";
+import { GuildOverview } from "./pages/guilds/overview";
+import { Invite } from "./pages/invite-detail/invite";
+import { InviteResponse } from "./pages/invite-detail/invite-response";
 
 export const router = createBrowserRouter([
     {
@@ -29,17 +33,13 @@ export const router = createBrowserRouter([
                 path: "/",
                 element: (
                     <ProtectedRoute>
-                        <MyMembership />
+                        <Overview />
                     </ProtectedRoute>
                 ),
             },
             {
-                path: "/membership",
-                element: (
-                    <ProtectedRoute>
-                        <MyMembership />
-                    </ProtectedRoute>
-                ),
+                path: "/invite",
+                element: <Invite />,
             },
             {
                 path: "/legislative",
@@ -61,7 +61,7 @@ export const router = createBrowserRouter([
                 path: "/members",
                 element: (
                     <ProtectedRoute>
-                        <AllMembers />
+                        <Members />
                     </ProtectedRoute>
                 ),
             },
@@ -81,36 +81,38 @@ export const router = createBrowserRouter([
                         path: "",
                         element: (
                             <ProtectedRoute>
-                                <MyGuildMembership />
+                                <GuildOverview />
                             </ProtectedRoute>
                         ),
                     },
                     {
-                        path: "members",
+                        path: "invite-response",
                         element: (
                             <ProtectedRoute>
-                                <AllGuildMembers />
+                                <InviteResponse />
                             </ProtectedRoute>
                         ),
                     },
                     {
-                        path: "evaluations",
+                        path: "membership",
                         element: (
                             <ProtectedRoute>
-                                <ActiveAndUpcoming />
+                                <GuildMembershipLayout />
                             </ProtectedRoute>
                         ),
+                        children: [
+                            {
+                                path: "members",
+                                element: <GuildMembers />,
+                            },
+                            {
+                                path: "applicants",
+                                element: <GuildApplicants />,
+                            },
+                        ],
                     },
                     {
-                        path: "applications",
-                        element: (
-                            <ProtectedRoute>
-                                <Applications />
-                            </ProtectedRoute>
-                        ),
-                    },
-                    {
-                        path: "applications/:applicant",
+                        path: "membership/applicants/:applicant",
                         element: (
                             <ProtectedRoute>
                                 <ApplicationDetail />
@@ -118,15 +120,7 @@ export const router = createBrowserRouter([
                         ),
                     },
                     {
-                        path: "evaluations/completed",
-                        element: (
-                            <ProtectedRoute>
-                                <Completed />
-                            </ProtectedRoute>
-                        ),
-                    },
-                    {
-                        path: "evaluations/completed/:evaluationId",
+                        path: "evaluations/past/:evaluationId",
                         element: (
                             <ProtectedRoute>
                                 <EvaluationResult />
@@ -141,20 +135,29 @@ export const router = createBrowserRouter([
                             </ProtectedRoute>
                         ),
                     },
-
+                    {
+                        path: "evaluations",
+                        element: (
+                            <ProtectedRoute>
+                                <GuildEvaluationsLayout />
+                            </ProtectedRoute>
+                        ),
+                        children: [
+                            {
+                                path: "upcoming",
+                                element: <ActiveAndUpcoming />,
+                            },
+                            {
+                                path: "past",
+                                element: <PastEvaluations />,
+                            },
+                        ],
+                    },
                     {
                         path: "leadership",
                         element: (
                             <ProtectedRoute>
                                 <Leadership />
-                            </ProtectedRoute>
-                        ),
-                    },
-                    {
-                        path: "settings",
-                        element: (
-                            <ProtectedRoute>
-                                <Settings />
                             </ProtectedRoute>
                         ),
                     },

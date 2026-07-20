@@ -9,10 +9,10 @@ import { zPermissionRequest } from "./types";
 
 export const App = () => {
     const { data, isPending, error } = useQuery({
-        queryKey: ["permissions", "getContext"],
+        queryKey: ["perms", "getContext"],
         queryFn: async () => {
             const result = await supervisor.functionCall({
-                service: "permissions",
+                service: "perms",
                 intf: "admin",
                 method: "getContext",
                 params: [],

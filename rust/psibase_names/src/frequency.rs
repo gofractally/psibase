@@ -50,7 +50,7 @@ impl<'a, const CHARS: usize, const WIDTH: usize> NameFrequency<'a, CHARS, WIDTH>
             };
 
             if p.count == 0 {
-                c = CHAR_TO_SYMBOL[0];
+                c = CHAR_TO_SYMBOL_METHOD[0];
                 self.last_byte = c;
                 return (
                     Probability {
@@ -72,7 +72,7 @@ impl<'a, const CHARS: usize, const WIDTH: usize> NameFrequency<'a, CHARS, WIDTH>
                 high: 1,
                 count: 1,
             },
-            CHAR_TO_SYMBOL[0],
+            CHAR_TO_SYMBOL_METHOD[0],
         )
     }
 }

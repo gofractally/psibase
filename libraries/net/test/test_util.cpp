@@ -80,40 +80,10 @@ auto makeBoot(const ConsensusData& producers, bool ec) -> std::vector<SignedTran
 {
    std::vector<SignedTransaction> result;
    std::vector<GenesisService>    services = {{
-                                                  .service = Transact::service,
-                                                  .flags   = Transact::serviceFlags,
-                                                  .code    = readWholeFile("Transact.wasm"),
-                                           },
-                                              {
-                                                  .service = RTransact::service,
-                                                  .flags   = 0,
-                                                  .code    = readWholeFile("RTransact.wasm"),
-                                           },
-                                              {
-                                                  .service = CpuLimit::service,
-                                                  .flags   = CpuLimit::serviceFlags,
-                                                  .code    = readWholeFile("MockCpuLimit.wasm"),
-                                           },
-                                              {
-                                                  .service = Accounts::service,
-                                                  .flags   = 0,
-                                                  .code    = readWholeFile("Accounts.wasm"),
-                                           },
-                                              {
-                                                  .service = Producers::service,
-                                                  .flags   = Producers::serviceFlags,
-                                                  .code    = readWholeFile("Producers.wasm"),
-                                           },
-                                              {
-                                                  .service = AuthAny::service,
-                                                  .flags   = 0,
-                                                  .code    = readWholeFile("AuthAny.wasm"),
-                                           },
-                                              {
-                                                  .service = Db::service,
-                                                  .flags   = Db::flags,
-                                                  .code    = readWholeFile("Db.wasm"),
-                                           }};
+       .service = Transact::service,
+       .flags   = Transact::serviceFlags,
+       .code    = readWholeFile("MockTransact.wasm"),
+   }};
    if (ec)
    {
       services.push_back({
@@ -122,7 +92,6 @@ auto makeBoot(const ConsensusData& producers, bool ec) -> std::vector<SignedTran
           .code    = readWholeFile("VerifySig.wasm"),
       });
    }
-   // Transact + Producers + AuthAny + Accounts
    result.push_back({Transaction{
        //
        .actions = {
@@ -131,23 +100,11 @@ auto makeBoot(const ConsensusData& producers, bool ec) -> std::vector<SignedTran
                   .service = AccountNumber{"psibase"},  // ignored
                   .method  = MethodNumber{"boot"},
                   .rawData = psio::convert_to_frac(GenesisActionData{.services = services})}}}});
+   result.push_back(
+       {Transaction{.tapos   = {.expiration = TimePointSec{Seconds(2)}},
+                    .actions = {transactor<Producers>(Producers::service, Producers::service)
+                                    .setConsensus(producers)}}});
 
-   result.push_back({Transaction{
-       .tapos   = {.expiration = TimePointSec{Seconds(2)}},
-       .actions = {
-           Action{.sender  = Transact::service,
-                  .service = Transact::service,
-                  .method  = MethodNumber{"startBoot"},
-                  .rawData = psio::to_frac(std::tuple(std::vector<Checksum256>()))},
-           Action{.sender  = Accounts::service,
-                  .service = Accounts::service,
-                  .method  = MethodNumber{"init"},
-                  .rawData = psio::to_frac(std::tuple())},
-           transactor<Producers>(Producers::service, Producers::service).setConsensus(producers),
-           Action{.sender  = Transact::service,
-                  .service = Transact::service,
-                  .method  = MethodNumber{"finishBoot"},
-                  .rawData = psio::to_frac(std::tuple())}}}});
    return result;
 }
 

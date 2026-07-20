@@ -12,7 +12,7 @@ using namespace psibase;
 
 namespace SystemService
 {
-   void AuthAny::checkAuthSys(uint32_t                   flags,
+   bool AuthAny::checkAuthSys(uint32_t                   flags,
                               AccountNumber              requester,
                               AccountNumber              sender,
                               ServiceMethod              action,
@@ -21,6 +21,7 @@ namespace SystemService
    {
       if (enable_print)
          std::printf("checkAuthSys\n");
+      return true;
    }
 
    void AuthAny::canAuthUserSys(AccountNumber user)
@@ -29,12 +30,19 @@ namespace SystemService
          std::printf("canAuthUserSys\n");
    }
 
+   std::vector<AccountNumber> AuthAny::getDlgsSys(AccountNumber sender)
+   {
+      if (enable_print)
+         std::printf("getDlgsSys\n");
+      return {};
+   }
+
    bool AuthAny::isAuthSys(AccountNumber sender, std::vector<AccountNumber> authorizers)
    {
       if (enable_print)
          std::printf("isAuthSys\n");
 
-      return true;
+      return std::ranges::contains(authorizers, sender);
    }
 
    bool AuthAny::isRejectSys(AccountNumber sender, std::vector<AccountNumber> rejecters)
@@ -42,7 +50,7 @@ namespace SystemService
       if (enable_print)
          std::printf("isRejectSys\n");
 
-      return false;
+      return std::ranges::contains(rejecters, sender);
    }
 }  // namespace SystemService
 

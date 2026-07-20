@@ -1,4 +1,3 @@
-import { queryClient } from "@/queryClient";
 import { z } from "zod";
 
 import {
@@ -6,21 +5,22 @@ import {
     Status,
     appMetadataQueryKey,
     useAppMetadata,
-} from "@/hooks/useAppMetadata";
-import { useCurrentApp } from "@/hooks/useCurrentApp";
-import { useDeleteCsp } from "@/hooks/useDeleteCsp";
-import { usePublishApp } from "@/hooks/usePublishApp";
-import { useSetCacheMode } from "@/hooks/useSetCacheMode";
-import { useSetCsp } from "@/hooks/useSetCsp";
-import { SiteConfigResponse, useSiteConfig } from "@/hooks/useSiteConfig";
-import { useSpa } from "@/hooks/useSpa";
-import { Account } from "@/lib/zodTypes";
+} from "@/hooks/use-app-metadata";
+import { useCurrentApp } from "@/hooks/use-current-app";
+import { useDeleteCsp } from "@/hooks/use-delete-csps";
+import { usePublishApp } from "@/hooks/use-publish-app";
+import { useSetCacheMode } from "@/hooks/use-set-cache-mode";
+import { useSetCsp } from "@/hooks/use-set-csps";
+import { SiteConfigResponse, useSiteConfig } from "@/hooks/use-site-config";
+import { useSpa } from "@/hooks/use-spa";
 
+import { queryClient } from "@shared/lib/query-client";
+import { zAccount } from "@shared/lib/schemas/account";
 import { Button } from "@shared/shadcn/ui/button";
 import { Label } from "@shared/shadcn/ui/label";
 import { toast } from "@shared/shadcn/ui/sonner";
 
-import { CheckCard } from "./Check-Card";
+import { CheckCard } from "./check-card";
 import { CspForm } from "./csp-form";
 import { ServiceUpload } from "./service-upload";
 
@@ -141,7 +141,7 @@ export const ControlPanel = () => {
 
         for (const policy of [...newPolicies, ...updatedPolicies]) {
             await setCsp({
-                account: Account.parse(currentApp),
+                account: zAccount.parse(currentApp),
                 path: policy.path,
                 csp: policy.csp,
             });
@@ -149,7 +149,7 @@ export const ControlPanel = () => {
 
         for (const policy of deletedPolicies) {
             await removeCsp({
-                account: Account.parse(currentApp),
+                account: zAccount.parse(currentApp),
                 path: policy.path,
             });
         }
@@ -168,7 +168,7 @@ export const ControlPanel = () => {
                     checked={isAppPublished}
                     disabled={isPublishingApp}
                     onChange={(checked) =>
-                        handleChecked(checked, Account.parse(currentApp))
+                        handleChecked(checked, zAccount.parse(currentApp))
                     }
                     title="Publish"
                     description="Mark the app available for public use."
@@ -179,7 +179,7 @@ export const ControlPanel = () => {
                     disabled={isSettingSpa}
                     onChange={async (checked) => {
                         await setSpa({
-                            account: Account.parse(currentApp),
+                            account: zAccount.parse(currentApp),
                             enableSpa: checked,
                         });
                     }}
@@ -192,7 +192,7 @@ export const ControlPanel = () => {
                     disabled={isSettingCacheMode}
                     onChange={async (checked) => {
                         await setCacheMode({
-                            account: Account.parse(currentApp),
+                            account: zAccount.parse(currentApp),
                             enableCache: checked,
                         });
                     }}

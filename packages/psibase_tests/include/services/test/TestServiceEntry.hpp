@@ -17,7 +17,7 @@ namespace TestService
 
    struct TestServiceEntry : psibase::Service
    {
-      static constexpr auto service = psibase::AccountNumber{"entry-point"};
+      static constexpr auto service = psibase::AccountNumber{"entrypoint"};
       using Tables                  = psibase::ServiceTables<CallCounterTable>;
       int call(int number, std::string memo);
    };

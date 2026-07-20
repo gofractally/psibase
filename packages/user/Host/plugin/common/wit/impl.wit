@@ -8,5 +8,4 @@ world impl {
     export server;
     export client;
     export admin;
-    export store;
 }

@@ -4,8 +4,8 @@ import { useMediaQuery } from "usehooks-ts";
 
 import { TwoColumnSelect } from "@/components/two-column-select";
 
-import { useCurrentUser } from "@/hooks/use-current-user";
-
+import { useContacts } from "@shared/hooks/use-contacts";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Button } from "@shared/shadcn/ui/button";
 import { DialogTrigger } from "@shared/shadcn/ui/dialog";
 import { Input } from "@shared/shadcn/ui/input";
@@ -17,7 +17,6 @@ import { Tooltip } from "@shared/shadcn/ui/tooltip";
 import { ContactDetails } from "./components/contact-details";
 import { ContactListSection } from "./components/contact-list-section";
 import { NewContactDialog } from "./components/new-contact-dialog";
-import { useContacts } from "./hooks/use-contacts";
 import { useCreateContact } from "./hooks/use-create-contact";
 
 export const ContactsPage = () => {

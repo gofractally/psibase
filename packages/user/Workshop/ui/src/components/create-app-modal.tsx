@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 
 import { useCreateApp } from "@/hooks/use-create-app";
-import { useTrackedApps } from "@/hooks/useTrackedApps";
+import { useTrackedApps } from "@/hooks/use-tracked-apps";
 
 import {
     Dialog,

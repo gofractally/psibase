@@ -5,13 +5,20 @@ interface types {
         name: string,
         version: string,
     }
+    record package-export {
+        name: string,
+        service: string,
+    }
     /// Package metadata including where to fetch the package
     record package-info {
         name: string,
         version: string,
+        scope: string,
         description: string,
         depends: list<package-ref>,
         accounts: list<string>,
+        services: list<string>,
+        exports: list<package-export>,
         sha256: string,
         file: string,
     }
@@ -19,9 +26,12 @@ interface types {
     record meta {
         name: string,
         version: string,
+        scope: string,
         description: string,
         depends: list<package-ref>,
         accounts: list<string>,
+        services: list<string>,
+        exports: list<package-export>,
     }
     /// The location of a package repository.
     ///

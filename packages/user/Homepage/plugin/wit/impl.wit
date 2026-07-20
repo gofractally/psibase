@@ -1,0 +1,13 @@
+package homepage:plugin;
+
+world impl {
+    include host:crypto/imports;
+    import transact:plugin/intf;
+    import auth-sig:plugin/keyvault;
+    import auth-sig:plugin/actions;
+    import name-market:plugin/api;
+
+    import accounts:plugin/api;
+
+    export name-market;
+}

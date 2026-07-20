@@ -204,12 +204,6 @@ namespace psibase
                  const char* value,
                  uint32_t    valueLen);
 
-      /// Add a sequentially-numbered record
-      ///
-      /// Returns the id.
-      PSIBASE_NATIVE(putSequential)
-      uint64_t putSequential(DbId db, const char* value, uint32_t valueLen);
-
       /// Remove a key-value pair if it exists
       PSIBASE_NATIVE(kvRemove) void kvRemove(KvHandle db, const char* key, uint32_t keyLen);
 
@@ -218,12 +212,6 @@ namespace psibase
       /// If key exists, then sets result to value and returns size. If key does not
       /// exist, returns `-1` and clears result. Use [getResult] to get result.
       PSIBASE_NATIVE(kvGet) uint32_t kvGet(KvHandle db, const char* key, uint32_t keyLen);
-
-      /// Get a sequentially-numbered record
-      ///
-      /// If `id` is available, then sets result to value and returns size. If id does
-      /// not exist, returns -1 and clears result.
-      PSIBASE_NATIVE(getSequential) uint32_t getSequential(DbId db, uint64_t id);
 
       /// Get the first key-value pair which is greater than or equal to the provided
       /// key
@@ -324,11 +312,16 @@ namespace psibase
       ///
       /// Returns 0 on success or an error code on failure
       ///
+      /// The interpretation of flags depends on the type of the socket
+      ///
       /// Errors:
       /// - `EBADF`: fd is not a valid file descriptor
       /// - `ENOTSOCK`: fd is not a socket
       PSIBASE_NATIVE(socketSend)
-      std::int32_t socketSend(std::int32_t fd, const void* data, std::size_t size);
+      std::int32_t socketSend(std::int32_t  fd,
+                              const void*   data,
+                              std::size_t   size,
+                              std::uint32_t flags);
 
       /// Change flags on a socket. The mask determines which flags are set.
       ///
@@ -345,6 +338,12 @@ namespace psibase
       /// - `EACCES`: The socket is owned by another context
       PSIBASE_NATIVE(socketSetFlags)
       std::int32_t socketSetFlags(std::int32_t fd, SocketFlags mask, SocketFlags value);
+
+      /// Sets result to the contents of the file and returns the size.
+      ///
+      /// Returns -1 if the file cannot be opened for any reason
+      PSIBASE_NATIVE(readFile)
+      std::uint32_t readFile(const char* name, std::uint32_t len);
    }  // namespace raw
 
    /// Get result
@@ -508,40 +507,6 @@ namespace psibase
       kvPutRaw(db, psio::convert_to_key(key), psio::convert_to_frac(value));
    }
 
-   /// Add a sequentially-numbered record
-   ///
-   /// Returns the id.
-   inline uint64_t putSequentialRaw(DbId db, psio::input_stream value)
-   {
-      return raw::putSequential(db, value.pos, value.remaining());
-   }
-
-   template <typename Type, NotOptional V = void>
-   struct SequentialRecord
-   {
-      AccountNumber       service;
-      std::optional<Type> type;
-      std::optional<V>    value;
-      PSIO_REFLECT(SequentialRecord, service, type, value);
-   };
-
-   template <typename Type>
-   struct SequentialRecord<Type, void>
-   {
-      AccountNumber       service;
-      std::optional<Type> type;
-      PSIO_REFLECT(SequentialRecord, service, type);
-   };
-
-   /// Add a sequentially-numbered record
-   ///
-   /// Returns the id.
-   template <typename Type, NotOptional V>
-   uint64_t putSequential(DbId db, AccountNumber service, Type type, const V& value)
-   {
-      return putSequentialRaw(db, psio::to_frac(SequentialRecord<Type, V>{service, type, value}));
-   }
-
    /// Remove a key-value pair if it exists
    inline void kvRemoveRaw(KvHandle db, psio::input_stream key)
    {
@@ -599,54 +564,6 @@ namespace psibase
       if (obj)
          return std::move(*obj);
       return {};
-   }
-
-   /// Get a sequentially-numbered record, if available
-   inline std::optional<std::vector<char>> getSequentialRaw(DbId db, uint64_t id)
-   {
-      auto size = raw::getSequential(db, id);
-      if (size == -1)
-         return std::nullopt;
-      return getResult(size);
-   }
-
-   /// Get a sequentially-numbered record, if available
-   ///
-   /// * If `matchService` is non-null, and the record wasn't written by `matchService`, then return nullopt.
-   ///   This prevents a spurious abort from mismatched serialization.
-   /// * If `matchType` is non-null, and the record type doesn't match, then return nullopt.
-   ///   This prevents a spurious abort from mismatched serialization.
-   /// * If `service` is non-null, then it receives the service that wrote the record. It is
-   ///   left untouched if the record is not available.
-   /// * If `type` is non-null, then it receives the record type. It is left untouched if either the record
-   ///   is not available or if `matchService` is not null but doesn't match.
-   template <typename V, typename Type>
-   inline std::optional<V> getSequential(DbId                 db,
-                                         uint64_t             id,
-                                         const AccountNumber* matchService = nullptr,
-                                         const Type*          matchType    = nullptr,
-                                         AccountNumber*       service      = nullptr,
-                                         Type*                type         = nullptr)
-   {
-      auto v = getSequentialRaw(db, id);
-      if (!v)
-         return {};
-
-      auto [c, t] = psio::from_frac<SequentialRecord<Type>>(*v);
-
-      if (service)
-         *service = c;
-      if (matchService && *matchService != c)
-         return {};
-
-      if (!t)
-         return {};
-      if (type)
-         *type = *t;
-      if (matchType && *matchType != *t)
-         return {};
-
-      return psio::view<SequentialRecord<Type, V>>{*v}.value().unpack();
    }
 
    /// Get the first key-value pair which is greater than or equal to `key`
@@ -800,12 +717,14 @@ namespace psibase
    ///
    /// Returns 0 on success. On failure returns -1 and sets errno.
    ///
+   /// The interpretation of flags depends on the type of the socket
+   ///
    /// Errors:
    /// - `EBADF`: fd is not a valid file descriptor
    /// - `ENOTSOCK`: fd is not a socket
-   inline int socketSend(int fd, std::span<const char> data)
+   inline int socketSend(int fd, std::span<const char> data, std::uint32_t flags = 0)
    {
-      if (auto err = raw::socketSend(fd, data.data(), data.size()))
+      if (auto err = raw::socketSend(fd, data.data(), data.size(), flags))
       {
          errno = err;
          return -1;
@@ -835,6 +754,14 @@ namespace psibase
          return -1;
       }
       return 0;
+   }
+
+   inline std::optional<std::vector<char>> readFile(std::string_view path)
+   {
+      auto sz = raw::readFile(path.data(), path.size());
+      if (sz == -1)
+         return std::nullopt;
+      return getResult(sz);
    }
 }  // namespace psibase
 

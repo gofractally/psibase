@@ -1,0 +1,64 @@
+import { z } from "zod";
+
+import { graphql } from "@shared/lib/graphql";
+import { zAccount } from "@shared/lib/schemas/account";
+
+export const zStream = z.object({
+    nftId: z.number().int().positive(),
+    tokenId: z.number().int().positive(),
+    deposited: z.string(),
+    claimed: z.string(),
+    claimable: z.string(),
+    vested: z.string(),
+    unclaimed: z.string(),
+    lastDepositTimestamp: z.string().datetime({ offset: true }),
+});
+
+export const getStream = async (nftId: number) => {
+    const stream = await graphql(
+        `
+            {
+                stream(nftId: ${nftId}) {
+                    nftId
+                    tokenId
+                    deposited
+                    claimed
+                    claimable
+                    unclaimed
+                    vested
+                    lastDepositTimestamp
+                }
+                updates(nftId: ${nftId}) {
+                    nodes {
+                        nftId
+                        actor
+                        amount
+                        txType
+                    }
+                }
+            }
+        `,
+        { service: "token-stream" },
+    );
+
+    const response = z
+        .object({
+            stream: zStream,
+            updates: z.object({
+                nodes: z
+                    .object({
+                        nftId: z.number(),
+                        actor: zAccount,
+                        amount: z.string(),
+                        txType: z.enum(["deposited", "claimed"]),
+                    })
+                    .array(),
+            }),
+        })
+        .parse(stream);
+
+    return {
+        stream: response.stream,
+        updates: response.updates.nodes.reverse(),
+    };
+};

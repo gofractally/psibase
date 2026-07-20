@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { getGuildApplication } from "@/lib/graphql/fractals/getGuildApplication";
-import QueryKey, { OptionalAccount } from "@/lib/queryKeys";
+import { getGuildApplication } from "@/lib/graphql/fractals/get-guild-application";
+import QueryKey, { OptionalAccount } from "@/lib/query-keys";
 
 export const useGuildApplication = (
     guildAccount: OptionalAccount,

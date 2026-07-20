@@ -1,13 +1,14 @@
 import { createBrowserRouter } from "react-router-dom";
 
+import { ProtectedRoute } from "@shared/components/protected-route";
+
 import { AppExists } from "./components/app-exists";
 import { Layout } from "./components/layout";
-import { ProtectedRoute } from "./components/protected-route";
-import { Loader } from "./pages/Loader";
-import { Settings } from "./pages/Settings";
-import { Support } from "./pages/Support";
-import { Thread } from "./pages/Support/Thread";
-import { Upload } from "./pages/Upload";
+import { Loader } from "./pages/loader";
+import { Settings } from "./pages/settings";
+import { Support } from "./pages/support";
+import { Thread } from "./pages/support/thread";
+import { Upload } from "./pages/upload";
 
 export const router = createBrowserRouter([
     {

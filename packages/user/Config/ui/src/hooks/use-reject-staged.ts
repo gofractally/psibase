@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 
-import { getStagedTx } from "@/lib/getStagedTx";
+import { getStagedTx } from "@/lib/get-staged-tx";
 
 import { usePluginMutation } from "./use-plugin-mutation";
 

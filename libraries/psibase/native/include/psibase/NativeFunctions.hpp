@@ -53,10 +53,8 @@ namespace psibase
       void     kvPut(uint32_t                    handle,
                      eosio::vm::span<const char> key,
                      eosio::vm::span<const char> value);
-      uint64_t putSequential(uint32_t db, eosio::vm::span<const char> value);
       void     kvRemove(uint32_t handle, eosio::vm::span<const char> key);
       uint32_t kvGet(uint32_t handle, eosio::vm::span<const char> key);
-      uint32_t getSequential(uint32_t db, uint64_t indexNumber);
       uint32_t kvGreaterEqual(uint32_t                    handle,
                               eosio::vm::span<const char> key,
                               uint32_t                    matchKeySize);
@@ -69,7 +67,9 @@ namespace psibase
       void abortSubjective();
 
       int32_t socketOpen(eosio::vm::span<const char> args);
-      int32_t socketSend(int32_t fd, eosio::vm::span<const char> msg);
+      int32_t socketSend(int32_t fd, eosio::vm::span<const char> msg, std::uint32_t flags);
       int32_t socketSetFlags(int32_t fd, std::uint32_t mask, std::uint32_t value);
+
+      std::uint32_t readFile(eosio::vm::span<const char> path);
    };  // NativeFunctions
 }  // namespace psibase

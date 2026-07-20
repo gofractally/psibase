@@ -2,16 +2,19 @@ import { FilePlus2, LucideProps } from "lucide-react";
 
 import { cn } from "@shared/lib/utils";
 import { Button } from "@shared/shadcn/ui/button";
+import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 interface Props {
     title: string;
     description?: string;
     buttonLabel?: string;
     onButtonClick?: () => void;
+    isLoading?: boolean;
     Icon?: React.ForwardRefExoticComponent<
         Omit<LucideProps, "ref"> & React.RefAttributes<SVGSVGElement>
     >;
     iconClass?: string;
+    disabled?: boolean;
 }
 
 export const EmptyBlock = ({
@@ -19,9 +22,15 @@ export const EmptyBlock = ({
     title,
     buttonLabel,
     onButtonClick,
+    isLoading = false,
     Icon = FilePlus2,
     iconClass = "",
+    disabled = false,
 }: Props) => {
+    if (isLoading) {
+        return <Skeleton className="h-[450px] w-full rounded-md" />;
+    }
+
     return (
         <div className="flex h-[450px] shrink-0 items-center justify-center rounded-md border border-dashed">
             <div className="mx-auto flex max-w-[420px] flex-col items-center justify-center text-center">
@@ -34,6 +43,7 @@ export const EmptyBlock = ({
                 )}
                 {onButtonClick && (
                     <Button
+                        disabled={disabled}
                         size="lg"
                         className="mt-4"
                         onClick={() => {

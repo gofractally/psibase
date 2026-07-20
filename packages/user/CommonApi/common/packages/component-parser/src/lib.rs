@@ -21,19 +21,6 @@ impl Default for Functions {
     }
 }
 
-fn kebab_to_camel(s: &str) -> String {
-    s.split('-')
-        .enumerate()
-        .map(|(i, part)| {
-            if i == 0 {
-                part.to_string()
-            } else {
-                part[..1].to_uppercase() + &part[1..]
-            }
-        })
-        .collect()
-}
-
 fn extract_wit(resolved_wit: &wit_parser::Resolve) -> Result<String, String> {
     let mut printer = WitPrinter::default();
     let mut wit = String::new();
@@ -145,7 +132,7 @@ where
                 let mut new_intf = Intf {
                     namespace: pkg.name.namespace.to_owned(),
                     package: pkg.name.name.to_owned(),
-                    name: kebab_to_camel(&intf_name),
+                    name: intf_name.to_string(),
                     funcs: vec![],
                 };
                 for (func_name, func) in &intf.functions {
@@ -157,7 +144,7 @@ where
 
                     let dynamic_link = is_linking_dynamically(func, resolved_wit);
                     new_intf.funcs.push(Function {
-                        name: kebab_to_camel(&func_name.to_owned()),
+                        name: func_name.to_owned(),
                         dynamic_link,
                     });
                 }
@@ -166,7 +153,7 @@ where
             WorldItem::Function(func) => {
                 let dynamic_link = is_linking_dynamically(func, resolved_wit);
                 funcs.funcs.push(Function {
-                    name: kebab_to_camel(&func.name.to_owned()),
+                    name: func.name.to_owned(),
                     dynamic_link,
                 });
             }

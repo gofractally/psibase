@@ -36,7 +36,7 @@ pub type BlockTime = TimePointUSec;
     PartialEq,
     Eq,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
+#[fracpack(fracpack_mod = "fracpack", custom = "Action")]
 #[to_key(psibase_mod = "crate")]
 #[graphql(input_name = "ActionInput")]
 pub struct Action {
@@ -54,7 +54,7 @@ pub struct Action {
 }
 
 #[derive(Debug, Clone, Default, Pack, Unpack, ToKey, ToSchema, Serialize)]
-#[fracpack(fracpack_mod = "fracpack")]
+#[fracpack(fracpack_mod = "fracpack", custom = "Action")]
 #[to_key(psibase_mod = "crate")]
 pub struct SharedAction<'a> {
     pub sender: AccountNumber,
@@ -226,6 +226,7 @@ pub struct SignedTransaction {
     // Contains a packed `Transaction`. TODO: shared_view_ptr
     pub transaction: Hex<Vec<u8>>,
     pub proofs: Vec<Hex<Vec<u8>>>,
+    pub subjectiveData: Option<Vec<Hex<Vec<u8>>>>,
 }
 
 type TermNum = u32;
@@ -389,7 +390,8 @@ pub struct BlockHeader {
     trxMerkleRoot: Checksum256,
 
     // The merkle root of events generated while processing the block.
-    // The leaves have type EventInfo.
+    // It is zero-initialized at the start of a block and
+    // may be updated by services..
     eventMerkleRoot: Checksum256,
 
     // If newConsensus is set, activates joint consensus on
@@ -410,7 +412,6 @@ pub struct BlockHeader {
 pub struct Block {
     pub header: BlockHeader,
     pub transactions: Vec<SignedTransaction>,
-    pub subjectiveData: Vec<Hex<Vec<u8>>>,
 }
 
 #[derive(Debug, Clone, Default, Pack, Unpack, ToSchema, Serialize, Deserialize)]

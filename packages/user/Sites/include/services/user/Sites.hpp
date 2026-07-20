@@ -87,7 +87,8 @@ namespace SystemService
           ServiceTables<SitesContentTable, SiteConfigTable, SitesDataTable, SitesDataRefTable>;
 
       /// Serves a request by looking up the content uploaded to the specified subdomain
-      auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
+      auto serveSys(psibase::HttpRequest        request,
+                    std::optional<std::int32_t> socket) -> std::optional<psibase::HttpReply>;
 
       /// Stores content accessible at the caller's subdomain
       void storeSys(std::string                path,
@@ -110,6 +111,18 @@ namespace SystemService
       /// are routed client-side, so a route like `/page1` is considered a valid route as long as the SPA serves a root document.
       bool isValidPath(psibase::AccountNumber site, std::string path);
 
+      /// Get file properties for a given site and path
+      std::optional<SitesContentRow> getProps(psibase::AccountNumber site, std::string path);
+
+      /// Get raw file data from a site, optionally decompressing it.
+      ///
+      /// Aborts if the file is not found.
+      ///
+      /// If the file has no encoding, or decompression is not requested, the raw data is returned.
+      /// Otherwise, the data is decompressed. This action aborts if no decompressor is available
+      /// for the file's encoding.
+      std::vector<char> getData(psibase::AccountNumber site, std::string path, bool decompress);
+
       /// Enables/disables single-page application mode.
       /// When enabled, all content requests return the root document.
       void enableSpa(bool enable);
@@ -130,11 +143,16 @@ namespace SystemService
       /// - If the hash does not match, the new content is returned with an updated `ETag` header
       void enableCache(bool enable);
 
-      /// If content requested for the sender service is not found, proxy the request to the
-      /// specified proxy.
+      /// When `serveSys` looks up a path on the caller's site, and no file matches (after SPA and
+      /// index rules), it tries the same path on `proxy`'s uploaded content, then on that site's
+      /// proxy if configured, and so on.
+      ///
+      /// Files that exist on the caller's site always take precedence.
+      ///
+      ///  A proxy chain must not contain a cycle or `setProxy` aborts.
       void setProxy(psibase::AccountNumber proxy);
 
-      /// Removes the proxy set with `setProxy`.
+      /// Removes the proxy fallback for the caller's site. No-op if none is set.
       void clearProxy();
 
      private:
@@ -145,11 +163,13 @@ namespace SystemService
    };
 
    PSIO_REFLECT(Sites,
-                method(serveSys, request),
+                method(serveSys, request, socket),
                 method(storeSys, path, contentType, contentEncoding, content),
                 method(hardlink, path, contentType, contentEncoding, contentHash),
                 method(remove, path),
                 method(isValidPath, site, path),
+                method(getProps, site, path),
+                method(getData, site, path, decompress),
                 method(enableSpa, enable),
                 method(setCsp, path, csp),
                 method(deleteCsp, path),

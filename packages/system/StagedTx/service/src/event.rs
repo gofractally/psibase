@@ -28,7 +28,7 @@ impl ToString for StagedTxEvent {
 
 impl From<u8> for StagedTxEvent {
     fn from(value: u8) -> Self {
-        psibase::check(value <= 4, "Invalid staged tx event type");
+        assert!(value <= 4, "Invalid staged tx event type");
         StagedTxEvent { ty: value }
     }
 }

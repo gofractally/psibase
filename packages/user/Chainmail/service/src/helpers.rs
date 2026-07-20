@@ -1,4 +1,4 @@
-use psibase::{services::accounts::Wrapper as AccountsSvc, AccountNumber};
+use psibase::{services::accounts::Wrapper as AccountsSvc, AccountNumber, ServiceWrapper};
 
 pub fn validate_user(user: &str) -> bool {
     let acc = AccountNumber::from_exact(user).unwrap();

@@ -373,6 +373,35 @@ namespace psibase::net
          return confirm(state, producer, confirm_type::commit, msg);
       }
 
+      void addIrreversibleCommits(const BlockHeaderState*             state,
+                                  const std::vector<ProducerConfirm>& confirms,
+                                  const ProducerSet&                  prods)
+      {
+         for (const auto& confirm : confirms)
+         {
+            const auto& [prod, sig] = confirm;
+            auto claim              = prods.getClaim(prod);
+            if (!claim)
+               check(false, "Not a valid producer: " + prod.str() + " (" + prods.to_string() + ")");
+            CommitMessage originalMsg{state->blockId(), prod, *claim};
+            commit(state, prod, SignedMessage<CommitMessage>{std::move(originalMsg), sig});
+         }
+      }
+
+      void addBlockConfirm(const BlockConfirm& commits, const BlockHeaderState* state)
+      {
+         addIrreversibleCommits(state, commits.commits, *state->producers);
+         if (state->nextProducers)
+         {
+            check(commits.nextCommits.has_value(), "nextCommits required during joint consensus");
+            addIrreversibleCommits(state, *commits.nextCommits, *state->nextProducers);
+         }
+         else
+         {
+            check(!commits.nextCommits, "Unexpected nextCommits outside joint consensus");
+         }
+      }
+
       bool isCommitted(const BlockHeaderState* state)
       {
          auto pos = confirmations.find(state->blockId());
@@ -1453,6 +1482,7 @@ namespace psibase::net
             }
          }
          verifyIrreversibleSignature(data, committed);
+         addBlockConfirm(data, committed);
          if (committed->producers->algorithm == ConsensusAlgorithm::bft)
          {
             chain().setBlockData(committed->blockId(), aux);

@@ -19,7 +19,6 @@ use bindings::transact::plugin::intf as Transact;
 use chrono::DateTime;
 use errors::ErrorType;
 use psibase::fracpack::Pack;
-use psibase::AccountNumber;
 use queries::{get_msg_by_id, query_messages_endpoint};
 use serde_structs::TempMessageForDeserGqlResponse;
 
@@ -57,7 +56,7 @@ impl Api for ChainmailPlugin {
         Transact::add_action_to_transaction(
             "send",
             &chainmail::action_structs::send {
-                receiver: AccountNumber::from(receiver.as_str()),
+                receiver: receiver.parse().unwrap(),
                 subject,
                 body,
             }
@@ -86,9 +85,9 @@ impl Api for ChainmailPlugin {
             &chainmail::action_structs::save {
                 subject: msg.subject,
                 body: msg.body,
-                receiver: AccountNumber::from(msg.receiver.as_str()),
+                receiver: msg.receiver.parse().unwrap(),
                 msg_id: msg.msg_id,
-                sender: AccountNumber::from(msg.sender.as_str()),
+                sender: msg.sender.parse().unwrap(),
                 datetime: get_unix_time_from_iso8601_str(msg.datetime)?,
             }
             .packed(),

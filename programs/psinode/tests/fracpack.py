@@ -466,15 +466,34 @@ class ObjectValue:
                 else:
                     raise Exception('%s is required' % name)
 
+def get_members_from_annotations(annotations):
+    members = {}
+    for (n, ty) in annotations.items():
+        if isinstance(ty, TypeBase):
+            members[n] = ty
+    return members
+
+try:
+    import annotationlib
+    def get_members_from_class_namespace(namespace):
+        if '__annotations__' in namespace:
+            return get_members_from_annotations(namespace['__annotations__'])
+        elif ann := annotationlib.get_annotate_from_class_namespace(namespace):
+            return get_members_from_annotations(ann(annotationlib.Format.VALUE))
+        else:
+            return {}
+except:
+    def get_members_from_class_namespace(namespace):
+        if '__annotations__' in namespace:
+            return get_members_from_annotations(namespace['__annotations__'])
+        else:
+            return {}
+
 class DerivedAsInstance(type):
     def __new__(cls, name, bases, namespace, **kw):
         for base in bases:
             if isinstance(base, DerivedAsInstance):
-                members = {}
-                if '__annotations__' in namespace:
-                    for (n, ty) in namespace['__annotations__'].items():
-                        if isinstance(ty, TypeBase):
-                            members[n] = ty
+                members = get_members_from_class_namespace(namespace)
                 return base(name, members)
         return super().__new__(cls, name, bases, namespace, **kw)
 

@@ -40,11 +40,6 @@ module.exports = {
                 900: "#0A1629",
             },
         },
-        fontFamily: {
-            ...defaultTheme.fontFamily,
-            sans: ["Raleway", "sans-serif"],
-            mono: ["Red Hat Mono", "monospace"],
-        },
         fontSize: {
             ...defaultTheme.fontSize,
             xs: ["0.75rem", { lineHeight: "1.25rem" }],

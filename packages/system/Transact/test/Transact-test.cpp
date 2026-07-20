@@ -8,11 +8,14 @@
 #include <services/system/SetCode.hpp>
 #include <services/system/Transact.hpp>
 #include <services/system/VerifySig.hpp>
+#include <services/test/AuthNone.hpp>
 #include <services/test/RemoveCode.hpp>
+#include <services/user/Nop.hpp>
 
 using namespace psibase;
 using namespace SystemService;
 using namespace TestService;
+using namespace UserService;
 
 namespace
 {
@@ -88,20 +91,19 @@ TEST_CASE("Test login")
 
    transactor<LoginInterface> login{alice, getUser};
    Tapos       tapos{.expiration = std::chrono::time_point_cast<std::chrono::seconds>(
-                                 std::chrono::system_clock::now()) +
-                             std::chrono::seconds(10),
-                     .flags = Tapos::do_not_broadcast_flag};
+                                       std::chrono::system_clock::now()) +
+                                   std::chrono::seconds(10),
+                     .flags      = Tapos::do_not_broadcast_flag};
    Transaction trx{.tapos = tapos, .actions = {login.loginSys("psibase.io")}};
 
    // User with no key
    {
       SignedTransaction strx{trx};
 
-      auto token = t.post<LoginReply>(Transact::service, "/login", FracPackBody{std::move(strx)})
-                       .access_token;
-      auto req = t.makeGet(getUser, "/");
-      req.headers.push_back({"Authorization", "Bearer " + token});
-      auto user = t.http<std::optional<AccountNumber>>(req);
+      auto token  = t.post<LoginReply>(Transact::service, "/login", FracPackBody{std::move(strx)})
+                        .access_token;
+      auto client = t.http(getUser).auth_bearer(token);
+      auto user   = client.get<std::optional<AccountNumber>>("/");
       CHECK(user == std::optional{alice});
    }
 
@@ -123,11 +125,10 @@ TEST_CASE("Test login")
    {
       SignedTransaction strx{t.signTransaction(trx, {aliceKeys})};
 
-      auto token = t.post<LoginReply>(Transact::service, "/login", FracPackBody{std::move(strx)})
-                       .access_token;
-      auto req = t.makeGet(getUser, "/");
-      req.headers.push_back({"Authorization", "Bearer " + token});
-      auto user = t.http<std::optional<AccountNumber>>(req);
+      auto token  = t.post<LoginReply>(Transact::service, "/login", FracPackBody{std::move(strx)})
+                        .access_token;
+      auto client = t.http(getUser).auth_bearer(token);
+      auto user   = client.get<std::optional<AccountNumber>>("/");
       CHECK(user == std::optional{alice});
    }
 }
@@ -368,7 +369,7 @@ TEST_CASE("Test push_transaction")
       auto flags = GENERATE(values({CodeRow::isPrivileged}));
       INFO("flags: " << std::hex << flags);
       t.startBlock();
-      auto verifyFlags = t.addService(AccountNumber{"verify-flags"}, "VerifyFlagsService.wasm",
+      auto verifyFlags = t.addService(AccountNumber{"verify-flg"}, "VerifyFlagsService.wasm",
                                       flags | CodeRow::isVerify);
       t.startBlock();
       static_assert(std::same_as<decltype(flags), std::uint64_t>);
@@ -452,4 +453,22 @@ TEST_CASE("Test stats")
    CHECK(stats.failed == 0);
    CHECK(stats.succeeded == 1);
    CHECK(stats.expired == 0);
+}
+
+TEST_CASE("Test runAs")
+{
+   DefaultTestChain t;
+   auto             alice = t.addAccount("alice");
+   SECTION("subaccount can be authorized by base account")
+   {
+      t.addService<AuthNone>("AuthNone.wasm");
+      auto alice1 = AccountNumber("alice+1");
+      REQUIRE(t.from(alice).to<Accounts>().newAccount(alice1, AuthNone::service, true).succeeded());
+      auto act = transactor<Accounts>().from(alice1).setAuthServ(AuthAny::service);
+      REQUIRE(t.from(alice)
+                  .to<Transact>()
+                  .runAs(std::move(act), std::vector<ServiceMethod>{})
+                  .succeeded());
+      CHECK(t.from(alice1).to<Nop>().nop().succeeded());
+   }
 }

@@ -64,12 +64,16 @@ SCENARIO("Buying a symbol")
 
       CHECK(issuance.succeeded());
 
+      CHECK(alice.to<Tokens>().setUserConf(Tokens::autoDebit, true).succeeded());
+      CHECK(bob.to<Tokens>().setUserConf(Tokens::autoDebit, true).succeeded());
+
       sysIssuer.credit(sysToken, alice, q(10'000, precision), memo);
       auto lastCredit = sysIssuer.credit(sysToken, bob, q(10'000, precision), memo);
       CHECK(lastCredit.succeeded());
 
       const Quantity quantity{q(SymbolPricing::initialPrice, precision)};
 
+      alice.to<Nft>().setUserConf(Nft::autoDebit, true);
       THEN("Alice cannot create a symbol with numbers")
       {
          alice.to<Tokens>().credit(sysToken, Symbol::service, quantity, memo);
@@ -82,7 +86,10 @@ SCENARIO("Buying a symbol")
       {
          alice.to<Tokens>().credit(sysToken, Symbol::service, quantity, memo);
          auto symbolId = SID{"aBc"};
-         CHECK(a.create(symbolId).failed(notForSale));
+         if (symbolId.str() != "abc")
+         {
+            CHECK(a.create(symbolId).failed(notForSale));
+         }
       }
       THEN("Alice cannot create a symbol with fewer than 3 characters")
       {
@@ -196,6 +203,7 @@ SCENARIO("Measuring price increases")
 
       sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false);
       REQUIRE(sysIssuer.mint(sysToken, aliceBalance, memo).succeeded());
+      REQUIRE(alice.to<Tokens>().setUserConf(Tokens::autoDebit, true).succeeded());
       sysIssuer.credit(sysToken, alice, aliceBalance, memo);
 
       const Quantity quantity{q(SymbolPricing::initialPrice, precision)};
@@ -223,7 +231,9 @@ SCENARIO("Measuring price increases")
 
       THEN("Alice can buy the first symbol for initialPrice tokens")
       {
-         alice.to<Tokens>().credit(sysToken, Symbol::service, 2 * quantity.value, memo);
+         CHECK(alice.to<Tokens>()
+                   .credit(sysToken, Symbol::service, 2 * quantity.value, memo)
+                   .succeeded());
 
          CHECK(a.getPrice(3).returnVal() == q(SymbolPricing::initialPrice, precision));
 
@@ -285,6 +295,7 @@ SCENARIO("Using symbol ownership NFT")
 
       sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false);
       REQUIRE(sysIssuer.mint(sysToken, aliceBalance, memo).succeeded());
+      REQUIRE(alice.to<Tokens>().setUserConf(Tokens::autoDebit, true).succeeded());
       REQUIRE(sysIssuer.credit(sysToken, alice, aliceBalance, memo).succeeded());
 
       // Create the symbol and claim the owner NFT

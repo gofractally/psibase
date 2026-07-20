@@ -49,6 +49,7 @@ mod service {
 
 #[psibase::test_case(packages("TestSubjective"))]
 fn test1(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    use psibase::*;
     psibase::services::setcode::Wrapper::push(&chain)
         .setFlags(SERVICE, psibase::CodeRow::IS_PRIVILEGED)
         .get()?;

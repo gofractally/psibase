@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useSetRankedGuilds } from "@/hooks/fractals/use-set-ranked-guilds";
 
 import { useAppForm } from "@shared/components/form/app-form";
@@ -10,6 +9,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
+import { useRankedGuilds } from "@/hooks/fractals/use-ranked-guilds";
 
 export const SetRankedGuilds = ({
     show,
@@ -20,11 +20,12 @@ export const SetRankedGuilds = ({
 }) => {
     const { mutateAsync: setRankedGuilds } = useSetRankedGuilds();
 
-    const { data: fractal } = useFractal();
+    const { data: rankedGuilds } = useRankedGuilds()
+
     const form = useAppForm({
         defaultValues: {
             rankedGuilds: (
-                fractal?.fractal?.consensusReward?.rankedGuilds ?? []
+                rankedGuilds ?? []
             ).join(","),
         },
         onSubmit: async ({ formApi, value: { rankedGuilds } }) => {

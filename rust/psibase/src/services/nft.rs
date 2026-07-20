@@ -39,7 +39,7 @@ pub struct CreditRecord {
 }
 
 crate::define_flags!(NftHolderFlags, u8, {
-    manual_debit,
+    auto_debit,
 });
 
 #[crate::service(name = "nft", dispatch = false, psibase_mod = "crate")]

@@ -6,20 +6,22 @@ mod tests {
     use p256::ecdsa::Signature;
     use p256::ecdsa::{signature::hazmat::PrehashSigner, SigningKey};
     use p256::pkcs8::DecodePrivateKey;
+    use psibase::FlagsType;
     use psibase::{
         account,
         fracpack::Pack,
         method_raw,
         services::{
             auth_sig::SubjectPublicKeyInfo,
-            credentials, http_server, invite,
+            credentials, http_server,
+            invite::{self, InvPayload},
             nft::Wrapper as Nft,
             staged_tx,
             tokens::{self, Decimal, Precision, Quantity, Wrapper as Tokens},
             verify_sig,
         },
-        tester, AccountNumber, Action, ChainEmptyResult, Claim, MethodNumber, SignedTransaction,
-        Transaction,
+        tester, AccountNumber, Action, ChainEmptyResult, Claim, MethodNumber, Push,
+        SignedTransaction, Transaction,
     };
     use rand::Rng;
     use serde::Deserialize;
@@ -174,13 +176,26 @@ mod tests {
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
 
+        for acc in &[alice, bob, PRODUCER_ACCOUNT, symbol] {
+            Tokens::push_from(chain, *acc)
+                .setUserConf(
+                    psibase::services::tokens::BalanceFlags::AUTO_DEBIT.index(),
+                    true,
+                )
+                .get()?;
+
+            Nft::push_from(chain, *acc)
+                .setUserConf(
+                    psibase::services::nft::NftHolderFlags::AUTO_DEBIT.index(),
+                    true,
+                )
+                .get()?;
+        }
+
         let supply: u64 = 10_000_000_000_000_0000u64.into();
         let sys = tokens::Wrapper::push_from(chain, symbol)
             .create(Precision::new(4).unwrap(), Quantity::from(supply))
             .get()?;
-
-        let nid = Tokens::push(&chain).getToken(sys).get()?.nft_id;
-        Nft::push_from(chain, symbol).debit(nid, "".into()).get()?;
 
         Tokens::push_from(chain, tokens_service)
             .setSysToken(sys)
@@ -206,7 +221,7 @@ mod tests {
         let vserver = Wrapper::SERVICE;
         let tokens = tokens::Wrapper::SERVICE;
         let sys: tokens::TID = 1;
-        let alice = AccountNumber::from("alice");
+        let alice = account!("alice");
 
         initial_setup(&chain)?;
 
@@ -379,17 +394,14 @@ mod tests {
 
     #[psibase::test_case(packages("VirtualServer", "StagedTx", "Invite", "Credentials"))]
     fn invites(chain: psibase::Chain) -> Result<(), psibase::Error> {
-        //let vserver = Wrapper::SERVICE;
-        // let tokens = tokens::Wrapper::SERVICE;
         let invite = invite::Wrapper::SERVICE;
         let sys: tokens::TID = 1;
-        // let alice = AccountNumber::from("alice");
         let token_prod = chain.login(PRODUCER_ACCOUNT, Wrapper::SERVICE)?;
 
         initial_setup(&chain)?;
 
         http_server::Wrapper::push_from(&chain, invite)
-            .registerServer(account!("r-invite"))
+            .registerServer(account!("invite+1"))
             .get()?;
         chain.finish_block();
 
@@ -410,15 +422,14 @@ mod tests {
             .into_contents();
 
         let fingerprint = psibase::sha256(&inv_pubkey_der);
+        let payload = InvPayload {
+            fingerprint: fingerprint.to_vec(),
+            secret: "".to_string(),
+        }
+        .packed();
+
         invite::Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
-            .createInvite(
-                invite_id,
-                fingerprint,
-                1,
-                false,
-                "".to_string(),
-                min_cost.into(),
-            )
+            .createInvite(invite_id, payload, 1, false, min_cost.into())
             .get()?;
 
         // Create an account using the invite
@@ -430,7 +441,7 @@ mod tests {
         let mut trx = Transaction {
             tapos: Default::default(),
             actions: vec![Action {
-                sender: AccountNumber::from(credentials::CREDENTIAL_SENDER),
+                sender: credentials::CREDENTIAL_SENDER,
                 service: invite,
                 method: MethodNumber::new(method_raw!("createAccount")),
                 rawData: (
@@ -455,6 +466,7 @@ mod tests {
         let strx = SignedTransaction {
             transaction: tx_packed.into(),
             proofs: vec![signature.to_bytes().to_vec().into()],
+            subjectiveData: None,
         };
         let trace = chain.push(&strx);
         if trace.error.is_some() {

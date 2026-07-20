@@ -1,12 +1,14 @@
 #include <services/system/Accounts.hpp>
 
+#include <psibase/AccountNumber.hpp>
 #include <psibase/Table.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
-#include <services/system/AuthAny.hpp>
+#include <services/system/AuthDelegate.hpp>
 #include <services/system/Transact.hpp>
 
-static constexpr bool enable_print = false;
+static constexpr bool        enable_print               = false;
+static constexpr std::size_t MIN_ALLOWED_ACCOUNT_LENGTH = 8;
 
 using namespace psibase;
 
@@ -18,7 +20,9 @@ namespace SystemService
       auto   statusTable  = tables.open<AccountsStatusTable>();
       auto   statusIndex  = statusTable.getIndex<0>();
       auto   accountTable = tables.open<AccountTable>();
-      check(!statusIndex.get(std::tuple{}), "already started");
+
+      if (statusIndex.get(std::tuple{}))
+         return;
 
       uint32_t totalAccounts = 0;
       auto     codeTable     = Native::tables(KvMode::read).open<CodeTable>();
@@ -33,7 +37,7 @@ namespace SystemService
          }
          accountTable.put({
              .accountNum  = code.codeNum,
-             .authService = AuthAny::service,
+             .authService = AuthDelegate::service,
          });
          ++totalAccounts;
       }
@@ -41,7 +45,31 @@ namespace SystemService
       statusTable.put({.totalAccounts = totalAccounts});
    }
 
-   void Accounts::newAccount(AccountNumber name, AccountNumber authService, bool requireNew)
+   namespace
+   {
+      std::vector<psibase::AccountNumber> preapprovedAccounts = {};
+   }
+
+   void Accounts::preapproveAcc(AccountNumber name)
+   {
+      if (name.subaccount())
+      {
+         if (getSender() != name.base())
+         {
+            abortMessage(std::format("subaccount {} can only be created by {}", name.str(),
+                                     name.base().str()));
+         }
+      }
+      else
+      {
+         check(getSender() == getReceiver() || getSender() == AccountNumber("namemarket"),
+               "unauthorized");
+      }
+
+      preapprovedAccounts.push_back(name);
+   }
+
+   bool Accounts::newAccount(AccountNumber name, AccountNumber authService, bool requireMatch)
    {
       Tables tables{getReceiver()};
       auto   statusTable  = tables.open<AccountsStatusTable>();
@@ -63,32 +91,44 @@ namespace SystemService
 
       check(name.value, "invalid account name");
       check(strName.back() != '-', "account name must not end in a hyphen");
-      if (getSender() != service)
+      if (!std::ranges::contains(preapprovedAccounts, name))
       {
-         check(!strName.starts_with("x-"),
-               "The 'x-' account prefix is reserved for infrastructure providers");
-         check(strName.length() >= 10, "account name must be at least 10 characters: " + strName);
+         if (name.subaccount())
+         {
+            check(getSender() == name.base(),
+                  "Subaccounts can only be created by the primary account");
+         }
+         else if (getSender() != service)
+         {
+            check(!strName.starts_with("x-"),
+                  "The 'x-' account prefix is reserved for infrastructure providers");
+            check(strName.length() >= MIN_ALLOWED_ACCOUNT_LENGTH,
+                  "account name must be at least " + std::to_string(MIN_ALLOWED_ACCOUNT_LENGTH) +
+                      " characters: " + strName);
+         }
       }
 
       // Check compression roundtrip
       check(AccountNumber{strName}.value, "invalid account name");
 
-      if (accountIndex.get(name))
+      if (auto existing = accountIndex.get(name))
       {
-         if (requireNew)
+         if (requireMatch && existing->authService != authService)
             abortMessage("account already exists");
-         return;
+         return false;
       }
       check(accountIndex.get(authService) != std::nullopt, "unknown auth service");
 
       Account account{
-          .accountNum  = name,
-          .authService = authService,
+          .accountNum   = name,
+          .authService  = authService,
+          .authSequence = 0,
       };
       accountTable.put(account);
 
       ++status->totalAccounts;
       statusTable.put(*status);
+      return true;
    }
 
    void Accounts::setAuthServ(psibase::AccountNumber authService)
@@ -102,6 +142,7 @@ namespace SystemService
       to<AuthInterface>(authService).canAuthUserSys(getSender());
 
       account->authService = authService;
+      ++account->authSequence;
       accountTable.put(*account);
    }
 
@@ -118,6 +159,17 @@ namespace SystemService
       auto accountRow = getAccount(account);
       check(accountRow.has_value(), "account " + account.str() + " does not exist");
       return accountRow->authService;
+   }
+
+   void Accounts::incAuthSeq(psibase::AccountNumber name)
+   {
+      auto accountTable = open<AccountTable>();
+      auto accountRow   = accountTable.getIndex<0>().get(name);
+      if (accountRow && accountRow->authService == getSender())
+      {
+         ++accountRow->authSequence;
+         accountTable.put(*accountRow);
+      }
    }
 
    bool Accounts::exists(AccountNumber name)

@@ -17,6 +17,7 @@ HttpServer = "0.23.0"
 
 [dependencies]
 psibase.workspace = true
+psibase_service.workspace = true
 psibase_macros.workspace = true
 async-graphql.workspace = true
 serde = { version = "1.0.209", features = ["derive"] }

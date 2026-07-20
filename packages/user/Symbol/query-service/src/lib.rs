@@ -1,7 +1,7 @@
-#[psibase::service]
+#[psibase::service(name = "symbol+1")]
 #[allow(non_snake_case)]
 mod service {
-    use async_graphql::{connection::Connection, *};
+    use async_graphql::*;
     use psibase::{services::tokens::TID, *};
     use serde::Deserialize;
     use serde_aux::prelude::*;
@@ -39,7 +39,7 @@ mod service {
 
         /// Fetch symbol information, returns null if it does not exist
         async fn symbol(&self, symbol: String) -> Option<Symbol> {
-            Symbol::get(symbol.as_str().into())
+            Symbol::get(symbol.parse().unwrap())
         }
 
         /// Fetch a mapping of a symbol by token ID
@@ -58,7 +58,7 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, SymbolEvent>> {
+        ) -> async_graphql::Result<EventConnection<SymbolEvent>> {
             let mut query = EventQuery::new("history.symbol.symEvent");
 
             // Build conditions if filters are provided

@@ -1,0 +1,43 @@
+import z from "zod";
+
+import { graphql } from "@shared/lib/graphql";
+import { type Account, zAccount } from "@shared/lib/schemas/account";
+import { zDateTime } from "@shared/lib/schemas/date-time";
+
+const HistoryItem = z.object({
+    actor: zAccount,
+    txid: z.string(),
+    eventType: z.enum([
+        "proposed",
+        "accepted",
+        "deleted",
+        "executed",
+        "deleted",
+        "rejected",
+    ]),
+    datetime: zDateTime,
+});
+
+const response = z.object({
+    actorHistory: z.object({
+        nodes: HistoryItem.array(),
+    }),
+});
+
+export const getActorHistory = async (account: Account) => {
+    const res = await graphql(
+        `{ 
+            actorHistory(actor: "${account}", last: 8) {
+                nodes {
+                    actor
+                    txid
+                    eventType
+                    datetime
+                }
+            }
+        }`,
+        { service: "staged-tx" },
+    );
+
+    return response.parse(res).actorHistory.nodes;
+};

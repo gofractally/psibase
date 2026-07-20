@@ -121,8 +121,8 @@ to get the account that the service is running on.
 ```rust
 #[action]
 fn do_something() {
-    psibase::check(
-        psibase::get_sender() == expectedAccount,
+    assert_eq!(
+        psibase::get_sender(), expectedAccount,
         "you're not who I expected",
     );
 }

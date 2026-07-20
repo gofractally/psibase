@@ -55,7 +55,7 @@ pub mod policy {
 }
 
 #[crate::service(
-    name = "auth-dyn-it",
+    name = "i-auth-dyn",
     actions = "int_actions",
     wrapper = "int_wrapper",
     structs = "int_structs",
@@ -99,7 +99,7 @@ mod service {
         action: ServiceMethod,
         allowedActions: Vec<ServiceMethod>,
         claims: Vec<Claim>,
-    ) {
+    ) -> bool {
         unimplemented!()
     }
 
@@ -109,11 +109,15 @@ mod service {
     }
 
     #[action]
+    fn getDlgsSys(sender: AccountNumber, method: Option<ServiceMethod>) -> Vec<AccountNumber> {
+        unimplemented!()
+    }
+
+    #[action]
     fn isAuthSys(
         sender: AccountNumber,
         authorizers: Vec<AccountNumber>,
         method: Option<ServiceMethod>,
-        auth_set: Option<Vec<AccountNumber>>,
     ) -> bool {
         unimplemented!()
     }
@@ -121,9 +125,8 @@ mod service {
     #[action]
     fn isRejectSys(
         sender: AccountNumber,
-        authorizers: Vec<AccountNumber>,
+        rejecters: Vec<AccountNumber>,
         method: Option<ServiceMethod>,
-        auth_set: Option<Vec<AccountNumber>>,
     ) -> bool {
         unimplemented!()
     }

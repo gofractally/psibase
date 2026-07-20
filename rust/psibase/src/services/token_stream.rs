@@ -20,7 +20,7 @@ pub struct Stream {
     pub claimable_at_last_deposit: Quantity,
 }
 
-#[crate::service(name = "token-stream", dispatch = false, psibase_mod = "crate")]
+#[crate::service(name = "tok-stream", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 pub mod Service {
     use crate::{

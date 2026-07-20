@@ -8,22 +8,14 @@ import {
     verifyViteCache,
 } from "../../../vite.shared";
 
-const serviceDir = path.resolve(__dirname);
-
-verifyViteCache(serviceDir);
+const appDirectory = path.resolve(__dirname);
+verifyViteCache(appDirectory);
 
 // https://vitejs.dev/config/
-export default defineConfig(({ command }) => ({
+export default defineConfig((config) => ({
     plugins: [
-        createSharedViteConfig({
-            projectDir: serviceDir,
-        }),
-        createPsibaseConfig({
-            service: "supervisor",
-            serviceDir: serviceDir,
-            isServing: command === "serve",
-            useHttps: process.env.VITE_SECURE_LOCAL_DEV === "true",
-        }),
+        createSharedViteConfig(),
+        createPsibaseConfig(config, { appDirectory }),
         ...getSharedUIPlugins(),
     ],
     build: {
@@ -33,8 +25,8 @@ export default defineConfig(({ command }) => ({
         rollupOptions: {
             external: ["hash.js", "elliptic"],
             input: {
-                main: path.resolve(serviceDir, "index.html"),
-                prompt: path.resolve(serviceDir, "prompt.html"),
+                main: path.resolve(appDirectory, "index.html"),
+                prompt: path.resolve(appDirectory, "prompt.html"),
             },
             output: {
                 entryFileNames: "assets/[name].js",

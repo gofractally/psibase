@@ -1,6 +1,6 @@
 import { Controller, UseFormReturn } from "react-hook-form";
 
-import { filterHighestVersions } from "@/lib/filterHighestVersions";
+import { filterHighestVersions } from "@/lib/filter-highest-versions";
 import { PackageInfo, ServicesType } from "@/types";
 
 import { Button } from "@shared/shadcn/ui/button";

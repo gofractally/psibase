@@ -7,19 +7,21 @@ interface admin-fractal {
     exile-member: func(member: string) -> result<_, error>;
     set-dist-interval: func(distribution-interval-sec: u32) -> result<_, error>;
     init-token: func() -> result<_, error>;
-    set-ranked-guild-slots: func(slots-count: u8) -> result<_, error>;
     set-ranked-guilds: func(guilds: list<string>) -> result<_, error>;
 
-    set-token-threshold: func(threshold: u8) -> result<_, error>;
+    set-role-occupation: func(role-id: u8, occupation: string) -> result<_, error>;
+
+    set-role-mapping: func(role-id: u8, guild: string) -> result<_, error>;
 
 }
 
 interface user-fractal {
     use host:types/types.{error};
 
-    join: func() -> result<_, error>;
     dist-token: func() -> result<_, error>;
+    claim-rewards: func(member: string) -> result<_, error>;
 
+    join: func() -> result<_, error>;
 
 }
 
@@ -55,20 +57,23 @@ interface admin-guild {
     resign-guild-rep: func(guild-account: string) -> result<_, error>;
     remove-guild-rep: func(guild-account: string) -> result<_, error>;
 
-    con-membership-app: func(guild-account: string, member: string, accepted: bool) -> result<_, error>;
     set-rank-ordering-threshold: func(guild-account: string, threshold: u8) -> result<_, error>;
-
 }
 
 interface user-guild {
     use host:types/types.{error};
     register-candidacy: func(guild-account: string, active: bool) -> result<_, error>;
 
+    draft-application: func(guild-account: string, description: string) -> result<_, error>;
+    push-application: func(guild-account: string) -> result<_, error>;
+
+
+    delete-guild-invite: func(invite-id: u32) -> result<_, error>;
+
+    invite-member: func(guild-account: string, num-accounts: u16, pre-attest: bool) -> result<string, error>;
     apply-guild: func(guild-account: string, app: string) -> result<_, error>;
     attest-membership-app: func(guild-account: string, applicant: string, comment: string, endorses: bool) -> result<_, error>;
 }
-
-
 
 
 

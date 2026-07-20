@@ -1,13 +1,13 @@
 use crate::bindings::host::common as Host;
 use crate::bindings::transact::plugin::types::*;
-use psibase::{AccountNumber, Hex, Tapos, TimePointSec};
+use psibase::{Hex, Tapos, TimePointSec};
 use serde::Deserialize;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 impl From<Claim> for psibase::Claim {
     fn from(claim: Claim) -> Self {
         psibase::Claim {
-            service: AccountNumber::from(claim.verify_service.as_str()),
+            service: claim.verify_service.parse().unwrap(),
             rawData: Hex::from(claim.raw_data.clone()),
         }
     }

@@ -132,11 +132,11 @@ SCENARIO("Producers")
 
       // Other accounts
       auto producers = t.from("producers"_a);
-      auto weak      = "prods-weak"_a;
-      auto strong    = "prods-strong"_a;
+      auto weak      = Producers::producerAccountWeak;
+      auto strong    = Producers::producerAccountStrong;
       auto rando     = t.from(t.addAccount("rando"_a));
 
-      // Alice requires prods-strong
+      // Alice requires prods-str
       REQUIRE(alice.to<AuthDelegate>().setOwner(strong).succeeded());
       REQUIRE(alice.to<Accounts>().setAuthServ(AuthDelegate::service).succeeded());
 
@@ -163,10 +163,10 @@ SCENARIO("Producers")
 
       auto getNfts = [](DefaultTestChain& t, AccountNumber acc)
       {
-         std::string query_str = "query UserNfts { userNfts( user: \"" + acc.str() +
-                                 "\" ) { edges { node { id issuer owner } } } "
-                                 "}";
-         std::string_view query_sv = query_str;
+         std::string      query_str = "query UserNfts { userNfts( user: \"" + acc.str() +
+                                      "\" ) { edges { node { id issuer owner } } } "
+                                      "}";
+         std::string_view query_sv  = query_str;
 
          auto query = GraphQLBody{query_sv};
 
@@ -186,7 +186,7 @@ SCENARIO("Producers")
       THEN("Producers can be retrieved")
       {
          auto prods = alice.to<Producers>().getProducers().returnVal();
-         REQUIRE(prods == std::vector<AccountNumber>{"firstproducer"_a});
+         REQUIRE(prods == std::vector<AccountNumber>{"firstprod"_a});
       }
 
       THEN("CFT Producer set can be changed")
@@ -248,7 +248,7 @@ SCENARIO("Producers")
                REQUIRE(accept.succeeded());
 
                THEN(
-                   "Alice (dependent on prods-strong) threshold was not reached, so has not minted "
+                   "Alice (dependent on prods-str) threshold was not reached, so has not minted "
                    "an NFT")
                {
                   REQUIRE(getNfts(t, alice.id) == 0);
@@ -333,7 +333,7 @@ SCENARIO("Producers")
                REQUIRE(accept2.succeeded());
 
                THEN(
-                   "Alice (dependent on prods-strong) threshold was not reached, so has not minted "
+                   "Alice (dependent on prods-str) threshold was not reached, so has not minted "
                    "an NFT")
                {
                   CHECK(getNfts(t, alice.id) == 0);
@@ -345,7 +345,7 @@ SCENARIO("Producers")
                       frank.with({frank_keys}).to<StagedTxService>().accept(proposeAliceId, txid);
                   REQUIRE(accept3.succeeded());
                   THEN(
-                      "Alice (dependent on prods-strong) threshold was reached, so has minted an "
+                      "Alice (dependent on prods-str) threshold was reached, so has minted an "
                       "NFT")
                   {
                      CHECK(getNfts(t, alice.id) == 1);

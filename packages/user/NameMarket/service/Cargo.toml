@@ -1,0 +1,28 @@
+[package]
+name = "name-market"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[package.metadata.psibase]
+server = "r-name-market"
+plugin = "name-market-plugin"
+data = [{ src = "../ui/dist", dst = "/" }]
+postinstall = [
+    { sender = "namemarket", service = "namemarket", method = "init", data = {} },
+    { sender = "namemarket", service = "sites", method = "enablespa", data = { enable = true } },
+]
+
+[dependencies]
+psibase.workspace = true
+psibase_service.workspace = true
+psibase_macros.workspace = true
+async-graphql.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+psibase-user-workspace-hack.workspace = true
+
+[dev-dependencies]
+pem = "3.0"
+name-market-pkg = { path = "..", version = "0.23.0" }

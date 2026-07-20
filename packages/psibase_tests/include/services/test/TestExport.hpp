@@ -8,7 +8,7 @@ namespace TestService
 {
    struct TestExport : psibase::Service
    {
-      static constexpr auto service = psibase::AccountNumber{"test-export"};
+      static constexpr auto service = psibase::AccountNumber{"testexport"};
       static constexpr auto flags   = psibase::CodeRow::isPrivileged;
 
       void testPlain();

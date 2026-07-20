@@ -39,13 +39,7 @@ pub fn service_macro_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
         options.name = std::env::var("CARGO_PKG_NAME").unwrap().replace('_', "-");
     }
     if options.dispatch.is_none() {
-        options.dispatch = Some(std::env::var_os("CARGO_PRIMARY_PACKAGE").is_some());
-    }
-    if options.generate_schema.is_none() {
-        options.generate_schema = options.dispatch.clone();
-    }
-    if std::env::var_os("CARGO_PSIBASE_TEST").is_some() {
-        options.dispatch = Some(false);
+        options.dispatch = Some(true);
     }
 
     let psibase_mod = proc_macro2::TokenStream::from_str(&options.psibase_mod).unwrap();
@@ -242,104 +236,6 @@ fn process_mod(
             pub struct #wrapper;
         });
 
-        let call_from_to_doc = format!(
-            "
-            Call another service.
-
-            This method returns an object which has [methods]({actions}#implementations)
-            (one per action) which call another service and return the result from the call.
-            This method is only usable by services.
-
-            ",
-            actions = options.actions
-        );
-        let call_doc = format!(
-            "{} This method defaults `sender` to [`{psibase}::get_sender`] and `service` to \"{}\".",
-            call_from_to_doc, options.name,            psibase = options.psibase_mod,
-        );
-        let call_to_doc = format!(
-            "{} This method defaults `sender` to [`{psibase}::get_sender`].",
-            call_from_to_doc,
-            psibase = options.psibase_mod,
-        );
-        let call_from_doc = format!(
-            "{} This method defaults `service` to \"{}\".",
-            call_from_to_doc, options.name
-        );
-        let call_as_doc = format!(
-            "
-            Call another service using [runAs]({psibase}::services::transact::Actions::runAs).
-
-            This method returns an object which has [methods]({actions}#implementations)
-            (one per action) which call another service via `runAs` and return the result from the call.
-            The action will run with `sender` set to the provided account. This method defaults `service` to \"{name}\".
-
-            This will fail unless certain conditions are met. See [runAs]({psibase}::services::transact::Actions::runAs) 
-            documentation for more details.
-
-            ",
-            psibase = options.psibase_mod,
-            actions = options.actions,
-            name = options.name
-        );
-        let call_as_extend_doc = format!(
-            "{} This method also accepts `allowedActions` for nested `runAs` calls.",
-            call_as_doc
-        );
-
-        let push_from_to_doc = format!(
-            "
-            push transactions to [psibase::Chain]({psibase}::Chain).
-
-            This method returns an object which has [methods]({actions}#implementations)
-            (one per action) which push transactions to a test chain and return a
-            [psibase::ChainResult]({psibase}::ChainResult) or
-            [psibase::ChainEmptyResult]({psibase}::ChainEmptyResult). This final object
-            can verify success or failure and can retrieve the return value, if any.
-
-            ",
-            psibase = options.psibase_mod,
-            actions = options.actions
-        );
-        let push_doc = format!(
-            "{} This method defaults both `sender` and `service` to \"{}\".",
-            push_from_to_doc, options.name
-        );
-        let push_to_doc = format!(
-            "{} This method defaults `sender` to \"{}\".",
-            push_from_to_doc, options.name
-        );
-        let push_from_doc = format!(
-            "{} This method defaults `service` to \"{}\".",
-            push_from_to_doc, options.name
-        );
-
-        let pack_from_to_doc = format!(
-            "
-            Pack actions into [psibase::Action]({psibase}::Action).
-
-            This method returns an object which has [methods]({actions}#implementations)
-            (one per action) which pack the action's arguments using [fracpack] and
-            return a [psibase::Action]({psibase}::Action). The `pack_*` series of
-            functions is mainly useful to applications which push transactions
-            to blockchains.
-
-            ",
-            psibase = options.psibase_mod,
-            actions = options.actions
-        );
-        let pack_doc = format!(
-            "{} This method defaults both `sender` and `service` to \"{}\".",
-            pack_from_to_doc, options.name
-        );
-        let pack_to_doc = format!(
-            "{} This method defaults `sender` to \"{}\".",
-            pack_from_to_doc, options.name
-        );
-        let pack_from_doc = format!(
-            "{} This method defaults `service` to \"{}\".",
-            pack_from_to_doc, options.name
-        );
         let emit_from_doc = format!(
             "
             Emit events from a service.
@@ -357,168 +253,6 @@ fn process_mod(
                 #[doc = #constant_doc]
                 pub const SERVICE: #psibase_mod::AccountNumber =
                     #psibase_mod::AccountNumber::new(#psibase_mod::account_raw!(#service_account));
-
-                #[doc = #call_doc]
-                pub fn call() -> #actions<#psibase_mod::ServiceCaller> {
-                    #psibase_mod::ServiceCaller {
-                        sender: #psibase_mod::get_service(),
-                        service: Self::#constant,
-                        flags: 0,
-                    }
-                    .into()
-                }
-
-                #[doc = #call_to_doc]
-                pub fn call_to(service: #psibase_mod::AccountNumber)
-                -> #actions<#psibase_mod::ServiceCaller>
-                {
-                    #psibase_mod::ServiceCaller {
-                        sender: #psibase_mod::get_service(),
-                        service,
-                        flags: 0,
-                    }
-                    .into()
-                }
-
-                #[doc = #call_from_doc]
-                pub fn call_from(sender: #psibase_mod::AccountNumber)
-                -> #actions<#psibase_mod::ServiceCaller>
-                {
-                    #psibase_mod::ServiceCaller {
-                        sender,
-                        service: Self::#constant,
-                        flags: 0,
-                    }
-                    .into()
-                }
-
-                #[doc = #call_from_to_doc]
-                pub fn call_from_to(
-                    sender: #psibase_mod::AccountNumber,
-                    service: #psibase_mod::AccountNumber)
-                -> #actions<#psibase_mod::ServiceCaller>
-                {
-                    #psibase_mod::ServiceCaller { sender, service,
-                        flags: 0, }.into()
-                }
-
-                #[doc = #call_as_doc]
-                pub fn call_as(sender: #psibase_mod::AccountNumber)
-                -> #actions<#psibase_mod::RunAsCaller>
-                {
-                    #psibase_mod::RunAsCaller {
-                        sender,
-                        service: Self::#constant,
-                        allowed_actions: vec![],
-                    }
-                    .into()
-                }
-
-                #[doc = #call_as_extend_doc]
-                pub fn call_as_extend(
-                    sender: #psibase_mod::AccountNumber,
-                    allowed_actions: Vec<#psibase_mod::services::transact::ServiceMethod>)
-                -> #actions<#psibase_mod::RunAsCaller>
-                {
-                    #psibase_mod::RunAsCaller {
-                        sender,
-                        service: Self::#constant,
-                        allowed_actions,
-                    }
-                    .into()
-                }
-
-                #[doc = #call_doc]
-                pub fn rpc() -> #actions<#psibase_mod::ServiceCaller> {
-                    #psibase_mod::ServiceCaller {
-                        sender: #psibase_mod::get_service(),
-                        service: Self::#constant,
-                        flags: 1,
-                    }
-                    .into()
-                }
-
-                #[doc = #push_doc]
-                pub fn push(chain: &#psibase_mod::Chain) -> #actions<#psibase_mod::ChainPusher> {
-                    #psibase_mod::ChainPusher {
-                        chain,
-                        sender: Self::#constant,
-                        service: Self::#constant,
-                    }
-                    .into()
-                }
-
-                #[doc = #push_to_doc]
-                pub fn push_to(chain: &#psibase_mod::Chain, service: #psibase_mod::AccountNumber)
-                -> #actions<#psibase_mod::ChainPusher>
-                {
-                    #psibase_mod::ChainPusher {
-                        chain,
-                        sender: Self::#constant,
-                        service,
-                    }
-                    .into()
-                }
-
-                #[doc = #push_from_doc]
-                pub fn push_from(chain: &#psibase_mod::Chain, sender: #psibase_mod::AccountNumber)
-                -> #actions<#psibase_mod::ChainPusher>
-                {
-                    #psibase_mod::ChainPusher {
-                        chain,
-                        sender,
-                        service: Self::#constant,
-                    }
-                    .into()
-                }
-
-                #[doc = #push_from_to_doc]
-                pub fn push_from_to(
-                    chain: &#psibase_mod::Chain,
-                    sender: #psibase_mod::AccountNumber,
-                    service: #psibase_mod::AccountNumber)
-                -> #actions<#psibase_mod::ChainPusher>
-                {
-                    #psibase_mod::ChainPusher { chain, sender, service }.into()
-                }
-
-                #[doc = #pack_doc]
-                pub fn pack() -> #actions<#psibase_mod::ActionPacker> {
-                    #psibase_mod::ActionPacker {
-                        sender: Self::#constant,
-                        service: Self::#constant,
-                    }
-                    .into()
-                }
-
-                #[doc = #pack_to_doc]
-                pub fn pack_to(service: #psibase_mod::AccountNumber)
-                -> #actions<#psibase_mod::ActionPacker>
-                {
-                    #psibase_mod::ActionPacker {
-                        sender: Self::#constant,
-                        service,
-                    }
-                    .into()
-                }
-
-                #[doc = #pack_from_doc]
-                pub fn pack_from(sender: #psibase_mod::AccountNumber)
-                -> #actions<#psibase_mod::ActionPacker>
-                {
-                    #psibase_mod::ActionPacker {
-                        sender,
-                        service: Self::#constant,
-                    }
-                    .into()
-                }
-
-                #[doc = #pack_from_to_doc]
-                pub fn pack_from_to(sender: #psibase_mod::AccountNumber, service: #psibase_mod::AccountNumber)
-                -> #actions<#psibase_mod::ActionPacker>
-                {
-                    #psibase_mod::ActionPacker { sender, service }.into()
-                }
 
                 #[doc = #emit_doc]
                 pub fn emit() -> EmitEvent {
@@ -550,8 +284,19 @@ fn process_mod(
 
         items.push(parse_quote! {
             #[automatically_derived]
+            impl #psibase_mod::ServiceWrapper for #wrapper {
+                const SERVICE: #psibase_mod::AccountNumber = Self::SERVICE;
+                type Actions<T: #psibase_mod::Caller> = #actions<T>;
+                fn with_caller<T: #psibase_mod::Caller>(caller: T) -> #actions<T> {
+                    caller.into()
+                }
+            }
+        });
+
+        items.push(parse_quote! {
+            #[automatically_derived]
             pub struct #history_events {
-                event_log: #psibase_mod::DbId,
+                event_log: #psibase_mod::EventDb,
                 sender: #psibase_mod::AccountNumber,
             }
         });
@@ -559,7 +304,7 @@ fn process_mod(
         items.push(parse_quote! {
             #[automatically_derived]
             pub struct #ui_events {
-                event_log: #psibase_mod::DbId,
+                event_log: #psibase_mod::EventDb,
                 sender: #psibase_mod::AccountNumber,
             }
         });
@@ -567,7 +312,7 @@ fn process_mod(
         items.push(parse_quote! {
             #[automatically_derived]
             pub struct #merkle_events {
-                event_log: #psibase_mod::DbId,
+                event_log: #psibase_mod::EventDb,
                 sender: #psibase_mod::AccountNumber,
             }
         });
@@ -597,13 +342,10 @@ fn process_mod(
         items.push(parse_quote! {
             impl EmitEvent {
                 pub fn history(&self) -> #history_events {
-                    #history_events { event_log: #psibase_mod::DbId::HistoryEvent, sender: self.sender }
-                }
-                pub fn ui(&self) -> #ui_events {
-                    #ui_events { event_log: #psibase_mod::DbId::UiEvent, sender: self.sender }
+                    #history_events { event_log: #psibase_mod::EventDb::HistoryEvent, sender: self.sender }
                 }
                 pub fn merkle(&self) -> #merkle_events {
-                    #merkle_events { event_log: #psibase_mod::DbId::MerkleEvent, sender: self.sender }
+                    #merkle_events { event_log: #psibase_mod::EventDb::MerkleEvent, sender: self.sender }
                 }
             }
         });
@@ -744,16 +486,20 @@ fn process_mod(
         };
         if options.dispatch.unwrap() {
             items.push(parse_quote! {
+                #[cfg(not(test))]
                 #[automatically_derived]
                 #[cfg(target_family = "wasm")]
-                mod service_wasm_interface {
+                pub mod service_wasm_interface {
+                    use super::super::*;
+                    pub use #psibase_mod as psibase;
+                    pub use psibase_service;
+                    pub use super::#wrapper as Wrapper;
                     fn dispatch(act: #psibase_mod::SharedAction) -> #psibase_mod::fracpack::Result<()> {
                         #dispatch_body
                         Ok(())
                     }
 
-                    #[no_mangle]
-                    pub unsafe extern "C" fn called(_this_service: u64, sender: u64) {
+                    pub unsafe fn called(_this_service: u64, sender: u64) {
                         #begin_protection
                         let prev = #psibase_mod::get_sender();
                         #psibase_mod::set_sender(#psibase_mod::AccountNumber::new(sender));
@@ -765,14 +511,9 @@ fn process_mod(
                         #end_protection
                     }
 
-                    extern "C" {
-                        fn __wasm_call_ctors();
-                    }
-
-                    #[no_mangle]
-                    pub unsafe extern "C" fn start(this_service: u64) {
-                        __wasm_call_ctors();
+                    pub unsafe fn start(this_service: u64) {
                         #psibase_mod::set_service(#psibase_mod::AccountNumber::new(this_service));
+                        #psibase_mod::service_start();
                     }
                 }
             });
@@ -811,17 +552,17 @@ fn process_mod(
         quote! {#[allow(dead_code)]}
     };
     let polyfill = gen_polyfill(psibase_mod);
-    let schema_gen = if options.generate_schema.unwrap() {
+    let export_wasm_interface = if options.dispatch.unwrap() {
         quote! {
-            #[test]
-            #[ignore]
-            fn _psibase_get_schema() {
-                #psibase_mod::print_schema_impl::<#mod_name::#wrapper>()
-            }
+            #[cfg(not(test))]
+            #[automatically_derived]
+            #[cfg(target_family = "wasm")]
+            pub use #mod_name::service_wasm_interface;
         }
     } else {
         quote! {}
     };
+
     quote! {
         #silence
         #impl_mod
@@ -836,9 +577,8 @@ fn process_mod(
         #[automatically_derived]
         pub use #mod_name::#structs;
 
+        #export_wasm_interface
         #polyfill
-
-        #schema_gen
     }
     .into()
 } // process_mod
@@ -849,7 +589,9 @@ fn gen_polyfill(psibase_mod: &proc_macro2::TokenStream) -> proc_macro2::TokenStr
         mod psibase_tester_polyfill {
             #![allow(non_snake_case)]
             use #psibase_mod::tester_raw;
-            use #psibase_mod::DbId;
+            use #psibase_mod::tester;
+            use #psibase_mod::{DbId, KvMode};
+            use #psibase_mod::native_raw::KvHandle;
             use tester_raw::get_selected_chain;
 
             #[no_mangle]
@@ -859,7 +601,7 @@ fn gen_polyfill(psibase_mod: &proc_macro2::TokenStream) -> proc_macro2::TokenStr
 
             #[no_mangle]
             pub unsafe extern "C" fn getKey(dest: *mut u8, dest_size: u32) -> u32 {
-                tester_raw::getKey(dest, dest_size)
+                tester::polyfill::getKey(dest, dest_size)
             }
 
             #[no_mangle]
@@ -873,39 +615,58 @@ fn gen_polyfill(psibase_mod: &proc_macro2::TokenStream) -> proc_macro2::TokenStr
             }
 
             #[no_mangle]
-            pub unsafe extern "C" fn kvGet(db: DbId, key: *const u8, key_len: u32) -> u32 {
-                tester_raw::kvGet(get_selected_chain(), db, key, key_len)
+            pub unsafe extern "C" fn kvOpen(db: DbId, key: *const u8, key_len: u32, mode: KvMode) -> KvHandle {
+                tester::polyfill::kvOpen(db, key, key_len, mode)
             }
 
             #[no_mangle]
-            pub unsafe extern "C" fn getSequential(db: DbId, id: u64) -> u32 {
-                tester_raw::getSequential(get_selected_chain(), db, id)
+            pub unsafe extern "C" fn psibase_proxy_kv_open(db: DbId, key: *const u8, key_len: u32, mode: KvMode) -> KvHandle {
+                tester::polyfill::kvOpen(db, key, key_len, mode)
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn kvOpenAt(db: KvHandle, key: *const u8, key_len: u32, mode: KvMode) -> KvHandle {
+                tester::polyfill::kvOpenAt(db, key, key_len, mode)
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn kvClose(handle: KvHandle) {
+                tester::polyfill::kvClose(handle)
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn kvGet(db: KvHandle, key: *const u8, key_len: u32) -> u32 {
+                tester::polyfill::kvGet(db, key, key_len)
             }
 
             #[no_mangle]
             pub unsafe extern "C" fn kvGreaterEqual(
-                db: DbId,
+                db: KvHandle,
                 key: *const u8,
                 key_len: u32,
                 match_key_size: u32,
             ) -> u32 {
-                tester_raw::kvGreaterEqual(get_selected_chain(), db, key, key_len, match_key_size)
+                tester::polyfill::kvGreaterEqual(db, key, key_len, match_key_size)
             }
 
             #[no_mangle]
-            pub unsafe extern "C" fn kvLessThan(db: DbId, key: *const u8, key_len: u32, match_key_size: u32) -> u32 {
-                tester_raw::kvLessThan(get_selected_chain(), db, key, key_len, match_key_size)
+            pub unsafe extern "C" fn kvLessThan(db: KvHandle, key: *const u8, key_len: u32, match_key_size: u32) -> u32 {
+                tester::polyfill::kvLessThan(db, key, key_len, match_key_size)
             }
 
             #[no_mangle]
-            pub unsafe extern "C" fn kvMax(db: DbId, key: *const u8, key_len: u32) -> u32 {
-                tester_raw::kvMax(get_selected_chain(), db, key, key_len)
+            pub unsafe extern "C" fn kvMax(db: KvHandle, key: *const u8, key_len: u32) -> u32 {
+                tester::polyfill::kvMax(db, key, key_len)
             }
 
             #[no_mangle]
-            pub unsafe extern "C" fn kvPut(db: DbId, key: *const u8, key_len: u32, value: *const u8, value_len: u32)
-            {
-                tester_raw::kvPut(get_selected_chain(), db, key, key_len, value, value_len)
+            pub unsafe extern "C" fn kvPut(db: KvHandle, key: *const u8, key_len: u32, value: *const u8, value_len: u32) {
+                tester::polyfill::kvPut(db, key, key_len, value, value_len)
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn kvRemove(db: KvHandle, key: *const u8, key_len: u32) {
+                tester::polyfill::kvRemove(db, key, key_len)
             }
 
             #[no_mangle]
@@ -915,10 +676,6 @@ fn gen_polyfill(psibase_mod: &proc_macro2::TokenStream) -> proc_macro2::TokenStr
             #[no_mangle]
             pub unsafe extern "C" fn call(action: *const u8, len: u32, flags: u64) -> u32 {
                 panic!("call not supported in tester");
-            }
-            #[no_mangle]
-            pub unsafe extern "C" fn putSequential(_db: DbId, _value: *const u8, _value_len: u32) -> u64 {
-                panic!("putSequential not supported in tester");
             }
             #[no_mangle]
             pub unsafe extern "C" fn getCurrentAction() -> u32 {

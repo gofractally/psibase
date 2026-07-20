@@ -48,6 +48,7 @@ using std::chrono::steady_clock;  // To create explicit timer
 
 namespace psibase::http
 {
+   namespace net = boost::asio;
    // Report a failure
    static void fail(psibase::loggers::common_logger& logger, beast::error_code ec, const char* what)
    {

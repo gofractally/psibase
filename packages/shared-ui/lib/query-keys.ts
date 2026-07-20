@@ -11,8 +11,14 @@ export type OptionalNumber = number | undefined | null;
 const QueryKey = {
     branding: () => ["branding"] as const,
     profile: (account: OptionalAccount) => ["profile", account] as const,
+    systemToken: () => ["systemToken"] as const,
     chainId: () => ["chainId"] as const,
+    contacts: (user: string | undefined | null) => ["contacts", user] as const,
     currentUser: () => ["currentUser"] as const,
+    billingConfig: () => ["billingConfig"] as const,
+    nameMarketsOverview: () => ["nameMarkets", "overview"] as const,
+    userTokenBalances: (user?: string | null) =>
+        ["userTokenBalances", user] as const,
 } as const satisfies Record<string, QueryKeyGenerator>;
 
 export type QueryKeysType = typeof QueryKey;

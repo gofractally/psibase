@@ -14,7 +14,10 @@ services = ["nft"]
 
 [package.metadata.psibase.dependencies]
 HttpServer = "0.23.0"
+Host = "0.23.0"
+Permissions = "0.23.0"
 Sites = "0.23.0"
+Transact = "0.23.0"
 Events = "0.23.0"
 
 [lib]

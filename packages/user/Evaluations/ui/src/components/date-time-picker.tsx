@@ -11,8 +11,6 @@ export function DateTimePicker24h({
     const field = useFieldContext();
     const date = field.state.value as Date;
 
-    console.log(date, "is the date?");
-
     return (
         <div>
             <div className="flex justify-between">

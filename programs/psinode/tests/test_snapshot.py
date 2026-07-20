@@ -46,6 +46,9 @@ class TestSnapshot(unittest.TestCase):
         b.connect(f)
         c.connect(e)
         c.connect(f)
+        is_synced = predicates.new_block()
+        e.wait(is_synced)
+        f.wait(is_synced)
         b.set_producers([e, f, 'missing'], algorithm='cft')
         b.wait(predicates.producers_are(['e', 'f', 'missing']))
         # Make sure that nodes can sync with a node that loaded a snapshot

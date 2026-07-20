@@ -6,8 +6,9 @@ pub mod tables {
     use psibase::services::nft::{Nft as NftRecord, Wrapper as Nft, NID};
     use psibase::services::tokens::Wrapper as Tokens;
     use psibase::services::tokens::{Decimal, Quantity, TokenRecord, TID};
-    use psibase::{check, check_some, get_sender, AccountNumber, Fracpack, Table, ToSchema};
-    use psibase::{check_none, get_service};
+    use psibase::{
+        get_sender, get_service, AccountNumber, Fracpack, ServiceWrapper, Table, ToSchema,
+    };
     use serde::{Deserialize, Serialize};
 
     use crate::service::{CREATED, MAPPED};
@@ -45,16 +46,16 @@ pub mod tables {
         }
 
         pub fn get_assert(symbol_length: u8) -> Self {
-            check_some(
-                Self::get(symbol_length),
-                format!("symbol length of {} not supported", symbol_length).as_str(),
-            )
+            Self::get(symbol_length)
+                .expect(format!("symbol length of {} not supported", symbol_length).as_str())
         }
 
         pub fn bill_sender(&self) {
             let sender = get_sender();
-            let billing_token =
-                check_some(Tokens::call().getSysToken(), "system token must be defined").id;
+            let billing_token = Tokens::call()
+                .getSysToken()
+                .expect("system token must be defined")
+                .id;
 
             let price = Quantity::from(DiffAdjust::call().increment(self.nftId, 1));
 
@@ -75,11 +76,11 @@ pub mod tables {
         }
 
         pub fn add(symbol_length: u8, initial_price: u64, target: u32, floor_price: u64) -> Self {
-            check_none(
-                Self::get(symbol_length),
+            assert!(
+                Self::get(symbol_length).is_none(),
                 "sale of symbol length already exists",
             );
-            check(
+            assert!(
                 symbol_length >= 3 && symbol_length <= 7,
                 "symbol length must be between 3 - 7 chars",
             );
@@ -115,12 +116,17 @@ pub mod tables {
         pub async fn current_price(&self) -> Decimal {
             Decimal::new(
                 self.price(),
-                check_some(Tokens::call().getSysToken(), "system token must be defined").precision,
+                Tokens::call()
+                    .getSysToken()
+                    .expect("system token must be defined")
+                    .precision,
             )
         }
 
         pub async fn billing_token(&self) -> TokenRecord {
-            check_some(Tokens::call().getSysToken(), "system token must be defined")
+            Tokens::call()
+                .getSysToken()
+                .expect("system token must be defined")
         }
     }
 
@@ -144,12 +150,12 @@ pub mod tables {
         }
 
         pub fn get_assert(symbol: AccountNumber) -> Self {
-            check_some(Self::get(symbol), "Symbol does not exist")
+            Self::get(symbol).expect("Symbol does not exist")
         }
 
         pub fn add(symbol: AccountNumber, recipient: AccountNumber) -> Self {
-            check_none(Symbol::get(symbol), "Symbol already exists");
-            check(
+            assert!(Symbol::get(symbol).is_none(), "Symbol already exists");
+            assert!(
                 symbol.to_string().chars().all(|c| c.is_ascii_lowercase()),
                 "Symbol may only contain lowercase alphabetic characters",
             );
@@ -157,11 +163,9 @@ pub mod tables {
 
             let is_billable = sender != get_service();
             if is_billable {
-                check_some(
-                    SymbolLength::get(symbol.to_string().len() as u8),
-                    "Symbol length is not for sale",
-                )
-                .bill_sender();
+                SymbolLength::get(symbol.to_string().len() as u8)
+                    .expect("Symbol length is not for sale")
+                    .bill_sender();
             }
 
             crate::Wrapper::emit()
@@ -183,8 +187,9 @@ pub mod tables {
         }
 
         fn check_is_owner_of_nft(nft_id: NID, user: AccountNumber) {
-            check(
-                Nft::call().getNft(nft_id).owner == user,
+            assert_eq!(
+                Nft::call().getNft(nft_id).owner,
+                user,
                 "Missing required authority",
             );
         }
@@ -247,7 +252,7 @@ pub mod tables {
         }
 
         pub fn get_assert(tokenId: TID) -> Self {
-            check_some(Self::get(tokenId), "mapping does not exist")
+            Self::get(tokenId).expect("mapping does not exist")
         }
 
         pub fn get_by_symbol(symbol: AccountNumber) -> Option<Self> {
@@ -255,9 +260,9 @@ pub mod tables {
         }
 
         pub fn add(tokenId: TID, symbol: AccountNumber) {
-            check_none(
-                Self::get_by_symbol(symbol),
-                "Symbol is already mapped to a token",
+            assert!(
+                Self::get_by_symbol(symbol).is_none(),
+                "Symbol is already mapped to a token"
             );
             Self::new(tokenId, symbol).save();
         }
@@ -298,12 +303,12 @@ pub mod service {
         if InitTable::read().get_index_pk().get(&()).is_none() {
             table.put(&InitRow {}).unwrap();
 
-            Tokens::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
-            Nft::call().setUserConf(NftHolderFlags::MANUAL_DEBIT.index(), true);
+            Tokens::call().setUserConf(BalanceFlags::AUTO_DEBIT.index(), false);
+            Nft::call().setUserConf(NftHolderFlags::AUTO_DEBIT.index(), false);
 
             let add_index = |method: &str, column: u8| {
                 events::Wrapper::call().addIndex(
-                    DbId::HistoryEvent,
+                    EventDb::HistoryEvent,
                     Wrapper::SERVICE,
                     MethodNumber::from(method),
                     column,
@@ -317,8 +322,10 @@ pub mod service {
 
     #[action]
     fn sellLength(length: u8, initial_price: Quantity, target: u32, floor_price: Quantity) {
-        check_some(Tokens::call().getSysToken(), "system token must be defined");
-        check(
+        Tokens::call()
+            .getSysToken()
+            .expect("system token must be defined");
+        assert!(
             get_sender() == get_service(),
             "only symbols account can sell lengths",
         );
@@ -327,7 +334,7 @@ pub mod service {
 
     #[action]
     fn delLength(length: u8) {
-        check(
+        assert!(
             get_sender() == get_service(),
             "only symbols account can delete lengths",
         );
@@ -341,7 +348,11 @@ pub mod service {
 
     #[action]
     fn admin_create(symbol: AccountNumber, recipient: AccountNumber) {
-        check(get_sender() == get_service(), "only symbol service can call this action");
+        assert_eq!(
+            get_sender(),
+            get_service(),
+            "only symbol service can call this action",
+        );
         Symbol::add(symbol, recipient);
     }
 
@@ -393,10 +404,10 @@ pub mod service {
 
     #[pre_action(exclude(init, getByToken))]
     fn check_init() {
-        check_some(
-            InitTable::read().get_index_pk().get(&()),
-            "service not inited",
-        );
+        InitTable::read()
+            .get_index_pk()
+            .get(&())
+            .expect("service not inited");
     }
 
     pub const CREATED: u8 = 0;

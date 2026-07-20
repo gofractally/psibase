@@ -73,7 +73,7 @@ namespace SystemService
    /// service to manage server specs, network variables, and billing parameters, as needed.
    struct VirtualServer : public psibase::Service
    {
-      static constexpr auto service = psibase::AccountNumber("virtual-server");
+      static constexpr auto service = psibase::AccountNumber("vserver");
 
       void init();
 
@@ -286,15 +286,13 @@ namespace SystemService
          {
             void consumed(psibase::AccountNumber account,
                           uint8_t                resource,
-                          uint64_t               amount,
-                          uint64_t               cost);
+                          int64_t                amount,
+                          int64_t                cost);
             void subsidized(psibase::AccountNumber purchaser,
                             psibase::AccountNumber recipient,
                             uint64_t               amount,
                             psibase::Memo          memo);
-            void block_summary(psibase::BlockNum block_num,
-                               uint32_t          net_usage_ppm,
-                               uint32_t          cpu_usage_ppm);
+            void block_summary(uint32_t net_usage_ppm, uint32_t cpu_usage_ppm);
          };
       };
    };

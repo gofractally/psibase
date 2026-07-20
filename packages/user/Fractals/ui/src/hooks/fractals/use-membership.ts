@@ -1,13 +1,13 @@
-import { queryClient } from "@/queryClient";
 import { useQuery } from "@tanstack/react-query";
 
+import QueryKey, { OptionalAccount } from "@/lib/query-keys";
+
 import {
-    Membership,
+    type Membership,
     getMembership,
-} from "@/lib/graphql/fractals/getMembership";
-import QueryKey, { OptionalAccount } from "@/lib/queryKeys";
-import { zAccount } from "@/lib/zod/Account";
-import { MemberStatus } from "@/lib/zod/MemberStatus";
+} from "@shared/domains/fractal/lib/graphql/get-membership";
+import { queryClient } from "@shared/lib/query-client";
+import { zAccount } from "@shared/lib/schemas/account";
 
 const queryFn = async (fractal: string, user: string) => {
     try {
@@ -41,7 +41,6 @@ export const setDefaultMembership = (
             fractal: zAccount.parse(fractal),
             account: zAccount.parse(user),
             createdAt: new Date().toISOString(),
-            memberStatus: MemberStatus.Citizen,
         };
         return defaultMember;
     });

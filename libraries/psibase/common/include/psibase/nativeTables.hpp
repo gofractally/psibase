@@ -264,6 +264,23 @@ namespace psibase
    };
    using LogTruncateTable = Table<LogTruncateRow, SingletonKey{}>;
 
+   struct LogMessage
+   {
+      enum class Severity : std::uint32_t
+      {
+         debug,
+         info,
+         notice,
+         warning,
+         error,
+         critical,
+      };
+      std::string                  message;
+      Severity                     severity = Severity::info;
+      std::optional<AccountNumber> service;
+      PSIO_REFLECT(LogMessage, severity, message, service)
+   };
+
    using SocketKeyType = std::tuple<std::uint16_t, std::uint8_t, std::int32_t>;
    auto socketPrefix() -> KeyPrefixType;
    auto socketKey(std::int32_t fd) -> SocketKeyType;
@@ -271,6 +288,8 @@ namespace psibase
    {
       // Well-known fds
       static constexpr std::int32_t producer_multicast = 0;
+      static constexpr std::int32_t log                = 1;
+      static constexpr std::int32_t unreservedStart    = 2;
 
       std::int32_t fd;
       SocketInfo   info;
@@ -332,12 +351,17 @@ namespace psibase
    //   PSIO_REFLECT(ContinuationArgs, id, trace, token)
    //};
 
-   struct BoundMethod
+   /// Identifies a method on a particular service
+   struct ServiceMethod
    {
       AccountNumber service;
       MethodNumber  method;
-      PSIO_REFLECT(BoundMethod, service, method)
+      PSIO_REFLECT(ServiceMethod, service, method)
    };
+   inline constexpr bool psio_custom_schema(ServiceMethod*)
+   {
+      return true;
+   }
 
    using RunKeyType = std::tuple<std::uint16_t, std::uint8_t, std::uint64_t>;
    auto runPrefix() -> KeyPrefixType;
@@ -388,8 +412,8 @@ namespace psibase
       // not limited and therefore should be a system service.
       MicroSeconds maxTime;
       // the action to run
-      Action      action;
-      BoundMethod continuation;
+      Action        action;
+      ServiceMethod continuation;
 
       static const auto db = psibase::DbId::nativeSubjective;
       auto              key() const -> RunKeyType;

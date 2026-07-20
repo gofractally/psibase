@@ -16,8 +16,8 @@ import {
 } from "@shared/shadcn/ui/chart";
 import { Separator } from "@shared/shadcn/ui/separator";
 
-import { usePerformance } from "../hooks/usePerformance";
-import { useTransactStats } from "../hooks/useTransactStats";
+import { usePerformance } from "../hooks/use-performance";
+import { useTransactStats } from "../hooks/use-transact-stats";
 
 const chartConfig = {
     database: {

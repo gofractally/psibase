@@ -1,18 +1,14 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 
-import { supervisor } from "@/supervisor";
-
-import QueryKey from "@/lib/queryKeys";
-import { zAccount } from "@/lib/zod/Account";
-
+import { upsertUserToCache } from "@shared/hooks/use-contacts";
+import SharedQueryKey from "@shared/lib/query-keys";
+import { zAccount } from "@shared/lib/schemas/account";
+import { supervisor } from "@shared/lib/supervisor";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 import { LocalContact, zLocalContact } from "../types";
-import { upsertUserToCache } from "./use-contacts";
 
 export const useCreateContact = () => {
-    const queryClient = useQueryClient();
-
     return useMutation({
         mutationFn: async (newContact: LocalContact) => {
             const parsed = zLocalContact.parse(newContact);
@@ -24,18 +20,18 @@ export const useCreateContact = () => {
             }));
         },
         onMutate: () => ({ toastId: toast.loading("Creating contact...") }),
-        onSuccess: (_, newContact, context) => {
-            toast.success("Contact created", { id: context.toastId });
+        onSuccess: (_data, newContact, onMutateResult, context) => {
+            toast.success("Contact created", { id: onMutateResult.toastId });
             const username = zAccount.parse(
-                queryClient.getQueryData(QueryKey.currentUser()),
+                context.client.getQueryData(SharedQueryKey.currentUser()),
             );
             upsertUserToCache(username, newContact);
-            queryClient.invalidateQueries({
-                queryKey: QueryKey.contacts(username),
+            context.client.invalidateQueries({
+                queryKey: SharedQueryKey.contacts(username),
             });
         },
-        onError: (error, _, context) => {
-            toast.error(error.message, { id: context?.toastId });
+        onError: (error, _, onMutateResult) => {
+            toast.error(error.message, { id: onMutateResult?.toastId });
         },
     });
 };

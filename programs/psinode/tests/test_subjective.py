@@ -14,7 +14,9 @@ def is_user_action(action):
         return False
     if action['service'] == 'cpu-limit':
         return False
-    if action['sender'] == 'transact' and action['service'] == 'virtual-server':
+    if action['sender'] == 'transact' and action['service'] == 'vserver':
+        return False
+    if action['sender'] == 'transact' and action['service'] == 'accounts' and action['method'] == 'getauthof':
         return False
     if action['service'] == 'events' and action['method'] == 'sync':
         return False
@@ -90,7 +92,7 @@ class TestSubjective(unittest.TestCase):
             return all_values
 
         def inc(api):
-            with api.post('/inc', 'psubjective', json={}) as response:
+            with api.post('/inc', 'psubj', json={}) as response:
                 response.raise_for_status()
                 return response.json()['value']
 
@@ -98,7 +100,7 @@ class TestSubjective(unittest.TestCase):
         self.assertSequenceEqual(values, range(1, len(values)+1))
 
         def ge(api):
-            with api.post('/ge', 'psubjective', json={}) as response:
+            with api.post('/ge', 'psubj', json={}) as response:
                 response.raise_for_status()
                 return response.json()['key']
 
@@ -123,7 +125,7 @@ class TestSubjective(unittest.TestCase):
         for i in range(nthreads):
             def tfn(api, out):
                 while not done.is_set():
-                    with api.post('/inc', 'psubjective', json={}) as response:
+                    with api.post('/inc', 'psubj', json={}) as response:
                         response.raise_for_status()
                         out.append(response.json()['value'])
             v = []

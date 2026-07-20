@@ -6,7 +6,7 @@ fn increment_last_char(s: String) -> String {
     String::from_utf8(bytes).unwrap()
 }
 
-#[psibase::service]
+#[psibase::service(name = "registry+1")]
 #[allow(non_snake_case)]
 mod service {
     use super::increment_last_char;
@@ -73,7 +73,7 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, StatusUpdate>> {
+        ) -> async_graphql::Result<EventConnection<StatusUpdate>> {
             let app = ExactAccountNumber::from_str(&app).unwrap();
             EventQuery::new("history.registry.appStatusChanged")
                 .condition(format!("app_account_id = '{}'", app))

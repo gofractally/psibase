@@ -11,11 +11,9 @@ publish.workspace = true
 [package.metadata.psibase]
 package-name = "test_contract"
 
-[lib]
-crate-type = ["cdylib"]
-
 [dependencies]
 psibase.workspace = true
+psibase_service.workspace = true
 psibase-rust-workspace-hack.workspace = true
 serde.workspace = true
 serde_json.workspace = true

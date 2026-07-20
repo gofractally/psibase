@@ -22,10 +22,11 @@ namespace psibase
    struct ExecutionContextImpl;
    using rhf_t = eosio::vm::registered_host_functions<ExecutionContextImpl>;
 #ifdef __x86_64__
-   using backend_t = eosio::vm::backend<rhf_t, eosio::vm::jit_profile, VMOptions>;
+   using impl_t = eosio::vm::jit_profile;
 #else
-   using backend_t = eosio::vm::backend<rhf_t, eosio::vm::interpreter, VMOptions>;
+   using impl_t = eosio::vm::interpreter;
 #endif
+   using backend_t = eosio::vm::backend<rhf_t, impl_t, VMOptions>;
 
    // Rethrow with detailed info
    template <typename F>
@@ -119,7 +120,7 @@ namespace psibase
             return result;
          ind.modify(it, [&](auto& x) { result = std::move(x); });
          ind.erase(it);
-         result.backend->get_module().allocator.enable_code(true);
+         result.backend->get_module().allocator.enable_code(impl_t::is_jit);
          return result;
       }
    };
@@ -365,10 +366,8 @@ namespace psibase
       rhf_t::add<&ExecutionContextImpl::exportHandles>("env", "exportHandles");
       rhf_t::add<&ExecutionContextImpl::importHandles>("env", "importHandles");
       rhf_t::add<&ExecutionContextImpl::kvPut>("env", "kvPut");
-      rhf_t::add<&ExecutionContextImpl::putSequential>("env", "putSequential");
       rhf_t::add<&ExecutionContextImpl::kvRemove>("env", "kvRemove");
       rhf_t::add<&ExecutionContextImpl::kvGet>("env", "kvGet");
-      rhf_t::add<&ExecutionContextImpl::getSequential>("env", "getSequential");
       rhf_t::add<&ExecutionContextImpl::kvGreaterEqual>("env", "kvGreaterEqual");
       rhf_t::add<&ExecutionContextImpl::kvLessThan>("env", "kvLessThan");
       rhf_t::add<&ExecutionContextImpl::kvMax>("env", "kvMax");
@@ -379,6 +378,7 @@ namespace psibase
       rhf_t::add<&ExecutionContextImpl::socketOpen>("env", "socketOpen");
       rhf_t::add<&ExecutionContextImpl::socketSend>("env", "socketSend");
       rhf_t::add<&ExecutionContextImpl::socketSetFlags>("env", "socketSetFlags");
+      rhf_t::add<&ExecutionContextImpl::readFile>("env", "readFile");
    }
 
    std::uint32_t ExecutionContext::remainingStack() const

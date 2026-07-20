@@ -6,12 +6,14 @@ use psibase::*;
 impl BillingConfig {
     pub fn initialize(fee_receiver: AccountNumber) {
         let table = BillingConfigTable::read_write();
-        check(
+        assert!(
             table.get_index_pk().get(&()).is_none(),
             "Billing already initialized",
         );
 
-        let sys = check_some(Tokens::call().getSysToken(), "System token not found");
+        let sys = Tokens::call()
+            .getSysToken()
+            .expect("System token not found");
 
         table
             .put(&BillingConfig {
@@ -27,15 +29,18 @@ impl BillingConfig {
     }
 
     pub fn get_assert() -> Self {
-        check_some(
-            BillingConfigTable::read().get_index_pk().get(&()),
-            "Billing not yet initialized",
-        )
+        BillingConfigTable::read()
+            .get_index_pk()
+            .get(&())
+            .expect("Billing not yet initialized")
     }
 
     pub fn enable(enabled: bool) {
         let table = BillingConfigTable::read_write();
-        let mut config = check_some(table.get_index_pk().get(&()), "Billing not yet initialized");
+        let mut config = table
+            .get_index_pk()
+            .get(&())
+            .expect("Billing not yet initialized");
         config.enabled = enabled;
         table.put(&config).unwrap();
     }

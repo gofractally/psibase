@@ -15,6 +15,7 @@ postinstall = [{ sender = "chainmail", service = "chainmail", method = "init" }]
 
 [dependencies]
 psibase.workspace = true
+psibase_service.workspace = true
 async-graphql.workspace = true
 serde.workspace = true
 psibase-user-workspace-hack.workspace = true

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { zAccount } from "@/lib/zod/Account";
+import { zAccount } from "@shared/lib/schemas/account";
 
 export const zLocalContact = z.object({
     account: zAccount,

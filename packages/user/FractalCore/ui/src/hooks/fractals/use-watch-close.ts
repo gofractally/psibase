@@ -1,4 +1,4 @@
-import { EvaluationStatus } from "@/lib/getStatus";
+import { EvaluationStatus } from "@/lib/get-status";
 
 import { useGuildAccount } from "../use-guild-account";
 import { useCloseEvaluation } from "./use-close-evaluation";

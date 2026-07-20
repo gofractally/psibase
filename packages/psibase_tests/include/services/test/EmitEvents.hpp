@@ -17,7 +17,7 @@ namespace TestService
 
    struct EmitEvents : psibase::Service
    {
-      static constexpr auto service = psibase::AccountNumber{"event-service"};
+      static constexpr auto service = psibase::AccountNumber{"event-svc"};
 
       struct Events
       {

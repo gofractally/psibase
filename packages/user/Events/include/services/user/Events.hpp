@@ -48,23 +48,61 @@ namespace UserService
    {
       static constexpr psibase::AccountNumber service{"events"};
 
-      using Tables = psibase::ServiceTables<SecondaryIndexTable>;
+      using Tables =
+          psibase::ServiceTables<SecondaryIndexTable, EventNumberTable, EventMerkleTable>;
+      using WriteOnly = psibase::WriteOnlyTables<EventTable, EventTable>;
+
+      void init();
 
       /// Requests an index. Indexes can improve the performance of queries involving
       /// the column. The indexes are subjective and MAY be adjusted by individual nodes.
       /// Indexes increase the CPU cost of transactions that create events.
       /// Block producers SHOULD use exactly the indexes requested by services
       /// to ensure consistent billing.
-      void addIndex(psibase::DbId          db,
+      void addIndex(EventDb                db,
                     psibase::AccountNumber service,
                     psibase::MethodNumber  event,
                     std::uint8_t           column);
 
+      /// Writes an event to the event log
+      psibase::EventNumber event(EventDb db, psibase::MethodNumber type, std::vector<char> rawData);
+
+      /// Returns the current event merkle root
+      ///
+      /// This must be called by transact in every transaction that
+      /// sends merkle events. After it is called, no more merkle events
+      /// can be sent. transact is responsible for storing the merkle
+      /// root in the block header.
+      psibase::Checksum256 saveMerkle();
+
+      EventTable openEvents(EventDb db, psibase::KvMode mode)
+      {
+         auto tables = WriteOnly{service, mode};
+         switch (db)
+         {
+            case EventDb::historyEvent:
+               return tables.open<0>();
+            case EventDb::merkleEvent:
+               return tables.open<1>();
+            default:
+               psibase::abortMessage("Invalid event db");
+         }
+      }
+
+      /// Resets merkle state for a new block
+      void startBlock();
+
       /// Forwards to event-index::sync
       void sync();
    };
-   PSIO_REFLECT(EventConfig, method(addIndex, db, service, event, column), method(sync))
-   PSIBASE_REFLECT_TABLES(EventConfig, EventConfig::Tables)
+   PSIO_REFLECT(EventConfig,
+                method(init),
+                method(addIndex, db, service, event, column),
+                method(event, db, type, rawData),
+                method(saveMerkle),
+                method(startBlock),
+                method(sync))
+   PSIBASE_REFLECT_TABLES(EventConfig, EventConfig::Tables, EventConfig::WriteOnly)
 
    using Events = EventConfig;
 

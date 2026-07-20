@@ -20,8 +20,7 @@ package = "host:prompt"
 world = "impl"
 
 [package.metadata.component.target.dependencies]
-"clientdata:plugin" = { path = "../../../ClientData/plugin/wit/world.wit" }
-"accounts:plugin" = { path = "../../../../system/Accounts/plugin/accounts/wit/world.wit" }
 "host:common" = { path = "../common/wit/world.wit" }
+"host:db" = { path = "../db/wit/world.wit" }
 "host:types" = { path = "../types/wit/world.wit" }
 "supervisor:bridge" = { path = "./wit/deps/supervisor.wit" }

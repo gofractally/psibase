@@ -3,7 +3,7 @@ import { useProfile } from "@shared/hooks/use-profile";
 import { cn } from "@shared/lib/utils";
 
 import { LocalContact } from "../types";
-import { formatNames } from "../utils/formatNames";
+import { formatNames } from "../utils/format-names";
 
 export const ContactItem = ({
     contact,
@@ -14,9 +14,7 @@ export const ContactItem = ({
     isSelected: boolean;
     onSelect: () => void;
 }) => {
-    const { data: profile } = useProfile(contact.account, true, {
-        baseUrlIncludesSibling: false,
-    });
+    const { data: profile } = useProfile(contact.account, true, {});
 
     const [primaryName, secondaryName] = formatNames(
         contact.nickname,

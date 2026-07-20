@@ -59,9 +59,8 @@ namespace SystemService
 
    void SetCode::init()
    {
-      auto refsTable = Tables{}.open<CodeRefCountTable>();
-      auto codeTable =
-          Table<CodeRow, &CodeRow::codeNum>{CodeRow::db, psio::convert_to_key(codePrefix())};
+      auto refsTable   = Tables{}.open<CodeRefCountTable>();
+      auto codeTable   = Native::tables().open<CodeTable>();
       auto stagedTable = Tables{}.open<StagedCodeTable>();
       // clear ref counts table
       for (auto row : refsTable.getIndex<0>())

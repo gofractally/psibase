@@ -20,7 +20,7 @@ class TestExceptionExit(unittest.TestCase):
 
         def long_query(api):
             try:
-                api.get('/', service='s-keep-sock')
+                api.get('/', service='s-keepsock')
             except ConnectionError:
                 pass
 

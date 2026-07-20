@@ -30,6 +30,10 @@ namespace psibase
       friend bool operator==(const Action&, const Action&) = default;
       PSIO_REFLECT(Action, sender, service, method, rawData)
    };
+   inline constexpr bool psio_custom_schema(Action*)
+   {
+      return true;
+   }
 
    struct GenesisService
    {
@@ -265,7 +269,8 @@ namespace psibase
       // TransactionInfo.
       Checksum256 trxMerkleRoot;
       // The merkle root of events generated while processing the block.
-      // The leaves have type EventInfo.
+      // It is zero-initialized at the start of a block and
+      // may be updated by services.
       Checksum256 eventMerkleRoot;
 
       // If newConsensus is set, activates joint consensus on
@@ -306,14 +311,6 @@ namespace psibase
       Checksum256 signatureHash;
       Checksum256 subjectiveDataHash;
       PSIO_REFLECT(TransactionInfo, transactionId, signatureHash, subjectiveDataHash)
-   };
-
-   struct EventInfo
-   {
-      std::uint64_t id;
-      // TODO: Should we use a hash instead of including the data directly?
-      std::span<const char> data;
-      PSIO_REFLECT(EventInfo)
    };
 
    // TODO: switch fields to shared_view_ptr?

@@ -1,6 +1,6 @@
-import { NumericType, isNumericType } from "./NumericConstraints";
-import { withArgs } from "./RpcUtils";
-import { camelCase } from "./StringUtils";
+import { NumericType, isNumericType } from "./numeric-constraints";
+import { withArgs } from "./rpc-utils";
+import { camelCase } from "./string-utils";
 import { Schema, TypeDefinition } from "./types";
 
 // Type definitions

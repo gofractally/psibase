@@ -96,6 +96,12 @@ namespace psibase
                  logger, "BlockId", boost::log::attributes::constant< ::psibase::Checksum256>(id))};
       }
 
+      // Fixes anything that is not allowed in a log message
+      // - control characters except tabs
+      // More may be added in the future. This conversion may
+      // not be reversible.
+      std::string sanitize(std::string message);
+
    }  // namespace loggers
 
 #define PSIBASE_LOG(logger, log_level) BOOST_LOG_SEV(logger, psibase::loggers::level::log_level)

@@ -32,7 +32,10 @@ fn get_sender_app() -> Result<AccountNumber, ErrorType> {
 pub fn check_app_origin(owner: AccountNumber) -> Result<(), ErrorType> {
     let sender = get_sender_app()?;
 
-    if sender != owner && sender != psibase::services::evaluations::SERVICE {
+    if sender != owner
+        && sender != psibase::services::evaluations::SERVICE
+        && sender != psibase::services::guilds::SERVICE
+    {
         return Err(ErrorType::InvalidSender(sender.to_string()).into());
     }
     Ok(())

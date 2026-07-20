@@ -66,7 +66,7 @@ TEST_CASE("ec")
                          .sender  = sue,
                          .service = AccountNumber{"nop"},
                      }})))
-             .failed("transaction does not include a claim for the key"));
+             .failed("Authorization for sue -> nop:: failed"));
    t.startBlock(0);
 
    auto ec_trx = t.makeTransaction({{
@@ -106,7 +106,7 @@ TEST_CASE("ec")
                                            .service = AccountNumber{"nop"},
                                        }}),
                                        {{pub_key2, priv_key2}}))
-             .failed("transaction does not include a claim for the key"));
+             .failed("Authorization for sue -> nop:: failed"));
    t.startBlock(0);
 
    CHECK(TraceResult(t.pushTransaction(t.makeTransaction({{

@@ -276,8 +276,8 @@ pub fn process_service_tables(
             const TABLE_INDEX: u16 = #table_index;
             const SERVICE: #psibase_mod::AccountNumber = <TablesWrapper as #psibase_mod::ServiceTablesWrapper>::SERVICE;
 
-            fn with_prefix(db_id: #psibase_mod::DbId, prefix: Vec<u8>, mode: #psibase_mod::KvMode) -> Self {
-                #table_name_id{db: #psibase_mod::KvHandle::new(db_id, &prefix, mode), prefix: Vec::new()}
+            fn from_handle(handle: #psibase_mod::KvHandle) -> Self {
+                #table_name_id{db: handle, prefix: Vec::new()}
             }
 
             fn prefix(&self) -> &[u8] {

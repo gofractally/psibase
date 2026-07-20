@@ -80,7 +80,7 @@ pub struct BufferConfig {
 /// After each of the above steps, the billing service will be enabled, and users will be
 /// required to buy resources to transact with the network. Use the other actions in this
 /// service to manage server specs, network variables, and billing parameters, as needed.
-#[crate::service(name = "virtual-server", dispatch = false, psibase_mod = "crate")]
+#[crate::service(name = "vserver", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use super::{BufferConfig, NetworkVariables, ServerSpecs};
@@ -394,7 +394,7 @@ mod service {
     }
 
     #[event(history)]
-    fn consumed(account: AccountNumber, resource: u8, amount: u64, cost: u64) {}
+    fn consumed(account: AccountNumber, resource: u8, amount: i64, cost: i64) {}
 
     #[event(history)]
     fn subsidized(
@@ -406,7 +406,7 @@ mod service {
     }
 
     #[event(history)]
-    fn block_summary(block_num: BlockNum, net_usage_ppm: u32, cpu_usage_ppm: u32) {}
+    fn block_summary(net_usage_ppm: u32, cpu_usage_ppm: u32) {}
 }
 
 #[test]

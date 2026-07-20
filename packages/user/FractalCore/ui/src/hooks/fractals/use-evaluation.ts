@@ -3,8 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import {
     Evaluation,
     getEvaluation,
-} from "@/lib/graphql/evaluations/getEvaluation";
-import QueryKey from "@/lib/queryKeys";
+} from "@/lib/graphql/evaluations/get-evaluation";
+import QueryKey from "@/lib/query-keys";
 
 export const useEvaluation = (evaluationId: number | undefined | null) =>
     useQuery<Evaluation>({

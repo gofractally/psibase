@@ -37,7 +37,7 @@ pub mod Hooks {
     }
 }
 
-#[crate::service(name = "evaluations", dispatch = false, psibase_mod = "crate")]
+#[crate::service(name = "evaluation", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 pub mod Service {
     use crate::AccountNumber;
@@ -54,7 +54,7 @@ pub mod Service {
     /// * `use_hooks` - Flag to enable or disable hooks for the evaluation.
     ///
     /// # Returns
-    /// The ID of the newly created evaluation.    
+    /// The ID of the newly created evaluation.
     #[action]
     fn create(
         registration: u32,
@@ -158,6 +158,45 @@ pub mod Service {
     /// * `registrant` - The account number of the user to unregister.
     #[action]
     fn unregister(owner: AccountNumber, evaluation_id: u32, registrant: AccountNumber) {
+        unimplemented!()
+    }
+
+    /// Gets the schedule of an evaluation.
+    ///
+    /// # Arguments
+    /// * `owner` - The account number of the evaluation owner.
+    /// * `evaluation_id` - The ID of the evaluation.
+    ///
+    /// # Returns
+    /// The `(registration, deliberation, submission, finish_by)` unix seconds timestamps,
+    /// or `None` if the evaluation does not exist.
+    #[action]
+    fn get_sched(owner: AccountNumber, evaluation_id: u32) -> Option<(u32, u32, u32, u32)> {
+        unimplemented!()
+    }
+
+    /// Gets the accounts of all users registered for an evaluation.
+    ///
+    /// # Arguments
+    /// * `owner` - The account number of the evaluation owner.
+    /// * `evaluation_id` - The ID of the evaluation.
+    #[action]
+    fn get_users(owner: AccountNumber, evaluation_id: u32) -> Vec<AccountNumber> {
+        unimplemented!()
+    }
+
+    /// Gets the accounts of the users in a group of an evaluation.
+    ///
+    /// # Arguments
+    /// * `owner` - The account number of the evaluation owner.
+    /// * `evaluation_id` - The ID of the evaluation.
+    /// * `group_number` - The group number within the evaluation.
+    #[action]
+    fn get_grp_users(
+        owner: AccountNumber,
+        evaluation_id: u32,
+        group_number: u32,
+    ) -> Vec<AccountNumber> {
         unimplemented!()
     }
 

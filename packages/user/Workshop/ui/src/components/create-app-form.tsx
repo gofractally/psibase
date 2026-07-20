@@ -2,8 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { Account } from "@/lib/zodTypes";
-
+import { zAccount } from "@shared/lib/schemas/account";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Form,
@@ -17,7 +16,7 @@ import {
 import { Input } from "@shared/shadcn/ui/input";
 
 const FormSchema = z.object({
-    appName: Account,
+    appName: zAccount,
 });
 
 type FormSchemaType = z.infer<typeof FormSchema>;

@@ -39,6 +39,12 @@ if (!projectDir.includes('common-lib')) {
     });
 }
 
+// shared-ui is consumed by packages as source via the @shared/* path alias,
+// so there is no build output to validate.
+buildDirs.push({
+    source: path.resolve(scriptDir, 'shared-ui'),
+});
+
 if (shouldSkipBuild(projectDir, buildDirs)) {
     process.exit(0);
 }

@@ -17,6 +17,7 @@
 *.pem
 build
 build-*
+psidk-book.tar.gz
 CMakeCache.txt
 CMakeFiles
 compile_commands.json

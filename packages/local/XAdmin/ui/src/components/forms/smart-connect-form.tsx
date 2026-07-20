@@ -1,9 +1,10 @@
-import { queryKeys } from "@/lib/queryKeys";
+import { queryKeys } from "@/lib/query-keys";
+
+import { queryClient } from "@shared/lib/query-client";
 
 import { Schema, UrlForm } from "../../components/forms/url";
 import { useToast } from "../../components/ui/use-toast";
-import { useConnect } from "../../hooks/useConnect";
-import { queryClient } from "../../main";
+import { useConnect } from "../../hooks/use-connect";
 
 interface Props {
     onConnection: () => void;
@@ -18,9 +19,7 @@ export const SmartConnectForm = ({ onConnection }: Props) => {
         queryClient.invalidateQueries({ queryKey: queryKeys.config });
         toast({
             title: "Success",
-            description: `Connected to ${
-                res.newPeer.url || res.newPeer.endpoint
-            }.`,
+            description: `Connected to ${res.urls[0] || res.endpoint}.`,
         });
         onConnection();
     };

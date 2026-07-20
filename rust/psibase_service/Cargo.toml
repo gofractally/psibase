@@ -1,0 +1,9 @@
+[package]
+name = "psibase_service"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+psibase.workspace = true
+psibase-rust-workspace-hack.workspace = true

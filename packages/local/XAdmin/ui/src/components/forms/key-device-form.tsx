@@ -15,7 +15,7 @@ import {
 import { Input } from "@shared/shadcn/ui/input";
 import { RadioGroup, RadioGroupItem } from "@shared/shadcn/ui/radio-group";
 
-import { useKeyDevices, useUnlockKeyDevice } from "../../hooks/useKeyDevices";
+import { useKeyDevices, useUnlockKeyDevice } from "../../hooks/use-key-devices";
 
 interface Props {
     form: UseFormReturn<z.infer<typeof KeyDeviceSchema>>;

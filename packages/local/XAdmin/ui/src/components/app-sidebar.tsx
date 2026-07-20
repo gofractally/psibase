@@ -17,9 +17,9 @@ import {
     SidebarMenuItem,
 } from "@shared/shadcn/ui/sidebar";
 
-import { useConfig } from "../hooks/useConfig";
-import { useKeyDevices } from "../hooks/useKeyDevices";
-import { useStatuses } from "../hooks/useStatuses";
+import { useConfig } from "../hooks/use-config";
+import { useKeyDevices } from "../hooks/use-key-devices";
+import { useStatuses } from "../hooks/use-statuses";
 import { routes } from "../routing";
 import { MenuContent } from "./menu-content";
 

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { EvervaultCard } from "@/components/ui/evervault-card";
 import { FlipWords } from "@/components/ui/flip-words";
 
-import { EaseIn } from "@/components/EaseIn";
+import { EaseIn } from "@/components/ease-in";
 
 const words: string[] = [
     "started",

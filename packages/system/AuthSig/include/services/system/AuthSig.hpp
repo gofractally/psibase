@@ -50,7 +50,7 @@ namespace SystemService
          /// transaction.
          ///
          /// This action verifies that the transaction contains a claim for the user's public key.
-         void checkAuthSys(uint32_t                    flags,
+         bool checkAuthSys(uint32_t                    flags,
                            psibase::AccountNumber      requester,
                            psibase::AccountNumber      sender,
                            ServiceMethod               action,
@@ -71,6 +71,9 @@ namespace SystemService
          /// This is the public key that must be claimed by the transaction whenever a sender using this auth service
          /// submits a transaction.
          void setKey(SubjectPublicKeyInfo key);
+
+         /// Get the accounts this auth service delegates authority to for a sender.
+         std::vector<psibase::AccountNumber> getDlgsSys(psibase::AccountNumber sender);
 
          /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
          /// transaction from a specified sender.
@@ -103,6 +106,7 @@ namespace SystemService
                    method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                    method(canAuthUserSys, user),
                    method(setKey, key),
+                   method(getDlgsSys, sender),
                    method(isAuthSys, sender, authorizers),
                    method(isRejectSys, sender, rejecters),
                    method(newAccount, name, key)

@@ -1,4 +1,4 @@
-import type { PendingBalance } from "../../hooks/tokensPlugin/use-pending-balances";
+import type { PendingBalance } from "../../hooks/tokens-plugin/use-pending-balances";
 import type { PendingActionProps } from "../../pending";
 
 import { Loader2, Undo2 } from "lucide-react";
@@ -24,7 +24,7 @@ import {
     TooltipTrigger,
 } from "@shared/shadcn/ui/tooltip";
 
-import { useUncredit } from "../../hooks/tokensPlugin/use-uncredit";
+import { useUncredit } from "../../hooks/tokens-plugin/use-uncredit";
 import { zTransferFormMemo } from "../../lib/transfer-form-schema";
 
 export const CancelButton = ({

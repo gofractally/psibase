@@ -2,8 +2,8 @@ import { Gavel } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { useCurrentUser } from "@/hooks/use-current-user";
-
+import { useConnectAccount } from "@shared/hooks/use-connect-account";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Card,
@@ -14,9 +14,9 @@ import {
 } from "@shared/shadcn/ui/card";
 
 import { CreateFractalModal } from "../components/create-fractal-modal";
-import { LoginButton } from "../components/login-button";
 
 export const Loader = () => {
+    const { mutate: login } = useConnectAccount();
     const { data: currentUser, isPending } = useCurrentUser();
 
     const isLoggedIn = typeof currentUser === "string";
@@ -46,7 +46,6 @@ export const Loader = () => {
                     The fractals app allows users to create fractals and
                     participate in fractal governance.
                 </CardDescription>
-
                 <CardDescription>
                     {isLoggedIn
                         ? "Add a fractal to continue"
@@ -62,7 +61,9 @@ export const Loader = () => {
                             Add fractal
                         </Button>
                     ) : (
-                        <LoginButton isPendingCurrentUser={isPending} />
+                        <Button disabled={isPending} onClick={() => login()}>
+                            Login
+                        </Button>
                     )}
                 </CardFooter>
             </CardHeader>

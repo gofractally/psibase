@@ -6,7 +6,7 @@
         "data": {
             "name": "alice",
             "authService": "auth-any",
-            "requireNew": true
+            "requireMatch": true
         }
     },
     {
@@ -16,7 +16,7 @@
         "data": {
             "name": "bob",
             "authService": "auth-any",
-            "requireNew": true
+            "requireMatch": true
         }
     },
     {

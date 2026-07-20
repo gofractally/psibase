@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Usage: make_publisher.sh <ACCOUNT> <CHAIN_URL>
 #

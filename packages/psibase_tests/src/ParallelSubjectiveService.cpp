@@ -31,7 +31,7 @@ PSIO_REFLECT_TYPENAME(GeTable)
 struct ParallelSubjectiveService : psibase::Service
 {
    using Tables = psibase::SubjectiveTables<ParallelSubjectiveTable, GeTable>;
-   static constexpr auto             service      = psibase::AccountNumber{"psubjective"};
+   static constexpr auto             service      = psibase::AccountNumber{"psubj"};
    static constexpr auto             serviceFlags = psibase::CodeRow::isPrivileged;
    std::optional<psibase::HttpReply> serveSys(const psibase::HttpRequest& req);
 };

@@ -27,32 +27,81 @@ impl ActionAuthPlugins {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct ActionMetadata {
-    pub action: Action,
-    pub label: Option<String>,
-}
-
 thread_local! {
-    static CURRENT_ACTIONS_MEMORY: RefCell<Vec<ActionMetadata>> = RefCell::new(Vec::new());
+    static TX_ACTIONS: RefCell<Vec<Action>> = const { RefCell::new(Vec::new()) };
+    static LATCH: RefCell<Option<ProposeLatch>> = const { RefCell::new(None) };
 }
 
-pub struct CurrentActions;
-impl CurrentActions {
-    pub fn push(action: Action, label: Option<String>) {
-        CURRENT_ACTIONS_MEMORY.with(|mem| mem.borrow_mut().push(ActionMetadata { action, label }));
+pub struct ProposeLatch {
+    /// Account that subsequent actions added under this latch will use as their sender.
+    /// The actual sender for any particular action is stored in the action.
+    pub subsequent_action_sender: String,
+    pub actions: Vec<Action>,
+}
+
+pub struct TxActions;
+
+impl TxActions {
+    pub fn reset() {
+        TX_ACTIONS.with(|t| t.borrow_mut().clear());
     }
 
-    pub fn get() -> Vec<ActionMetadata> {
-        CURRENT_ACTIONS_MEMORY.with(|mem| mem.borrow().clone())
+    pub fn add(action: Action) {
+        TX_ACTIONS.with(|t| t.borrow_mut().push(action));
     }
 
-    pub fn has_actions() -> bool {
-        CURRENT_ACTIONS_MEMORY.with(|mem| !mem.borrow().is_empty())
+    pub fn is_empty() -> bool {
+        TX_ACTIONS.with(|t| t.borrow().is_empty())
+    }
+
+    pub fn take() -> Vec<Action> {
+        TX_ACTIONS.with(|t| std::mem::take(&mut *t.borrow_mut()))
+    }
+}
+
+impl ProposeLatch {
+    pub fn open(action_sender: String) {
+        LATCH.with(|l| {
+            let mut l = l.borrow_mut();
+            assert!(
+                l.is_none(),
+                "ProposeLatch::open called while a latch is open"
+            );
+            *l = Some(ProposeLatch {
+                subsequent_action_sender: action_sender,
+                actions: Vec::new(),
+            });
+        });
+    }
+
+    pub fn take() -> Option<ProposeLatch> {
+        LATCH.with(|l| l.borrow_mut().take())
+    }
+
+    pub fn add(action: Action) -> bool {
+        LATCH.with(|l| match l.borrow_mut().as_mut() {
+            Some(latch) => {
+                latch.actions.push(action);
+                true
+            }
+            None => false,
+        })
+    }
+
+    pub fn subsequent_action_sender() -> Option<String> {
+        LATCH.with(|l| {
+            l.borrow()
+                .as_ref()
+                .map(|latch| latch.subsequent_action_sender.clone())
+        })
+    }
+
+    pub fn is_active() -> bool {
+        LATCH.with(|l| l.borrow().is_some())
     }
 
     pub fn clear() {
-        CURRENT_ACTIONS_MEMORY.with(|mem| mem.borrow_mut().clear());
+        LATCH.with(|l| *l.borrow_mut() = None);
     }
 }
 
@@ -118,36 +167,5 @@ impl ActionSenderHook {
 
     pub fn clear() {
         Keyvalue::delete(Self::KEY);
-    }
-}
-
-pub struct TxTransformLabel;
-impl TxTransformLabel {
-    const KEY_LABEL: &'static str = "tx_transform_label";
-    const KEY_PLUGIN: &'static str = "tx_transform_app";
-
-    pub fn set(transformer: String, label: Option<String>) {
-        Keyvalue::set(Self::KEY_LABEL, &label.packed());
-        Keyvalue::set(Self::KEY_PLUGIN, &transformer.packed());
-    }
-
-    pub fn get_transformer_plugin() -> Option<String> {
-        Keyvalue::get(Self::KEY_PLUGIN)
-            .map(|a| <String>::unpacked(&a).expect("Failed to unpack tx transform app"))
-    }
-
-    pub fn get_current_label() -> Option<String> {
-        Keyvalue::get(Self::KEY_LABEL).map_or(None, |a| {
-            <Option<String>>::unpacked(&a).expect("Failed to unpack tx transform label")
-        })
-    }
-
-    pub fn has() -> bool {
-        Keyvalue::get(Self::KEY_PLUGIN).is_some()
-    }
-
-    pub fn clear() {
-        Keyvalue::delete(Self::KEY_PLUGIN);
-        Keyvalue::delete(Self::KEY_LABEL);
     }
 }

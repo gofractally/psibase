@@ -24,4 +24,4 @@ world = "impl"
 "host:common" = { path = "../../Host/plugin/common/wit/world.wit" }
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
 "host:crypto" = { path = "../../Host/plugin/crypto/wit/world.wit" }
-"clientdata:plugin" = { path = "../../ClientData/plugin/wit/world.wit" }
+"host:db" = { path = "../../Host/plugin/db/wit/world.wit" }

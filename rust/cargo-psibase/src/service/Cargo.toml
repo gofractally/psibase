@@ -1,0 +1,11 @@
+[workspace]
+
+[package]
+name = "psibase-service"
+version = "1.0.0"
+edition = "2021"
+rust-version = "1.64"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]

@@ -135,6 +135,11 @@ impl TimePointUSec {
             seconds: self.microseconds / 1000000,
         }
     }
+    pub fn ceil_seconds(&self) -> TimePointSec {
+        TimePointSec {
+            seconds: (self.microseconds + 999999) / 1000000,
+        }
+    }
 }
 
 impl From<i64> for TimePointUSec {

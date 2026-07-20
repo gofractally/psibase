@@ -1,7 +1,7 @@
 use super::gql::Queryable;
 use crate::tables::{Attestation, AttestationStats};
 use crate::Wrapper as Identity;
-use psibase::AccountNumber;
+use psibase::{AccountNumber, Push, ServiceWrapper};
 use std::fmt::Debug;
 
 pub trait HasQueryFields {
@@ -17,8 +17,8 @@ pub struct PartialAttestation {
 impl PartialAttestation {
     pub fn new(attester: &str, subject: &str, value: u8) -> Self {
         Self {
-            attester: attester.into(),
-            subject: subject.into(),
+            attester: attester.parse().unwrap(),
+            subject: subject.parse().unwrap(),
             value,
         }
     }
@@ -37,7 +37,7 @@ pub struct PartialAttestationStats {
 impl PartialAttestationStats {
     pub fn new(subject: &str, unique_attesters: u16, num_high_conf_attestations: u16) -> Self {
         Self {
-            subject: subject.into(),
+            subject: subject.parse().unwrap(),
             uniqueAttesters: unique_attesters,
             numHighConfAttestations: num_high_conf_attestations,
         }
@@ -48,30 +48,12 @@ impl HasQueryFields for AttestationStats {
         "subject, uniqueAttesters, numHighConfAttestations, mostRecentAttestation";
 }
 
-// Todo: implement a ServiceWrapper trait on the Wrapper itself, instead of needing a wrapper object
-pub trait IsServiceWrapper {
-    const SERVICE: psibase::AccountNumber;
-    fn push_from(
-        chain: &psibase::Chain,
-        account: AccountNumber,
-    ) -> crate::Actions<psibase::ChainPusher>;
-}
-impl IsServiceWrapper for Identity {
-    const SERVICE: psibase::AccountNumber = Identity::SERVICE;
-    fn push_from(
-        chain: &psibase::Chain,
-        account: AccountNumber,
-    ) -> crate::Actions<psibase::ChainPusher> {
-        Identity::push_from(chain, account)
-    }
-}
-
-pub struct ChainPusher<'a, T: IsServiceWrapper> {
+pub struct ChainPusher<'a, T: ServiceWrapper> {
     chain: &'a psibase::Chain,
     _marker: core::marker::PhantomData<T>,
 }
 
-impl<'a, T: IsServiceWrapper> ChainPusher<'a, T> {
+impl<'a, T: ServiceWrapper> ChainPusher<'a, T> {
     fn new(chain: &'a psibase::Chain) -> Self {
         ChainPusher::<T> {
             chain,
@@ -80,8 +62,8 @@ impl<'a, T: IsServiceWrapper> ChainPusher<'a, T> {
     }
 
     /// Push an action from the specified account
-    pub fn from(&self, account: &str) -> crate::Actions<psibase::ChainPusher> {
-        T::push_from(self.chain, account.into())
+    pub fn from(&self, account: &str) -> T::Actions<psibase::ChainPusher<'a>> {
+        T::push_from(self.chain, account.parse().unwrap())
     }
 
     /// Make the specified graphql query on this service.
@@ -94,7 +76,7 @@ impl<'a, T: IsServiceWrapper> ChainPusher<'a, T> {
     }
 }
 
-pub fn init_identity_svc(chain: &psibase::Chain) -> ChainPusher<Identity> {
+pub fn init_identity_svc<'a>(chain: &'a psibase::Chain) -> ChainPusher<'a, Identity> {
     chain.new_account(psibase::account!("alice")).unwrap();
     chain.new_account(psibase::account!("bob")).unwrap();
     ChainPusher::<Identity>::new(&chain)

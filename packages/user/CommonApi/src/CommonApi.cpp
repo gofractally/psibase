@@ -1,6 +1,7 @@
 #include "services/system/CommonApi.hpp"
 
 #include <chrono>
+#include <psibase/check.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psio/to_json.hpp>
@@ -102,16 +103,18 @@ namespace SystemService
                 request.host[request.host.size() - rootHost.size() - 1] == '.')
                serviceName.assign(request.host.begin(), request.host.end() - rootHost.size() - 1);
             else
-               serviceName = HttpServer::homepageService.str();
+            {
+               abortMessage("Invalid host");
+            }
             return to_json(serviceName);
          }
          if (request.target == "/common/rootdomain")
             return to_json(to<HttpServer>().rootHost(request.host));
          if (request.target == "/common/tapos/head")
          {
-            auto [index, suffix] = headTapos();
+            auto [index, suffix] = to<Transact>().headTapos();
             auto json            = "{\"refBlockIndex\":" + std::to_string(index) +
-                        ",\"refBlockSuffix\":" + std::to_string(suffix) + "}";
+                                   ",\"refBlockSuffix\":" + std::to_string(suffix) + "}";
             return HttpReply{
                 .contentType = "application/json",
                 .body        = {json.begin(), json.end()},

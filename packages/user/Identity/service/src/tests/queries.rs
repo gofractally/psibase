@@ -4,19 +4,20 @@ use crate::{
         init_identity_svc, PartialAttestation, PartialAttestationStats,
     },
 };
+use psibase::account;
 
 #[psibase::test_case(packages("Identity"))]
 // ATTEST QUERY: verify first *high* confidence attestation is saved properly to table
 pub fn test_attestation_queries(chain: psibase::Chain) -> Result<(), psibase::Error> {
     let svc = init_identity_svc(&chain);
 
-    chain.new_account("alice".into())?;
-    chain.new_account("bob".into())?;
-    chain.new_account("carol".into())?;
+    chain.new_account(account!("alice"))?;
+    chain.new_account(account!("bob"))?;
+    chain.new_account(account!("carol"))?;
 
-    svc.from("carol").attest("bob".into(), 76).get()?;
-    svc.from("alice").attest("carol".into(), 77).get()?;
-    svc.from("alice").attest("bob".into(), 75).get()?;
+    svc.from("carol").attest(account!("bob"), 76).get()?;
+    svc.from("alice").attest(account!("carol"), 77).get()?;
+    svc.from("alice").attest(account!("bob"), 75).get()?;
 
     let all = svc.query::<Vec<Attestation>>("allAttestations");
     let all_expected = vec![
@@ -61,9 +62,9 @@ pub fn test_attestation_queries(chain: psibase::Chain) -> Result<(), psibase::Er
 pub fn test_empty_attestation_queries(chain: psibase::Chain) -> Result<(), psibase::Error> {
     let svc = init_identity_svc(&chain);
 
-    chain.new_account("alice".into())?;
-    chain.new_account("bob".into())?;
-    chain.new_account("carol".into())?;
+    chain.new_account(account!("alice"))?;
+    chain.new_account(account!("bob"))?;
+    chain.new_account(account!("carol"))?;
 
     let response = svc.query::<Vec<Attestation>>("allAttestations");
     assert!(response.len() == 0);
@@ -71,9 +72,9 @@ pub fn test_empty_attestation_queries(chain: psibase::Chain) -> Result<(), psiba
     let response = svc.query::<Vec<AttestationStats>>("allAttestationStats");
     assert!(response.len() == 0);
 
-    svc.from("carol").attest("bob".into(), 76).get()?;
-    svc.from("alice").attest("carol".into(), 77).get()?;
-    svc.from("alice").attest("bob".into(), 75).get()?;
+    svc.from("carol").attest(account!("bob"), 76).get()?;
+    svc.from("alice").attest(account!("carol"), 77).get()?;
+    svc.from("alice").attest(account!("bob"), 75).get()?;
 
     let response = svc.query::<Vec<Attestation>>(r#"attestationsByAttester(attester: "bob")"#);
     assert!(response.len() == 0);

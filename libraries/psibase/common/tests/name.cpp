@@ -5,22 +5,7 @@
 
 TEST_CASE("invalid-account-names-are-zeroed")
 {
-   auto acc = psibase::AccountNumber("9");
-   REQUIRE(acc.value == 0);
-
-   acc = psibase::AccountNumber("3");
-   REQUIRE(acc.value == 0);
-
-   acc = psibase::AccountNumber("1abc");
-   REQUIRE(acc.value == 0);
-
-   acc = psibase::AccountNumber("1234");
-   REQUIRE(acc.value == 0);
-
-   acc = psibase::AccountNumber("9asdf");
-   REQUIRE(acc.value == 0);
-
-   acc = psibase::AccountNumber("");
+   auto acc = psibase::AccountNumber("");
    REQUIRE(acc.value == 0);
 
    acc = psibase::AccountNumber("?");
@@ -44,27 +29,32 @@ TEST_CASE("invalid-account-names-are-zeroed")
 
 TEST_CASE("valid-account-names-check")
 {
-   REQUIRE(psibase::AccountNumber("a").value == 49158);
-   REQUIRE(psibase::AccountNumber("b").value == 184);
-   REQUIRE(psibase::AccountNumber("c").value == 16538);
-   REQUIRE(psibase::AccountNumber("abc123").value == 1754468116);
-   REQUIRE(psibase::AccountNumber("spiderman").value == 483466201442);
-   REQUIRE(psibase::AccountNumber("brucewayne").value == 132946582102463);
-   REQUIRE(psibase::AccountNumber("anthonystark").value == 183678712946955);
-   REQUIRE(psibase::AccountNumber("natasharomanoff").value == 5818245174062392369);
+   CHECK(psibase::AccountNumber("a").value == 331048532879956736);
+   CHECK(psibase::AccountNumber("b").value == 364153386167952384);
+   CHECK(psibase::AccountNumber("c").value == 397258239455948032);
+   CHECK(psibase::AccountNumber("abc123").value == 342084831226198272);
+   CHECK(psibase::AccountNumber("spiderman").value == 950660654012764416);
+   CHECK(psibase::AccountNumber("brucewayne").value == 389958816282596608);
+   CHECK(psibase::AccountNumber("a+0").value == 331048532879956736);
+   CHECK(psibase::AccountNumber("a+42").value == 331048532879956736 + 42);
+   CHECK(psibase::AccountNumber("a+9").value == 331048532879956736 + 9);
+   CHECK(psibase::AccountNumber("a+90").value == 331048532879956736 + 90);
+   CHECK(psibase::AccountNumber("spiderman+255").value == 950660654012764416 + 255);
 }
 
 TEST_CASE("convert-account-names-back-to-string")
 {
-   REQUIRE(psibase::AccountNumber(49158).str() == "a");
-   REQUIRE(psibase::AccountNumber(184).str() == "b");
-   REQUIRE(psibase::AccountNumber(16538).str() == "c");
-   REQUIRE(psibase::AccountNumber(1754468116).str() == "abc123");
-   REQUIRE(psibase::AccountNumber(483466201442).str() == "spiderman");
-   REQUIRE(psibase::AccountNumber(132946582102463).str() == "brucewayne");
-   REQUIRE(psibase::AccountNumber(183678712946955).str() == "anthonystark");
-   REQUIRE(psibase::AccountNumber(5818245174062392369).str() == "natasharomanoff");
-   REQUIRE(psibase::AccountNumber(0).str() == "");
+   CHECK(psibase::AccountNumber(331048532879956736).str() == "a");
+   CHECK(psibase::AccountNumber(364153386167952384).str() == "b");
+   CHECK(psibase::AccountNumber(397258239455948032).str() == "c");
+   CHECK(psibase::AccountNumber(342084831226198272).str() == "abc123");
+   CHECK(psibase::AccountNumber(950660654012764416).str() == "spiderman");
+   CHECK(psibase::AccountNumber(389958816282596608).str() == "brucewayne");
+   CHECK(psibase::AccountNumber(331048532879956736 + 42).str() == "a+42");
+   CHECK(psibase::AccountNumber(331048532879956736 + 9).str() == "a+9");
+   CHECK(psibase::AccountNumber(331048532879956736 + 90).str() == "a+90");
+   CHECK(psibase::AccountNumber(950660654012764416 + 255).str() == "spiderman+255");
+   CHECK(psibase::AccountNumber(0).str() == "");
 }
 
 TEST_CASE("invalid-method-names-are-zeroed")

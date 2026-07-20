@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { getMemberships } from "@/lib/graphql/fractals/getMemberships";
-import QueryKey, { OptionalAccount } from "@/lib/queryKeys";
+import { getMemberships } from "@/lib/graphql/get-memberships";
+import QueryKey, { OptionalAccount } from "@/lib/query-keys";
 
 export const useMemberships = (user: OptionalAccount) =>
     useQuery({

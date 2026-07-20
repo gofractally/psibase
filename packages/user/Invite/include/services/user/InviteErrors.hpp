@@ -25,6 +25,7 @@ namespace UserService
           "Resources provided for the invite are below the required minimum";
       constexpr std::string_view inviteIdTaken   = "Invite ID already taken";
       constexpr std::string_view inviteCorrupted = "Invite is corrupted";
+      constexpr std::string_view fprintInvalid   = "Fingerprint is invalid";
       constexpr std::string_view tooManyAccounts =
           "Invite with this many accounts is too expensive to create";
    }  // namespace Errors

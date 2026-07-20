@@ -29,3 +29,17 @@ export const getAccount = async (
         return undefined;
     }
 };
+
+export const zAccountNameStatus = z.enum(["Available", "Taken", "Invalid"]);
+
+export const isAccountAvailable = async (
+    accountName: string,
+): Promise<z.infer<typeof zAccountNameStatus>> => {
+    try {
+        const account = await getAccount(accountName);
+        return zAccountNameStatus.parse(account ? "Taken" : "Available");
+    } catch (e) {
+        console.error(e);
+        return zAccountNameStatus.parse("Invalid");
+    }
+};

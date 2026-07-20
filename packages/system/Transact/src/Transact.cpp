@@ -87,18 +87,25 @@ namespace SystemService
       check(getSender().value == 0, "Only native code may call startBlock");
       auto _ = recurse();
 
+      if (auto eventIndexer = open<EventIndexerTable>().get({}))
+      {
+         to<EventIndexerInterface>(eventIndexer->service).startBlock();
+      }
+
       Tables tables(Transact::service);
 
       // Add head block to BlockSummaryTable; processTransaction uses it to
       // verify TAPoS on transactions.
       tables.open<BlockSummaryTable>().put(getBlockSummary());
 
+      const auto& stat = getStatus();
+      emit().history().blockStart(stat.current.blockNum, stat.current.time);
+
       // Remove expired transaction IDs. The iteration limit on the loop helps to
       // mitigate a potential attack.
-      const auto& stat          = getStatus();
-      auto        includedTable = tables.open<IncludedTrxTable>();
-      auto        includedIndex = includedTable.getIndex<0>();
-      auto        includedEnd   = includedIndex.end();
+      auto includedTable = tables.open<IncludedTrxTable>();
+      auto includedIndex = includedTable.getIndex<0>();
+      auto includedEnd   = includedIndex.end();
       for (int i = 0; i < 20; ++i)
       {
          auto it = includedIndex.begin();
@@ -312,14 +319,9 @@ namespace SystemService
 
       if (transactStatus && transactStatus->enforceAuth)
       {
-         auto accountsTables = Accounts::Tables(Accounts::service, KvMode::read);
-         auto accountTable   = accountsTables.open<AccountTable>();
-         auto accountIndex   = accountTable.getIndex<0>();
-         auto account        = accountIndex.get(action.sender);
-         if (!account)
-            abortMessage("unknown sender \"" + action.sender.str() + "\"");
+         auto authService = to<Accounts>().getAuthOf(action.sender);
 
-         if (requester != account->authService)
+         if (requester != authService && requester != action.sender.base())
          {
             uint32_t flags = 0;
             if (requester == action.sender)
@@ -361,16 +363,19 @@ namespace SystemService
 
                if (!flags_str.empty())
                {
-                  psibase::writeConsole("Checking auth service " + account->authService.str() +
+                  psibase::writeConsole("Checking auth service " + authService.str() +
                                         " with flags: \n" + flags_str + "\n");
                }
             }
 
-            Actor<AuthInterface> auth(Transact::service, account->authService);
-            auth.checkAuthSys(flags, requester, action.sender,
-                              ServiceMethod{action.service, action.method}, allowedActions,
-                              std::vector<Claim>{});
-         }  // if (requester != account->authService)
+            Actor<AuthInterface> auth(Transact::service, authService);
+            if (!auth.checkAuthSys(flags, requester, action.sender,
+                                   ServiceMethod{action.service, action.method}, allowedActions,
+                                   std::vector<Claim>{}))
+            {
+               abortMessage("Not authorized");
+            }
+         }  // if (requester != authService)
       }  // if(enforceAuth)
 
       for (auto& a : allowedActions)
@@ -416,9 +421,17 @@ namespace SystemService
       return {};
    }
 
+   std::pair<uint8_t, uint32_t> Transact::headTapos()
+   {
+      return SystemService::headTapos();
+   }
+
    namespace
    {
-      bool checkTapos(const Checksum256& id, const Tapos& tapos, bool speculative)
+      bool checkTapos(const Checksum256& id,
+                      const Tapos&       tapos,
+                      bool               speculative,
+                      bool               isStartBlock)
       {
          auto statusTable =
              Transact{}.open<TransactStatusTable>(speculative ? KvMode::read : KvMode::readWrite);
@@ -432,7 +445,6 @@ namespace SystemService
          check(stat.current.time < tapos.expiration, "transaction has expired");
          check(tapos.expiration < stat.current.time + maxTrxLifetime,
                "transaction was submitted too early");
-
          auto transactStatus = statusIdx.get(std::tuple{});
 
          std::optional<BlockSummary> summary;
@@ -441,6 +453,31 @@ namespace SystemService
          else
             summary = summaryIdx.get(std::tuple<>{});
 
+         if (isStartBlock)
+         {
+            if (summary)
+            {
+               check(summary->blockNum + 1 >= getStatus().current.blockNum,
+                     "startBlock was not run in the previous block");
+               check(summary->blockNum + 1 == getStatus().current.blockNum,
+                     "startBlock has already been run");
+            }
+            check(!tapos.refBlockIndex && !tapos.refBlockSuffix,
+                  "tapos must be zero for startBlock");
+            return false;
+         }
+         else
+         {
+            if (!summary)
+            {
+               check(!getStatus().head, "startBlock has not been run");
+            }
+            else
+            {
+               check(summary->blockNum == getStatus().current.blockNum,
+                     "startBlock has not been run");
+            }
+         }
          if (transactStatus && transactStatus->bootTransactions)
          {
             auto& bootTransactions = *transactStatus->bootTransactions;
@@ -491,18 +528,12 @@ namespace SystemService
                      bool                      first,
                      bool                      readOnly)
       {
-         auto accountsTables = Accounts::Tables(Accounts::service);
-         auto accountTable   = accountsTables.open<AccountTable>();
-         auto accountIndex   = accountTable.getIndex<0>();
-
-         auto account = accountIndex.get(act.sender().unpack());
-         if (!account)
-            abortMessage("unknown sender \"" + act.sender().unpack().str() + "\"");
+         auto authService = to<Accounts>().getAuthOf(act.sender().unpack());
 
          if constexpr (enable_print)
             std::printf("call checkAuthSys on %s for sender account %s\n",
-                        account->authService.str().c_str(), act.sender().unpack().str().c_str());
-         Actor<AuthInterface> auth(Transact::service, account->authService);
+                        authService.str().c_str(), act.sender().unpack().str().c_str());
+         Actor<AuthInterface> auth(Transact::service, authService);
          uint32_t             flags = AuthInterface::topActionReq;
          if (first && !readOnly)
          {
@@ -517,16 +548,21 @@ namespace SystemService
          if (readOnly)
             flags |= AuthInterface::readOnlyFlag;
          // This can execute user defined code, so we must set the timer first
-         auth.checkAuthSys(flags, psibase::AccountNumber{}, act.sender(),
-                           ServiceMethod{act.service(), act.method()}, std::vector<ServiceMethod>{},
-                           claims);
+         if (!auth.checkAuthSys(flags, psibase::AccountNumber{}, act.sender(),
+                                ServiceMethod{act.service(), act.method()},
+                                std::vector<ServiceMethod>{}, claims))
+         {
+            abortMessage(std::format("Authorization for {} -> {}::{} failed",
+                                     act.sender().unpack().str(), act.service().unpack().str(),
+                                     act.method().unpack().str()));
+         }
       }
    }  // namespace
    bool Transact::checkFirstAuth(Checksum256 id, psio::view<const psibase::Transaction> trx)
    {
       check(trx.actions().size() > 0, "transaction has no actions");
       auto _           = recurse();
-      bool enforceAuth = checkTapos(id, trx.tapos(), true);
+      bool enforceAuth = checkTapos(id, trx.tapos(), true, false);
       if (enforceAuth)
          checkAuth(trx.actions().front(), trx.claims(), true, true);
       return enforceAuth;
@@ -565,7 +601,7 @@ namespace SystemService
       check(!includedIdx.get(std::tuple{tapos.expiration, id}), "duplicate transaction");
       includedTable.put({tapos.expiration, id});
 
-      bool enforceAuth = checkTapos(id, tapos, speculative);
+      bool enforceAuth = checkTapos(id, tapos, speculative, isStartBlock(trx));
 
       Actor<CpuLimit> cpuLimit(Transact::service, CpuLimit::service, CallFlags::runModeRpc);
       Actor<Accounts> accounts(Transact::service, Accounts::service);
@@ -628,6 +664,11 @@ namespace SystemService
          // Therefore, we do one more event indexer sync after useCpuSys, which will only index the new event (and uses
          // cached service schemas so isn't as expensive).
          to<EventIndexerInterface>(eventIndexer->service).sync();
+         auto mroot       = to<EventIndexerInterface>(eventIndexer->service).saveMerkle();
+         auto statusTable = Native::tables().open<StatusTable>();
+         auto status      = statusTable.get({}).value();
+         status.current.eventMerkleRoot = mroot;
+         statusTable.put(status);
       }
 
       trxData = std::span<const char>{};

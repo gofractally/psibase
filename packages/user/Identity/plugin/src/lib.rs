@@ -9,7 +9,6 @@ use bindings::host::common::server as CommonServer;
 use bindings::host::types::types as HostTypes;
 use bindings::transact::plugin::intf as Transact;
 use psibase::fracpack::Pack;
-use psibase::AccountNumber;
 
 use serde::{Deserialize, Serialize};
 
@@ -54,7 +53,7 @@ impl Api for IdentityPlugin {
         let int_score = (score * 100.0).trunc() as u8;
 
         let packed_a = identity::action_structs::attest {
-            subject: AccountNumber::from(subject.as_str()),
+            subject: subject.parse().unwrap(),
             value: int_score,
         }
         .packed();
