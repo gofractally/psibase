@@ -421,9 +421,7 @@ fn format_transaction_disk_usage_trace(
     f: &mut fmt::Formatter<'_>,
 ) -> fmt::Result {
     let total: i64 = ttrace.action_traces.iter().map(subtree_disk_net).sum();
-    write!(f, "Total disk usage: ")?;
-    write!(f, "{:+}", total)?;
-    writeln!(f, " bytes")?;
+    writeln!(f, "Total disk usage: {:+} bytes", total)?;
     writeln!(
         f,
         "{:>w1$}  {:>w2$}  action",
