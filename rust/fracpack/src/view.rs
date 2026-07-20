@@ -3,13 +3,62 @@ use std::marker::PhantomData;
 use std::ops::{Deref, Index};
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 
-// The end is always the end of the outermost object.
 #[repr(transparent)]
-pub struct View<T> {
+pub struct ViewData<T> {
     _phantom: PhantomData<T>,
     data: [u8],
 }
 
+trait MakeView {
+    type ViewType;
+}
+
+unsafe trait ViewExt<'a> {
+    type ValueType;
+    fn new_unchecked(data: &'a [u8]) -> &'a Self {
+        unsafe { &*(data as *const [u8] as *const View<T>) }
+    }
+    pub fn new(data: &'a [u8]) -> Result<&'a View<T>> {
+        T::verify_no_extra(data)?;
+        Ok(Self::new_unchecked(data))
+    }
+    pub fn unpack(&'a self) -> ValueType {
+        let mut stream = FracInputStream::new(&self.data);
+        if T::IS_OPTIONAL {
+            stream.known_end = false;
+            let mut fixed_pos = 0;
+            T::embedded_unpack(&mut stream, &mut fixed_pos).unwrap()
+        } else {
+            T::unpack(&mut stream).unwrap()
+        }
+    }
+}
+
+type View<T> = MakeView<T>::ViewType;
+
+#[repr(transparent)]
+struct StringView(ViewData<String>);
+impl MakeView for String {
+    type ViewType = StringView;
+}
+unsafe impl ViewExt for StringView {
+    type ValueType = String;
+}
+
+impl Deref for StringView {
+    type Target = str;
+    fn deref(&self) -> &str {
+        let mut stream = FracInputStream::new(&self.data);
+        <&str>::unpack(&mut stream).unwrap()
+    }
+}
+
+// Usage should be &View<T>
+
+// view!(BoxView<T>: Box<T>)
+
+
+/*
 impl<T> View<T> {
     fn new_unchecked<'b>(data: &'b [u8]) -> &'b View<T> {
         unsafe { &*(data as *const [u8] as *const View<T>) }
@@ -183,3 +232,4 @@ tuple_impls! {
     15 => (0 T0 get0 1 T1 get1 2 T2 get2 3 T3 get3 4 T4 get4 5 T5 get5 6 T6 get6 7 T7 get7 8 T8 get8 9 T9 get9 10 T10 get10 11 T11 get11 12 T12 get12 13 T13 get13 14 T14 get14)
     16 => (0 T0 get0 1 T1 get1 2 T2 get2 3 T3 get3 4 T4 get4 5 T5 get5 6 T6 get6 7 T7 get7 8 T8 get8 9 T9 get9 10 T10 get10 11 T11 get11 12 T12 get12 13 T13 get13 14 T14 get14 15 T15 get15)
 }
+ */

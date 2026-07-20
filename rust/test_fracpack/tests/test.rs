@@ -900,6 +900,13 @@ test_fracpack_macros::include_tests!(
 #[test]
 fn test_view() {
     {
+        let data = "asdf".to_string().packed();
+        let v = <View<String>>::new(&data).unwrap();
+        assert_eq!(v.find('d'), Some(2));
+        assert!(v.is_empty());
+    }
+    /*
+    {
         let data = vec![42u32, 7u32].packed();
         let v = <View<Vec<u32>>>::new(&data).unwrap();
         assert_eq!(v[0].unpack(), 42);
@@ -930,5 +937,6 @@ fn test_view() {
         assert_eq!(v.get1().unpack(), 7);
         assert_eq!(v.get2().unpack(), Some(42));
         assert_eq!(&v.get3().unpack().unwrap(), "jkl;");
-    }
+}
+    */
 }
