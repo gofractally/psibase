@@ -232,6 +232,10 @@ impl RateLimitPricing {
     pub fn get_billable_unit(&self) -> u64 {
         self.billable_unit
     }
+
+    pub fn is_full(&self) -> bool {
+        self.current_usage >= capacity(self.resource_id)
+    }
 }
 
 #[derive(SimpleObject)]

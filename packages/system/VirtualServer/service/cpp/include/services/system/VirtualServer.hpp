@@ -371,6 +371,9 @@ namespace SystemService
 
       UserService::Quantity get_resources(psibase::AccountNumber user);
 
+      /// Whether the current block can hold another transaction
+      bool can_push_tx();
+
       void notifyBlock(psibase::BlockNum block_num);
 
       /// A notification called before the start of a transaction that specifies the primary
@@ -441,6 +444,7 @@ namespace SystemService
                 method(finishTx),
                 method(useDiskSys, user, db_id, amount_bytes),
                 method(get_resources, user),
+                method(can_push_tx),
                 method(notifyBlock, block_num),
                 method(prestartTx, actor),
                 method(setBillableAcc, account),

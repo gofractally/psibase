@@ -479,6 +479,12 @@ mod service {
         unimplemented!()
     }
 
+    /// Whether the current block can hold another transaction
+    #[action]
+    fn can_push_tx() -> bool {
+        unimplemented!()
+    }
+
     #[action]
     fn notifyBlock(block_num: BlockNum) {
         unimplemented!()
