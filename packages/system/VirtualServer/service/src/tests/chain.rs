@@ -77,9 +77,15 @@ fn initial_setup(chain: &psibase::Chain) -> Result<(), psibase::Error> {
     tokens::Wrapper::push_from(chain, symbol)
         .credit(sys, alice, 100_000_0000u64.into(), "".into())
         .get()?;
+    tokens::Wrapper::push_from(chain, alice)
+        .debit(sys, symbol, 100_000_0000u64.into(), "".into())
+        .get()?;
 
     tokens::Wrapper::push_from(chain, symbol)
         .credit(sys, bob, 100_000_0000u64.into(), "".into())
+        .get()?;
+    tokens::Wrapper::push_from(chain, bob)
+        .debit(sys, symbol, 100_000_0000u64.into(), "".into())
         .get()?;
 
     chain.finish_block();
@@ -287,6 +293,9 @@ fn metering(chain: psibase::Chain) -> Result<(), psibase::Error> {
     tokens::Wrapper::push_from(&chain, alice)
         .credit(sys, PRODUCER_ACCOUNT, min_resource_buffer.into(), "".into())
         .get()?;
+    tokens::Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
+        .debit(sys, alice, min_resource_buffer.into(), "".into())
+        .get()?;
 
     // Verify filling resource buffer
     tokens::Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
@@ -313,6 +322,9 @@ fn metering(chain: psibase::Chain) -> Result<(), psibase::Error> {
     // Send some more tokens to the producer account
     tokens::Wrapper::push_from(&chain, alice)
         .credit(sys, PRODUCER_ACCOUNT, 50_000_0000.into(), "".into())
+        .get()?;
+    tokens::Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
+        .debit(sys, alice, 50_000_0000.into(), "".into())
         .get()?;
 
     // Verify enable billing
