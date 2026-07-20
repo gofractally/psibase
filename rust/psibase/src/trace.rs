@@ -3,7 +3,7 @@ use std::fmt;
 use crate::{
     method, schema_types,
     services::{db, transact, virtual_server},
-    AccountNumber, Action, DbId, Hex, MethodNumber, MethodString, Schema, SchemaMap, ServiceMethod,
+    AccountNumber, Action, Hex, MethodNumber, MethodString, Schema, SchemaMap, ServiceMethod,
     SharedAction,
 };
 use anyhow::anyhow;
@@ -288,8 +288,8 @@ fn format_transaction_trace(
 fn use_disk_sys_amount(action: &Action) -> Option<i64> {
     use crate as psibase;
     if action.service == virtual_server::SERVICE && action.method == method!("useDiskSys") {
-        let (_, _, amount) = <(AccountNumber, DbId, i64)>::unpacked(&action.rawData).ok()?;
-        Some(amount)
+        let args = virtual_server::action_structs::useDiskSys::unpacked(&action.rawData).ok()?;
+        Some(args.amount_bytes)
     } else {
         None
     }
