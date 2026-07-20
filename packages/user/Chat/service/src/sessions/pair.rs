@@ -16,7 +16,7 @@ pub fn canonical_pair_accounts(
     }
 }
 
-/// Deterministic pair transport session id (v2 chat-data transport).
+/// Deterministic pair transport session id.
 pub fn allocate_pair_session_id(a: AccountNumber, b: AccountNumber) -> String {
     let (lower, higher) = canonical_pair_accounts(a, b);
     format!("{PAIR_SESSION_PREFIX}{lower}:{higher}")
