@@ -26,14 +26,14 @@ fn test_create_group_chat_data_session(chain: psibase::Chain) -> Result<(), psib
     // Caller may pass a subset; group chat-data resolves to all Space members (N-party).
     let session = Wrapper::push_from(&chain, alice)
         .createSession(
-            group.space_uuid.clone(),
+            group.space_id.clone(),
             "chat-data".into(),
             vec![alice, bob],
         )
         .get()?;
 
     assert!(session.session_id.starts_with("wrtc:"));
-    assert_eq!(session.space_uuid, group.space_uuid);
+    assert_eq!(session.space_id, group.space_id);
     assert_eq!(session.purpose, "chat-data");
     assert_eq!(session.participants.len(), 3);
     assert!(session.participants.contains(&alice));
@@ -48,7 +48,7 @@ fn test_create_group_chat_data_session(chain: psibase::Chain) -> Result<(), psib
             .get()?;
         assert!(auth.authorized, "member {member} should be authorized");
         assert_eq!(auth.participants.len(), 3);
-        assert_eq!(auth.space_uuid, group.space_uuid);
+        assert_eq!(auth.space_id, group.space_id);
         assert_eq!(auth.purpose, "chat-data");
     }
 
@@ -76,7 +76,7 @@ fn test_create_group_session_rejects_non_space_member(
 
     let err = Wrapper::push_from(&chain, dave)
         .createSession(
-            group.space_uuid,
+            group.space_id,
             "chat-data".into(),
             vec![dave, alice, bob, carol],
         )
@@ -109,7 +109,7 @@ fn test_group_session_graphql_returns_full_participant_set(
         .get()?;
     let session = Wrapper::push_from(&chain, bob)
         .createSession(
-            group.space_uuid.clone(),
+            group.space_id.clone(),
             "chat-data".into(),
             vec![bob, alice, carol],
         )
@@ -121,13 +121,13 @@ fn test_group_session_graphql_returns_full_participant_set(
         Wrapper::SERVICE,
         &format!(
             r#"query {{
-                activeSession(spaceUuid: "{}", purpose: "chat-data") {{
+                activeSession(spaceId: "{}", purpose: "chat-data") {{
                     sessionId
                     participants
                 }}
                 session(sessionId: "{}") {{
                     sessionId
-                    spaceUuid
+                    spaceId
                     participants
                     purpose
                     status
@@ -136,10 +136,10 @@ fn test_group_session_graphql_returns_full_participant_set(
                 sessionJoinAuth(sessionId: "{}") {{
                     authorized
                     participants
-                    spaceUuid
+                    spaceId
                 }}
             }}"#,
-            group.space_uuid, session.session_id, session.session_id
+            group.space_id, session.session_id, session.session_id
         ),
         &token,
     )?;
@@ -153,7 +153,7 @@ fn test_group_session_graphql_returns_full_participant_set(
     assert_eq!(active_parts.len(), 3);
 
     let loaded = reply.pointer("/data/session").expect("session");
-    assert_eq!(loaded.get("spaceUuid"), Some(&json!(group.space_uuid)));
+    assert_eq!(loaded.get("spaceId"), Some(&json!(group.space_id)));
     assert_eq!(loaded.get("purpose"), Some(&json!("chat-data")));
     assert_eq!(loaded.get("status"), Some(&json!(1)));
     let participants = loaded
@@ -171,7 +171,7 @@ fn test_group_session_graphql_returns_full_participant_set(
         .and_then(|v| v.as_array())
         .expect("sessionJoinAuth participants");
     assert_eq!(auth_parts.len(), 3);
-    assert_eq!(join_auth.get("spaceUuid"), Some(&json!(group.space_uuid)));
+    assert_eq!(join_auth.get("spaceId"), Some(&json!(group.space_id)));
 
     Ok(())
 }
@@ -196,7 +196,7 @@ fn test_group_webrtc_session_event_joined_and_left(
         .get()?;
     let session = Wrapper::push_from(&chain, alice)
         .createSession(
-            group.space_uuid,
+            group.space_id,
             "chat-data".into(),
             vec![alice, bob, carol],
         )
@@ -286,7 +286,7 @@ fn test_group_authorize_session_join_rejects_non_member(
         .get()?;
     let session = Wrapper::push_from(&chain, alice)
         .createSession(
-            group.space_uuid,
+            group.space_id,
             "chat-data".into(),
             vec![alice, bob, carol],
         )

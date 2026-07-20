@@ -22,16 +22,17 @@ fn participants_for_session_uses_all_members_for_group_chat_data() {
 }
 
 #[test]
-fn participants_for_session_keeps_explicit_list_for_dm_chat_data() {
+fn participants_for_session_uses_all_members_for_dm_chat_data() {
     let alice = "alice".parse().unwrap();
     let bob = "bob".parse().unwrap();
     let members = vec![alice, bob];
 
+    // Explicit subset is ignored; DM sessions always include both members.
     let resolved = participants_for_session(
         crate::tables::SPACE_KIND_DM,
         PURPOSE_CHAT_DATA,
         &members,
-        &[bob, alice],
+        &[alice],
     );
     assert_eq!(resolved, vec![alice, bob]);
 }
@@ -49,7 +50,7 @@ fn participants_for_session_uses_all_members_for_group_av_call() {
 }
 
 #[test]
-fn participants_for_session_keeps_explicit_list_for_dm_av_call() {
+fn participants_for_session_uses_all_members_for_dm_av_call() {
     let alice = "alice".parse().unwrap();
     let bob = "bob".parse().unwrap();
     let members = vec![alice, bob];
@@ -58,7 +59,7 @@ fn participants_for_session_keeps_explicit_list_for_dm_av_call() {
         crate::tables::SPACE_KIND_DM,
         PURPOSE_AV_CALL,
         &members,
-        &[bob, alice],
+        &[alice],
     );
     assert_eq!(resolved, vec![alice, bob]);
 }
@@ -74,10 +75,10 @@ fn validate_session_participants_requires_sender_and_space_members() {
     assert_eq!(ok, vec![alice, bob]);
 
     let err = validate_session_participants(alice, &members, &[bob]).unwrap_err();
-    assert!(err.message().contains("caller must be included"));
+    assert!(err.to_string().contains("caller must be included"));
 
     let err = validate_session_participants(alice, &members, &[alice, carol]).unwrap_err();
-    assert!(err.message().contains("not a member of the space"));
+    assert!(err.to_string().contains("not a member of the space"));
 }
 
 #[test]
@@ -150,7 +151,7 @@ fn session_is_expired_when_now_at_or_past_expires_at() {
 
     let row = SessionRow {
         session_id: "wrtc:exp".into(),
-        space_uuid: "space:1".into(),
+        space_id: "space:1".into(),
         purpose: PURPOSE_CHAT_DATA.into(),
         status: SESSION_STATUS_ACTIVE,
         created_at: 0,
@@ -168,7 +169,7 @@ fn session_is_not_expired_when_expires_at_zero() {
 
     let row = SessionRow {
         session_id: "wrtc:no-exp".into(),
-        space_uuid: "space:1".into(),
+        space_id: "space:1".into(),
         purpose: PURPOSE_CHAT_DATA.into(),
         status: SESSION_STATUS_ACTIVE,
         created_at: 0,

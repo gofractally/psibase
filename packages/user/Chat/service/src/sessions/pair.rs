@@ -1,8 +1,8 @@
 use psibase::AccountNumber;
 
-use super::types::{
-    SessionJoinAuth, PAIR_SESSION_PREFIX, PURPOSE_CHAT_DATA, SESSION_STATUS_ACTIVE,
-};
+use crate::tables::SessionJoinAuth;
+
+use super::types::{PAIR_SESSION_PREFIX, PURPOSE_CHAT_DATA, SESSION_STATUS_ACTIVE};
 
 /// Canonical lex order for a two-account pair (stable initiator / pair id).
 pub fn canonical_pair_accounts(
@@ -46,7 +46,7 @@ pub(crate) fn authorize_pair_session_join(
         session_id: session_id.to_owned(),
         authorized,
         purpose: PURPOSE_CHAT_DATA.to_owned(),
-        space_uuid: String::new(),
+        space_id: String::new(),
         participants,
         status: SESSION_STATUS_ACTIVE,
         expires_at: 0,

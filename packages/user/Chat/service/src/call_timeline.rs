@@ -75,7 +75,7 @@ pub fn call_events_for_session(session_id: &str) -> Vec<CallEvent> {
         .into_iter()
         .filter_map(|row| {
             map_session_event_to_call_timeline(&row).map(|kind| CallEvent {
-                space_uuid: session.space_uuid.clone(),
+                space_id: session.space_id.clone(),
                 session_id: session_id.to_owned(),
                 kind,
                 account: row.account,
@@ -89,8 +89,8 @@ pub fn call_events_for_session(session_id: &str) -> Vec<CallEvent> {
 }
 
 /// All av-call timeline events for a Space (all objective sessions, any status).
-pub fn call_events_for_space(space_uuid: &str) -> Vec<CallEvent> {
-    let mut events: Vec<CallEvent> = sessions_for_space(space_uuid, PURPOSE_AV_CALL)
+pub fn call_events_for_space(space_id: &str) -> Vec<CallEvent> {
+    let mut events: Vec<CallEvent> = sessions_for_space(space_id, PURPOSE_AV_CALL)
         .into_iter()
         .flat_map(|row| call_events_for_session(&row.session_id))
         .collect();

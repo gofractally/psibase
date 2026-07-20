@@ -19,7 +19,7 @@ pub mod tables {
     #[derive(Debug, Clone, PartialEq, Eq, Fracpack, ToSchema, Serialize, Deserialize)]
     pub struct SpaceRow {
         #[primary_key]
-        pub space_uuid: String,
+        pub space_id: String,
         pub kind: u8,
         pub created_at: i64,
     }
@@ -27,25 +27,25 @@ pub mod tables {
     #[table(name = "SpaceMemberTable", index = 2)]
     #[derive(Debug, Clone, PartialEq, Eq, Fracpack, ToSchema, Serialize, Deserialize)]
     pub struct SpaceMemberRow {
-        pub space_uuid: String,
+        pub space_id: String,
         pub member: AccountNumber,
     }
 
     impl SpaceMemberRow {
         #[primary_key]
         fn pk(&self) -> (String, AccountNumber) {
-            (self.space_uuid.clone(), self.member)
+            (self.space_id.clone(), self.member)
         }
 
         #[secondary_key(1)]
         fn by_member_space(&self) -> (AccountNumber, String) {
-            (self.member, self.space_uuid.clone())
+            (self.member, self.space_id.clone())
         }
     }
 
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
     pub struct Space {
-        pub space_uuid: String,
+        pub space_id: String,
         pub members: Vec<AccountNumber>,
     }
 
@@ -54,7 +54,7 @@ pub mod tables {
     pub struct SessionRow {
         #[primary_key]
         pub session_id: String,
-        pub space_uuid: String,
+        pub space_id: String,
         pub purpose: String,
         pub status: u8,
         pub created_at: i64,
@@ -95,7 +95,7 @@ pub mod tables {
 
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
     pub struct CallEvent {
-        pub space_uuid: String,
+        pub space_id: String,
         pub session_id: String,
         pub kind: u8,
         pub account: AccountNumber,
@@ -106,7 +106,7 @@ pub mod tables {
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
     pub struct Session {
         pub session_id: String,
-        pub space_uuid: String,
+        pub space_id: String,
         pub purpose: String,
         pub participants: Vec<AccountNumber>,
         pub status: u8,
@@ -127,7 +127,7 @@ pub mod tables {
         pub session_id: String,
         pub authorized: bool,
         pub purpose: String,
-        pub space_uuid: String,
+        pub space_id: String,
         pub participants: Vec<AccountNumber>,
         pub status: u8,
         pub expires_at: i64,
@@ -141,10 +141,10 @@ pub mod spaces;
 
 #[psibase::service(name = "chat", tables = "tables")]
 pub mod service {
-    use crate::sessions::{self, SessionError};
+    use crate::sessions;
     use crate::spaces::{
         dm_members, group_members, open_space, space_with_members, spaces_for_user,
-        validate_group_members, SpaceError,
+        validate_group_members,
     };
     use crate::tables::{
         CallEvent, InitRow, InitTable, Session, SessionJoinAuth, Space, WebRtcSessionEvent,
@@ -153,44 +153,7 @@ pub mod service {
     use psibase::*;
 
     fn now_micros() -> i64 {
-        TransactSvc::call()
-            .currentBlock()
-            .time
-            .seconds()
-            .microseconds()
-            .microseconds
-    }
-
-    fn abort_on_space_err(result: Result<(), SpaceError>) {
-        if let Err(err) = result {
-            abort_message(&err.message());
-        }
-    }
-
-    fn abort_on_session_err<T>(result: Result<T, SessionError>) -> T {
-        match result {
-            Ok(value) => value,
-            Err(err) => abort_message(&err.message()),
-        }
-    }
-
-    fn session_view(session: sessions::Session) -> Session {
-        Session {
-            session_id: session.session_id,
-            space_uuid: session.space_uuid,
-            purpose: session.purpose,
-            participants: session.participants,
-            status: session.status,
-            expires_at: session.expires_at,
-            created_at: session.created_at,
-        }
-    }
-
-    fn open_space_or_abort(members: Vec<AccountNumber>) -> crate::tables::SpaceRow {
-        match open_space(members, now_micros()) {
-            Ok(row) => row,
-            Err(err) => abort_message(&err.message()),
-        }
+        TransactSvc::call().currentBlock().time.microseconds
     }
 
     #[action]
@@ -217,7 +180,7 @@ pub mod service {
             crate::spaces::sender_is_member(&members, sender),
             "caller must be included in space members",
         );
-        let row = open_space_or_abort(members);
+        let row = open_space(members, now_micros()).expect("open space");
         space_with_members(row)
     }
 
@@ -225,11 +188,8 @@ pub mod service {
     #[allow(non_snake_case)]
     fn ensureDm(contact: AccountNumber) -> Space {
         let sender = get_sender();
-        let members = match dm_members(sender, contact) {
-            Ok(m) => m,
-            Err(err) => abort_message(&err.message()),
-        };
-        let row = open_space_or_abort(members);
+        let members = dm_members(sender, contact).expect("invalid dm members");
+        let row = open_space(members, now_micros()).expect("open space");
         space_with_members(row)
     }
 
@@ -238,24 +198,24 @@ pub mod service {
     fn ensureGroup(other_members: Vec<AccountNumber>) -> Space {
         let sender = get_sender();
         let members = group_members(sender, other_members);
-        abort_on_space_err(validate_group_members(&members));
-        let row = open_space_or_abort(members);
+        validate_group_members(&members).expect("invalid group members");
+        let row = open_space(members, now_micros()).expect("open space");
         space_with_members(row)
     }
 
     #[action]
     #[allow(non_snake_case)]
-    fn getSpace(space_uuid: String) -> Option<Space> {
+    fn getSpace(space_id: String) -> Option<Space> {
         let row = crate::tables::SpaceTable::read()
             .get_index_pk()
-            .get(&space_uuid)?;
+            .get(&space_id)?;
         Some(space_with_members(row))
     }
 
     #[action]
     #[allow(non_snake_case)]
-    fn isSpaceMember(space_uuid: String, member: AccountNumber) -> bool {
-        crate::spaces::is_space_member(&space_uuid, member)
+    fn isSpaceMember(space_id: String, member: AccountNumber) -> bool {
+        crate::spaces::is_space_member(&space_id, member)
     }
 
     #[action]
@@ -271,31 +231,26 @@ pub mod service {
     #[action]
     #[allow(non_snake_case)]
     fn createSession(
-        space_uuid: String,
+        space_id: String,
         purpose: String,
         participants: Vec<AccountNumber>,
     ) -> Session {
         let sender = get_sender();
-        let session = abort_on_session_err(sessions::create_session(
-            &space_uuid,
+        sessions::create_session(
+            &space_id,
             &purpose,
             participants,
             sender,
             now_micros(),
-        ));
-        session_view(session)
+        )
+        .expect("createSession")
     }
 
     #[action]
     #[allow(non_snake_case)]
     fn closeSession(session_id: String, reason: String) {
         let sender = get_sender();
-        abort_on_session_err(sessions::close_session(
-            &session_id,
-            &reason,
-            sender,
-            now_micros(),
-        ));
+        sessions::close_session(&session_id, &reason, sender, now_micros()).expect("closeSession");
     }
 
     #[action]
@@ -306,34 +261,27 @@ pub mod service {
             account!("x-wrtcsig"),
             "permission denied: webrtcSessionEvent only callable by x-wrtcsig",
         );
-        abort_on_session_err(sessions::apply_webrtc_session_event(
-            sessions::WebRtcSessionEvent {
-                session_id: event.session_id,
-                kind: event.kind,
-                account: event.account,
-                reason: event.reason,
-            },
-            now_micros(),
-        ));
+        sessions::apply_webrtc_session_event(event, now_micros()).expect("webrtcSessionEvent");
     }
 
     #[action]
     #[allow(non_snake_case)]
     fn commitWebRtcSessionEvent(session_id: String, kind: u8, reason: String) {
         let sender = get_sender();
-        abort_on_session_err(sessions::commit_webrtc_session_event(
+        sessions::commit_webrtc_session_event(
             &session_id,
             kind,
             sender,
             &reason,
             now_micros(),
-        ));
+        )
+        .expect("commitWebRtcSessionEvent");
     }
 
     #[action]
     #[allow(non_snake_case)]
     fn getSession(session_id: String) -> Option<Session> {
-        sessions::session_row(&session_id).map(|row| session_view(sessions::session_to_view(row)))
+        sessions::session_row(&session_id).map(sessions::session_to_view)
     }
 
     #[action]
@@ -351,17 +299,7 @@ pub mod service {
     #[action]
     #[allow(non_snake_case)]
     fn authorizeSessionJoin(session_id: String, account: AccountNumber) -> SessionJoinAuth {
-        let auth = sessions::authorize_session_join(&session_id, account, now_micros());
-        SessionJoinAuth {
-            session_id: auth.session_id,
-            authorized: auth.authorized,
-            purpose: auth.purpose,
-            space_uuid: auth.space_uuid,
-            participants: auth.participants,
-            status: auth.status,
-            expires_at: auth.expires_at,
-            expired: auth.expired,
-        }
+        sessions::authorize_session_join(&session_id, account, now_micros())
     }
 }
 
