@@ -6,7 +6,7 @@ impl NetworkSpecs {
     fn derive_net(vars: &NetworkVariables, specs: &ServerSpecs) -> u64 {
         let net_bps = specs.net_bps;
         let max_bp_peers = Producers::call().getMaxProds();
-        check(
+        assert!(
             net_bps > vars.block_replay_factor as u64 * max_bp_peers as u64,
             "Insufficient network bandwidth",
         );
@@ -35,13 +35,13 @@ impl NetworkSpecs {
     }
 
     fn derive_storage(vars: &NetworkVariables, specs: &ServerSpecs) -> u64 {
-        check(
+        assert!(
             specs.storage_bytes >= vars.obj_storage_bytes,
             "Total server storage must exceed objective storage",
         );
 
         if let Some(network_specs) = NetworkSpecsTable::read().get_index_pk().get(&()) {
-            check(
+            assert!(
                 network_specs.obj_storage_bytes <= vars.obj_storage_bytes,
                 "Total objective storage amount cannot decrease",
             );
@@ -69,9 +69,9 @@ impl NetworkSpecs {
     }
 
     pub fn get_assert() -> Self {
-        check_some(
-            NetworkSpecsTable::read().get_index_pk().get(&()),
-            "Network specs not yet initialized",
-        )
+        NetworkSpecsTable::read()
+            .get_index_pk()
+            .get(&())
+            .expect("Network specs not yet initialized")
     }
 }

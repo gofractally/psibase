@@ -148,17 +148,16 @@ impl BandwidthPricing {
 
     fn update<F: FnOnce(&mut BandwidthPricing)>(resource_id: u8, f: F) {
         let table = BandwidthPricingTable::read_write();
-        let mut row = check_some(
-            table.get_index_pk().get(&resource_id),
-            &format!("resource {} not initialized", resource_id),
-        );
+        let mut row = table
+            .get_index_pk()
+            .get(&resource_id)
+            .expect(&format!("resource {} not initialized", resource_id));
         f(&mut row);
         table.put(&row).unwrap();
     }
 
     pub fn get_assert(resource_id: u8) -> Self {
-        let row = Self::get(resource_id);
-        check_some(row, &format!("resource {} not initialized", resource_id))
+        Self::get(resource_id).expect(&format!("resource {} not initialized", resource_id))
     }
 
     pub fn get(resource_id: u8) -> Option<Self> {
@@ -193,10 +192,10 @@ impl BandwidthPricing {
         // Round up to the nearest billable unit
         let amount_units = (amount + billable_unit - 1) / billable_unit;
 
-        let mut cost = check_some(
-            amount_units.checked_mul(price),
-            &format!("{} usage overflow", get_resource_name(self.resource_id)),
-        );
+        let mut cost = amount_units.checked_mul(price).expect(&format!(
+            "{} usage overflow",
+            get_resource_name(self.resource_id)
+        ));
 
         if !billing_enabled {
             cost = 0;
@@ -228,12 +227,12 @@ impl BandwidthPricing {
     }
 
     pub fn set_thresholds(&self, idle_ppm: u32, congested_ppm: u32) {
-        check(
+        assert!(
             idle_ppm < congested_ppm,
             "idle ppm must be less than congested ppm",
         );
-        check(idle_ppm > 0, "idle ppm must be greater than 0%");
-        check(
+        assert!(idle_ppm > 0, "idle ppm must be greater than 0%");
+        assert!(
             congested_ppm < PPM as u32,
             "congested ppm must be less than 100%",
         );
@@ -242,11 +241,11 @@ impl BandwidthPricing {
     }
 
     pub fn set_change_rates(&self, doubling_time_sec: u32, halving_time_sec: u32) {
-        check(
+        assert!(
             doubling_time_sec > 0,
             "doubling time must be greater than 0",
         );
-        check(halving_time_sec > 0, "halving time must be greater than 0");
+        assert!(halving_time_sec > 0, "halving time must be greater than 0");
 
         Self::update(self.resource_id, |r| {
             r.doubling_time_sec = doubling_time_sec;
@@ -266,6 +265,10 @@ impl BandwidthPricing {
 
     pub fn get_billable_unit(&self) -> u64 {
         self.billable_unit
+    }
+
+    pub fn is_full(&self) -> bool {
+        self.current_usage >= capacity(self.resource_id)
     }
 }
 

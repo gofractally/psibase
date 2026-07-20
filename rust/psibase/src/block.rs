@@ -390,7 +390,8 @@ pub struct BlockHeader {
     trxMerkleRoot: Checksum256,
 
     // The merkle root of events generated while processing the block.
-    // The leaves have type EventInfo.
+    // It is zero-initialized at the start of a block and
+    // may be updated by services..
     eventMerkleRoot: Checksum256,
 
     // If newConsensus is set, activates joint consensus on

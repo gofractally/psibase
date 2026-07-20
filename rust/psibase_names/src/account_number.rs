@@ -22,6 +22,9 @@ fn char_index(ch: u8) -> u64 {
     }
 }
 
+pub const MIN_ACCOUNT_NAME_LENGTH: u8 = 1;
+pub const MAX_ACCOUNT_NAME_LENGTH: u8 = 10;
+
 fn account_number_has_valid_format(s: &str) -> bool {
     if s.starts_with('-') || s.ends_with('-') || s.contains("--") {
         return false;
@@ -42,7 +45,10 @@ pub fn account_number_from_str(s: &str) -> u64 {
     if let Some((base, sub)) = s.split_once(SUBACCOUNT_SEPARATOR) {
         return account_number_from_str(base) + (sub.parse::<u8>().unwrap() as u64);
     }
-    if s.is_empty() || s.len() > 10 || !account_number_has_valid_format(s) {
+    if s.is_empty()
+        || s.len() > MAX_ACCOUNT_NAME_LENGTH as usize
+        || !account_number_has_valid_format(s)
+    {
         0
     } else {
         ACCOUNT_ENCODER.encode(s.bytes().map(|b| char_index(b)), 0) << 8

@@ -27,7 +27,7 @@ pub mod service {
 
             let add_index = |method: &str, column: u8| {
                 events::Wrapper::call().addIndex(
-                    DbId::HistoryEvent,
+                    EventDb::HistoryEvent,
                     Wrapper::SERVICE,
                     MethodNumber::from(method),
                     column,
@@ -43,8 +43,10 @@ pub mod service {
 
     #[pre_action(exclude(init))]
     fn check_init() {
-        let table = InitTable::read();
-        check_some(table.get_index_pk().get(&()), "service not initialized");
+        InitTable::read()
+            .get_index_pk()
+            .get(&())
+            .expect("service not initialized");
     }
 
     /// Create a new token
@@ -56,7 +58,7 @@ pub mod service {
     /// Returns the unique token identifier aka TID (u32)
     #[action]
     fn create(precision: Precision, max_issued_supply: Quantity) -> TID {
-        check(
+        assert!(
             max_issued_supply.value > 0,
             "Max issued supply must be greater than 0",
         );
@@ -533,11 +535,11 @@ pub mod service {
     /// * The system token can only be set once (changing system token is not yet supported)
     #[action]
     fn setSysToken(tokenId: TID) {
-        check(get_sender() == get_service(), "Unauthorized");
-        check(Token::get(tokenId).is_some(), "Token DNE");
+        assert_eq!(get_sender(), get_service(), "Unauthorized");
+        Token::get(tokenId).expect("Token DNE");
 
         let config_table = ConfigTable::new();
-        check(
+        assert!(
             config_table.get_index_pk().get(&()).is_none(),
             "Changing system token is not supported",
         );

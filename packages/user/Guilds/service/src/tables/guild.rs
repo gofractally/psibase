@@ -5,9 +5,7 @@ use psibase::services::fractals::weighted_normalization::{
     curves::{get_curve, Curve},
     weighted_normalization,
 };
-use psibase::{
-    check, check_none, check_some, get_sender, AccountNumber, Flags, Memo, ServiceWrapper, Table,
-};
+use psibase::{get_sender, AccountNumber, Flags, Memo, ServiceWrapper, Table};
 
 use crate::constants::{
     COUNCIL_SEATS, DEFAULT_CANDIDACY_COOLDOWN, DEFAULT_RANK_ORDERING_THRESHOLD,
@@ -70,7 +68,7 @@ impl Guild {
         council_role: AccountNumber,
         rep_role: AccountNumber,
     ) -> Self {
-        check_none(Self::get(guild), "guild already exists");
+        assert!(Self::get(guild).is_none(), "guild already exists");
 
         let new_guild_instance =
             Self::new(fractal, guild, rep, display_name, council_role, rep_role);
@@ -86,7 +84,7 @@ impl Guild {
     }
 
     pub fn set_candidacy_cooldown(&mut self, cooldown_seconds: u32) {
-        check(
+        assert!(
             cooldown_seconds <= MAX_CANDIDACY_COOLDOWN,
             "cooldown seconds breaches max limit",
         );
@@ -95,7 +93,7 @@ impl Guild {
     }
 
     pub fn set_rank_ordering_threshold(&mut self, rank_ordering_threshold: u8) {
-        check(
+        assert!(
             rank_ordering_threshold >= MIN_RANK_ORDERING_THRESHOLD,
             "minimum scorers is too low",
         );
@@ -108,7 +106,7 @@ impl Guild {
     }
 
     pub fn get_assert(account: AccountNumber) -> Self {
-        check_some(Self::get(account), "guild does not exist")
+        Self::get(account).expect("guild does not exist")
     }
 
     pub fn by_sender() -> Self {
@@ -222,10 +220,8 @@ impl Guild {
     }
 
     pub fn set_representative(&mut self, new_representative: AccountNumber) {
-        check_some(
-            GuildMember::get(self.account, new_representative),
-            "representative must be a guild member",
-        ); // Or must it?
+        GuildMember::get(self.account, new_representative)
+            .expect("representative must be a guild member");
         self.rep = Some(new_representative);
         self.save();
     }

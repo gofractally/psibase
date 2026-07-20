@@ -5,10 +5,7 @@ pub mod tables {
     use psibase::services::accounts::Wrapper as Accounts;
     use psibase::services::nft::{Wrapper as Nfts, NID};
     use psibase::services::tokens::{Decimal, Precision, Quantity};
-    use psibase::{
-        abort_message, check, check_none, check_some, get_sender, AccountNumber, Memo,
-        ServiceWrapper, TableRecord,
-    };
+    use psibase::{abort_message, get_sender, AccountNumber, Memo, ServiceWrapper, TableRecord};
     use psibase::{define_flags, Flags};
     use psibase::{Fracpack, Table, ToSchema};
     use serde::{Deserialize, Serialize};
@@ -38,21 +35,21 @@ pub mod tables {
         }
 
         pub fn get_assert() -> Self {
-            check_some(Self::get(), "init row does not exist")
+            Self::get().expect("init row does not exist")
         }
 
         pub fn init() {
-            check_none(Self::get(), "init row already exists");
+            assert!(Self::get().is_none(), "init row already exists");
             Self::new().save();
         }
 
         pub fn next_token_id() -> TID {
             let mut init_row = InitRow::get_assert();
 
-            let next_id = check_some(
-                init_row.last_used_id.checked_add(1),
-                "last_used_id overflowed",
-            );
+            let next_id = init_row
+                .last_used_id
+                .checked_add(1)
+                .expect("last_used_id overflowed");
             init_row.last_used_id = next_id;
             init_row.save();
             next_id
@@ -61,10 +58,10 @@ pub mod tables {
         pub fn next_subaccount_id() -> u64 {
             let mut init_row = InitRow::get_assert();
 
-            let next_id = check_some(
-                init_row.last_used_subaccount_id.checked_add(1),
-                "last_used_subaccount_id overflowed",
-            );
+            let next_id = init_row
+                .last_used_subaccount_id
+                .checked_add(1)
+                .expect("last_used_subaccount_id overflowed");
             init_row.last_used_subaccount_id = next_id;
             init_row.save();
 
@@ -74,10 +71,11 @@ pub mod tables {
         pub fn next_shared_bal_id() -> u64 {
             let mut init_row = InitRow::get_assert();
 
-            let next_id = check_some(
-                init_row.last_used_shared_bal_id.checked_add(1),
-                "last_used_shared_bal_id overflowed",
-            );
+            let next_id = init_row
+                .last_used_shared_bal_id
+                .checked_add(1)
+                .expect("last_used_shared_bal_id overflowed");
+
             init_row.last_used_shared_bal_id = next_id;
             init_row.save();
             next_id
@@ -129,7 +127,7 @@ pub mod tables {
         }
 
         pub fn get_assert(id: TID) -> Self {
-            check_some(Self::get(id), "Token DNE")
+            Self::get(id).expect("Token DNE")
         }
 
         pub fn get_by_symbol(symbol: AccountNumber) -> Option<Self> {
@@ -140,7 +138,7 @@ pub mod tables {
         fn check_is_owner(&self, account: AccountNumber) {
             let holder = self.nft_holder();
 
-            check(account == holder, "Missing required authority");
+            assert_eq!(account, holder, "Missing required authority");
         }
 
         pub fn add(precision: Precision, max_issued_supply: Quantity) -> Self {
@@ -173,10 +171,10 @@ pub mod tables {
         pub fn mint(&mut self, amount: Quantity) {
             let owner = get_sender();
             self.check_is_owner(owner);
-            check(amount.value > 0, "mint quantity must be greater than 0");
+            assert!(amount.value > 0, "mint quantity must be greater than 0");
 
             self.issued_supply = self.issued_supply + amount;
-            psibase::check(
+            assert!(
                 self.issued_supply <= self.max_issued_supply,
                 "Max issued supply exceeded",
             );
@@ -188,7 +186,7 @@ pub mod tables {
         pub fn set_flag(&mut self, flag: TokenFlags, enabled: bool) {
             self.check_is_owner(get_sender());
             if flag == TokenFlags::UNRECALLABLE {
-                check(enabled, "Invalid configuration update")
+                assert!(enabled, "Invalid configuration update");
             }
             self.settings_value = Flags::new(self.settings_value).set(flag, enabled).value();
             self.save();
@@ -205,7 +203,7 @@ pub mod tables {
         pub fn recall(&mut self, amount: Quantity, from: AccountNumber) {
             self.check_is_owner(get_sender());
 
-            check(
+            assert!(
                 !self.get_flag(TokenFlags::UNRECALLABLE),
                 "Token unrecallable",
             );
@@ -214,7 +212,7 @@ pub mod tables {
         }
 
         fn burn_supply(&mut self, amount: Quantity, from: AccountNumber) {
-            check(amount.value > 0, "burn quantity must be greater than 0");
+            assert!(amount.value > 0, "burn quantity must be greater than 0");
 
             Balance::get_or_new(from, self.id).sub_balance(amount);
             self.burned_supply = self.burned_supply + amount;
@@ -290,10 +288,10 @@ pub mod tables {
         }
 
         pub fn get_assert(account: AccountNumber, token_id: TID) -> Self {
-            check_some(
-                Self::get(account, token_id),
-                &format!("{} has no balance of token ID {}", account, token_id),
-            )
+            Self::get(account, token_id).expect(&format!(
+                "{} has no balance of token ID {}",
+                account, token_id
+            ))
         }
 
         pub fn get_or_new(account: AccountNumber, token_id: TID) -> Self {
@@ -426,9 +424,10 @@ pub mod tables {
     impl SharedBalance {
         fn new(creditor: AccountNumber, debitor: AccountNumber, token_id: TID) -> Self {
             Token::get_assert(token_id);
-            check(
-                creditor != debitor,
-                format!("Sender {} cannot also be receiver", creditor).as_str(),
+            assert_ne!(
+                creditor, debitor,
+                "Sender {} cannot also be receiver",
+                creditor
             );
 
             if !Accounts::call().exists(debitor) {
@@ -472,10 +471,7 @@ pub mod tables {
         }
 
         pub fn get_assert(creditor: AccountNumber, debitor: AccountNumber, token_id: TID) -> Self {
-            check_some(
-                Self::get(creditor, debitor, token_id),
-                "Shared balance does not exist",
-            )
+            Self::get(creditor, debitor, token_id).expect("Shared balance does not exist")
         }
 
         pub fn get_or_new(creditor: AccountNumber, debitor: AccountNumber, token_id: TID) -> Self {
@@ -483,7 +479,7 @@ pub mod tables {
         }
 
         pub fn credit(&mut self, quantity: Quantity, memo: Memo) {
-            check(quantity.value > 0, "credit quantity must be greater than 0");
+            assert!(quantity.value > 0, "credit quantity must be greater than 0");
 
             Balance::get_or_new(self.creditor, self.token_id).sub_balance(quantity);
             self.add_balance(quantity);
@@ -492,7 +488,7 @@ pub mod tables {
 
             let is_untransferable = token.get_flag(TokenFlags::UNTRANSFERABLE);
             if is_untransferable {
-                check(token.nft_holder() == get_sender(), "Token untradeable");
+                assert_eq!(token.nft_holder(), get_sender(), "Token untradeable");
             }
 
             let is_auto_debit = BalanceConfig::get(self.debitor, self.token_id)
@@ -505,9 +501,9 @@ pub mod tables {
         }
 
         pub fn uncredit(&mut self, quantity: Quantity) {
-            check(
+            assert!(
                 quantity.value > 0,
-                "uncredit quantity must be greater than 0",
+                "uncredit quantity must be greater than 0"
             );
             let quantity = quantity.min(self.balance);
             self.sub_balance(quantity);
@@ -515,7 +511,7 @@ pub mod tables {
         }
 
         pub fn debit(&mut self, quantity: Quantity, memo: Memo) {
-            check(quantity.value > 0, "debit quantity must be greater than 0");
+            assert!(quantity.value > 0, "debit quantity must be greater than 0");
 
             crate::Wrapper::emit().history().balChanged(
                 self.token_id,
@@ -641,10 +637,7 @@ pub mod tables {
         }
 
         pub fn get_assert(account: AccountNumber, token_id: TID) -> Self {
-            check_some(
-                Self::get(account, token_id),
-                "balance config does not exist",
-            )
+            Self::get(account, token_id).expect("balance config does not exist")
         }
 
         pub fn get_or_new(account: AccountNumber, token_id: TID) -> Self {
@@ -852,7 +845,7 @@ pub mod tables {
         ) -> Self {
             if let Some(mut inst) = Self::get(owner, sub_account.clone()) {
                 if manual_deletion {
-                    check(!inst.manual_deletion, "Sub-account was 'created' twice");
+                    assert!(!inst.manual_deletion, "Sub-account was 'created' twice");
                     inst.manual_deletion = true;
                     inst.save();
                 }
@@ -860,7 +853,7 @@ pub mod tables {
                 return inst;
             }
 
-            check(
+            assert!(
                 sub_account.len() <= 80,
                 "Sub-account key must be 80 bytes or less",
             );
@@ -870,10 +863,8 @@ pub mod tables {
         }
 
         pub fn get_assert(owner: AccountNumber, sub_account: String) -> Self {
-            check_some(
-                Self::get(owner, sub_account.clone()),
-                &format!("{} has no sub-account '{}'", owner, sub_account),
-            )
+            Self::get(owner, sub_account.clone())
+                .expect(&format!("{} has no sub-account '{}'", owner, sub_account))
         }
 
         pub fn get_by_id(id: u64) -> Option<Self> {
@@ -893,8 +884,8 @@ pub mod tables {
                 .collect();
 
             for sub_balance in sub_balances {
-                check(
-                    sub_balance.balance.value == 0,
+                assert_eq!(
+                    sub_balance.balance.value, 0,
                     "Sub-account with non-zero balances cannot be deleted",
                 );
                 sub_bal_table.erase(&sub_balance.pk());
@@ -966,13 +957,10 @@ pub mod tables {
         }
 
         pub fn get_assert(subaccount_id: u64, token_id: TID) -> Self {
-            check_some(
-                Self::get(subaccount_id, token_id),
-                &format!(
-                    "Sub-account balance does not exist for subaccount ID {} and token ID {}",
-                    subaccount_id, token_id
-                ),
-            )
+            Self::get(subaccount_id, token_id).expect(&format!(
+                "Sub-account balance does not exist for subaccount ID {} and token ID {}",
+                subaccount_id, token_id
+            ))
         }
 
         fn save(&self) {
@@ -985,7 +973,7 @@ pub mod tables {
         }
 
         fn sub_balance(&mut self, quantity: Quantity) -> Quantity {
-            check(self.balance >= quantity, "Insufficient sub-account balance");
+            assert!(self.balance >= quantity, "Insufficient sub-account balance");
             self.balance = self.balance - quantity;
             self.save();
             self.balance

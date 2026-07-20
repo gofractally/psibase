@@ -46,10 +46,10 @@ pub mod service {
     #[pre_action(exclude(init))]
     fn check_init() {
         let table: InitTable = InitTable::new();
-        check(
-            table.get_index_pk().get(&()).is_some(),
-            "service not initialized",
-        );
+        table
+            .get_index_pk()
+            .get(&())
+            .expect("service not initialized");
     }
 
     /// Initialize the staged-tx service
@@ -59,8 +59,8 @@ pub mod service {
         table.put(&InitRow {}).unwrap();
 
         let updated = MethodNumber::from("updated");
-        Events::call().addIndex(DbId::HistoryEvent, SERVICE, updated, 0); // Index events related to specific txid
-        Events::call().addIndex(DbId::HistoryEvent, SERVICE, updated, 1); // Index events related to specific proposer/accepter/rejecter
+        Events::call().addIndex(EventDb::HistoryEvent, SERVICE, updated, 0); // Index events related to specific txid
+        Events::call().addIndex(EventDb::HistoryEvent, SERVICE, updated, 1); // Index events related to specific proposer/accepter/rejecter
     }
 
     /// Proposes a new staged transaction containing the specified actions.
@@ -150,8 +150,9 @@ pub mod service {
     fn remove(id: u32, txid: Checksum256) {
         let staged_tx = StagedTx::get(id, txid);
 
-        check(
-            staged_tx.proposer == get_sender(),
+        assert_eq!(
+            staged_tx.proposer,
+            get_sender(),
             "only the proposer can explicitly remove a staged transaction",
         );
 
@@ -213,9 +214,10 @@ pub mod service {
     /// * `id`: The ID of the database record containing the staged transaction
     #[action]
     fn get_staged_tx(id: u32) -> StagedTx {
-        let staged_tx = StagedTxTable::new().get_index_pk().get(&id);
-        check(staged_tx.is_some(), "Unknown staged tx");
-        staged_tx.unwrap()
+        StagedTxTable::new()
+            .get_index_pk()
+            .get(&id)
+            .expect("Unknown staged tx")
     }
 
     fn emit_update(txid: Checksum256, event_type: u8) {

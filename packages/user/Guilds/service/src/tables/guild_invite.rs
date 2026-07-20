@@ -1,8 +1,8 @@
 use async_graphql::ComplexObject;
 
 use psibase::{
-    check, check_some, get_sender, services::tokens::Quantity, AccountNumber, Memo, ServiceWrapper,
-    Table, TimePointSec,
+    get_sender, services::tokens::Quantity, AccountNumber, Memo, ServiceWrapper, Table,
+    TimePointSec,
 };
 
 use crate::{
@@ -45,14 +45,11 @@ impl GuildInvite {
         pre_attest: bool,
     ) {
         let inviter = get_sender();
-        check(
+        assert!(
             Self::by_inviter(guild, inviter).len() < MAX_GUILD_INVITES_PER_MEMBER.into(),
             "too many pending invites",
         );
-        check_some(
-            GuildMember::get(guild, inviter),
-            "must be a member of guild to invite to it",
-        );
+        GuildMember::get(guild, inviter).expect("must be a member of guild to invite to it");
 
         let invite_cost = Self::invite_cost(num_accounts);
 
@@ -72,7 +69,7 @@ impl GuildInvite {
     }
 
     pub fn get_assert(invite_id: u32) -> Self {
-        check_some(Self::get(invite_id), "guild invite does not exist")
+        Self::get(invite_id).expect("guild invite does not exist")
     }
 
     pub fn accept(&self, accepter: AccountNumber) {
@@ -84,8 +81,9 @@ impl GuildInvite {
     }
 
     pub fn delete(&self) {
-        check(
-            get_sender() == self.inviter,
+        assert_eq!(
+            get_sender(),
+            self.inviter,
             "only inviter can delete invites",
         );
         self.remove()
@@ -97,11 +95,10 @@ impl GuildInvite {
         }
         let tokens = Tokens::call();
 
-        let system_token = check_some(
-            tokens.getSysToken(),
-            "expected system token to issue refund",
-        )
-        .id;
+        let system_token = tokens
+            .getSysToken()
+            .expect("expected system token to issue refund")
+            .id;
 
         tokens.debit(system_token, from.0, amount, from.1);
         tokens.credit(system_token, to.0, amount, to.1);

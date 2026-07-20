@@ -1,10 +1,12 @@
+import type { PluginCall } from "../../lib/plugins/lib/call-plugin-function";
+
 import { useMutation } from "@tanstack/react-query";
 import z from "zod";
 
 import { supervisor } from "@shared/lib/supervisor";
 import { toast } from "@shared/shadcn/ui/sonner";
 
-import { MutationOptions, PluginCall } from ".";
+import { MutationOptions } from ".";
 
 type ToastId = number | string;
 

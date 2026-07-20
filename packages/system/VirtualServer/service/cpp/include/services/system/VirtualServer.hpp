@@ -267,6 +267,9 @@ namespace SystemService
 
       UserService::Quantity get_resources(psibase::AccountNumber user);
 
+      /// Whether the current block can hold another transaction
+      bool can_push_tx();
+
       void notifyBlock(psibase::BlockNum block_num);
 
       /// This action specifies which account is primarily responsible for
@@ -328,6 +331,7 @@ namespace SystemService
                 method(useNetSys, user, amount_bytes),
                 method(useCpuSys, user, amount_ns),
                 method(get_resources, user),
+                method(can_push_tx),
                 method(notifyBlock, block_num),
                 method(setBillableAcc, account),
                 method(serveSys, request, socket, user))
