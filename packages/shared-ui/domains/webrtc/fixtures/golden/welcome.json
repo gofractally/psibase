@@ -1,0 +1,19 @@
+{
+    "t": "welcome",
+    "user": "alice",
+    "serverTime": 1700000000000,
+    "iceServers": [
+        {
+            "urls": ["stun:stun.l.google.com:19302"]
+        }
+    ],
+    "activeSessions": [
+        {
+            "sessionId": "wrtc:pair:alice:bob",
+            "purpose": "chat-data",
+            "spaceUuid": "space-uuid-1",
+            "participants": ["alice", "bob"],
+            "epoch": 3
+        }
+    ]
+}

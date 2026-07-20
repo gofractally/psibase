@@ -28,6 +28,19 @@ namespace LocalService
    using AdminOptionsTable = psibase::Table<AdminOptionsRow, psibase::SingletonKey{}>;
    PSIO_REFLECT_TYPENAME(AdminOptionsTable)
 
+   /// Node-local OpenRelay/Metered credentials and cached ICE servers for Chat WebRTC TURN.
+   /// Written by admin HTTP/UI in a later PR; x-wrtcsig reads via turnIceServersJson.
+   struct OpenRelayRow
+   {
+      std::string app_name;
+      std::string api_key;
+      /// JSON array of WebRTC iceServers entries (Metered credential response shape).
+      std::string ice_servers_json = "[]";
+      PSIO_REFLECT(OpenRelayRow, app_name, api_key, ice_servers_json)
+   };
+   using OpenRelayTable = psibase::Table<OpenRelayRow, psibase::SingletonKey{}>;
+   PSIO_REFLECT_TYPENAME(OpenRelayTable)
+
    namespace Auth
    {
       struct Account
@@ -76,8 +89,9 @@ namespace LocalService
    struct XAdmin : psibase::Service
    {
       static constexpr auto service = psibase::AccountNumber{"x-admin"};
-      using Subjective = psibase::SubjectiveTables<AdminAccountTable, CodeRefCountTable>;
-      using Session    = psibase::SessionTables<AdminOptionsTable>;
+      using Subjective =
+          psibase::SubjectiveTables<AdminAccountTable, CodeRefCountTable, OpenRelayTable>;
+      using Session = psibase::SessionTables<AdminOptionsTable>;
       /// Returns true if the account or the remote end of socket is a node admin
       bool isAdmin(std::optional<psibase::AccountNumber>          account,
                    std::optional<std::int32_t>                    socket,
@@ -91,12 +105,17 @@ namespace LocalService
       void startSession();
       /// This action can be called inside a subjective tx
       AdminOptionsRow options();
+
+      /// JSON array string (possibly empty) of TURN/STUN entries; only x-wrtcsig may call.
+      /// Unauthorized callers receive "[]" (no abort) so signaling welcome can fall back to STUN.
+      std::string turnIceServersJson();
    };
    PSIO_REFLECT(XAdmin,
                 method(isAdmin, account, socket),
                 method(checkAuth, req, socket),
                 method(serveSys, req, socket),
                 method(startSession),
-                method(options))
+                method(options),
+                method(turnIceServersJson))
    PSIBASE_REFLECT_TABLES(XAdmin, XAdmin::Subjective, XAdmin::Session)
 }  // namespace LocalService

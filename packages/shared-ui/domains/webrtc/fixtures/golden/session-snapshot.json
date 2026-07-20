@@ -1,0 +1,7 @@
+{
+    "t": "sessionSnapshot",
+    "sessionId": "wrtc:pair:alice:bob",
+    "epoch": 2,
+    "joinedParticipants": ["alice"],
+    "pendingParticipants": ["bob"]
+}

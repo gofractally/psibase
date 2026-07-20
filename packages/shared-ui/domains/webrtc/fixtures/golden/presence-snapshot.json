@@ -1,0 +1,7 @@
+{
+    "t": "presenceSnapshot",
+    "contacts": [
+        { "account": "bob", "presence": "online" },
+        { "account": "carol", "presence": "offline" }
+    ]
+}
