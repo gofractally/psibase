@@ -156,6 +156,17 @@ impl KvHandle {
     pub fn new(db: DbId, prefix: &[u8], mode: KvMode) -> KvHandle {
         KvHandle(unsafe { psibase_proxy_kv_open(db, prefix.as_ptr(), prefix.len() as u32, mode) })
     }
+    /// Open a handle via native `kvOpen`, bypassing `db` / `x-db` service checks.
+    pub fn open_direct(db: DbId, prefix: &[u8], mode: KvMode) -> KvHandle {
+        unsafe {
+            KvHandle::from_raw(native_raw::kvOpen(
+                db,
+                prefix.as_ptr(),
+                prefix.len() as u32,
+                mode,
+            ))
+        }
+    }
     pub unsafe fn from_raw(handle: native_raw::KvHandle) -> KvHandle {
         KvHandle(handle)
     }
