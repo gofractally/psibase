@@ -545,6 +545,12 @@ mod service {
             .unwrap_or(0.into())
     }
 
+    /// Whether the current block can hold another transaction
+    #[action]
+    fn can_push_tx() -> bool {
+        BandwidthPricing::get(NET).map_or(true, |n| !n.is_full())
+    }
+
     #[action]
     fn notifyBlock(block_num: BlockNum) {
         assert_eq!(get_sender(), Transact::SERVICE, "Unauthorized");
