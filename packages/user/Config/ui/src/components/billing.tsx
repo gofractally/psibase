@@ -106,11 +106,11 @@ export const Billing = ({ systemToken, systemTokenLoading }: BillingProps) => {
                 <div>
                     <Label>System Token</Label>
                     <p className="mt-1 text-sm">
-                        {(systemToken?.symbol ??
-                        systemToken?.id ??
-                        systemTokenLoading)
+                        {systemTokenLoading
                             ? "Loading..."
-                            : "None"}
+                            : (systemToken?.symbol ??
+                              systemToken?.id ??
+                              "None")}
                     </p>
                 </div>
 
