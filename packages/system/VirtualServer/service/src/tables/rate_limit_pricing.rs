@@ -234,7 +234,7 @@ impl RateLimitPricing {
     }
 
     pub fn is_full(&self) -> bool {
-        self.current_usage >= capacity(self.resource_id)
+        self.current_usage >= capacity(self.resource())
     }
 }
 

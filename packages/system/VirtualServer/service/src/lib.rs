@@ -1099,7 +1099,7 @@ mod service {
     /// Whether the current block can hold another transaction
     #[action]
     fn can_push_tx() -> bool {
-        BandwidthPricing::get(NET).map_or(true, |n| !n.is_full())
+        RateLimitPricing::get(Net).map_or(true, |n| !n.is_full())
     }
 
     #[action]
