@@ -1,5 +1,5 @@
 [package]
-name = "chat-pkg"                          # Crate name
+name = "chat-pkg"
 description = "Objective Chat application"
 version.workspace = true
 rust-version.workspace = true

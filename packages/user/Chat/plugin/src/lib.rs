@@ -1,7 +1,9 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::exports::chat::plugin::api::Guest as Api;
+use bindings::chat::plugin::types::SessionPurpose;
+use bindings::exports::chat::plugin::sessions::Guest as Sessions;
+use bindings::exports::chat::plugin::spaces::Guest as Spaces;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
@@ -15,29 +17,38 @@ use errors::ErrorType;
 
 define_trust! {
     descriptions {
-        Low => "
+        Low => "",
+        Medium => "
             - Opening or reusing chat spaces (DM, group, or explicit member list)
+            - Creating or closing WebRTC sessions for messaging or Meet
         ",
-        Medium => "",
         High => "",
     }
     functions {
-        Low => [ensure_space, ensure_dm, ensure_group, create_session, close_session],
+        Medium => [ensure_space, ensure_dm, ensure_group, create_session, close_session],
     }
 }
 
 struct ChatPlugin;
 
-fn parse_account(account: &str) -> Result<AccountNumber, Error> {
-    AccountNumber::from_str(account)
-        .map_err(|_| ErrorType::InvalidAccountNumber(account.to_string()).into())
-}
-
 fn parse_members(members: Vec<String>) -> Result<Vec<AccountNumber>, Error> {
-    members.iter().map(|m| parse_account(m)).collect()
+    members
+        .iter()
+        .map(|m| {
+            AccountNumber::from_str(m)
+                .map_err(|_| ErrorType::InvalidAccountNumber(m.to_string()).into())
+        })
+        .collect()
 }
 
-impl Api for ChatPlugin {
+fn purpose_to_chain(purpose: SessionPurpose) -> String {
+    match purpose {
+        SessionPurpose::ChatData => "chat-data".to_owned(),
+        SessionPurpose::AvCall => "av-call".to_owned(),
+    }
+}
+
+impl Spaces for ChatPlugin {
     fn ensure_space(members: Vec<String>) -> Result<(), Error> {
         trust::assert_authorized_with_whitelist(
             trust::FunctionName::ensure_space,
@@ -55,7 +66,8 @@ impl Api for ChatPlugin {
             trust::FunctionName::ensure_dm,
             vec!["homepage".into()],
         )?;
-        let contact = parse_account(&contact)?;
+        let contact = AccountNumber::from_str(&contact)
+            .map_err(|_| ErrorType::InvalidAccountNumber(contact).into())?;
         let packed = chat::action_structs::ensureDm { contact }.packed();
         add_action_to_transaction(chat::action_structs::ensureDm::ACTION_NAME, &packed).unwrap();
         Ok(())
@@ -72,10 +84,12 @@ impl Api for ChatPlugin {
             .unwrap();
         Ok(())
     }
+}
 
+impl Sessions for ChatPlugin {
     fn create_session(
         space_uuid: String,
-        purpose: String,
+        purpose: SessionPurpose,
         participants: Vec<String>,
     ) -> Result<(), Error> {
         trust::assert_authorized_with_whitelist(
@@ -85,7 +99,7 @@ impl Api for ChatPlugin {
         let participants = parse_members(participants)?;
         let packed = chat::action_structs::createSession {
             space_uuid,
-            purpose,
+            purpose: purpose_to_chain(purpose),
             participants,
         }
         .packed();
