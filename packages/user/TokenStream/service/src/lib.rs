@@ -2,7 +2,7 @@
 pub mod tables {
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::services::tokens::{Decimal, Precision, Quantity, TID};
-    use psibase::{check, check_some, AccountNumber, Fracpack, Table, TimePointSec, ToSchema};
+    use psibase::{AccountNumber, Fracpack, ServiceWrapper, Table, TimePointSec, ToSchema};
     use serde::{Deserialize, Serialize};
 
     use psibase::services::nft::{Wrapper as Nfts, NID};
@@ -50,7 +50,7 @@ pub mod tables {
 
     impl Stream {
         fn new(half_life_seconds: u32, token_id: u32) -> Self {
-            check(half_life_seconds > 0, "half life must be over 0");
+            assert!(half_life_seconds > 0, "half life must be over 0");
             let now = TransactSvc::call().currentBlock().time.seconds();
 
             Self {
@@ -81,16 +81,18 @@ pub mod tables {
         }
 
         pub fn get_assert(nft_id: u32) -> Self {
-            check_some(Self::get(nft_id), "Stream does not exist")
+            Self::get(nft_id).expect("Stream does not exist")
         }
 
         pub fn check_is_owner(&self, account: AccountNumber) {
-            check(
+            assert_eq!(
                 psibase::services::nft::Wrapper::call()
                     .getNft(self.nft_id)
-                    .owner
-                    == account,
-                format!("{} must be holder of NFT ID: {}", account, self.nft_id).as_str(),
+                    .owner,
+                account,
+                "{} must be holder of NFT ID: {}",
+                account,
+                self.nft_id,
             );
         }
 
@@ -159,8 +161,8 @@ pub mod tables {
         }
 
         pub fn delete(&self) {
-            check(
-                self.total_claimed == self.total_deposited,
+            assert_eq!(
+                self.total_claimed, self.total_deposited,
                 "cannot delete until entire balance is claimed",
             );
             StreamTable::new().remove(&self);
@@ -174,7 +176,7 @@ pub mod service {
 
     use psibase::services::nft::Wrapper as Nft;
     use psibase::services::tokens::Wrapper as Tokens;
-    use psibase::{get_sender, AccountNumber, Memo};
+    use psibase::{get_sender, AccountNumber, Memo, ServiceWrapper};
 
     use crate::tables::Stream;
 

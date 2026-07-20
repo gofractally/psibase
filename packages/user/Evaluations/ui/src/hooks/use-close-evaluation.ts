@@ -2,6 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
+import { EVALUATIONS_SERVICE } from "@shared/domains/fractal/lib/constants";
 import { supervisor } from "@shared/lib/supervisor";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -15,7 +16,7 @@ export const useCloseEvaluation = () => {
         mutationFn: async (params: z.infer<typeof Params>) => {
             void (await supervisor.functionCall({
                 method: "close",
-                service: "evaluations",
+                service: EVALUATIONS_SERVICE,
                 intf: "admin",
                 params: [params.evaluationId],
             }));

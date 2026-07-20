@@ -14,7 +14,7 @@ impl NetworkSpecs {
     fn derive_net(vars: &NetworkVariables, specs: &ServerSpecs) -> u64 {
         let net_bps = specs.net_bps;
         let max_bp_peers = Producers::call().getMaxProds();
-        check(
+        assert!(
             net_bps > vars.block_replay_factor as u64 * max_bp_peers as u64,
             "Insufficient network bandwidth",
         );
@@ -72,11 +72,11 @@ impl NetworkSpecs {
             subj_storage_bytes: Self::derive_subj_storage(&vars),
         };
 
-        check(
+        assert!(
             old_specs.obj_storage_bytes <= new_specs.obj_storage_bytes,
             "Objective storage allocation cannot decrease",
         );
-        check(
+        assert!(
             old_specs.subj_storage_bytes <= new_specs.subj_storage_bytes,
             "Subjective storage allocation cannot decrease",
         );
@@ -85,9 +85,9 @@ impl NetworkSpecs {
     }
 
     pub fn get_assert() -> Self {
-        check_some(
-            NetworkSpecsTable::read().get_index_pk().get(&()),
-            "Network specs not yet initialized",
-        )
+        NetworkSpecsTable::read()
+            .get_index_pk()
+            .get(&())
+            .expect("Network specs not yet initialized")
     }
 }

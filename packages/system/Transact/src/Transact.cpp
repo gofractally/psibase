@@ -138,6 +138,11 @@ namespace SystemService
       // cost is socialized.
       SystemWriteGuard sysWrite;
 
+      if (auto eventIndexer = open<EventIndexerTable>().get({}))
+      {
+         to<EventIndexerInterface>(eventIndexer->service).startBlock();
+      }
+
       Tables tables(Transact::service);
 
       // Add head block to BlockSummaryTable; processTransaction uses it to
@@ -365,14 +370,9 @@ namespace SystemService
 
       if (transactStatus && transactStatus->enforceAuth)
       {
-         auto accountsTables = Accounts::Tables(Accounts::service, KvMode::read);
-         auto accountTable   = accountsTables.open<AccountTable>();
-         auto accountIndex   = accountTable.getIndex<0>();
-         auto account        = accountIndex.get(action.sender);
-         if (!account)
-            abortMessage("unknown sender \"" + action.sender.str() + "\"");
+         auto authService = to<Accounts>().getAuthOf(action.sender);
 
-         if (requester != account->authService && requester != action.sender.base())
+         if (requester != authService && requester != action.sender.base())
          {
             uint32_t flags = 0;
             if (requester == action.sender)
@@ -414,19 +414,19 @@ namespace SystemService
 
                if (!flags_str.empty())
                {
-                  psibase::writeConsole("Checking auth service " + account->authService.str() +
+                  psibase::writeConsole("Checking auth service " + authService.str() +
                                         " with flags: \n" + flags_str + "\n");
                }
             }
 
-            Actor<AuthInterface> auth(Transact::service, account->authService);
+            Actor<AuthInterface> auth(Transact::service, authService);
             if (!auth.checkAuthSys(flags, requester, action.sender,
                                    ServiceMethod{action.service, action.method}, allowedActions,
                                    std::vector<Claim>{}))
             {
                abortMessage("Not authorized");
             }
-         }  // if (requester != account->authService)
+         }  // if (requester != authService)
       }  // if(enforceAuth)
 
       for (auto& a : allowedActions)
@@ -470,6 +470,11 @@ namespace SystemService
       if (stat.head)
          return stat.head->header.time;
       return {};
+   }
+
+   std::pair<uint8_t, uint32_t> Transact::headTapos()
+   {
+      return SystemService::headTapos();
    }
 
    namespace
@@ -574,18 +579,12 @@ namespace SystemService
                      bool                      first,
                      bool                      readOnly)
       {
-         auto accountsTables = Accounts::Tables(Accounts::service);
-         auto accountTable   = accountsTables.open<AccountTable>();
-         auto accountIndex   = accountTable.getIndex<0>();
-
-         auto account = accountIndex.get(act.sender().unpack());
-         if (!account)
-            abortMessage("unknown sender \"" + act.sender().unpack().str() + "\"");
+         auto authService = to<Accounts>().getAuthOf(act.sender().unpack());
 
          if constexpr (enable_print)
             std::printf("call checkAuthSys on %s for sender account %s\n",
-                        account->authService.str().c_str(), act.sender().unpack().str().c_str());
-         Actor<AuthInterface> auth(Transact::service, account->authService);
+                        authService.str().c_str(), act.sender().unpack().str().c_str());
+         Actor<AuthInterface> auth(Transact::service, authService);
          uint32_t             flags = AuthInterface::topActionReq;
          if (first && !readOnly)
          {
@@ -771,6 +770,11 @@ namespace SystemService
          // Therefore, we do one more event indexer sync, which will only index the new events (and uses
          // cached service schemas so isn't as expensive).
          to<EventIndexerInterface>(eventIndexer->service).sync();
+         auto mroot       = to<EventIndexerInterface>(eventIndexer->service).saveMerkle();
+         auto statusTable = Native::tables().open<StatusTable>();
+         auto status      = statusTable.get({}).value();
+         status.current.eventMerkleRoot = mroot;
+         statusTable.put(status);
       }
 
       trxData = std::span<const char>{};

@@ -70,12 +70,12 @@ pub mod service {
         num_options: u8,
         use_hooks: bool,
     ) -> u32 {
-        check(
+        assert!(
             registration < deliberation && deliberation < submission && submission < finish_by,
             "invalid times",
         );
 
-        check(
+        assert!(
             allowed_group_sizes.iter().all(|size| *size > 1),
             "allowable group sizes must be greater than 1",
         );
@@ -112,7 +112,7 @@ pub mod service {
     #[action]
     fn start(evaluation_id: u32) {
         let owner = get_sender();
-        let evaluation = Evaluation::get(owner, evaluation_id);
+        let evaluation = Evaluation::get_assert(owner, evaluation_id);
 
         evaluation.assert_status(helpers::EvaluationStatus::Deliberation);
 
@@ -154,18 +154,16 @@ pub mod service {
     /// * `hash` - Hash of the keys for verification.
     #[action]
     fn group_key(owner: AccountNumber, evaluation_id: u32, keys: Vec<Vec<u8>>, hash: String) {
-        let evaluation = Evaluation::get(owner, evaluation_id);
+        let evaluation = Evaluation::get_assert(owner, evaluation_id);
 
         evaluation.assert_status(helpers::EvaluationStatus::Deliberation);
 
         let sender = get_sender();
 
-        let group_number = check_some(
-            evaluation
-                .get_user(sender)
-                .and_then(|user| user.group_number),
-            "user not found or not grouped",
-        );
+        let group_number = evaluation
+            .get_user(sender)
+            .and_then(|user| user.group_number)
+            .expect("user not found or not grouped");
 
         let mut group = evaluation.get_group(group_number).expect("group not found");
         group.set_key_submitter(sender);
@@ -182,7 +180,7 @@ pub mod service {
     /// * `evaluation_id` - The ID of the evaluation to close.
     #[action]
     fn close(owner: AccountNumber, evaluation_id: u32) {
-        let evaluation = Evaluation::get(owner, evaluation_id);
+        let evaluation = Evaluation::get_assert(owner, evaluation_id);
 
         let is_closed = evaluation.get_current_phase() == EvaluationStatus::Closed;
         let has_all_results = || {
@@ -192,7 +190,7 @@ pub mod service {
                 .all(|group| group.get_result().is_some())
         };
 
-        check(
+        assert!(
             is_closed || has_all_results(),
             "evaluation is still in progress",
         );
@@ -222,10 +220,10 @@ pub mod service {
     /// * `force` - If true, allows deletion regardless of the evaluation's phase.
     #[action]
     fn delete(evaluation_id: u32, force: bool) {
-        let evaluation = Evaluation::get(get_sender(), evaluation_id);
+        let evaluation = Evaluation::get_assert(get_sender(), evaluation_id);
         if !force {
             let phase = evaluation.get_current_phase();
-            check(
+            assert!(
                 phase == EvaluationStatus::Pending || phase == EvaluationStatus::Closed,
                 "evaluation is not deletable unless pending, closed or force is true",
             );
@@ -241,14 +239,14 @@ pub mod service {
     /// * `proposal` - The encrypted proposal data.
     #[action]
     fn propose(owner: AccountNumber, evaluation_id: u32, proposal: Vec<u8>) {
-        let evaluation = Evaluation::get(owner, evaluation_id);
+        let evaluation = Evaluation::get_assert(owner, evaluation_id);
         evaluation.assert_status(EvaluationStatus::Deliberation);
 
         let sender = get_sender();
         let user = evaluation.get_user(sender);
-        let mut user = psibase::check_some(user, format!("user {} not found", sender).as_str());
+        let mut user = user.expect(format!("user {} not found", sender).as_str());
 
-        check(
+        assert!(
             evaluation
                 .get_group(user.group_number.unwrap())
                 .expect("group not found")
@@ -269,12 +267,12 @@ pub mod service {
     #[action]
     fn attest(owner: AccountNumber, evaluation_id: u32, attestation: Vec<u8>) {
         let sender = get_sender();
-        let evaluation = Evaluation::get(owner, evaluation_id);
+        let evaluation = Evaluation::get_assert(owner, evaluation_id);
 
         let ranks_within_scope = attestation
             .iter()
             .all(|rank| rank <= &evaluation.num_options);
-        check(ranks_within_scope, "attestation is out of scope");
+        assert!(ranks_within_scope, "attestation is out of scope");
 
         evaluation.assert_status(EvaluationStatus::Submission);
 
@@ -298,19 +296,16 @@ pub mod service {
     /// * `registrant` - The account number of the user to register.
     #[action]
     fn register(owner: AccountNumber, evaluation_id: u32, registrant: AccountNumber) {
-        let evaluation = Evaluation::get(owner, evaluation_id);
+        let evaluation = Evaluation::get_assert(owner, evaluation_id);
         evaluation.assert_status(EvaluationStatus::Registration);
 
         let sender = get_sender();
-        check(
+        assert!(
             sender == registrant || sender == evaluation.owner,
             "user is not allowed to register",
         );
 
-        check_some(
-            UserSettings::get(registrant),
-            "user must have a pre-existing key to be registered",
-        );
+        UserSettings::get(registrant).expect("user must have a pre-existing key to be registered");
 
         evaluation.register_user(registrant);
     }
@@ -323,15 +318,72 @@ pub mod service {
     /// * `registrant` - The account number of the user to unregister.
     #[action]
     fn unregister(owner: AccountNumber, evaluation_id: u32, registrant: AccountNumber) {
-        let evaluation = Evaluation::get(owner, evaluation_id);
+        let evaluation = Evaluation::get_assert(owner, evaluation_id);
         evaluation.assert_status(EvaluationStatus::Registration);
 
         let sender = get_sender();
-        check(
+        assert!(
             sender == registrant || sender == evaluation.owner,
             "user is not allowed to unregister",
         );
 
         evaluation.unregister_user(registrant);
+    }
+
+    /// Gets the schedule of an evaluation.
+    ///
+    /// # Arguments
+    /// * `owner` - The account number of the evaluation owner.
+    /// * `evaluation_id` - The ID of the evaluation.
+    ///
+    /// # Returns
+    /// The `(registration, deliberation, submission, finish_by)` unix seconds timestamps,
+    /// or `None` if the evaluation does not exist.
+    #[action]
+    fn get_sched(owner: AccountNumber, evaluation_id: u32) -> Option<(u32, u32, u32, u32)> {
+        Evaluation::get(owner, evaluation_id).map(|evaluation| {
+            (
+                evaluation.registration_starts,
+                evaluation.deliberation_starts,
+                evaluation.submission_starts,
+                evaluation.finish_by,
+            )
+        })
+    }
+
+    /// Gets the accounts of all users registered for an evaluation.
+    ///
+    /// # Arguments
+    /// * `owner` - The account number of the evaluation owner.
+    /// * `evaluation_id` - The ID of the evaluation.
+    #[action]
+    fn get_users(owner: AccountNumber, evaluation_id: u32) -> Vec<AccountNumber> {
+        Evaluation::get_assert(owner, evaluation_id)
+            .get_users()
+            .into_iter()
+            .map(|user| user.user)
+            .collect()
+    }
+
+    /// Gets the accounts of the users in a group of an evaluation.
+    ///
+    /// # Arguments
+    /// * `owner` - The account number of the evaluation owner.
+    /// * `evaluation_id` - The ID of the evaluation.
+    /// * `group_number` - The group number within the evaluation.
+    #[action]
+    fn get_grp_users(
+        owner: AccountNumber,
+        evaluation_id: u32,
+        group_number: u32,
+    ) -> Vec<AccountNumber> {
+        let evaluation = Evaluation::get_assert(owner, evaluation_id);
+        evaluation
+            .get_group(group_number)
+            .expect("group not found")
+            .get_users()
+            .into_iter()
+            .map(|user| user.user)
+            .collect()
     }
 }

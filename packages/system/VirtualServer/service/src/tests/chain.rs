@@ -553,7 +553,7 @@ fn invites(chain: psibase::Chain) -> Result<(), psibase::Error> {
     let mut trx = Transaction {
         tapos: Default::default(),
         actions: vec![Action {
-            sender: AccountNumber::from(credentials::CREDENTIAL_SENDER),
+            sender: credentials::CREDENTIAL_SENDER,
             service: invite,
             method: MethodNumber::new(method_raw!("createAccount")),
             rawData: (

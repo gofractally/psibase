@@ -19,6 +19,7 @@ members = [
     "test_package/plugin",
     "test_package/query",
     "test_package/service",
+    "test_panic",
     "test_psibase_macros",
     "test_subjective",
 ]

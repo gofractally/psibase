@@ -3,8 +3,8 @@
 pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::{
-        abort_message, check, check_none, check_some, define_flags, get_sender, AccountNumber,
-        FlagsType, Fracpack, Memo, Table, ToSchema,
+        abort_message, define_flags, get_sender, AccountNumber, FlagsType, Fracpack, Memo,
+        ServiceWrapper, Table, ToSchema,
     };
     use serde::{Deserialize, Serialize};
 
@@ -13,7 +13,7 @@ pub mod tables {
     pub type NID = u32;
 
     define_flags!(NftHolderFlags, u8, {
-        manual_debit,
+        auto_debit,
     });
 
     #[table(name = "ConfigTable", index = 0)]
@@ -27,7 +27,7 @@ pub mod tables {
         fn pk(&self) {}
 
         pub fn add() {
-            check_none(Self::get(), "config row already exists");
+            assert!(Self::get().is_none(), "config row already exists");
             let new_instance = Self { next_id: 0 };
             new_instance.save();
         }
@@ -37,7 +37,7 @@ pub mod tables {
         }
 
         pub fn get_assert() -> Self {
-            check_some(Self::get(), "config row does not exist")
+            Self::get().expect("config row does not exist")
         }
 
         pub fn get_next_id(&mut self) -> NID {
@@ -88,7 +88,7 @@ pub mod tables {
         }
 
         pub fn check_is_owner(&self, account: AccountNumber) {
-            check(self.owner == account, "Missing required authority");
+            assert_eq!(self.owner, account, "Missing required authority");
         }
 
         pub fn get_assert(nft_id: NID) -> Self {
@@ -114,7 +114,10 @@ pub mod tables {
         }
 
         pub fn burn(&self) {
-            check_none(CreditRecord::get(self.id), "cannot burn nft while credited");
+            assert!(
+                CreditRecord::get(self.id).is_none(),
+                "cannot burn nft while credited"
+            );
             super::Wrapper::emit().history().burned(self.id, self.owner);
             self.erase();
         }
@@ -176,7 +179,7 @@ pub mod tables {
         }
 
         pub fn get_assert(nft_id: NID) -> Self {
-            check_some(Self::get(nft_id), "Nothing to uncredit. Must first credit.")
+            Self::get(nft_id).expect("Nothing to uncredit. Must first credit.")
         }
 
         pub fn add(
@@ -185,15 +188,17 @@ pub mod tables {
             debitor: AccountNumber,
             memo: Memo,
         ) -> Self {
-            check_none(Self::get(nft_id), "NFT already credited to an account");
-            check(
+            assert!(
+                Self::get(nft_id).is_none(),
+                "NFT already credited to an account"
+            );
+            assert!(
                 creditor != debitor,
                 "Creditor and debitor cannot be the same",
             );
-            check_some(
-                psibase::services::accounts::Wrapper::call().getAccount(debitor),
-                "Receiver DNE",
-            );
+            psibase::services::accounts::Wrapper::call()
+                .getAccount(debitor)
+                .expect("Receiver DNE");
 
             let new_instance = Self::new(nft_id, creditor, debitor);
             new_instance.save();
@@ -218,7 +223,7 @@ pub mod tables {
         }
 
         pub fn uncredit(&self, memo: Memo) {
-            check(
+            assert!(
                 Nft::get_assert(self.nftId).owner == get_sender(),
                 "Only the creditor may perform this action",
             );
@@ -278,8 +283,7 @@ pub mod tables {
 pub mod service {
     use crate::tables::*;
     use psibase::{
-        check, check_some, get_sender, get_service, services::events, AccountNumber, DbId, Memo,
-        MethodNumber,
+        get_sender, services::events, AccountNumber, EventDb, Memo, MethodNumber, ServiceWrapper,
     };
 
     pub type NID = u32;
@@ -288,9 +292,8 @@ pub mod service {
     fn init() {
         if ConfigRow::get().is_none() {
             ConfigRow::add();
-            NftHolder::get_or_default(get_service()).set_flag(NftHolderFlags::MANUAL_DEBIT, true);
 
-            let add_index = |method: &str, column: u8, db_id: DbId| {
+            let add_index = |method: &str, column: u8, db_id: EventDb| {
                 events::Wrapper::call().addIndex(
                     db_id,
                     Wrapper::SERVICE,
@@ -299,27 +302,27 @@ pub mod service {
                 );
             };
 
-            add_index("minted", 0, DbId::HistoryEvent);
-            add_index("minted", 1, DbId::HistoryEvent);
-            add_index("burned", 0, DbId::HistoryEvent);
-            add_index("burned", 1, DbId::HistoryEvent);
-            add_index("userConfSet", 0, DbId::HistoryEvent);
-            add_index("credited", 0, DbId::HistoryEvent);
-            add_index("credited", 1, DbId::HistoryEvent);
-            add_index("credited", 2, DbId::HistoryEvent);
-            add_index("uncredited", 0, DbId::HistoryEvent);
-            add_index("uncredited", 1, DbId::HistoryEvent);
-            add_index("uncredited", 2, DbId::HistoryEvent);
+            add_index("minted", 0, EventDb::HistoryEvent);
+            add_index("minted", 1, EventDb::HistoryEvent);
+            add_index("burned", 0, EventDb::HistoryEvent);
+            add_index("burned", 1, EventDb::HistoryEvent);
+            add_index("userConfSet", 0, EventDb::HistoryEvent);
+            add_index("credited", 0, EventDb::HistoryEvent);
+            add_index("credited", 1, EventDb::HistoryEvent);
+            add_index("credited", 2, EventDb::HistoryEvent);
+            add_index("uncredited", 0, EventDb::HistoryEvent);
+            add_index("uncredited", 1, EventDb::HistoryEvent);
+            add_index("uncredited", 2, EventDb::HistoryEvent);
 
-            add_index("transferred", 0, DbId::MerkleEvent);
-            add_index("transferred", 1, DbId::MerkleEvent);
-            add_index("transferred", 2, DbId::MerkleEvent);
+            add_index("transferred", 0, EventDb::MerkleEvent);
+            add_index("transferred", 1, EventDb::MerkleEvent);
+            add_index("transferred", 2, EventDb::MerkleEvent);
         }
     }
 
     #[pre_action(exclude(init))]
     fn check_init() {
-        check_some(ConfigRow::get(), "service not initialized");
+        ConfigRow::get().expect("service not initialized");
     }
 
     #[action]
@@ -342,8 +345,8 @@ pub mod service {
         let credit_record = CreditRecord::add(nft_id, creditor, debitor, memo.clone());
 
         let receiver_holder = NftHolder::get_or_default(debitor);
-        let manual_debit = receiver_holder.get_flag(NftHolderFlags::MANUAL_DEBIT);
-        if !manual_debit {
+        let auto_debit = receiver_holder.get_flag(NftHolderFlags::AUTO_DEBIT);
+        if auto_debit {
             credit_record.debit(memo);
         }
     }
@@ -360,25 +363,21 @@ pub mod service {
 
     #[action]
     pub fn uncredit(nftId: NID, memo: Memo) {
-        check_some(
-            CreditRecord::get(nftId),
-            "Nothing to uncredit. Must first credit.",
-        )
-        .uncredit(memo);
+        CreditRecord::get(nftId)
+            .expect("Nothing to uncredit. Must first credit.")
+            .uncredit(memo);
     }
 
     #[action]
     pub fn debit(nftId: NID, memo: Memo) {
-        let credit_record = check_some(
-            CreditRecord::get(nftId),
-            &format!(
-                "{} has no pending nft {} to debit.",
-                get_sender().to_string(),
-                nftId.to_string()
-            ),
-        );
-        check(
-            credit_record.debitor == get_sender(),
+        let credit_record = CreditRecord::get(nftId).expect(&format!(
+            "{} has no pending nft {} to debit.",
+            get_sender().to_string(),
+            nftId.to_string()
+        ));
+        assert_eq!(
+            credit_record.debitor,
+            get_sender(),
             "Missing required authority",
         );
         credit_record.debit(memo);

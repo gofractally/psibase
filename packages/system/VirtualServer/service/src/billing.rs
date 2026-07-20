@@ -1,9 +1,11 @@
 use crate::resource_type::ResourceType;
 use crate::tables::tables::{BillingConfig, CapacityPricing, CapacityPricingTable, UserSettings};
 use crate::tx_cache::{accrual, balance_cache};
-use psibase::services::tokens::{Quantity, Wrapper as Tokens};
-use psibase::services::transact::Wrapper as Transact;
-use psibase::{AccountNumber, Table};
+use psibase::{
+    services::tokens::{Quantity, Wrapper as Tokens},
+    services::transact::Wrapper as Transact,
+    AccountNumber, ServiceWrapper, Table,
+};
 use std::collections::HashMap;
 
 /// Upper bound on the bytes written when crediting the fee receiver during

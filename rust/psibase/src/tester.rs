@@ -9,14 +9,14 @@
 #![cfg_attr(not(target_family = "wasm"), allow(unused_imports, dead_code))]
 
 use crate::{
-    self as psibase, account, actions::login_action, check, create_boot_transactions,
-    fetch_packages, get_optional_result_bytes, get_result_bytes, services, status_key, tester_raw,
-    AccountNumber, Action, ActionFormatter, BlockTime, Caller, Checksum256, CodeByHashRow, CodeRow,
-    DbId, DirectoryRegistry, Error, HostConfigRow, HttpBody, HttpHeader, HttpReply, HttpRequest,
+    self as psibase, account, actions::login_action, create_boot_transactions, fetch_packages,
+    get_optional_result_bytes, get_result_bytes, services, status_key, tester_raw, AccountNumber,
+    Action, ActionFormatter, BlockTime, Caller, Checksum256, CodeByHashRow, CodeRow, DbId,
+    DirectoryRegistry, Error, HostConfigRow, HttpBody, HttpHeader, HttpReply, HttpRequest,
     InnerTraceEnum, JointRegistry, KvHandle, KvMode, PackageOpFull, PackageRegistry,
-    PackagedService, RunMode, Schema, SchemaFetcher, SchemaMap, Seconds, SignedTransaction,
-    StatusRow, Table, TableRecord, Tapos, TimePointSec, TimePointUSec, ToKey, Transaction,
-    TransactionBuilder, TransactionTrace,
+    PackagedService, RunMode, Schema, SchemaFetcher, SchemaMap, Seconds, ServiceWrapper,
+    SignedTransaction, StatusRow, Table, TableRecord, Tapos, TimePointSec, TimePointUSec, ToKey,
+    Transaction, TransactionBuilder, TransactionTrace,
 };
 #[cfg(target_family = "wasm")]
 use crate::{MicroSeconds, PackageList};
@@ -339,7 +339,7 @@ impl Chain {
                 .into(),
             });
         }
-        check(
+        assert!(
             unsafe { tester_raw::commitSubjective(self.chain_handle) },
             "Failed to commit changes",
         );
@@ -372,7 +372,7 @@ impl Chain {
             tester_raw::checkoutSubjective(self.chain_handle);
         }
         self.kv_put(DbId::NativeSession, &row.key(), &row);
-        check(
+        assert!(
             unsafe { tester_raw::commitSubjective(self.chain_handle) },
             "Failed to commit changes",
         );
@@ -572,7 +572,6 @@ impl Chain {
     /// this chain's database:
     ///
     /// * [`native_raw::kvGet`](crate::native_raw::kvGet)
-    /// * [`native_raw::getSequential`](crate::native_raw::getSequential)
     /// * [`native_raw::kvGreaterEqual`](crate::native_raw::kvGreaterEqual)
     /// * [`native_raw::kvLessThan`](crate::native_raw::kvLessThan)
     /// * [`native_raw::kvMax`](crate::native_raw::kvMax)
@@ -1096,11 +1095,14 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
     fn is_user_action(act: &Action) -> bool {
         use crate::{
             self as psibase, method,
-            services::{cpu_limit, db, events, transact, virtual_server},
+            services::{accounts, cpu_limit, db, events, transact, virtual_server},
         };
         !(act.service == db::SERVICE && act.method == method!("open")
             || act.service == cpu_limit::SERVICE
             || act.sender == transact::SERVICE && act.service == virtual_server::SERVICE
+            || act.sender == transact::SERVICE
+                && act.service == accounts::SERVICE
+                && act.method == method!("getAuthOf")
             || act.service == events::SERVICE && act.method == method!("sync")
             || act.sender == AccountNumber::default())
     }
@@ -1219,6 +1221,68 @@ impl<'a> Caller for ChainPusher<'a> {
         ret
     }
 }
+
+pub trait Push: ServiceWrapper {
+    /// push transactions to [psibase::Chain](psibase::Chain).
+    ///
+    /// This method returns an object which has methods
+    /// (one per action) which push transactions to a test chain and return a
+    /// [psibase::ChainResult](psibase::ChainResult) or
+    /// [psibase::ChainEmptyResult](psibase::ChainEmptyResult). This final object
+    /// can verify success or failure and can retrieve the return value, if any.
+    ///
+    /// This method defaults both `sender` and `service` to Self::SERVICE
+    fn push<'a>(chain: &'a Chain) -> Self::Actions<ChainPusher<'a>> {
+        Self::push_from_to(chain, Self::SERVICE, Self::SERVICE)
+    }
+
+    /// push transactions to [psibase::Chain](psibase::Chain).
+    ///
+    /// This method returns an object which has methods
+    /// (one per action) which push transactions to a test chain and return a
+    /// [psibase::ChainResult](psibase::ChainResult) or
+    /// [psibase::ChainEmptyResult](psibase::ChainEmptyResult). This final object
+    /// can verify success or failure and can retrieve the return value, if any.
+    ///
+    /// This method defaults `sender` to Self::SERVICE
+    fn push_to<'a>(chain: &'a Chain, service: AccountNumber) -> Self::Actions<ChainPusher<'a>> {
+        Self::push_from_to(chain, Self::SERVICE, service)
+    }
+
+    /// push transactions to [psibase::Chain](psibase::Chain).
+    ///
+    /// This method returns an object which has methods
+    /// (one per action) which push transactions to a test chain and return a
+    /// [psibase::ChainResult](psibase::ChainResult) or
+    /// [psibase::ChainEmptyResult](psibase::ChainEmptyResult). This final object
+    /// can verify success or failure and can retrieve the return value, if any.
+    ///
+    /// This method defaults `service` to Self::SERVICE
+    fn push_from<'a>(chain: &'a Chain, sender: AccountNumber) -> Self::Actions<ChainPusher<'a>> {
+        Self::push_from_to(chain, sender, Self::SERVICE)
+    }
+
+    /// push transactions to [psibase::Chain](psibase::Chain).
+    ///
+    /// This method returns an object which has methods
+    /// (one per action) which push transactions to a test chain and return a
+    /// [psibase::ChainResult](psibase::ChainResult) or
+    /// [psibase::ChainEmptyResult](psibase::ChainEmptyResult). This final object
+    /// can verify success or failure and can retrieve the return value, if any.
+    fn push_from_to<'a>(
+        chain: &'a Chain,
+        sender: AccountNumber,
+        service: AccountNumber,
+    ) -> Self::Actions<ChainPusher<'a>> {
+        Self::with_caller(ChainPusher {
+            chain,
+            sender,
+            service,
+        })
+    }
+}
+
+impl<T: ServiceWrapper> Push for T {}
 
 /// A [`Caller`] that uses [`staged_tx::propose`](crate::services::staged_tx)
 /// to wrap an action call (from `sender` to `service`) in a proposal by `proposer`.
@@ -1349,10 +1413,6 @@ pub mod polyfill {
             full_key.as_ptr(),
             full_key.len() as u32,
         )
-    }
-
-    pub unsafe fn getSequential(db: DbId, id: u64) -> u32 {
-        return tester_raw::getSequential(get_selected_chain(), db, id);
     }
 
     pub unsafe fn getKey(dest: *mut u8, dest_size: u32) -> u32 {

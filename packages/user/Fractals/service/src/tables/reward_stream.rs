@@ -1,4 +1,4 @@
-use psibase::{check, check_none, check_some, AccountNumber, Memo, Table};
+use psibase::{AccountNumber, Memo, ServiceWrapper, Table};
 
 use crate::constants::{
     DEFAULT_MEMBER_DISTRIBUTION_INTERVAL, FRACTAL_STREAM_HALF_LIFE, MEMBER_STREAM_HALF_LIFE,
@@ -32,7 +32,7 @@ impl RewardStream {
     }
 
     pub fn add_member(fractal: AccountNumber, owner: AccountNumber, token_id: TID) -> Self {
-        check_none(Self::get(fractal, owner), "stream already exists");
+        assert!(Self::get(fractal, owner).is_none(), "stream already exists");
         let new_instance = Self::new_member(fractal, owner, token_id);
 
         new_instance.save();
@@ -40,7 +40,10 @@ impl RewardStream {
     }
 
     pub fn add_fractal(fractal: AccountNumber, token_id: TID) -> Self {
-        check_none(Self::get(fractal, fractal), "stream already exists");
+        assert!(
+            Self::get(fractal, fractal).is_none(),
+            "stream already exists"
+        );
         let new_instance = Self::new_fractal(fractal, token_id);
 
         new_instance.save();
@@ -49,7 +52,7 @@ impl RewardStream {
 
     pub fn claim(&mut self) -> (TID, Quantity) {
         let (token_id, claimed_before_levy_payments) = self.withdraw();
-        check(
+        assert!(
             claimed_before_levy_payments.value > 0,
             "nothing to withdraw",
         );
@@ -86,7 +89,7 @@ impl RewardStream {
     }
 
     pub fn deposit(&self, amount: Quantity, memo: Memo) {
-        check(amount.value > 0, "deposit must be greater than 0");
+        assert!(amount.value > 0, "deposit must be greater than 0");
         Tokens::call().credit(self.token_id(), TokenStream::SERVICE, amount, memo);
         TokenStream::call().deposit(self.stream_id, amount);
     }
@@ -98,7 +101,7 @@ impl RewardStream {
     }
 
     pub fn get_assert(fractal: AccountNumber, owner: AccountNumber) -> Self {
-        check_some(Self::get(fractal, owner), "reward stream does not exist")
+        Self::get(fractal, owner).expect("reward stream does not exist")
     }
 
     fn token_id(&self) -> TID {
@@ -131,7 +134,7 @@ impl RewardStream {
             (self.last_distributed.seconds - genesis) / distribution_interval;
         let whole_intervals_elapsed = intervals_since_genesis - intervals_at_last_dist;
 
-        check(
+        assert!(
             whole_intervals_elapsed > 0,
             "must wait for interval period before token distribution",
         );

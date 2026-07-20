@@ -3,7 +3,7 @@ use psibase::{
     account,
     services::{http_server, tokens},
     tester::PRODUCER_ACCOUNT,
-    AccountNumber, ChainEmptyResult,
+    AccountNumber, ChainEmptyResult, Push,
 };
 
 use super::query::get_user_resources;

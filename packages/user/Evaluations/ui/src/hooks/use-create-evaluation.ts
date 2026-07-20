@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getEvaluation } from "@/lib/graphql/get-evaluation";
 import { getLastCreatedEvaluationId } from "@/lib/graphql/get-last-created-evaluation";
 
+import { EVALUATIONS_SERVICE } from "@shared/domains/fractal/lib/constants";
 import { queryClient } from "@shared/lib/query-client";
 import { type Account, zAccount } from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";
@@ -59,7 +60,7 @@ export const useCreateEvaluation = () => {
 
             void (await supervisor.functionCall({
                 method: "create",
-                service: "evaluations",
+                service: EVALUATIONS_SERVICE,
                 intf: "admin",
                 params: [
                     registration,

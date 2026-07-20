@@ -2,15 +2,19 @@
 mod bindings;
 use bindings::*;
 
-use exports::config::plugin::virtual_server::{
-    CpuPricingParams, NetPricingParams, NetworkVariables, ServerSpecs,
-};
-use exports::config::plugin::{
-    branding::Guest as Branding, packaging::Guest as Packaging,
-    prem_accounts::Guest as PremAccounts, producers::Guest as Producers,
-    settings::Guest as Settings, symbol::Guest as Symbol, virtual_server::Guest as VirtualServer,
-};
 use host::types::types::Error;
+
+use exports::config::plugin::{
+    branding::Guest as Branding,
+    name_market::{Guest as NameMarket, MarketConfig},
+    packaging::Guest as Packaging,
+    producers::Guest as Producers,
+    settings::Guest as Settings,
+    symbol::Guest as Symbol,
+    virtual_server::{
+        CpuPricingParams, Guest as VirtualServer, NetPricingParams, NetworkVariables, ServerSpecs,
+    },
+};
 
 use virtual_server::plugin::types::{
     CpuPricingParams as DestCpuPricingParams, NetPricingParams as DestNetPricingParams,
@@ -92,59 +96,15 @@ impl Packaging for ConfigPlugin {
     }
 }
 
-impl PremAccounts for ConfigPlugin {
-    fn create(
-        length: u8,
-        initial_price: String,
-        target: u32,
-        floor_price: String,
-        increase_ppm: u32,
-        decrease_ppm: u32,
-    ) -> Result<(), Error> {
-        set_propose_latch(Some("prem-accounts"))?;
+impl NameMarket for ConfigPlugin {
+    fn configure_markets(configs: Vec<MarketConfig>) -> Result<(), Error> {
+        if configs.is_empty() {
+            return Ok(());
+        }
 
-        prem_accounts::plugin::market_admin::create(
-            length,
-            &initial_price,
-            target,
-            &floor_price,
-            increase_ppm,
-            decrease_ppm,
-        )?;
-        Ok(())
-    }
-    fn configure(
-        length: u8,
-        window_seconds: u32,
-        target: u32,
-        floor_price: String,
-        increase_ppm: u32,
-        decrease_ppm: u32,
-    ) -> Result<(), Error> {
-        set_propose_latch(Some("prem-accounts"))?;
+        set_propose_latch(Some("namemarket"))?;
 
-        prem_accounts::plugin::market_admin::configure(
-            length,
-            window_seconds,
-            target,
-            &floor_price,
-            increase_ppm,
-            decrease_ppm,
-        )?;
-        Ok(())
-    }
-    fn enable(length: u8) -> Result<(), Error> {
-        set_propose_latch(Some("prem-accounts"))?;
-
-        prem_accounts::plugin::market_admin::enable(length)?;
-        Ok(())
-    }
-
-    fn disable(length: u8) -> Result<(), Error> {
-        set_propose_latch(Some("prem-accounts"))?;
-
-        prem_accounts::plugin::market_admin::disable(length)?;
-        Ok(())
+        name_market::plugin::market_admin::configure_markets(&configs)
     }
 }
 

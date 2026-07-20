@@ -24,8 +24,8 @@ use psibase::fracpack::{Pack, Unpack};
 use psibase::services::packages::PackageSource;
 use psibase::{
     make_refs, method, solve_dependencies, AccountNumber, Action, InstalledPackageInfo,
-    PackageDisposition, PackageList, PackageManifest, PackagedService, SchemaMap, StagedUpload,
-    TransactionBuilder,
+    PackageDisposition, PackageList, PackageManifest, PackagedService, SchemaMap, ServiceWrapper,
+    StagedUpload, TransactionBuilder,
 };
 
 use psibase::services::{

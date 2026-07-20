@@ -18,6 +18,7 @@ Base64 = "0.23.0"
 Guilds = "0.23.0"
 Host = "0.23.0"
 HttpServer = "0.23.0"
+Permissions = "0.23.0"
 Sites = "0.23.0"
 Transact = "0.23.0"
 

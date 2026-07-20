@@ -1,4 +1,5 @@
 import { ChevronsUpDown, LogIn, LogOut, Moon, Sun, Users } from "lucide-react";
+import { useLocation } from "react-router-dom";
 
 import { Avatar } from "@shared/components/avatar";
 import { useTheme } from "@shared/components/theme-provider";
@@ -28,6 +29,7 @@ import {
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 export function UserSidebarNavFooter() {
+    const location = useLocation();
     const { isMobile } = useSidebar();
     const { setTheme } = useTheme();
 
@@ -37,8 +39,11 @@ export function UserSidebarNavFooter() {
     const { mutateAsync: logout } = useLogout();
     const { mutateAsync: login } = useConnectAccount();
 
-    const onSwitchAccounts = async () => {
-        await login();
+    const onLogin = async () => {
+        await login({
+            enabled: true,
+            returnPath: `${location.pathname}${location.search}${location.hash}`,
+        });
     };
 
     const onLogout = async () => {
@@ -138,7 +143,7 @@ export function UserSidebarNavFooter() {
                         <DropdownMenuSeparator />
                         {user ? (
                             <>
-                                <DropdownMenuItem onClick={onSwitchAccounts}>
+                                <DropdownMenuItem onClick={onLogin}>
                                     <Users className="mr-2 h-4 w-4" />
                                     Switch account
                                 </DropdownMenuItem>
@@ -149,7 +154,7 @@ export function UserSidebarNavFooter() {
                             </>
                         ) : (
                             <DropdownMenuItem
-                                onClick={() => login()}
+                                onClick={onLogin}
                                 disabled={isPendingUser}
                             >
                                 <LogIn className="mr-2 h-4 w-4" />

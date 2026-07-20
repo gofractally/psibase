@@ -507,8 +507,8 @@ mod service {
             return;
         }
 
-        Nft::call().setUserConf(NftHolderFlags::MANUAL_DEBIT.index(), true);
-        Tokens::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
+        Nft::call().setUserConf(NftHolderFlags::AUTO_DEBIT.index(), false);
+        Tokens::call().setUserConf(BalanceFlags::AUTO_DEBIT.index(), false);
         Tokens::call().setUserConf(BalanceFlags::KEEP_ZERO_BALANCE.index(), true);
 
         // Initialize network resource consumption tracking
@@ -545,9 +545,9 @@ mod service {
         Transact::call().resMonitoring(true);
 
         // Event indexes
-        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("consumed"), 0);
-        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("subsidized"), 0);
-        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("subsidized"), 1);
+        events::Wrapper::call().addIndex(EventDb::HistoryEvent, SERVICE, method!("consumed"), 0);
+        events::Wrapper::call().addIndex(EventDb::HistoryEvent, SERVICE, method!("subsidized"), 0);
+        events::Wrapper::call().addIndex(EventDb::HistoryEvent, SERVICE, method!("subsidized"), 1);
 
         CapacityPricing::get_assert(Disk).consume(prealloc);
         Wrapper::emit().history().consumed(
@@ -571,8 +571,8 @@ mod service {
     /// `enable_billing` action must be called explicitly to enable user billing.
     #[action]
     fn init_billing(fee_receiver: AccountNumber) {
-        check(get_sender() == get_service(), "Unauthorized");
-        check(Accounts::call().exists(fee_receiver), "Fee_receiver DNE");
+        assert_eq!(get_sender(), get_service(), "Unauthorized");
+        assert!(Accounts::call().exists(fee_receiver), "Fee_receiver DNE");
 
         BillingConfig::initialize(fee_receiver);
 
@@ -594,7 +594,7 @@ mod service {
     /// in the network must have available.
     #[action]
     fn set_specs(specs: ServerSpecs) {
-        check(get_sender() == get_service(), "Unauthorized");
+        assert_eq!(get_sender(), get_service(), "Unauthorized");
 
         ServerSpecs::set(&specs);
         NetworkSpecs::update();
@@ -610,7 +610,7 @@ mod service {
     /// functionality.
     #[action]
     fn set_network_variables(variables: NetworkVariables) {
-        check(get_sender() == get_service(), "Unauthorized");
+        assert_eq!(get_sender(), get_service(), "Unauthorized");
 
         NetworkVariables::set(&variables);
         NetworkSpecs::update();
@@ -622,7 +622,7 @@ mod service {
     /// Enable the billing system
     #[action]
     fn enable_billing() {
-        check(get_sender() == get_service(), "Unauthorized");
+        assert_eq!(get_sender(), get_service(), "Unauthorized");
 
         BillingConfig::enable();
     }
@@ -701,8 +701,9 @@ mod service {
         let sender = get_sender();
 
         // Cannot delete a sub-account that has pending billing
-        check(
-            !balance_cache::has_pending(sender, Some(sub_account.clone())),
+        assert_eq!(
+            false,
+            balance_cache::has_pending(sender, Some(sub_account.clone())),
             "cannot delete a sub-account that has pending billing this transaction",
         );
 
@@ -738,19 +739,18 @@ mod service {
     /// billable account.
     #[action]
     fn bill_to_sub(sub_account: String) {
-        let billable_account =
-            check_some(tx_cache::get_billable_account(), "Billable account not set");
+        let billable_account = tx_cache::get_billable_account().expect("Billable account not set");
 
-        check(
+        assert!(
             !sub_account.is_empty(),
-            "Billable sub-account cannot be empty",
+            "Billable sub-account cannot be empty"
         );
 
         let sender = get_sender();
 
         // Warning: This `get_resource_balance_opt` call calls into the tokens service. Therefore the
         // tokens service is currently not allowed to use `bill_to_sub`` since it is not re-entrant.
-        check(
+        assert!(
             UserSettings::get_resource_balance_opt(sender, Some(sub_account.clone())).is_some(),
             "Billable sub-account does not exist",
         );
@@ -794,7 +794,7 @@ mod service {
     /// * `congested_ppm` - Threshold above which the network is considered congested (ppm)
     #[action]
     fn net_thresholds(idle_ppm: u32, congested_ppm: u32) {
-        check(get_sender() == get_service(), "Unauthorized");
+        assert_eq!(get_sender(), get_service(), "Unauthorized");
         RateLimitPricing::get_assert(Net).set_thresholds(idle_ppm, congested_ppm);
     }
 
@@ -808,7 +808,7 @@ mod service {
     /// * `halving_time_sec` - Time it takes to halve the price when idle
     #[action]
     fn net_rates(doubling_time_sec: u32, halving_time_sec: u32) {
-        check(get_sender() == get_service(), "Unauthorized");
+        assert_eq!(get_sender(), get_service(), "Unauthorized");
         RateLimitPricing::get_assert(Net).set_change_rates(doubling_time_sec, halving_time_sec);
     }
 
@@ -817,8 +817,8 @@ mod service {
     /// the price of network bandwidth.
     #[action]
     fn net_blocks_avg(num_blocks: u8) {
-        check(get_sender() == get_service(), "Unauthorized");
-        check(num_blocks > 0, "Number of blocks must be greater than 0");
+        assert_eq!(get_sender(), get_service(), "Unauthorized");
+        assert!(num_blocks > 0, "Number of blocks must be greater than 0");
         RateLimitPricing::get_assert(Net).set_num_blocks_to_average(num_blocks);
     }
 
@@ -827,7 +827,7 @@ mod service {
     /// This unit is also the minimum amount billed for bandwidth in a single transaction.
     #[action]
     fn net_min_unit(bits: u64) {
-        check(get_sender() == get_service(), "Unauthorized");
+        assert_eq!(get_sender(), get_service(), "Unauthorized");
         RateLimitPricing::get_assert(Net).set_billable_unit(bits);
     }
 
@@ -866,7 +866,7 @@ mod service {
     /// * `congested_ppm` - Threshold above which the network is considered congested (ppm)
     #[action]
     fn cpu_thresholds(idle_ppm: u32, congested_ppm: u32) {
-        check(get_sender() == get_service(), "Unauthorized");
+        assert_eq!(get_sender(), get_service(), "Unauthorized");
         RateLimitPricing::get_assert(Cpu).set_thresholds(idle_ppm, congested_ppm);
     }
 
@@ -880,7 +880,7 @@ mod service {
     /// * `halving_time_sec` - Time it takes to halve the price when idle
     #[action]
     fn cpu_rates(doubling_time_sec: u32, halving_time_sec: u32) {
-        check(get_sender() == get_service(), "Unauthorized");
+        assert_eq!(get_sender(), get_service(), "Unauthorized");
         RateLimitPricing::get_assert(Cpu).set_change_rates(doubling_time_sec, halving_time_sec);
     }
 
@@ -889,8 +889,8 @@ mod service {
     /// the price of CPU.
     #[action]
     fn cpu_blocks_avg(num_blocks: u8) {
-        check(get_sender() == get_service(), "Unauthorized");
-        check(num_blocks > 0, "Number of blocks must be greater than 0");
+        assert_eq!(get_sender(), get_service(), "Unauthorized");
+        assert!(num_blocks > 0, "Number of blocks must be greater than 0");
         RateLimitPricing::get_assert(Cpu).set_num_blocks_to_average(num_blocks);
     }
 
@@ -899,7 +899,7 @@ mod service {
     /// This unit is also the minimum amount billed for CPU in a single transaction.
     #[action]
     fn cpu_min_unit(ns: u64) {
-        check(get_sender() == get_service(), "Unauthorized");
+        assert_eq!(get_sender(), get_service(), "Unauthorized");
         RateLimitPricing::get_assert(Cpu).set_billable_unit(ns);
     }
 
@@ -931,7 +931,7 @@ mod service {
     /// relay. Reducing it lowers the spot price of disk.
     #[action]
     fn reduce_disk_budget(delta_supply: Quantity) {
-        check(get_sender() == get_service(), "Unauthorized");
+        assert_eq!(get_sender(), get_service(), "Unauthorized");
         CapacityPricing::get_assert(Disk).reduce_reserve_budget(delta_supply.value);
     }
 
@@ -958,12 +958,9 @@ mod service {
     /// this resource.
     #[action]
     fn useNetSys(user: AccountNumber, amount_bytes: u64) {
-        check(
-            get_sender() == Transact::SERVICE,
-            "[useNetSys] Unauthorized",
-        );
+        assert_eq!(get_sender(), Transact::SERVICE, "[useNetSys] Unauthorized");
 
-        let amount_bits = check_some(amount_bytes.checked_mul(8), "network usage overflow");
+        let amount_bits = amount_bytes.checked_mul(8).expect("network usage overflow");
         let sub = tx_cache::get_sub(user);
         let raw_cost = RateLimitPricing::get_assert(Net).consume(amount_bits);
         let cost = if is_billing_enabled() { raw_cost } else { 0 };
@@ -983,10 +980,7 @@ mod service {
     /// this resource.
     #[action]
     fn useCpuSys(user: AccountNumber, amount_ns: u64) {
-        check(
-            get_sender() == Transact::SERVICE,
-            "[useCpuSys] Unauthorized",
-        );
+        assert_eq!(get_sender(), Transact::SERVICE, "[useCpuSys] Unauthorized");
 
         let sub = tx_cache::get_sub(user);
         let raw_cost = RateLimitPricing::get_assert(Cpu).consume(amount_ns);
@@ -1005,7 +999,7 @@ mod service {
     /// per-tx accounting or cleanup.
     #[action]
     fn finishTx() {
-        check(get_sender() == Transact::SERVICE, "[finishTx] Unauthorized");
+        assert_eq!(get_sender(), Transact::SERVICE, "[finishTx] Unauthorized");
 
         for (disk_user, disk_amount, disk_cost) in tx_cache::drain_disk_usage() {
             if disk_amount == 0 && disk_cost == 0 {
@@ -1042,10 +1036,7 @@ mod service {
         // `Tokens::getSubBal` on balance_cache cache misses. For that reason, billable resource
         // token balances are pre-warmed during the pre-tx initialization.
 
-        check(
-            get_sender() == Transact::SERVICE,
-            "[useDiskSys] Unauthorized",
-        );
+        assert_eq!(get_sender(), Transact::SERVICE, "[useDiskSys] Unauthorized");
 
         if amount_bytes == 0 {
             return;
@@ -1077,7 +1068,7 @@ mod service {
                     }
                 }
             }
-            DbId::HistoryEvent | DbId::UiEvent | DbId::MerkleEvent | DbId::WriteOnly => return, // TODO: Event billing (rate-limit-style)
+            DbId::WriteOnly => return, // TODO: Event billing (rate-limit-style)
             DbId::BlockLog | DbId::BlockProof => return, // TODO: Billing (obj storage offset, correlated with NET consumption)
 
             // Subjectively billed databases:
@@ -1107,7 +1098,7 @@ mod service {
 
     #[action]
     fn notifyBlock(block_num: BlockNum) {
-        check(get_sender() == Transact::SERVICE, "Unauthorized");
+        assert_eq!(get_sender(), Transact::SERVICE, "Unauthorized");
 
         let net_usage = RateLimitPricing::get_assert(Net).new_block();
         let cpu_usage = RateLimitPricing::get_assert(Cpu).new_block();
@@ -1173,7 +1164,7 @@ mod service {
     /// actor responsible for the transaction. Used for any pre-tx initialization.
     #[action]
     fn prestartTx(actor: AccountNumber) {
-        check(get_sender() == Transact::SERVICE, "Unauthorized");
+        assert_eq!(get_sender(), Transact::SERVICE, "Unauthorized");
 
         warm_billable_account_caches(actor);
     }
@@ -1185,7 +1176,7 @@ mod service {
     /// on the resources available for the specified account.
     #[action]
     fn setBillableAcc(account: AccountNumber) {
-        check(get_sender() == Transact::SERVICE, "Unauthorized");
+        assert_eq!(get_sender(), Transact::SERVICE, "Unauthorized");
 
         tx_cache::set_billable_account(account);
 
@@ -1198,8 +1189,9 @@ mod service {
         _socket: Option<i32>,
         user: Option<AccountNumber>,
     ) -> Option<HttpReply> {
-        check(
-            get_sender() == psibase::services::http_server::SERVICE,
+        assert_eq!(
+            get_sender(),
+            psibase::services::http_server::SERVICE,
             "permission denied: serveSys only callable by http-server service",
         );
 

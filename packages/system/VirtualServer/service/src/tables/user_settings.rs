@@ -44,16 +44,17 @@ impl UserSettings {
 
     pub fn configure_buffer(&mut self, config: Option<BufferConfig>) {
         if let Some(config) = config {
-            check(
+            assert!(
                 config.threshold_percent <= 100,
                 "Threshold must be between 0 and 100 inclusive",
             );
             if config.threshold_percent != 0 {
                 // If the threshold is 0, capacity isn't used so it can be anything
                 let min_buffer_size = Self::get_min_buffer_capacity();
-                check(
+                assert!(
                     config.capacity > min_buffer_size,
-                    &format!("Capacity must be greater than {} bytes", min_buffer_size),
+                    "Capacity must be greater than {} bytes",
+                    min_buffer_size
                 );
             }
 

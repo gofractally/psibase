@@ -555,22 +555,6 @@ namespace psibase
       }
    }
 
-   Checksum256 BlockContext::makeEventMerkleRoot()
-   {
-      auto dbStatus = db.kvGet<DatabaseStatusRow>(DatabaseStatusRow::db, databaseStatusKey());
-      check(!!dbStatus, "databaseStatus not set");
-
-      Merkle m;
-      for (std::uint64_t i   = dbStatus->blockMerkleEventNumber,
-                         end = dbStatus->nextMerkleEventNumber;
-           i != end; ++i)
-      {
-         auto data = db.kvGetRaw(DbId::merkleEvent, psio::convert_to_key(i));
-         m.push(EventInfo{i, std::span{data->pos, data->end}});
-      }
-      return m.root();
-   }
-
    Checksum256 BlockContext::makeTransactionMerkle()
    {
       Merkle m;
@@ -759,7 +743,7 @@ namespace psibase
 
       status->current.consensusState = current.header.consensusState = sha256(status->consensus);
       status->current.trxMerkleRoot = current.header.trxMerkleRoot = makeTransactionMerkle();
-      status->current.eventMerkleRoot = current.header.eventMerkleRoot = makeEventMerkleRoot();
+      current.header.eventMerkleRoot = status->current.eventMerkleRoot;
 
       status->head = current;  // Also calculates blockId
       // authCode can be loaded from the database. We don't need an

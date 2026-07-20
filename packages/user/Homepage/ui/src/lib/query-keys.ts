@@ -19,6 +19,30 @@ const QueryKey = {
         ["userTokenBalances", user] as const,
     userTokenBalanceChanges: (user?: string | null, tokenId?: number) =>
         ["userTokenBalanceChanges", user, tokenId] as const,
+    nameMarketUnclaimedNames: (user?: string | null) =>
+        ["nameMarketUnclaimedNames", user] as const,
+    nameMarketEvents: (
+        user?: string | null,
+        {
+            first,
+            after,
+            last,
+            before,
+        }: {
+            first?: number;
+            after?: string;
+            last?: number;
+            before?: string;
+        } = {},
+    ) =>
+        [
+            "nameMarketEvents",
+            user,
+            first ?? null,
+            after ?? null,
+            last ?? null,
+            before ?? null,
+        ] as const,
 } as const satisfies Record<string, QueryKeyGenerator>;
 
 export type QueryKeysType = typeof QueryKey;
