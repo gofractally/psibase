@@ -129,11 +129,23 @@ The flake exposes a NixOS module so you can enable a node with:
         {
           services.psibase = {
             enable = true;
-            host = "psibase.localhost";
-            listen = 8080;
+            host = "psibase.example.com";
+            listen = 8090;
             producer = "prod";   # omit for a non-producing node
-            # openFirewall = true;
-            # extraArgs = [ "--p2p" "--database-cache-size=2GiB" ];
+            p2p = true;
+            databaseCacheSize = "2GiB";
+            # openFirewall = true;  # usually false when behind a reverse proxy
+
+            # SoftHSM2 for PKCS #11 block-signing keys (parity with docker deploy)
+            softHsm = {
+              enable = true;
+              pinFile = config.sops.secrets.softhsm_pin.path; # or any file with the PIN
+            };
+
+            # Reverse proxy injects this after authenticating admin (e.g. Caddy basic_auth)
+            environment = {
+              PSIBASE_USERNAME_FIELD = "X-Auth-User";
+            };
           };
         }
       ];
@@ -151,16 +163,33 @@ sudo nixos-rebuild switch --flake .#myhost
 The service starts `psinode` as the `psibase` user under `/var/lib/psibase/db`. A **new** chain still needs a one-time boot (with the service already running):
 
 ```bash
-psibase -a http://psibase.localhost:8080 boot -p prod
+psibase -a http://HOST:PORT boot -p prod
 ```
 
 Use the same producer name you set in `services.psibase.producer`.
+
+### SoftHSM / block production
+
+With `softHsm.enable = true` the module:
+
+1. Writes a SoftHSM config pointing at a persistent token directory
+2. Runs a oneshot that initializes the token once (using `pinFile`)
+3. Starts psinode with `--pkcs11-module=…/libsofthsm2.so` and `SOFTHSM2_CONF`
+
+After each psinode restart, unlock the HSM device in **x-admin** (same as the docker deploy) before the node can sign blocks. Do not put `$` or `#` in the SoftHSM PIN.
+
+### Production notes (vs docker compose)
+
+| Concern | Module / host responsibility |
+|--------|-------------------------------|
+| psinode + SoftHSM + p2p + cache | `services.psibase` |
+| TLS / reverse proxy / admin basic auth | your host (Caddy, Traefik, …) |
+| Dynamic DNS, log aggregation, disk UI | site-specific (not in this module) |
 
 ## Package notes
 
 - `nix build .#psibase` installs the current prebuilt SDK release (x86_64-linux) with binaries patched for NixOS.
 - Pure Nix source builds and aarch64 packages are planned follow-ups; until then you can override `services.psibase.package` with your own derivation if needed.
-- Production extras (SoftHSM / PKCS#11 signing, reverse proxy auth, auto-boot) are intentionally out of this module for now — use `extraArgs` and site-specific modules.
 
 # Relationship to Docker
 
