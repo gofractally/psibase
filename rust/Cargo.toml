@@ -10,6 +10,7 @@ members = [
     "psibase_macros",
     "psibase_plugin",
     "psibase_service",
+    "reserved-names",
     # must be present for `caro hakari` to find the workspace-hack
     "rust-workspace-hack",
     "test_contract",
@@ -33,6 +34,7 @@ default-members = [
     "psibase_macros",
     "psibase",
     "psibase_plugin",
+    "reserved-names",
     "test_fracpack",
     "test_fracpack_macros",
 ]
