@@ -343,7 +343,27 @@
           '';
         };
 
-        packages.wasi-sdk = wasiSdk;
+        packages = rec {
+          wasi-sdk = wasiSdk;
+          # Prebuilt runtime package (see nix/package.nix). Pure source build is follow-up.
+          psibase = pkgs.callPackage ./nix/package.nix { };
+          default = psibase;
+        };
       }
-    );
+    )
+    // {
+      overlays.default = final: prev: {
+        psibase = self.packages.${final.stdenv.hostPlatform.system}.psibase;
+      };
+
+      # System-independent NixOS module. Import as:
+      #   imports = [ inputs.psibase.nixosModules.psibase ];
+      nixosModules.psibase =
+        { pkgs, lib, ... }:
+        {
+          imports = [ ./nix/module.nix ];
+          services.psibase.package = lib.mkDefault self.packages.${pkgs.stdenv.hostPlatform.system}.psibase;
+        };
+      nixosModules.default = self.nixosModules.psibase;
+    };
 }

@@ -109,7 +109,59 @@ nix develop
 
 - `flake.nix` / `flake.lock` — Nix flake at repo root
 - `nix/rust-toolchain.toml` — Rust version and targets
+- `nix/package.nix` — Installable `psibase` package (`psinode` + `psibase` CLI)
+- `nix/module.nix` — NixOS module (`services.psibase`)
+
+# NixOS service (run a chain)
+
+The flake exposes a NixOS module so you can enable a node with:
+
+```nix
+# flake.nix (your NixOS host)
+{
+  inputs.psibase.url = "github:gofractally/psibase"; # or a local path
+
+  outputs = { nixpkgs, psibase, ... }: {
+    nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        psibase.nixosModules.psibase
+        {
+          services.psibase = {
+            enable = true;
+            host = "psibase.localhost";
+            listen = 8080;
+            producer = "prod";   # omit for a non-producing node
+            # openFirewall = true;
+            # extraArgs = [ "--p2p" "--database-cache-size=2GiB" ];
+          };
+        }
+      ];
+    };
+  };
+}
+```
+
+Then:
+
+```bash
+sudo nixos-rebuild switch --flake .#myhost
+```
+
+The service starts `psinode` as the `psibase` user under `/var/lib/psibase/db`. A **new** chain still needs a one-time boot (with the service already running):
+
+```bash
+psibase -a http://psibase.localhost:8080 boot -p prod
+```
+
+Use the same producer name you set in `services.psibase.producer`.
+
+## Package notes
+
+- `nix build .#psibase` installs the current prebuilt SDK release (x86_64-linux) with binaries patched for NixOS.
+- Pure Nix source builds and aarch64 packages are planned follow-ups; until then you can override `services.psibase.package` with your own derivation if needed.
+- Production extras (SoftHSM / PKCS#11 signing, reverse proxy auth, auto-boot) are intentionally out of this module for now — use `extraArgs` and site-specific modules.
 
 # Relationship to Docker
 
-Docker (psibase-contributor) remains a supported path. Nix is an **additional** option for Linux: one clone of psibase, then `nix develop` and build.
+Docker (psibase-contributor) remains a supported path. Nix is an **additional** option for Linux: one clone of psibase, then `nix develop` and build. For running a long-lived node on NixOS, prefer `services.psibase` over the dev shell.
