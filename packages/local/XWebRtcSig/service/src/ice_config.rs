@@ -1,7 +1,7 @@
 //! ICE server merge and client validation.
 //!
-//! Default STUN entries and TURN entries from node admin JSON are merged for the
-//! `welcome` frame. TURN secrets remain in `x-admin`; only `x-webrtc-sig` reads them.
+//! Welcome currently uses default STUN only. [`merged_ice_servers`] also accepts
+//! optional TURN JSON so a later PR can wire node-configured relay servers.
 
 use crate::protocol::{IceServerConfig, IceServerUrls};
 
@@ -60,7 +60,7 @@ pub fn default_stun_ice_server_configs() -> Vec<IceServerConfig> {
     ]
 }
 
-/// Merges default STUN servers with TURN entries from node admin JSON (`[]` if unset).
+/// Merges default STUN servers with optional extra ICE JSON (`[]` / invalid → STUN only).
 pub fn merged_ice_servers(turn_json: &str) -> Vec<IceServerConfig> {
     let mut servers = default_stun_ice_server_configs();
     let Ok(extra) = serde_json::from_str::<Vec<IceServerConfig>>(turn_json) else {
@@ -88,7 +88,6 @@ mod tests {
 
     #[test]
     fn merge_empty_turn_array_uses_default_stun_only() {
-        // XAdmin returns "[]" when unset or unauthorized; welcome must still work.
         let servers = merged_ice_servers("[]");
         assert_eq!(servers, default_stun_ice_server_configs());
     }

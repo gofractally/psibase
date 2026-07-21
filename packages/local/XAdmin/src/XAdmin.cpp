@@ -759,19 +759,6 @@ namespace LocalService
       return result.value_or(AdminOptionsRow{});
    }
 
-   std::string XAdmin::turnIceServersJson()
-   {
-      if (getSender() != psibase::AccountNumber{"x-wrtcsig"})
-         return "[]";
-      std::optional<std::string> json;
-      PSIBASE_SUBJECTIVE_TX
-      {
-         if (auto row = XAdmin{}.open<OpenRelayTable>().get({}))
-            json = row->ice_servers_json;
-      }
-      return json.value_or("[]");
-   }
-
    // Returns nullopt on success, an appropriate error on failure
    std::optional<HttpReply> XAdmin::checkAuth(const HttpRequest&          req,
                                               std::optional<std::int32_t> socket)

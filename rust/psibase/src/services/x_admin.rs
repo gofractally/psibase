@@ -35,12 +35,6 @@ mod service {
         unimplemented!()
     }
 
-    /// JSON array of additional ICE server entries from node OpenRelay config; only x-webrtc-sig may call.
-    #[action]
-    fn turnIceServersJson() -> String {
-        unimplemented!()
-    }
-
     #[derive(Debug, Pack, Unpack, ToSchema, Serialize, Deserialize)]
     #[fracpack(fracpack_mod = "fracpack")]
     struct AdminOptionsRow {

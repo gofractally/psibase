@@ -61,8 +61,7 @@ mod service {
             Err(reply) => return Some(reply),
         };
 
-        // Fetch ICE before accept: XAdmin must not abort after the socket is upgraded.
-        // Empty/unauthorized responses ("[]") still yield default STUN via merged_ice_servers.
+        // Welcome ICE is STUN-only for now (`[]` → default STUN via merged_ice_servers).
         let turn_json = turn_ice_servers_json();
 
         XHttp::call().accept(socket, reply);

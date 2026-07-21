@@ -1,7 +1,5 @@
 use psibase::services::x_http::Wrapper as XHttp;
 use psibase::{services::transact::Wrapper as Transact, AccountNumber, ServiceWrapper};
-#[cfg(not(test))]
-use psibase::{account, services::x_admin::Wrapper as XAdminWrapper};
 
 use crate::ice_config::merged_ice_servers;
 use crate::protocol::{
@@ -14,19 +12,10 @@ use crate::state::subjective::{
 };
 use crate::trace::xrtcsig_trace;
 
-/// TURN/STUN JSON from x-admin. On failure or empty config, callers pass the
-/// result through [`merged_ice_servers`], which falls back to default STUN.
-/// Must be fetched *before* websocket accept so an abort cannot leave a
-/// hung upgraded socket with no welcome frames.
+/// Extra ICE JSON merged into welcome. Empty for now (default STUN only).
+/// A later PR will supply node-configured TURN here.
 pub(crate) fn turn_ice_servers_json() -> String {
-    #[cfg(test)]
-    {
-        "[]".into()
-    }
-    #[cfg(not(test))]
-    {
-        XAdminWrapper::call_from(account!("x-wrtcsig")).turnIceServersJson()
-    }
+    "[]".into()
 }
 
 #[cfg_attr(not(feature = "rt-trace"), allow(dead_code))]

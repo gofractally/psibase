@@ -22,14 +22,14 @@ relay. Chat message bodies are not sent on this websocket.
 | `service/src/state/` | Subjective socket/session tables + tx wrappers |
 | `service/src/cleanup.rs` | Stale ringing/session sweep |
 | `service/src/presence.rs` | Online presence fanout |
-| `service/src/ice_config.rs` | Default STUN + node TURN merge |
+| `service/src/ice_config.rs` | Default STUN (merge helper ready for later TURN) |
 | `tests/python/` | Slow integration/e2e (not in default ctest) |
 
 Service account: `x-wrtcsig` (`AccountNumber` max length is 10). Subprotocol:
 `psibase.realtime.v1`.
 
-TURN credentials are stored node-locally by `x-admin`; this service reads ICE
-JSON via `turnIceServersJson` and merges it with default STUN for welcome.
+Welcome ICE is **STUN-only** in this package today. Node-configured TURN
+(via `x-admin`) is deferred to a later PR.
 
 ## Tests
 
