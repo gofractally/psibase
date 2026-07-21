@@ -6,16 +6,14 @@ use host::types::types::Error;
 
 use exports::config::plugin::{
     branding::Guest as Branding,
-    packaging::Guest as Packaging,
     name_market::{Guest as NameMarket, MarketConfig},
+    packaging::Guest as Packaging,
     producers::Guest as Producers,
     settings::Guest as Settings,
     symbol::Guest as Symbol,
-    virtual_server::Guest as VirtualServer,
-};
-
-use exports::config::plugin::virtual_server::{
-    CpuPricingParams, NetPricingParams, NetworkVariables, ServerSpecs,
+    virtual_server::{
+        CpuPricingParams, Guest as VirtualServer, NetPricingParams, NetworkVariables, ServerSpecs,
+    },
 };
 
 use virtual_server::plugin::types::{
@@ -159,17 +157,16 @@ impl VirtualServer for ConfigPlugin {
             block_replay_factor: variables.block_replay_factor,
             per_block_sys_cpu_ns: variables.per_block_sys_cpu_ns,
             obj_storage_bytes: variables.obj_storage_bytes,
+            subj_storage_bytes: variables.subj_storage_bytes,
         };
         virtual_server::plugin::admin::set_network_variables(variables)
     }
 
-    fn enable_billing(enabled: bool) -> Result<(), Error> {
-        if enabled {
-            virtual_server::plugin::billing::fill_gas_tank()?;
-        }
+    fn enable_billing() -> Result<(), Error> {
+        virtual_server::plugin::billing::fill_gas_tank()?;
 
         set_propose_latch(Some(VIRTUAL_SERVER))?;
-        virtual_server::plugin::admin::enable_billing(enabled)
+        virtual_server::plugin::admin::enable_billing()
     }
 
     fn set_cpu_pricing_params(params: CpuPricingParams) -> Result<(), Error> {
