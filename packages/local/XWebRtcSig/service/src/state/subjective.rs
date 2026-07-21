@@ -2,15 +2,17 @@
 
 use psibase::AccountNumber;
 
-use crate::presence::{connect_presence_fanout, disconnect_presence_fanout, ConnectPresenceFanout, DisconnectPresenceFanout};
-use crate::protocol::ClientSupports;
 use crate::cleanup;
-use crate::signaling;
+use crate::presence::{
+    connect_presence_fanout, disconnect_presence_fanout, ConnectPresenceFanout,
+    DisconnectPresenceFanout,
+};
+use crate::protocol::ClientSupports;
+use crate::state::tables::SocketSessionRow;
 use crate::state::{
     enqueue_pending_outbound, remove_socket_session, socket_session, store_client_ready,
     take_pending_outbound_payloads, upsert_socket_session, RemovedSocket,
 };
-use crate::state::tables::SocketSessionRow;
 
 pub fn socket_session_tx(socket: i32) -> Option<SocketSessionRow> {
     ::psibase::subjective_tx! {
@@ -18,7 +20,7 @@ pub fn socket_session_tx(socket: i32) -> Option<SocketSessionRow> {
     }
 }
 
-pub fn upsert_session_tx(socket: i32, user: AccountNumber, now: i64) {
+pub fn upsert_socket_session_tx(socket: i32, user: AccountNumber, now: i64) {
     ::psibase::subjective_tx! {
         upsert_socket_session(socket, user, now);
     }
@@ -69,15 +71,10 @@ pub fn remove_socket_session_tx(socket: i32) -> Option<RemovedSocket> {
     }
 }
 
-pub fn tear_down_signaling_for_dead_socket_tx(
-    socket: i32,
-    now: i64,
-) -> Vec<(i32, crate::protocol::ServerFrame)> {
-    signaling::tear_down_sessions_for_dead_socket(socket, now)
-}
-
-pub fn sweep_stale_sessions_tx(now: i64) -> Vec<(i32, crate::protocol::ServerFrame)> {
-    cleanup::sweep_stale_sessions(now)
+pub fn sweep_all_known_sessions_tx(now: i64) -> Vec<(i32, crate::protocol::ServerFrame)> {
+    ::psibase::subjective_tx! {
+        cleanup::sweep_all_known_sessions(now)
+    }
 }
 
 pub fn take_pending_outbound_payloads_tx(target_socket: i32) -> Vec<String> {

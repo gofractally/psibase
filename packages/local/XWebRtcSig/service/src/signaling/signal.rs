@@ -1,7 +1,7 @@
 use psibase::AccountNumber;
 
 use crate::protocol::{encode_server_frame, ServerFrame, SignalKind};
-use crate::state::{enqueue_pending_signal, sig_join_row};
+use crate::state::{enqueue_pending_signal, sig_join_row, touch_sig_session_track};
 #[cfg(feature = "rt-trace")]
 use crate::state::{live_sockets_for_user, sig_joins_for_session};
 #[cfg(feature = "rt-trace")]
@@ -10,7 +10,7 @@ use crate::trace::xrtcsig_trace;
 use super::constants::{is_supported_signaling_purpose, query_session_auth, session_err};
 use super::fanout::{fanout_signal_to_peer, redeliver_pending_signals};
 
-fn validate_signal_in_tx(
+fn validate_signal(
     socket: i32,
     user: AccountNumber,
     session_id: &str,
@@ -78,10 +78,10 @@ pub fn handle_signal(
     now: i64,
 ) -> Vec<(i32, ServerFrame)> {
     ::psibase::subjective_tx! {
-        if let Err(frame) = validate_signal_in_tx(socket, user, &session_id, to) {
+        if let Err(frame) = validate_signal(socket, user, &session_id, to) {
             vec![(socket, frame)]
         } else {
-            crate::cleanup::note_session_activity(&session_id, now);
+            touch_sig_session_track(&session_id, now);
             let outbound = ServerFrame::Signal {
                 session_id: session_id.clone(),
                 from: user.into(),

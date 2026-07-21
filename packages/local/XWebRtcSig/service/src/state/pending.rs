@@ -3,7 +3,6 @@ use psibase::Table;
 
 use super::tables::{
     SigPendingOutboundRow, SigPendingOutboundTable, SigPendingSignalRow, SigPendingSignalTable,
-    SigPendingWebRtcEventRow, SigPendingWebRtcEventTable,
 };
 
 pub fn enqueue_pending_signal(session_id: &str, to: AccountNumber, seq: i64, payload: String) {
@@ -17,7 +16,7 @@ pub fn enqueue_pending_signal(session_id: &str, to: AccountNumber, seq: i64, pay
         .range(lo..=hi)
         .map(|row| row.seq)
         .max();
-    let next_seq = next_pending_signal_seq(max_existing, seq);
+    let next_seq = next_pending_seq(max_existing, seq);
     SigPendingSignalTable::new()
         .put(&SigPendingSignalRow {
             session_id: session_id.to_owned(),
@@ -28,8 +27,8 @@ pub fn enqueue_pending_signal(session_id: &str, to: AccountNumber, seq: i64, pay
         .unwrap();
 }
 
-/// Pure seq bump for pending-signal FIFO when multiple signals share a block time.
-pub fn next_pending_signal_seq(max_existing: Option<i64>, block_seq: i64) -> i64 {
+/// Pure seq bump for pending FIFO when multiple items share a block time.
+pub fn next_pending_seq(max_existing: Option<i64>, block_seq: i64) -> i64 {
     match max_existing {
         Some(prev) if prev >= block_seq => prev + 1,
         _ => block_seq,
@@ -58,7 +57,7 @@ pub fn enqueue_pending_outbound(target_socket: i32, seq: i64, payload: String) {
         .range(lo..=hi)
         .map(|row| row.seq)
         .max();
-    let next_seq = next_pending_signal_seq(max_existing, seq);
+    let next_seq = next_pending_seq(max_existing, seq);
     SigPendingOutboundTable::new()
         .put(&SigPendingOutboundRow {
             target_socket,
@@ -105,20 +104,4 @@ pub fn erase_pending_signals_for_session(session_id: &str) {
     for row in rows {
         table.erase(&(row.session_id, row.to, row.seq));
     }
-}
-
-pub fn enqueue_pending_webrtc_session_event(row: SigPendingWebRtcEventRow) {
-    SigPendingWebRtcEventTable::new().put(&row).unwrap();
-}
-
-pub fn take_pending_webrtc_session_events() -> Vec<SigPendingWebRtcEventRow> {
-    let rows: Vec<SigPendingWebRtcEventRow> = SigPendingWebRtcEventTable::read()
-        .get_index_pk()
-        .iter()
-        .collect();
-    let table = SigPendingWebRtcEventTable::new();
-    for row in &rows {
-        table.erase(&(row.session_id.clone(), row.seq));
-    }
-    rows
 }

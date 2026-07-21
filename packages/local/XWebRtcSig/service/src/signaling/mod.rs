@@ -40,6 +40,6 @@ pub use join::handle_join_session;
 pub use signal::handle_signal;
 pub use leave::{handle_leave_session, handle_participant_state};
 
-pub use teardown::tear_down_sessions_for_dead_socket;
+pub(crate) use teardown::tear_down_sessions_for_dead_socket_tx;
 
 pub use dispatch::{dispatch_signaling_client_frame, SignalingDispatch};

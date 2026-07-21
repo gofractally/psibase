@@ -8,17 +8,13 @@ use crate::signaling::{
     query_session_auth_for_cleanup, EVENT_SESSION_ENDED, EVENT_SESSION_FAILED, PURPOSE_AV_CALL,
 };
 use crate::state::{
-    active_sig_session_ids, cleanup_all_subjective_for_session, joined_accounts_for_session,
-    sig_joins_for_session, sig_session_track, touch_sig_session_track, STALE_RINGING_TTL_US,
+    cleanup_all_subjective_for_session, joined_accounts_for_session, known_sig_session_ids,
+    sig_joins_for_session, sig_session_track, STALE_RINGING_TTL_US,
 };
 
 const SESSION_STATUS_ACTIVE: u8 = 1;
 
-fn session_ids_to_sweep() -> Vec<String> {
-    active_sig_session_ids()
-}
-
-fn last_activity_for_session(session_id: &str, now: i64) -> i64 {
+fn session_last_activity_at(session_id: &str, now: i64) -> i64 {
     if let Some(track) = sig_session_track(session_id) {
         return track.last_activity_at;
     }
@@ -29,11 +25,11 @@ fn last_activity_for_session(session_id: &str, now: i64) -> i64 {
         .unwrap_or(now)
 }
 
-fn ringing_since_for_session(session_id: &str, now: i64) -> i64 {
+fn session_ringing_started_at(session_id: &str, now: i64) -> i64 {
     if let Some(track) = sig_session_track(session_id) {
         return track.ringing_since;
     }
-    last_activity_for_session(session_id, now)
+    session_last_activity_at(session_id, now)
 }
 
 fn is_ringing_av_call(auth: &chat::SessionJoinAuth, session_id: &str) -> bool {
@@ -43,7 +39,9 @@ fn is_ringing_av_call(auth: &chat::SessionJoinAuth, session_id: &str) -> bool {
         && joined_accounts_for_session(session_id).len() < auth.participants.len()
 }
 
-fn terminal_event_account_from_participants(
+/// Account to put in `SessionEnded.by` when the server force-ends a session
+/// (prefer first unjoined participant, else first participant, else `x-wrtcsig`).
+fn get_who_terminated_session(
     participants: &[AccountNumber],
     joined: &[AccountNumber],
 ) -> AccountNumber {
@@ -53,13 +51,6 @@ fn terminal_event_account_from_participants(
         .copied()
         .or_else(|| participants.first().copied())
         .unwrap_or_else(|| psibase::account!("x-wrtcsig"))
-}
-
-fn terminal_event_account(auth: &chat::SessionJoinAuth, session_id: &str) -> AccountNumber {
-    terminal_event_account_from_participants(
-        &auth.participants,
-        &joined_accounts_for_session(session_id),
-    )
 }
 
 fn fanout_session_ended(
@@ -76,19 +67,21 @@ fn fanout_session_ended(
     crate::signaling::fanout_session_ended_to_participants(participants, &frame)
 }
 
-fn fail_session_subjective(
+fn end_and_purge_session(
     session_id: &str,
     auth: &chat::SessionJoinAuth,
     reason: &str,
-    _event_kind: u8,
 ) -> Vec<(i32, ServerFrame)> {
-    let account = terminal_event_account(auth, session_id);
-    let out = fanout_session_ended(&auth.participants, session_id, account, reason);
+    let by = get_who_terminated_session(
+        &auth.participants,
+        &joined_accounts_for_session(session_id),
+    );
+    let out = fanout_session_ended(&auth.participants, session_id, by, reason);
     cleanup_all_subjective_for_session(session_id);
     out
 }
 
-fn maybe_sweep_session(session_id: &str, now: i64) -> Vec<(i32, ServerFrame)> {
+fn sweep_one_session(session_id: &str, now: i64) -> Vec<(i32, ServerFrame)> {
     let auth = query_session_auth_for_cleanup(session_id);
     if auth.purpose.is_empty() {
         cleanup_all_subjective_for_session(session_id);
@@ -104,7 +97,7 @@ fn maybe_sweep_session(session_id: &str, now: i64) -> Vec<(i32, ServerFrame)> {
             } else {
                 "session-not-active"
             };
-            return fail_session_subjective(session_id, &auth, reason, EVENT_SESSION_FAILED);
+            return end_and_purge_session(session_id, &auth, reason);
         }
         cleanup_all_subjective_for_session(session_id);
         return vec![];
@@ -115,42 +108,24 @@ fn maybe_sweep_session(session_id: &str, now: i64) -> Vec<(i32, ServerFrame)> {
     }
 
     let cutoff = now - STALE_RINGING_TTL_US;
-    let stale_at = last_activity_for_session(session_id, now);
-    let ringing_since = ringing_since_for_session(session_id, now);
+    let stale_at = session_last_activity_at(session_id, now);
+    let ringing_since = session_ringing_started_at(session_id, now);
     if stale_at >= cutoff && ringing_since >= cutoff {
         return vec![];
     }
 
-    fail_session_subjective(session_id, &auth, "timeout", EVENT_SESSION_FAILED)
+    end_and_purge_session(session_id, &auth, "timeout")
 }
 
-pub(crate) fn sweep_stale_sessions_subjective(now: i64) -> Vec<(i32, ServerFrame)> {
+pub(crate) fn sweep_all_known_sessions(now: i64) -> Vec<(i32, ServerFrame)> {
     let mut out = Vec::new();
-    for session_id in session_ids_to_sweep() {
-        out.extend(maybe_sweep_session(&session_id, now));
+    for session_id in known_sig_session_ids() {
+        out.extend(sweep_one_session(&session_id, now));
     }
     out
 }
 
-fn sweep_stale_sessions_inner(now: i64) -> Vec<(i32, ServerFrame)> {
-    ::psibase::subjective_tx! {
-        sweep_stale_sessions_subjective(now)
-    }
-}
-
-pub fn sweep_stale_sessions(now: i64) -> Vec<(i32, ServerFrame)> {
-    sweep_stale_sessions_inner(now)
-}
-
-pub fn note_session_activity(session_id: &str, now: i64) {
-    touch_sig_session_track(session_id, now);
-}
-
-pub fn cleanup_session_if_terminal(
-    session_id: &str,
-    _auth: &chat::SessionJoinAuth,
-    event_kind: u8,
-) {
+pub fn purge_session_if_fully_ended(session_id: &str, event_kind: u8) {
     if event_kind == EVENT_SESSION_ENDED || event_kind == EVENT_SESSION_FAILED {
         cleanup_all_subjective_for_session(session_id);
     }
@@ -230,16 +205,10 @@ mod unit_tests {
     }
 
     #[test]
-    fn terminal_event_account_prefers_unjoined_participant() {
+    fn get_who_terminated_session_prefers_unjoined_participant() {
         let alice = account!("alice");
         let bob = account!("bob");
-        assert_eq!(
-            terminal_event_account_from_participants(&[alice, bob], &[]),
-            alice
-        );
-        assert_eq!(
-            terminal_event_account_from_participants(&[alice, bob], &[alice]),
-            bob
-        );
+        assert_eq!(get_who_terminated_session(&[alice, bob], &[]), alice);
+        assert_eq!(get_who_terminated_session(&[alice, bob], &[alice]), bob);
     }
 }

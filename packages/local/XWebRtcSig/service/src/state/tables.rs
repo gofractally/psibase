@@ -63,7 +63,7 @@ pub mod tables {
         }
     }
 
-    /// SDP/ICE queued when the recipient had no live websocket at signal time.
+    /// SDP/ICE queued when the recipient had no joined socket for the session.
     #[table(name = "SigPendingSignalTable", index = 3, db = "Subjective")]
     #[derive(Debug, Clone, PartialEq, Eq, Fracpack, Serialize, Deserialize, ToSchema)]
     pub struct SigPendingSignalRow {
@@ -90,27 +90,9 @@ pub mod tables {
         pub last_activity_at: i64,
     }
 
-    /// Chat timeline events queued during websocket recv (objective writes deferred).
-    #[table(name = "SigPendingWebRtcEventTable", index = 5, db = "Subjective")]
-    #[derive(Debug, Clone, PartialEq, Eq, Fracpack, Serialize, Deserialize, ToSchema)]
-    pub struct SigPendingWebRtcEventRow {
-        pub session_id: String,
-        pub seq: i64,
-        pub kind: u8,
-        pub account: AccountNumber,
-        pub reason: String,
-    }
-
-    impl SigPendingWebRtcEventRow {
-        #[primary_key]
-        fn pk(&self) -> (String, i64) {
-            (self.session_id.clone(), self.seq)
-        }
-    }
-
     /// Server frames queued for a socket when inline `send` would abort the
     /// active recv action (dead peer socket during join/signal fanout).
-    #[table(name = "SigPendingOutboundTable", index = 6, db = "Subjective")]
+    #[table(name = "SigPendingOutboundTable", index = 5, db = "Subjective")]
     #[derive(Debug, Clone, PartialEq, Eq, Fracpack, Serialize, Deserialize, ToSchema)]
     pub struct SigPendingOutboundRow {
         pub target_socket: i32,

@@ -176,14 +176,6 @@ pub(super) fn flush_pending_signals_to_socket(
     out
 }
 
-pub(super) fn fanout_participant_sockets(
-    participants: &[AccountNumber],
-    except: Option<AccountNumber>,
-    frame: &ServerFrame,
-) -> Vec<(i32, ServerFrame)> {
-    fanout_to_participant_sockets(participants, except, frame)
-}
-
 pub(crate) fn fanout_session_ended_to_participants(
     participants: &[AccountNumber],
     frame: &ServerFrame,

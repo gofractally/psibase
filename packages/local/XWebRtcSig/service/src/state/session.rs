@@ -105,7 +105,8 @@ pub fn joined_accounts_for_session(session_id: &str) -> Vec<AccountNumber> {
         .collect()
 }
 
-pub fn active_sig_session_ids() -> Vec<String> {
+/// Session ids with a track row and/or at least one subjective join (sweep candidates).
+pub fn known_sig_session_ids() -> Vec<String> {
     let mut ids: BTreeSet<String> = tracked_session_ids().into_iter().collect();
     for join in SigSessionJoinTable::read().get_index_pk().iter() {
         ids.insert(join.session_id.clone());

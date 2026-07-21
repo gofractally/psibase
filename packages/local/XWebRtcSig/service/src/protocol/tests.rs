@@ -118,10 +118,10 @@ fn rejects_missing_frame_discriminator() {
 
 #[test]
 fn serializes_presence_snapshot_and_delta() {
-    use super::{ContactPresence, PresenceStatus};
+    use super::{PeerPresence, PresenceStatus};
 
     let snapshot = ServerFrame::PresenceSnapshot {
-        contacts: vec![ContactPresence {
+        peers: vec![PeerPresence {
             account: "bob".parse().unwrap(),
             presence: PresenceStatus::Online,
         }],
@@ -322,10 +322,10 @@ mod golden_fixtures {
     fn deserializes_golden_presence_snapshot_frame() {
         let frame = decode_server_frame_json(PRESENCE_SNAPSHOT).unwrap();
         match frame {
-            ServerFrame::PresenceSnapshot { contacts } => {
-                assert_eq!(contacts.len(), 2);
-                assert_eq!(contacts[0].account, "bob".parse().unwrap());
-                assert_eq!(contacts[0].presence, PresenceStatus::Online);
+            ServerFrame::PresenceSnapshot { peers } => {
+                assert_eq!(peers.len(), 2);
+                assert_eq!(peers[0].account, "bob".parse().unwrap());
+                assert_eq!(peers[0].presence, PresenceStatus::Online);
             }
             other => panic!("expected PresenceSnapshot, got {other:?}"),
         }

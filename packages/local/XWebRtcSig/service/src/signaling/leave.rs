@@ -2,11 +2,14 @@ use psibase::AccountNumber;
 
 use crate::protocol::ServerFrame;
 
-use super::constants::{query_session_auth, session_err, EVENT_PARTICIPANT_LEFT, EVENT_SESSION_ENDED, EVENT_SESSION_FAILED, PURPOSE_AV_CALL};
-use super::fanout::fanout_participant_sockets;
+use super::constants::{
+    query_session_auth, session_err, EVENT_PARTICIPANT_LEFT, EVENT_SESSION_ENDED,
+    EVENT_SESSION_FAILED, PURPOSE_AV_CALL,
+};
+use super::fanout::fanout_to_participant_sockets;
 use crate::state::{erase_sig_session_join, sig_join_row, sig_joins_for_session};
 
-pub(super) fn leave_lifecycle_event_kind(
+pub(super) fn leave_event_kind(
     purpose: &str,
     participant_count: usize,
     reason: &str,
@@ -65,60 +68,22 @@ fn leave_session_subjective(
     let joined_before = sig_joins_for_session(&session_id).len() + 1;
     let reason_str = normalize_leave_reason(reason);
 
-    let event_kind = leave_lifecycle_event_kind(
+    let event_kind = leave_event_kind(
         &auth.purpose,
         auth.participants.len(),
         &reason_str,
         joined_before,
     );
-    crate::cleanup::cleanup_session_if_terminal(&session_id, &auth, event_kind);
+    crate::cleanup::purge_session_if_fully_ended(&session_id, event_kind);
 
     let ended = ServerFrame::SessionEnded {
         session_id: session_id.clone(),
         by: user.into(),
         reason: reason_str.clone(),
     };
-    let mut out = fanout_participant_sockets(&auth.participants, Some(user), &ended);
+    let mut out = fanout_to_participant_sockets(&auth.participants, Some(user), &ended);
     out.push((socket, ended));
     out
-}
-
-fn leave_session_subjective_frames(
-    socket: i32,
-    user: AccountNumber,
-    session_id: String,
-    reason: Option<String>,
-    now: i64,
-) -> Vec<(i32, ServerFrame)> {
-    leave_session_subjective(socket, user, session_id, reason, now)
-}
-
-fn leave_session_subjective_tx_subjective(
-    socket: i32,
-    user: AccountNumber,
-    session_id: String,
-    reason: Option<String>,
-    now: i64,
-) -> Vec<(i32, ServerFrame)> {
-    ::psibase::subjective_tx! {
-        leave_session_subjective_frames(
-            socket,
-            user,
-            session_id.clone(),
-            reason.clone(),
-            now,
-        )
-    }
-}
-
-fn leave_session_subjective_tx(
-    socket: i32,
-    user: AccountNumber,
-    session_id: String,
-    reason: Option<String>,
-    now: i64,
-) -> Vec<(i32, ServerFrame)> {
-    leave_session_subjective_tx_subjective(socket, user, session_id, reason, now)
 }
 
 pub fn handle_leave_session(
@@ -128,7 +93,9 @@ pub fn handle_leave_session(
     reason: Option<String>,
     now: i64,
 ) -> Vec<(i32, ServerFrame)> {
-    leave_session_subjective_tx(socket, user, session_id, reason, now)
+    ::psibase::subjective_tx! {
+        leave_session_subjective(socket, user, session_id.clone(), reason.clone(), now)
+    }
 }
 
 pub fn handle_participant_state(

@@ -3,7 +3,7 @@ use super::invite::{
     av_call_data_channels, av_call_transports, chat_data_channels, chat_data_transports,
     session_invite_frame, CHAT_DATA_CHANNEL_LABEL,
 };
-use super::leave::{leave_lifecycle_event_kind, normalize_leave_reason};
+use super::leave::{leave_event_kind, normalize_leave_reason};
 use super::*;
 use crate::protocol::ServerFrame;
 use psibase::services::chat;
@@ -12,15 +12,15 @@ use psibase::*;
 #[test]
 fn av_call_leave_event_kind_maps_ringing_timeout_to_failed() {
     assert_eq!(
-        leave_lifecycle_event_kind(PURPOSE_AV_CALL, 2, "timeout", 1),
+        leave_event_kind(PURPOSE_AV_CALL, 2, "timeout", 1),
         EVENT_SESSION_FAILED
     );
     assert_eq!(
-        leave_lifecycle_event_kind(PURPOSE_AV_CALL, 2, "declined", 1),
+        leave_event_kind(PURPOSE_AV_CALL, 2, "declined", 1),
         EVENT_SESSION_ENDED
     );
     assert_eq!(
-        leave_lifecycle_event_kind(PURPOSE_AV_CALL, 2, "ended", 2),
+        leave_event_kind(PURPOSE_AV_CALL, 2, "ended", 2),
         EVENT_SESSION_ENDED
     );
 }

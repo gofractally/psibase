@@ -5,8 +5,6 @@ pub const REALTIME_SUBPROTOCOL_V1: &str = "psibase.realtime.v1";
 
 /// WebSocket text frame flag passed to `x-http` `send` / `recv`.
 pub const WEBSOCKET_TEXT: u32 = 1;
-/// WebSocket binary frame flag passed to `x-http` `send` / `recv`.
-pub const WEBSOCKET_BINARY: u32 = 2;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProtocolError {
@@ -106,7 +104,7 @@ pub struct ParticipantStatePayload {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct ContactPresence {
+pub struct PeerPresence {
     pub account: ExactAccountNumber,
     pub presence: PresenceStatus,
 }

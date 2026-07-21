@@ -66,7 +66,7 @@ pub fn store_client_ready(
     true
 }
 
-pub fn sessions_for_user(user: AccountNumber) -> Vec<i32> {
+pub fn sockets_for_user(user: AccountNumber) -> Vec<i32> {
     UserSessionTable::read()
         .get_index_pk()
         .iter()
@@ -77,14 +77,14 @@ pub fn sessions_for_user(user: AccountNumber) -> Vec<i32> {
 
 /// Sockets listed for `user` that still have an active `SocketSessionRow`.
 pub fn live_sockets_for_user(user: AccountNumber) -> Vec<i32> {
-    sessions_for_user(user)
+    sockets_for_user(user)
         .into_iter()
         .filter(|socket| socket_session(*socket).is_some())
         .collect()
 }
 
 /// Other accounts with at least one live websocket (excluding `user`).
-pub fn active_session_accounts_except(user: AccountNumber) -> Vec<AccountNumber> {
+pub fn connected_accounts_except(user: AccountNumber) -> Vec<AccountNumber> {
     let mut accounts: Vec<AccountNumber> = UserSessionTable::read()
         .get_index_pk()
         .iter()
@@ -102,14 +102,6 @@ pub fn socket_session(socket: i32) -> Option<SocketSessionRow> {
         .get(&socket)
 }
 
-pub fn stable_pick_socket(mut sockets: Vec<i32>) -> Option<i32> {
-    if sockets.is_empty() {
-        return None;
-    }
-    sockets.sort_unstable();
-    Some(sockets[0])
-}
-
 pub fn remove_socket_session(socket: i32) -> Option<RemovedSocket> {
     erase_sig_joins_for_socket(socket);
     erase_pending_outbound_for_socket(socket);
@@ -121,6 +113,6 @@ pub fn remove_socket_session(socket: i32) -> Option<RemovedSocket> {
     Some(RemovedSocket {
         socket,
         user: row.user,
-        remaining_sockets: sessions_for_user(row.user),
+        remaining_sockets: sockets_for_user(row.user),
     })
 }

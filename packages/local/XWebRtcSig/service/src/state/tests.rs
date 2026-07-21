@@ -1,4 +1,4 @@
-use super::{next_pending_signal_seq, RemovedSocket};
+use super::{next_pending_seq, RemovedSocket};
 use psibase::AccountNumber;
 
 #[test]
@@ -24,9 +24,9 @@ fn removed_socket_not_final_when_tabs_remain() {
 }
 
 #[test]
-fn next_pending_signal_seq_preserves_fifo_within_same_block() {
-    assert_eq!(next_pending_signal_seq(None, 100), 100);
-    assert_eq!(next_pending_signal_seq(Some(100), 100), 101);
-    assert_eq!(next_pending_signal_seq(Some(105), 100), 106);
-    assert_eq!(next_pending_signal_seq(Some(99), 100), 100);
+fn next_pending_seq_preserves_fifo_within_same_block() {
+    assert_eq!(next_pending_seq(None, 100), 100);
+    assert_eq!(next_pending_seq(Some(100), 100), 101);
+    assert_eq!(next_pending_seq(Some(105), 100), 106);
+    assert_eq!(next_pending_seq(Some(99), 100), 100);
 }

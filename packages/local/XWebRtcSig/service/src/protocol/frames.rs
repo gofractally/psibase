@@ -2,7 +2,7 @@ use psibase::ExactAccountNumber;
 use serde::{Deserialize, Serialize};
 
 use super::types::{
-    ChatAppMetadata, ClientSupports, ContactPresence, DataChannelSpec, IceServerConfig,
+    ChatAppMetadata, ClientSupports, PeerPresence, DataChannelSpec, IceServerConfig,
     ParticipantStatePayload, PresenceStatus, SignalKind, WelcomeActiveSession,
 };
 
@@ -161,7 +161,7 @@ pub enum ServerFrame {
     Pong,
     #[serde(rename = "presenceSnapshot")]
     PresenceSnapshot {
-        contacts: Vec<ContactPresence>,
+        peers: Vec<PeerPresence>,
     },
     #[serde(rename = "presence")]
     Presence {

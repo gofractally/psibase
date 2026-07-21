@@ -1,4 +1,4 @@
-//! Contact-scoped presence fanout.
+//! Node-local presence fanout.
 //!
 //! Presence peers are other accounts with live websockets on this node.
 //! Clients merge snapshot/delta frames with Contacts-app data; Contacts
@@ -6,19 +6,11 @@
 
 use psibase::AccountNumber;
 
-use crate::protocol::{ContactPresence, PresenceStatus, ServerFrame};
-use crate::state::{active_session_accounts_except, sessions_for_user};
-
-/// Accounts that should receive presence deltas about `subject`.
-///
-/// Contact-scoped: other users currently connected on this node. The UI
-/// filters to Contacts-app entries when rendering the sidebar.
-pub fn peer_accounts_for_presence(subject: AccountNumber) -> Vec<AccountNumber> {
-    active_session_accounts_except(subject)
-}
+use crate::protocol::{PeerPresence, PresenceStatus, ServerFrame};
+use crate::state::{connected_accounts_except, sockets_for_user};
 
 pub fn presence_status(account: AccountNumber) -> PresenceStatus {
-    if sessions_for_user(account).is_empty() {
+    if sockets_for_user(account).is_empty() {
         PresenceStatus::Offline
     } else {
         PresenceStatus::Online
@@ -28,7 +20,7 @@ pub fn presence_status(account: AccountNumber) -> PresenceStatus {
 fn socket_count_for_status(account: AccountNumber, status: PresenceStatus) -> Option<u32> {
     match status {
         PresenceStatus::Online => {
-            let n = sessions_for_user(account).len();
+            let n = sockets_for_user(account).len();
             (n > 0).then_some(n as u32)
         }
         PresenceStatus::Offline => None,
@@ -45,20 +37,20 @@ pub fn presence_delta_frame(user: AccountNumber, status: PresenceStatus) -> Serv
 
 /// Snapshot of online peers for the connecting user.
 pub fn presence_snapshot_frame(for_user: AccountNumber) -> ServerFrame {
-    let contacts = peer_accounts_for_presence(for_user)
+    let peers = connected_accounts_except(for_user)
         .into_iter()
-        .map(|account| ContactPresence {
+        .map(|account| PeerPresence {
             account: account.into(),
             presence: presence_status(account),
         })
         .collect();
-    ServerFrame::PresenceSnapshot { contacts }
+    ServerFrame::PresenceSnapshot { peers }
 }
 
 pub fn subscriber_sockets_for_presence(subject: AccountNumber) -> Vec<i32> {
-    peer_accounts_for_presence(subject)
+    connected_accounts_except(subject)
         .into_iter()
-        .flat_map(sessions_for_user)
+        .flat_map(sockets_for_user)
         .collect()
 }
 
@@ -68,7 +60,7 @@ pub struct ConnectPresenceFanout {
 }
 
 /// After a websocket session is recorded, build snapshot for the connector and
-/// online deltas for contact-scoped peers.
+/// online deltas for peers with live sockets on this node.
 pub fn connect_presence_fanout(user: AccountNumber) -> ConnectPresenceFanout {
     let snapshot = presence_snapshot_frame(user);
     let delta = presence_delta_frame(user, PresenceStatus::Online);

@@ -323,7 +323,7 @@ class TestXWebRtcSig(unittest.TestCase):
     async def _presence_snapshot(self, ws):
         msg = await _read_json(ws)
         self.assertEqual(msg.get('t'), 'presenceSnapshot')
-        self.assertIn('contacts', msg)
+        self.assertIn('peers', msg)
         return msg
 
     @testutil.psinode_test
@@ -375,8 +375,8 @@ class TestXWebRtcSig(unittest.TestCase):
                 ) as ws_b:
                     await self._welcome(ws_b)
                     snap_b = await self._presence_snapshot(ws_b)
-                    contacts = {c['account']: c['presence'] for c in snap_b['contacts']}
-                    self.assertEqual(contacts.get('alice'), 'online')
+                    peers = {c['account']: c['presence'] for c in snap_b['peers']}
+                    self.assertEqual(peers.get('alice'), 'online')
 
                     delta_a = await _read_json(ws_a)
                     self.assertEqual(delta_a['t'], 'presence')

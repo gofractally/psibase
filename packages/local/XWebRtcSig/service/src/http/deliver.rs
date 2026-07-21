@@ -5,16 +5,16 @@ use crate::ice_config::merged_ice_servers;
 use crate::protocol::{
     decode_server_frame_json, encode_server_frame, ProtocolError, ServerFrame, WEBSOCKET_TEXT,
 };
+use crate::signaling::tear_down_sessions_for_dead_socket_tx;
 use crate::state::subjective::{
     disconnect_presence_fanout_tx, enqueue_pending_outbound_frames_tx, remove_socket_session_tx,
-    sweep_stale_sessions_tx, take_pending_outbound_payloads_tx,
-    tear_down_signaling_for_dead_socket_tx,
+    sweep_all_known_sessions_tx, take_pending_outbound_payloads_tx,
 };
 use crate::trace::xrtcsig_trace;
 
 /// Extra ICE JSON merged into welcome. Empty for now (default STUN only).
+/// Placeholder for coming node-configured TURN.
 pub(crate) fn turn_ice_servers_json() -> String {
-    /// Placeholder for coming node-configured TURN
     "[]".into()
 }
 
@@ -72,7 +72,7 @@ pub(crate) fn send_protocol_error(socket: i32, err: ProtocolError) {
 }
 
 pub(crate) fn enqueue_sweep_frames(now: i64) {
-    let frames = sweep_stale_sessions_tx(now);
+    let frames = sweep_all_known_sessions_tx(now);
     enqueue_peer_outbound_frames(now, frames);
 }
 
@@ -118,7 +118,7 @@ pub(crate) fn handle_socket_cleanup(socket: i32) {
     // subjective_tx). Doing all writes before any sends prevents zombie
     // rows from leaking into UserSessionTable / SocketSessionTable when a
     // later `send_frame` aborts on a peer socket whose tcp already died.
-    let tear_down_frames = tear_down_signaling_for_dead_socket_tx(socket, now);
+    let tear_down_frames = tear_down_sessions_for_dead_socket_tx(socket, now);
     let removed = remove_socket_session_tx(socket);
     let disconnect_fanout = removed
         .as_ref()

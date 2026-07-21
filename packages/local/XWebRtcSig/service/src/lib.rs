@@ -25,7 +25,7 @@ mod service {
     };
     use crate::signaling::dispatch_signaling_client_frame;
     use crate::state::subjective::{
-        connect_presence_fanout_tx, socket_session_tx, store_client_ready_tx, upsert_session_tx,
+        connect_presence_fanout_tx, socket_session_tx, store_client_ready_tx, upsert_socket_session_tx,
     };
     #[cfg(feature = "rt-trace")]
     use crate::trace::xrtcsig_trace;
@@ -71,7 +71,7 @@ mod service {
             MethodNumber::from("close"),
         );
         let now = Transact::call().currentBlock().time.microseconds;
-        upsert_session_tx(socket, user, now);
+        upsert_socket_session_tx(socket, user, now);
         send_welcome(socket, user, now, &turn_json);
         let fanout = connect_presence_fanout_tx(user);
         #[cfg(feature = "rt-trace")]

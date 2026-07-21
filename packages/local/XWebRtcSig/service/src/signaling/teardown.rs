@@ -2,7 +2,7 @@ use crate::protocol::ServerFrame;
 use crate::state::erase_sig_session_join;
 
 use super::constants::query_session_auth;
-use super::fanout::{fanout_participant_sockets, fanout_session_snapshot};
+use super::fanout::{fanout_session_snapshot, fanout_to_participant_sockets};
 
 /// Subjective join teardown for a dead socket. Caller must already be in `subjective_tx!`.
 ///
@@ -28,7 +28,7 @@ pub(crate) fn tear_down_sessions_for_dead_socket_subjective(
 
         // Recoverable transport drop: tell every other joined socket that
         // *this participant's* transport is gone. They keep the session.
-        out.extend(fanout_participant_sockets(
+        out.extend(fanout_to_participant_sockets(
             &auth.participants,
             Some(join.account),
             &ServerFrame::TransportLost {
@@ -47,20 +47,11 @@ pub(crate) fn tear_down_sessions_for_dead_socket_subjective(
     out
 }
 
-fn tear_down_sessions_for_dead_socket_inner(dead_socket: i32, now: i64) -> Vec<(i32, ServerFrame)> {
-    ::psibase::subjective_tx! {
-        tear_down_sessions_for_dead_socket_subjective(dead_socket, now)
-    }
-}
-
 pub(crate) fn tear_down_sessions_for_dead_socket_tx(
     dead_socket: i32,
     now: i64,
 ) -> Vec<(i32, ServerFrame)> {
-    tear_down_sessions_for_dead_socket_inner(dead_socket, now)
-}
-
-/// Tear down subjective joins for a dead socket (caller sends frames).
-pub fn tear_down_sessions_for_dead_socket(dead_socket: i32, now: i64) -> Vec<(i32, ServerFrame)> {
-    tear_down_sessions_for_dead_socket_tx(dead_socket, now)
+    ::psibase::subjective_tx! {
+        tear_down_sessions_for_dead_socket_subjective(dead_socket, now)
+    }
 }

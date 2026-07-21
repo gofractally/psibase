@@ -2,7 +2,10 @@ use psibase::services::chat;
 use psibase::AccountNumber;
 
 use crate::protocol::ServerFrame;
-use crate::state::{put_sig_session_join, sig_join_row, sig_joins_for_socket, tables::SigSessionJoinRow};
+use crate::state::{
+    put_sig_session_join, sig_join_row, sig_joins_for_socket, tables::SigSessionJoinRow,
+    touch_sig_session_track,
+};
 
 use super::constants::{is_supported_signaling_purpose, query_session_auth, session_err};
 use super::fanout::{
@@ -91,7 +94,7 @@ fn join_session_subjective(
     let prior = sig_join_row(&session_id, user);
     let duplicate_same_socket = prior.as_ref().is_some_and(|row| row.socket == socket);
     record_join(&session_id, user, socket, &client_instance_id, now);
-    crate::cleanup::note_session_activity(&session_id, now);
+    touch_sig_session_track(&session_id, now);
 
     // Deliver any signals buffered while this user had no joined socket.
     let flushed = flush_pending_signals_to_socket(&session_id, user, socket);
@@ -128,14 +131,6 @@ fn join_session_subjective(
     }
 
     if duplicate_same_socket {
-        if socket_has_other_sessions {
-            let mut out = vec![(
-                socket,
-                build_session_snapshot(&session_id, &auth.participants),
-            )];
-            out.extend(flushed);
-            return out;
-        }
         // Re-send invite so clients can recover after duplicate joinSession (e.g. UI retries).
         let invite = session_invite_frame(&auth, user);
         let mut out = vec![(socket, invite)];
@@ -172,37 +167,6 @@ fn join_session_subjective(
     out
 }
 
-fn join_session_subjective_frames(
-    socket: i32,
-    user: AccountNumber,
-    session_id: String,
-    client_instance_id: String,
-    now: i64,
-    auth: chat::SessionJoinAuth,
-) -> Vec<(i32, ServerFrame)> {
-    join_session_subjective(socket, user, session_id, client_instance_id, now, auth)
-}
-
-fn join_session_subjective_tx_subjective(
-    socket: i32,
-    user: AccountNumber,
-    session_id: String,
-    client_instance_id: String,
-    now: i64,
-    auth: chat::SessionJoinAuth,
-) -> Vec<(i32, ServerFrame)> {
-    ::psibase::subjective_tx! {
-        join_session_subjective_frames(
-            socket,
-            user,
-            session_id.clone(),
-            client_instance_id.clone(),
-            now,
-            auth.clone(),
-        )
-    }
-}
-
 fn join_session_subjective_tx(
     socket: i32,
     user: AccountNumber,
@@ -211,7 +175,16 @@ fn join_session_subjective_tx(
     now: i64,
     auth: chat::SessionJoinAuth,
 ) -> Vec<(i32, ServerFrame)> {
-    join_session_subjective_tx_subjective(socket, user, session_id, client_instance_id, now, auth)
+    ::psibase::subjective_tx! {
+        join_session_subjective(
+            socket,
+            user,
+            session_id.clone(),
+            client_instance_id.clone(),
+            now,
+            auth.clone(),
+        )
+    }
 }
 
 pub fn handle_join_session(

@@ -1,6 +1,6 @@
 {
     "t": "presenceSnapshot",
-    "contacts": [
+    "peers": [
         { "account": "bob", "presence": "online" },
         { "account": "carol", "presence": "offline" }
     ]
