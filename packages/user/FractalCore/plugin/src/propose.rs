@@ -1,5 +1,6 @@
-use crate::bindings::guilds::plugin as GuildsPlugin;
-use crate::bindings::guilds::plugin::queries::Guild;
+use std::str::FromStr;
+
+use psibase::{services::guilds::GuildSubaccount, AccountNumber};
 
 use crate::bindings::host::types::types::Error;
 use crate::bindings::{
@@ -8,10 +9,6 @@ use crate::bindings::{
 
 fn latch(account: &str) -> Result<(), Error> {
     set_propose_latch(Some(account))
-}
-
-fn get_guild(guild_account: &str) -> Result<Guild, Error> {
-    GuildsPlugin::queries::get_guild(guild_account)
 }
 
 pub fn fractal() -> Result<(), Error> {
@@ -23,9 +20,19 @@ pub fn guild(guild_account: &str) -> Result<(), Error> {
 }
 
 pub fn council(guild_account: &str) -> Result<(), Error> {
-    get_guild(guild_account).and_then(|guild| latch(&guild.council_role))
+    let guild_account = AccountNumber::from_str(guild_account).unwrap();
+    latch(
+        &guild_account
+            .with_subaccount(GuildSubaccount::Council.subaccount())
+            .to_string(),
+    )
 }
 
 pub fn representative(guild_account: &str) -> Result<(), Error> {
-    get_guild(guild_account).and_then(|guild| latch(&guild.rep_role))
+    let guild_account = AccountNumber::from_str(guild_account).unwrap();
+    latch(
+        &guild_account
+            .with_subaccount(GuildSubaccount::Rep.subaccount())
+            .to_string(),
+    )
 }

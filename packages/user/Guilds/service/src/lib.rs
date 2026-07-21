@@ -13,6 +13,7 @@ pub mod service {
     use psibase::{
         services::{
             auth_dyn::{self, policy::DynamicAuthPolicy},
+            guilds::GuildSubaccount,
             transact::ServiceMethod,
         },
         *,
@@ -24,16 +25,8 @@ pub mod service {
     /// * `fractal` - Fractal to serve as jurisdiction of guild.
     /// * `guild_account` - The account number for the new guild.
     /// * `display_name` - The display name of the guild.
-    /// * `council_role` - Council role account.
-    /// * `rep_role` - Representative role account.
     #[action]
-    fn create_guild(
-        fractal: AccountNumber,
-        guild_account: AccountNumber,
-        display_name: Memo,
-        council_role: AccountNumber,
-        rep_role: AccountNumber,
-    ) {
+    fn create_guild(fractal: AccountNumber, guild_account: AccountNumber, display_name: Memo) {
         let sender = get_sender();
 
         let sender_is_fractal_member =
@@ -45,14 +38,7 @@ pub mod service {
             sender, fractal
         );
 
-        Guild::add(
-            fractal,
-            guild_account,
-            sender,
-            display_name,
-            council_role,
-            rep_role,
-        );
+        Guild::add(fractal, guild_account, sender, display_name);
     }
 
     /// Add a member to a fractal.
@@ -413,9 +399,7 @@ pub mod service {
     /// Called by council role account of the guild.
     #[action]
     fn remove_g_rep() {
-        Guild::get_by_council_role(get_sender())
-            .expect("sender must be council role account of guild")
-            .remove_representative();
+        Guild::by_council_sender().remove_representative();
     }
 
     /// Set a new representative of the Guild.
@@ -432,9 +416,7 @@ pub mod service {
     /// Called by current representative of guild.
     #[action]
     fn resign_g_rep() {
-        Guild::get_by_rep_role(get_sender())
-            .expect("sender must be representative role account of guild")
-            .remove_representative();
+        Guild::by_rep_sender().remove_representative();
     }
 
     /// Invite a guild member.
@@ -488,10 +470,14 @@ pub mod service {
     }
 
     fn account_policy(account: AccountNumber) -> Option<auth_dyn::policy::DynamicAuthPolicy> {
-        Guild::get(account)
-            .map(|guild| guild.auth_policy())
-            .or(Guild::get_by_council_role(account).map(|guild| guild.council_role_auth()))
-            .or(Guild::get_by_rep_role(account).map(|guild| guild.rep_role_auth()))
+        let (base, subaccount) = account.split();
+
+        let guild = Guild::get(base)?;
+        GuildSubaccount::from_subaccount(subaccount).map(|subaccount| match subaccount {
+            GuildSubaccount::Base => guild.auth_policy(),
+            GuildSubaccount::Council => guild.council_role_auth(),
+            GuildSubaccount::Rep => guild.rep_role_auth(),
+        })
     }
 
     /// Get policy action used by AuthDyn service.

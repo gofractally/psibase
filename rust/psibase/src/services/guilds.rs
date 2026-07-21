@@ -1,3 +1,25 @@
+use crate::Subaccount;
+
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum GuildSubaccount {
+    Base = 0,
+    Council = 1,
+    Rep = 2,
+}
+
+impl GuildSubaccount {
+    pub fn subaccount(self) -> Subaccount {
+        Subaccount(self as u8)
+    }
+
+    pub fn from_subaccount(subaccount: Subaccount) -> Option<Self> {
+        [Self::Base, Self::Council, Self::Rep]
+            .into_iter()
+            .find(|candidate| candidate.subaccount() == subaccount)
+    }
+}
+
 #[crate::service(name = "guilds", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 pub mod Service {
@@ -78,16 +100,8 @@ pub mod Service {
     /// * `fractal` - Fractal to serve as jurisdiction of guild.
     /// * `guild_account` - The account number for the new guild.
     /// * `display_name` - The display name of the guild.
-    /// * `council_role` - Council role account.
-    /// * `rep_role` - Representative role account.
     #[action]
-    fn create_guild(
-        fractal: AccountNumber,
-        guild_account: AccountNumber,
-        display_name: Memo,
-        council_role: AccountNumber,
-        rep_role: AccountNumber,
-    ) {
+    fn create_guild(fractal: AccountNumber, guild_account: AccountNumber, display_name: Memo) {
         unimplemented!()
     }
 

@@ -35,7 +35,14 @@ pub struct AccountNumber {
 
 serialize_as_str!(AccountNumber, "account number");
 
-pub struct Subaccount(u8);
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Subaccount(pub u8);
+
+impl From<u8> for Subaccount {
+    fn from(value: u8) -> Self {
+        Subaccount(value)
+    }
+}
 
 impl AccountNumber {
     pub const MIN: Self = AccountNumber { value: 0 };
