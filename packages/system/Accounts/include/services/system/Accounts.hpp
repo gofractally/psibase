@@ -64,7 +64,8 @@ namespace SystemService
       /// Preapprove an account of any length to be created within this transaction.
       /// If an account is preapproved, it will bypass naming restrictions.
       ///
-      /// The `Accounts` service must itself authorize this action.
+      /// The `Accounts` or `NameMarket` service must itself authorize this action.
+      /// Names with an "x-" prefix must be preapproved by the `Accounts` service specifically.
       ///
       /// The preapproval only lasts for the duration of the transaction context, after
       /// which the preapproval is cleared.
