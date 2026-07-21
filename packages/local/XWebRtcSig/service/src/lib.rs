@@ -16,7 +16,7 @@ mod service {
     use crate::http::{
         authenticated_user, deliver_signaling_frames, enqueue_peer_outbound_frames,
         flush_pending_outbound_for_socket, handle_socket_cleanup, plain_reply, route_target,
-        rtransact_login, send_frame, send_protocol_error, send_sweep_frames, send_welcome,
+        rtransact_login, send_frame, send_protocol_error, enqueue_sweep_frames, send_welcome,
         turn_ice_servers_json, websocket_route, RouteTarget,
     };
     use crate::protocol::{
@@ -88,7 +88,7 @@ mod service {
         enqueue_peer_outbound_frames(now, fanout.peer_deltas);
         // Sweep after responding to the new connection so a dead peer socket
         // cannot abort before welcome / presence delivery.
-        send_sweep_frames(now);
+        enqueue_sweep_frames(now);
         flush_pending_outbound_for_socket(socket);
         None
     }
@@ -173,13 +173,13 @@ mod service {
                         ),
                     );
                 } else {
-                    send_sweep_frames(now);
+                    enqueue_sweep_frames(now);
                     flush_pending_outbound_for_socket(socket);
                 }
             }
             ClientFrame::Ping => {
                 send_frame(socket, &ServerFrame::Pong);
-                send_sweep_frames(now);
+                enqueue_sweep_frames(now);
                 flush_pending_outbound_for_socket(socket);
             }
             session_frame => {
@@ -199,7 +199,7 @@ mod service {
                 deliver_signaling_frames(socket, dispatch.frames, now);
                 // Run stale-session sweep after the requesting socket has been
                 // answered — same ordering contract as handle_socket_cleanup.
-                send_sweep_frames(now);
+                enqueue_sweep_frames(now);
                 flush_pending_outbound_for_socket(socket);
             }
         }

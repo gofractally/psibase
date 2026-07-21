@@ -71,7 +71,7 @@ pub(crate) fn send_protocol_error(socket: i32, err: ProtocolError) {
     );
 }
 
-pub(crate) fn send_sweep_frames(now: i64) {
+pub(crate) fn enqueue_sweep_frames(now: i64) {
     let frames = sweep_stale_sessions_tx(now);
     enqueue_peer_outbound_frames(now, frames);
 }
