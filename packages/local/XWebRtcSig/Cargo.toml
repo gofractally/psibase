@@ -14,9 +14,6 @@ scope = "local"
 services = ["x-wrtcsig"]
 
 [package.metadata.psibase.dependencies]
-# Chat is a runtime dependency (authorizeSessionJoin) installed at boot via DevDefault,
-# not during XDefault subjective init — listing it here breaks fresh Launch (PUT/postinstall
-# hits HttpServer before the chain is booted).
 XHttp = "0.23.0"
 
 [lib]

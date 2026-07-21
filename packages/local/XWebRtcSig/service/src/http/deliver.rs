@@ -13,8 +13,8 @@ use crate::state::subjective::{
 use crate::trace::xrtcsig_trace;
 
 /// Extra ICE JSON merged into welcome. Empty for now (default STUN only).
-/// A later PR will supply node-configured TURN here.
 pub(crate) fn turn_ice_servers_json() -> String {
+    /// Placeholder for coming node-configured TURN
     "[]".into()
 }
 

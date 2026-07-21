@@ -1,4 +1,4 @@
-use crate::bindings::host::common::client::{get_active_app, get_sender};
+use crate::bindings::host::common::client::get_sender;
 
 pub fn check_caller(allowed: &[&str], context: &str) {
     let app = get_sender();
@@ -7,14 +7,13 @@ pub fn check_caller(allowed: &[&str], context: &str) {
     }
 }
 
-pub fn check_caller_or_active_app(app: &str, allowed: &[&str], context: &str) {
+/// Privileged callers, or Homepage fetching only its own token.
+pub fn check_get_active_query_token_caller(app: &str, context: &str) {
     let caller = get_sender();
-    if caller == app || allowed.contains(&caller.as_str()) {
+    if caller == "host" || caller == "supervisor" {
         return;
     }
-
-    let active_app = get_active_app();
-    if active_app == app && caller == active_app {
+    if caller == "homepage" && app == "homepage" {
         return;
     }
 

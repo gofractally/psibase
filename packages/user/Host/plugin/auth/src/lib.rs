@@ -69,11 +69,7 @@ impl Api for HostAuth {
     }
 
     fn get_active_query_token(app: String, user: String) -> Option<String> {
-        check_caller_or_active_app(
-            &app,
-            &["host", "supervisor"],
-            "get-active-query-token@host:auth/api",
-        );
+        check_get_active_query_token_caller(&app, "get-active-query-token@host:auth/api");
 
         Bucket::new(DB, &bucket_id(&user))
             .get(&app)
