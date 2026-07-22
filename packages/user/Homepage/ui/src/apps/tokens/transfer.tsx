@@ -1,21 +1,22 @@
 import type { TokensOutletContext } from "./layout";
 
-import { TransferModal } from "@/apps/tokens/components/transfer-modal";
 import { useCallback, useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 
-import { supervisor } from "@/supervisor";
+import { NoTokensWarning } from "@/apps/tokens/components/no-tokens-warning";
+import { TransferModal } from "@/apps/tokens/components/transfer-modal";
 
 import { useAppForm } from "@shared/components/form/app-form";
 import { FieldTokenAmount } from "@shared/components/form/field-token-amount";
 import { GlowingCard } from "@shared/components/glowing-card";
+import { supervisor } from "@shared/lib/supervisor";
 import { CardContent } from "@shared/shadcn/ui/card";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 import { useCreateContact } from "../contacts/hooks/use-create-contact";
 import { CreditTable } from "./components/credit-table";
 import { FieldAccount } from "./components/transfer/account-field";
-import { useCredit } from "./hooks/tokensPlugin/use-credit";
+import { useCredit } from "./hooks/tokens-plugin/use-credit";
 import { useTransferActions } from "./hooks/use-transfer-actions";
 import {
     defaultTransferValues,
@@ -45,6 +46,8 @@ const TransferPageContents = () => {
         value: typeof defaultTransferValues;
         meta: { addToContacts: boolean; closeConfirmationModal: () => void };
     }) => {
+        if (!selectedToken) return;
+
         const selectedTokenId = selectedToken.id.toString();
 
         if (meta.addToContacts) {
@@ -68,7 +71,7 @@ const TransferPageContents = () => {
 
             toast("Sent", {
                 description: `Sent ${paddedAmount} ${
-                    selectedToken?.label || selectedToken?.symbol
+                    selectedToken.label || selectedToken.symbol
                 } to ${value.to.account}`,
             });
 
@@ -158,6 +161,10 @@ const TransferPageContents = () => {
         handleSetMaxAmount,
         clearAmountErrors,
     ]);
+
+    if (!selectedToken) {
+        return <NoTokensWarning />;
+    }
 
     return (
         <div className="space-y-4">

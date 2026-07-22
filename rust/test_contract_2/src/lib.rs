@@ -6,7 +6,7 @@
 #[psibase::service]
 #[allow(non_snake_case)]
 mod service {
-    use async_graphql::{connection::Connection, *};
+    use async_graphql::*;
     use psibase::*;
     use serde::{Deserialize, Serialize};
     use serde_aux::field_attributes::deserialize_number_from_string;
@@ -107,25 +107,6 @@ mod service {
             AnswerTable::read().get_index_pk().get(&account)
         }
 
-        /// Look up an event
-        ///
-        /// ```
-        /// query {
-        ///   event(id: 1) {
-        ///     __typename
-        ///     ... on Add {
-        ///       a b result
-        ///     }
-        ///     ... on Multiply {
-        ///       a b result
-        ///     }
-        ///   }
-        /// }
-        /// ```
-        async fn event(&self, id: u64) -> Result<event_structs::HistoryEvents, anyhow::Error> {
-            get_event(id)
-        }
-
         async fn get_add_events(
             &self,
             condition: Option<String>,
@@ -133,7 +114,7 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> Result<Connection<u64, AddEvent>, async_graphql::Error> {
+        ) -> Result<EventConnection<AddEvent>, async_graphql::Error> {
             let mut q = EventQuery::new("history.example.add")
                 .first(first)
                 .last(last)
@@ -153,7 +134,7 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> Result<Connection<u64, ExampleRecordWrapper>, async_graphql::Error> {
+        ) -> Result<EventConnection<ExampleRecordWrapper>, async_graphql::Error> {
             EventQuery::new("history.example.save_record")
                 .first(first)
                 .last(last)
@@ -175,12 +156,12 @@ mod service {
 #[psibase::test_case(packages("TestContract2"))]
 fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
     use psibase::services::http_server;
-    use psibase::HttpBody;
+    use psibase::{HttpBody, Push, Table};
     use serde_json::{json, Value};
     http_server::Wrapper::push_from(&chain, SERVICE).registerServer(SERVICE);
     let result = Wrapper::push(&chain).add(3, 4);
     assert_eq!(result.get()?, 7);
-    println!("\n\nTrace:\n{}", result.trace);
+    println!("\n\nTrace:\n{}", chain.display_trace(&result.trace));
 
     chain.finish_block();
     let reply: Value = chain.graphql(
@@ -191,6 +172,9 @@ fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
         reply,
         json!({ "data": { "answer": {"id": "example", "result": 7} } })
     );
+
+    let answer = service::AnswerTable::read().get_index_pk().get(&SERVICE);
+    assert_eq!(answer.unwrap().result, 7);
 
     let reply = chain
         .post(
@@ -231,6 +215,7 @@ fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
 #[psibase::test_case(packages("TestContract2"))]
 fn test_add_events(chain: psibase::Chain) -> Result<(), psibase::Error> {
     use psibase::services::http_server;
+    use psibase::Push;
     use serde_json::{json, Value};
 
     http_server::Wrapper::push_from(&chain, SERVICE).registerServer(SERVICE);
@@ -446,6 +431,7 @@ fn test_add_events(chain: psibase::Chain) -> Result<(), psibase::Error> {
 #[psibase::test_case(packages("TestContract2"))]
 fn test_example_records(chain: psibase::Chain) -> Result<(), psibase::Error> {
     use psibase::services::http_server;
+    use psibase::Push;
     use serde_json::{json, Value};
 
     http_server::Wrapper::push_from(&chain, SERVICE).registerServer(SERVICE);

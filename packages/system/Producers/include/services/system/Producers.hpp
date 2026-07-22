@@ -53,8 +53,8 @@ namespace SystemService
       /// |--------|-----------|------------|
       /// | weak   | 1         | ⌈n/3⌉      |
       /// | strong | ⌊n/2⌋ + 1 | ⌊2n/3⌋ + 1 |
-      static constexpr auto producerAccountWeak   = psibase::AccountNumber("prods-weak");
-      static constexpr auto producerAccountStrong = psibase::AccountNumber("prods-strong");
+      static constexpr auto producerAccountWeak   = psibase::AccountNumber("producers+2");
+      static constexpr auto producerAccountStrong = psibase::AccountNumber("producers+3");
 
       void setConsensus(psibase::ConsensusData consensus);
       void setProducers(std::vector<psibase::Producer> prods);
@@ -71,7 +71,7 @@ namespace SystemService
       uint32_t antiThreshold(psibase::AccountNumber account);
 
       // Allows this service to be used as an auth service for `prods-weak` and `prods-strong`.
-      void checkAuthSys(uint32_t                    flags,
+      bool checkAuthSys(uint32_t                    flags,
                         psibase::AccountNumber      requester,
                         psibase::AccountNumber      sender,
                         ServiceMethod               action,
@@ -79,37 +79,33 @@ namespace SystemService
                         std::vector<psibase::Claim> claims);
       void canAuthUserSys(psibase::AccountNumber user);
 
+      /// Get the accounts this auth service delegates authority to for a sender.
+      std::vector<psibase::AccountNumber> getDlgsSys(psibase::AccountNumber sender);
+
       /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
       /// transaction from a specified sender.
       ///
       /// * `sender`: The sender account for the transaction potentially being authorized.
       /// * `authorizers`: The set of accounts that have already authorized the execution of the transaction.
-      /// * `authSet`: The set of accounts that are already being checked for authorization. If
-      ///              the sender is already in this set, then the function should return false.
       ///
       /// Returns:
-      /// * `true`: If the total authorizations from `authorizers` or their auth services meets sender's threshold
-      /// * `false`: If not returning true, or on recursive checks for the same sender
-      bool isAuthSys(psibase::AccountNumber                             sender,
-                     std::vector<psibase::AccountNumber>                authorizers,
-                     std::optional<ServiceMethod>                       method,
-                     std::optional<std::vector<psibase::AccountNumber>> authSet);
+      /// * `true`: If the total authorizations from `authorizers` meets sender's threshold
+      /// * `false`: Otherwise
+      bool isAuthSys(psibase::AccountNumber              sender,
+                     std::vector<psibase::AccountNumber> authorizers);
 
       /// Check whether a specified set of rejecter accounts are sufficient to reject (cancel) a
       /// transaction from a specified sender.
       ///
       /// * `sender`: The sender account for the transaction potentially being rejected.
-      /// * `rejecters`: The set of accounts that have already authorized the rejection of the transaction.
-      /// * `authSet`: The set of accounts that are already being checked for authorization. If
-      ///              the sender is already in this set, then the function should return false.
+      /// * `rejecters`: The set of accounts that have already authorized the rejection of the
+      ///               transaction.
       ///
       /// Returns:
-      /// * `true`: If the total authorizations from `rejecters` or their auth services meets sender's threshold
-      /// * `false`: If not returning true, or on recursive checks for the same sender
-      bool isRejectSys(psibase::AccountNumber                             sender,
-                       std::vector<psibase::AccountNumber>                rejecters,
-                       std::optional<ServiceMethod>                       method,
-                       std::optional<std::vector<psibase::AccountNumber>> authSet);
+      /// * `true`: If enough rejecters meet the sender's anti-threshold
+      /// * `false`: Otherwise
+      bool isRejectSys(psibase::AccountNumber              sender,
+                       std::vector<psibase::AccountNumber> rejecters);
    };
    PSIO_REFLECT(Producers,
                 method(setConsensus, consensus),
@@ -123,8 +119,9 @@ namespace SystemService
                 method(antiThreshold, account),
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                 method(canAuthUserSys, user),
-                method(isAuthSys, sender, authorizers, method, authSet),
-                method(isRejectSys, sender, rejecters, method, authSet)
+                method(getDlgsSys, sender),
+                method(isAuthSys, sender, authorizers),
+                method(isRejectSys, sender, rejecters)
                 //
    )
 

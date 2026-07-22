@@ -1,9 +1,7 @@
 use crate::{
     bindings::exports::chainmail::plugin::queries::Message,
-    bindings::host::common::server as CommonServer,
-    bindings::host::types::types::Error,
-    errors::ErrorType,
-    serde_structs::TempMessageForDeserEvents,
+    bindings::host::common::server as CommonServer, bindings::host::types::types::Error,
+    errors::ErrorType, serde_structs::TempMessageForDeserEvents,
 };
 
 pub fn get_msg_by_id(msg_id: u64) -> Result<Message, Error> {

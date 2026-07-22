@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 WORKSPACE_ROOT=$1
 BUILDER_IMAGE=$2
 UBUNTU_BUILD_VER=$3
@@ -67,4 +67,9 @@ ${DOCKER} bash -c "cd build && cpack -G TGZ -D CPACK_PACKAGE_FILE_NAME=psidk-ubu
 echo =====
 ${DOCKER} bash -c "cd build && mv book psidk-book && tar czf ../psidk-book.tar.gz psidk-book"
 echo =====
+if [[ -n "$(git status --porcelain --untracked-files=all)" ]]; then
+  echo "Build left the working tree dirty:"
+  git status --short --untracked-files=all
+  exit 1
+fi
 ${DOCKER} bash -c "cargo generate -p ./package-templates/ --destination ./packages/user/ --init -v --allow-commands --name Buildtest --silent basic-01 ; cd packages/user/Buildtest && ${WORKSPACE_ROOT}/build/rust/release/cargo-psibase package"

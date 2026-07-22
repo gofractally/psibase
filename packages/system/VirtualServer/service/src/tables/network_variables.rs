@@ -8,10 +8,29 @@ impl NetworkVariables {
             .get(&())
             .unwrap_or_default()
     }
-    pub fn set(vars: &Self) {
-        let mut variables = Self::get();
-        variables.block_replay_factor = vars.block_replay_factor;
-        variables.per_block_sys_cpu_ns = vars.per_block_sys_cpu_ns;
-        NetworkVariablesTable::read_write().put(&variables).unwrap();
+    pub fn set(new_vars: &Self) {
+        let current = Self::get();
+
+        assert!(
+            new_vars.obj_storage_bytes >= current.obj_storage_bytes,
+            "Objective storage allocation cannot decrease",
+        );
+        assert!(
+            new_vars.subj_storage_bytes >= current.subj_storage_bytes,
+            "Subjective storage allocation cannot decrease",
+        );
+
+        assert!(
+            new_vars.obj_storage_bytes >= NetworkSpecs::obj_storage_offset(),
+            "obj_storage_bytes must be >= reserved offset",
+        );
+
+        assert!(
+            new_vars.obj_storage_bytes + new_vars.subj_storage_bytes
+                <= ServerSpecs::get().unwrap_or_default().storage_bytes,
+            "Total storage allocation must not exceed available server storage",
+        );
+
+        NetworkVariablesTable::read_write().put(new_vars).unwrap();
     }
 }

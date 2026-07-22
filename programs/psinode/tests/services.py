@@ -1,5 +1,6 @@
 from psinode import Action, PrivateKey, Transaction, TransactionError, Service
 import time
+import json
 
 class Tokens(Service):
     service = 'tokens'
@@ -10,7 +11,8 @@ class Tokens(Service):
         for edge in balances['userBalances']['edges']:
             node = edge['node']
             if node['tokenId'] == token:
-                return int(node['balance'].replace('.', '')) 
+                return int(node['balance'].replace('.', ''))
+        return 0
 
 class Transact(Service):
     service = 'transact'
@@ -43,8 +45,8 @@ class Transact(Service):
 
 class Accounts(Service):
     service = 'accounts'
-    def new_account(self, name, auth_service='auth-any', require_new=True, *, sender='root'):
-        self.push_action(sender, 'newAccount', {"name": name, "authService": auth_service,"requireNew": require_new})
+    def new_account(self, name, auth_service='auth-any', require_match=True, *, sender='root'):
+        self.push_action(sender, 'newAccount', {"name": name, "authService": auth_service,"requireMatch": require_match})
     def set_auth_service(self, account, auth_service):
         self.push_action(account, 'setAuthServ', {'authService': auth_service})
 
@@ -77,6 +79,12 @@ class StagedTx(Service):
             txid = id_or_tx['txid']
         self.push_action(account, 'accept', {"id": id_,  "txid": txid}, keys=keys)
 
+class XHttp(Service):
+    service = 'x-http'
+    def register_server(self, service, server):
+        with self.post('/register_server', json={"service": service, "server": server}) as reply:
+            reply.raise_for_status()
+
 class XAdmin(Service):
     service = 'x-admin'
     def get_admin_accounts(self):
@@ -97,9 +105,30 @@ class XAdmin(Service):
     def install(self, file):
         from zipfile import ZipFile
         with ZipFile(file) as package:
+            services = {}
+            class Filenames:
+                def __init__(self):
+                    self.json = None
+                    self.wasm = None
             for filename in package.namelist():
+                if filename.startswith('service/') and filename.endswith('.json'):
+                    service = filename.removeprefix('service/').removesuffix('.json')
+                    services.setdefault(service, Filenames()).json = filename
                 if filename.startswith('service/') and filename.endswith('.wasm'):
                     service = filename.removeprefix('service/').removesuffix('.wasm')
-                    with package.open(filename) as f:
-                        with self.put('/services/' + service, data=f, headers={'Content-Type': 'application/wasm'}) as reply:
+                    services.setdefault(service, Filenames()).wasm = filename
+            for (service, filenames) in services.items():
+                flags = ''
+                if filenames.json is not None:
+                    with package.open(filenames.json) as f:
+                        info = json.load(f)
+                    server = info.get('server')
+                    if server is not None:
+                        XHttp(self.api).register_server(service, server)
+                    flagsList = info.get('flags', [])
+                    if len(flagsList) != 0:
+                        flags = '?' + '&'.join(f + '=1' for f in flagsList)
+                if filenames.wasm is not None:
+                    with package.open(filenames.wasm) as f:
+                        with self.put('/services/' + service + flags, data=f, headers={'Content-Type': 'application/wasm'}) as reply:
                             reply.raise_for_status()

@@ -3,7 +3,7 @@ package web-crypto:plugin;
 world impl {
     include host:types/imports;
     include host:common/imports;
-    include clientdata:plugin/imports;
+    include host:db/imports;
 
     export api;
 }

@@ -1,12 +1,9 @@
-#[psibase::service]
+#[psibase::service(name = "tok-stream+1")]
 #[allow(non_snake_case)]
 mod service {
     use ::token_stream::tables::{Stream, StreamTable};
     use async_graphql::{connection::Connection, *};
-    use psibase::{
-        services::{token_stream},
-        *,
-    };
+    use psibase::{services::token_stream, *};
     use serde::Deserialize;
     use serde_aux::field_attributes::deserialize_number_from_string;
 
@@ -65,8 +62,8 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, CreatedEvent>> {
-            EventQuery::new("history.token-stream.created")
+        ) -> async_graphql::Result<EventConnection<CreatedEvent>> {
+            EventQuery::new("history.tok-stream.created")
                 .first(first)
                 .last(last)
                 .before(before)
@@ -81,8 +78,8 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, UpdatedEvent>> {
-            EventQuery::new("history.token-stream.updated")
+        ) -> async_graphql::Result<EventConnection<UpdatedEvent>> {
+            EventQuery::new("history.tok-stream.updated")
                 .condition(format!("nft_id = {}", nft_id))
                 .first(first)
                 .last(last)

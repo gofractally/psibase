@@ -1,14 +1,12 @@
+import type { Supervisor } from "@psibase/common-lib";
+
 import { ChevronsUpDown } from "lucide-react";
 import { useState } from "react";
 
-import { Supervisor } from "@psibase/common-lib";
-
-import { useContacts } from "@/apps/contacts/hooks/use-contacts";
-
-import { useCurrentUser } from "@/hooks/use-current-user";
-
 import { withFieldGroup } from "@shared/components/form/app-form";
 import { FieldErrors } from "@shared/components/form/internal/field-errors";
+import { useContacts } from "@shared/hooks/use-contacts";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { zAccount } from "@shared/lib/schemas/account";
 import { cn } from "@shared/lib/utils";
 import { Button } from "@shared/shadcn/ui/button";
@@ -132,7 +130,7 @@ export const FieldAccount = withFieldGroup({
                                         aria-invalid={!field.state.meta.isValid}
                                         className="aria-expanded:border-ring aria-expanded:ring-ring/50 aria-expanded:dark:border-ring
                                         aria-expanded:dark:ring-ring/50 aria-invalid:ring-destructive/20 aria-invalid:dark:ring-destructive/40
-                                        aria-invalid:border-destructive aria-invalid:dark:border-destructive justify-between aria-expanded:ring-[3px]"
+                                        aria-invalid:border-destructive aria-invalid:dark:border-destructive h-9 justify-between aria-expanded:ring-[3px]"
                                     >
                                         <Placeholder
                                             placeholder={placeholder}

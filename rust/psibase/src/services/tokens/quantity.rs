@@ -5,6 +5,14 @@ use std::ops::{Add, Sub};
 
 use crate::services::tokens::{Precision, TokensError};
 
+fn parse_u64_part(s: &str) -> Result<u64, TokensError> {
+    if s.is_empty() {
+        Ok(0)
+    } else {
+        s.parse().map_err(|_| TokensError::InvalidNumber)
+    }
+}
+
 #[derive(
     Debug,
     Copy,
@@ -17,9 +25,9 @@ use crate::services::tokens::{Precision, TokensError};
     Deserialize,
     SimpleObject,
     InputObject,
+    Ord,
     PartialOrd,
     PartialEq,
-    Ord,
     Eq,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
@@ -43,11 +51,12 @@ impl Quantity {
         if !amount.chars().all(|c| c == '.' || c.is_ascii_digit()) {
             return Err(TokensError::InvalidNumber);
         }
+        if !amount.chars().any(|c| c.is_ascii_digit()) {
+            return Err(TokensError::InvalidNumber);
+        }
         let value = match amount.split_once('.') {
             Some((integer_part, fraction_part)) => {
-                let integer_value: u64 = integer_part
-                    .parse()
-                    .map_err(|_| TokensError::InvalidNumber)?;
+                let integer_value = parse_u64_part(integer_part)?;
 
                 let integer_value = integer_value
                     .checked_mul(10u64.pow(precision.value() as u32))
@@ -60,9 +69,7 @@ impl Quantity {
                 }
                 let remaining_pow = precision.value() - fraction_len;
 
-                let fraction_value: u64 = fraction_part
-                    .parse()
-                    .map_err(|_| TokensError::InvalidNumber)?;
+                let fraction_value = parse_u64_part(fraction_part)?;
 
                 let fraction_value = fraction_value
                     .checked_mul(10u64.pow(remaining_pow as u32))

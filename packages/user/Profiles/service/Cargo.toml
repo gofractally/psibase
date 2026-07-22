@@ -11,6 +11,7 @@ plugin = "profiles-plugin"
 
 [dependencies]
 psibase.workspace = true
+psibase_service.workspace = true
 psibase_macros.workspace = true
 async-graphql.workspace = true
 serde.workspace = true
@@ -18,4 +19,4 @@ serde_json.workspace = true
 psibase-user-workspace-hack.workspace = true
 
 [dev-dependencies]
-profiles-pkg = { path = "..", version = "0.23.0" }
+profiles-pkg = { path = "..", version = "0.24.0" }

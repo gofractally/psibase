@@ -160,6 +160,9 @@ namespace psio
          void           insert(std::string name, AnyType type);
          //
          bool merge(const AnyType&, const Schema& other, const AnyType& otherType);
+
+         // checks that all named types referenced by this type exist
+         void checkType(const AnyType&) const;
       };
       PSIO_REFLECT(Schema, types)
 
@@ -528,16 +531,29 @@ namespace psio
 
       struct CustomHandler
       {
-         template <typename T>
-         CustomHandler(const T&)
-             : match(&T::match),
-               frac2json(&T::frac2json),
+         template <typename T, typename U = void>
+         CustomHandler(const T&, U* arg = nullptr)
+             : userData(const_cast<void*>(static_cast<const void*>(arg))),
+               match(&T::match),
+               frac2json(
+                   [](void* data, const CompiledType* ty, FracStream& in, StreamBase& out)
+                   {
+                      if constexpr (requires { T::frac2json(ty, in, out); })
+                      {
+                         return T::frac2json(ty, in, out);
+                      }
+                      else
+                      {
+                         return T::frac2json(static_cast<U*>(data), ty, in, out);
+                      }
+                   }),
                json2frac(&T::json2frac),
                is_empty_container(&T::is_empty_container)
          {
          }
+         void* userData;
          bool (*match)(const CompiledType*);
-         bool (*frac2json)(const CompiledType*, FracStream& in, StreamBase& out);
+         bool (*frac2json)(void*, const CompiledType*, FracStream& in, StreamBase& out);
          void (*json2frac)(const CompiledType*, const json::any& in, StreamBase& out);
          bool (*is_empty_container)(const CompiledType*, const json::any& in);
       };
@@ -595,7 +611,7 @@ namespace psio
                                       auto&               out) const
          {
             StreamRef stream{out};
-            return impl[index].frac2json(type, in, stream);
+            return impl[index].frac2json(impl[index].userData, type, in, stream);
          }
 
          void json2frac(const CompiledType* type,
@@ -1549,8 +1565,8 @@ namespace psio
          {
             const auto& varty = std::get<Variant>(ty.original_type->value);
             const auto& name  = obj->front().key;
-            auto        pos   = std::ranges::find_if(varty.members,
-                                                     [&](auto& member) { return member.name == name; });
+            auto pos = std::ranges::find_if(varty.members,
+                                            [&](auto& member) { return member.name == name; });
             if (pos != varty.members.end())
             {
                auto alt = checked_cast<std::uint8_t>(pos - varty.members.begin());

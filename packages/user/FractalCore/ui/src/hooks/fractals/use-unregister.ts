@@ -1,15 +1,15 @@
-import { queryClient } from "@/queryClient";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
 import { getSupervisor } from "@psibase/common-lib";
 
-import QueryKey from "@/lib/queryKeys";
-import { zGuildAccount } from "@/lib/zod/Wrappers";
+import QueryKey from "@/lib/query-keys";
+import { zGuildAccount } from "@/lib/zod/wrappers";
 
+import { assertUser } from "@shared/hooks/use-current-user";
+import { queryClient } from "@shared/lib/query-client";
 import { toast } from "@shared/shadcn/ui/sonner";
 
-import { assertUser } from "../use-current-user";
 import { useFractalAccount } from "./use-fractal-account";
 import { updateParticipants } from "./use-users-and-groups";
 

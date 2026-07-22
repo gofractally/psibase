@@ -70,31 +70,82 @@ function(json_append_deps VAR KEY)
     set(${VAR} ${result} PARENT_SCOPE)
 endfunction()
 
+function(split_export EXPORT NAME_VAR SERVICE_VAR)
+    if("${EXPORT}" MATCHES "^([-a-z0-9]+)$")
+        set(${NAME_VAR} ${CMAKE_MATCH_1} PARENT_SCOPE)
+        set(${SERVICE_VAR} ${CMAKE_MATCH_1} PARENT_SCOPE)
+    elseif("${EXPORT}" MATCHES "^([-a-z0-9]+)=([-a-z0-9]+)$")
+        set(${NAME_VAR} ${CMAKE_MATCH_1} PARENT_SCOPE)
+        set(${SERVICE_VAR} ${CMAKE_MATCH_2} PARENT_SCOPE)
+    else()
+        message(FATAL_ERROR "Invalid export: ${EXPORT}")
+    endif()
+endfunction()
+
+function(json_append_exports VAR KEY)
+    set(result ${${VAR}})
+    json_append_comma(result)
+    json_append_string(result ${KEY})
+    string(APPEND result ":")
+    string(APPEND result "[")
+    foreach(item IN LISTS ARGN)
+        split_export(${item} name service)
+        json_append_comma(result)
+        string(APPEND ${VAR} "{")
+        json_append_string(result "name")
+        string(APPEND ${VAR} ":")
+        json_append_string(result ${name})
+        string(APPEND ${VAR} ",")
+        json_append_string(result "service")
+        string(APPEND ${VAR} ":")
+        json_append_string(result ${service})
+        string(APPEND ${VAR} "}")
+    endforeach()
+    string(APPEND result "]")
+    set(${VAR} ${result} PARENT_SCOPE)
+endfunction()
+
 function(write_meta)
-    cmake_parse_arguments(PARSE_ARGV 0 "" "" "NAME;VERSION;DESCRIPTION;OUTPUT" "DEPENDS;ACCOUNTS")
+    cmake_parse_arguments(PARSE_ARGV 0 "" "" "NAME;VERSION;SCOPE;DESCRIPTION;OUTPUT" "DEPENDS;ACCOUNTS;SERVICES;EXPORTS")
     set(result)
     string(APPEND result "{")
     json_append_key(result "name" ${_NAME})
     json_append_key(result "version" ${_VERSION})
+    json_append_key(result "scope" ${_SCOPE})
     json_append_key(result "description" ${_DESCRIPTION})
     json_append_deps(result "depends" ${_DEPENDS})
     json_append_list(result "accounts" ${_ACCOUNTS})
+    json_append_list(result "services" ${_SERVICES})
+    json_append_exports(result "exports" ${_EXPORTS})
     string(APPEND result "}")
     file(GENERATE OUTPUT ${_OUTPUT} CONTENT ${result})
 endfunction()
 
 function(write_service_info)
-    cmake_parse_arguments(PARSE_ARGV 0 "" "" "SERVER;OUTPUT;SCHEMA" "FLAGS")
+    cmake_parse_arguments(PARSE_ARGV 0 "" "" "SERVER;OUTPUT;SCHEMA;DEPENDS" "FLAGS")
     add_custom_command(
         OUTPUT ${_OUTPUT}
-        DEPENDS ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/generate_service_info.cmake ${_SCHEMA}
+        DEPENDS ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/generate_service_info.cmake ${_SCHEMA} ${_DEPENDS}
         COMMAND ${CMAKE_COMMAND} -DPSIBASE_OUTPUT=${_OUTPUT} -DPSIBASE_SERVER=${_SERVER} "-DPSIBASE_FLAGS=${_FLAGS}" -DPSIBASE_SCHEMA=${_SCHEMA} -P ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/generate_service_info.cmake
         VERBATIM
     )
 endfunction()
 
+function(check_account_names)
+    foreach(account ${ARGN})
+        if (NOT "${account}" MATCHES "^[-0-9a-z][-0-9a-z]?[-0-9a-z]?[-0-9a-z]?[-0-9a-z]?[-0-9a-z]?[-0-9a-z]?[-0-9a-z]?[-0-9a-z]?[-0-9a-z]?([+][0-9]+)?$")
+            message(FATAL_ERROR "Invalid account name ${account}")
+        endif()
+        if ("${account}" MATCHES "^-.*|.*-$|.*--.*")
+            message(FATAL_ERROR "Invalid account name ${account}")
+        endif()
+    endforeach()
+endfunction()
+
 # NAME <name>               - The name of the package
 # VERSION <version>         - The package version
+# LOCAL                     - The package is installed to a single node. Default is NETWORK
+# NETWORK                   - The package is installed to the whole network
 # DESCRIPTION <text>        - The package description
 # OUTPUT <filename>         - The package file. Defaults to ${NAME}.psi
 # ACCOUNTS <name>...        - Additional non-service accounts to create
@@ -109,12 +160,14 @@ endfunction()
 #   DATA GLOB <path>... <dir> - Uploads multiple files to a directory
 #   INIT                    - The service has an init action that should be run with no arguments
 #   POSTINSTALL <filename>  - Additional actions that should be run at the end of installation
+#   EXPORT <name>           - Define a name that can be used to refer to the service
 function(psibase_package)
-    set(keywords NAME VERSION DESCRIPTION OUTPUT PACKAGE_DEPENDS DEPENDS ACCOUNTS SERVICE DATA TARGET WASM FLAGS SERVER INIT POSTINSTALL SCHEMA)
+    set(keywords NAME VERSION LOCAL NETWORK DESCRIPTION OUTPUT PACKAGE_DEPENDS DEPENDS ACCOUNTS SERVICE DATA TARGET WASM FLAGS SERVER INIT POSTINSTALL SCHEMA EXPORT)
     foreach(keyword IN LISTS keywords)
         set(_${keyword})
     endforeach()
     set(_SERVICES)
+    set(_SCOPE network)
     foreach(arg IN LISTS ARGN)
         set(my_keyword)
         foreach(keyword IN LISTS keywords)
@@ -129,6 +182,10 @@ function(psibase_package)
             if (my_keyword STREQUAL "INIT")
                 set(_INIT_${_SERVICE} TRUE)
                 set(current_keyword)
+            elseif(my_keyword STREQUAL "LOCAL")
+                set(_SCOPE local)
+            elseif(my_keyword STREQUAL "NETWORK")
+                set(_SCOPE network)
             else()
                 set(current_keyword ${my_keyword})
             endif()
@@ -167,6 +224,8 @@ function(psibase_package)
                 set(_SERVER_${_SERVICE} ${arg})
             elseif(current_keyword STREQUAL "SCHEMA")
                 set(_SCHEMA_${_SERVICE} ${arg})
+            elseif(current_keyword STREQUAL "EXPORT")
+                list(APPEND _EXPORT_${_SERVICE} ${arg})
             elseif(current_keyword STREQUAL "POSTINSTALL")
                 set(_POSTINSTALL ${arg})
             else()
@@ -187,27 +246,38 @@ function(psibase_package)
         set(_OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${_NAME}.psi)
     endif()
     set(outdir ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${_NAME}.psi.tmp)
+    set(exports)
     set(copy-contents)
     set(contents meta.json)
     set(zip-deps ${outdir}/meta.json)
     set(init-services)
+    set(wasm-services)
     foreach(service IN LISTS _SERVICES)
+        check_account_names(${service})
         if(_WASM_${service} OR _TARGET_${service})
+            list(APPEND wasm-services ${service})
+            set(schema-target)
             if(NOT _SCHEMA_${service})
                 if(_TARGET_${service})
                     set(_SCHEMA_${service} ${CMAKE_CURRENT_BINARY_DIR}/${service}-schema.json)
-                    psibase_schema(${_TARGET_${service}} ${_SCHEMA_${service}})
+                    psibase_schema(${_TARGET_${service}} OUTPUT ${_SCHEMA_${service}})
+                    set(schema-target ${_TARGET_${service}}-schema)
                 else()
                     message(FATAL_ERROR "Missing schema for ${service}")
                 endif()
             endif()
+            if (_SERVER_${service})
+                check_account_names(${_SERVER_${service}})
+            endif()
+            string(REPLACE "+" "/" service-basename ${service})
             write_service_info(
-                OUTPUT ${outdir}/service/${service}.json
+                OUTPUT ${outdir}/service/${service-basename}.json
                 FLAGS ${_FLAGS_${service}}
                 SERVER ${_SERVER_${service}}
                 SCHEMA ${_SCHEMA_${service}}
+                DEPENDS ${schema-target}
             )
-            list(APPEND zip-deps ${outdir}/service/${service}.json)
+            list(APPEND zip-deps ${outdir}/service/${service-basename}.json)
             if(_INIT_${service})
                 list(APPEND init-services ${service})
             endif()
@@ -218,8 +288,8 @@ function(psibase_package)
                 set(wasm ${_WASM_${service}})
                 list(APPEND zip-deps ${wasm})
             endif()
-            list(APPEND copy-contents COMMAND ln -f ${wasm} ${outdir}/service/${service}.wasm)
-            list(APPEND contents service/${service}.wasm service/${service}.json)
+            list(APPEND copy-contents COMMAND ln -f ${wasm} ${outdir}/service/${service-basename}.wasm)
+            list(APPEND contents service/${service-basename}.wasm service/${service-basename}.json)
         endif()
         if(_DATA_${service})
             set(commands)
@@ -268,6 +338,11 @@ function(psibase_package)
                 ${commands})
             list(APPEND contents data/${service})
         endif()
+        if (_EXPORT_${service})
+            list(APPEND exports "${_EXPORT_${service}}=${service}")
+        elseif (NOT ( "${service}" MATCHES "[+]" ) )
+            list(APPEND exports ${service})
+        endif()
     endforeach()
 
     if(init-services)
@@ -300,9 +375,12 @@ function(psibase_package)
         OUTPUT ${outdir}/meta.json
         NAME ${_NAME}
         VERSION ${_VERSION}
+        SCOPE ${_SCOPE}
         DESCRIPTION ${_DESCRIPTION}
         ACCOUNTS ${_ACCOUNTS} ${_SERVICES}
+        SERVICES ${wasm-services}
         DEPENDS ${_PACKAGE_DEPENDS}
+        EXPORTS ${exports}
     )
     string(REGEX REPLACE "/[^/]+/?$" "" output-dir ${_OUTPUT})
     add_custom_command(
@@ -371,6 +449,16 @@ function(cargo_psibase_package)
 endfunction()
 
 function(psibase_schema target)
+    cmake_parse_arguments(PARSE_ARGV 1 "" "" "OUTPUT;OUTPUT_DIRECTORY" "")
+    if (_KEYWORDS_MISSING_VALUES)
+        list(JOIN _KEYWORDS_MISSING_VALUES " " kw)
+        message(FATAL_ERROR "psibase_schema missing arguments for ${kw}")
+    endif()
+    if (_UNPARSED_ARGUMENTS)
+        list(JOIN _UNPARSED_ARGUMENTS " " args)
+        message(FATAL_ERROR "Invalid arguments to psibase_schema: ${args}")
+    endif()
+
     add_executable(${target}-schema-gen $<TARGET_PROPERTY:${target},SOURCES>)
     target_compile_definitions(${target}-schema-gen PRIVATE $<TARGET_PROPERTY:${target},COMPILE_DEFINITIONS> PSIBASE_GENERATE_SCHEMA)
     target_compile_options(${target}-schema-gen PRIVATE $<TARGET_PROPERTY:${target},COMPILE_OPTIONS>)
@@ -381,14 +469,23 @@ function(psibase_schema target)
         target_link_libraries(${target}-schema-gen PRIVATE "$<FILTER:$<TARGET_PROPERTY:${target},LINK_LIBRARIES>,EXCLUDE,.*(Psibase::service).*>" Psibase::test)
     endif()
 
-    if(ARGC GREATER_EQUAL 2)
-        set(_OUTFILE ${ARGV1})
+    if (NOT _OUTPUT)
+        set(_OUTPUT "${target}-schema.json")
+    endif()
+    if (NOT _OUTPUT_DIRECTORY)
+        set(_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+    endif()
+    if (CMAKE_VERSION VERSION_LESS 3.20)
+        if (_OUTPUT MATCHES "^[^/]")
+            set(_OUTFILE "${_OUTPUT_DIRECTORY}/${_OUTPUT}")
+        endif()
     else()
-        set(_OUTFILE $<TARGET_PROPERTY:${target},RUNTIME_OUTPUT_DIRECTORY>/${target}-schema.json)
+        cmake_path(APPEND _OUTFILE "${_OUTPUT_DIRECTORY}" "${_OUTPUT}")
     endif()
 
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${target}-schema.json.stamp
+        BYPRODUCTS ${_OUTFILE}
         DEPENDS ${target}
         COMMAND ${PSITEST_EXECUTABLE} $<TARGET_FILE:${target}-schema-gen> --schema > ${_OUTFILE}
         COMMAND touch ${CMAKE_CURRENT_BINARY_DIR}/${target}-schema.json.stamp

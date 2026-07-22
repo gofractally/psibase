@@ -8,7 +8,7 @@ homepage.workspace = true
 publish.workspace = true
 
 [dependencies]
-staged-tx = { path = "../service/", version = "0.23.0" }
+staged-tx = { path = "../service/", version = "0.24.0" }
 psibase.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -27,11 +27,9 @@ world = "impl"
 [package.metadata.component.target.dependencies]
 "host:common" = { path = "../../../user/Host/plugin/common/wit/world.wit" }
 "host:types" = { path = "../../../user/Host/plugin/types/wit/world.wit" }
-"accounts:plugin" = { path = "../../Accounts/plugin/accounts/wit/world.wit" }
 "transact:plugin" = { path = "../../Transact/plugin/wit/world.wit" }
-"clientdata:plugin" = { path = "../../../user/ClientData/plugin/wit/world.wit" }
 "permissions:plugin" = { path = "../../../user/Permissions/plugin/wit/world.wit" }
 
 
 [dev-dependencies]
-staged-tx-pkg = { path = "..", version = "0.23.0" }
+staged-tx-pkg = { path = "..", version = "0.24.0" }

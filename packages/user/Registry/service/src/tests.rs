@@ -4,7 +4,7 @@ mod tests {
     use constants::app_status;
     use constants::MAX_NAME_SIZE;
     use psibase::services::http_server;
-    use psibase::{account, ChainEmptyResult, TimePointUSec};
+    use psibase::{account, ChainEmptyResult, Push, TimePointUSec};
     use serde_json::{json, Value};
     use service::AppMetadata;
 
@@ -50,7 +50,7 @@ mod tests {
     fn test_set_metadata_simple(chain: psibase::Chain) -> Result<(), psibase::Error> {
         chain.new_account(account!("alice"))?;
         chain.new_account(account!("bob"))?;
-        http_server::Wrapper::push_from(&chain, SERVICE).registerServer(account!("r-registry"));
+        http_server::Wrapper::push_from(&chain, SERVICE).registerServer(account!("registry+1"));
 
         push_set_metadata(&chain, default_metadata(), default_tags()).get()?;
 
@@ -66,7 +66,6 @@ mod tests {
                         icon,
                         iconMimeType,
                         status,
-                        createdAt,
                         tags
                     }}
                 }}"#,
@@ -85,7 +84,6 @@ mod tests {
                     "icon": "icon-as-base64",
                     "iconMimeType": "image/png",
                     "status": "Draft",
-                    "createdAt": "1970-01-01T00:00:04+00:00",
                     "tags": [
                         "cozy",
                         "cuisine",

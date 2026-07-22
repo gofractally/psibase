@@ -4,9 +4,8 @@ import { z } from "zod";
 
 import { useToast } from "@/components/ui/use-toast";
 
-import { EmptyBlock } from "@/components/EmptyBlock";
-import { Pulse } from "@/components/Pulse";
 import { SmartConnectForm } from "@/components/forms/smart-connect-form";
+import { Pulse } from "@/components/pulse";
 
 import {
     PeerType,
@@ -14,8 +13,9 @@ import {
     StateEnum,
     UIPeer,
     chain,
-} from "@/lib/chainEndpoints";
+} from "@/lib/chain-endpoints";
 
+import { EmptyBlock } from "@shared/components/empty-block";
 import { cn } from "@shared/lib/utils";
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -41,8 +41,8 @@ import {
     TableRow,
 } from "@shared/shadcn/ui/table";
 
-import { useConfig } from "../hooks/useConfig";
-import { usePeers } from "../hooks/usePeers";
+import { useConfig } from "../hooks/use-config";
+import { usePeers } from "../hooks/use-peers";
 
 const randomIntFromInterval = (min: number, max: number) =>
     Math.floor(Math.random() * (max - min + 1) + min);
@@ -56,17 +56,19 @@ const combinePeers = (
 
     const connectMap: { [index: string]: PeerType } = {};
     for (const peer of livePeers) {
-        if (peer.url) {
-            connectMap[peer.url] = peer;
+        for (const url of peer.urls) {
+            connectMap[url] = peer;
         }
     }
 
     const persistentPeers = configPeers.map((url): z.infer<typeof UIPeer> => {
         if (url in connectMap) {
+            const { id, endpoint } = connectMap[url];
             return {
                 state: "persistent",
                 url: url,
-                ...connectMap[url],
+                id,
+                endpoint,
             };
         } else {
             return {
@@ -79,12 +81,13 @@ const combinePeers = (
     });
 
     const transientPeers: z.infer<typeof UIPeer>[] = livePeers
-        .filter((peer) => !peer.url || !configSet.has(peer.url))
+        .filter((peer) => !peer.urls.some((url) => configSet.has(url)))
         .map(
             (peer): z.infer<typeof UIPeer> => ({
                 state: "transient",
-                url: peer.url ?? "",
-                ...peer,
+                url: peer.urls[0] ?? "",
+                id: peer.id,
+                endpoint: peer.endpoint,
             }),
         );
 
@@ -204,7 +207,7 @@ export const PeersPage = () => {
             {combinedPeers.length == 0 ? (
                 <EmptyBlock
                     buttonLabel="Add Connection"
-                    onClick={() => setShowModalConnection(true)}
+                    onButtonClick={() => setShowModalConnection(true)}
                     title="No connections"
                     description="No existing connections to other nodes."
                 />

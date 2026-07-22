@@ -165,23 +165,24 @@ pub mod impls {
         }
 
         fn check_valid(&self) {
-            check(self.tag.len() > 0, "Tag cannot be empty");
+            assert!(self.tag.len() > 0, "Tag cannot be empty");
 
-            check(
+            assert!(
                 self.tag
                     .chars()
                     .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-'),
                 "Tags must be lowercase and can only contain dashes",
             );
 
-            check(
+            assert!(
                 !self.tag.starts_with('-') && !self.tag.ends_with('-'),
                 "Tag cannot start or end with a dash",
             );
 
-            check(
+            assert!(
                 self.tag.len() <= MAX_TAG_LENGTH,
-                format!("Tag can only be up to {} characters long", MAX_TAG_LENGTH).as_str(),
+                "Tag can only be up to {} characters long",
+                MAX_TAG_LENGTH
             );
         }
     }
@@ -195,8 +196,8 @@ pub mod impls {
     #[ComplexObject]
     impl AppMetadata {
         async fn tags(&self) -> Vec<String> {
-            let app_tags_table = AppTagsTable::new();
-            let tags_table = TagsTable::new();
+            let app_tags_table = AppTagsTable::read();
+            let tags_table = TagsTable::read();
 
             app_tags_table
                 .get_index_pk()
@@ -219,13 +220,11 @@ pub mod impls {
     }
 
     fn validate_length(property_name: &str, property: &str, max_length: usize) {
-        check(
+        assert!(
             property.len() <= max_length,
-            format!(
-                "{} can only be up to {} characters long",
-                property_name, max_length
-            )
-            .as_str(),
+            "{} can only be up to {} characters long",
+            property_name,
+            max_length
         );
     }
 
@@ -299,12 +298,12 @@ pub mod impls {
 
             // Validate icon
             if self.icon.len() > 0 {
-                check(
+                assert!(
                     self.icon_mime_type.len() > 0,
                     "Icon MIME type is required if icon is present",
                 );
 
-                check(
+                assert!(
                     ICON_MIME_TYPES.contains(&self.icon_mime_type.as_str()),
                     "Unsupported icon MIME type",
                 );
@@ -312,14 +311,12 @@ pub mod impls {
         }
 
         pub fn get(account_id: AccountNumber) -> Option<Self> {
-            let app_metadata_table = AppMetadataTable::new();
+            let app_metadata_table = AppMetadataTable::read();
             app_metadata_table.get_index_pk().get(&account_id)
         }
 
         pub fn get_assert(account_id: AccountNumber) -> Self {
-            let record = Self::get(account_id);
-            check(record.is_some(), "App metadata not found");
-            record.unwrap()
+            Self::get(account_id).expect("App metadata not found")
         }
 
         pub fn upsert(
@@ -367,9 +364,10 @@ pub mod impls {
         }
 
         pub fn set_tags(&self, tags: &mut Vec<String>) {
-            check(
+            assert!(
                 tags.len() <= MAX_APP_TAGS,
-                format!("Max {} tags per app", MAX_APP_TAGS).as_str(),
+                "Max {} tags per app",
+                MAX_APP_TAGS
             );
             tags.dedup();
 
@@ -387,9 +385,10 @@ pub mod impls {
         }
 
         pub fn publish(&mut self) {
-            check(
-                self.status != app_status::PUBLISHED,
-                "App is already published",
+            assert_ne!(
+                self.status,
+                app_status::PUBLISHED,
+                "App is already published"
             );
 
             let required_fields = [
@@ -399,7 +398,7 @@ pub mod impls {
                 ("long_description", &self.long_desc),
             ];
             for (name, v) in required_fields {
-                check(v.len() > 0, &format!("{} required to publish", name));
+                assert!(v.len() > 0, "{} required to publish", name);
             }
 
             self.status = app_status::PUBLISHED;
@@ -411,7 +410,7 @@ pub mod impls {
         }
 
         pub fn unpublish(&mut self) {
-            check(self.status == app_status::PUBLISHED, "App is not published");
+            assert_eq!(self.status, app_status::PUBLISHED, "App is not published");
             self.status = app_status::UNPUBLISHED;
             AppMetadataTable::new().put(&self).unwrap();
 

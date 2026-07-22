@@ -43,7 +43,6 @@ namespace
          Actor<InviteHooks>{Invite::service, invite.inviter}.onInvAccept(invite.id, accepter);
       }
    }
-
 }  // namespace
 
 Invite::Invite(psio::shared_view_ptr<Action> action)
@@ -71,13 +70,13 @@ void Invite::init()
    auto init      = (initTable.get({}));
    initTable.put(InitializedRecord{});
 
-   // Configure manual debit for self on Token and NFT
-   to<Nft>().setUserConf(Nft::manualDebit, true);
-   to<Tokens>().setUserConf(Tokens::manualDebit, true);
+   // Configure auto debit for self on Token and NFT
+   to<Nft>().setUserConf(Nft::autoDebit, false);
+   to<Tokens>().setUserConf(Tokens::autoDebit, false);
 
    // Register event indices
-   to<EventConfig>().addIndex(DbId::historyEvent, Invite::service, "updated"_m, 0);
-   to<EventConfig>().addIndex(DbId::historyEvent, Invite::service, "updated"_m, 1);
+   to<EventConfig>().addIndex(EventDb::historyEvent, Invite::service, "updated"_m, 0);
+   to<EventConfig>().addIndex(EventDb::historyEvent, Invite::service, "updated"_m, 1);
 }
 
 namespace
@@ -87,28 +86,35 @@ namespace
       // The basic `createAccount` action (manually measured):
       // * 293 bytes of network bandwidth -> Round up to 300
       // * 6.7MS of CPU time              -> Round up to 7ms
-      const uint64_t CREATE_ACTION_NET_BYTES = 300;
-      const uint64_t CREATE_ACTION_CPU_NS    = 7000000;
+      // * 318 bytes of disk              -> Round up to 320
+      const uint64_t CREATE_ACTION_NET_BYTES  = 300;
+      const uint64_t CREATE_ACTION_CPU_NS     = 7000000;
+      const uint64_t CREATE_ACTION_DISK_BYTES = 320;
 
-      auto net_cost        = to<VirtualServer>().get_net_cost(CREATE_ACTION_NET_BYTES);
-      auto cpu_cost        = to<VirtualServer>().get_cpu_cost(CREATE_ACTION_CPU_NS);
-      auto create_act_cost = (net_cost + cpu_cost);
-      create_act_cost += create_act_cost / 10;  // 10% buffer for additional net/cpu leeway
-      create_act_cost += create_act_cost / 2;   // 50% buffer to allow resource cost increase
+      auto virtualServer = to<VirtualServer>();
+      auto net_cost      = virtualServer.get_net_cost(CREATE_ACTION_NET_BYTES);
+      auto cpu_cost      = virtualServer.get_cpu_cost(CREATE_ACTION_CPU_NS);
+      auto disk_cost     = virtualServer.get_disk_cost(CREATE_ACTION_DISK_BYTES);
+
+      auto create_act_cost = (net_cost + cpu_cost + disk_cost);
+      create_act_cost += create_act_cost / 10;  // 10% buffer for additional resource leeway
       return create_act_cost;
    }
 
    Quantity get_std_buffer_reserve()
    {
-      auto gas_tank_cost = to<VirtualServer>().std_buffer_cost();
-      gas_tank_cost += gas_tank_cost / 2;  // 50% buffer to allow resource cost increase
-      return gas_tank_cost;
+      return to<VirtualServer>().std_buffer_cost();
    }
 
 }  // namespace
 
 Quantity Invite::getInvCost(uint16_t numAccounts)
 {
+   if (!to<VirtualServer>().is_billing_enabled())
+   {
+      return 0;
+   }
+
    auto create_action_reserve = get_create_action_reserve();
    auto buffer_reserve        = get_std_buffer_reserve();
 
@@ -123,18 +129,25 @@ TID getSysToken()
    return sys_record->id;
 }
 
-uint32_t Invite::createInvite(uint32_t    inviteId,
-                              Checksum256 fingerprint,
-                              uint16_t    numAccounts,
-                              bool        useHooks,
-                              std::string secret,
-                              Quantity    resources)
+uint32_t Invite::createInvite(uint32_t             inviteId,
+                              std::vector<uint8_t> payload,
+                              uint16_t             numAccounts,
+                              bool                 useHooks,
+                              Quantity             resources)
 {
+   std::vector<char> payloadChars(payload.begin(), payload.end());
+   auto              invPayload  = psio::from_frac<InvPayload>(payloadChars);
+   auto              fingerprint = invPayload.fingerprint;
+
    auto sender    = getSender();
    auto isBilling = to<VirtualServer>().is_billing_enabled();
 
-   auto cid = to<Credentials>().issue(fingerprint,       //
-                                      ONE_WEEK.count(),  //
+   check(fingerprint.size() == 32, fprintInvalid.data());
+   Checksum256 fingerprint_checksum;
+   std::memcpy(fingerprint_checksum.data(), fingerprint.data(), 32);
+
+   auto cid = to<Credentials>().issue(fingerprint_checksum,  //
+                                      ONE_WEEK.count(),      //
                                       std::vector<MethodNumber>{"createAccount"_m});
 
    if (isBilling)
@@ -177,7 +190,7 @@ uint32_t Invite::createInvite(uint32_t    inviteId,
        .inviter     = sender,
        .numAccounts = numAccounts,
        .useHooks    = useHooks,
-       .secret      = secret,
+       .secret      = invPayload.secret,
    };
    inviteTable.put(invite);
 
@@ -262,7 +275,7 @@ void Invite::accept(uint32_t inviteId)
    hookOnInvAccept(*invite, accepter);
 }
 
-void Invite::delInvite(uint32_t inviteId)
+Quantity Invite::delInvite(uint32_t inviteId)
 {
    auto sender      = getSender();
    auto inviteTable = Tables().open<InviteTable>();
@@ -270,7 +283,8 @@ void Invite::delInvite(uint32_t inviteId)
    check(invite.has_value(), inviteDNE.data());
    check(invite->inviter == sender, unauthDelete.data());
 
-   auto sysRecord = to<Tokens>().getSysToken();
+   Quantity refund    = 0;
+   auto     sysRecord = to<Tokens>().getSysToken();
    if (sysRecord.has_value())
    {
       auto sys           = sysRecord->id;
@@ -281,9 +295,9 @@ void Invite::delInvite(uint32_t inviteId)
       {
          if (balanceRecord->value > 0)
          {
-            to<Tokens>().fromSub(sys, sub_account, balanceRecord->value);
-            to<Tokens>().credit(sys, invite->inviter, balanceRecord->value,
-                                "Unused invite tokens refunded");
+            refund = *balanceRecord;
+            to<Tokens>().fromSub(sys, sub_account, refund);
+            to<Tokens>().credit(sys, invite->inviter, refund, "Unused invite tokens refunded");
          }
       }
    }
@@ -291,11 +305,21 @@ void Invite::delInvite(uint32_t inviteId)
    inviteTable.remove(*invite);
    to<Credentials>().consume(invite->cid);
    emit().history().updated(invite->id, getSender(), InviteEventType::deleted);
+
+   return refund;
 }
 
 optional<InviteRecord> Invite::getInvite(uint32_t inviteId)
 {
    return Tables(getReceiver(), KvMode::read).open<InviteTable>().get(inviteId);
+}
+
+psibase::TimePointSec Invite::getExpDate(uint32_t inviteId)
+{
+   auto cid    = getInvite(inviteId)->cid;
+   auto expiry = to<Credentials>().get_expiry_date(cid);
+   check(expiry.has_value(), inviteCorrupted.data());
+   return *expiry;
 }
 
 PSIBASE_DISPATCH(UserService::InviteNs::Invite)

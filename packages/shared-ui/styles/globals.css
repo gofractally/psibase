@@ -42,6 +42,42 @@
     --sidebar-ring: oklch(0.708 0 0);
 }
 
+@keyframes shake-once {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
+  20%, 40%, 60%, 80% { transform: translateX(2px); }
+}
+
+.animate-shake-once {
+  animation: shake-once 0.5s ease-in-out;
+}
+
+@keyframes price-flash-up {
+  0% {
+    background-color: oklch(0.72 0.19 145 / 0.55);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+@keyframes price-flash-down {
+  0% {
+    background-color: oklch(0.65 0.22 25 / 0.55);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.animate-price-flash-up {
+  animation: price-flash-up 0.8s ease-out;
+}
+
+.animate-price-flash-down {
+  animation: price-flash-down 0.8s ease-out;
+}
+
 .dark {
     --background: oklch(0.145 0 0);
     --foreground: oklch(0.985 0 0);

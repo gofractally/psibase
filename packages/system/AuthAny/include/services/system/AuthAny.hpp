@@ -8,7 +8,7 @@ namespace SystemService
    {
       static constexpr psibase::AccountNumber service = psibase::AccountNumber("auth-any");
 
-      void checkAuthSys(uint32_t                    flags,
+      bool checkAuthSys(uint32_t                    flags,
                         psibase::AccountNumber      requester,
                         psibase::AccountNumber      sender,
                         ServiceMethod               action,
@@ -16,6 +16,8 @@ namespace SystemService
                         std::vector<psibase::Claim> claims);
 
       void canAuthUserSys(psibase::AccountNumber user);
+
+      std::vector<psibase::AccountNumber> getDlgsSys(psibase::AccountNumber sender);
 
       bool isAuthSys(psibase::AccountNumber              sender,
                      std::vector<psibase::AccountNumber> authorizers);
@@ -26,6 +28,7 @@ namespace SystemService
    PSIO_REFLECT(AuthAny,  //
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                 method(canAuthUserSys, user),
+                method(getDlgsSys, sender),
                 method(isAuthSys, sender, authorizers),
                 method(isRejectSys, sender, rejecters)
                 //

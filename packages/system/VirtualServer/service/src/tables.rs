@@ -1,37 +1,48 @@
 #[psibase::service_tables]
 pub mod tables {
-    use std::u64;
-
     use async_graphql::SimpleObject;
     use psibase::services::tokens::TID;
     use psibase::*;
     use serde::{Deserialize, Serialize};
 
     #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
-    pub struct InitRow {}
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, Default)]
+    pub struct InitRow {
+        /// Bytes already in db at boot (`Native` + `Service`),
+        pub used_bytes: u64,
+    }
     impl InitRow {
         #[primary_key]
         fn pk(&self) {}
     }
 
     impl InitRow {
-        pub fn init() {
-            InitTable::read_write().put(&InitRow {}).unwrap();
+        pub fn init(used_bytes: u64) {
+            InitTable::read_write()
+                .put(&InitRow { used_bytes })
+                .unwrap();
         }
 
         pub fn is_init() -> bool {
             InitTable::read().get_index_pk().get(&()).is_some()
         }
 
+        pub fn used_bytes() -> u64 {
+            InitTable::read()
+                .get_index_pk()
+                .get(&())
+                .map_or(0, |r| r.used_bytes)
+        }
+
         pub fn check_init() {
-            check(InitRow::is_init(), "service not initialized");
+            assert!(InitRow::is_init(), "service not initialized");
         }
     }
 
     #[table(name = "BillingConfigTable", index = 1)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone)]
     #[serde(rename_all = "camelCase")]
+    #[graphql(complex)]
     pub struct BillingConfig {
         /// ID of the system token used for resource billing
         pub sys: TID,
@@ -82,6 +93,8 @@ pub mod tables {
         pub per_block_sys_cpu_ns: u64,
         /// Amount of storage space in bytes allocated to objective state
         pub obj_storage_bytes: u64,
+        /// Amount of storage space in bytes allocated to subjective (node-local) state
+        pub subj_storage_bytes: u64,
     }
     impl NetworkVariables {
         #[primary_key]
@@ -91,8 +104,9 @@ pub mod tables {
         fn default() -> Self {
             NetworkVariables {
                 block_replay_factor: 5,
-                per_block_sys_cpu_ns: 20_000_000,  // 20ms
-                obj_storage_bytes: 20_000_000_000, // 20 GB
+                per_block_sys_cpu_ns: 20_000_000,   // 20ms
+                obj_storage_bytes: 20_000_000_000,  // 20 GB
+                subj_storage_bytes: 20_000_000_000, // 20 GB
             }
         }
     }
@@ -147,24 +161,30 @@ pub mod tables {
         pub capacity: u64,
     }
 
-    #[table(name = "NetPricingTable", index = 6)]
+    /// Pricing configuration for a rate-limited resource.
+    ///
+    /// A rate-limited resource is one that has a max capacity per unit time and uses
+    /// a "difficulty adjustment" algorithm to adjust price based on congestion.
+    #[table(name = "RateLimitPricingTable", index = 6)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone)]
     #[graphql(complex)]
-    pub struct NetPricing {
+    pub struct RateLimitPricing {
+        #[primary_key]
+        pub resource_id: u8,
+
         /// The number of blocks over which to compute the average usage
         pub num_blocks_to_average: u8,
 
         #[graphql(skip)]
-        /// The actual history of network bandwidth usage over the last
-        /// `num_blocks_to_average` blocks
-        pub usage_history: Vec<u64>,
+        /// The average usage over the last `num_blocks_to_average` blocks
+        pub avg_usage: u64,
 
         #[graphql(skip)]
-        /// The network bandwidth usage in bits per second for the current block
-        pub current_usage_bps: u64,
+        /// The usage consumed during the current block
+        pub current_usage: u64,
 
         #[graphql(skip)]
-        /// The ID Of the diff adjust object used to calculate price
+        /// The ID of the diff adjust object used to calculate price
         pub diff_adjust_id: u32,
 
         /// The approximate amount of time it takes to double the price when congested
@@ -173,63 +193,40 @@ pub mod tables {
         /// The approximate amount of time it takes to halve the price when idle
         pub halving_time_sec: u32,
 
-        /// This is some number of bits that represents the smallest unit of billable
-        /// network bandwidth. Consumed network bandwidth is rounded up to the nearest
-        /// billable unit.
+        /// The smallest unit of billable resource consumption. Consumed amount
+        /// is rounded up to the nearest billable unit.
         pub billable_unit: u64,
     }
 
-    impl NetPricing {
-        #[primary_key]
-        fn pk(&self) {}
-    }
-
-    #[table(name = "CpuPricingTable", index = 7)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone)]
+    /// Capacity-limited pricing state
+    #[table(name = "CapacityPricingTable", index = 7)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone, Default)]
     #[graphql(complex)]
-    pub struct CpuPricing {
-        /// The number of blocks over which to compute the average usage
-        pub num_blocks_to_average: u8,
-
-        #[graphql(skip)]
-        /// The actual history of CPU time usage over the last
-        /// `num_blocks_to_average` blocks
-        pub usage_history: Vec<u64>,
-
-        #[graphql(skip)]
-        /// The CPU time usage in nanoseconds for the current block
-        pub current_usage_ns: u64,
-
-        #[graphql(skip)]
-        /// The ID Of the diff adjust object used to calculate price
-        pub diff_adjust_id: u32,
-
-        /// The approximate amount of time it takes to double the price when congested
-        pub doubling_time_sec: u32,
-
-        /// The approximate amount of time it takes to halve the price when idle
-        pub halving_time_sec: u32,
-
-        /// This is some number of nanoseconds that represents the smallest unit of
-        /// billable CPU time. Consumed CPU time is rounded up to the nearest billable unit.
-        pub billable_unit: u64,
-    }
-
-    impl CpuPricing {
+    pub struct CapacityPricing {
         #[primary_key]
-        fn pk(&self) {}
+        pub resource_id: u8,
+
+        /// Remaining billable resource capacity
+        pub remaining_capacity: u64,
+        /// Max reserve tokens that may be sold into the relay (e.g. max issued supply)
+        #[graphql(skip)]
+        pub max_reserve: u64,
+        /// Total resource capacity
+        pub max_capacity: u64,
+        /// Curve / virtual-offset parameter
+        pub curve_d: u64,
+        /// Fee on refunds, parts per million
+        pub fee_ppm: u32,
     }
 }
 
 mod billing_config;
-mod cpu_pricing;
-mod net_pricing;
+pub(crate) mod capacity_limit_pricing;
 mod network_specs;
 mod network_variables;
-mod pricing_common;
+mod rate_limit_pricing;
 mod server_specs;
 mod user_settings;
 
+pub use rate_limit_pricing::*;
 pub use user_settings::DEFAULT_AUTO_FILL_THRESHOLD_PERCENT;
-
-pub use pricing_common::*;

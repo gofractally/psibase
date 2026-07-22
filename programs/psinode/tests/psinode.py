@@ -208,9 +208,9 @@ class API:
         else:
             host = url.host
         return urllib3.util.Url(url.scheme, url.auth, host, url.port, path).url
-    def request(self, method, path, service=None, **kw):
+    def request(self, method, path, service=None, timeout=10, **kw):
         '''Makes an HTTP request and returns a Response. Other named parameters are passed through to requests.request.'''
-        return self.session.request(method, self._make_url(path, service), **kw)
+        return self.session.request(method, self._make_url(path, service), timeout=timeout, **kw)
     def head(self, path, service=None, **kw):
         '''HTTP HEAD request'''
         return self.request('HEAD', path, service, **kw)
@@ -409,7 +409,7 @@ class Service(object):
         return self.api.graphql(self.service, query, token)
 
 _default_config = '''# psinode config
-service  = x-admin.:$PSIBASE_DATADIR/services/x-admin
+mount  = $PSIBASE_DATADIR/packages
 
 http-timeout = 4
 %s
@@ -419,7 +419,7 @@ filter = %s
 format = %s
 '''
 _default_log_filter = 'Severity >= info'
-_default_log_format = '[{TimeStamp}] [{Severity}]{?: [{RemoteEndpoint}]}: {Message}{?: {TransactionId}}{?: {BlockId}}{?RequestMethod:: {RequestMethod} {RequestHost}{RequestTarget}{?: {ResponseStatus}{?: {ResponseBytes}}}}{?: {ResponseTime} µs}{Indent:4:{TraceConsole}}'
+_default_log_format = '[{TimeStamp}] [{Severity}]{?: [{Service}]}{?: [{RemoteEndpoint}]}: {Message}{?: {TransactionId}}{?: {BlockId}}{?RequestMethod:: {RequestMethod} {RequestHost}{RequestTarget}{?: {ResponseStatus}{?: {ResponseBytes}}}}{?: {ResponseTime} µs}{Indent:4:{TraceConsole}}'
 
 def _write_config(dir, log_filter, log_format, softhsm, trustfile):
     logfile = os.path.join(dir, 'config')
@@ -489,6 +489,7 @@ class Node(API):
             args.extend(['-p', self.producer])
         if self.hostname is not None:
             args.extend(['--host', self.hostname])
+        args.extend(['--host', 'psibase.localhost'])
         if self.p2p:
             args.append('--p2p')
         if database_cache_size is not None:
@@ -571,20 +572,20 @@ class Node(API):
             url = other.socketpath
         else:
             url = other
-        with self.post('/native/admin/connect', service='x-admin', json={'url':url}):
-            pass
+        with self.post('/connect', service='x-peers', json={'url':url}) as result:
+            result.raise_for_status()
     def disconnect(self, other):
         '''Disconnects a peer. other can be a peer id, a URL, or a Node object.'''
         if isinstance(other, int):
-            result = self.post('/native/admin/disconnect', service='x-admin', json={'id': other})
+            result = self.post('/disconnect', service='x-peers', json={'id': other})
             result.raise_for_status()
             return True
         elif isinstance(other, str):
-            with self.get('/native/admin/peers', service='x-admin') as peers:
+            with self.get('/peers', service='x-peers') as peers:
                 peers.raise_for_status()
                 for peer in peers.json():
-                    if peer['url'] == other:
-                        return self.disconnect(int(peer['id']))
+                    if other in peer['urls']:
+                        return self.disconnect(int(peer['socket']))
             return False
         else:
             return self.disconnect(other.socketpath) or other.disconnect(self.socketpath)
@@ -609,10 +610,13 @@ class Node(API):
         self.wait(isbooted)
     def install(self, packages=[], sources=[]):
         '''installs a package'''
-        self.run_psibase(['install'] + self.node_args() + ['--package-source=' + s for s in sources] + packages)
+        self.run_psibase(['install', '-y'] + self.node_args() + ['--package-source=' + s for s in sources] + packages)
+    def install_local(self, packages=[], sources=[]):
+        '''installs a local package'''
+        self.run_psibase(['install', '--local', '-y'] + self.node_args() + ['--package-source=' + s for s in sources] + packages)
     def run_psibase(self, args, *, check=True, **kw):
         self._find_psibase()
-        result = subprocess.run([self.psibase] + args, check=check, **kw)
+        result = subprocess.run([self.psibase] + args, check=check, timeout=100, **kw)
         return result
     def unlock_softhsm(self):
         with self.get('/native/admin/keys/devices', service='x-admin') as reply:

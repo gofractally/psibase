@@ -3,11 +3,9 @@ import type { QueryOptions } from "@shared/hooks/types";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { getSupervisor } from "@psibase/common-lib";
+import { supervisor } from "@shared/lib/supervisor";
 
-import QueryKey from "../lib/queryKeys";
-
-const supervisor = getSupervisor();
+import QueryKey from "../lib/query-keys";
 
 export const queryGetAllAccounts = queryOptions({
     queryKey: QueryKey.getAllAccounts(),
@@ -34,4 +32,3 @@ export const useGetAllAccounts = (
     const queryOptions = options ?? {};
     return useQuery({ ...queryGetAllAccounts, ...queryOptions });
 };
-

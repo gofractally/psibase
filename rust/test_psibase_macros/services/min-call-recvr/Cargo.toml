@@ -12,10 +12,11 @@ publish.workspace = true
 package-name = "mincallrecvr"
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.23.0"
+HttpServer = "0.24.0"
 
 [dependencies]
 psibase.workspace = true
+psibase_service.workspace = true
 psibase_macros.workspace = true
 async-graphql.workspace = true
 serde.workspace = true

@@ -8,10 +8,10 @@
 #include <services/system/VirtualServer.hpp>
 
 #include <boost/container/flat_map.hpp>
+#include <cstdio>
+#include <psibase/api.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/serviceEntry.hpp>
-
-#include <cstdio>
 
 using namespace psibase;
 
@@ -25,16 +25,63 @@ namespace SystemService
 
    namespace
    {
-      bool isResMonitoring()
+      bool resMonitoringEnabled()
       {
          auto table  = Transact::Tables(Transact::service).open<ResMonitoringConfigTable>();
          auto config = table.get({});
          return config && config->enabled;
       }
+
+      // While nonzero, kv writes are attributed to the system account (`{}`) instead of
+      // `trxSender`, up to a budget of `systemWriteBudget` net bytes written.
+      uint64_t systemWriteBudget = 0;
+
+      // When set with `skipBilling`, the next `N` disk writes are not billed; exactly N unbilled
+      // writes must occur before `endSkipBilling` is called.
+      std::optional<uint32_t> skipDiskWrites;
+
+      // RAII guard that marks the enclosing scope as performing authorized system
+      // writes. All writes are attributed to the system account until the guard is
+      // destroyed.
+      struct SystemWriteGuard
+      {
+         SystemWriteGuard()
+         {
+            check(systemWriteBudget == 0, "system write already active");
+            // Use the guard when the limit is specified by the scope of the guard,
+            // rather than a byte limit.
+            systemWriteBudget = static_cast<uint64_t>(-1);
+         }
+         ~SystemWriteGuard() { systemWriteBudget = 0; }
+         SystemWriteGuard(const SystemWriteGuard&)            = delete;
+         SystemWriteGuard& operator=(const SystemWriteGuard&) = delete;
+      };
+
+      // Returns true if a write of net size `delta` should be attributed to the
+      // system account
+      bool chargeSystemWrite(int64_t delta)
+      {
+         if (systemWriteBudget == 0)
+            return false;
+         if (delta > 0)
+         {
+            auto d = static_cast<uint64_t>(delta);
+            if (d > systemWriteBudget)
+            {
+               systemWriteBudget = 0;
+               // If the budget is exceeded, attribute the whole write to
+               // the normal sender.
+               return false;
+            }
+            systemWriteBudget -= d;
+         }
+         return true;
+      }
    }  // namespace
 
    void Transact::startBoot(psio::view<const std::vector<Checksum256>> bootTransactions)
    {
+      auto _           = recurse();
       auto statusTable = open<TransactStatusTable>();
       auto statusIdx   = statusTable.getIndex<0>();
       check(!statusIdx.get(std::tuple{}), "already started");
@@ -43,6 +90,7 @@ namespace SystemService
 
    void Transact::finishBoot()
    {
+      auto _           = recurse();
       auto tables      = Transact::Tables(Transact::service);
       auto statusTable = tables.open<TransactStatusTable>();
       auto statusIdx   = statusTable.getIndex<0>();
@@ -83,6 +131,17 @@ namespace SystemService
    void Transact::startBlock()
    {
       check(getSender().value == 0, "Only native code may call startBlock");
+      auto _ = recurse();
+
+      // This function is executed outside the context of any action/transaction context.
+      // Therefore, any database write operations are treated as system writes, and their
+      // cost is socialized.
+      SystemWriteGuard sysWrite;
+
+      if (auto eventIndexer = open<EventIndexerTable>().get({}))
+      {
+         to<EventIndexerInterface>(eventIndexer->service).startBlock();
+      }
 
       Tables tables(Transact::service);
 
@@ -90,12 +149,14 @@ namespace SystemService
       // verify TAPoS on transactions.
       tables.open<BlockSummaryTable>().put(getBlockSummary());
 
+      const auto& stat = getStatus();
+      emit().history().blockStart(stat.current.blockNum, stat.current.time);
+
       // Remove expired transaction IDs. The iteration limit on the loop helps to
       // mitigate a potential attack.
-      const auto& stat          = getStatus();
-      auto        includedTable = tables.open<IncludedTrxTable>();
-      auto        includedIndex = includedTable.getIndex<0>();
-      auto        includedEnd   = includedIndex.end();
+      auto includedTable = tables.open<IncludedTrxTable>();
+      auto includedIndex = includedTable.getIndex<0>();
+      auto includedEnd   = includedIndex.end();
       for (int i = 0; i < 20; ++i)
       {
          auto it = includedIndex.begin();
@@ -125,7 +186,7 @@ namespace SystemService
          snap.put({stat.head->header.time, psibase::Seconds{0}});
       }
 
-      if (isResMonitoring())
+      if (resMonitoringEnabled())
       {
          auto _ = recurse();
          to<VirtualServer>().notifyBlock(stat.current.blockNum);
@@ -135,6 +196,7 @@ namespace SystemService
    void Transact::setSnapTime(uint32_t seconds)
    {
       check(getSender() == getReceiver(), "Wrong sender");
+      auto   _ = recurse();
       Tables tables(Transact::service);
 
       auto& stat = getStatus();
@@ -183,6 +245,7 @@ namespace SystemService
    {
       auto me = getReceiver();
       check(getSender() == me, "Wrong sender");
+      auto _ = recurse();
       if (objective)
       {
          check(act.sender == me, "Objective callbacks must have 'transact' as sender");
@@ -223,6 +286,7 @@ namespace SystemService
    {
       auto me = getReceiver();
       check(getSender() == me, "Wrong sender");
+      auto _ = recurse();
       if (objective)
       {
          Tables tables(me);
@@ -267,6 +331,7 @@ namespace SystemService
    {
       auto me = getReceiver();
       check(getSender() == me, "Wrong sender");
+      auto _ = recurse();
       Transact::Tables(Transact::service).open<EventIndexerTable>().put({service});
    }
 
@@ -301,17 +366,13 @@ namespace SystemService
                psibase::writeConsole(" - " + a.service.str() + "->" + a.method.str() + "\n");
          }
       }
+      auto _ = recurse();
 
       if (transactStatus && transactStatus->enforceAuth)
       {
-         auto accountsTables = Accounts::Tables(Accounts::service, KvMode::read);
-         auto accountTable   = accountsTables.open<AccountTable>();
-         auto accountIndex   = accountTable.getIndex<0>();
-         auto account        = accountIndex.get(action.sender);
-         if (!account)
-            abortMessage("unknown sender \"" + action.sender.str() + "\"");
+         auto authService = to<Accounts>().getAuthOf(action.sender);
 
-         if (requester != account->authService)
+         if (requester != authService && requester != action.sender.base())
          {
             uint32_t flags = 0;
             if (requester == action.sender)
@@ -353,22 +414,24 @@ namespace SystemService
 
                if (!flags_str.empty())
                {
-                  psibase::writeConsole("Checking auth service " + account->authService.str() +
+                  psibase::writeConsole("Checking auth service " + authService.str() +
                                         " with flags: \n" + flags_str + "\n");
                }
             }
 
-            Actor<AuthInterface> auth(Transact::service, account->authService);
-            auth.checkAuthSys(flags, requester, action.sender,
-                              ServiceMethod{action.service, action.method}, allowedActions,
-                              std::vector<Claim>{});
-         }  // if (requester != account->authService)
+            Actor<AuthInterface> auth(Transact::service, authService);
+            if (!auth.checkAuthSys(flags, requester, action.sender,
+                                   ServiceMethod{action.service, action.method}, allowedActions,
+                                   std::vector<Claim>{}))
+            {
+               abortMessage("Not authorized");
+            }
+         }  // if (requester != authService)
       }  // if(enforceAuth)
 
       for (auto& a : allowedActions)
          ++runAsMap[{action.sender, action.service, a.service, a.method}];
 
-      auto _      = recurse();
       auto result = call(action);
 
       for (auto& a : allowedActions)
@@ -409,9 +472,17 @@ namespace SystemService
       return {};
    }
 
+   std::pair<uint8_t, uint32_t> Transact::headTapos()
+   {
+      return SystemService::headTapos();
+   }
+
    namespace
    {
-      bool checkTapos(const Checksum256& id, const Tapos& tapos, bool speculative)
+      bool checkTapos(const Checksum256& id,
+                      const Tapos&       tapos,
+                      bool               speculative,
+                      bool               isStartBlock)
       {
          auto statusTable =
              Transact{}.open<TransactStatusTable>(speculative ? KvMode::read : KvMode::readWrite);
@@ -425,7 +496,6 @@ namespace SystemService
          check(stat.current.time < tapos.expiration, "transaction has expired");
          check(tapos.expiration < stat.current.time + maxTrxLifetime,
                "transaction was submitted too early");
-
          auto transactStatus = statusIdx.get(std::tuple{});
 
          std::optional<BlockSummary> summary;
@@ -434,6 +504,31 @@ namespace SystemService
          else
             summary = summaryIdx.get(std::tuple<>{});
 
+         if (isStartBlock)
+         {
+            if (summary)
+            {
+               check(summary->blockNum + 1 >= getStatus().current.blockNum,
+                     "startBlock was not run in the previous block");
+               check(summary->blockNum + 1 == getStatus().current.blockNum,
+                     "startBlock has already been run");
+            }
+            check(!tapos.refBlockIndex && !tapos.refBlockSuffix,
+                  "tapos must be zero for startBlock");
+            return false;
+         }
+         else
+         {
+            if (!summary)
+            {
+               check(!getStatus().head, "startBlock has not been run");
+            }
+            else
+            {
+               check(summary->blockNum == getStatus().current.blockNum,
+                     "startBlock has not been run");
+            }
+         }
          if (transactStatus && transactStatus->bootTransactions)
          {
             auto& bootTransactions = *transactStatus->bootTransactions;
@@ -484,24 +579,18 @@ namespace SystemService
                      bool                      first,
                      bool                      readOnly)
       {
-         auto accountsTables = Accounts::Tables(Accounts::service);
-         auto accountTable   = accountsTables.open<AccountTable>();
-         auto accountIndex   = accountTable.getIndex<0>();
-
-         auto account = accountIndex.get(act.sender().unpack());
-         if (!account)
-            abortMessage("unknown sender \"" + act.sender().unpack().str() + "\"");
+         auto authService = to<Accounts>().getAuthOf(act.sender().unpack());
 
          if constexpr (enable_print)
             std::printf("call checkAuthSys on %s for sender account %s\n",
-                        account->authService.str().c_str(), act.sender().unpack().str().c_str());
-         Actor<AuthInterface> auth(Transact::service, account->authService);
+                        authService.str().c_str(), act.sender().unpack().str().c_str());
+         Actor<AuthInterface> auth(Transact::service, authService);
          uint32_t             flags = AuthInterface::topActionReq;
          if (first && !readOnly)
          {
             flags |= AuthInterface::firstAuthFlag;
 
-            if (isResMonitoring())
+            if (resMonitoringEnabled())
             {
                // If resMonitoring is disabled, no CPU limit is set for the transaction
                to<VirtualServer>().setBillableAcc(act.sender());
@@ -510,15 +599,39 @@ namespace SystemService
          if (readOnly)
             flags |= AuthInterface::readOnlyFlag;
          // This can execute user defined code, so we must set the timer first
-         auth.checkAuthSys(flags, psibase::AccountNumber{}, act.sender(),
-                           ServiceMethod{act.service(), act.method()}, std::vector<ServiceMethod>{},
-                           claims);
+         if (!auth.checkAuthSys(flags, psibase::AccountNumber{}, act.sender(),
+                                ServiceMethod{act.service(), act.method()},
+                                std::vector<ServiceMethod>{}, claims))
+         {
+            abortMessage(std::format("Authorization for {} -> {}::{} failed",
+                                     act.sender().unpack().str(), act.service().unpack().str(),
+                                     act.method().unpack().str()));
+         }
       }
+
+      namespace
+      {
+         // Asserts that the sender is a privileged service.
+         void checkPrivilegedSender()
+         {
+            auto code = Native::tables(KvMode::read).open<CodeTable>().get(getSender());
+            check(code && (code->flags & CodeRow::isPrivileged),
+                  "operation requires a privileged service");
+         }
+
+         // The sender of the currently executing transaction.
+         //
+         // It is set to the sender of the first action at the start of a transaction, unset when
+         // processing is complete.
+         std::optional<AccountNumber> trxSender;
+      }  // namespace
+
    }  // namespace
    bool Transact::checkFirstAuth(Checksum256 id, psio::view<const psibase::Transaction> trx)
    {
       check(trx.actions().size() > 0, "transaction has no actions");
-      bool enforceAuth = checkTapos(id, trx.tapos(), true);
+      auto _           = recurse();
+      bool enforceAuth = checkTapos(id, trx.tapos(), true, false);
       if (enforceAuth)
          checkAuth(trx.actions().front(), trx.claims(), true, true);
       return enforceAuth;
@@ -527,10 +640,40 @@ namespace SystemService
    void Transact::resMonitoring(bool enable)
    {
       check(getSender() == VirtualServer::service, "Wrong sender");
+      auto _ = recurse();
 
       Transact::Tables(Transact::service)
           .open<ResMonitoringConfigTable>()  //
           .put({.enabled = enable});
+   }
+
+   bool Transact::isResMonitoring()
+   {
+      return resMonitoringEnabled();
+   }
+
+   void Transact::skipBilling(uint32_t numWrites)
+   {
+      checkPrivilegedSender();
+      check(!skipDiskWrites.has_value(), "skipBilling already active");
+      skipDiskWrites = numWrites;
+   }
+
+   void Transact::endSkipBilling()
+   {
+      checkPrivilegedSender();
+      check(skipDiskWrites.has_value(), "endSkipBilling without active skipBilling");
+      check(*skipDiskWrites == 0, "endSkipBilling called before all skipped writes occurred");
+      skipDiskWrites.reset();
+   }
+
+   void Transact::systemWrite(uint64_t numBytes)
+   {
+      check(getSender() == VirtualServer::service, "Wrong sender");
+      if (numBytes > 0)
+         check(systemWriteBudget == 0, "system write already active");
+
+      systemWriteBudget = numBytes;
    }
 
    static void processTransactionImpl(
@@ -545,6 +688,8 @@ namespace SystemService
 
       check(trx.actions().size() > 0, "transaction has no actions");
 
+      trxSender = trx.actions()[0].sender();
+
       // unpack some fields for convenience
       auto tapos  = trx.tapos().unpack();
       auto claims = trx.claims().unpack();
@@ -554,12 +699,16 @@ namespace SystemService
       auto includedIdx   = includedTable.getIndex<0>();
 
       check(!includedIdx.get(std::tuple{tapos.expiration, id}), "duplicate transaction");
-      includedTable.put({tapos.expiration, id});
 
-      bool enforceAuth = checkTapos(id, tapos, speculative);
+      bool enforceAuth = checkTapos(id, tapos, speculative, isStartBlock(trx));
 
       Actor<CpuLimit> cpuLimit(Transact::service, CpuLimit::service, CallFlags::runModeRpc);
       Actor<Accounts> accounts(Transact::service, Accounts::service);
+
+      if (enforceAuth && resMonitoringEnabled())
+      {
+         to<VirtualServer>().prestartTx(trxSender.value());
+      }
 
       for (auto act : trx.actions())
       {
@@ -568,13 +717,17 @@ namespace SystemService
             auto first = get_view_data(act) == get_view_data(trx.actions()[0]);
             checkAuth(act, claims, first, false);
 
-            if (first && isResMonitoring())
+            if (first)
             {
-               // Billing network usage *after* first action auth, because first action auth may set
-               //   a billable subaccount on the VirtualServer.
-               uint64_t      netUsage = t.size();
-               AccountNumber sender   = act.sender();
-               to<VirtualServer>().useNetSys(sender, netUsage);
+               // Anything that could be billed should be done after first auth, because first
+               //   auth may set a billable subaccount on the VirtualServer.
+
+               if (resMonitoringEnabled())
+               {
+                  uint64_t      netUsage = t.size();
+                  AccountNumber sender   = act.sender();
+                  to<VirtualServer>().useNetSys(sender, netUsage);
+               }
             }
          }
          if constexpr (enable_print)
@@ -591,6 +744,8 @@ namespace SystemService
          }
       }
 
+      includedTable.put({tapos.expiration, id});
+
       if (auto callbacks =
               tables.open<CallbacksTable>().getIndex<0>().get(CallbackType::onTransaction))
       {
@@ -603,25 +758,32 @@ namespace SystemService
       check(!trx.actions().empty(), "transaction must have at least one action");
       if (enforceAuth)
       {
-         if (isResMonitoring())
+         if (resMonitoringEnabled())
          {
             std::chrono::nanoseconds cpuUsage = cpuLimit.getCpuTime();
             to<VirtualServer>().useCpuSys(trx.actions()[0].sender(), cpuUsage.count());
+            to<VirtualServer>().finishTx();
          }
       }
 
       if (auto eventIndexer = tables.open<EventIndexerTable>().get({}))
       {
          // Events were already indexed before useCpuSys, which is intentional because we want to bill CPU time for event
-         // indexing. However, if indexing is done before useCpuSys, then the event emitted by useCpuSys that reports
-         // the used CPU doesn't get indexed (or billed).
+         // indexing. However, if indexing is done before useCpuSys, then the event(s) emitted by useCpuSys and finishTx
+         // don't get indexed (or billed).
          //
-         // Therefore, we do one more event indexer sync after useCpuSys, which will only index the new event (and uses
+         // Therefore, we do one more event indexer sync, which will only index the new events (and uses
          // cached service schemas so isn't as expensive).
          to<EventIndexerInterface>(eventIndexer->service).sync();
+         auto mroot       = to<EventIndexerInterface>(eventIndexer->service).saveMerkle();
+         auto statusTable = Native::tables().open<StatusTable>();
+         auto status      = statusTable.get({}).value();
+         status.current.eventMerkleRoot = mroot;
+         statusTable.put(status);
       }
 
       trxData = std::span<const char>{};
+      trxSender.reset();
    }
 
    void Transact::execTrx(psio::view<const psio::shared_view_ptr<psibase::Transaction>> trx,
@@ -632,6 +794,58 @@ namespace SystemService
       check(sender == AccountNumber{} || sender == RTransact::service, "Wrong sender");
       auto _ = recurse();
       processTransactionImpl(trx, speculative);
+   }
+
+   void Transact::kvNotify(AccountNumber service,
+                           DbId          db,
+                           std::uint32_t keyLen,
+                           std::uint32_t oldValueLen,
+                           std::uint32_t newValueLen)
+   {
+      check(getSender() == AccountNumber{}, "Wrong sender");
+
+      constexpr std::uint32_t DNE = static_cast<std::uint32_t>(-1);
+      check(!(oldValueLen == DNE && newValueLen == DNE), "Invalid kv notify");
+
+      if (resMonitoringEnabled())
+      {
+         if (skipDiskWrites.has_value())
+         {
+            check(*skipDiskWrites > 0, "more writes occurred than promised by skipBilling");
+            --*skipDiskWrites;
+            return;
+         }
+
+         int64_t delta = 0;
+         if (oldValueLen == DNE)
+         {
+            delta = static_cast<int64_t>(keyLen) + static_cast<int64_t>(newValueLen);
+         }
+         else if (newValueLen == DNE)
+         {
+            delta = -(static_cast<int64_t>(keyLen) + static_cast<int64_t>(oldValueLen));
+         }
+         else
+         {
+            delta = static_cast<int64_t>(newValueLen) - static_cast<int64_t>(oldValueLen);
+         }
+         if (delta != 0)
+         {
+            AccountNumber user;
+
+            if (chargeSystemWrite(delta))
+            {
+               user = AccountNumber{};
+            }
+            else
+            {
+               check(trxSender.has_value(), "unauthorized db write: trxSender not set");
+               user = *trxSender;
+            }
+
+            recurse().to<VirtualServer>().useDiskSys(user, db, delta);
+         }
+      }
    }
 
 #ifndef PSIBASE_GENERATE_SCHEMA

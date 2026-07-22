@@ -1,0 +1,92 @@
+import { useQuery } from "@tanstack/react-query";
+import { z } from "zod";
+
+import QueryKey from "@/lib/query-keys";
+
+import { graphql } from "@shared/lib/graphql";
+
+// import { CpuPricing, NetPricing } from "./use-resource-pricing";
+
+const zServerSpecs = z.object({
+    netBps: z.number(),
+    storageBytes: z.number(),
+    recommendedMinMemoryBytes: z.number(),
+});
+
+const zNetworkVariables = z.object({
+    blockReplayFactor: z.number(),
+    perBlockSysCpuNs: z.number(),
+    objStorageBytes: z.number(),
+    subjStorageBytes: z.number(),
+});
+
+const zCpuPricing = z.object({
+    availableUnits: z.number(),
+    billableUnit: z.number(),
+});
+
+const zNetPricing = z.object({
+    availableUnits: z.number(),
+    billableUnit: z.number(),
+});
+
+const zResourcesResponse = z.object({
+    getServerSpecs: zServerSpecs,
+    getNetworkVariables: zNetworkVariables,
+    cpuPricing: zCpuPricing.nullable(),
+    networkPricing: zNetPricing.nullable(),
+});
+
+export type ServerSpecs = z.infer<typeof zServerSpecs>;
+export type NetworkVariables = z.infer<typeof zNetworkVariables>;
+
+export interface VirtualServerResources {
+    serverSpecs: ServerSpecs;
+    networkVariables: NetworkVariables;
+    cpuAvailableUnits: number;
+    netAvailableUnits: number;
+    cpuBillableUnit: number;
+    netBillableUnit: number;
+}
+
+export const useVirtualServerResources = () => {
+    return useQuery({
+        queryKey: [...QueryKey.virtualServerResources()],
+        queryFn: async (): Promise<VirtualServerResources> => {
+            const query = `
+                query {
+                    getServerSpecs {
+                        netBps
+                        storageBytes
+                        recommendedMinMemoryBytes
+                    }
+                    getNetworkVariables {
+                        blockReplayFactor
+                        perBlockSysCpuNs
+                        objStorageBytes
+                        subjStorageBytes
+                    }
+                    networkPricing {
+                        availableUnits
+                        billableUnit
+                    }
+                    cpuPricing {
+                        availableUnits
+                        billableUnit
+                    }
+                }
+            `;
+
+            const res = await graphql(query, { service: "vserver" });
+            const parsed = zResourcesResponse.parse(res);
+            return {
+                serverSpecs: parsed.getServerSpecs,
+                networkVariables: parsed.getNetworkVariables,
+                cpuAvailableUnits: parsed.cpuPricing?.availableUnits ?? 0,
+                netAvailableUnits: parsed.networkPricing?.availableUnits ?? 0,
+                cpuBillableUnit: parsed.cpuPricing?.billableUnit ?? 0,
+                netBillableUnit: parsed.networkPricing?.billableUnit ?? 0,
+            };
+        },
+    });
+};

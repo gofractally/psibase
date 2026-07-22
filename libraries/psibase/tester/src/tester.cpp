@@ -62,6 +62,25 @@ namespace
       return result;
    }
 
+   struct TestChainSchemas
+   {
+      std::map<psibase::AccountNumber, psibase::ServiceSchema> schemas;
+      const psibase::ServiceSchema* operator()(psibase::AccountNumber service)
+      {
+         auto pos = schemas.find(service);
+         if (pos != schemas.end())
+            return &pos->second;
+
+         auto table = UserService::Packages{}.open<UserService::InstalledSchemaTable>();
+         if (auto row = table.get(service))
+         {
+            auto [pos, inserted] = schemas.try_emplace(service, std::move(row->schema));
+            return &pos->second;
+         }
+         return nullptr;
+      }
+   };
+
 }  // namespace
 
 using psibase::tester::raw::selectedChain;
@@ -131,7 +150,10 @@ void psibase::expect(TransactionTrace t, const std::string& expected, bool alway
    std::string error = t.error ? *t.error : "";
    bool bad = (expected.empty() && !error.empty()) || error.find(expected) == std::string::npos;
    if (bad || always_show)
-      std::cout << prettyTrace(trimRawData(std::move(t))) << "\n";
+   {
+      auto schemas = TestChainSchemas{};
+      std::cout << prettyTrace(t, std::ref(schemas)) << "\n";
+   }
    if (bad)
    {
       if (expected.empty())
@@ -141,12 +163,24 @@ void psibase::expect(TransactionTrace t, const std::string& expected, bool alway
    }
 }
 
+std::string psibase::show(bool include, TransactionTrace t)
+{
+   if (include || t.error)
+   {
+      auto schemas = TestChainSchemas{};
+      std::cout << prettyTrace(t, std::ref(schemas)) << "\n";
+   }
+   if (t.error)
+      return *t.error;
+   return {};
+}
+
 namespace
 {
    void loadLocalServices(psibase::TestChain& self)
    {
       using namespace psibase;
-      using LocalService::XPackages;
+      using namespace LocalService;
       auto prefix = psio::convert_to_key(codePrefix());
       if (self.kvGreaterEqualRaw(DbId::nativeSubjective, prefix, prefix.size()))
          return;
@@ -155,12 +189,13 @@ namespace
       auto                     packagesDir = std::string{serviceRoot} + "/packages";
       DirectoryRegistry        registry{packagesDir};
       std::vector<std::string> packageNames{"XDefault"};
-      auto                     packages = registry.resolve(packageNames);
+      auto                     packages = registry.resolve(packageNames, {});
       std::vector<HttpRequest> requests;
+      std::vector<HttpRequest> early_requests;
+      const std::string        rootHost("", 1);
       tester::raw::checkoutSubjective(self.nativeHandle());
-      for (const auto& info : packages)
+      for (auto& package : packages)
       {
-         auto package = registry.get(info);
          for (const auto& [account, header, serviceInfo] : package.services)
          {
             auto file = package.archive.getEntry(header);
@@ -180,9 +215,21 @@ namespace
                 .code     = std::move(code),
             };
             self.kvPut(DbId::nativeSubjective, codeByHashRow.key(), codeByHashRow);
-         }
 
-         std::string rootHost("", 1);
+            if (serviceInfo.server)
+            {
+               HttpRequest         req{.host        = XHttp::service.str() + "." + rootHost,
+                                       .method      = "POST",
+                                       .target      = "/register_server",
+                                       .contentType = "application/json"};
+               psio::vector_stream stream{req.body};
+               to_json(RegisteredServiceRow{account, *serviceInfo.server}, stream);
+               if (account == XPackages::service)
+                  early_requests.push_back(std::move(req));
+               else
+                  requests.push_back(std::move(req));
+            }
+         }
 
          for (const auto& [account, header] : package.data)
          {
@@ -201,7 +248,7 @@ namespace
          requests.push_back(HttpRequest{
              .host        = XPackages::service.str() + "." + rootHost,
              .method      = "PUT",
-             .target      = "/manifest/" + psio::hex(info.sha256.begin(), info.sha256.end()),
+             .target      = "/manifest/" + psio::hex(package.sha256.begin(), package.sha256.end()),
              .contentType = "application/json",
              .body        = package.manifest(),
          });
@@ -212,18 +259,27 @@ namespace
              .contentType = "application/json",
          };
          psio::vector_stream stream(postinstall.body);
-         to_json(info, stream);
+         to_json(
+             LocalPackage{
+                 .name        = package.meta.name,
+                 .version     = package.meta.version,
+                 .description = package.meta.description,
+                 .depends     = package.meta.depends,
+                 .accounts    = package.meta.accounts,
+                 .services    = package.meta.services,
+                 .sha256      = package.sha256,
+             },
+             stream);
          requests.push_back(std::move(postinstall));
       }
       psibase::check(tester::raw::commitSubjective(self.nativeHandle()),
                      "Failed to commit changes");
 
-      for (const auto& request : requests)
+      auto checkReply = [](const auto& request, const auto& reply)
       {
-         auto reply = self.http(request);
          if (reply.status != HttpStatus::ok)
          {
-            auto message = std::format("PUT {} returned {}", request.target,
+            auto message = std::format("{} {} returned {}", request.method, request.target,
                                        static_cast<std::uint16_t>(reply.status));
             if (reply.contentType.starts_with("text/"))
             {
@@ -232,6 +288,15 @@ namespace
             }
             abortMessage(message);
          }
+      };
+
+      for (const auto& request : early_requests)
+      {
+         checkReply(request, self.http(request));
+      }
+      for (const auto& request : requests)
+      {
+         checkReply(request, self.http(request));
       }
    }
 
@@ -248,6 +313,19 @@ namespace
                      "Failed to commit changes");
       transactor<LocalService::XHttp> xhttp{AccountNumber{}, LocalService::XHttp::service};
       expect(tester::runAction(self.nativeHandle(), RunMode::rpc, true, xhttp.startSession()));
+   }
+
+   psibase::SignedTransaction makeStartBlock(psibase::TimePointUSec expiration)
+   {
+      return {.transaction{{
+          .tapos   = {.expiration = std::chrono::ceil<psibase::Seconds>(expiration)},
+          .actions = {{
+              .sender  = {},
+              .service = psibase::transactionServiceNum,
+              .method  = psibase::MethodNumber("startBlock"),
+              .rawData = psio::to_frac(std::tuple()),
+          }},
+      }}};
    }
 
 }  // namespace
@@ -373,11 +451,16 @@ void psibase::TestChain::startBlock(BlockTime tp)
    {
       tester::raw::startBlock(id, (tp - Seconds(1)).time_since_epoch().count(), producer.value,
                               term, commitNum);
+      expect(tester::pushTransaction(id, makeStartBlock(tp)));
       finishBlock();
       commitNum = status->head.value().header.blockNum;
    }
    tester::raw::startBlock(id, tp.time_since_epoch().count(), producer.value, term, commitNum);
-   status    = kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
+   status = kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
+   if (status && status->head)
+   {
+      expect(tester::pushTransaction(id, makeStartBlock(tp + Seconds(1))));
+   }
    producing = true;
 }
 
@@ -709,6 +792,15 @@ psibase::HttpReply psibase::TestChain::http(const HttpRequest& request)
    return asyncHttp(request).get();
 }
 
+psibase::HttpClient psibase::TestChain::http(AccountNumber account, std::vector<HttpHeader> headers)
+{
+   return {*this, account, std::move(headers)};
+}
+psibase::HttpClient psibase::TestChain::http(std::vector<HttpHeader> headers)
+{
+   return {*this, {}, std::move(headers)};
+}
+
 namespace
 {
    struct LoginInterface
@@ -722,9 +814,9 @@ std::string psibase::TestChain::login(AccountNumber user, AccountNumber service)
 {
    transactor<LoginInterface> loginTransactor{user, service};
    Tapos             tapos{.expiration = std::chrono::time_point_cast<std::chrono::seconds>(
-                                 std::chrono::system_clock::now()) +
-                             std::chrono::seconds(10),
-                           .flags = Tapos::do_not_broadcast_flag};
+                                             std::chrono::system_clock::now()) +
+                                         std::chrono::seconds(10),
+                           .flags      = Tapos::do_not_broadcast_flag};
    Transaction       trx{.tapos = tapos, .actions = {loginTransactor.loginSys("psibase.io")}};
    SignedTransaction strx{trx};
    auto reply = post<SystemService::LoginReply>(SystemService::Transact::service, "/login",

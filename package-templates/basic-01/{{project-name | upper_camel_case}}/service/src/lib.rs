@@ -48,10 +48,7 @@ pub mod service {
     #[pre_action(exclude(init))]
     fn check_init() {
         let table = InitTable::read();
-        check(
-            table.get_index_pk().get(&()).is_some(),
-            "service not inited",
-        );
+        table.get_index_pk().get(&()).expect("service not inited");
     }
 
     #[action]

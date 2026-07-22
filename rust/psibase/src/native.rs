@@ -7,9 +7,7 @@
 //!
 //! These functions wrap the [Raw Native Functions](crate::native_raw).
 
-use crate::{
-    native_raw, AccountNumber, DbId, HttpRequest, MicroSeconds, SocketEndpoint, TLSInfo, ToKey,
-};
+use crate::{native_raw, DbId, HttpRequest, MicroSeconds, SocketEndpoint, TLSInfo, ToKey};
 use anyhow::anyhow;
 use fracpack::{Pack, Unpack, UnpackOwned};
 
@@ -45,28 +43,6 @@ pub fn abort_message_bytes(message: &[u8]) -> ! {
 /// Abort with message
 pub fn abort_message(message: &str) -> ! {
     abort_message_bytes(message.as_bytes());
-}
-
-/// Abort with message if condition is false
-pub fn check(condition: bool, message: &str) {
-    if !condition {
-        abort_message_bytes(message.as_bytes());
-    }
-}
-
-/// Abort with message if optional value is empty
-pub fn check_some<T>(opt_value: Option<T>, message: &str) -> T {
-    if opt_value.is_none() {
-        abort_message_bytes(message.as_bytes());
-    }
-    opt_value.unwrap()
-}
-
-/// Abort with message if optional has value
-pub fn check_none<T>(opt_value: Option<T>, message: &str) {
-    if opt_value.is_some() {
-        abort_message_bytes(message.as_bytes());
-    }
 }
 
 /// Get the most-recent result when the size is known in advance
@@ -166,30 +142,45 @@ pub struct KvHandle(native_raw::KvHandle);
 
 pub use native_raw::KvMode;
 
+// The tester needs a different implementation from services
+extern "C" {
+    pub fn psibase_proxy_kv_open(
+        db: DbId,
+        prefix: *const u8,
+        prefix_len: u32,
+        mode: KvMode,
+    ) -> native_raw::KvHandle;
+}
+
 impl KvHandle {
     pub fn new(db: DbId, prefix: &[u8], mode: KvMode) -> KvHandle {
-        match db {
-            DbId::Service | DbId::WriteOnly | DbId::BlockLog | DbId::Native => Self::import(
-                crate::services::db::Wrapper::call().open(db, prefix.to_vec().into(), mode as u8),
-            ),
-            DbId::Subjective | DbId::Session | DbId::Temporary => Self::import(
-                crate::services::x_db::Wrapper::call().open(db, prefix.to_vec().into(), mode as u8),
-            ),
-            _ => KvHandle(unsafe {
-                native_raw::kvOpen(db, prefix.as_ptr(), prefix.len() as u32, mode)
-            }),
+        KvHandle(unsafe { psibase_proxy_kv_open(db, prefix.as_ptr(), prefix.len() as u32, mode) })
+    }
+    /// Open a handle via native `kvOpen`, bypassing `db` / `x-db` service checks.
+    pub fn open_direct(db: DbId, prefix: &[u8], mode: KvMode) -> KvHandle {
+        unsafe {
+            KvHandle::from_raw(native_raw::kvOpen(
+                db,
+                prefix.as_ptr(),
+                prefix.len() as u32,
+                mode,
+            ))
         }
+    }
+    pub unsafe fn from_raw(handle: native_raw::KvHandle) -> KvHandle {
+        KvHandle(handle)
     }
     pub fn subtree(&self, prefix: &[u8], mode: KvMode) -> KvHandle {
         KvHandle(unsafe {
             native_raw::kvOpenAt(self.0, prefix.as_ptr(), prefix.len() as u32, mode)
         })
     }
+    pub unsafe fn import_raw(index: u32) -> native_raw::KvHandle {
+        let handles = Vec::<u32>::unpacked(&get_result_bytes(native_raw::importHandles())).unwrap();
+        native_raw::KvHandle(handles[index as usize])
+    }
     pub fn import(index: u32) -> KvHandle {
-        let handles =
-            Vec::<u32>::unpacked(&get_result_bytes(unsafe { native_raw::importHandles() }))
-                .unwrap();
-        KvHandle(native_raw::KvHandle(handles[index as usize]))
+        KvHandle(unsafe { Self::import_raw(index) })
     }
 }
 
@@ -219,25 +210,6 @@ pub fn kv_put_bytes(db: &KvHandle, key: &[u8], value: &[u8]) {
 /// If key already exists, then replace the existing value.
 pub fn kv_put<K: ToKey, V: Pack>(db: &KvHandle, key: &K, value: &V) {
     kv_put_bytes(db, &key.to_key(), &value.packed())
-}
-
-/// Add a sequentially-numbered record
-///
-/// Returns the id.
-pub fn put_sequential_bytes(db: DbId, value: &[u8]) -> u64 {
-    unsafe { native_raw::putSequential(db, value.as_ptr(), value.len() as u32) }
-}
-
-/// Add a sequentially-numbered record
-///
-/// Returns the id.
-pub fn put_sequential<Type: Pack, V: Pack>(
-    db: DbId,
-    service: AccountNumber,
-    ty: &Type,
-    value: &V,
-) -> u64 {
-    put_sequential_bytes(db, &(service, Some(ty), Some(value)).packed())
 }
 
 /// Remove a key-value pair if it exists
@@ -275,9 +247,18 @@ pub fn kv_get<V: UnpackOwned, K: ToKey>(
 /// matches the provided key, then returns the value. Use [get_key_bytes] to get
 /// the found key.
 pub fn kv_greater_equal_bytes(db: &KvHandle, key: &[u8], match_key_size: u32) -> Option<Vec<u8>> {
+    kv_greater_equal_value_size(db, key, match_key_size).map(get_result_bytes)
+}
+
+/// Get the value size of the first key-value pair which is greater than or
+/// equal to the provided key.
+///
+/// Like [kv_greater_equal_bytes], but returns only the value's size. Use
+/// [get_key_bytes] to read the matched key. Returns `None` when no row matches.
+pub fn kv_greater_equal_value_size(db: &KvHandle, key: &[u8], match_key_size: u32) -> Option<u32> {
     let size =
         unsafe { native_raw::kvGreaterEqual(db.0, key.as_ptr(), key.len() as u32, match_key_size) };
-    get_optional_result_bytes(size)
+    (size < u32::MAX).then_some(size)
 }
 
 /// Get the first key-value pair which is greater than or equal to the provided
@@ -334,11 +315,6 @@ pub fn kv_max_bytes(db: &KvHandle, key: &[u8]) -> Option<Vec<u8>> {
 pub fn kv_max<K: ToKey, V: UnpackOwned>(db: &KvHandle, key: &K) -> Option<V> {
     let bytes = kv_max_bytes(db, &key.to_key());
     bytes.map(|v| V::unpacked(&v[..]).unwrap())
-}
-
-pub fn get_sequential_bytes(db_id: DbId, id: u64) -> Option<Vec<u8>> {
-    let size = unsafe { native_raw::getSequential(db_id, id) };
-    get_optional_result_bytes(size)
 }
 
 /// Sets the CPU timer to expire after the current transaction/query/callback
@@ -410,8 +386,8 @@ pub fn socket_open(
 }
 
 /// Send a message to a socket
-pub fn socket_send(fd: i32, data: &[u8]) -> Result<(), anyhow::Error> {
-    let err = unsafe { native_raw::socketSend(fd, data.as_ptr(), data.len()) };
+pub fn socket_send(fd: i32, data: &[u8], flags: u32) -> Result<(), anyhow::Error> {
+    let err = unsafe { native_raw::socketSend(fd, data.as_ptr(), data.len(), flags) };
     if err == 0 {
         Ok(())
     } else {

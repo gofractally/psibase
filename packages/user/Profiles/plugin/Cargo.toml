@@ -6,7 +6,7 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-profiles = { path = "../service/", version = "0.23.0" }
+profiles = { path = "../service/", version = "0.24.0" }
 psibase.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -27,9 +27,9 @@ world = "impl"
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
 "sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
-"clientdata:plugin" = { path = "../../ClientData/plugin/wit/world.wit" }
+"host:db" = { path = "../../Host/plugin/db/wit/world.wit" }
 "accounts:plugin" = { path = "../../../system/Accounts/plugin/accounts/wit/world.wit" }
 "permissions:plugin" = { path = "../../Permissions/plugin/wit/world.wit" }
 
 [dev-dependencies]
-profiles-pkg = { path = "..", version = "0.23.0" }
+profiles-pkg = { path = "..", version = "0.24.0" }

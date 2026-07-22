@@ -8,8 +8,9 @@ publish.workspace = true
 
 [dependencies]
 psibase.workspace = true
+psibase_service.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-auth-dyn = { path = "../service", version = "0.23.0" }
+auth-dyn = { path = "../service", version = "0.24.0" }
 async-graphql.workspace = true
 psibase-system-workspace-hack.workspace = true

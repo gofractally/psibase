@@ -13,14 +13,18 @@ package-name = "Tokens"
 services = ["tokens"]
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.23.0"
-Sites = "0.23.0"
+HttpServer = "0.24.0"
+Sites = "0.24.0"
+Host = "0.24.0"
+Nft = "0.24.0"
+Permissions = "0.24.0"
+Transact = "0.24.0"
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-tokens = { path = "service", version = "0.23.0" }
-r-tokens = { path = "query-service", version = "0.23.0" }
-tokens-plugin = { path = "plugin", version = "0.23.0" }
+tokens = { path = "service", version = "0.24.0" }
+r-tokens = { path = "query-service", version = "0.24.0" }
+tokens-plugin = { path = "plugin", version = "0.24.0" }
 psibase-user-workspace-hack.workspace = true

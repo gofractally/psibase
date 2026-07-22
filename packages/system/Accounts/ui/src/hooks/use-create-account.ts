@@ -1,8 +1,6 @@
 import { type UseMutationOptions, useMutation } from "@tanstack/react-query";
 
-import { getSupervisor } from "@psibase/common-lib";
-
-const supervisor = getSupervisor();
+import { supervisor } from "@shared/lib/supervisor";
 
 export const useCreateAccount = (
     options: UseMutationOptions<string, Error, string> = {},

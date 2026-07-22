@@ -96,7 +96,7 @@ class TestQuery(unittest.TestCase):
         time.sleep(0.5)
 
         # Check that all sockets were cleaned up
-        sockets = a.graphql(service='x-sock-list', query='''
+        sockets = a.graphql(service='x-socklist', query='''
             query {
                 sockets {
                     edges {
@@ -109,8 +109,9 @@ class TestQuery(unittest.TestCase):
         ''')
         sockets = [edge['node']['fd'] for edge in sockets['sockets']['edges']]
         # 0 = producer multicast
-        # 1 = current request
-        self.assertEqual(sockets, [0, 1])
+        # 1 = log
+        # 2 = current request
+        self.assertEqual(sockets, [0, 1, 2])
 
 if __name__ == '__main__':
     testutil.main()

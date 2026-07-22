@@ -833,6 +833,7 @@ fn parse<'tu>(
         &("-I".to_owned() + repo_path + "/packages/user/Tokens/include"),
         &("-I".to_owned() + repo_path + "/packages/user/Sites/include"),
         &("-I".to_owned() + repo_path + "/packages/local/XAdmin/include"),
+        &("-I".to_owned() + repo_path + "/packages/local/XHttp/include"),
         &("-I".to_owned() + repo_path + "/external/rapidjson/include"),
         &("-I".to_owned() + repo_path + "/libraries/psibase/common/include"),
         &("-I".to_owned() + repo_path + "/libraries/psibase/service/include"),

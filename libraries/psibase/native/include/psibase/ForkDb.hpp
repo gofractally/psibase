@@ -1196,7 +1196,6 @@ namespace psibase
                auto claim = validateBlockSignature(prev, state->info, blockPtr->signature());
                ctx.start(Block(blockPtr->block()));
                validateTransactionSignatures(ctx, ctx.current, prev->revision);
-               ctx.callStartBlock();
                ctx.execAllInBlock();
                auto [newRevision, id] = ctx.writeRevision(FixedProver(blockPtr->signature()), claim,
                                                           state->getProdsAuthRevision());
@@ -2021,15 +2020,16 @@ namespace psibase
       void onValidateHostConfig(auto&& fn) { dbCallbacks.validateHostConfig = fn; }
       void onChangeShutdown(auto&& fn) { dbCallbacks.shutdown = fn; }
       void onSocketOpen(auto&& fn) { dbCallbacks.socketOpen = fn; }
+      void onSocketP2P(auto&& fn) { dbCallbacks.socketP2P = fn; }
 
       void recvMessage(const Socket& sock, const std::vector<char>& data)
       {
          Action action{.service = proxyServiceNum,
-                       .rawData = psio::to_frac(std::tuple(sock.id, data))};
+                       .rawData = psio::to_frac(std::tuple(sock.id, data, std::uint32_t{0}))};
 
          // TODO: This can run concurrently
          BlockContext     bc{*systemContext, systemContext->sharedDatabase.getHead(),
-                         systemContext->sharedDatabase.createWriter(), true};
+                             systemContext->sharedDatabase.createWriter(), true};
          TransactionTrace trace;
          try
          {

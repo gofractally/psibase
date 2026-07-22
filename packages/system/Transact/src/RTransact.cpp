@@ -6,6 +6,7 @@
 #include <services/system/RTransact.hpp>
 #include <services/system/SetCode.hpp>
 #include <services/system/Transact.hpp>
+#include <services/system/VirtualServer.hpp>
 
 #include <functional>
 #include <psibase/HttpHeaders.hpp>
@@ -60,11 +61,37 @@ namespace
       return to<Transact>().checkFirstAuth(id, *trx.transaction);
    }
 
+   bool isResMonitoring()
+   {
+      auto table  = Transact{}.open<ResMonitoringConfigTable>(KvMode::read);
+      auto config = table.get({});
+      return config && config->enabled;
+   }
 }  // namespace
 
 std::optional<SignedTransaction> SystemService::RTransact::next()
 {
    check(getSender() == AccountNumber{}, "Wrong sender");
+   if (isResMonitoring())
+   {
+      if (!to<VirtualServer>().can_push_tx())
+      {
+         return {};
+      }
+   }
+   else
+   {
+      // Soft limit for boot blocks (hard limit imposed by triedent
+      // is 16 MiB for the packed block)
+      constexpr std::uint32_t blockLimit = 8 * 1024 * 1024;
+      if (auto sizeRow = open<BlockSizeTable>().get({}))
+      {
+         if (sizeRow->currentBlockSize >= blockLimit)
+         {
+            return {};
+         }
+      }
+   }
    auto unapplied    = WriteOnly{}.open<UnappliedTransactionTable>();
    auto reverify     = open<ReverifySignaturesTable>();
    auto nextSequence = unapplied.get({}).value_or(UnappliedTransactionRecord{0}).nextSequence;
@@ -674,6 +701,19 @@ void RTransact::onTrx(const Checksum256& id, psio::view<const TransactionTrace> 
       row = clients.get(id);
    }
 
+   if (!isResMonitoring())
+   {
+      auto          table   = open<BlockSizeTable>();
+      auto          sizeRow = table.get({}).value_or(BlockSizeRecord{0});
+      std::uint32_t txSize;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         txSize = open<TransactionDataTable>().getView(id).size();
+      }
+      sizeRow.currentBlockSize += txSize;
+      table.put(sizeRow);
+   }
+
    if (row)
    {
       waitForApplied = std::ranges::any_of(row->clients, WaitFor::isApplied);
@@ -719,6 +759,11 @@ void RTransact::onBlock()
    check(stat && stat->head, "Head block should be set before calling onBlock");
 
    checkReverify(stat->head->blockId);
+
+   if (!isResMonitoring())
+   {
+      open<BlockSizeTable>().erase({});
+   }
 
    auto finalized = finalizeBlocks(stat->head->header);
    if (!finalized)
@@ -1039,19 +1084,34 @@ namespace
       }
    }
 
-   bool pushTransaction(const Checksum256& id, const SignedTransaction& trx, bool speculate)
+   bool pushTransaction(const Checksum256&             id,
+                        const SignedTransaction&       trx,
+                        bool                           speculate,
+                        std::optional<TraceClientInfo> client = std::nullopt)
    {
+      bool result = true;
       PSIBASE_SUBJECTIVE_TX
       {
+         if (client)
+         {
+            auto clients = RTransact{}.open<TraceClientTable>();
+            auto row     = clients.get(id).value_or(
+                TraceClientRow{.id = id, .expiration = trx.transaction->tapos().expiration()});
+            row.clients.push_back(*client);
+            clients.put(row);
+            to<HttpServer>().deferReply(client->socket);
+         }
          auto pending = Subjective{}.open<PendingTransactionTable>();
          if (pending.get(id))
          {
-            return false;
+            result = false;
+            continue;
          }
          auto unverified = RTransact{}.open<UnverifiedTransactionTable>();
          if (auto row = unverified.get(id))
          {
-            return false;
+            result = false;
+            continue;
          }
          auto speculative = speculate ? std::optional{scheduleSpeculative(id, trx)} : std::nullopt;
          scheduleVerify(id, trx, false, speculative);
@@ -1062,11 +1122,11 @@ namespace
          ++stats.total;
          statsTable.put(stats);
       }
-      if (!speculate && trx.transaction->claims().empty())
+      if (result && !speculate && trx.transaction->claims().empty())
       {
          forwardTransaction(trx);
       }
-      return true;
+      return result;
    }
    void forwardTransaction(const SignedTransaction& trx)
    {
@@ -1207,8 +1267,7 @@ namespace
       AcceptParser parser;
       for (const auto& header : headers)
       {
-         if (std::ranges::equal(header.name | std::views::transform(::tolower),
-                                std::string_view("accept")))
+         if (iequal(header.name, "accept"))
          {
             parseHeader(header.value, parser);
          }
@@ -1319,6 +1378,7 @@ void RTransact::requeue()
          break;
       while (true)
       {
+         std::uint64_t foundSequence;
          PSIBASE_SUBJECTIVE_TX
          {
             auto iter = pendingBySequence.lower_bound(nextSequence);
@@ -1332,8 +1392,9 @@ void RTransact::requeue()
 
                scheduleVerify(item.id, data->trx, true, item.speculative);
             }
-            nextSequence = item.sequence + 1;
+            foundSequence = item.sequence;
          }
+         nextSequence = foundSequence + 1;
          if (nextSequence >= endSequence)
             break;
       }
@@ -1370,7 +1431,7 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
 
    for (const auto& header : request.headers)
    {
-      if (std::ranges::equal(header.name, std::string_view{"authorization"}, {}, ::tolower))
+      if (iequal(header.name, "authorization"))
       {
          parseHeader(header.value,
                      [&](std::string_view value)
@@ -1490,16 +1551,8 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
       auto id          = psibase::sha256(trx.transaction.data(), trx.transaction.size());
       bool enforceAuth = validateTransaction(id, trx);
       bool json        = acceptJson(request.headers);
-      PSIBASE_SUBJECTIVE_TX
-      {
-         auto clients = open<TraceClientTable>();
-         auto row     = clients.get(id).value_or(
-             TraceClientRow{.id = id, .expiration = trx.transaction->tapos().expiration()});
-         row.clients.push_back({*socket, json, query.flag()});
-         clients.put(row);
-         to<HttpServer>().deferReply(*socket);
-      }
-      pushTransaction(id, trx, enforceAuth);
+      auto client      = TraceClientInfo{*socket, json, query.flag()};
+      pushTransaction(id, trx, enforceAuth, std::move(client));
    }
    else if (request.method == "POST" && target == "/login")
    {
@@ -1528,23 +1581,23 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
                              trx.proofs[i]);
          }
          // check auth
-         auto accountsTables = Accounts::Tables(Accounts::service);
-         auto accountTable   = accountsTables.open<AccountTable>();
-         auto accountIndex   = accountTable.getIndex<0>();
-         auto account        = accountIndex.get(sender);
+         auto account = to<Accounts>().getAccount(sender);
          if (!account)
             return make404("Account not found");
          Actor<AuthInterface> auth(RTransact::service, account->authService);
          auto                 flags = AuthInterface::topActionReq | AuthInterface::firstAuthFlag;
-         auth.checkAuthSys(flags, psibase::AccountNumber{}, sender,
-                           ServiceMethod{AccountNumber{}, MethodNumber{}},
-                           std::vector<ServiceMethod>{}, claims);
+         if (!auth.checkAuthSys(flags, psibase::AccountNumber{}, sender,
+                                ServiceMethod{AccountNumber{}, MethodNumber{}},
+                                std::vector<ServiceMethod>{}, claims))
+         {
+            return make400("Login failed");
+         }
          // Construct token
          auto exp = std::chrono::time_point_cast<std::chrono::seconds>(
              std::chrono::system_clock::now() + std::chrono::days(30));
-         auto                token = encodeJWT(getJWTKey(), LoginTokenData{.sub = sender,
-                                                                           .aud = std::string(rootHost(request)),
-                                                                           .exp = exp.time_since_epoch().count()});
+         auto token = encodeJWT(getJWTKey(), LoginTokenData{.sub = sender,
+                                                            .aud = std::string(rootHost(request)),
+                                                            .exp = exp.time_since_epoch().count()});
          HttpReply           reply{.contentType = "application/json",
                                    .headers     = allowCors(request, AccountNumber{"supervisor"})};
          psio::vector_stream stream{reply.body};

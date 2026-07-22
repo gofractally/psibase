@@ -8,12 +8,7 @@ namespace SystemService
    /// Identify a service and method
    ///
    /// An empty `service` or `method` indicates a wildcard.
-   struct ServiceMethod
-   {
-      psibase::AccountNumber service;
-      psibase::MethodNumber  method;
-   };
-   PSIO_REFLECT(ServiceMethod, service, method)
+   using psibase::ServiceMethod;
 
    /// Authenticate actions
    ///
@@ -121,9 +116,7 @@ namespace SystemService
       /// * `allowedActions`: Argument from `runAs`
       /// * `claims`:         Claims in transaction (e.g. public keys).
       ///                     Empty if `runAs`
-      //
-      // TODO: return error message instead?
-      void checkAuthSys(uint32_t                    flags,
+      bool checkAuthSys(uint32_t                    flags,
                         psibase::AccountNumber      requester,
                         psibase::AccountNumber      sender,
                         ServiceMethod               action,
@@ -140,41 +133,49 @@ namespace SystemService
       // TODO: Return error message instead?
       void canAuthUserSys(psibase::AccountNumber user);
 
+      /// Get the accounts this auth service delegates authority to for a sender.
+      ///
+      /// * `sender`: The account whose delegations are being queried.
+      /// * `method`: The service and method being authorized. Delegations may vary by method.
+      ///
+      /// Returns the accounts that must be consulted before this sender can be authorized.
+      /// An empty result means the sender does not delegate to other accounts.
+      std::vector<psibase::AccountNumber> getDlgsSys(psibase::AccountNumber       sender,
+                                                     std::optional<ServiceMethod> method);
+
       /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
       /// transaction from a specified sender.
       ///
       /// * `sender`: The sender account for the transaction potentially being authorized.
       /// * `authorizers`: The set of accounts that have already authorized the execution of the transaction.
-      /// * `authSet`: The set of accounts that are already being checked for authorization. If
-      ///              the sender is already in this set, then the function should return false.
+      /// * `method`: The service and method being authorized.
       ///
       /// Returns:
       /// * `true`: The authorizers are sufficient to authorize a transaction from the sender.
       /// * `false`: The authorizers are not sufficient to authorize a transaction from the sender.
-      bool isAuthSys(psibase::AccountNumber                             sender,
-                     std::vector<psibase::AccountNumber>                authorizers,
-                     std::optional<ServiceMethod>                       method,
-                     std::optional<std::vector<psibase::AccountNumber>> authSet);
+      bool isAuthSys(psibase::AccountNumber              sender,
+                     std::vector<psibase::AccountNumber> authorizers, 
+                     std::optional<ServiceMethod> method);
 
       /// Check whether a specified set of rejecter accounts are sufficient to reject (cancel) a
       /// transaction from a specified sender.
       ///
       /// * `sender`: The sender account for the transaction potentially being rejected.
-      /// * `rejecters`: The set of accounts that have already authorized the rejection of the transaction.
-      /// * `authSet`: The set of accounts that are already being checked for authorization. If
-      ///              the sender is already in this set, then the function should return false.
+      /// * `rejecters`: The set of accounts that have already authorized the rejection of the
+      ///               transaction.
+      /// * `method`: The service and method being rejected.
       ///
       /// Returns:
       /// * `true`: The rejecters are sufficient to reject a transaction from the sender.
       /// * `false`: The rejecters are not sufficient to reject a transaction from the sender.
-      bool isRejectSys(psibase::AccountNumber                             sender,
-                       std::vector<psibase::AccountNumber>                rejecters,
-                       std::optional<ServiceMethod>                       method,
-                       std::optional<std::vector<psibase::AccountNumber>> authSet);
+      bool isRejectSys(psibase::AccountNumber              sender,
+                       std::vector<psibase::AccountNumber> rejecters, 
+                       std::optional<ServiceMethod> method);
    };
    PSIO_REFLECT(AuthInterface,
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                 method(canAuthUserSys, user),
+                method(getDlgsSys, sender),
                 method(isAuthSys, sender, authorizers, method),
                 method(isRejectSys, sender, rejecters, method)
                 //
@@ -182,10 +183,13 @@ namespace SystemService
 
    struct EventIndexerInterface
    {
+      void startBlock();
       /// Indexes all new events. This is run automatically at the end of every transaction.
       void sync();
+      // Gets the eventMerkle root and writes back any cached state
+      auto saveMerkle() -> psibase::Checksum256;
    };
-   PSIO_REFLECT(EventIndexerInterface, method(sync))
+   PSIO_REFLECT(EventIndexerInterface, method(startBlock), method(sync), method(saveMerkle))
 
    struct VerifyInterface
    {
@@ -217,8 +221,9 @@ namespace SystemService
    struct BlockSummary
    {
       std::array<uint32_t, 256> blockSuffixes;
+      std::uint32_t             blockNum;
    };
-   PSIO_REFLECT(BlockSummary, blockSuffixes)
+   PSIO_REFLECT(BlockSummary, blockSuffixes, blockNum)
    using BlockSummaryTable = psibase::Table<BlockSummary, psibase::SingletonKey{}>;
    PSIO_REFLECT_TYPENAME(BlockSummaryTable)
 
@@ -317,6 +322,13 @@ namespace SystemService
       /// Called by RTransact to execute a transaction speculatively
       void execTrx(psio::view<const psio::shared_view_ptr<psibase::Transaction>> trx,
                    bool                                                          speculative);
+
+      /// Called by native code on objective writes to the database
+      void kvNotify(psibase::AccountNumber service,
+                    psibase::DbId          db,
+                    std::uint32_t          keyLen,
+                    std::uint32_t          oldValueLen,
+                    std::uint32_t          newValueLen);
 
       /// Sets the time between snapshots
       ///
@@ -432,6 +444,28 @@ namespace SystemService
       /// Enable/disable resource monitoring
       void resMonitoring(bool enable);
 
+      /// Returns true if resource monitoring is enabled
+      bool isResMonitoring();
+
+      /// Suppress billing/tracking for the next `numWrites` disk writes.
+      ///
+      /// Intended for wrapping privileged-service writes that are modified
+      /// by both wasm and native code (e.g. status row). The caller is expected
+      /// to perform exactly `numWrites` writes/frees and then call `endSkipBilling`.
+      ///
+      /// Only callable by privileged services.
+      void skipBilling(uint32_t numWrites);
+
+      /// Asserts that all writes promised by `skipBilling` were consumed.
+      ///
+      /// Only callable by privileged services.
+      void endSkipBilling();
+
+      /// Attribute subsequent disk writes to the system account until `numBytes`
+      /// bytes have been written or the transaction ends. `numBytes = 0` clears
+      /// the override. Callable only by the VirtualServer service.
+      void systemWrite(uint64_t numBytes);
+
       /// Get the currently executing transaction
       psio::view<const psibase::Transaction> getTransaction() const;
 
@@ -452,12 +486,33 @@ namespace SystemService
       /// This is *not* the currently executing block time.
       /// TODO: remove
       psibase::BlockTime headBlockTime() const;
+
+      /// Returns the tapos `refBlockIndex` and `refBlockSuffix`
+      /// for the head block.
+      std::pair<uint8_t, uint32_t> headTapos();
+
+      struct Events
+      {
+         struct History
+         {
+            /// Emitted at the start of each block
+            void blockStart(psibase::BlockNum blockNum, psibase::BlockTime blockTime) {}
+         };
+         struct Ui
+         {
+         };
+         struct Merkle
+         {
+         };
+      };
    };
    PSIO_REFLECT(Transact,
+                allowHashedMethods(),
                 method(startBoot, bootTransactions),
                 method(finishBoot),
                 method(startBlock),
                 method(execTrx, transaction, speculative),
+                method(kvNotify, service, db, keyLen, oldValueLen, newValueLen),
                 method(setSnapTime, seconds),
                 method(addCallback, type, objective, action),
                 method(removeCallback, type, objective, action),
@@ -465,15 +520,24 @@ namespace SystemService
                 method(runAs, action, allowedActions),
                 method(checkFirstAuth, id, transaction),
                 method(resMonitoring, enable),
+                method(isResMonitoring),
+                method(skipBilling, numWrites),
+                method(endSkipBilling),
+                method(systemWrite, numBytes),
                 method(getTransaction),
                 method(isTransaction),
                 method(currentBlock),
                 method(headBlock),
                 method(headBlockTime),
+                method(headTapos)
                 //
    )
 
    PSIBASE_REFLECT_TABLES(Transact, Transact::Tables)
+   PSIBASE_REFLECT_EVENTS(Transact);
+   PSIBASE_REFLECT_HISTORY_EVENTS(Transact, method(blockStart, blockNum, blockTime));
+   PSIBASE_REFLECT_UI_EVENTS(Transact);
+   PSIBASE_REFLECT_MERKLE_EVENTS(Transact);
 
    // The status will never be nullopt during transaction execution or during RPC.
    // It will be nullopt when called by a test wasm before the genesis transaction
@@ -547,6 +611,10 @@ namespace SystemService
          if (!(stat->head->header.blockNum & 0x1fff))
             update((stat->head->header.blockNum >> 13) | 0x80);
       }
+      if (stat)
+      {
+         summary->blockNum = stat->current.blockNum;
+      }
       return *summary;
    }  // getBlockSummary()
 
@@ -563,5 +631,15 @@ namespace SystemService
       }
       else
          return {0, 0};  // Usable for transactions in the genesis block
+   }
+
+   inline bool isStartBlock(psio::view<const psibase::Action> act)
+   {
+      return act.sender() == psibase::AccountNumber{} && act.service() == Transact::service &&
+             act.method() == psibase::MethodNumber{"startBlock"};
+   }
+   inline bool isStartBlock(psio::view<const psibase::Transaction> tx)
+   {
+      return tx.actions().size() == 1 && isStartBlock(tx.actions()[0]);
    }
 }  // namespace SystemService

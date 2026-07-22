@@ -1,4 +1,5 @@
-import { configuredApps } from "@/configuredApps";
+import { type AppConfig, configuredApps } from "@/configured-apps";
+import { getAppPath } from "@/app-config";
 import { type LucideIcon } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
@@ -8,12 +9,50 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
+    SidebarMenuSkeleton,
 } from "@shared/shadcn/ui/sidebar";
 
 export interface App {
     name: string;
     url: string;
     icon: LucideIcon;
+}
+
+const defaultSidebarVisibility = () => ({
+    visible: true,
+    isLoading: false,
+});
+
+function NavAppItem({ app }: { app: AppConfig }) {
+    const { visible, isLoading } = (
+        app.useSidebarVisibility ?? defaultSidebarVisibility
+    )();
+
+    if (isLoading) {
+        return (
+            <SidebarMenuItem>
+                <SidebarMenuSkeleton showIcon />
+            </SidebarMenuItem>
+        );
+    }
+
+    if (!visible) return null;
+
+    return (
+        <SidebarMenuItem>
+            <NavLink to={`/${getAppPath(app)}`}>
+                {({ isActive }) => (
+                    <SidebarMenuButton
+                        data-active={isActive}
+                        className="data-[active=true]:bg-accent"
+                    >
+                        {app.icon}
+                        <span>{app.name}</span>
+                    </SidebarMenuButton>
+                )}
+            </NavLink>
+        </SidebarMenuItem>
+    );
 }
 
 export function NavApps() {
@@ -23,20 +62,8 @@ export function NavApps() {
             <SidebarMenu>
                 {configuredApps
                     .filter((app) => !app.isMore)
-                    .map((item) => (
-                        <SidebarMenuItem key={item.service}>
-                            <NavLink to={`/${item.service}`}>
-                                {({ isActive }) => (
-                                    <SidebarMenuButton
-                                        data-active={isActive}
-                                        className="data-[active=true]:bg-accent"
-                                    >
-                                        {item.icon}
-                                        <span>{item.name}</span>
-                                    </SidebarMenuButton>
-                                )}
-                            </NavLink>
-                        </SidebarMenuItem>
+                    .map((app) => (
+                        <NavAppItem key={app.service} app={app} />
                     ))}
             </SidebarMenu>
         </SidebarGroup>

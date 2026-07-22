@@ -60,7 +60,10 @@ fn validate_compression_quality(quality: u8) -> Result<(), Error> {
 
 impl Sites for SitesPlugin {
     fn upload(file: File, compression_quality: u8) -> Result<(), Error> {
-        assert_authorized_with_whitelist(FunctionName::upload, vec!["workshop".into()])?;
+        assert_authorized_with_whitelist(
+            FunctionName::upload,
+            vec!["workshop".into(), "profiles".into()],
+        )?;
 
         validate_compression_quality(compression_quality)?;
 
@@ -186,7 +189,7 @@ impl Sites for SitesPlugin {
     fn set_proxy(proxy: String) {
         assert_authorized_with_whitelist(FunctionName::set_proxy, vec!["workshop".into()]).unwrap();
 
-        let proxy = psibase::AccountNumber::from(proxy.as_str());
+        let proxy = proxy.parse().unwrap();
         Transact::add_action_to_transaction("setProxy", &Actions::setProxy { proxy }.packed())
             .unwrap();
     }

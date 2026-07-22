@@ -1,10 +1,8 @@
 import { useEffect, useState } from "react";
 
 import { Button } from "@shared/shadcn/ui/button";
-import { Label } from "@shared/shadcn/ui/label";
 import { Input } from "@shared/shadcn/ui/input";
-
-import { Nav } from "@/components/nav";
+import { Label } from "@shared/shadcn/ui/label";
 
 import { supervisor } from "@shared/lib/supervisor";
 
@@ -12,14 +10,14 @@ export const App = () => {
     const [changesMade, setChangesMade] = useState<boolean>(false);
     const [exampleThing, setExampleThing] = useState<string>("");
     const [, setUploadStatus] = useState<string>("");
-    const thisServiceName = "{{project-name}}"
+    const thisServiceName = "{{project-name}}";
 
     useEffect(() => {
         const init = async () => {
             await supervisor.onLoaded();
             await getExampleThing();
         };
-        
+
         init();
     }, []);
 
@@ -62,33 +60,30 @@ export const App = () => {
     };
 
     return (
-        <div className="mx-auto h-screen w-screen max-w-5xl">
-            <Nav title="Example Thing Page" />
-            <form className="mx-auto grid max-w-3xl grid-cols-6">
-                <div className="col-span-6 mt-6 grid grid-cols-6">
-                    <Label htmlFor="exampleThing" className="col-span-2">
-                        Example Thing
-                    </Label>
-                    <Input
-                        id="exampleThing"
-                        className="col-span-4"
-                        onChange={(e) => {
-                            setExampleThing(e.target.value);
-                            setChangesMade(true);
-                        }}
-                        value={exampleThing}
-                    />
-                </div>
-                <div className="col-span-6 mt-6 font-medium">
-                    <Button
-                        type="submit"
-                        disabled={!changesMade}
-                        onClick={updateAssets}
-                    >
-                        Save
-                    </Button>
-                </div>
-            </form>
-        </div>
+        <form className="mx-auto grid max-w-3xl grid-cols-6">
+            <div className="col-span-6 mt-6 grid grid-cols-6">
+                <Label htmlFor="exampleThing" className="col-span-2">
+                    Example Thing
+                </Label>
+                <Input
+                    id="exampleThing"
+                    className="col-span-4"
+                    onChange={(e) => {
+                        setExampleThing(e.target.value);
+                        setChangesMade(true);
+                    }}
+                    value={exampleThing}
+                />
+            </div>
+            <div className="col-span-6 mt-6 font-medium">
+                <Button
+                    type="submit"
+                    disabled={!changesMade}
+                    onClick={updateAssets}
+                >
+                    Save
+                </Button>
+            </div>
+        </form>
     );
 };

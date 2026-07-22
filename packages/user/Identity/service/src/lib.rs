@@ -102,30 +102,30 @@ mod service {
     fn init() {
         let table = InitTable::new();
         table.put(&InitRow {}).unwrap();
-        services::http_server::Wrapper::call().registerServer(SERVICE);
     }
 
     #[pre_action(exclude(init))]
     fn check_init() {
-        let table = InitTable::new();
-        check(
-            table.get_index_pk().get(&()).is_some(),
-            "service not initialized",
-        );
+        let table = InitTable::read();
+        table
+            .get_index_pk()
+            .get(&())
+            .expect("service not initialized");
     }
 
     #[action]
     pub fn attest(subject: AccountNumber, value: u8) {
-        check(value <= 100, "bad confidence score");
+        assert!(value <= 100, "bad confidence score");
         let attester = get_sender();
         let issued = transact::Wrapper::call().currentBlock().time.seconds();
 
         let attestation_table = AttestationTable::new();
 
         // verify subject is valid chain account
-        psibase::check(
+        assert!(
             AccountsSvc::call().exists(subject),
-            &format!("subject account {} doesn't exist", subject),
+            "subject account {} doesn't exist",
+            subject
         );
 
         let existing_rec = attestation_table.get_index_pk().get(&(subject, attester));
@@ -169,7 +169,7 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, Attestation>, async_graphql::Error> {
-            TableQuery::new(AttestationTable::new().get_index_pk())
+            TableQuery::new(AttestationTable::read().get_index_pk())
                 .first(first)
                 .last(last)
                 .before(before)
@@ -187,7 +187,7 @@ mod service {
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, Attestation>> {
             TableQuery::subindex::<AccountNumber>(
-                AttestationTable::new().get_index_by_attester(),
+                AttestationTable::read().get_index_by_attester(),
                 &attester,
             )
             .first(first)
@@ -206,7 +206,7 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, Attestation>> {
-            TableQuery::subindex::<AccountNumber>(AttestationTable::new().get_index_pk(), &subject)
+            TableQuery::subindex::<AccountNumber>(AttestationTable::read().get_index_pk(), &subject)
                 .first(first)
                 .last(last)
                 .before(before)
@@ -223,7 +223,7 @@ mod service {
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, AttestationStats>, async_graphql::Error>
         {
-            TableQuery::new(AttestationStatsTable::new().get_index_pk())
+            TableQuery::new(AttestationStatsTable::read().get_index_pk())
                 .first(first)
                 .last(last)
                 .before(before)
@@ -236,7 +236,7 @@ mod service {
             &self,
             subject: AccountNumber,
         ) -> async_graphql::Result<Option<AttestationStats>, async_graphql::Error> {
-            Ok(AttestationStatsTable::new().get_index_pk().get(&subject))
+            Ok(AttestationStatsTable::read().get_index_pk().get(&subject))
         }
     }
 

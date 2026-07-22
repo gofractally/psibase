@@ -1,14 +1,14 @@
-import { NoTokensWarning } from "@/apps/tokens/components/no-tokens-warning";
-import {
-    type Token,
-    useUserTokenBalances,
-} from "@/apps/tokens/hooks/tokensPlugin/use-user-token-balances";
 import { useEffect, useMemo, useState } from "react";
 import { Outlet } from "react-router-dom";
 
-import { useCurrentUser } from "@/hooks/use-current-user";
+import {
+    type Token,
+    useUserTokenBalances,
+} from "@/apps/tokens/hooks/tokens-plugin/use-user-token-balances";
 
 import { GlowingCard } from "@shared/components/glowing-card";
+import { PageContainer } from "@shared/components/page-container";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { CardContent } from "@shared/shadcn/ui/card";
 
 import { Loading } from "../../components/loading";
@@ -18,7 +18,7 @@ import { UntransferableTokenWarning } from "./components/transfer/untransferable
 import { useTransferActions } from "./hooks/use-transfer-actions";
 
 export interface TokensOutletContext {
-    selectedToken: Token;
+    selectedToken: Token | undefined;
     currentUser: string | null;
     isLoading: boolean;
 }
@@ -31,7 +31,6 @@ export const TokensLayout = () => {
     const currentUser = isSuccess ? currentUserData : null;
 
     const tokens = useMemo(() => data ?? [], [data]);
-    const isNoTokens = currentUser && tokens.length == 0;
 
     const [selectedTokenId, setSelectedTokenId] = useState<string>("");
 
@@ -63,39 +62,26 @@ export const TokensLayout = () => {
     }
 
     return (
-        <div className="p-4">
-            <div className="mx-auto max-w-screen-md">
-                {isNoTokens ? (
-                    <NoTokensWarning />
-                ) : (
-                    <div className="space-y-4">
-                        <AutoDebitSwitch currentUser={currentUser} />
-                        <GlowingCard>
-                            <CardContent className="@container space-y-2">
-                                {!isLoading && (
-                                    <>
-                                        <TokenSelector
-                                            tokens={tokens}
-                                            selectedToken={selectedToken}
-                                            onChange={handleTokenSelect}
-                                            onClickAvailableBalance={
-                                                handleSetMaxAmount ?? undefined
-                                            }
-                                        />
-                                        {selectedToken?.isTransferable ===
-                                            false && (
-                                            <UntransferableTokenWarning />
-                                        )}
-                                    </>
-                                )}
-                            </CardContent>
-                        </GlowingCard>
-                        <Outlet
-                            context={{ selectedToken, currentUser, isLoading }}
+        <PageContainer className="space-y-6">
+            <AutoDebitSwitch currentUser={currentUser} />
+            {tokens.length > 0 && (
+                <GlowingCard>
+                    <CardContent className="@container space-y-2">
+                        <TokenSelector
+                            tokens={tokens}
+                            selectedToken={selectedToken}
+                            onChange={handleTokenSelect}
+                            onClickAvailableBalance={
+                                handleSetMaxAmount ?? undefined
+                            }
                         />
-                    </div>
-                )}
-            </div>
-        </div>
+                        {selectedToken?.isTransferable === false && (
+                            <UntransferableTokenWarning />
+                        )}
+                    </CardContent>
+                </GlowingCard>
+            )}
+            <Outlet context={{ selectedToken, currentUser, isLoading }} />
+        </PageContainer>
     );
 };

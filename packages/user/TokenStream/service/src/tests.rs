@@ -4,14 +4,14 @@
 mod tests {
     use crate::tables::Stream;
     use crate::Wrapper as TokenStream;
-    use psibase::services::nft::Wrapper as Nfts;
+    use psibase::services::nft::{NftHolderFlags, Wrapper as Nfts};
     use psibase::services::tokens::{Quantity, Wrapper as Tokens};
     use psibase::*;
 
     static ALICE: AccountNumber = account!("alice");
     static BOB: AccountNumber = account!("bob");
     static CHARLIE: AccountNumber = account!("charlie");
-    static TOKEN_STREAM: AccountNumber = account!("token-stream");
+    static TOKEN_STREAM: AccountNumber = TokenStream::SERVICE;
 
     fn get_balance(chain: &psibase::Chain, token_id: u32, account: AccountNumber) -> Quantity {
         Tokens::push(&chain)
@@ -48,9 +48,23 @@ mod tests {
 
     /// Creates alice, bob, charlie, and alice mints a new token with supply 1000_0000.
     fn setup_env(chain: &psibase::Chain) -> u32 {
-        chain.new_account(ALICE).unwrap();
-        chain.new_account(BOB).unwrap();
-        chain.new_account(CHARLIE).unwrap();
+        for account in [ALICE, BOB, CHARLIE] {
+            chain.new_account(account).unwrap();
+            // For NFTs (including token-stream NFTs)
+            Nfts::push_from(&chain, account)
+                .setUserConf(NftHolderFlags::AUTO_DEBIT.index(), true)
+                .get()
+                .unwrap();
+
+            // For token balances
+            Tokens::push_from(&chain, account)
+                .setUserConf(
+                    psibase::services::tokens::BalanceFlags::AUTO_DEBIT.index(),
+                    true,
+                )
+                .get()
+                .unwrap();
+        }
 
         let supply = Quantity::from(1000_0000);
 
@@ -58,13 +72,11 @@ mod tests {
             .create(4.try_into().unwrap(), supply)
             .get()
             .unwrap();
-        assert_eq!(token_id, 2);
 
-        Tokens::push_from(&chain, ALICE).mint(
-            token_id,
-            supply,
-            "memo".to_string().try_into().unwrap(),
-        );
+        Tokens::push_from(&chain, ALICE)
+            .mint(token_id, supply, "memo".to_string().try_into().unwrap())
+            .get()
+            .unwrap();
         token_id
     }
 
@@ -80,6 +92,7 @@ mod tests {
             chain.set_auto_block_start(false);
             reset_clock(&chain);
             let token_id = setup_env(&chain);
+
             Self { chain, token_id }
         }
 
@@ -171,7 +184,7 @@ mod tests {
     }
 
     #[psibase::test_case(packages("TokenStream"))]
-    fn test_basics(mut chain: psibase::Chain) {
+    fn test_basics(mut chain: psibase::Chain) -> Result<(), psibase::Error> {
         chain.set_auto_block_start(false);
         reset_clock(&chain);
         let token_id = setup_env(&chain);
@@ -189,14 +202,9 @@ mod tests {
             "No tokens should be deposited"
         );
 
-        // Test claim fails since there's been no deposit
-        let err = TokenStream::push_from(&chain, ALICE)
-            .claim(id)
-            .get()
-            .unwrap_err();
-        assert!(err
-            .to_string()
-            .contains("credit quantity must be greater than 0"));
+        // Claim yields nothing since there's been no deposit
+        let q = TokenStream::push_from(&chain, ALICE).claim(id).get()?;
+        assert!(q.value == 0, "Claim should return 0");
 
         // Make deposit
         tokens_credit(&chain, token_id, ALICE, TOKEN_STREAM, 500);
@@ -205,19 +213,17 @@ mod tests {
             .get()
             .unwrap();
 
-        // Check claim fails when no vesting has yet occured
+        // Check claim yields nothing when no vesting has yet occured
         Nfts::push_from(&chain, ALICE).credit(id, BOB, "memo".into());
         Nfts::push_from(&chain, BOB).debit(id, "memo".into());
-        assert!(TokenStream::push_from(&chain, BOB)
-            .claim(id)
-            .get()
-            .unwrap_err()
-            .to_string()
-            .contains("credit quantity must be greater than 0"));
+        let q = TokenStream::push_from(&chain, BOB).claim(id).get()?;
+        assert!(q.value == 0, "Claim should return 0");
 
         // Check total deposited is correct
         chain.start_block();
         assert_eq!(get_stream(&chain, id).total_deposited, 500.into());
+
+        Ok(())
     }
 
     #[psibase::test_case(packages("TokenStream"))]

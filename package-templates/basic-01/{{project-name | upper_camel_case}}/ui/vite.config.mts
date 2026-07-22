@@ -8,23 +8,14 @@ import {
   verifyViteCache,
 } from "../../../vite.shared";
 
-const serviceDir = path.resolve(__dirname);
-const serviceName = "{{project-name}}";
-
-verifyViteCache(serviceDir);
+const appDirectory = path.resolve(__dirname);
+verifyViteCache(appDirectory);
 
 // https://vitejs.dev/config/
-export default defineConfig(({ command }) => ({
+export default defineConfig((config) => ({
   plugins: [
-    createSharedViteConfig({
-      projectDir: serviceDir,
-    }),
-    createPsibaseConfig({
-      service: serviceName,
-      serviceDir: serviceDir,
-      isServing: command === "serve",
-      useHttps: process.env.VITE_SECURE_LOCAL_DEV === "true",
-    }),
+    createSharedViteConfig(),
+    createPsibaseConfig(config, { appDirectory }),
     ...getSharedUIPlugins(),
   ],
   build: {

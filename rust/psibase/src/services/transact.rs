@@ -1,36 +1,7 @@
-use crate::{Pack, ToKey, ToSchema, Unpack};
-use async_graphql::{InputObject, SimpleObject};
-use serde::{Deserialize, Serialize};
-
 /// Identify a service and method
 ///
 /// An empty `service` or `method` indicates a wildcard.
-#[derive(
-    Copy,
-    Clone,
-    Debug,
-    Pack,
-    Unpack,
-    ToKey,
-    ToSchema,
-    Serialize,
-    Deserialize,
-    SimpleObject,
-    InputObject,
-)]
-#[fracpack(fracpack_mod = "crate::fracpack")]
-#[to_key(psibase_mod = "crate")]
-#[graphql(input_name = "ServiceMethodInput")]
-pub struct ServiceMethod {
-    pub service: crate::AccountNumber,
-    pub method: crate::MethodNumber,
-}
-
-impl ServiceMethod {
-    pub fn new(service: crate::AccountNumber, method: crate::MethodNumber) -> Self {
-        Self { service, method }
-    }
-}
+pub use crate::ServiceMethod;
 
 type CallbackType = u32;
 
@@ -56,7 +27,7 @@ type CallbackType = u32;
 /// Services implement `auth_interface` by defining actions with
 /// identical signatures; there is no trait.
 #[crate::service(
-    name = "example-auth",
+    name = "i-auth",
     actions = "AuthActions",
     wrapper = "AuthWrapper",
     structs = "auth_action_structs",
@@ -147,7 +118,7 @@ pub mod auth_interface {
         action: crate::Action,
         allowedActions: Vec<crate::services::transact::ServiceMethod>,
         claims: Vec<crate::Claim>,
-    ) {
+    ) -> bool {
         unimplemented!()
     }
 
@@ -163,14 +134,21 @@ pub mod auth_interface {
         unimplemented!()
     }
 
+    /// Get the accounts this auth service delegates authority to for a sender.
+    #[action]
+    fn getDlgsSys(
+        sender: crate::AccountNumber,
+        method: Option<ServiceMethod>,
+    ) -> Vec<crate::AccountNumber> {
+        unimplemented!()
+    }
+
     /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
     /// transaction from a specified sender.
     ///
     /// * `sender`: The sender account for the transaction potentially being authorized.
     /// * `authorizers`: The set of accounts that have already authorized the execution of the transaction.
     /// * `method`: The service and method being called.
-    /// * `authSet`: The set of accounts that are already being checked for authorization.
-    ///              If the sender is already in this set, then the function should return false.
     ///
     /// Returns:
     /// * `true`: The authorizers are sufficient to authorize a transaction from the sender.
@@ -180,7 +158,6 @@ pub mod auth_interface {
         sender: crate::AccountNumber,
         authorizers: Vec<crate::AccountNumber>,
         method: Option<ServiceMethod>,
-        authSet: Option<Vec<crate::AccountNumber>>,
     ) -> bool {
         unimplemented!()
     }
@@ -191,8 +168,6 @@ pub mod auth_interface {
     /// * `sender`: The sender account for the transaction potentially being rejected.
     /// * `rejecters`: The set of accounts that have already authorized the rejection of the transaction.
     /// * `method`: The service and method being called.
-    /// * `authSet`: The set of accounts that are already being checked for authorization.
-    ///              If the sender is already in this set, then the function should return false.
     ///
     /// Returns:
     /// * `true`: The rejecters are sufficient to reject a transaction from the sender.
@@ -202,7 +177,6 @@ pub mod auth_interface {
         sender: crate::AccountNumber,
         rejecters: Vec<crate::AccountNumber>,
         method: Option<ServiceMethod>,
-        authSet: Option<Vec<crate::AccountNumber>>,
     ) -> bool {
         unimplemented!()
     }
@@ -258,6 +232,18 @@ mod service {
     /// Called by RTransact to execute a transaction speculatively
     #[action]
     fn execTrx(trx: Nested<Transaction>, speculative: bool) {
+        unimplemented!()
+    }
+
+    /// Called by native code on objective writes to the database
+    #[action]
+    fn kvNotify(
+        service: crate::AccountNumber,
+        db: crate::DbId,
+        keyLen: u32,
+        oldValueLen: u32,
+        newValueLen: u32,
+    ) {
         unimplemented!()
     }
 
@@ -347,6 +333,36 @@ mod service {
         unimplemented!()
     }
 
+    /// Returns true if resource monitoring is enabled
+    #[action]
+    fn isResMonitoring() -> bool {
+        unimplemented!()
+    }
+
+    /// The next `numWrites` db writes will not be billed.
+    ///
+    /// This may only be called by privileged services, and must be paired
+    /// with a call to `endSkipBilling` when the specified number of writes
+    /// have been performed.
+    #[action]
+    fn skipBilling(numWrites: u32) {
+        unimplemented!()
+    }
+
+    /// Asserts that all writes promised by [skipBilling](Self::skipBilling) were consumed.
+    #[action]
+    fn endSkipBilling() {
+        unimplemented!()
+    }
+
+    /// Attribute subsequent disk writes to the system account until `numBytes`
+    /// bytes have been written or the transaction ends. `numBytes = 0` clears
+    ///  the override. Callable only by the VirtualServer service.
+    #[action]
+    fn systemWrite(numBytes: u64) {
+        unimplemented!()
+    }
+
     /// Get the currently executing transaction
     #[action]
     fn getTransaction() -> crate::Transaction {
@@ -380,6 +396,19 @@ mod service {
     /// TODO: remove
     #[action]
     fn headBlockTime() -> crate::TimePointSec {
+        unimplemented!()
+    }
+
+    /// Returns the tapos `refBlockIndex` and `refBlockSuffix`
+    /// for the head block.
+    #[action]
+    fn headTapos() -> (u8, u32) {
+        unimplemented!();
+    }
+
+    /// Emitted at the start of each block
+    #[event(history)]
+    fn blockStart(blockNum: crate::BlockNum, blockTime: crate::BlockTime) {
         unimplemented!()
     }
 }

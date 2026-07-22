@@ -1,18 +1,18 @@
-import { queryClient } from "@/queryClient";
+import type { Account } from "@shared/lib/schemas/account";
+
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { FRACTALS_SERVICE } from "@/lib/constants";
 import {
     getUsersAndGroups,
     zUsersAndGroupsResponse,
-} from "@/lib/graphql/evaluations/getUsersAndGroups";
-import QueryKey from "@/lib/queryKeys";
-import { updateArray } from "@/lib/updateArray";
+} from "@/lib/graphql/evaluations/get-users-and-groups";
+import QueryKey from "@/lib/query-keys";
 
-import { Account } from "@shared/lib/schemas/account";
-
-import { assertUser } from "../use-current-user";
+import { GUILDS_SERVICE } from "@shared/domains/fractal/lib/constants";
+import { assertUser } from "@shared/hooks/use-current-user";
+import { queryClient } from "@shared/lib/query-client";
+import { updateArray } from "@shared/lib/update-array";
 
 let attestedEvaluationId: number | undefined;
 
@@ -27,7 +27,7 @@ export const useUsersAndGroups = (
         queryFn: async () => {
             try {
                 const res = await getUsersAndGroups(
-                    FRACTALS_SERVICE,
+                    GUILDS_SERVICE,
                     evaluationId!,
                 );
 

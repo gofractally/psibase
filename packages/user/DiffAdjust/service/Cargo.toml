@@ -10,6 +10,7 @@ server = "r-diff-adjust"
 
 [dependencies]
 psibase.workspace = true
+psibase_service.workspace = true
 psibase_macros.workspace = true
 async-graphql.workspace = true
 serde.workspace = true
@@ -17,4 +18,4 @@ serde_json.workspace = true
 psibase-user-workspace-hack.workspace = true
 
 [dev-dependencies]
-diff-adjust-pkg = { path = "..", version = "0.23.0" }
+diff-adjust-pkg = { path = "..", version = "0.24.0" }

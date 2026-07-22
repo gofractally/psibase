@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
-import QueryKey, { OptionalAccount, OptionalNumber } from "@/lib/queryKeys";
+import QueryKey, { OptionalAccount, OptionalNumber } from "@/lib/query-keys";
 
 import { zAccount } from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";

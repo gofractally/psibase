@@ -2,9 +2,9 @@ import { createBrowserRouter } from "react-router-dom";
 
 import { Layout } from "@/components/layout";
 
-import { App } from "./App";
-import { EvaluationPage } from "./pages/Evaluation";
-import { GroupPage } from "./pages/Group";
+import { App } from "./app";
+import { EvaluationPage } from "./pages/evaluation";
+import { GroupPage } from "./pages/group";
 
 export const router = createBrowserRouter([
     {

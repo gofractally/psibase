@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { getStreams } from "@/lib/getStreams";
-import QueryKey from "@/lib/queryKeys";
+import { getStreams } from "@/lib/get-streams";
+import QueryKey from "@/lib/query-keys";
 
 export const useStreams = () =>
     useQuery({

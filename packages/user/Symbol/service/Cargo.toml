@@ -13,6 +13,7 @@ postinstall = [{ sender = "symbol", service = "symbol", method = "init" }]
 
 [dependencies]
 psibase.workspace = true
+psibase_service.workspace = true
 psibase_macros.workspace = true
 async-graphql.workspace = true
 serde.workspace = true
@@ -21,4 +22,4 @@ psibase-user-workspace-hack.workspace = true
 
 
 [dev-dependencies]
-symbol-pkg = { path = "..", version = "0.23.0" }
+symbol-pkg = { path = "..", version = "0.24.0" }

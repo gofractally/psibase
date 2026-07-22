@@ -2,8 +2,9 @@
 
 use crate::{
     AccountNumber, Action, BlockHeader, BlockInfo, BlockNum, Checksum256, Claim, DbId, Hex,
-    JointConsensus, MethodNumber, MicroSeconds, Pack, ToSchema, Unpack,
+    JointConsensus, MethodNumber, MicroSeconds, Pack, ToKey, ToSchema, Unpack,
 };
+use async_graphql::{InputObject, SimpleObject};
 use serde::{Deserialize, Serialize};
 
 pub type NativeTable = u16;
@@ -358,6 +359,23 @@ pub enum SocketInfo {
 
 #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+pub struct LogMessage {
+    pub message: String,
+    pub severity: u32,
+    pub service: Option<AccountNumber>,
+}
+
+impl LogMessage {
+    pub const DEBUG: u32 = 0;
+    pub const INFO: u32 = 1;
+    pub const NOTICE: u32 = 2;
+    pub const WARNING: u32 = 3;
+    pub const ERROR: u32 = 4;
+    pub const CRITICAL: u32 = 5;
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
 pub struct SocketRow {
     fd: i32,
     info: SocketInfo,
@@ -366,6 +384,7 @@ pub struct SocketRow {
 impl SocketRow {
     // Well-known fds
     pub const PRODUCER_MULTICAST: i32 = 0;
+    pub const LOG: i32 = 1;
 
     pub const DB: DbId = DbId::NativeSubjective;
     pub fn key(&self) -> (NativeTable, NativeIndex, i32) {
@@ -387,11 +406,32 @@ impl RunMode {
 
 pub type RunToken = Vec<u8>;
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
-#[fracpack(fracpack_mod = "fracpack")]
-pub struct BoundMethod {
-    service: AccountNumber,
-    method: MethodNumber,
+/// Identify a service and method
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    Pack,
+    Unpack,
+    ToKey,
+    ToSchema,
+    Serialize,
+    Deserialize,
+    SimpleObject,
+    InputObject,
+)]
+#[fracpack(fracpack_mod = "fracpack", custom = "ServiceMethod")]
+#[to_key(psibase_mod = "crate")]
+#[graphql(input_name = "ServiceMethodInput")]
+pub struct ServiceMethod {
+    pub service: AccountNumber,
+    pub method: MethodNumber,
+}
+
+impl ServiceMethod {
+    pub fn new(service: AccountNumber, method: MethodNumber) -> Self {
+        Self { service, method }
+    }
 }
 
 #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
@@ -401,7 +441,7 @@ pub struct RunRow {
     mode: RunMode,
     maxTime: MicroSeconds,
     action: Action,
-    continuation: BoundMethod,
+    continuation: ServiceMethod,
 }
 
 impl RunRow {

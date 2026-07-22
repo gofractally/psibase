@@ -35,7 +35,7 @@ impl API for AccountsPlugin {
             AccountNumber::from_exact(&name).map_err(|err| InvalidAccountName(err.to_string()))?;
 
         let query = format!(
-            "query {{ getAccount(accountName: \"{}\") {{ accountNum, authService }} }}",
+            "query {{ getAccount(accountName: \"{}\") {{ accountNum, authService, authSequence }} }}",
             acct_num
         );
 
@@ -54,7 +54,10 @@ impl API for AccountsPlugin {
     }
 
     fn set_auth_service(service_name: String) -> Result<(), Error> {
-        assert_authorized_with_whitelist(FunctionName::set_auth_service, vec!["homepage".into()])?;
+        assert_authorized_with_whitelist(
+            FunctionName::set_auth_service,
+            vec!["homepage".into(), "namemarket".into()],
+        )?;
 
         let account_num: AccountNumber = AccountNumber::from_exact(&service_name)
             .map_err(|_| InvalidAccountName(service_name))?;

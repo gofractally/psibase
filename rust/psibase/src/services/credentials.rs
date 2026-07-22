@@ -1,6 +1,8 @@
-pub const CREDENTIAL_SENDER: &str = "cred-sys";
+use crate::{self as psibase, account, AccountNumber};
 
-#[crate::service(name = "credentials", dispatch = false, psibase_mod = "crate")]
+pub const CREDENTIAL_SENDER: AccountNumber = account!("cred-sys");
+
+#[crate::service(name = "credential", dispatch = false, psibase_mod = "crate")]
 #[allow(unused_variables)]
 pub mod service {
     use crate::{
@@ -28,29 +30,25 @@ pub mod service {
         action: ServiceMethod,
         allowedActions: Vec<ServiceMethod>,
         claims: Vec<Claim>,
-    ) {
-        unimplemented!()
-    }
-
-    #[action]
-    #[allow(non_snake_case)]
-    fn isAuthSys(
-        sender: AccountNumber,
-        authorizers: Vec<AccountNumber>,
-        method: Option<ServiceMethod>,
-        auth_set: Option<Vec<AccountNumber>>,
     ) -> bool {
         unimplemented!()
     }
 
     #[action]
     #[allow(non_snake_case)]
-    fn isRejectSys(
-        sender: AccountNumber,
-        authorizers: Vec<AccountNumber>,
-        method: Option<ServiceMethod>,
-        auth_set: Option<Vec<AccountNumber>>,
-    ) -> bool {
+    fn getDlgsSys(sender: AccountNumber) -> Vec<AccountNumber> {
+        unimplemented!()
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn isAuthSys(sender: AccountNumber, authorizers: Vec<AccountNumber>) -> bool {
+        unimplemented!()
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn isRejectSys(sender: AccountNumber, rejecters: Vec<AccountNumber>) -> bool {
         unimplemented!()
     }
 

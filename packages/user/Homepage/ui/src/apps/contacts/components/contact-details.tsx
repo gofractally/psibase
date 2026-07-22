@@ -11,9 +11,8 @@ import {
 import { useState } from "react";
 import { z } from "zod";
 
-import { useCurrentUser } from "@/hooks/use-current-user";
-
 import { Avatar } from "@shared/components/avatar";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { useProfile } from "@shared/hooks/use-profile";
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -34,7 +33,7 @@ import {
 import { useDeleteContact } from "../hooks/use-delete-contact";
 import { useUpdateContact } from "../hooks/use-update-contact";
 import { LocalContact } from "../types";
-import { formatNames } from "../utils/formatNames";
+import { formatNames } from "../utils/format-names";
 import { ContactForm } from "./contact-form";
 import { EditProfileDialogContent } from "./edit-profile-dialog";
 
@@ -63,9 +62,7 @@ export function ContactDetails({
     );
 
     const { data: currentUser } = useCurrentUser();
-    const { data: profile } = useProfile(contact?.account, true, {
-        baseUrlIncludesSibling: false,
-    });
+    const { data: profile } = useProfile(contact?.account, true, {});
 
     const { mutateAsync: updateContact } = useUpdateContact();
     const { mutateAsync: deleteContact } = useDeleteContact();
