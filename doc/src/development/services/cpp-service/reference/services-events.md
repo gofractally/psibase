@@ -66,11 +66,6 @@ auto result =
 
 ## Defining events
 
-See the following for a description of the various types of events:
-
-- [psibase::DbId::historyEvent]
-- [psibase::DbId::merkleEvent]
-
 To define events for a service, declare the event functions as below, then reflect them using the 3 macros below. Each of the `History` and `Merkle` structs must be present and reflected, even when they don't have any events declared within.
 
 After you have defined your events, use [psibase::Service::emit] to emit them and [psibase::Service::events] to read them.
