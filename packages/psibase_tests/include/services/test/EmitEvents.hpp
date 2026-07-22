@@ -26,9 +26,6 @@ namespace TestService
             void e(std::string s, int i);
             void e2(ExampleRecord r);
          };
-         struct Ui
-         {
-         };
          struct Merkle
          {
             void m(std::string s);
@@ -59,7 +56,6 @@ namespace TestService
    PSIBASE_REFLECT_HISTORY_EVENTS(EmitEvents,  //
                                   method(e, s, i),
                                   method(e2, r))
-   PSIBASE_REFLECT_UI_EVENTS(EmitEvents)
    PSIBASE_REFLECT_MERKLE_EVENTS(EmitEvents,  //
                                  method(m, s))
    PSIBASE_REFLECT_TABLES(EmitEvents)

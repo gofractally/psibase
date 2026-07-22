@@ -93,7 +93,6 @@ class ServiceSchema:
             for (name, ty) in json.get(name, {}).items():
                 events[MethodNumber(name)] = load_type(ty, self.types)
             return events
-        self.ui = get_events('ui')
         self.history = get_events('history')
         self.merkle = get_events('merkle')
 
