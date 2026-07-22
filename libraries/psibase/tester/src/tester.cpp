@@ -62,6 +62,25 @@ namespace
       return result;
    }
 
+   struct TestChainSchemas
+   {
+      std::map<psibase::AccountNumber, psibase::ServiceSchema> schemas;
+      const psibase::ServiceSchema* operator()(psibase::AccountNumber service)
+      {
+         auto pos = schemas.find(service);
+         if (pos != schemas.end())
+            return &pos->second;
+
+         auto table = UserService::Packages{}.open<UserService::InstalledSchemaTable>();
+         if (auto row = table.get(service))
+         {
+            auto [pos, inserted] = schemas.try_emplace(service, std::move(row->schema));
+            return &pos->second;
+         }
+         return nullptr;
+      }
+   };
+
 }  // namespace
 
 using psibase::tester::raw::selectedChain;
@@ -131,7 +150,10 @@ void psibase::expect(TransactionTrace t, const std::string& expected, bool alway
    std::string error = t.error ? *t.error : "";
    bool bad = (expected.empty() && !error.empty()) || error.find(expected) == std::string::npos;
    if (bad || always_show)
-      std::cout << prettyTrace(trimRawData(std::move(t))) << "\n";
+   {
+      auto schemas = TestChainSchemas{};
+      std::cout << prettyTrace(t, std::ref(schemas)) << "\n";
+   }
    if (bad)
    {
       if (expected.empty())
@@ -139,6 +161,18 @@ void psibase::expect(TransactionTrace t, const std::string& expected, bool alway
       else
          check(false, "transaction was expected to fail with " + expected);
    }
+}
+
+std::string psibase::show(bool include, TransactionTrace t)
+{
+   if (include || t.error)
+   {
+      auto schemas = TestChainSchemas{};
+      std::cout << prettyTrace(t, std::ref(schemas)) << "\n";
+   }
+   if (t.error)
+      return *t.error;
+   return {};
 }
 
 namespace
