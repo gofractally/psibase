@@ -547,14 +547,28 @@ namespace psio
                          return T::frac2json(static_cast<U*>(data), ty, in, out);
                       }
                    }),
-               json2frac(&T::json2frac),
+               json2frac(
+                   [](void*                                   data,
+                      const psio::schema_types::CompiledType* ty,
+                      const psio::json::any&                  in,
+                      psio::StreamBase&                       out)
+                   {
+                      if constexpr (requires { T::json2frac(ty, in, out); })
+                      {
+                         T::json2frac(ty, in, out);
+                      }
+                      else
+                      {
+                         T::json2frac(static_cast<U*>(data), ty, in, out);
+                      }
+                   }),
                is_empty_container(&T::is_empty_container)
          {
          }
          void* userData;
          bool (*match)(const CompiledType*);
          bool (*frac2json)(void*, const CompiledType*, FracStream& in, StreamBase& out);
-         void (*json2frac)(const CompiledType*, const json::any& in, StreamBase& out);
+         void (*json2frac)(void*, const CompiledType*, const json::any& in, StreamBase& out);
          bool (*is_empty_container)(const CompiledType*, const json::any& in);
       };
 
@@ -620,7 +634,7 @@ namespace psio
                         auto&               out) const
          {
             StreamRef stream{out};
-            impl[index].json2frac(type, in, stream);
+            impl[index].json2frac(impl[index].userData, type, in, stream);
          }
 
          bool is_empty_container(const CompiledType* type,
