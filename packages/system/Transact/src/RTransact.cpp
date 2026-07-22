@@ -705,7 +705,7 @@ void RTransact::onTrx(const Checksum256& id, psio::view<const TransactionTrace> 
    {
       auto          table   = open<BlockSizeTable>();
       auto          sizeRow = table.get({}).value_or(BlockSizeRecord{0});
-      std::uint32_t txSize;
+      std::uint32_t txSize  = 0;
       PSIBASE_SUBJECTIVE_TX
       {
          if (auto tx = open<TransactionDataTable>().getView(id))
