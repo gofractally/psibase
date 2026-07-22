@@ -19,4 +19,4 @@ serde_json.workspace = true
 psibase-system-workspace-hack.workspace = true
 
 [dev-dependencies]
-auth-dyn-pkg = { path = "..", version = "0.23.0" }
+auth-dyn-pkg = { path = "..", version = "0.24.0" }
