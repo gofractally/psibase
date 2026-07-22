@@ -5,20 +5,21 @@ use psibase::AccountNumber;
 
 use crate::protocol::ServerFrame;
 use crate::signaling::{
-    query_session_auth_for_cleanup, EVENT_SESSION_ENDED, EVENT_SESSION_FAILED, PURPOSE_AV_CALL,
+    fanout_to_participant_sockets, query_session_auth, sig_service, EVENT_SESSION_ENDED,
+    EVENT_SESSION_FAILED, PURPOSE_AV_CALL,
 };
 use crate::state::{
-    cleanup_all_subjective_for_session, joined_accounts_for_session, known_sig_session_ids,
-    sig_joins_for_session, sig_session_track, STALE_RINGING_TTL_US,
+    get_session_liveness, known_session_ids, session_joined_accounts, session_joins, session_purge,
+    STALE_RINGING_TTL_US,
 };
 
 const SESSION_STATUS_ACTIVE: u8 = 1;
 
 fn session_last_activity_at(session_id: &str, now: i64) -> i64 {
-    if let Some(track) = sig_session_track(session_id) {
-        return track.last_activity_at;
+    if let Some(liveness) = get_session_liveness(session_id) {
+        return liveness.last_activity_at;
     }
-    sig_joins_for_session(session_id)
+    session_joins(session_id)
         .into_iter()
         .map(|row| row.joined_at)
         .min()
@@ -26,8 +27,8 @@ fn session_last_activity_at(session_id: &str, now: i64) -> i64 {
 }
 
 fn session_ringing_started_at(session_id: &str, now: i64) -> i64 {
-    if let Some(track) = sig_session_track(session_id) {
-        return track.ringing_since;
+    if let Some(liveness) = get_session_liveness(session_id) {
+        return liveness.ringing_since;
     }
     session_last_activity_at(session_id, now)
 }
@@ -36,7 +37,7 @@ fn is_ringing_av_call(auth: &chat::SessionJoinAuth, session_id: &str) -> bool {
     auth.purpose == PURPOSE_AV_CALL
         && auth.status == SESSION_STATUS_ACTIVE
         && !auth.expired
-        && joined_accounts_for_session(session_id).len() < auth.participants.len()
+        && session_joined_accounts(session_id).len() < auth.participants.len()
 }
 
 /// Account to put in `SessionEnded.by` when the server force-ends a session
@@ -64,7 +65,7 @@ fn fanout_session_ended(
         by: by.into(),
         reason: reason.to_owned(),
     };
-    crate::signaling::fanout_session_ended_to_participants(participants, &frame)
+    fanout_to_participant_sockets(participants, None, &frame)
 }
 
 fn end_and_purge_session(
@@ -72,25 +73,22 @@ fn end_and_purge_session(
     auth: &chat::SessionJoinAuth,
     reason: &str,
 ) -> Vec<(i32, ServerFrame)> {
-    let by = get_who_terminated_session(
-        &auth.participants,
-        &joined_accounts_for_session(session_id),
-    );
+    let by = get_who_terminated_session(&auth.participants, &session_joined_accounts(session_id));
     let out = fanout_session_ended(&auth.participants, session_id, by, reason);
-    cleanup_all_subjective_for_session(session_id);
+    session_purge(session_id);
     out
 }
 
 fn sweep_one_session(session_id: &str, now: i64) -> Vec<(i32, ServerFrame)> {
-    let auth = query_session_auth_for_cleanup(session_id);
+    let auth = query_session_auth(session_id, sig_service());
     if auth.purpose.is_empty() {
-        cleanup_all_subjective_for_session(session_id);
+        session_purge(session_id);
         return vec![];
     }
 
     if auth.expired || auth.status != SESSION_STATUS_ACTIVE {
-        if !joined_accounts_for_session(session_id).is_empty()
-            || sig_session_track(session_id).is_some()
+        if !session_joined_accounts(session_id).is_empty()
+            || get_session_liveness(session_id).is_some()
         {
             let reason = if auth.expired {
                 "expired"
@@ -99,7 +97,7 @@ fn sweep_one_session(session_id: &str, now: i64) -> Vec<(i32, ServerFrame)> {
             };
             return end_and_purge_session(session_id, &auth, reason);
         }
-        cleanup_all_subjective_for_session(session_id);
+        session_purge(session_id);
         return vec![];
     }
 
@@ -119,15 +117,15 @@ fn sweep_one_session(session_id: &str, now: i64) -> Vec<(i32, ServerFrame)> {
 
 pub(crate) fn sweep_all_known_sessions(now: i64) -> Vec<(i32, ServerFrame)> {
     let mut out = Vec::new();
-    for session_id in known_sig_session_ids() {
+    for session_id in known_session_ids() {
         out.extend(sweep_one_session(&session_id, now));
     }
     out
 }
 
-pub fn purge_session_if_fully_ended(session_id: &str, event_kind: u8) {
+pub fn session_purge_if_fully_ended(session_id: &str, event_kind: u8) {
     if event_kind == EVENT_SESSION_ENDED || event_kind == EVENT_SESSION_FAILED {
-        cleanup_all_subjective_for_session(session_id);
+        session_purge(session_id);
     }
 }
 

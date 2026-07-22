@@ -14,8 +14,8 @@ pub mod presence;
 #[allow(non_snake_case)]
 mod service {
     use crate::http::{
-        authenticated_user, deliver_signaling_frames, enqueue_peer_outbound_frames,
-        flush_pending_outbound_for_socket, handle_socket_cleanup, plain_reply, route_target,
+        authenticated_user, deliver_frames, enqueue_peer_frames,
+        flush_outbound, cleanup_socket, plain_reply, route_target,
         rtransact_login, send_frame, send_protocol_error, enqueue_sweep_frames, send_welcome,
         turn_ice_servers_json, websocket_route, RouteTarget,
     };
@@ -23,9 +23,9 @@ mod service {
         parse_client_frame, validate_client_frame, ClientFrame, ProtocolError, ServerFrame,
         WEBSOCKET_TEXT,
     };
-    use crate::signaling::dispatch_signaling_client_frame;
+    use crate::signaling::dispatch_client_frame;
     use crate::state::subjective::{
-        connect_presence_fanout_tx, socket_session_tx, store_client_ready_tx, upsert_socket_session_tx,
+        connect_presence_fanout_tx, get_socket_tx, apply_client_ready_tx, upsert_socket_tx,
     };
     #[cfg(feature = "rt-trace")]
     use crate::trace::xrtcsig_trace;
@@ -71,7 +71,7 @@ mod service {
             MethodNumber::from("close"),
         );
         let now = Transact::call().currentBlock().time.microseconds;
-        upsert_socket_session_tx(socket, user, now);
+        upsert_socket_tx(socket, user, now);
         send_welcome(socket, user, now, &turn_json);
         let fanout = connect_presence_fanout_tx(user);
         #[cfg(feature = "rt-trace")]
@@ -85,11 +85,11 @@ mod service {
             );
         }
         send_frame(socket, &fanout.snapshot);
-        enqueue_peer_outbound_frames(now, fanout.peer_deltas);
+        enqueue_peer_frames(now, fanout.peer_deltas);
         // Sweep after responding to the new connection so a dead peer socket
         // cannot abort before welcome / presence delivery.
         enqueue_sweep_frames(now);
-        flush_pending_outbound_for_socket(socket);
+        flush_outbound(socket);
         None
     }
 
@@ -109,7 +109,7 @@ mod service {
             return;
         }
 
-        let session = socket_session_tx(socket);
+        let session = get_socket_tx(socket);
         let Some(session) = session else {
             send_protocol_error(
                 socket,
@@ -158,7 +158,7 @@ mod service {
                 visible,
                 supports,
             } => {
-                if !store_client_ready_tx(
+                if !apply_client_ready_tx(
                     socket,
                     now,
                     client_instance_id,
@@ -174,16 +174,16 @@ mod service {
                     );
                 } else {
                     enqueue_sweep_frames(now);
-                    flush_pending_outbound_for_socket(socket);
+                    flush_outbound(socket);
                 }
             }
             ClientFrame::Ping => {
                 send_frame(socket, &ServerFrame::Pong);
                 enqueue_sweep_frames(now);
-                flush_pending_outbound_for_socket(socket);
+                flush_outbound(socket);
             }
             session_frame => {
-                let dispatch = dispatch_signaling_client_frame(socket, user, now, session_frame);
+                let dispatch = dispatch_client_frame(socket, user, now, session_frame);
                 #[cfg(feature = "rt-trace")]
                 {
                     let dispatch_targets: Vec<i32> =
@@ -196,11 +196,11 @@ mod service {
                         dispatch_targets,
                     );
                 }
-                deliver_signaling_frames(socket, dispatch.frames, now);
+                deliver_frames(socket, dispatch.frames, now);
                 // Run stale-session sweep after the requesting socket has been
-                // answered — same ordering contract as handle_socket_cleanup.
+                // answered — same ordering contract as cleanup_socket.
                 enqueue_sweep_frames(now);
-                flush_pending_outbound_for_socket(socket);
+                flush_outbound(socket);
             }
         }
     }
@@ -212,7 +212,7 @@ mod service {
             psibase::account!("x-http"),
             "x-wrtcsig close must be called by x-http",
         );
-        handle_socket_cleanup(socket);
+        cleanup_socket(socket);
     }
 
     #[action]
@@ -223,6 +223,6 @@ mod service {
             psibase::account!("x-http"),
             "x-wrtcsig errSys must be called by x-http",
         );
-        handle_socket_cleanup(socket);
+        cleanup_socket(socket);
     }
 }

@@ -302,7 +302,7 @@ mod golden_fixtures {
 
     #[test]
     fn deserializes_golden_welcome_frame() {
-        let frame = decode_server_frame_json(WELCOME).unwrap();
+        let frame = decode_server_frame(WELCOME).unwrap();
         match frame {
             ServerFrame::Welcome {
                 user,
@@ -320,7 +320,7 @@ mod golden_fixtures {
 
     #[test]
     fn deserializes_golden_presence_snapshot_frame() {
-        let frame = decode_server_frame_json(PRESENCE_SNAPSHOT).unwrap();
+        let frame = decode_server_frame(PRESENCE_SNAPSHOT).unwrap();
         match frame {
             ServerFrame::PresenceSnapshot { peers } => {
                 assert_eq!(peers.len(), 2);
@@ -333,7 +333,7 @@ mod golden_fixtures {
 
     #[test]
     fn deserializes_golden_session_snapshot_frame() {
-        let frame = decode_server_frame_json(SESSION_SNAPSHOT).unwrap();
+        let frame = decode_server_frame(SESSION_SNAPSHOT).unwrap();
         match frame {
             ServerFrame::SessionSnapshot {
                 session_id,

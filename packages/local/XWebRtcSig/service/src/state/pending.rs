@@ -8,14 +8,16 @@ use super::tables::{
 pub fn enqueue_pending_signal(session_id: &str, to: AccountNumber, seq: i64, payload: String) {
     // Block time microseconds collide for signals enqueued in the same block.
     // Push past the highest existing seq so the FIFO ordering of the queue
-    // (offer → ICE candidates) survives `take_pending_signal_payloads`.
+    // (offer → ICE candidates) survives `drain_pending_signals`.
+    // `Iterator::last` on `TableIter` reverse-seeks the highest PK (same idea as
+    // XRun/Events). Do not use `.map(...).max()` (full scan) or `.max()` (needs Ord).
     let lo = (session_id.to_owned(), to, i64::MIN);
     let hi = (session_id.to_owned(), to, i64::MAX);
     let max_existing = SigPendingSignalTable::read()
         .get_index_pk()
         .range(lo..=hi)
-        .map(|row| row.seq)
-        .max();
+        .last()
+        .map(|row| row.seq);
     let next_seq = next_pending_seq(max_existing, seq);
     SigPendingSignalTable::new()
         .put(&SigPendingSignalRow {
@@ -35,7 +37,7 @@ pub fn next_pending_seq(max_existing: Option<i64>, block_seq: i64) -> i64 {
     }
 }
 
-pub fn take_pending_signal_payloads(session_id: &str, to: AccountNumber) -> Vec<String> {
+pub fn drain_pending_signals(session_id: &str, to: AccountNumber) -> Vec<String> {
     let table = SigPendingSignalTable::new();
     let read = SigPendingSignalTable::read();
     let lo = (session_id.to_owned(), to, i64::MIN);
@@ -55,8 +57,8 @@ pub fn enqueue_pending_outbound(target_socket: i32, seq: i64, payload: String) {
     let max_existing = SigPendingOutboundTable::read()
         .get_index_pk()
         .range(lo..=hi)
-        .map(|row| row.seq)
-        .max();
+        .last()
+        .map(|row| row.seq);
     let next_seq = next_pending_seq(max_existing, seq);
     SigPendingOutboundTable::new()
         .put(&SigPendingOutboundRow {
@@ -67,7 +69,7 @@ pub fn enqueue_pending_outbound(target_socket: i32, seq: i64, payload: String) {
         .unwrap();
 }
 
-pub fn take_pending_outbound_payloads(target_socket: i32) -> Vec<String> {
+pub fn drain_pending_outbound(target_socket: i32) -> Vec<String> {
     let table = SigPendingOutboundTable::new();
     let read = SigPendingOutboundTable::read();
     let lo = (target_socket, i64::MIN);
@@ -81,7 +83,7 @@ pub fn take_pending_outbound_payloads(target_socket: i32) -> Vec<String> {
     out
 }
 
-pub fn erase_pending_outbound_for_socket(target_socket: i32) {
+pub fn clear_pending_outbound(target_socket: i32) {
     let table = SigPendingOutboundTable::new();
     let lo = (target_socket, i64::MIN);
     let hi = (target_socket, i64::MAX);
@@ -94,7 +96,7 @@ pub fn erase_pending_outbound_for_socket(target_socket: i32) {
     }
 }
 
-pub fn erase_pending_signals_for_session(session_id: &str) {
+pub fn session_clear_pending_signals(session_id: &str) {
     let table = SigPendingSignalTable::new();
     let rows: Vec<SigPendingSignalRow> = SigPendingSignalTable::read()
         .get_index_pk()

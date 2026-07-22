@@ -21,7 +21,7 @@ pub(crate) fn websocket_key(request: &HttpRequest) -> Option<&str> {
         .map(|_| key)
 }
 
-pub(crate) fn accept_key(key: &str) -> String {
+pub(crate) fn websocket_accept_key(key: &str) -> String {
     let mut hasher = Sha1::new();
     hasher.update(key.as_bytes());
     hasher.update(b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
@@ -39,7 +39,7 @@ pub(crate) fn websocket_handshake(request: &HttpRequest) -> Option<HttpReply> {
         headers: vec![
             HttpHeader::new("Upgrade", "websocket"),
             HttpHeader::new("Connection", "Upgrade"),
-            HttpHeader::new("Sec-WebSocket-Accept", &accept_key(key)),
+            HttpHeader::new("Sec-WebSocket-Accept", &websocket_accept_key(key)),
             HttpHeader::new("Sec-WebSocket-Protocol", chosen),
         ],
     })

@@ -1,42 +1,27 @@
 use psibase::services::chat;
-use psibase::AccountNumber;
+use psibase::{AccountNumber, Table};
 
 use crate::protocol::ServerFrame;
 use crate::state::{
-    put_sig_session_join, sig_join_row, sig_joins_for_socket, tables::SigSessionJoinRow,
-    touch_sig_session_track,
+    get_session_join, socket_joins,
+    tables::{SessionJoinRow, SessionJoinTable},
+    touch_session_liveness,
 };
 
-use super::constants::{is_supported_signaling_purpose, query_session_auth, session_err};
+use super::constants::{is_supported_purpose, query_session_auth, error_for_socket};
 use super::fanout::{
     build_session_snapshot, fanout_participant_joined, fanout_session_snapshot,
     fanout_to_participant_sockets, flush_pending_signals_to_socket,
 };
 use super::invite::session_invite_frame;
 
-fn record_join(
-    session_id: &str,
-    account: AccountNumber,
-    socket: i32,
-    client_instance_id: &str,
-    now: i64,
-) {
-    put_sig_session_join(&SigSessionJoinRow {
-        session_id: session_id.to_owned(),
-        account,
-        socket,
-        client_instance_id: client_instance_id.to_owned(),
-        joined_at: now,
-    });
-}
-
-fn join_session_auth_errors(
+fn join_auth_errors(
     socket: i32,
     session_id: &str,
     auth: &chat::SessionJoinAuth,
 ) -> Option<Vec<(i32, ServerFrame)>> {
     if auth.purpose.is_empty() {
-        return Some(vec![session_err(
+        return Some(vec![error_for_socket(
             socket,
             "unknown-session",
             "unknown session",
@@ -45,7 +30,7 @@ fn join_session_auth_errors(
     }
 
     if auth.expired {
-        return Some(vec![session_err(
+        return Some(vec![error_for_socket(
             socket,
             "session-expired",
             "session has expired",
@@ -54,7 +39,7 @@ fn join_session_auth_errors(
     }
 
     if auth.status != 1 {
-        return Some(vec![session_err(
+        return Some(vec![error_for_socket(
             socket,
             "session-not-active",
             "session is not active",
@@ -63,7 +48,7 @@ fn join_session_auth_errors(
     }
 
     if !auth.authorized {
-        return Some(vec![session_err(
+        return Some(vec![error_for_socket(
             socket,
             "not-participant",
             "account is not a participant in this session",
@@ -71,8 +56,8 @@ fn join_session_auth_errors(
         )]);
     }
 
-    if !is_supported_signaling_purpose(&auth.purpose) {
-        return Some(vec![session_err(
+    if !is_supported_purpose(&auth.purpose) {
+        return Some(vec![error_for_socket(
             socket,
             "unsupported-purpose",
             "unsupported session purpose for signaling",
@@ -83,7 +68,7 @@ fn join_session_auth_errors(
     None
 }
 
-fn join_session_subjective(
+fn join_session(
     socket: i32,
     user: AccountNumber,
     session_id: String,
@@ -91,10 +76,18 @@ fn join_session_subjective(
     now: i64,
     auth: chat::SessionJoinAuth,
 ) -> Vec<(i32, ServerFrame)> {
-    let prior = sig_join_row(&session_id, user);
+    let prior = get_session_join(&session_id, user);
     let duplicate_same_socket = prior.as_ref().is_some_and(|row| row.socket == socket);
-    record_join(&session_id, user, socket, &client_instance_id, now);
-    touch_sig_session_track(&session_id, now);
+    SessionJoinTable::new()
+        .put(&SessionJoinRow {
+            session_id: session_id.clone(),
+            account: user,
+            socket,
+            client_instance_id: client_instance_id.clone(),
+            joined_at: now,
+        })
+        .unwrap();
+    touch_session_liveness(&session_id, now);
 
     // Deliver any signals buffered while this user had no joined socket.
     let flushed = flush_pending_signals_to_socket(&session_id, user, socket);
@@ -104,7 +97,7 @@ fn join_session_subjective(
     // join abort the recv action and can kill the socket. Return only a
     // sessionSnapshot to the joiner, but still fan out invites/roster deltas to
     // other participants (e.g. group Meet after chat-data pair PCs are live).
-    let socket_has_other_sessions = sig_joins_for_socket(socket)
+    let socket_has_other_sessions = socket_joins(socket)
         .iter()
         .any(|row| row.session_id != session_id);
     if socket_has_other_sessions {
@@ -167,7 +160,7 @@ fn join_session_subjective(
     out
 }
 
-fn join_session_subjective_tx(
+fn join_session_tx(
     socket: i32,
     user: AccountNumber,
     session_id: String,
@@ -176,7 +169,7 @@ fn join_session_subjective_tx(
     auth: chat::SessionJoinAuth,
 ) -> Vec<(i32, ServerFrame)> {
     ::psibase::subjective_tx! {
-        join_session_subjective(
+        join_session(
             socket,
             user,
             session_id.clone(),
@@ -195,8 +188,8 @@ pub fn handle_join_session(
     now: i64,
 ) -> Vec<(i32, ServerFrame)> {
     let auth = query_session_auth(&session_id, user);
-    if let Some(err) = join_session_auth_errors(socket, &session_id, &auth) {
+    if let Some(err) = join_auth_errors(socket, &session_id, &auth) {
         return err;
     }
-    join_session_subjective_tx(socket, user, session_id, client_instance_id, now, auth)
+    join_session_tx(socket, user, session_id, client_instance_id, now, auth)
 }

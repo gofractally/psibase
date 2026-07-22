@@ -10,23 +10,23 @@ use crate::presence::{
 use crate::protocol::ClientSupports;
 use crate::state::tables::SocketSessionRow;
 use crate::state::{
-    enqueue_pending_outbound, remove_socket_session, socket_session, store_client_ready,
-    take_pending_outbound_payloads, upsert_socket_session, RemovedSocket,
+    apply_client_ready, close_socket, drain_pending_outbound, enqueue_pending_outbound, get_socket,
+    upsert_socket, RemovedSocket,
 };
 
-pub fn socket_session_tx(socket: i32) -> Option<SocketSessionRow> {
+pub fn get_socket_tx(socket: i32) -> Option<SocketSessionRow> {
     ::psibase::subjective_tx! {
-        socket_session(socket)
+        get_socket(socket)
     }
 }
 
-pub fn upsert_socket_session_tx(socket: i32, user: AccountNumber, now: i64) {
+pub fn upsert_socket_tx(socket: i32, user: AccountNumber, now: i64) {
     ::psibase::subjective_tx! {
-        upsert_socket_session(socket, user, now);
+        upsert_socket(socket, user, now);
     }
 }
 
-pub fn store_client_ready_tx(
+pub fn apply_client_ready_tx(
     socket: i32,
     now: i64,
     client_instance_id: String,
@@ -35,7 +35,7 @@ pub fn store_client_ready_tx(
     supports: ClientSupports,
 ) -> bool {
     ::psibase::subjective_tx! {
-        let ok = store_client_ready(
+        let ok = apply_client_ready(
             socket,
             now,
             &client_instance_id,
@@ -64,9 +64,9 @@ pub fn disconnect_presence_fanout_tx(
     }
 }
 
-pub fn remove_socket_session_tx(socket: i32) -> Option<RemovedSocket> {
+pub fn close_socket_tx(socket: i32) -> Option<RemovedSocket> {
     ::psibase::subjective_tx! {
-        let removed = remove_socket_session(socket);
+        let removed = close_socket(socket);
         removed
     }
 }
@@ -77,16 +77,13 @@ pub fn sweep_all_known_sessions_tx(now: i64) -> Vec<(i32, crate::protocol::Serve
     }
 }
 
-pub fn take_pending_outbound_payloads_tx(target_socket: i32) -> Vec<String> {
+pub fn drain_pending_outbound_tx(target_socket: i32) -> Vec<String> {
     ::psibase::subjective_tx! {
-        take_pending_outbound_payloads(target_socket)
+        drain_pending_outbound(target_socket)
     }
 }
 
-pub fn enqueue_pending_outbound_frames_tx(
-    frames: Vec<(i32, crate::protocol::ServerFrame)>,
-    now: i64,
-) {
+pub fn enqueue_outbound_frames_tx(frames: Vec<(i32, crate::protocol::ServerFrame)>, now: i64) {
     use crate::protocol::encode_server_frame;
     ::psibase::subjective_tx! {
         for (target_socket, frame) in &frames {

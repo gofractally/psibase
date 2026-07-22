@@ -1,5 +1,5 @@
 use crate::protocol::ServerFrame;
-use crate::state::erase_sig_session_join;
+use crate::state::clear_session_join;
 
 use super::constants::query_session_auth;
 use super::fanout::{fanout_session_snapshot, fanout_to_participant_sockets};
@@ -11,12 +11,12 @@ use super::fanout::{fanout_session_snapshot, fanout_to_participant_sockets};
 /// participant's websocket dying is recoverable — the on-chain session remains
 /// active and peers should keep other connections, disposing only the lost
 /// participant. Re-establish via a fresh `joinSession` → `sessionSnapshot`.
-pub(crate) fn tear_down_sessions_for_dead_socket_subjective(
+pub(crate) fn teardown_dead_socket_sessions(
     dead_socket: i32,
     now: i64,
 ) -> Vec<(i32, ServerFrame)> {
     let _ = now;
-    let joins = crate::state::sig_joins_for_socket(dead_socket);
+    let joins = crate::state::socket_joins(dead_socket);
     if joins.is_empty() {
         return vec![];
     }
@@ -24,7 +24,7 @@ pub(crate) fn tear_down_sessions_for_dead_socket_subjective(
     let mut out = Vec::new();
     for join in joins {
         let auth = query_session_auth(&join.session_id, join.account);
-        erase_sig_session_join(&join.session_id, join.account);
+        clear_session_join(&join.session_id, join.account);
 
         // Recoverable transport drop: tell every other joined socket that
         // *this participant's* transport is gone. They keep the session.
@@ -47,11 +47,11 @@ pub(crate) fn tear_down_sessions_for_dead_socket_subjective(
     out
 }
 
-pub(crate) fn tear_down_sessions_for_dead_socket_tx(
+pub(crate) fn teardown_dead_socket_sessions_tx(
     dead_socket: i32,
     now: i64,
 ) -> Vec<(i32, ServerFrame)> {
     ::psibase::subjective_tx! {
-        tear_down_sessions_for_dead_socket_subjective(dead_socket, now)
+        teardown_dead_socket_sessions(dead_socket, now)
     }
 }

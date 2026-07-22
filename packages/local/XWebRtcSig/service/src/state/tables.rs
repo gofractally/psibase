@@ -20,30 +20,17 @@ pub mod tables {
     }
 
     impl SocketSessionRow {
+        /// Secondary index for "all sockets for this account" (presence / fanout).
         #[secondary_key(1)]
         fn by_user_socket(&self) -> (AccountNumber, i32) {
             (self.user, self.socket)
         }
     }
 
-    #[table(name = "UserSessionTable", index = 1, db = "Subjective")]
-    #[derive(Debug, Clone, PartialEq, Eq, Fracpack, Serialize, Deserialize, ToSchema)]
-    pub struct UserSessionRow {
-        pub user: AccountNumber,
-        pub socket: i32,
-    }
-
-    impl UserSessionRow {
-        #[primary_key]
-        fn pk(&self) -> (AccountNumber, i32) {
-            (self.user, self.socket)
-        }
-    }
-
     /// Live websocket join for an objective WebRTC session.
-    #[table(name = "SigSessionJoinTable", index = 2, db = "Subjective")]
+    #[table(name = "SessionJoinTable", index = 1, db = "Subjective")]
     #[derive(Debug, Clone, PartialEq, Eq, Fracpack, Serialize, Deserialize, ToSchema)]
-    pub struct SigSessionJoinRow {
+    pub struct SessionJoinRow {
         pub session_id: String,
         pub account: AccountNumber,
         pub socket: i32,
@@ -51,7 +38,7 @@ pub mod tables {
         pub joined_at: i64,
     }
 
-    impl SigSessionJoinRow {
+    impl SessionJoinRow {
         #[primary_key]
         fn pk(&self) -> (String, AccountNumber) {
             (self.session_id.clone(), self.account)
@@ -64,7 +51,7 @@ pub mod tables {
     }
 
     /// SDP/ICE queued when the recipient had no joined socket for the session.
-    #[table(name = "SigPendingSignalTable", index = 3, db = "Subjective")]
+    #[table(name = "SigPendingSignalTable", index = 2, db = "Subjective")]
     #[derive(Debug, Clone, PartialEq, Eq, Fracpack, Serialize, Deserialize, ToSchema)]
     pub struct SigPendingSignalRow {
         pub session_id: String,
@@ -80,10 +67,10 @@ pub mod tables {
         }
     }
 
-    /// Last activity for stale ringing/session sweep.
-    #[table(name = "SigSessionTrackTable", index = 4, db = "Subjective")]
+    /// Per-session ringing/activity clocks for the stale-ringing sweep.
+    #[table(name = "SessionLivenessTable", index = 3, db = "Subjective")]
     #[derive(Debug, Clone, PartialEq, Eq, Fracpack, Serialize, Deserialize, ToSchema)]
-    pub struct SigSessionTrackRow {
+    pub struct SessionLivenessRow {
         #[primary_key]
         pub session_id: String,
         pub ringing_since: i64,
@@ -92,7 +79,7 @@ pub mod tables {
 
     /// Server frames queued for a socket when inline `send` would abort the
     /// active recv action (dead peer socket during join/signal fanout).
-    #[table(name = "SigPendingOutboundTable", index = 5, db = "Subjective")]
+    #[table(name = "SigPendingOutboundTable", index = 4, db = "Subjective")]
     #[derive(Debug, Clone, PartialEq, Eq, Fracpack, Serialize, Deserialize, ToSchema)]
     pub struct SigPendingOutboundRow {
         pub target_socket: i32,

@@ -1,5 +1,5 @@
 use super::{
-    accept_key, bearer_subprotocol_token, header_contains, route_target, websocket_handshake,
+    websocket_accept_key, bearer_subprotocol_token, header_contains, route_target, websocket_handshake,
     websocket_route, RouteTarget,
 };
 use crate::protocol::{
@@ -24,7 +24,7 @@ fn required_entrypoint_names_are_valid() {
 #[test]
 fn derives_rfc6455_websocket_accept_key() {
     assert_eq!(
-        accept_key("dGhlIHNhbXBsZSBub25jZQ=="),
+        websocket_accept_key("dGhlIHNhbXBsZSBub25jZQ=="),
         "s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
     );
 }

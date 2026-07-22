@@ -10,7 +10,7 @@ pub struct SignalingDispatch {
     pub frames: Vec<(i32, ServerFrame)>,
 }
 
-pub fn dispatch_signaling_client_frame(
+pub fn dispatch_client_frame(
     socket: i32,
     user: AccountNumber,
     now: i64,

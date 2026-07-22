@@ -1,4 +1,4 @@
-use super::constants::session_err;
+use super::constants::error_for_socket;
 use super::invite::{
     av_call_data_channels, av_call_transports, chat_data_channels, chat_data_transports,
     session_invite_frame, CHAT_DATA_CHANNEL_LABEL,
@@ -34,8 +34,8 @@ fn normalize_leave_reason_maps_invite_timeout() {
 }
 
 #[test]
-fn session_err_frame_includes_code_and_session_id() {
-    let (_, frame) = session_err(
+fn error_for_socket_frame_includes_code_and_session_id() {
+    let (_, frame) = error_for_socket(
         7,
         "not-participant",
         "account is not a participant in this session",

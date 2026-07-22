@@ -1,8 +1,8 @@
 use psibase::AccountNumber;
 use psibase::Table;
 
-use super::tables::{self, SocketSessionRow, UserSessionTable};
-use super::{erase_pending_outbound_for_socket, erase_sig_joins_for_socket};
+use super::tables::{SocketSessionRow, SocketSessionTable};
+use super::{clear_pending_outbound, socket_clear_joins};
 use crate::protocol::ClientSupports;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -18,14 +18,8 @@ impl RemovedSocket {
     }
 }
 
-pub fn upsert_socket_session(socket: i32, user: AccountNumber, now: i64) {
-    let socket_table = tables::SocketSessionTable::new();
-    let user_table = UserSessionTable::new();
-
-    if let Some(existing) = socket_table.get_index_pk().get(&socket) {
-        user_table.erase(&(existing.user, socket));
-    }
-
+pub fn upsert_socket(socket: i32, user: AccountNumber, now: i64) {
+    let socket_table = SocketSessionTable::new();
     socket_table
         .put(&SocketSessionRow {
             socket,
@@ -40,10 +34,9 @@ pub fn upsert_socket_session(socket: i32, user: AccountNumber, now: i64) {
             supports_data: false,
         })
         .unwrap();
-    user_table.put(&tables::UserSessionRow { user, socket }).unwrap();
 }
 
-pub fn store_client_ready(
+pub fn apply_client_ready(
     socket: i32,
     now: i64,
     client_instance_id: &str,
@@ -51,7 +44,7 @@ pub fn store_client_ready(
     visible: bool,
     supports: &ClientSupports,
 ) -> bool {
-    let socket_table = tables::SocketSessionTable::new();
+    let socket_table = SocketSessionTable::new();
     let Some(mut row) = socket_table.get_index_pk().get(&socket) else {
         return false;
     };
@@ -66,26 +59,25 @@ pub fn store_client_ready(
     true
 }
 
-pub fn sockets_for_user(user: AccountNumber) -> Vec<i32> {
-    UserSessionTable::read()
-        .get_index_pk()
-        .iter()
-        .filter(|row| row.user == user)
+pub fn user_sockets(user: AccountNumber) -> Vec<i32> {
+    let lo = (user, i32::MIN);
+    let hi = (user, i32::MAX);
+    SocketSessionTable::read()
+        .get_index_by_user_socket()
+        .range(lo..=hi)
         .map(|row| row.socket)
         .collect()
 }
 
-/// Sockets listed for `user` that still have an active `SocketSessionRow`.
-pub fn live_sockets_for_user(user: AccountNumber) -> Vec<i32> {
-    sockets_for_user(user)
-        .into_iter()
-        .filter(|socket| socket_session(*socket).is_some())
-        .collect()
+/// Sockets for `user` with a live `SocketSessionRow` (same as [`user_sockets`]
+/// now that the user index is derived from that table).
+pub fn user_live_sockets(user: AccountNumber) -> Vec<i32> {
+    user_sockets(user)
 }
 
 /// Other accounts with at least one live websocket (excluding `user`).
-pub fn connected_accounts_except(user: AccountNumber) -> Vec<AccountNumber> {
-    let mut accounts: Vec<AccountNumber> = UserSessionTable::read()
+pub fn other_connected_accounts(user: AccountNumber) -> Vec<AccountNumber> {
+    let mut accounts: Vec<AccountNumber> = SocketSessionTable::read()
         .get_index_pk()
         .iter()
         .filter(|row| row.user != user)
@@ -96,23 +88,20 @@ pub fn connected_accounts_except(user: AccountNumber) -> Vec<AccountNumber> {
     accounts
 }
 
-pub fn socket_session(socket: i32) -> Option<SocketSessionRow> {
-    tables::SocketSessionTable::read()
-        .get_index_pk()
-        .get(&socket)
+pub fn get_socket(socket: i32) -> Option<SocketSessionRow> {
+    SocketSessionTable::read().get_index_pk().get(&socket)
 }
 
-pub fn remove_socket_session(socket: i32) -> Option<RemovedSocket> {
-    erase_sig_joins_for_socket(socket);
-    erase_pending_outbound_for_socket(socket);
+pub fn close_socket(socket: i32) -> Option<RemovedSocket> {
+    socket_clear_joins(socket);
+    clear_pending_outbound(socket);
 
-    let socket_table = tables::SocketSessionTable::new();
+    let socket_table = SocketSessionTable::new();
     let row = socket_table.get_index_pk().get(&socket)?;
     socket_table.erase(&socket);
-    UserSessionTable::new().erase(&(row.user, socket));
     Some(RemovedSocket {
         socket,
         user: row.user,
-        remaining_sockets: sockets_for_user(row.user),
+        remaining_sockets: user_sockets(row.user),
     })
 }

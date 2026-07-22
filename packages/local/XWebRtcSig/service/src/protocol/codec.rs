@@ -30,7 +30,7 @@ pub fn encode_server_frame(frame: &ServerFrame) -> Result<String, ProtocolError>
     serde_json::to_string(frame).map_err(|err| ProtocolError::InvalidFrame(err.to_string()))
 }
 
-pub fn decode_server_frame_json(json: &str) -> Result<ServerFrame, ProtocolError> {
+pub fn decode_server_frame(json: &str) -> Result<ServerFrame, ProtocolError> {
     serde_json::from_str(json).map_err(|err| ProtocolError::InvalidFrame(err.to_string()))
 }
 
@@ -38,14 +38,14 @@ pub fn validate_client_frame(frame: &ClientFrame) -> Result<(), ProtocolError> {
     match frame {
         ClientFrame::ClientReady {
             client_instance_id, ..
-        } => validate_required_id("clientInstanceId", client_instance_id),
+        } => validate_required_field("clientInstanceId", client_instance_id),
         ClientFrame::Ping => Ok(()),
         ClientFrame::JoinSession {
             session_id,
             client_instance_id,
         } => {
-            validate_required_id("sessionId", session_id)?;
-            validate_required_id("clientInstanceId", client_instance_id)
+            validate_required_field("sessionId", session_id)?;
+            validate_required_field("clientInstanceId", client_instance_id)
         }
         ClientFrame::Signal {
             session_id,
@@ -56,14 +56,14 @@ pub fn validate_client_frame(frame: &ClientFrame) -> Result<(), ProtocolError> {
             sdp_mid,
             sdp_mline_index,
         } => {
-            validate_required_id("sessionId", session_id)?;
+            validate_required_field("sessionId", session_id)?;
             validate_signal_payload(*kind, sdp, candidate, sdp_mid, sdp_mline_index)
         }
         ClientFrame::LeaveSession { session_id, .. } => {
-            validate_required_id("sessionId", session_id)
+            validate_required_field("sessionId", session_id)
         }
         ClientFrame::ParticipantState { session_id, .. } => {
-            validate_required_id("sessionId", session_id)
+            validate_required_field("sessionId", session_id)
         }
     }
 }
@@ -105,7 +105,7 @@ fn validate_signal_payload(
     }
 }
 
-fn validate_required_id(field: &str, value: &str) -> Result<(), ProtocolError> {
+fn validate_required_field(field: &str, value: &str) -> Result<(), ProtocolError> {
     if value.trim().is_empty() {
         return Err(ProtocolError::InvalidFrame(format!(
             "{field} must not be empty"

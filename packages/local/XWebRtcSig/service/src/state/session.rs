@@ -4,53 +4,49 @@ use psibase::AccountNumber;
 use psibase::Table;
 
 use super::tables::{
-    SigSessionJoinRow, SigSessionJoinTable, SigSessionTrackRow, SigSessionTrackTable,
+    SessionJoinRow, SessionJoinTable, SessionLivenessRow, SessionLivenessTable,
 };
-use super::erase_pending_signals_for_session;
+use super::session_clear_pending_signals;
 
 /// Client + server safety net: drop stale ringing av-call rows after this many µs.
 pub const STALE_RINGING_TTL_US: i64 = 25_000_000;
 
-pub fn sig_join_row(session_id: &str, account: AccountNumber) -> Option<SigSessionJoinRow> {
-    SigSessionJoinTable::read()
+pub fn get_session_join(session_id: &str, account: AccountNumber) -> Option<SessionJoinRow> {
+    SessionJoinTable::read()
         .get_index_pk()
         .get(&(session_id.to_owned(), account))
 }
 
-pub fn sig_joins_for_session(session_id: &str) -> Vec<SigSessionJoinRow> {
-    SigSessionJoinTable::read()
+pub fn session_joins(session_id: &str) -> Vec<SessionJoinRow> {
+    SessionJoinTable::read()
         .get_index_pk()
         .iter()
         .filter(|row| row.session_id == session_id)
         .collect()
 }
 
-pub fn sig_joins_for_socket(socket: i32) -> Vec<SigSessionJoinRow> {
-    SigSessionJoinTable::read()
+pub fn socket_joins(socket: i32) -> Vec<SessionJoinRow> {
+    SessionJoinTable::read()
         .get_index_pk()
         .iter()
         .filter(|row| row.socket == socket)
         .collect()
 }
 
-pub fn put_sig_session_join(row: &SigSessionJoinRow) {
-    SigSessionJoinTable::new().put(row).unwrap();
+pub fn clear_session_join(session_id: &str, account: AccountNumber) {
+    SessionJoinTable::new().erase(&(session_id.to_owned(), account));
 }
 
-pub fn erase_sig_session_join(session_id: &str, account: AccountNumber) {
-    SigSessionJoinTable::new().erase(&(session_id.to_owned(), account));
-}
-
-pub fn erase_sig_joins_for_socket(socket: i32) {
-    let joins = sig_joins_for_socket(socket);
-    let table = SigSessionJoinTable::new();
+pub fn socket_clear_joins(socket: i32) {
+    let joins = socket_joins(socket);
+    let table = SessionJoinTable::new();
     for row in joins {
         table.erase(&(row.session_id, row.account));
     }
 }
 
-pub fn touch_sig_session_track(session_id: &str, now: i64) {
-    let table = SigSessionTrackTable::new();
+pub fn touch_session_liveness(session_id: &str, now: i64) {
+    let table = SessionLivenessTable::new();
     let row = table
         .get_index_pk()
         .get(&session_id.to_owned())
@@ -58,7 +54,7 @@ pub fn touch_sig_session_track(session_id: &str, now: i64) {
             existing.last_activity_at = now;
             existing
         })
-        .unwrap_or(SigSessionTrackRow {
+        .unwrap_or(SessionLivenessRow {
             session_id: session_id.to_owned(),
             ringing_since: now,
             last_activity_at: now,
@@ -66,49 +62,41 @@ pub fn touch_sig_session_track(session_id: &str, now: i64) {
     table.put(&row).unwrap();
 }
 
-pub fn sig_session_track(session_id: &str) -> Option<SigSessionTrackRow> {
-    SigSessionTrackTable::read()
+pub fn get_session_liveness(session_id: &str) -> Option<SessionLivenessRow> {
+    SessionLivenessTable::read()
         .get_index_pk()
         .get(&session_id.to_owned())
 }
 
-pub fn tracked_session_ids() -> Vec<String> {
-    SigSessionTrackTable::read()
-        .get_index_pk()
-        .iter()
-        .map(|row| row.session_id.clone())
-        .collect()
-}
-
-pub fn erase_sig_session_track(session_id: &str) {
-    SigSessionTrackTable::new().erase(&session_id.to_owned());
-}
-
-pub fn erase_sig_joins_for_session(session_id: &str) {
-    let table = SigSessionJoinTable::new();
-    for row in sig_joins_for_session(session_id) {
+pub fn session_clear_joins(session_id: &str) {
+    let table = SessionJoinTable::new();
+    for row in session_joins(session_id) {
         table.erase(&(row.session_id, row.account));
     }
 }
 
-/// Drop all subjective signaling rows for a session (joins, pending signals, track).
-pub fn cleanup_all_subjective_for_session(session_id: &str) {
-    erase_sig_joins_for_session(session_id);
-    erase_pending_signals_for_session(session_id);
-    erase_sig_session_track(session_id);
+/// Drop all signaling rows for a session (joins, pending signals, track).
+pub fn session_purge(session_id: &str) {
+    session_clear_joins(session_id);
+    session_clear_pending_signals(session_id);
+    SessionLivenessTable::new().erase(&session_id.to_owned());
 }
 
-pub fn joined_accounts_for_session(session_id: &str) -> Vec<AccountNumber> {
-    sig_joins_for_session(session_id)
+pub fn session_joined_accounts(session_id: &str) -> Vec<AccountNumber> {
+    session_joins(session_id)
         .into_iter()
         .map(|row| row.account)
         .collect()
 }
 
-/// Session ids with a track row and/or at least one subjective join (sweep candidates).
-pub fn known_sig_session_ids() -> Vec<String> {
-    let mut ids: BTreeSet<String> = tracked_session_ids().into_iter().collect();
-    for join in SigSessionJoinTable::read().get_index_pk().iter() {
+/// Session ids with a track row and/or at least one join (sweep candidates).
+pub fn known_session_ids() -> Vec<String> {
+    let mut ids: BTreeSet<String> = SessionLivenessTable::read()
+        .get_index_pk()
+        .iter()
+        .map(|row| row.session_id.clone())
+        .collect();
+    for join in SessionJoinTable::read().get_index_pk().iter() {
         ids.insert(join.session_id.clone());
     }
     ids.into_iter().collect()

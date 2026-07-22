@@ -7,10 +7,10 @@
 use psibase::AccountNumber;
 
 use crate::protocol::{PeerPresence, PresenceStatus, ServerFrame};
-use crate::state::{connected_accounts_except, sockets_for_user};
+use crate::state::{other_connected_accounts, user_sockets};
 
 pub fn presence_status(account: AccountNumber) -> PresenceStatus {
-    if sockets_for_user(account).is_empty() {
+    if user_sockets(account).is_empty() {
         PresenceStatus::Offline
     } else {
         PresenceStatus::Online
@@ -20,7 +20,7 @@ pub fn presence_status(account: AccountNumber) -> PresenceStatus {
 fn socket_count_for_status(account: AccountNumber, status: PresenceStatus) -> Option<u32> {
     match status {
         PresenceStatus::Online => {
-            let n = sockets_for_user(account).len();
+            let n = user_sockets(account).len();
             (n > 0).then_some(n as u32)
         }
         PresenceStatus::Offline => None,
@@ -37,7 +37,7 @@ pub fn presence_delta_frame(user: AccountNumber, status: PresenceStatus) -> Serv
 
 /// Snapshot of online peers for the connecting user.
 pub fn presence_snapshot_frame(for_user: AccountNumber) -> ServerFrame {
-    let peers = connected_accounts_except(for_user)
+    let peers = other_connected_accounts(for_user)
         .into_iter()
         .map(|account| PeerPresence {
             account: account.into(),
@@ -48,9 +48,9 @@ pub fn presence_snapshot_frame(for_user: AccountNumber) -> ServerFrame {
 }
 
 pub fn subscriber_sockets_for_presence(subject: AccountNumber) -> Vec<i32> {
-    connected_accounts_except(subject)
+    other_connected_accounts(subject)
         .into_iter()
-        .flat_map(sockets_for_user)
+        .flat_map(user_sockets)
         .collect()
 }
 

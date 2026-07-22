@@ -13,23 +13,19 @@ pub(super) const EVENT_PARTICIPANT_LEFT: u8 = 2;
 pub(crate) const EVENT_SESSION_FAILED: u8 = 3;
 pub(crate) const EVENT_SESSION_ENDED: u8 = 4;
 
-pub(super) fn sig_service() -> AccountNumber {
+pub(crate) fn sig_service() -> AccountNumber {
     psibase::account!("x-wrtcsig")
 }
 
-pub(super) fn is_supported_signaling_purpose(purpose: &str) -> bool {
+pub(super) fn is_supported_purpose(purpose: &str) -> bool {
     purpose == PURPOSE_CHAT_DATA || purpose == PURPOSE_AV_CALL
 }
 
-pub(super) fn query_session_auth(session_id: &str, account: AccountNumber) -> chat::SessionJoinAuth {
+pub(crate) fn query_session_auth(session_id: &str, account: AccountNumber) -> chat::SessionJoinAuth {
     Chat::call_from(sig_service()).authorizeSessionJoin(session_id.into(), account)
 }
 
-pub(crate) fn query_session_auth_for_cleanup(session_id: &str) -> chat::SessionJoinAuth {
-    query_session_auth(session_id, sig_service())
-}
-
-pub(super) fn session_err(
+pub(super) fn error_for_socket(
     socket: i32,
     code: &str,
     reason: &str,

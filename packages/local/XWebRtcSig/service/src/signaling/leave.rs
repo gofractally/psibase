@@ -3,11 +3,11 @@ use psibase::AccountNumber;
 use crate::protocol::ServerFrame;
 
 use super::constants::{
-    query_session_auth, session_err, EVENT_PARTICIPANT_LEFT, EVENT_SESSION_ENDED,
+    query_session_auth, error_for_socket, EVENT_PARTICIPANT_LEFT, EVENT_SESSION_ENDED,
     EVENT_SESSION_FAILED, PURPOSE_AV_CALL,
 };
 use super::fanout::fanout_to_participant_sockets;
-use crate::state::{erase_sig_session_join, sig_join_row, sig_joins_for_session};
+use crate::state::{clear_session_join, get_session_join, session_joins};
 
 pub(super) fn leave_event_kind(
     purpose: &str,
@@ -37,7 +37,7 @@ pub(super) fn normalize_leave_reason(reason: Option<String>) -> String {
     }
 }
 
-fn leave_session_subjective(
+fn leave_session(
     socket: i32,
     user: AccountNumber,
     session_id: String,
@@ -47,7 +47,7 @@ fn leave_session_subjective(
     let _ = now;
     let auth = query_session_auth(&session_id, user);
     if auth.purpose.is_empty() {
-        return vec![session_err(
+        return vec![error_for_socket(
             socket,
             "unknown-session",
             "unknown session",
@@ -55,8 +55,8 @@ fn leave_session_subjective(
         )];
     }
 
-    if sig_join_row(&session_id, user).is_none() {
-        return vec![session_err(
+    if get_session_join(&session_id, user).is_none() {
+        return vec![error_for_socket(
             socket,
             "not-joined",
             "not joined to this session",
@@ -64,8 +64,8 @@ fn leave_session_subjective(
         )];
     }
 
-    erase_sig_session_join(&session_id, user);
-    let joined_before = sig_joins_for_session(&session_id).len() + 1;
+    clear_session_join(&session_id, user);
+    let joined_before = session_joins(&session_id).len() + 1;
     let reason_str = normalize_leave_reason(reason);
 
     let event_kind = leave_event_kind(
@@ -74,7 +74,7 @@ fn leave_session_subjective(
         &reason_str,
         joined_before,
     );
-    crate::cleanup::purge_session_if_fully_ended(&session_id, event_kind);
+    crate::cleanup::session_purge_if_fully_ended(&session_id, event_kind);
 
     let ended = ServerFrame::SessionEnded {
         session_id: session_id.clone(),
@@ -94,7 +94,7 @@ pub fn handle_leave_session(
     now: i64,
 ) -> Vec<(i32, ServerFrame)> {
     ::psibase::subjective_tx! {
-        leave_session_subjective(socket, user, session_id.clone(), reason.clone(), now)
+        leave_session(socket, user, session_id.clone(), reason.clone(), now)
     }
 }
 
@@ -107,15 +107,15 @@ pub fn handle_participant_state(
     ::psibase::subjective_tx! {
         let auth = query_session_auth(&session_id, user);
         if !auth.authorized || auth.expired || auth.status != 1 {
-            return vec![session_err(
+            return vec![error_for_socket(
                 socket,
                 "not-participant",
                 "not authorized in this session",
                 Some(session_id),
             )];
         }
-        if sig_join_row(&session_id, user).is_none() {
-            return vec![session_err(
+        if get_session_join(&session_id, user).is_none() {
+            return vec![error_for_socket(
                 socket,
                 "not-joined",
                 "join the session before sending participant state",
@@ -123,7 +123,7 @@ pub fn handle_participant_state(
             )];
         }
 
-        let joins = sig_joins_for_session(&session_id);
+        let joins = session_joins(&session_id);
         let mut seen = std::collections::BTreeSet::new();
         let mut out = Vec::new();
         let frame = ServerFrame::ParticipantState {
