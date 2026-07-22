@@ -444,6 +444,28 @@ namespace SystemService
       /// Enable/disable resource monitoring
       void resMonitoring(bool enable);
 
+      /// Returns true if resource monitoring is enabled
+      bool isResMonitoring();
+
+      /// Suppress billing/tracking for the next `numWrites` disk writes.
+      ///
+      /// Intended for wrapping privileged-service writes that are modified
+      /// by both wasm and native code (e.g. status row). The caller is expected
+      /// to perform exactly `numWrites` writes/frees and then call `endSkipBilling`.
+      ///
+      /// Only callable by privileged services.
+      void skipBilling(uint32_t numWrites);
+
+      /// Asserts that all writes promised by `skipBilling` were consumed.
+      ///
+      /// Only callable by privileged services.
+      void endSkipBilling();
+
+      /// Attribute subsequent disk writes to the system account until `numBytes`
+      /// bytes have been written or the transaction ends. `numBytes = 0` clears
+      /// the override. Callable only by the VirtualServer service.
+      void systemWrite(uint64_t numBytes);
+
       /// Get the currently executing transaction
       psio::view<const psibase::Transaction> getTransaction() const;
 
@@ -485,6 +507,7 @@ namespace SystemService
       };
    };
    PSIO_REFLECT(Transact,
+                allowHashedMethods(),
                 method(startBoot, bootTransactions),
                 method(finishBoot),
                 method(startBlock),
@@ -497,6 +520,10 @@ namespace SystemService
                 method(runAs, action, allowedActions),
                 method(checkFirstAuth, id, transaction),
                 method(resMonitoring, enable),
+                method(isResMonitoring),
+                method(skipBilling, numWrites),
+                method(endSkipBilling),
+                method(systemWrite, numBytes),
                 method(getTransaction),
                 method(isTransaction),
                 method(currentBlock),

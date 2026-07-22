@@ -3,6 +3,7 @@ import type { TokensOutletContext } from "./layout";
 import { useCallback, useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 
+import { NoTokensWarning } from "@/apps/tokens/components/no-tokens-warning";
 import { TransferModal } from "@/apps/tokens/components/transfer-modal";
 
 import { useAppForm } from "@shared/components/form/app-form";
@@ -45,6 +46,8 @@ const TransferPageContents = () => {
         value: typeof defaultTransferValues;
         meta: { addToContacts: boolean; closeConfirmationModal: () => void };
     }) => {
+        if (!selectedToken) return;
+
         const selectedTokenId = selectedToken.id.toString();
 
         if (meta.addToContacts) {
@@ -68,7 +71,7 @@ const TransferPageContents = () => {
 
             toast("Sent", {
                 description: `Sent ${paddedAmount} ${
-                    selectedToken?.label || selectedToken?.symbol
+                    selectedToken.label || selectedToken.symbol
                 } to ${value.to.account}`,
             });
 
@@ -158,6 +161,10 @@ const TransferPageContents = () => {
         handleSetMaxAmount,
         clearAmountErrors,
     ]);
+
+    if (!selectedToken) {
+        return <NoTokensWarning />;
+    }
 
     return (
         <div className="space-y-4">

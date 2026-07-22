@@ -1,19 +1,42 @@
 #![allow(non_snake_case)]
 
+pub mod resource_type;
 pub mod rpc;
 pub mod tables;
 pub use crate::tables::DEFAULT_AUTO_FILL_THRESHOLD_PERCENT;
 
+mod billing;
 mod math_utils;
 
 mod tx_cache {
-    use psibase::AccountNumber;
+    use psibase::{abort_message, AccountNumber};
     use std::cell::{Cell, RefCell};
     use std::collections::HashMap;
+    use std::thread::LocalKey;
+
+    /// Mutably access a billing cache
+    fn with_cache<T: 'static, R>(
+        cache: &'static LocalKey<RefCell<Option<T>>>,
+        f: impl FnOnce(&mut T) -> R,
+    ) -> R {
+        cache.with_borrow_mut(|m| match m.as_mut() {
+            Some(inner) => f(inner),
+            None => abort_message("resource billing attempted during end-of-tx settlement"),
+        })
+    }
+
+    /// Drain a billing cache, subsequent access panics.
+    fn drain_cache<T: 'static>(cache: &'static LocalKey<RefCell<Option<T>>>) -> T {
+        cache.with_borrow_mut(|m| match m.take() {
+            Some(inner) => inner,
+            None => abort_message("resource billing attempted during end-of-tx settlement"),
+        })
+    }
 
     thread_local! {
         static BILLABLE_ACCOUNT: Cell<Option<AccountNumber>> = const { Cell::new(None) };
         static BILL_TO_SUB: RefCell<Option<HashMap<AccountNumber, String>>> = const { RefCell::new(None) };
+        static DISK_NET: RefCell<Option<HashMap<AccountNumber, (i64, i64)>>> = const { RefCell::new(None) };
     }
 
     pub fn get_billable_account() -> Option<AccountNumber> {
@@ -34,23 +57,309 @@ mod tx_cache {
                 .insert(user, sub_account);
         });
     }
+
+    pub fn add_disk_usage(user: AccountNumber, amount_bytes: i64, cost: i64) {
+        DISK_NET.with_borrow_mut(|map| {
+            let entry = map
+                .get_or_insert_with(HashMap::new)
+                .entry(user)
+                .or_insert((0, 0));
+            entry.0 = entry
+                .0
+                .checked_add(amount_bytes)
+                .unwrap_or_else(|| abort_message("disk usage amount overflow"));
+            entry.1 = entry
+                .1
+                .checked_add(cost)
+                .unwrap_or_else(|| abort_message("disk usage cost overflow"));
+        });
+    }
+
+    pub fn drain_disk_usage() -> Vec<(AccountNumber, i64, i64)> {
+        DISK_NET.with_borrow_mut(|map| {
+            map.take()
+                .map(|m| m.into_iter().map(|(k, (a, c))| (k, a, c)).collect())
+                .unwrap_or_default()
+        })
+    }
+
+    /// Cache of account resource balances.
+    /// We track updates to user resources in the cache so we can do a settlement of the actual token
+    /// balances once at the end of the transaction.
+    pub mod balance_cache {
+        use crate::tables::tables::UserSettings;
+        use crate::tx_cache::{drain_cache, with_cache};
+        use psibase::services::tokens::Quantity;
+        use psibase::{abort_message, AccountNumber};
+        use std::cell::RefCell;
+        use std::collections::HashMap;
+
+        type Payer = (AccountNumber, Option<String>);
+
+        #[derive(Clone, Copy)]
+        struct Balance {
+            available: i128,
+            initial: i128,
+        }
+
+        impl Balance {
+            fn from_live((account, sub): &Payer) -> Self {
+                let value = UserSettings::get_resource_balance(*account, sub.clone()).value as i128;
+                Balance {
+                    available: value,
+                    initial: value,
+                }
+            }
+
+            // The amount to settle
+            fn delta(self) -> i128 {
+                self.available - self.initial
+            }
+        }
+
+        thread_local! {
+            static BALANCES: RefCell<Option<HashMap<Payer, Balance>>> =
+                RefCell::new(Some(HashMap::new()));
+        }
+
+        fn with<R>(f: impl FnOnce(&mut HashMap<Payer, Balance>) -> R) -> R {
+            with_cache(&BALANCES, f)
+        }
+
+        /// Applies `delta` to the payer's balance, aborts on overdraft.
+        fn adjust(account: AccountNumber, sub: Option<String>, delta: i128) {
+            with(|m| {
+                let bal = m
+                    .entry((account, sub.clone()))
+                    .or_insert_with_key(Balance::from_live);
+                bal.available += delta;
+                if bal.available < 0 {
+                    let who = UserSettings::to_sub_account_key(account, sub);
+                    abort_message(&format!("{} has insufficient resource balance", who));
+                }
+            });
+        }
+
+        pub fn charge(account: AccountNumber, sub: Option<String>, cost: u64) {
+            adjust(account, sub, -(cost as i128));
+        }
+
+        pub fn refund(account: AccountNumber, sub: Option<String>, amount: u64) {
+            adjust(account, sub, amount as i128);
+        }
+
+        /// Returns whether the payer already has a pending accrual in this tx.
+        pub fn has_pending(account: AccountNumber, sub: Option<String>) -> bool {
+            with(|m| m.contains_key(&(account, sub)))
+        }
+
+        /// The current resource balance for the specified account.
+        ///
+        /// Caches on cache-miss.
+        pub fn get_available(account: AccountNumber, sub: Option<String>) -> Quantity {
+            with(|m| {
+                let bal = m
+                    .entry((account, sub))
+                    .or_insert_with_key(Balance::from_live);
+                Quantity::new(bal.available.max(0) as u64)
+            })
+        }
+
+        /// Handles mid-tx resource purchase/deletion.
+        /// Shifts available+initial together so the delta is unchanged but the new balance is spendable.
+        /// No-op if the account hasn't yet been touched for billing.
+        pub fn update_balance(account: AccountNumber, sub: Option<String>, delta: i128) {
+            with(|m| {
+                if let Some(bal) = m.get_mut(&(account, sub)) {
+                    bal.available += delta;
+                    bal.initial += delta;
+                }
+            });
+        }
+
+        pub fn drain_balances() -> Vec<(Payer, i128)> {
+            drain_cache(&BALANCES)
+                .into_iter()
+                .map(|(payer, b)| (payer, b.delta()))
+                .collect()
+        }
+    }
+
+    /// Per-tx billing accrual, settled at end of tx
+    pub mod accrual {
+        fn is_system_user(user: psibase::AccountNumber) -> bool {
+            user == psibase::AccountNumber::new(0)
+        }
+
+        /// Rate-limited resources: consumption cost is directly credited to the fee receiver.
+        pub mod rate_limited {
+            use super::is_system_user;
+            use crate::resource_type::ResourceType;
+            use crate::tx_cache::{balance_cache, drain_cache, with_cache};
+            use psibase::AccountNumber;
+            use std::cell::RefCell;
+            use std::collections::HashMap;
+
+            #[derive(Default)]
+            pub struct Accrual {
+                pub fee: u64,
+            }
+
+            thread_local! {
+                static STATE: RefCell<Option<HashMap<ResourceType, Accrual>>> =
+                    RefCell::new(Some(HashMap::new()));
+            }
+
+            pub fn consume(
+                resource: ResourceType,
+                user: AccountNumber,
+                sub: Option<String>,
+                cost: u64,
+            ) {
+                if cost == 0 {
+                    return;
+                }
+                if is_system_user(user) {
+                    psibase::abort_message("System user consumes rate-limited resources!");
+                }
+                balance_cache::charge(user, sub, cost);
+                with_cache(&STATE, |m| m.entry(resource).or_default().fee += cost);
+            }
+
+            pub fn drain() -> Vec<(ResourceType, Accrual)> {
+                drain_cache(&STATE).into_iter().collect()
+            }
+        }
+
+        /// Capacity-limited resources: consumption cost is sent as a reserve into a relay. When freed, relay refund is split between
+        /// the user and the fee receiver.
+        ///
+        /// In rare cases (system writes or writes when billing is disabled), the relay may become under-collateralized. In such cases,
+        /// tokens that would be sent to the fee receiver are instead used to recollateralize the relay.
+        pub mod capacity_limited {
+            use super::is_system_user;
+            use crate::resource_type::ResourceType;
+            use crate::tables::capacity_limit_pricing::relay_sub_account;
+            use crate::tables::tables::CapacityPricing;
+            use crate::tx_cache::{balance_cache, drain_cache, with_cache};
+            use crate::Wrapper;
+            use psibase::AccountNumber;
+            use std::cell::RefCell;
+            use std::collections::HashMap;
+
+            #[derive(Default)]
+            pub struct Accrual {
+                pub relay_delta: i128,
+                pub fee: u64,
+            }
+
+            thread_local! {
+                static STATE: RefCell<Option<HashMap<ResourceType, Accrual>>> =
+                    RefCell::new(Some(HashMap::new()));
+            }
+
+            fn with<R>(resource: ResourceType, f: impl FnOnce(&mut Accrual) -> R) -> R {
+                with_cache(&STATE, |m| f(m.entry(resource).or_default()))
+            }
+
+            pub fn get_collateral(resource: ResourceType) -> u64 {
+                let sub = relay_sub_account(resource);
+                let actual = balance_cache::get_available(Wrapper::SERVICE, sub).value as i128;
+                let pending = with(resource, |a| a.relay_delta);
+                (actual + pending).max(0) as u64
+            }
+
+            pub fn consume(
+                resource: ResourceType,
+                user: AccountNumber,
+                sub: Option<String>,
+                cost: u64,
+            ) {
+                if is_system_user(user) || cost == 0 {
+                    return;
+                }
+                balance_cache::charge(user, sub, cost);
+                with(resource, |a| a.relay_delta += cost as i128);
+            }
+
+            pub fn free(
+                resource: ResourceType,
+                user: AccountNumber,
+                sub: Option<String>,
+                user_refund: u64,
+                fee: u64,
+            ) -> u64 {
+                let total_out = user_refund + fee;
+                if is_system_user(user) || total_out == 0 {
+                    return 0;
+                }
+                let collateral = get_collateral(resource);
+                let refund = user_refund.min(collateral);
+
+                // Fee only comes from collateral beyond the refund and what the curve must keep.
+                let required_reserve = CapacityPricing::get_assert(resource).required_reserve();
+                let fee = fee.min(collateral.saturating_sub(refund + required_reserve));
+
+                with(resource, |a| {
+                    a.relay_delta -= (refund + fee) as i128;
+                    a.fee += fee;
+                });
+                if refund > 0 {
+                    balance_cache::refund(user, sub, refund);
+                }
+                refund
+            }
+
+            pub fn drain() -> Vec<(ResourceType, Accrual)> {
+                drain_cache(&STATE).into_iter().collect()
+            }
+        }
+    }
 }
 
-/// Virtual Server Service
+/// # Virtual Server Service
 ///
-/// This service defines a "virtual server" that represents the "server" with which
-/// a user interacts when they connect to any full node on the network.
+/// This service defines a "virtual server" that represents the subset of a real server that
+/// a node operator dedicates to running their network node. A user then interacts with one
+/// or more virtual servers that are peered together to form a network. The network has
+/// effective specifications that are derived from (and necessarily lower than) the virtual
+/// server specs. The difference in specs comes from various overhead costs incurred by the
+/// management of the network.
 ///
-/// This service distinguishes between the specs of the network itself, and
-/// the specs of an individual node that runs the virtual server. The actual node
-/// specs must meet or exceed the specs defined for the virtual server. And the
-/// derived network specs will always be less than the virtual server specs to account
-/// for various overheads (e.g. from running a distributed network, desired replay
-/// speed, etc).
+/// Example diagram:
 ///
-/// This service also defines a billing system that allows for the network to meter
-/// the consumption of resources by users. A user must send system tokens to this service,
-/// which are then held in reserve for the user.
+/// .------------------------.  .------------------------.  .------------------------.
+/// |     Actual Server 1    |  |     Actual Server 2    |  |     Actual Server 3    |
+/// |                        |  |                        |  |                        |
+/// |    100 Gbps network    |  |    50 Gbps network     |  |    100 Gbps network    |
+/// |       2 TB disk        |  |       1 TB disk        |  |      300 GB disk       |
+/// |                        |  |                        |  |                        |
+/// | .--------------------. |  | .--------------------. |  | .--------------------. |
+/// | |  Virtual Server 1  | |  | |  Virtual Server 2  | |  | |  Virtual Server 3  | |
+/// | |  10 Gbps network   | |  | |  10 Gbps network   | |  | |  10 Gbps network   | |
+/// | |    100 GB disk     | |  | |    100 GB disk     | |  | |    100 GB disk     | |
+/// | '---------+----------' |  | '---------+----------' |  | '---------+----------' |
+/// '-----------|------------'  '-----------|------------'  '-----------|------------'
+///             |                           |                           |
+///             |                           V                           |
+///             |        .--------------------------------------.       |
+///             |        |               Network                |       |
+///             +------->|  .--------------------------------.  |<------+
+///                      |  |            1 Gbps              |  |
+///                      |  |    50 GB replicated storage    |  |
+///                      |  |    50 GB node-local storage    |  |
+///                      |  '-------------------------------'   |
+///                      '-------------------^------------------'
+///                                          |
+///                                          v
+///                                    .-----------.
+///                                    |   User    |
+///                                    '-----------'
+///
+/// This service also manages monitoring all of the network's resource consumption, and exposes
+/// an interface that can be used to tune a billing system for rate-limiting per-account resource
+/// consumption. Users can send system tokens into a "reserve" that can be subsequently redeemed for
+/// resource consumption.
 ///
 /// As physical resources (CPU, disk space, network bandwidth, etc.) are consumed, the
 /// real-time price of the resource is billed to the user's reserved balance. Reserved system
@@ -68,9 +377,9 @@ mod tx_cache {
 /// 2 - Call `init_billing`: Initializes the billing system. To call this, the system token
 ///     must have already been set in the `Tokens` service. The specified `fee_receiver` will
 ///     receive all of the system token fees paid for resources by users.
-/// 3 - Call `enable_billing`: When ready (when existing users have accumulated system tokens),
-///     calling this action will enable the billing system. To call this, the caller must have
-///     already filled their resource buffer because the action to enable billing is itself billed.
+/// 3 - Call `enable_billing`: When ready, calling this action enables the
+///     billing system. The caller must have already filled their resource buffer because
+///     this action is itself billed.
 ///
 /// > Note: typically, step 1 should be called at system boot, and therefore the network should
 /// >       always at least have some server specs and derived network specs.
@@ -78,10 +387,71 @@ mod tx_cache {
 /// After each of the above steps, the billing service will be enabled, and users will be
 /// required to buy resources to transact with the network. Use the other actions in this
 /// service to manage server specs, network variables, and billing parameters, as needed.
+///
+/// ## Curve under-collateralization
+///
+/// Capacity limited resources are managed via a constant-product curve that reports the quantity
+/// of reserve tokens required to be held as collateral for the current utilization levels of the
+/// resource.
+///
+/// This service attempts to balance the required collateral as reported by the state of the curve
+/// with the actual collateral as measured by the relay subaccount token balance. The curve for a
+/// capacity-limited resource can be undercollateralized in certain well-defined scenarios (e.g.
+/// consumption before billing is enabled).
+///
+/// An undercollateralized curve recollateralizes as users free bytes: a free sells bytes
+/// back to the relay, reducing the required reserve. The user's refund is still paid (if
+/// collateral allows), but the fee portion is retained in the curve rather than paid out.
+/// The fee receiver is paid only once the curve is fully collateralized.
+///
+/// Example disk recollateralization flow diagram (simplified for clarity) for a transaction that
+/// frees bytes:
+///
+/// ```text
+///                                                                 Example values:
+///                                                                 Total collateral: $15
+///                                                                 Required reserve: $100
+///
+///            .---------------.
+///           (   free bytes    )                                   Total free: $20
+///            '-------+-------'                                    Required reserve: $80
+///                    |
+///                    v
+///      +--------------------------+
+///      |  Split gross-refund into |                               Refund: $10
+///      |  refund + fee            |                               Fee: $10
+///      +----+----------------+----+
+///           |                |
+///           |                v
+///           |     +-------------------------------+
+///           |     | Calculate final refund:       |               Final refund:
+///           |     | min(refund, collateral)       |               min(10, 15) = $10
+///           |     +-----+-------------+-----------+
+///           |           |             |
+///           |           |             v
+///           |           |      +---------------------------+
+///           |           |      | Send final refund to user |
+///           |           |      +---------------------------+
+///           v           v
+///      +----------------------------------------------------+
+///      | Calculate final fee:                               |     Final fee:
+///      | Final fee can only come from collateral left over  |     min(fee, max(collateral - final refund - required reserve, 0))
+///      | after the refund and the curve's required reserve. |     min(10, max(15 - 10 - 80, 0)) = $0
+///      +-----------------+----------------------------------+
+///                        |
+///                        v
+///        +--------------------------------+
+///        | Send final fee to fee receiver |
+///        +--------------------------------+          
+/// ```
+///
 #[psibase::service(name = "vserver", recursive = "true", tables = "tables::tables")]
 mod service {
+    use crate::billing;
     use crate::tables::tables::{UserSettings, *};
     use crate::tx_cache;
+    use crate::tx_cache::accrual;
+    use crate::tx_cache::balance_cache;
     use psibase::services::events;
     use psibase::services::{
         accounts::Wrapper as Accounts,
@@ -93,28 +463,42 @@ mod service {
     use psibase::{abort_message, *};
     use std::cmp::min;
 
-    // Resource type IDs
-    pub mod resources {
-        pub const CPU: u8 = 0;
-        pub const NET: u8 = 1;
-        pub const _STORAGE: u8 = 2;
-    }
-    use resources::{CPU, NET};
+    use crate::resource_type::ResourceType;
+    use ResourceType::{Cpu, Disk, Net};
 
-    pub fn get_resource_name(resource_id: u8) -> &'static str {
-        match resource_id {
-            CPU => "CPU",
-            NET => "Net",
-            _ => "UnknownResource",
+    /// Sum of every row's `key + value` bytes in a database.
+    fn db_used_bytes(db: DbId) -> u64 {
+        let handle = KvHandle::open_direct(db, &[], KvMode::Read);
+        let mut total: u64 = 0;
+        let mut key: Vec<u8> = Vec::new();
+        while let Some(value_size) = kv_greater_equal_value_size(&handle, &key, 0) {
+            key = get_key_bytes();
+            total += key.len() as u64 + value_size as u64;
+            key.push(0); // advance the cursor past the matched key
         }
+        total
     }
 
-    pub fn get_measurement_unit(resource_id: u8) -> &'static str {
-        match resource_id {
-            CPU => "ns",
-            NET => "bytes",
-            _ => "UnknownUnit",
-        }
+    fn status_row_bytes() -> u64 {
+        let native = KvHandle::open_direct(DbId::Native, &[], KvMode::Read);
+        let key = status_key().to_key();
+        kv_get_bytes(&native, &key)
+            .map(|value| key.len() as u64 + value.len() as u64)
+            .unwrap_or(0)
+    }
+
+    fn get_prealloc() -> u64 {
+        let native = db_used_bytes(DbId::Native);
+        let service = db_used_bytes(DbId::Service);
+        let status = status_row_bytes();
+        native + service - status
+    }
+
+    /// Exact on-disk footprint (`key + value`) of a single fixed-width table row.
+    fn row_size<R: TableRecord, T: Table<R>>(table: &T, sample: &R) -> u64 {
+        let prefix = (T::SERVICE, T::TABLE_INDEX).to_key();
+        let key = table.serialize_key(0, &sample.get_primary_key());
+        (prefix.len() + key.data.len() + sample.packed().len()) as u64
     }
 
     #[action]
@@ -123,24 +507,55 @@ mod service {
             return;
         }
 
-        InitRow::init();
-
         Nft::call().setUserConf(NftHolderFlags::AUTO_DEBIT.index(), false);
         Tokens::call().setUserConf(BalanceFlags::AUTO_DEBIT.index(), false);
-        Wrapper::call().set_specs(MIN_SERVER_SPECS);
-        Transact::call().resMonitoring(true);
+        Tokens::call().setUserConf(BalanceFlags::KEEP_ZERO_BALANCE.index(), true);
 
         // Initialize network resource consumption tracking
-        BandwidthPricing::initialize(NET, 5, 600, 1800, 8);
-        BandwidthPricing::initialize(CPU, 5, 600, 1800, 1_000_000);
+        RateLimitPricing::initialize(Net, 5, 600, 1800, 8);
+        RateLimitPricing::initialize(Cpu, 5, 600, 1800, 1_000_000);
+
+        // Create a few records before scanning for preallocated db usage
+        CapacityPricing::create_relay(Disk);
+        Transact::call().resMonitoring(false);
+
+        // `InitRow`, `NetworkSpecs`, and `CapacityPricing` are necessarily written
+        // after the db scan, and before resMonitoring is enabled. Therefore we must
+        // explicitly add their exact footprints into the prealloc.
+        let prealloc = get_prealloc()
+            + row_size(&InitTable::new(), &InitRow::default())
+            + row_size(&NetworkSpecsTable::new(), &NetworkSpecs::default())
+            + row_size(&CapacityPricingTable::new(), &CapacityPricing::default());
+
+        InitRow::init(prealloc);
+
+        // Must run after `InitRow::init` because it transitively depends on `InitRow::used_bytes()`
+        NetworkSpecs::update();
+        let billable_obj_storage = NetworkSpecs::get_assert().obj_storage_bytes;
+
+        // Disk capacity pricing parameters:
+        //   `DISK_CURVE_D` controls the aggressiveness of the constant-product curve.
+        //   Smaller values make pricing flatter near the endpoints; larger values
+        //   make pricing steeper.
+        const DISK_CURVE_D: u64 = 15;
+        // Refund fee in ppm: 50% of any disk refund is paid to the fee receiver.
+        const DISK_FEE_PPM: u32 = 500_000;
+        CapacityPricing::initialize(Disk, billable_obj_storage, DISK_CURVE_D, DISK_FEE_PPM);
+
+        Transact::call().resMonitoring(true);
 
         // Event indexes
         events::Wrapper::call().addIndex(EventDb::HistoryEvent, SERVICE, method!("consumed"), 0);
         events::Wrapper::call().addIndex(EventDb::HistoryEvent, SERVICE, method!("subsidized"), 0);
         events::Wrapper::call().addIndex(EventDb::HistoryEvent, SERVICE, method!("subsidized"), 1);
 
-        // TODO: Iterate over the system service tables and aggregate code rows as pre-allocated objective disk space
-        // (the accounts service init already does such iterating, use as reference.)
+        CapacityPricing::get_assert(Disk).consume(prealloc);
+        Wrapper::emit().history().consumed(
+            AccountNumber::new(0),
+            Disk.as_id(),
+            to_i64(prealloc, "preallocated disk space"),
+            0,
+        );
     }
 
     #[pre_action(exclude(init))]
@@ -150,8 +565,7 @@ mod service {
 
     /// Initializes the billing system
     ///
-    /// If no specs are provided, some default specs are used that define a server
-    ///   with minimal specs.
+    /// The `fee_receiver` account will receive all resource billing fees.
     ///
     /// After calling this action, the billing system is NOT yet enabled. The
     /// `enable_billing` action must be called explicitly to enable user billing.
@@ -161,6 +575,11 @@ mod service {
         assert!(Accounts::call().exists(fee_receiver), "Fee_receiver DNE");
 
         BillingConfig::initialize(fee_receiver);
+
+        let max_supply = BillingConfig::get_sys_token().max_issued_supply.value;
+
+        let pricing = CapacityPricing::get_assert(Disk);
+        pricing.reduce_reserve_budget(pricing.max_reserve - max_supply);
     }
 
     /// Get the account that receives all resource billing fees
@@ -178,7 +597,7 @@ mod service {
         assert_eq!(get_sender(), get_service(), "Unauthorized");
 
         ServerSpecs::set(&specs);
-        NetworkSpecs::set_from(&specs);
+        NetworkSpecs::update();
     }
 
     /// These variables change how the network specs are derived from the server
@@ -194,18 +613,18 @@ mod service {
         assert_eq!(get_sender(), get_service(), "Unauthorized");
 
         NetworkVariables::set(&variables);
+        NetworkSpecs::update();
+
+        CapacityPricing::get_assert(Disk)
+            .set_capacity(NetworkSpecs::get_assert().obj_storage_bytes);
     }
 
-    /// Enable or disable the billing system
-    ///
-    /// If billing is disabled, resource consumption will still be tracked, but the resources will
-    /// not be automatically metered by the network. This is insecure and allows users to abuse
-    /// the network by consuming all of the network's resources.
+    /// Enable the billing system
     #[action]
-    fn enable_billing(enabled: bool) {
+    fn enable_billing() {
         assert_eq!(get_sender(), get_service(), "Unauthorized");
 
-        BillingConfig::enable(enabled);
+        BillingConfig::enable();
     }
 
     /// Returns whether the billing system has been enabled
@@ -232,6 +651,7 @@ mod service {
 
         Tokens::call().debit(sys, buyer, amount, "".into());
         Tokens::call().toSub(sys, for_user.to_string(), amount);
+        balance_cache::update_balance(for_user, None, amount.value as i128);
 
         if buyer != for_user {
             // No need for a subsidy event if user == buyer because it's not a subsidy and the purchase
@@ -263,45 +683,43 @@ mod service {
         Tokens::call().debit(sys, buyer, amount, "".into());
         Tokens::call().toSub(
             sys,
-            UserSettings::to_sub_account_key(buyer, &sub_account),
+            UserSettings::to_sub_account_key(buyer, Some(sub_account.clone())),
             amount,
         );
+        balance_cache::update_balance(buyer, Some(sub_account), amount.value as i128);
     }
 
     /// Deletes the resource subaccount, returning the resources back to the caller's primary
     /// resource balance.
     #[action]
     fn del_res_sub(sub_account: String) {
-        let config = BillingConfig::get();
-        if config.is_none() {
+        let Some(config) = BillingConfig::get() else {
             return;
-        }
-        let sys = config.unwrap().sys;
+        };
+        let sys = config.sys;
 
         let sender = get_sender();
+
+        // Cannot delete a sub-account that has pending billing
+        assert_eq!(
+            false,
+            balance_cache::has_pending(sender, Some(sub_account.clone())),
+            "cannot delete a sub-account that has pending billing this transaction",
+        );
+
         let Some(balance) =
             UserSettings::get_resource_balance_opt(sender, Some(sub_account.clone()))
         else {
             return;
         };
 
-        let sub_account = UserSettings::to_sub_account_key(sender, &sub_account);
         if balance.value != 0u64 {
-            Tokens::call().fromSub(sys, sub_account.clone(), balance);
+            let sub_key = UserSettings::to_sub_account_key(sender, Some(sub_account.clone()));
+            Tokens::call().fromSub(sys, sub_key, balance);
             Tokens::call().toSub(sys, sender.to_string(), balance);
+            balance_cache::update_balance(sender, Some(sub_account), -(balance.value as i128));
+            balance_cache::update_balance(sender, None, balance.value as i128);
         }
-    }
-
-    /// Gets the amount of resources available for the caller
-    #[action]
-    fn res_balance() -> Quantity {
-        UserSettings::get_resource_balance(get_sender(), None)
-    }
-
-    /// Gets the amount of resources available for the caller's specified sub-account
-    #[action]
-    fn res_balance_sub(sub_account: String) -> Quantity {
-        UserSettings::get_resource_balance(get_sender(), Some(sub_account.clone()))
     }
 
     /// Reserves system tokens for future resource consumption by the sender
@@ -329,6 +747,14 @@ mod service {
         );
 
         let sender = get_sender();
+
+        // Warning: This `get_resource_balance_opt` call calls into the tokens service. Therefore the
+        // tokens service is currently not allowed to use `bill_to_sub`` since it is not re-entrant.
+        assert!(
+            UserSettings::get_resource_balance_opt(sender, Some(sub_account.clone())).is_some(),
+            "Billable sub-account does not exist",
+        );
+
         tx_cache::set_sub(sender, sub_account.clone());
 
         if sender == billable_account {
@@ -351,7 +777,7 @@ mod service {
     /// Returns the current cost of a typically sized resource buffer
     #[action]
     fn std_buffer_cost() -> Quantity {
-        return Quantity::new(UserSettings::get_default_buffer_capacity());
+        Quantity::new(UserSettings::get_default_buffer_capacity())
     }
 
     /// Set the network bandwidth pricing thresholds
@@ -369,7 +795,7 @@ mod service {
     #[action]
     fn net_thresholds(idle_ppm: u32, congested_ppm: u32) {
         assert_eq!(get_sender(), get_service(), "Unauthorized");
-        BandwidthPricing::get_assert(NET).set_thresholds(idle_ppm, congested_ppm);
+        RateLimitPricing::get_assert(Net).set_thresholds(idle_ppm, congested_ppm);
     }
 
     /// Set the network bandwidth price change rates
@@ -383,7 +809,7 @@ mod service {
     #[action]
     fn net_rates(doubling_time_sec: u32, halving_time_sec: u32) {
         assert_eq!(get_sender(), get_service(), "Unauthorized");
-        BandwidthPricing::get_assert(NET).set_change_rates(doubling_time_sec, halving_time_sec);
+        RateLimitPricing::get_assert(Net).set_change_rates(doubling_time_sec, halving_time_sec);
     }
 
     /// Sets the number of blocks over which to compute the average network usage.
@@ -393,7 +819,7 @@ mod service {
     fn net_blocks_avg(num_blocks: u8) {
         assert_eq!(get_sender(), get_service(), "Unauthorized");
         assert!(num_blocks > 0, "Number of blocks must be greater than 0");
-        BandwidthPricing::get_assert(NET).set_num_blocks_to_average(num_blocks);
+        RateLimitPricing::get_assert(Net).set_num_blocks_to_average(num_blocks);
     }
 
     /// Sets the size of the billable unit of network bandwidth.
@@ -402,22 +828,28 @@ mod service {
     #[action]
     fn net_min_unit(bits: u64) {
         assert_eq!(get_sender(), get_service(), "Unauthorized");
-        BandwidthPricing::get_assert(NET).set_billable_unit(bits);
+        RateLimitPricing::get_assert(Net).set_billable_unit(bits);
     }
 
     /// Returns the current cost (in system tokens) of consuming the specified amount of network
     /// bandwidth
     #[action]
     fn get_net_cost(bytes: u64) -> Quantity {
-        let bits = bytes * 8;
-        let Some(pricing) = BandwidthPricing::get(NET) else {
+        let bits = bytes
+            .checked_mul(8)
+            .unwrap_or_else(|| abort_message("get_net_cost: overflow"));
+        let Some(pricing) = RateLimitPricing::get(Net) else {
             return Quantity::new(0);
         };
 
         let billable_unit = pricing.get_billable_unit();
-        let amount_units = (bits + billable_unit - 1) / billable_unit;
+        let amount_units = bits.div_ceil(billable_unit);
 
-        Quantity::new(pricing.price() * amount_units)
+        let cost = pricing
+            .price()
+            .checked_mul(amount_units)
+            .unwrap_or_else(|| abort_message("get_net_cost: overflow"));
+        Quantity::new(cost)
     }
 
     /// Set the CPU pricing thresholds
@@ -435,7 +867,7 @@ mod service {
     #[action]
     fn cpu_thresholds(idle_ppm: u32, congested_ppm: u32) {
         assert_eq!(get_sender(), get_service(), "Unauthorized");
-        BandwidthPricing::get_assert(CPU).set_thresholds(idle_ppm, congested_ppm);
+        RateLimitPricing::get_assert(Cpu).set_thresholds(idle_ppm, congested_ppm);
     }
 
     /// Set the CPU price change rates
@@ -449,7 +881,7 @@ mod service {
     #[action]
     fn cpu_rates(doubling_time_sec: u32, halving_time_sec: u32) {
         assert_eq!(get_sender(), get_service(), "Unauthorized");
-        BandwidthPricing::get_assert(CPU).set_change_rates(doubling_time_sec, halving_time_sec);
+        RateLimitPricing::get_assert(Cpu).set_change_rates(doubling_time_sec, halving_time_sec);
     }
 
     /// Sets the number of blocks over which to compute the average CPU usage.
@@ -459,7 +891,7 @@ mod service {
     fn cpu_blocks_avg(num_blocks: u8) {
         assert_eq!(get_sender(), get_service(), "Unauthorized");
         assert!(num_blocks > 0, "Number of blocks must be greater than 0");
-        BandwidthPricing::get_assert(CPU).set_num_blocks_to_average(num_blocks);
+        RateLimitPricing::get_assert(Cpu).set_num_blocks_to_average(num_blocks);
     }
 
     /// Sets the size of the billable unit of CPU time.
@@ -468,25 +900,55 @@ mod service {
     #[action]
     fn cpu_min_unit(ns: u64) {
         assert_eq!(get_sender(), get_service(), "Unauthorized");
-        BandwidthPricing::get_assert(CPU).set_billable_unit(ns);
+        RateLimitPricing::get_assert(Cpu).set_billable_unit(ns);
     }
 
     /// Returns the current cost (in system tokens) of consuming the specified amount of
     /// CPU time
     #[action]
     fn get_cpu_cost(ns: u64) -> Quantity {
-        let Some(pricing) = BandwidthPricing::get(CPU) else {
+        let Some(pricing) = RateLimitPricing::get(Cpu) else {
             return Quantity::new(0);
         };
 
         let billable_unit = pricing.get_billable_unit();
-        let amount_units = (ns + billable_unit - 1) / billable_unit;
+        let amount_units = ns.div_ceil(billable_unit);
 
-        Quantity::new(pricing.price() * amount_units)
+        let cost = pricing
+            .price()
+            .checked_mul(amount_units)
+            .unwrap_or_else(|| abort_message("get_cpu_cost: overflow"));
+        Quantity::new(cost)
     }
 
     fn to_i64(amount: u64, context: &str) -> i64 {
         i64::try_from(amount).unwrap_or_else(|_| abort_message(&format!("{} overflow", context)))
+    }
+
+    /// Reduce the disk-pricing reserve budget by `delta_supply`.
+    ///
+    /// The reserve budget caps the system tokens that may be sold into the disk-pricing
+    /// relay. Reducing it lowers the spot price of disk.
+    #[action]
+    fn reduce_disk_budget(delta_supply: Quantity) {
+        assert_eq!(get_sender(), get_service(), "Unauthorized");
+        CapacityPricing::get_assert(Disk).reduce_reserve_budget(delta_supply.value);
+    }
+
+    /// Returns the current cost of consuming the specified number of bytes
+    #[action]
+    fn get_disk_cost(bytes: u64) -> Quantity {
+        CapacityPricing::get(Disk)
+            .map(|p| p.get_cost(bytes))
+            .unwrap_or(Quantity::new(0))
+    }
+
+    /// Gets the estimated refund amount for freeing the specified number of bytes
+    #[action]
+    fn disk_ref_quote(bytes: u64) -> Quantity {
+        CapacityPricing::get(Disk)
+            .map(|p| p.refund_quote(bytes))
+            .unwrap_or(Quantity::new(0))
     }
 
     /// Called by the system to indicate that the specified user has consumed a
@@ -499,18 +961,16 @@ mod service {
         assert_eq!(get_sender(), Transact::SERVICE, "[useNetSys] Unauthorized");
 
         let amount_bits = amount_bytes.checked_mul(8).expect("network usage overflow");
-        let cost = BandwidthPricing::get_assert(NET).consume(
-            amount_bits,
-            user,
-            tx_cache::get_sub(user),
-            is_billing_enabled(),
-        );
+        let sub = tx_cache::get_sub(user);
+        let raw_cost = RateLimitPricing::get_assert(Net).consume(amount_bits);
+        let cost = if is_billing_enabled() { raw_cost } else { 0 };
+        accrual::rate_limited::consume(Net, user, sub, cost);
 
         let amount = to_i64(amount_bytes, "Consumed network bandwidth");
         let cost = to_i64(cost, "Consumed network bandwidth cost");
         Wrapper::emit()
             .history()
-            .consumed(user, resources::NET, amount, cost);
+            .consumed(user, Net.as_id(), amount, cost);
     }
 
     /// Called by the system to indicate that the specified user has consumed a
@@ -522,18 +982,109 @@ mod service {
     fn useCpuSys(user: AccountNumber, amount_ns: u64) {
         assert_eq!(get_sender(), Transact::SERVICE, "[useCpuSys] Unauthorized");
 
-        let cost = BandwidthPricing::get_assert(CPU).consume(
-            amount_ns,
-            user,
-            tx_cache::get_sub(user),
-            is_billing_enabled(),
-        );
+        let sub = tx_cache::get_sub(user);
+        let raw_cost = RateLimitPricing::get_assert(Cpu).consume(amount_ns);
+        let cost = if is_billing_enabled() { raw_cost } else { 0 };
+        accrual::rate_limited::consume(Cpu, user, sub, cost);
 
         let amount = to_i64(amount_ns, "Consumed CPU");
         let cost = to_i64(cost, "Consumed CPU cost");
+
         Wrapper::emit()
             .history()
-            .consumed(user, resources::CPU, amount, cost);
+            .consumed(user, Cpu.as_id(), amount, cost);
+    }
+
+    /// A notification called at the end of a transaction in which to do any final
+    /// per-tx accounting or cleanup.
+    #[action]
+    fn finishTx() {
+        assert_eq!(get_sender(), Transact::SERVICE, "[finishTx] Unauthorized");
+
+        for (disk_user, disk_amount, disk_cost) in tx_cache::drain_disk_usage() {
+            if disk_amount == 0 && disk_cost == 0 {
+                continue;
+            }
+            Wrapper::emit()
+                .history()
+                .consumed(disk_user, Disk.as_id(), disk_amount, disk_cost);
+        }
+
+        billing::reconcile();
+    }
+
+    /// Called by the system when `user` causes a write to any database.
+    ///
+    /// `amount_bytes` is positive for consumption and negative for a free
+    ///
+    /// If billing is enabled, the user may be billed from (or refunded to)
+    ///   their resource buffer, depending on the specified database and the
+    ///  amount of bytes consumed/freed.
+    #[action]
+    fn useDiskSys(user: AccountNumber, db_id: psibase::DbId, amount_bytes: i64) {
+        // [WARNING]
+        //
+        // Unlike `useCpuSys` and `useNetSys`, `useDiskSys` is called in real time during the
+        // execution of the user's transaction. For that reason, any inline action calls that
+        // are made in this action may cause recursion into that foreign service whenever that
+        // service itself updates database records.
+        //
+        // Therefore, we must be very careful if we are introducing inline action calls to other
+        // services in this action.
+        //
+        // Currently, the only potential foreign service call in this action is the call to
+        // `Tokens::getSubBal` on balance_cache cache misses. For that reason, billable resource
+        // token balances are pre-warmed during the pre-tx initialization.
+
+        assert_eq!(get_sender(), Transact::SERVICE, "[useDiskSys] Unauthorized");
+
+        if amount_bytes == 0 {
+            return;
+        }
+
+        let billing = is_billing_enabled();
+        let sub = tx_cache::get_sub(user);
+
+        let cost = match db_id {
+            DbId::Service | DbId::Native => {
+                if amount_bytes > 0 {
+                    let c = CapacityPricing::get_assert(Disk).consume(amount_bytes as u64);
+                    if billing {
+                        accrual::capacity_limited::consume(Disk, user, sub, c);
+                        to_i64(c, "Disk consume cost")
+                    } else {
+                        0
+                    }
+                } else {
+                    // amount_bytes < 0
+                    let (user_refund, fee) =
+                        CapacityPricing::get_assert(Disk).free((-amount_bytes) as u64);
+                    if billing {
+                        let refund =
+                            accrual::capacity_limited::free(Disk, user, sub, user_refund, fee);
+                        -(to_i64(refund, "Disk refund"))
+                    } else {
+                        0
+                    }
+                }
+            }
+            DbId::WriteOnly => return, // TODO: Event billing (rate-limit-style)
+            DbId::BlockLog | DbId::BlockProof => return, // TODO: Billing (obj storage offset, correlated with NET consumption)
+
+            // Subjectively billed databases:
+            DbId::Subjective | DbId::NativeSubjective => return,
+
+            // Unbilled databases:
+            DbId::PrevAuthServices | DbId::Session | DbId::NativeSession | DbId::Temporary => {
+                return
+            }
+
+            DbId::NumChainDatabases => abort_message("NumChainDatabases is not a valid database"),
+        };
+
+        // Avoiding a flood of events for writing individual records. Accumulate in the tx_cache and emit
+        // one event at the end of the tx (`finishTx`).
+        tx_cache::add_disk_usage(user, amount_bytes, cost);
     }
 
     #[action]
@@ -545,18 +1096,27 @@ mod service {
             .unwrap_or(0.into())
     }
 
+    /// Whether the current block can hold another transaction
+    #[action]
+    fn can_push_tx() -> bool {
+        RateLimitPricing::get(Net).map_or(true, |n| !n.is_full())
+    }
+
     #[action]
     fn notifyBlock(block_num: BlockNum) {
         assert_eq!(get_sender(), Transact::SERVICE, "Unauthorized");
 
-        let net_usage = BandwidthPricing::get_assert(NET).new_block();
-        let cpu_usage = BandwidthPricing::get_assert(CPU).new_block();
+        let net_usage = RateLimitPricing::get_assert(Net).new_block();
+        let cpu_usage = RateLimitPricing::get_assert(Cpu).new_block();
+        let disk_usage = CapacityPricing::get(Disk)
+            .map(|p| p.utilization_ppm())
+            .unwrap_or(0);
 
         // Emit the block usage stats every 10 blocks
         if block_num % 10 == 0 {
             Wrapper::emit()
                 .history()
-                .block_summary(net_usage, cpu_usage);
+                .block_summary(net_usage, cpu_usage, disk_usage);
         }
     }
 
@@ -568,8 +1128,8 @@ mod service {
             return None;
         }
 
-        let cpu_pricing = BandwidthPricing::get_assert(CPU);
-        let res_balance = UserSettings::get_resource_balance(account, sub_account).value;
+        let cpu_pricing = RateLimitPricing::get_assert(Cpu);
+        let res_balance = balance_cache::get_available(account, sub_account).value;
 
         let price_per_unit = cpu_pricing.price();
         let ns_per_unit = cpu_pricing.billable_unit;
@@ -590,8 +1150,33 @@ mod service {
         Some(limit_ns)
     }
 
-    /// This actions specifies which account is primarily responsible for
-    /// paying the bill for any consumed resources.
+    // This function is used to warm the balance_cache for any accounts whose resource token
+    // balances may be queried. This is called outside of the transaction context, allowing
+    // any such queries during the tx to hit the cache instead of triggering an inline action
+    // call.
+    fn warm_billable_account_caches(user_account: AccountNumber) {
+        if !is_billing_enabled() {
+            return;
+        }
+
+        let _ = balance_cache::get_available(user_account, None);
+
+        for pricing in &CapacityPricingTable::read().get_index_pk() {
+            let _ = accrual::capacity_limited::get_collateral(pricing.resource());
+        }
+    }
+
+    /// A notification called before the start of a transaction that specifies the primary
+    /// actor responsible for the transaction. Used for any pre-tx initialization.
+    #[action]
+    fn prestartTx(actor: AccountNumber) {
+        assert_eq!(get_sender(), Transact::SERVICE, "Unauthorized");
+
+        warm_billable_account_caches(actor);
+    }
+
+    /// This action specifies which `account` is primarily responsible for paying the
+    /// bill for any resources consumed by the current tx.
     ///
     /// A time limit for the execution of the current tx/query will be set based
     /// on the resources available for the specified account.
@@ -613,7 +1198,7 @@ mod service {
         assert_eq!(
             get_sender(),
             psibase::services::http_server::SERVICE,
-            "permission denied: tokens::serveSys only callable by 'http-server'",
+            "permission denied: serveSys only callable by http-server service",
         );
 
         None.or_else(|| serve_graphql(&request, crate::rpc::Query { user }))
@@ -634,7 +1219,7 @@ mod service {
     }
 
     #[event(history)]
-    fn block_summary(net_usage_ppm: u32, cpu_usage_ppm: u32) {}
+    fn block_summary(net_usage_ppm: u32, cpu_usage_ppm: u32, disk_usage_ppm: u32) {}
 }
 
 #[cfg(test)]
