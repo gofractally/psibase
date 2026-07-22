@@ -1,22 +1,29 @@
 use anyhow::{anyhow, Context};
 use clap::Parser;
-use psibase::{AccountNumber, Meta, PackageRef, PackagedService};
+use psibase::{AccountNumber, Meta, PackageRef, PackagedService, MAX_ACCOUNT_NAME_LENGTH};
 use std::collections::BTreeSet;
 use std::fs::File;
 use std::io::{BufReader, Write};
 use std::path::PathBuf;
 use zip::write::{SimpleFileOptions, ZipWriter};
 
-/// Groups of characters that are easily mistaken for each other when
-/// rendered in a subdomain or account name.
-const CONFUSABLE_CLASSES: &[&[char]] = &[&['i', 'l', '1'], &['o', '0']];
+/// Groups of spellings that are easily mistaken for each other when
+/// rendered in a subdomain or account name. Every member of a group can be
+/// substituted for any other member, including multi-character sequences
+/// like `rn`/`m`.
+const CONFUSABLE_CLASSES: &[&[&str]] = &[
+    &["i", "l", "1"],
+    &["o", "0"],
+    &["rn", "m"],
+    &["vv", "w"],
+];
 
 /// Generates a psibase package that reserves account names which could be
 /// used to impersonate apps or system accounts.
 ///
 /// The tool collects account names from the given .psi package files and from
 /// an optional text file of generic names, generates every confusable
-/// variant (swapping i/l/1 and o/0), and writes a meta-only .psi package
+/// variant (swapping i/l/1, o/0, rn/m, and vv/w), and writes a meta-only .psi package
 /// that lists them all as accounts. Installing that package creates the
 /// accounts owned by the installer, making them unclaimable by ordinary
 /// users. It does not block later installation of the real packages, since
@@ -59,29 +66,35 @@ struct Args {
     output: Option<PathBuf>,
 }
 
-/// All spellings of `name` obtained by substituting confusable characters,
+/// All spellings of `name` obtained by substituting confusable spellings,
 /// including `name` itself.
 fn confusable_variants(name: &str) -> Vec<String> {
-    let mut results = vec![String::new()];
-    for ch in name.chars() {
-        if let Some(class) = CONFUSABLE_CLASSES.iter().find(|class| class.contains(&ch)) {
-            results = results
-                .iter()
-                .flat_map(|prefix| {
-                    class.iter().map(move |repl| {
-                        let mut s = prefix.clone();
-                        s.push(*repl);
-                        s
-                    })
-                })
-                .collect();
-        } else {
-            for prefix in &mut results {
-                prefix.push(ch);
+    fn expand(rest: &str, prefix: &str, results: &mut BTreeSet<String>) {
+        let Some(first) = rest.chars().next() else {
+            results.insert(prefix.to_string());
+            return;
+        };
+        // Leave the next character as-is. For multi-character spellings this
+        // branch is what allows overlapping matches to be found (e.g. both
+        // occurrences of "vv" in "vvv").
+        let mut literal = prefix.to_string();
+        literal.push(first);
+        expand(&rest[first.len_utf8()..], &literal, results);
+        // Replace any confusable spelling that starts here with each other
+        // member of its class.
+        for class in CONFUSABLE_CLASSES {
+            for spelling in *class {
+                if let Some(tail) = rest.strip_prefix(spelling) {
+                    for replacement in *class {
+                        expand(tail, &format!("{prefix}{replacement}"), results);
+                    }
+                }
             }
         }
     }
-    results
+    let mut results = BTreeSet::new();
+    expand(name, "", &mut results);
+    results.into_iter().collect()
 }
 
 struct Generated {
@@ -91,8 +104,9 @@ struct Generated {
 }
 
 /// Generates the reserved name list: every confusable variant of `seeds`
-/// (including the seeds themselves), minus variants that don't round-trip
-/// through the AccountNumber encoding.
+/// (including the seeds themselves), minus variants that exceed the maximum
+/// account name length or don't round-trip through the AccountNumber
+/// encoding.
 ///
 /// Names that real packages create are reserved too. This doesn't prevent
 /// installing those packages later: account creation during installation
@@ -104,6 +118,12 @@ fn generate(seeds: &BTreeSet<String>) -> Generated {
     for seed in seeds {
         for variant in confusable_variants(seed) {
             if reserved.contains(&variant) {
+                continue;
+            }
+            // Substitutions like m -> rn can push a variant past the
+            // maximum name length; such variants simply don't exist as
+            // account names, so drop them silently.
+            if variant.len() > MAX_ACCOUNT_NAME_LENGTH as usize {
                 continue;
             }
             if AccountNumber::from_exact(&variant).is_ok() {
@@ -286,5 +306,56 @@ mod tests {
         for name in &generated.reserved {
             assert!(AccountNumber::from_exact(name).is_ok());
         }
+    }
+
+    #[test]
+    fn multi_char_confusables_expand_both_ways() {
+        let result: BTreeSet<String> = confusable_variants("market").into_iter().collect();
+        assert!(result.contains("market"));
+        assert!(result.contains("rnarket"));
+
+        let result: BTreeSet<String> = confusable_variants("corn").into_iter().collect();
+        assert!(result.contains("corn"));
+        assert!(result.contains("com"));
+        assert!(result.contains("c0m"));
+        assert!(result.contains("c0rn"));
+
+        let result: BTreeSet<String> = confusable_variants("wow").into_iter().collect();
+        assert!(result.contains("wow"));
+        assert!(result.contains("vvow"));
+        assert!(result.contains("wovv"));
+        assert!(result.contains("vv0vv"));
+    }
+
+    #[test]
+    fn overlapping_multi_char_matches_are_found() {
+        // "vvv" contains two overlapping "vv" sequences; both replacements
+        // must be generated.
+        let result: BTreeSet<String> = confusable_variants("vvv").into_iter().collect();
+        assert!(result.contains("vvv"));
+        assert!(result.contains("wv"));
+        assert!(result.contains("vw"));
+        // "rnm" -> expanding m to rn and rn to m in all combinations
+        let result: BTreeSet<String> = confusable_variants("rnm").into_iter().collect();
+        assert!(result.contains("rnm"));
+        assert!(result.contains("mm"));
+        assert!(result.contains("rnrn"));
+        assert!(result.contains("mrn"));
+    }
+
+    #[test]
+    fn over_length_variants_are_dropped() {
+        // "mmmmmmmmm" is 9 chars; replacing two or more m's with rn exceeds
+        // the 10-character maximum and must be dropped, not reported as
+        // skipped.
+        let seeds = set(&["mmmmmmmmm"]);
+        let generated = generate(&seeds);
+        assert!(generated.reserved.contains(&"mmmmmmmmm".to_string()));
+        assert!(generated.reserved.contains(&"rnmmmmmmmm".to_string()));
+        for name in &generated.reserved {
+            assert!(name.len() <= MAX_ACCOUNT_NAME_LENGTH as usize);
+            assert!(AccountNumber::from_exact(name).is_ok());
+        }
+        assert!(generated.skipped.is_empty());
     }
 }
