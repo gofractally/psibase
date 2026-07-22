@@ -1,11 +1,9 @@
-root
 admin
 www
 api
 mail
 auth
 oauth
-network
 localhost
 support
 security
