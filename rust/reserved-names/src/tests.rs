@@ -87,8 +87,7 @@ fn overlapping_multi_char_matches_are_found() {
 #[test]
 fn over_length_variants_are_dropped() {
     // "mmmmmmmmm" is 9 chars; replacing two or more m's with rn exceeds
-    // the 10-character maximum and must be dropped, not reported as
-    // skipped.
+    // the 10-character maximum and must be dropped.
     let seeds = set(&["mmmmmmmmm"]);
     let generated = generate(&seeds);
     assert!(generated.reserved.contains(&"mmmmmmmmm".to_string()));
@@ -97,5 +96,20 @@ fn over_length_variants_are_dropped() {
         assert!(name.len() <= MAX_ACCOUNT_NAME_LENGTH as usize);
         assert!(AccountNumber::from_exact(name).is_ok());
     }
-    assert!(generated.skipped.is_empty());
+    assert!(generated.unused_seeds.is_empty());
+}
+
+#[test]
+fn warns_only_when_no_variant_is_valid() {
+    // Individual invalid variants of a good seed are dropped silently.
+    let seeds = set(&["billing"]);
+    let generated = generate(&seeds);
+    assert!(!generated.reserved.is_empty());
+    assert!(generated.unused_seeds.is_empty());
+
+    // A seed with no valid base or variants is the only case worth reporting.
+    let seeds = set(&["!!!"]);
+    let generated = generate(&seeds);
+    assert!(generated.reserved.is_empty());
+    assert_eq!(generated.unused_seeds, vec!["!!!".to_string()]);
 }

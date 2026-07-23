@@ -11,12 +11,7 @@ use zip::write::{SimpleFileOptions, ZipWriter};
 /// rendered in a subdomain or account name. Every member of a group can be
 /// substituted for any other member, including multi-character sequences
 /// like `rn`/`m`.
-const CONFUSABLE_CLASSES: &[&[&str]] = &[
-    &["i", "l", "1"],
-    &["o", "0"],
-    &["rn", "m"],
-    &["vv", "w"],
-];
+const CONFUSABLE_CLASSES: &[&[&str]] = &[&["i", "l", "1"], &["o", "0"], &["rn", "m"], &["vv", "w"]];
 
 /// Generates a psibase package that reserves account names which could be
 /// used to impersonate apps or system accounts.
@@ -105,8 +100,9 @@ fn confusable_variants(name: &str) -> Vec<String> {
 
 struct Generated {
     reserved: Vec<String>,
-    /// Variants that were dropped because they don't fit in an AccountNumber
-    skipped: Vec<String>,
+    /// Seeds for which neither the base name nor any confusable variant
+    /// is a valid AccountNumber, so nothing was reserved for them.
+    unused_seeds: Vec<String>,
 }
 
 /// Generates the reserved name list: every confusable variant of `seeds`
@@ -120,28 +116,28 @@ struct Generated {
 /// long as it is owned by the installer.
 fn generate(seeds: &BTreeSet<String>) -> Generated {
     let mut reserved = BTreeSet::new();
-    let mut skipped = BTreeSet::new();
+    let mut unused_seeds = Vec::new();
     for seed in seeds {
+        let mut any_valid = false;
         for variant in confusable_variants(seed) {
-            if reserved.contains(&variant) {
-                continue;
-            }
             // Substitutions like m -> rn can push a variant past the
             // maximum name length; such variants simply don't exist as
-            // account names, so drop them silently.
+            // account names, so drop them.
             if variant.len() > MAX_ACCOUNT_NAME_LENGTH as usize {
                 continue;
             }
             if AccountNumber::from_exact(&variant).is_ok() {
+                any_valid = true;
                 reserved.insert(variant);
-            } else {
-                skipped.insert(variant);
             }
+        }
+        if !any_valid {
+            unused_seeds.push(seed.clone());
         }
     }
     Generated {
         reserved: reserved.into_iter().collect(),
-        skipped: skipped.into_iter().collect(),
+        unused_seeds,
     }
 }
 
@@ -183,10 +179,7 @@ fn write_package(args: &Args, reserved: &[String]) -> Result<(), anyhow::Error> 
                 version: "*".to_string(),
             })
             .collect(),
-        accounts: reserved
-            .iter()
-            .map(|name| name.parse().unwrap())
-            .collect(),
+        accounts: reserved.iter().map(|name| name.parse().unwrap()).collect(),
         services: vec![],
         exports: vec![],
     };
@@ -234,12 +227,12 @@ fn main() -> Result<(), anyhow::Error> {
 
     let generated = generate(&seeds);
 
-    if !generated.skipped.is_empty() {
+    if !generated.unused_seeds.is_empty() {
         eprintln!(
-            "warning: {} variant(s) skipped because they don't fit in an account number:",
-            generated.skipped.len()
+            "warning: {} seed name(s) produced no valid account names to reserve:",
+            generated.unused_seeds.len()
         );
-        for name in &generated.skipped {
+        for name in &generated.unused_seeds {
             eprintln!("  {}", name);
         }
     }
