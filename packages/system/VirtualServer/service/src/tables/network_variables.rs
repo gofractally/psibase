@@ -11,21 +11,21 @@ impl NetworkVariables {
     pub fn set(new_vars: &Self) {
         let current = Self::get();
 
-        check(
+        assert!(
             new_vars.obj_storage_bytes >= current.obj_storage_bytes,
             "Objective storage allocation cannot decrease",
         );
-        check(
+        assert!(
             new_vars.subj_storage_bytes >= current.subj_storage_bytes,
             "Subjective storage allocation cannot decrease",
         );
 
-        check(
+        assert!(
             new_vars.obj_storage_bytes >= NetworkSpecs::obj_storage_offset(),
             "obj_storage_bytes must be >= reserved offset",
         );
 
-        check(
+        assert!(
             new_vars.obj_storage_bytes + new_vars.subj_storage_bytes
                 <= ServerSpecs::get().unwrap_or_default().storage_bytes,
             "Total storage allocation must not exceed available server storage",

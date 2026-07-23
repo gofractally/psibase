@@ -72,6 +72,9 @@ namespace SystemService
          /// submits a transaction.
          void setKey(SubjectPublicKeyInfo key);
 
+         /// Get the accounts this auth service delegates authority to for a sender.
+         std::vector<psibase::AccountNumber> getDlgsSys(psibase::AccountNumber sender);
+
          /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
          /// transaction from a specified sender.
          ///
@@ -103,6 +106,7 @@ namespace SystemService
                    method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                    method(canAuthUserSys, user),
                    method(setKey, key),
+                   method(getDlgsSys, sender),
                    method(isAuthSys, sender, authorizers),
                    method(isRejectSys, sender, rejecters),
                    method(newAccount, name, key)

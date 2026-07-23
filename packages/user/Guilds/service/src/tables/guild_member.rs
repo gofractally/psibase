@@ -1,7 +1,7 @@
 use async_graphql::ComplexObject;
 use psibase::services::fractals::weighted_normalization::HasScore;
 use psibase::services::tokens::{Decimal, Precision, Quantity};
-use psibase::{check, check_none, check_some, AccountNumber, Table};
+use psibase::{AccountNumber, ServiceWrapper, Table};
 
 use crate::constants::{EMA_ALPHA_DENOMINATOR, GUILD_EVALUATION_GROUP_SIZE, SCORE_SCALE};
 use crate::helpers::{calculate_ema_u32, Fraction, RollingBits16};
@@ -37,7 +37,10 @@ impl GuildMember {
     }
 
     pub fn add(guild: AccountNumber, member: AccountNumber) -> Self {
-        check_none(Self::get(guild, member), "guild member already exists");
+        assert!(
+            Self::get(guild, member).is_none(),
+            "guild member already exists"
+        );
         let new_instance = Self::new(guild, member);
         new_instance.save();
         new_instance
@@ -58,7 +61,7 @@ impl GuildMember {
     }
 
     pub fn get_assert(guild: AccountNumber, member: AccountNumber) -> Self {
-        check_some(Self::get(guild, member), "guild member does not exist")
+        Self::get(guild, member).expect("guild member does not exist")
     }
 
     pub fn kick(&self) {
@@ -110,10 +113,10 @@ impl GuildMember {
     }
 
     pub fn set_candidacy(&mut self, active: bool) {
-        check(self.is_candidate != active, "candidacy state unchanged");
+        assert_ne!(self.is_candidate, active, "candidacy state unchanged");
         let now = TransactSvc::call().currentBlock().time.seconds();
         if active {
-            check(
+            assert!(
                 now >= self.candidacy_eligible_from,
                 "candidacy not eligible yet",
             );

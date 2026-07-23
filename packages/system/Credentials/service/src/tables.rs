@@ -25,11 +25,11 @@ pub mod tables {
             }
             table.put(&InitRow {}).unwrap();
 
-            Tokens::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
-            Nft::call().setUserConf(NftHolderFlags::MANUAL_DEBIT.index(), true);
+            Tokens::call().setUserConf(BalanceFlags::AUTO_DEBIT.index(), false);
+            Nft::call().setUserConf(NftHolderFlags::AUTO_DEBIT.index(), false);
 
-            Nft::call_as(crate::CRED_SYS).setUserConf(NftHolderFlags::MANUAL_DEBIT.index(), true);
-            Tokens::call_as(crate::CRED_SYS).setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
+            Nft::call_as(crate::CRED_SYS).setUserConf(NftHolderFlags::AUTO_DEBIT.index(), false);
+            Tokens::call_as(crate::CRED_SYS).setUserConf(BalanceFlags::AUTO_DEBIT.index(), false);
         }
     }
 
@@ -95,7 +95,7 @@ pub mod tables {
             let now = Transact::call().currentBlock().time.seconds();
 
             let table = CredentialTable::read_write();
-            check(
+            assert!(
                 table.get_index_by_pkh().get(&pubkey_fingerprint).is_none(),
                 "Credential already exists",
             );

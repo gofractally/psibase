@@ -20,7 +20,7 @@ interface BillingFormData {
 }
 
 interface BillingProps {
-    systemToken: SystemTokenInfo | null;
+    systemToken?: SystemTokenInfo | null;
     systemTokenLoading: boolean;
 }
 
@@ -108,9 +108,9 @@ export const Billing = ({ systemToken, systemTokenLoading }: BillingProps) => {
                     <p className="mt-1 text-sm">
                         {systemTokenLoading
                             ? "Loading..."
-                            : systemToken?.id
-                              ? systemToken.symbol
-                              : "None"}
+                            : (systemToken?.symbol ??
+                              systemToken?.id ??
+                              "None")}
                     </p>
                 </div>
 

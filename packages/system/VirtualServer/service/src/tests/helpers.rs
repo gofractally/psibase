@@ -3,7 +3,7 @@ use psibase::{
     account,
     services::{http_server, tokens},
     tester::PRODUCER_ACCOUNT,
-    AccountNumber, ChainEmptyResult,
+    AccountNumber, ChainEmptyResult, Push,
 };
 
 use super::query::get_user_resources;
@@ -59,6 +59,9 @@ pub(super) fn enable_billing(chain: &psibase::Chain) -> Result<(), psibase::Erro
     tokens::Wrapper::push_from(&chain, alice)
         .credit(sys, PRODUCER_ACCOUNT, min_resource_buffer.into(), "".into())
         .get()?;
+    tokens::Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
+        .debit(sys, alice, min_resource_buffer.into(), "".into())
+        .get()?;
 
     tokens::Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
         .credit(sys, vserver, min_resource_buffer.into(), "".into())
@@ -70,6 +73,9 @@ pub(super) fn enable_billing(chain: &psibase::Chain) -> Result<(), psibase::Erro
     // Give producer account some more tokens for general use
     tokens::Wrapper::push_from(&chain, alice)
         .credit(sys, PRODUCER_ACCOUNT, 50_000_0000.into(), "".into())
+        .get()?;
+    tokens::Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
+        .debit(sys, alice, 50_000_0000.into(), "".into())
         .get()?;
 
     chain

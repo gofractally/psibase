@@ -134,14 +134,21 @@ pub mod auth_interface {
         unimplemented!()
     }
 
+    /// Get the accounts this auth service delegates authority to for a sender.
+    #[action]
+    fn getDlgsSys(
+        sender: crate::AccountNumber,
+        method: Option<ServiceMethod>,
+    ) -> Vec<crate::AccountNumber> {
+        unimplemented!()
+    }
+
     /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
     /// transaction from a specified sender.
     ///
     /// * `sender`: The sender account for the transaction potentially being authorized.
     /// * `authorizers`: The set of accounts that have already authorized the execution of the transaction.
     /// * `method`: The service and method being called.
-    /// * `authSet`: The set of accounts that are already being checked for authorization.
-    ///              If the sender is already in this set, then the function should return false.
     ///
     /// Returns:
     /// * `true`: The authorizers are sufficient to authorize a transaction from the sender.
@@ -151,7 +158,6 @@ pub mod auth_interface {
         sender: crate::AccountNumber,
         authorizers: Vec<crate::AccountNumber>,
         method: Option<ServiceMethod>,
-        authSet: Option<Vec<crate::AccountNumber>>,
     ) -> bool {
         unimplemented!()
     }
@@ -162,8 +168,6 @@ pub mod auth_interface {
     /// * `sender`: The sender account for the transaction potentially being rejected.
     /// * `rejecters`: The set of accounts that have already authorized the rejection of the transaction.
     /// * `method`: The service and method being called.
-    /// * `authSet`: The set of accounts that are already being checked for authorization.
-    ///              If the sender is already in this set, then the function should return false.
     ///
     /// Returns:
     /// * `true`: The rejecters are sufficient to reject a transaction from the sender.
@@ -173,7 +177,6 @@ pub mod auth_interface {
         sender: crate::AccountNumber,
         rejecters: Vec<crate::AccountNumber>,
         method: Option<ServiceMethod>,
-        authSet: Option<Vec<crate::AccountNumber>>,
     ) -> bool {
         unimplemented!()
     }
@@ -330,6 +333,12 @@ mod service {
         unimplemented!()
     }
 
+    /// Returns true if resource monitoring is enabled
+    #[action]
+    fn isResMonitoring() -> bool {
+        unimplemented!()
+    }
+
     /// The next `numWrites` db writes will not be billed.
     ///
     /// This may only be called by privileged services, and must be paired
@@ -388,6 +397,13 @@ mod service {
     #[action]
     fn headBlockTime() -> crate::TimePointSec {
         unimplemented!()
+    }
+
+    /// Returns the tapos `refBlockIndex` and `refBlockSuffix`
+    /// for the head block.
+    #[action]
+    fn headTapos() -> (u8, u32) {
+        unimplemented!();
     }
 
     /// Emitted at the start of each block

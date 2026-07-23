@@ -14,7 +14,7 @@ dependencies = [
 
 [[package]]
 name = "addcheckinit"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -416,7 +416,7 @@ checksum = "8c3c1a368f70d6cf7302d78f8f7093da241fb8e8807c05cc9e51a125895a6d5b"
 
 [[package]]
 name = "basicwquery"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "async-graphql",
  "mincallrecvr",
@@ -527,7 +527,7 @@ checksum = "5d20789868f4b01b2f2caec9f5c4e0213b41e3e5702a50157d699ae31ced2fcb"
 
 [[package]]
 name = "burst-transfer"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -578,7 +578,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-psibase"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -1327,7 +1327,7 @@ dependencies = [
 
 [[package]]
 name = "example"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -1404,7 +1404,7 @@ dependencies = [
 
 [[package]]
 name = "fracpack"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "custom_error",
  "hex 0.3.2",
@@ -1538,7 +1538,7 @@ dependencies = [
 
 [[package]]
 name = "gen-cpp-doc"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "anyhow",
  "clang",
@@ -2475,7 +2475,7 @@ dependencies = [
 
 [[package]]
 name = "md2man"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "clap",
  "psibase-rust-workspace-hack",
@@ -2544,7 +2544,7 @@ dependencies = [
 
 [[package]]
 name = "mincallrecvr"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -3183,7 +3183,7 @@ dependencies = [
 
 [[package]]
 name = "psibase"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -3245,7 +3245,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-derive"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "darling 0.14.4",
  "proc-macro-error",
@@ -3261,7 +3261,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-lib"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "colored-diff",
  "darling 0.20.10",
@@ -3332,7 +3332,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_macros"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "psibase-macros-derive",
  "psibase-rust-workspace-hack",
@@ -3340,7 +3340,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_names"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "psibase-rust-workspace-hack",
  "seahash",
@@ -3348,7 +3348,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_plugin"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "graphql_client",
  "psibase",
@@ -3360,7 +3360,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_service"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "psibase",
  "psibase-rust-workspace-hack",
@@ -3368,7 +3368,7 @@ dependencies = [
 
 [[package]]
 name = "psimacrotest"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "addcheckinit",
  "async-graphql",
@@ -3485,7 +3485,7 @@ checksum = "69cdb34c158ceb288df11e18b4bd39de994f6657d83847bdffdbd7f346754b0f"
 
 [[package]]
 name = "r-tpack"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "psibase",
  "psibase-rust-workspace-hack",
@@ -4278,7 +4278,7 @@ dependencies = [
 
 [[package]]
 name = "subjective"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "psibase",
  "psibase-rust-workspace-hack",
@@ -4423,7 +4423,18 @@ dependencies = [
 
 [[package]]
 name = "test-contract"
-version = "0.23.0"
+version = "0.24.0"
+dependencies = [
+ "psibase",
+ "psibase-rust-workspace-hack",
+ "psibase_service",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "test-panic"
+version = "0.24.0"
 dependencies = [
  "psibase",
  "psibase-rust-workspace-hack",
@@ -4434,7 +4445,7 @@ dependencies = [
 
 [[package]]
 name = "test_fracpack"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "cxx",
  "cxx-build",
@@ -4452,7 +4463,7 @@ dependencies = [
 
 [[package]]
 name = "test_fracpack_macros"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "anyhow",
  "fracpack",
@@ -4469,7 +4480,7 @@ dependencies = [
 
 [[package]]
 name = "test_package"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "psibase-rust-workspace-hack",
  "r-tpack",
@@ -4773,7 +4784,7 @@ checksum = "8df9b6e13f2d32c91b9bd719c00d1958837bc7dec474d94952798cc8e69eeec3"
 
 [[package]]
 name = "tpack"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "psibase",
  "psibase-rust-workspace-hack",
@@ -4784,7 +4795,7 @@ dependencies = [
 
 [[package]]
 name = "tpack-plugin"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "psibase",
  "psibase-rust-workspace-hack",

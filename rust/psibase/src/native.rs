@@ -7,9 +7,7 @@
 //!
 //! These functions wrap the [Raw Native Functions](crate::native_raw).
 
-use crate::{
-    native_raw, AccountNumber, DbId, HttpRequest, MicroSeconds, SocketEndpoint, TLSInfo, ToKey,
-};
+use crate::{native_raw, DbId, HttpRequest, MicroSeconds, SocketEndpoint, TLSInfo, ToKey};
 use anyhow::anyhow;
 use fracpack::{Pack, Unpack, UnpackOwned};
 
@@ -45,28 +43,6 @@ pub fn abort_message_bytes(message: &[u8]) -> ! {
 /// Abort with message
 pub fn abort_message(message: &str) -> ! {
     abort_message_bytes(message.as_bytes());
-}
-
-/// Abort with message if condition is false
-pub fn check(condition: bool, message: &str) {
-    if !condition {
-        abort_message_bytes(message.as_bytes());
-    }
-}
-
-/// Abort with message if optional value is empty
-pub fn check_some<T>(opt_value: Option<T>, message: &str) -> T {
-    if opt_value.is_none() {
-        abort_message_bytes(message.as_bytes());
-    }
-    opt_value.unwrap()
-}
-
-/// Abort with message if optional has value
-pub fn check_none<T>(opt_value: Option<T>, message: &str) {
-    if opt_value.is_some() {
-        abort_message_bytes(message.as_bytes());
-    }
 }
 
 /// Get the most-recent result when the size is known in advance
@@ -180,6 +156,17 @@ impl KvHandle {
     pub fn new(db: DbId, prefix: &[u8], mode: KvMode) -> KvHandle {
         KvHandle(unsafe { psibase_proxy_kv_open(db, prefix.as_ptr(), prefix.len() as u32, mode) })
     }
+    /// Open a handle via native `kvOpen`, bypassing `db` / `x-db` service checks.
+    pub fn open_direct(db: DbId, prefix: &[u8], mode: KvMode) -> KvHandle {
+        unsafe {
+            KvHandle::from_raw(native_raw::kvOpen(
+                db,
+                prefix.as_ptr(),
+                prefix.len() as u32,
+                mode,
+            ))
+        }
+    }
     pub unsafe fn from_raw(handle: native_raw::KvHandle) -> KvHandle {
         KvHandle(handle)
     }
@@ -223,25 +210,6 @@ pub fn kv_put_bytes(db: &KvHandle, key: &[u8], value: &[u8]) {
 /// If key already exists, then replace the existing value.
 pub fn kv_put<K: ToKey, V: Pack>(db: &KvHandle, key: &K, value: &V) {
     kv_put_bytes(db, &key.to_key(), &value.packed())
-}
-
-/// Add a sequentially-numbered record
-///
-/// Returns the id.
-pub fn put_sequential_bytes(db: DbId, value: &[u8]) -> u64 {
-    unsafe { native_raw::putSequential(db, value.as_ptr(), value.len() as u32) }
-}
-
-/// Add a sequentially-numbered record
-///
-/// Returns the id.
-pub fn put_sequential<Type: Pack, V: Pack>(
-    db: DbId,
-    service: AccountNumber,
-    ty: &Type,
-    value: &V,
-) -> u64 {
-    put_sequential_bytes(db, &(service, Some(ty), Some(value)).packed())
 }
 
 /// Remove a key-value pair if it exists
@@ -347,11 +315,6 @@ pub fn kv_max_bytes(db: &KvHandle, key: &[u8]) -> Option<Vec<u8>> {
 pub fn kv_max<K: ToKey, V: UnpackOwned>(db: &KvHandle, key: &K) -> Option<V> {
     let bytes = kv_max_bytes(db, &key.to_key());
     bytes.map(|v| V::unpacked(&v[..]).unwrap())
-}
-
-pub fn get_sequential_bytes(db_id: DbId, id: u64) -> Option<Vec<u8>> {
-    let size = unsafe { native_raw::getSequential(db_id, id) };
-    get_optional_result_bytes(size)
 }
 
 /// Sets the CPU timer to expire after the current transaction/query/callback

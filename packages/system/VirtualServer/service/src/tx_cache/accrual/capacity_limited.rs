@@ -1,12 +1,16 @@
 //! Capacity-limited resources: consumption cost is sent as a reserve into a relay. When freed, relay refund is split between
 //! the user and the fee receiver.
 //!
-//! In rare cases (system writes or writes when billing is disabled), the relay may become under-collateralized. In such cases,
-//! tokens that would be sent to the fee receiver are instead used to recollateralize the relay.
+//! In rare cases (system writes or writes when billing is disabled), the relay may become under-collateralized.
+//! An undercollateralized curve recollateralizes as users free bytes: a free sells bytes back to the relay,
+//! reducing the required reserve. The user's refund is still paid (if collateral allows), but the fee portion
+//! is retained in the curve rather than paid out. The fee receiver is paid only once the curve is fully
+//! collateralized.
 
 use super::is_system_user;
 use crate::resource_type::ResourceType;
 use crate::tables::capacity_limit_pricing::relay_sub_account;
+use crate::tables::tables::CapacityPricing;
 use crate::tx_cache::{balance_cache, drain_cache, with_cache};
 use crate::Wrapper;
 use psibase::AccountNumber;
@@ -60,19 +64,15 @@ pub fn free(
         return 0;
     }
     let collateral = get_collateral(resource);
+    let refund = user_refund.min(collateral);
 
-    let (gross, clamped_fee, refund) = if total_out > collateral {
-        // Clamp the fee and the refund (keeping fee_ppm ratio)
-        // if the payout exceeds available collateral.
-        let clamped_fee = (fee as u128 * collateral as u128 / total_out as u128) as u64;
-        (collateral, clamped_fee, collateral - clamped_fee)
-    } else {
-        (total_out, fee, user_refund)
-    };
+    // Fee only comes from collateral beyond the refund and what the curve must keep.
+    let required_reserve = CapacityPricing::get_assert(resource).required_reserve();
+    let fee = fee.min(collateral.saturating_sub(refund + required_reserve));
 
     with(resource, |a| {
-        a.relay_delta -= gross as i128;
-        a.fee += clamped_fee;
+        a.relay_delta -= (refund + fee) as i128;
+        a.fee += fee;
     });
     if refund > 0 {
         balance_cache::refund(user, sub, refund);

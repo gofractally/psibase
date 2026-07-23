@@ -152,11 +152,13 @@ impl CurvePosition {
         }
         let dy = amount_consumed as u128;
 
-        check(self.Y > dy, "Insufficient capacity");
+        assert!(self.Y > dy, "Insufficient capacity");
 
         let new_Y = self.Y - dy;
         let required_X = self.k.div_ceil(new_Y);
-        let dx = check_some(required_X.checked_sub(self.X), "Excess reserve detected");
+        let dx = required_X
+            .checked_sub(self.X)
+            .expect("Excess reserve detected");
 
         // Cap the charge at the remaining reserve budget. Without this, cost
         // overflows u64 when `max_reserve == u64::MAX` and remaining capacity
@@ -244,10 +246,10 @@ impl CapacityPricing {
     fn update<F: FnOnce(&mut CapacityPricing)>(resource: ResourceType, f: F) {
         let id = resource.as_id();
         let table = CapacityPricingTable::read_write();
-        let mut pricing = check_some(
-            table.get_index_pk().get(&id),
-            "Capacity pricing not initialized",
-        );
+        let mut pricing = table
+            .get_index_pk()
+            .get(&id)
+            .expect("Capacity pricing not initialized");
         f(&mut pricing);
         table.put(&pricing).unwrap();
     }
@@ -288,17 +290,15 @@ impl CapacityPricing {
         //   the total system token supply is known.
         let max_reserve = u64::MAX;
 
-        check(fee_ppm <= PPM as u32, "fee_ppm must be <= 1,000,000");
+        assert!(fee_ppm <= PPM as u32, "fee_ppm must be <= 1,000,000");
         check_curve_params(max_reserve, max_capacity, curve_d);
 
         let id = resource.as_id();
         let table = CapacityPricingTable::read_write();
-        check(
+        assert!(
             table.get_index_pk().get(&id).is_none(),
-            &format!(
-                "Capacity pricing already initialized for resource {}",
-                resource.name()
-            ),
+            "Capacity pricing already initialized for resource {}",
+            resource.name(),
         );
 
         table
@@ -324,7 +324,7 @@ impl CapacityPricing {
     }
 
     pub fn get_assert(resource: ResourceType) -> Self {
-        check_some(Self::get(resource), "Capacity pricing not initialized")
+        Self::get(resource).expect("Capacity pricing not initialized")
     }
 
     /// Live reserve-token balance held in the relay sub-account
@@ -362,9 +362,10 @@ impl CapacityPricing {
         let resource = self.resource();
         let mut cost = 0u64;
         Self::update(resource, |p| {
-            check(
+            assert!(
                 amount_consumed <= p.remaining_capacity,
-                &format!("Insufficient {} capacity", resource.name()),
+                "Insufficient {} capacity",
+                resource.name(),
             );
             cost = p
                 .curve()
@@ -384,7 +385,7 @@ impl CapacityPricing {
 
             // This should not be possible since preallocated bytes are "consumed"
             // in `init`, every byte should be accounted for on the curve.
-            check(
+            assert!(
                 amount_freed <= consumed,
                 "freed more disk than was consumed",
             );
@@ -403,7 +404,7 @@ impl CapacityPricing {
     }
 
     pub fn set_capacity(&self, new_max_capacity: u64) {
-        check(
+        assert!(
             new_max_capacity >= self.max_capacity,
             "Capacity can only increase",
         );
@@ -415,7 +416,7 @@ impl CapacityPricing {
     }
 
     fn increase_capacity(&self, delta_bytes: u64) {
-        check(delta_bytes > 0, "invalid capacity increase");
+        assert!(delta_bytes > 0, "invalid capacity increase");
 
         Self::update(self.resource(), |p| {
             let old_reserve = p.required_reserve();
@@ -423,7 +424,7 @@ impl CapacityPricing {
             p.max_capacity += delta_bytes;
             p.remaining_capacity += delta_bytes;
 
-            check(
+            assert!(
                 p.required_reserve() <= old_reserve,
                 "required reserve rose after capacity increase",
             );
@@ -431,11 +432,11 @@ impl CapacityPricing {
     }
 
     pub fn reduce_reserve_budget(&self, delta_supply: u64) {
-        check(delta_supply > 0, "invalid reserve budget decrease");
-        let new_max_reserve = check_some(
-            self.max_reserve.checked_sub(delta_supply),
-            "reserve budget decrease exceeds max_reserve",
-        );
+        assert!(delta_supply > 0, "invalid reserve budget decrease");
+        let new_max_reserve = self
+            .max_reserve
+            .checked_sub(delta_supply)
+            .expect("reserve budget decrease exceeds max_reserve");
         check_curve_params(new_max_reserve, self.max_capacity, self.curve_d);
 
         let mut to_remove = 0u64;
@@ -449,7 +450,7 @@ impl CapacityPricing {
         });
 
         let consumed = self.max_capacity - self.remaining_capacity;
-        check(
+        assert!(
             consumed == 0 || to_remove > 0,
             "reserve budget decrease freed no reserves",
         );

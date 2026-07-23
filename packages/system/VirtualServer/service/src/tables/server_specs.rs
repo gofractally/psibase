@@ -32,20 +32,23 @@ impl ServerSpecs {
 
         let network_vars = NetworkVariables::get();
         let min_storage_bytes = network_vars.obj_storage_bytes + network_vars.subj_storage_bytes;
-        check(
+        assert!(
             self.storage_bytes >= min_storage_bytes,
             "Storage space cannot be decreased below what has already been allocated to the network",
         );
     }
 
     fn check_range(value: u64, min: u64, max: u64, field_name: &str) {
-        check(
+        assert!(
             value >= min,
-            &format!("{} below minimum required server specs", field_name),
+            "{} below minimum required server specs",
+            field_name
         );
-        check(
+
+        assert!(
             value <= max,
-            &format!("{} above maximum allowed server specs", field_name),
+            "{} above maximum allowed server specs",
+            field_name
         );
     }
 }

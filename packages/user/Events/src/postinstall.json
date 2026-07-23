@@ -36,5 +36,11 @@
     "data": {
       "service": "events"
     }
+  },
+  {
+    "sender": "events",
+    "service": "events",
+    "method": "init",
+    "data": {}
   }
 ]

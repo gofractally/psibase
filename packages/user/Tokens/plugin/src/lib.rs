@@ -121,7 +121,7 @@ impl TokensPlugin {
 }
 
 impl User for TokensPlugin {
-    #[psibase_plugin::authorized(High, whitelist = ["homepage", "vserver", "invite", "token-swap", "prem-accounts", "config"])]
+    #[psibase_plugin::authorized(High, whitelist = ["homepage", "vserver", "invite", "token-swap", "namemarket", "accounts", "config"])]
     fn credit(token_id: u32, debitor: String, amount: String, memo: String) -> Result<(), Error> {
         let amount = Self::non_zero(token_id, amount)?;
         let memo = memo.try_into().unwrap();
@@ -165,8 +165,8 @@ impl User for TokensPlugin {
 
 impl UserConfig for TokensPlugin {
     #[psibase_plugin::authorized(High, whitelist = ["homepage"])]
-    fn enable_user_manual_debit(enable: bool) -> Result<(), Error> {
-        Tokens::add_to_tx().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), enable);
+    fn enable_user_auto_debit(enable: bool) -> Result<(), Error> {
+        Tokens::add_to_tx().setUserConf(BalanceFlags::AUTO_DEBIT.index(), enable);
         Ok(())
     }
 
@@ -177,8 +177,8 @@ impl UserConfig for TokensPlugin {
     }
 
     #[psibase_plugin::authorized(Medium, whitelist = ["homepage"])]
-    fn enable_balance_manual_debit(token_id: u32, enable: bool) -> Result<(), Error> {
-        Tokens::add_to_tx().setBalConf(token_id, BalanceFlags::MANUAL_DEBIT.index(), enable);
+    fn enable_balance_auto_debit(token_id: u32, enable: bool) -> Result<(), Error> {
+        Tokens::add_to_tx().setBalConf(token_id, BalanceFlags::AUTO_DEBIT.index(), enable);
         Ok(())
     }
 
@@ -203,7 +203,7 @@ impl Admin for TokensPlugin {
 }
 
 impl Authorized for TokensPlugin {
-    #[psibase_plugin::authorized(High, whitelist = ["homepage"])]
+    #[psibase_plugin::authorized(High, whitelist = ["homepage", "accounts"])]
     fn graphql(query: String) -> Result<String, Error> {
         host::server::post_graphql_get_json(&query)
     }

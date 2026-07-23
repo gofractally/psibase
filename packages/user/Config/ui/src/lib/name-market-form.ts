@@ -1,0 +1,231 @@
+import type { ConfiguredNameMarketRow } from "@/hooks/name-markets/use-configured-markets";
+import type { SystemTokenInfo } from "@shared/hooks/use-system-token";
+import type { MarketConfigInput } from "@shared/lib/plugins/config";
+
+import { z } from "zod";
+
+import { NAME_MARKET_DEFAULT_PARAMS } from "@/lib/name-market-defaults";
+import {
+    parseNonNegativeInt,
+    parsePercentToPct,
+    parseSystemTokenAmount,
+    parseWindowSeconds,
+    secondsToWindowForm,
+} from "@/lib/name-market-parsers";
+
+import {
+    MAX_ACCOUNT_NAME_LENGTH,
+    MIN_ACCOUNT_NAME_LENGTH,
+} from "@shared/lib/schemas/account";
+import { zDurationUnit } from "@shared/lib/schemas/duration-unit";
+
+export type NameMarketFormRow = {
+    length: number;
+    configured: boolean;
+    enabled: boolean;
+    initialPrice: string;
+    floorPrice: string;
+    windowAmount: string;
+    windowUnit: z.infer<typeof zDurationUnit>;
+    target: string;
+    increasePct: string;
+    decreasePct: string;
+};
+
+export type NameMarketsFormValues = {
+    markets: NameMarketFormRow[];
+};
+
+export type MarketConfigParam = MarketConfigInput;
+
+const zDirtyMarketRow = (systemToken: SystemTokenInfo) =>
+    z
+        .object({
+            length: z.number(),
+            configured: z.boolean(),
+            enabled: z.boolean(),
+            initialPrice: z.string(),
+            floorPrice: z.string(),
+            windowAmount: z.string(),
+            windowUnit: zDurationUnit,
+            target: z.string(),
+            increasePct: z.string(),
+            decreasePct: z.string(),
+        })
+        .superRefine((row, ctx) => {
+            if (!row.configured && row.initialPrice.trim() === "") {
+                ctx.addIssue({
+                    code: "custom",
+                    message: "Initial price is required",
+                    path: ["initialPrice"],
+                });
+            } else if (
+                !row.configured &&
+                parseSystemTokenAmount(row.initialPrice, systemToken) === null
+            ) {
+                ctx.addIssue({
+                    code: "custom",
+                    message: "Enter a valid token amount",
+                    path: ["initialPrice"],
+                });
+            }
+
+            if (row.floorPrice.trim() === "") {
+                ctx.addIssue({
+                    code: "custom",
+                    message: "Floor price is required",
+                    path: ["floorPrice"],
+                });
+            } else if (
+                parseSystemTokenAmount(row.floorPrice, systemToken) === null
+            ) {
+                ctx.addIssue({
+                    code: "custom",
+                    message: "Enter a valid token amount",
+                    path: ["floorPrice"],
+                });
+            }
+
+            if (parseWindowSeconds(row.windowAmount, row.windowUnit) === null) {
+                ctx.addIssue({
+                    code: "custom",
+                    message: "Window length is required",
+                    path: ["windowAmount"],
+                });
+            }
+
+            if (parseNonNegativeInt(row.target) === null) {
+                ctx.addIssue({
+                    code: "custom",
+                    message: "Enter an integer >= 0",
+                    path: ["target"],
+                });
+            }
+
+            if (parsePercentToPct(row.increasePct, 99) === null) {
+                ctx.addIssue({
+                    code: "custom",
+                    message: "Enter a whole-number percent from 1 to 99",
+                    path: ["increasePct"],
+                });
+            }
+
+            if (parsePercentToPct(row.decreasePct, 99) === null) {
+                ctx.addIssue({
+                    code: "custom",
+                    message: "Enter a whole-number percent from 1 to 99",
+                    path: ["decreasePct"],
+                });
+            }
+        });
+
+export function buildNameMarketsFormValues(
+    configuredRows: ConfiguredNameMarketRow[] | undefined,
+): NameMarketsFormValues {
+    const byLength = new Map(
+        configuredRows?.map((row) => [row.length, row]) ?? [],
+    );
+    const markets: NameMarketFormRow[] = [];
+
+    for (
+        let length = MIN_ACCOUNT_NAME_LENGTH;
+        length <= MAX_ACCOUNT_NAME_LENGTH;
+        length++
+    ) {
+        const row = byLength.get(length);
+        const configured = row !== undefined;
+        const windowForm = configured
+            ? secondsToWindowForm(row!.windowSeconds)
+            : {
+                  amount: "",
+                  unit: NAME_MARKET_DEFAULT_PARAMS.windowUnit,
+              };
+        markets.push({
+            length,
+            configured,
+            enabled: row?.enabled ?? false,
+            initialPrice: configured ? row!.initialPrice : "",
+            floorPrice: row?.floorPrice ?? "",
+            windowAmount: windowForm.amount,
+            windowUnit: windowForm.unit,
+            target: configured ? String(row!.target) : "",
+            increasePct: configured ? String(row!.increasePct) : "",
+            decreasePct: configured ? String(row!.decreasePct) : "",
+        });
+    }
+
+    return { markets };
+}
+
+export function validateDirtyMarkets(
+    values: NameMarketsFormValues,
+    systemToken: SystemTokenInfo,
+    isRowDirty: (index: number) => boolean,
+): { fields: Record<string, string> } | undefined {
+    const fieldErrors: Record<string, string> = {};
+
+    values.markets.forEach((row, index) => {
+        if (!isRowDirty(index)) {
+            return;
+        }
+
+        const result = zDirtyMarketRow(systemToken).safeParse(row);
+        if (result.success) {
+            return;
+        }
+
+        for (const issue of result.error.issues) {
+            const field = issue.path[0];
+            if (typeof field !== "string") {
+                continue;
+            }
+            fieldErrors[`markets[${index}].${field}`] = issue.message;
+        }
+    });
+
+    if (Object.keys(fieldErrors).length === 0) {
+        return undefined;
+    }
+
+    return { fields: fieldErrors };
+}
+
+export function toMarketConfig(
+    row: NameMarketFormRow,
+    systemToken: SystemTokenInfo,
+): MarketConfigParam {
+    const target = parseNonNegativeInt(row.target);
+    const increasePct = parsePercentToPct(row.increasePct);
+    const decreasePct = parsePercentToPct(row.decreasePct, 99);
+    const floorPrice = parseSystemTokenAmount(row.floorPrice, systemToken);
+    const windowSeconds = parseWindowSeconds(row.windowAmount, row.windowUnit);
+
+    if (
+        target === null ||
+        increasePct === null ||
+        decreasePct === null ||
+        floorPrice === null ||
+        windowSeconds === null
+    ) {
+        throw new Error(`Invalid market config for length ${row.length}`);
+    }
+
+    const initialPrice = row.configured
+        ? null
+        : parseSystemTokenAmount(row.initialPrice, systemToken);
+
+    if (!row.configured && initialPrice === null) {
+        throw new Error(`Invalid initial price for length ${row.length}`);
+    }
+
+    return {
+        length: row.length,
+        windowSeconds,
+        target,
+        floorPrice,
+        increasePct,
+        decreasePct,
+        enabled: row.enabled,
+        initialPrice,
+    };
+}

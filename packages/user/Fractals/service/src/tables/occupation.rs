@@ -1,5 +1,4 @@
 use psibase::{
-    check,
     services::tokens::{Decimal, Precision},
     AccountNumber, Table,
 };
@@ -39,7 +38,7 @@ impl Occupation {
     pub fn set_ordered_occupations(fractal: AccountNumber, new_occupations: Vec<AccountNumber>) {
         let occupations_length = new_occupations.len();
 
-        check(
+        assert!(
             occupations_length <= u8::MAX as usize,
             "too many occupations",
         );

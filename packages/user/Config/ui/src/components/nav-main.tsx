@@ -58,9 +58,9 @@ export const appMenus: Menu[] = [
         path: "resource-pricing",
     },
     {
-        title: "Premium Name Market",
+        title: "Account Marketplace",
         icon: Store,
-        path: "premium-name-market-config",
+        path: "account-marketplace",
     },
     {
         title: "Settings",

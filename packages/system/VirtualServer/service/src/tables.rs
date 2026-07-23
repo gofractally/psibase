@@ -35,7 +35,7 @@ pub mod tables {
         }
 
         pub fn check_init() {
-            check(InitRow::is_init(), "service not initialized");
+            assert!(InitRow::is_init(), "service not initialized");
         }
     }
 

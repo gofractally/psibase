@@ -410,8 +410,9 @@ mod service {
         _socket: Option<i32>,
         user: Option<AccountNumber>,
     ) -> Option<HttpReply> {
-        check(
-            get_sender() == http_server::SERVICE,
+        assert_eq!(
+            get_sender(),
+            http_server::SERVICE,
             "permission denied: tokens::serveSys only callable by 'http-server'",
         );
 

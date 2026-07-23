@@ -2,6 +2,8 @@ import type { Account } from "@shared/lib/schemas/account";
 
 import { UseMutationOptions } from "@tanstack/react-query";
 
+import { PluginCall } from "../../lib/plugins/lib/call-plugin-function";
+
 type Toast = {
     success: string;
     error: string;
@@ -18,17 +20,6 @@ export type MutationOptions<TParams, TResult = unknown> = UseMutationOptions<
 };
 
 export type ToastId = number | string;
-
-export type PluginCall<
-    TParams extends unknown[] = unknown[],
-    TReturn = unknown,
-> = {
-    readonly intf: string;
-    readonly method: string;
-    readonly service: Account;
-    readonly _params?: TParams;
-    readonly _return?: TReturn;
-};
 
 export abstract class PluginInterface {
     protected abstract readonly _intf: string;

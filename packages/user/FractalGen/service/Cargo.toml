@@ -10,7 +10,7 @@ publish.workspace = true
 [package.metadata.psibase]
 flags = ["isPrivileged"]
 postinstall = [
-    { sender = "fractal-gen", service = "fractal-gen", method = "create_frac" },
+    { sender = "frac-gen", service = "frac-gen", method = "create_frac" },
 ]
 
 [dependencies]
@@ -20,16 +20,16 @@ psibase-user-workspace-hack.workspace = true
 serde.workspace = true
 
 [package.metadata.psibase.dependencies]
-Sites = "0.23.0"
-HttpServer = "0.23.0"
-Tokens = "0.23.0"
-Symbol = "0.23.0"
-Transact = "0.23.0"
-Nft = "0.23.0"
-VirtualServer = "0.23.0"
-Fractals = "0.23.0"
-AuthDelegate = "0.23.0"
-Producers = "0.23.0"
+Sites = "0.24.0"
+HttpServer = "0.24.0"
+Tokens = "0.24.0"
+Symbol = "0.24.0"
+Transact = "0.24.0"
+Nft = "0.24.0"
+VirtualServer = "0.24.0"
+Fractals = "0.24.0"
+AuthDelegate = "0.24.0"
+Producers = "0.24.0"
 
 [dev-dependencies]
-fractal-gen-pkg = { path = "..", version = "0.23.0" }
+fractal-gen-pkg = { path = "..", version = "0.24.0" }

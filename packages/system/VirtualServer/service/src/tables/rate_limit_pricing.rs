@@ -127,19 +127,16 @@ impl RateLimitPricing {
     fn update<F: FnOnce(&mut RateLimitPricing)>(resource: ResourceType, f: F) {
         let id = resource.as_id();
         let table = RateLimitPricingTable::read_write();
-        let mut row = check_some(
-            table.get_index_pk().get(&id),
-            &format!("resource {} not initialized", resource.name()),
-        );
+        let mut row = table
+            .get_index_pk()
+            .get(&id)
+            .expect(&format!("resource {} not initialized", resource.name()));
         f(&mut row);
         table.put(&row).unwrap();
     }
 
     pub fn get_assert(resource: ResourceType) -> Self {
-        check_some(
-            Self::get(resource),
-            &format!("resource {} not initialized", resource.name()),
-        )
+        Self::get(resource).expect(&format!("resource {} not initialized", resource.name()))
     }
 
     pub fn get(resource: ResourceType) -> Option<Self> {
@@ -169,10 +166,9 @@ impl RateLimitPricing {
         // Round up to the nearest billable unit
         let amount_units = amount.div_ceil(billable_unit);
 
-        check_some(
-            amount_units.checked_mul(price),
-            &format!("{} usage overflow", resource.name()),
-        )
+        amount_units
+            .checked_mul(price)
+            .expect(&format!("{} usage overflow", resource.name()))
     }
 
     pub fn new_block(&self) -> u32 {
@@ -197,12 +193,12 @@ impl RateLimitPricing {
     }
 
     pub fn set_thresholds(&self, idle_ppm: u32, congested_ppm: u32) {
-        check(
+        assert!(
             idle_ppm < congested_ppm,
             "idle ppm must be less than congested ppm",
         );
-        check(idle_ppm > 0, "idle ppm must be greater than 0%");
-        check(
+        assert!(idle_ppm > 0, "idle ppm must be greater than 0%");
+        assert!(
             congested_ppm < PPM as u32,
             "congested ppm must be less than 100%",
         );
@@ -211,11 +207,11 @@ impl RateLimitPricing {
     }
 
     pub fn set_change_rates(&self, doubling_time_sec: u32, halving_time_sec: u32) {
-        check(
+        assert!(
             doubling_time_sec > 0,
             "doubling time must be greater than 0",
         );
-        check(halving_time_sec > 0, "halving time must be greater than 0");
+        assert!(halving_time_sec > 0, "halving time must be greater than 0");
 
         Self::update(self.resource(), |r| {
             r.doubling_time_sec = doubling_time_sec;
@@ -235,6 +231,10 @@ impl RateLimitPricing {
 
     pub fn get_billable_unit(&self) -> u64 {
         self.billable_unit
+    }
+
+    pub fn is_full(&self) -> bool {
+        self.current_usage >= capacity(self.resource())
     }
 }
 

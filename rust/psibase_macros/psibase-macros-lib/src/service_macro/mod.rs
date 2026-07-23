@@ -236,104 +236,6 @@ fn process_mod(
             pub struct #wrapper;
         });
 
-        let call_from_to_doc = format!(
-            "
-            Call another service.
-
-            This method returns an object which has [methods]({actions}#implementations)
-            (one per action) which call another service and return the result from the call.
-            This method is only usable by services.
-
-            ",
-            actions = options.actions
-        );
-        let call_doc = format!(
-            "{} This method defaults `sender` to [`{psibase}::get_sender`] and `service` to \"{}\".",
-            call_from_to_doc, options.name,            psibase = options.psibase_mod,
-        );
-        let call_to_doc = format!(
-            "{} This method defaults `sender` to [`{psibase}::get_sender`].",
-            call_from_to_doc,
-            psibase = options.psibase_mod,
-        );
-        let call_from_doc = format!(
-            "{} This method defaults `service` to \"{}\".",
-            call_from_to_doc, options.name
-        );
-        let call_as_doc = format!(
-            "
-            Call another service using [runAs]({psibase}::services::transact::Actions::runAs).
-
-            This method returns an object which has [methods]({actions}#implementations)
-            (one per action) which call another service via `runAs` and return the result from the call.
-            The action will run with `sender` set to the provided account. This method defaults `service` to \"{name}\".
-
-            This will fail unless certain conditions are met. See [runAs]({psibase}::services::transact::Actions::runAs) 
-            documentation for more details.
-
-            ",
-            psibase = options.psibase_mod,
-            actions = options.actions,
-            name = options.name
-        );
-        let call_as_extend_doc = format!(
-            "{} This method also accepts `allowedActions` for nested `runAs` calls.",
-            call_as_doc
-        );
-
-        let push_from_to_doc = format!(
-            "
-            push transactions to [psibase::Chain]({psibase}::Chain).
-
-            This method returns an object which has [methods]({actions}#implementations)
-            (one per action) which push transactions to a test chain and return a
-            [psibase::ChainResult]({psibase}::ChainResult) or
-            [psibase::ChainEmptyResult]({psibase}::ChainEmptyResult). This final object
-            can verify success or failure and can retrieve the return value, if any.
-
-            ",
-            psibase = options.psibase_mod,
-            actions = options.actions
-        );
-        let push_doc = format!(
-            "{} This method defaults both `sender` and `service` to \"{}\".",
-            push_from_to_doc, options.name
-        );
-        let push_to_doc = format!(
-            "{} This method defaults `sender` to \"{}\".",
-            push_from_to_doc, options.name
-        );
-        let push_from_doc = format!(
-            "{} This method defaults `service` to \"{}\".",
-            push_from_to_doc, options.name
-        );
-
-        let pack_from_to_doc = format!(
-            "
-            Pack actions into [psibase::Action]({psibase}::Action).
-
-            This method returns an object which has [methods]({actions}#implementations)
-            (one per action) which pack the action's arguments using [fracpack] and
-            return a [psibase::Action]({psibase}::Action). The `pack_*` series of
-            functions is mainly useful to applications which push transactions
-            to blockchains.
-
-            ",
-            psibase = options.psibase_mod,
-            actions = options.actions
-        );
-        let pack_doc = format!(
-            "{} This method defaults both `sender` and `service` to \"{}\".",
-            pack_from_to_doc, options.name
-        );
-        let pack_to_doc = format!(
-            "{} This method defaults `sender` to \"{}\".",
-            pack_from_to_doc, options.name
-        );
-        let pack_from_doc = format!(
-            "{} This method defaults `service` to \"{}\".",
-            pack_from_to_doc, options.name
-        );
         let emit_from_doc = format!(
             "
             Emit events from a service.
@@ -351,168 +253,6 @@ fn process_mod(
                 #[doc = #constant_doc]
                 pub const SERVICE: #psibase_mod::AccountNumber =
                     #psibase_mod::AccountNumber::new(#psibase_mod::account_raw!(#service_account));
-
-                #[doc = #call_doc]
-                pub fn call() -> #actions<#psibase_mod::ServiceCaller> {
-                    #psibase_mod::ServiceCaller {
-                        sender: #psibase_mod::get_service(),
-                        service: Self::#constant,
-                        flags: 0,
-                    }
-                    .into()
-                }
-
-                #[doc = #call_to_doc]
-                pub fn call_to(service: #psibase_mod::AccountNumber)
-                -> #actions<#psibase_mod::ServiceCaller>
-                {
-                    #psibase_mod::ServiceCaller {
-                        sender: #psibase_mod::get_service(),
-                        service,
-                        flags: 0,
-                    }
-                    .into()
-                }
-
-                #[doc = #call_from_doc]
-                pub fn call_from(sender: #psibase_mod::AccountNumber)
-                -> #actions<#psibase_mod::ServiceCaller>
-                {
-                    #psibase_mod::ServiceCaller {
-                        sender,
-                        service: Self::#constant,
-                        flags: 0,
-                    }
-                    .into()
-                }
-
-                #[doc = #call_from_to_doc]
-                pub fn call_from_to(
-                    sender: #psibase_mod::AccountNumber,
-                    service: #psibase_mod::AccountNumber)
-                -> #actions<#psibase_mod::ServiceCaller>
-                {
-                    #psibase_mod::ServiceCaller { sender, service,
-                        flags: 0, }.into()
-                }
-
-                #[doc = #call_as_doc]
-                pub fn call_as(sender: #psibase_mod::AccountNumber)
-                -> #actions<#psibase_mod::RunAsCaller>
-                {
-                    #psibase_mod::RunAsCaller {
-                        sender,
-                        service: Self::#constant,
-                        allowed_actions: vec![],
-                    }
-                    .into()
-                }
-
-                #[doc = #call_as_extend_doc]
-                pub fn call_as_extend(
-                    sender: #psibase_mod::AccountNumber,
-                    allowed_actions: Vec<#psibase_mod::services::transact::ServiceMethod>)
-                -> #actions<#psibase_mod::RunAsCaller>
-                {
-                    #psibase_mod::RunAsCaller {
-                        sender,
-                        service: Self::#constant,
-                        allowed_actions,
-                    }
-                    .into()
-                }
-
-                #[doc = #call_doc]
-                pub fn rpc() -> #actions<#psibase_mod::ServiceCaller> {
-                    #psibase_mod::ServiceCaller {
-                        sender: #psibase_mod::get_service(),
-                        service: Self::#constant,
-                        flags: 1,
-                    }
-                    .into()
-                }
-
-                #[doc = #push_doc]
-                pub fn push(chain: &#psibase_mod::Chain) -> #actions<#psibase_mod::ChainPusher> {
-                    #psibase_mod::ChainPusher {
-                        chain,
-                        sender: Self::#constant,
-                        service: Self::#constant,
-                    }
-                    .into()
-                }
-
-                #[doc = #push_to_doc]
-                pub fn push_to(chain: &#psibase_mod::Chain, service: #psibase_mod::AccountNumber)
-                -> #actions<#psibase_mod::ChainPusher>
-                {
-                    #psibase_mod::ChainPusher {
-                        chain,
-                        sender: Self::#constant,
-                        service,
-                    }
-                    .into()
-                }
-
-                #[doc = #push_from_doc]
-                pub fn push_from(chain: &#psibase_mod::Chain, sender: #psibase_mod::AccountNumber)
-                -> #actions<#psibase_mod::ChainPusher>
-                {
-                    #psibase_mod::ChainPusher {
-                        chain,
-                        sender,
-                        service: Self::#constant,
-                    }
-                    .into()
-                }
-
-                #[doc = #push_from_to_doc]
-                pub fn push_from_to(
-                    chain: &#psibase_mod::Chain,
-                    sender: #psibase_mod::AccountNumber,
-                    service: #psibase_mod::AccountNumber)
-                -> #actions<#psibase_mod::ChainPusher>
-                {
-                    #psibase_mod::ChainPusher { chain, sender, service }.into()
-                }
-
-                #[doc = #pack_doc]
-                pub fn pack() -> #actions<#psibase_mod::ActionPacker> {
-                    #psibase_mod::ActionPacker {
-                        sender: Self::#constant,
-                        service: Self::#constant,
-                    }
-                    .into()
-                }
-
-                #[doc = #pack_to_doc]
-                pub fn pack_to(service: #psibase_mod::AccountNumber)
-                -> #actions<#psibase_mod::ActionPacker>
-                {
-                    #psibase_mod::ActionPacker {
-                        sender: Self::#constant,
-                        service,
-                    }
-                    .into()
-                }
-
-                #[doc = #pack_from_doc]
-                pub fn pack_from(sender: #psibase_mod::AccountNumber)
-                -> #actions<#psibase_mod::ActionPacker>
-                {
-                    #psibase_mod::ActionPacker {
-                        sender,
-                        service: Self::#constant,
-                    }
-                    .into()
-                }
-
-                #[doc = #pack_from_to_doc]
-                pub fn pack_from_to(sender: #psibase_mod::AccountNumber, service: #psibase_mod::AccountNumber)
-                -> #actions<#psibase_mod::ActionPacker>
-                {
-                    #psibase_mod::ActionPacker { sender, service }.into()
-                }
 
                 #[doc = #emit_doc]
                 pub fn emit() -> EmitEvent {
@@ -545,6 +285,7 @@ fn process_mod(
         items.push(parse_quote! {
             #[automatically_derived]
             impl #psibase_mod::ServiceWrapper for #wrapper {
+                const SERVICE: #psibase_mod::AccountNumber = Self::SERVICE;
                 type Actions<T: #psibase_mod::Caller> = #actions<T>;
                 fn with_caller<T: #psibase_mod::Caller>(caller: T) -> #actions<T> {
                     caller.into()
@@ -555,7 +296,7 @@ fn process_mod(
         items.push(parse_quote! {
             #[automatically_derived]
             pub struct #history_events {
-                event_log: #psibase_mod::DbId,
+                event_log: #psibase_mod::EventDb,
                 sender: #psibase_mod::AccountNumber,
             }
         });
@@ -563,7 +304,7 @@ fn process_mod(
         items.push(parse_quote! {
             #[automatically_derived]
             pub struct #ui_events {
-                event_log: #psibase_mod::DbId,
+                event_log: #psibase_mod::EventDb,
                 sender: #psibase_mod::AccountNumber,
             }
         });
@@ -571,7 +312,7 @@ fn process_mod(
         items.push(parse_quote! {
             #[automatically_derived]
             pub struct #merkle_events {
-                event_log: #psibase_mod::DbId,
+                event_log: #psibase_mod::EventDb,
                 sender: #psibase_mod::AccountNumber,
             }
         });
@@ -601,13 +342,10 @@ fn process_mod(
         items.push(parse_quote! {
             impl EmitEvent {
                 pub fn history(&self) -> #history_events {
-                    #history_events { event_log: #psibase_mod::DbId::HistoryEvent, sender: self.sender }
-                }
-                pub fn ui(&self) -> #ui_events {
-                    #ui_events { event_log: #psibase_mod::DbId::UiEvent, sender: self.sender }
+                    #history_events { event_log: #psibase_mod::EventDb::HistoryEvent, sender: self.sender }
                 }
                 pub fn merkle(&self) -> #merkle_events {
-                    #merkle_events { event_log: #psibase_mod::DbId::MerkleEvent, sender: self.sender }
+                    #merkle_events { event_log: #psibase_mod::EventDb::MerkleEvent, sender: self.sender }
                 }
             }
         });
@@ -775,6 +513,7 @@ fn process_mod(
 
                     pub unsafe fn start(this_service: u64) {
                         #psibase_mod::set_service(#psibase_mod::AccountNumber::new(this_service));
+                        #psibase_mod::service_start();
                     }
                 }
             });
@@ -901,11 +640,6 @@ fn gen_polyfill(psibase_mod: &proc_macro2::TokenStream) -> proc_macro2::TokenStr
             }
 
             #[no_mangle]
-            pub unsafe extern "C" fn getSequential(db: DbId, id: u64) -> u32 {
-                tester::polyfill::getSequential(db, id)
-            }
-
-            #[no_mangle]
             pub unsafe extern "C" fn kvGreaterEqual(
                 db: KvHandle,
                 key: *const u8,
@@ -942,10 +676,6 @@ fn gen_polyfill(psibase_mod: &proc_macro2::TokenStream) -> proc_macro2::TokenStr
             #[no_mangle]
             pub unsafe extern "C" fn call(action: *const u8, len: u32, flags: u64) -> u32 {
                 panic!("call not supported in tester");
-            }
-            #[no_mangle]
-            pub unsafe extern "C" fn putSequential(_db: DbId, _value: *const u8, _value_len: u32) -> u64 {
-                panic!("putSequential not supported in tester");
             }
             #[no_mangle]
             pub unsafe extern "C" fn getCurrentAction() -> u32 {

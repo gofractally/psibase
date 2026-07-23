@@ -6,8 +6,7 @@ pub mod tables {
     use psibase::services::token_swap::{swap, Wrapper as TokenSwap, PPM};
     use psibase::services::tokens::{Decimal, Quantity, TokenRecord, Wrapper as Tokens, TID};
     use psibase::{
-        abort_message, check, check_none, check_some, get_sender, AccountNumber, Fracpack, Memo,
-        Table, ToSchema,
+        abort_message, get_sender, AccountNumber, Fracpack, Memo, ServiceWrapper, Table, ToSchema,
     };
 
     use crate::helpers::{mul_div, sqrt};
@@ -30,7 +29,7 @@ pub mod tables {
         }
 
         pub fn init() {
-            check_none(Self::get(), "init row already exists");
+            assert!(Self::get().is_none(), "init row already exists");
             Self::new().save();
         }
 
@@ -87,10 +86,7 @@ pub mod tables {
         }
 
         pub fn get_assert(pool_id: TID, token_id: TID) -> Self {
-            check_some(
-                Self::get(pool_id, token_id),
-                format!("reserve does not exist").as_str(),
-            )
+            Self::get(pool_id, token_id).expect("reserve does not exist")
         }
 
         pub fn get_reserves_of_pool(pool_id: TID) -> (Self, Self) {
@@ -103,11 +99,12 @@ pub mod tables {
         }
 
         pub fn set_fee(&mut self, fee_ppm: u32) {
-            check(
-                get_sender() == self.get_pool().administration_nft_owner(),
+            assert_eq!(
+                get_sender(),
+                self.get_pool().administration_nft_owner(),
                 "Must own administration NFT to set fee",
             );
-            check(fee_ppm < PPM as u32, "fee too high");
+            assert!(fee_ppm < PPM as u32, "fee too high");
             self.fee_ppm = fee_ppm;
             self.save();
         }
@@ -117,10 +114,9 @@ pub mod tables {
         }
 
         pub fn balance(&self) -> Quantity {
-            check_some(
-                Tokens::call().getSubBal(self.token_id, self.pool_sub_account_id()),
-                "reserve balance not found",
-            )
+            Tokens::call()
+                .getSubBal(self.token_id, self.pool_sub_account_id())
+                .expect("reserve balance not found")
         }
 
         pub fn debit_from_sender(&self, amount: Quantity) {
@@ -188,10 +184,8 @@ pub mod tables {
         }
 
         pub fn get_assert(liquidity_token: u32) -> Self {
-            check_some(
-                Self::get(liquidity_token),
-                format!("pool does not exist, liquidity id: {}", liquidity_token).as_str(),
-            )
+            Self::get(liquidity_token)
+                .expect(format!("pool does not exist, liquidity id: {}", liquidity_token).as_str())
         }
 
         pub fn administration_nft_owner(&self) -> AccountNumber {
@@ -201,11 +195,12 @@ pub mod tables {
         }
 
         pub fn set_admin_nft(&mut self, nft_id: NID) {
-            check(
-                get_sender() == self.administration_nft_owner(),
+            assert_eq!(
+                get_sender(),
+                self.administration_nft_owner(),
                 "Must own administration NFT to set new administration NFT",
             );
-            check(
+            assert!(
                 psibase::services::nft::Wrapper::call().exists(nft_id),
                 "new NFT does not exist",
             );
@@ -227,10 +222,7 @@ pub mod tables {
         }
 
         fn new(token_a_id: TID, token_b_id: TID, nft_id: Option<NID>) -> Self {
-            check(
-                token_a_id != token_b_id,
-                "reserve tokens cannot be the same",
-            );
+            assert_ne!(token_a_id, token_b_id, "reserve tokens cannot be the same");
             let tokens = psibase::services::tokens::Wrapper::call();
             tokens.getToken(token_a_id);
             tokens.getToken(token_b_id);
@@ -333,15 +325,15 @@ pub mod tables {
             amount_a_deposit: Quantity,
             amount_b_deposit: Quantity,
         ) {
-            check(amount_a_deposit.value > 0, "amount a must be non-zero");
-            check(amount_b_deposit.value > 0, "amount b must be non-zero");
+            assert!(amount_a_deposit.value > 0, "amount a must be non-zero");
+            assert!(amount_b_deposit.value > 0, "amount b must be non-zero");
 
             let (reserve_a, reserve_b) = self.reserves_in_order(token_a_id, token_b_id);
 
             let reserve_a_balance = reserve_a.balance();
             let reserve_b_balance = reserve_b.balance();
 
-            check(
+            assert!(
                 reserve_a_balance.value > 0 && reserve_b_balance.value > 0,
                 "pool does not have sufficient reserves",
             );
@@ -360,7 +352,7 @@ pub mod tables {
                 reserve_b_balance,
             );
 
-            check(lp_tokens_to_mint.value > 0, "no liquidity to mint");
+            assert!(lp_tokens_to_mint.value > 0, "no liquidity to mint");
 
             reserve_a.debit_from_sender(amount_a);
             reserve_b.debit_from_sender(amount_b);
@@ -397,9 +389,9 @@ pub mod tables {
         }
 
         pub fn remove_liquidity(&self, liquidity_amount: Quantity) {
-            check(
+            assert!(
                 liquidity_amount.value > 0,
-                "liquidity amount must be positive",
+                "liquidity amount must be positive"
             );
             self.debit_lp_tokens_from_sender(liquidity_amount);
 
@@ -409,8 +401,8 @@ pub mod tables {
             let a_amount = a_reserve.pool_token_entitlement(liquidity_amount, pool_token_supply);
             let b_amount = b_reserve.pool_token_entitlement(liquidity_amount, pool_token_supply);
 
-            check(a_amount.value > 0, "no a token reserve balance to return");
-            check(b_amount.value > 0, "no b token reserve balance to return");
+            assert!(a_amount.value > 0, "no a token reserve balance to return");
+            assert!(b_amount.value > 0, "no b token reserve balance to return");
 
             a_reserve.withdraw_and_credit_to_sender(a_amount, "Withdrawal 1/2".into());
             b_reserve.withdraw_and_credit_to_sender(b_amount, "Withdrawal 2/2".into());
@@ -474,7 +466,7 @@ pub mod tables {
                 let sqrt_approx = sqrt(product);
                 (sqrt_approx as u64).into()
             };
-            check(
+            assert!(
                 initial_lp_tokens.value > 100,
                 "not enough initial liquidity",
             );
@@ -483,7 +475,7 @@ pub mod tables {
             // so it keeps the pool permanently functional.
             // tokens aren't burned as that will reduce the total supply which negates this intended affect
             let dead_tokens: Quantity = 10.into();
-            check(
+            assert!(
                 initial_lp_tokens > dead_tokens,
                 "initial too small for dead tokens",
             );
@@ -507,7 +499,7 @@ pub mod tables {
                 outgoing_reserve.balance(),
                 incoming_reserve.fee_ppm,
             );
-            check(outgoing_amount.value > 0, "outgoing amount is 0");
+            assert!(outgoing_amount.value > 0, "outgoing amount is 0");
 
             incoming_reserve.deposit_into_reserve(incoming_amount);
             outgoing_reserve.withdraw_from_reserve(outgoing_amount);

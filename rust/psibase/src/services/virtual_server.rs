@@ -122,54 +122,50 @@ pub struct BufferConfig {
 /// capacity-limited resource can be undercollateralized in certain well-defined scenarios (e.g.
 /// consumption before billing is enabled).
 ///
-/// An undercollateralized curve is recollateralized over time using the fees that would otherwise
-/// be sent to the fee receiver.
+/// An undercollateralized curve recollateralizes as users free bytes: a free sells bytes
+/// back to the relay, reducing the required reserve. The user's refund is still paid (if
+/// collateral allows), but the fee portion is retained in the curve rather than paid out.
+/// The fee receiver is paid only once the curve is fully collateralized.
 ///
 /// Example disk recollateralization flow diagram (simplified for clarity) for a transaction that
 /// frees bytes:
 ///
 /// ```text
-///             .---------------.
-///            (   free bytes    )
-///             '-------+-------'
-///                     |
-///                     v
-///          +--------------------------+
-///          | Reduces curve shortfall  |
-///          +-----------+--------------+
-///                      |
-///                      v
-///                 .----------.
-///                /            \
-///       No      /   curve has  \     Yes
-///     .--------(   collateral?  )--------.
-///     |         \              /          |
-///     |          \            /           |
-///     v           '----------'            v
-///  .-----.                      +--------------------+
-/// (  End  )                     |  Calc user refund  |
-///  '-----'                      +---------+----------+
-///                                         |
-///                                         v
-///                               +----------------------+
-///                               | Take fee from refund |
-///                               +---------+------------+
-///                                         |
-///                                         v
-///                               +--------------------+
-///                               |  Send user refund  |
-///                               +---------+----------+
-///                                         |
-///                                         v
-///                                .-----------------.
-///                               /                   \
-///                   yes        /    Curve under-     \        no
-///                 .-----------(   collateralized?     )-----------.
-///                 |            \                     /            |
-///                 v             '-------------------'             v
-///       +--------------------+                        +--------------------------+
-///       |  Add fee to relay  |                        | Send fee to fee receiver |
-///       +--------------------+                        +--------------------------+
+///                                                                 Example values:
+///                                                                 Total collateral: $15
+///                                                                 Required reserve: $100
+///
+///            .---------------.
+///           (   free bytes    )                                   Total free: $20
+///            '-------+-------'                                    Required reserve: $80
+///                    |
+///                    v
+///      +--------------------------+
+///      |  Split gross-refund into |                               Refund: $10
+///      |  refund + fee            |                               Fee: $10
+///      +----+----------------+----+
+///           |                |
+///           |                v
+///           |     +-------------------------------+
+///           |     | Calculate final refund:       |               Final refund:
+///           |     | min(refund, collateral)       |               min(10, 15) = $10
+///           |     +-----+-------------+-----------+
+///           |           |             |
+///           |           |             v
+///           |           |      +---------------------------+
+///           |           |      | Send final refund to user |
+///           |           |      +---------------------------+
+///           v           v
+///      +----------------------------------------------------+
+///      | Calculate final fee:                               |     Final fee:
+///      | Final fee can only come from collateral left over  |     min(fee, max(collateral - final refund - required reserve, 0))
+///      | after the refund and the curve's required reserve. |     min(10, max(15 - 10 - 80, 0)) = $0
+///      +-----------------+----------------------------------+
+///                        |
+///                        v
+///        +--------------------------------+
+///        | Send final fee to fee receiver |
+///        +--------------------------------+
 /// ```
 #[crate::service(name = "vserver", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
@@ -480,6 +476,12 @@ mod service {
 
     #[action]
     fn get_resources(user: AccountNumber) -> Quantity {
+        unimplemented!()
+    }
+
+    /// Whether the current block can hold another transaction
+    #[action]
+    fn can_push_tx() -> bool {
         unimplemented!()
     }
 
