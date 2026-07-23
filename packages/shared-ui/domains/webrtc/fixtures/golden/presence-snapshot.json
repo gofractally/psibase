@@ -1,0 +1,7 @@
+{
+    "t": "presenceSnapshot",
+    "peers": [
+        { "account": "bob", "presence": "online" },
+        { "account": "carol", "presence": "offline" }
+    ]
+}

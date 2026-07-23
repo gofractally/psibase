@@ -31,6 +31,7 @@ option(ENABLE_SSL "Build psinode with TLS support" ON)
 
 set(USER_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/target)
 set(SYSTEM_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/target)
+set(LOCAL_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/local/target)
 
 add_subdirectory(native)
 add_subdirectory(rust)
@@ -178,6 +179,7 @@ if(DEFINED WASI_SDK_PREFIX)
             -DPSITEST_EXECUTABLE=$<TARGET_FILE:psitest>
             -DUSER_WORKSPACE_TARGET=${USER_WORKSPACE_TARGET}
             -DSYSTEM_WORKSPACE_TARGET=${SYSTEM_WORKSPACE_TARGET}
+            -DLOCAL_WORKSPACE_TARGET=${LOCAL_WORKSPACE_TARGET}
         BUILD_BYPRODUCTS ${WASM_BYPRODUCTS}
     )
     file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"wasm\")\n")
@@ -609,6 +611,12 @@ cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Subgroups.psi
     PATH packages/user/Subgroups
     TARGET_DIR ${USER_WORKSPACE_TARGET}
+)
+
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/XWebRtcSig.psi
+    PATH packages/local/XWebRtcSig
+    TARGET_DIR ${LOCAL_WORKSPACE_TARGET}
 )
 
 psibase_package(
@@ -1295,7 +1303,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Default set of local packages to install on a new server"
     LOCAL
-    PACKAGE_DEPENDS XHttp XAdmin XDb XPackages XPeers XRun XSites XTimer XTransact
+    PACKAGE_DEPENDS XHttp XAdmin XDb XPackages XPeers XRun XSites XTimer XTransact XWebRtcSig
 )
 
 function(write_package_index target dir)
@@ -1315,7 +1323,7 @@ write_package_index(package-index ${SERVICE_DIR}
     Accounts AccountsService Aes AuthAny AuthDyn AuthDelegate AuthDelegateService AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail Chat ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
     Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage VirtualServer WebCrypto Workshop Config
-    XAdmin XBasic XDb XDefault XHttp XPackages XPeers XProxy XRun XSites XTimer XTransact)
+    XAdmin XBasic XDb XDefault XHttp XPackages XPeers XProxy XRun XSites XTimer XTransact XWebRtcSig)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -1397,6 +1405,7 @@ install(
           ${SERVICE_DIR}/XHttp.psi
           ${SERVICE_DIR}/XPackages.psi
           ${SERVICE_DIR}/XPeers.psi
+          ${SERVICE_DIR}/XWebRtcSig.psi
           ${SERVICE_DIR}/XProxy.psi
           ${SERVICE_DIR}/XRun.psi
           ${SERVICE_DIR}/XSites.psi
