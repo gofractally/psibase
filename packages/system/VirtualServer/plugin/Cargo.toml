@@ -1,16 +1,16 @@
 [package]
 name = "virtual-server-plugin"
-version = "0.23.1"
+version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
 publish.workspace = true
 
 [build-dependencies]
-virtual-server = { path = "../service/", version = "0.23.0" }
+virtual-server = { path = "../service/", version = "0.24.0" }
 async-graphql.workspace = true
 
 [dependencies]
-virtual-server = { path = "../service/", version = "0.23.0" }
+virtual-server = { path = "../service/", version = "0.24.0" }
 psibase.workspace = true
 psibase_plugin.workspace = true
 serde.workspace = true

@@ -66,13 +66,7 @@ auto result =
 
 ## Defining events
 
-See the following for a description of the various types of events:
-
-- [psibase::DbId::historyEvent]
-- [psibase::DbId::uiEvent]
-- [psibase::DbId::merkleEvent]
-
-To define events for a service, declare the event functions as below, then reflect them using the 4 macros below. Each of the `History`, `Ui`, and `Merkle` structs must be present and reflected, even when they don't have any events declared within.
+To define events for a service, declare the event functions as below, then reflect them using the 3 macros below. Each of the `History` and `Merkle` structs must be present and reflected, even when they don't have any events declared within.
 
 After you have defined your events, use [psibase::Service::emit] to emit them and [psibase::Service::events] to read them.
 
@@ -85,11 +79,6 @@ struct MyService: psibase::Service<MyService> {
          // they only define the interface
          void myEvent(uint32_t a, std::string s);
          void anotherEvent(psibase::AccountNumber account);
-      };
-
-      // Events which live a short time
-      struct Ui {
-         void updateDisplay();
       };
 
       // Events which live in Merkle trees
@@ -108,10 +97,6 @@ PSIBASE_REFLECT_HISTORY_EVENTS(
    MyService,
    method(myEvent, a, s),
    method(anotherEvent, account))
-
-PSIBASE_REFLECT_UI_EVENTS(
-   MyService,
-   method(updateDisplay))
 
 PSIBASE_REFLECT_MERKLE_EVENTS(
    MyService,

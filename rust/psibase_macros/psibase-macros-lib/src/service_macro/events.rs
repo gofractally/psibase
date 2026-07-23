@@ -5,7 +5,6 @@ use syn::{AttrStyle, Attribute, ItemFn};
 #[derive(PartialEq, Eq, Hash)]
 pub enum EventType {
     History,
-    Ui,
     Merkle,
 }
 
@@ -91,16 +90,12 @@ pub fn parse_event_attr(attr: &Attribute) -> Option<EventType> {
                     event_type = Some(EventType::History);
                     return Ok(());
                 }
-                if meta.path.is_ident("ui") {
-                    event_type = Some(EventType::Ui);
-                    return Ok(());
-                }
                 if meta.path.is_ident("merkle") {
                     event_type = Some(EventType::Merkle);
                     return Ok(());
                 }
-                emit_error!(attr.meta, "expected history, ui, or merkle");
-                return Err(meta.error("expected history, ui, or merkle"));
+                emit_error!(attr.meta, "expected history or merkle");
+                return Err(meta.error("expected history or merkle"));
             });
             return event_type;
         }

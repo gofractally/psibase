@@ -6,7 +6,7 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-guilds = { path = "../service/", version = "0.23.0" }
+guilds = { path = "../service/", version = "0.24.0" }
 psibase.workspace = true
 psibase_plugin.workspace = true
 serde.workspace = true
