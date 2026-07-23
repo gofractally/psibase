@@ -1,5 +1,3 @@
-use crate::tables::SPACE_KIND_GROUP;
-
 use super::*;
 
 #[test]
@@ -10,91 +8,19 @@ fn validate_purpose_accepts_chat_data_and_av_call() {
 }
 
 #[test]
-fn participants_for_session_uses_all_members_for_group_chat_data() {
+fn pair_session_id_for_is_lex_ordered() {
     let alice = "alice".parse().unwrap();
     let bob = "bob".parse().unwrap();
-    let carol = "carol".parse().unwrap();
-    let members = vec![alice, bob, carol];
-
-    let resolved =
-        participants_for_session(SPACE_KIND_GROUP, PURPOSE_CHAT_DATA, &members, &[alice, bob]);
-    assert_eq!(resolved, vec![alice, bob, carol]);
-}
-
-#[test]
-fn participants_for_session_uses_all_members_for_dm_chat_data() {
-    let alice = "alice".parse().unwrap();
-    let bob = "bob".parse().unwrap();
-    let members = vec![alice, bob];
-
-    // Explicit subset is ignored; DM sessions always include both members.
-    let resolved = participants_for_session(
-        crate::tables::SPACE_KIND_DM,
-        PURPOSE_CHAT_DATA,
-        &members,
-        &[alice],
-    );
-    assert_eq!(resolved, vec![alice, bob]);
-}
-
-#[test]
-fn participants_for_session_uses_all_members_for_group_av_call() {
-    let alice = "alice".parse().unwrap();
-    let bob = "bob".parse().unwrap();
-    let carol = "carol".parse().unwrap();
-    let members = vec![alice, bob, carol];
-
-    let resolved =
-        participants_for_session(SPACE_KIND_GROUP, PURPOSE_AV_CALL, &members, &[alice, bob]);
-    assert_eq!(resolved, vec![alice, bob, carol]);
-}
-
-#[test]
-fn participants_for_session_uses_all_members_for_dm_av_call() {
-    let alice = "alice".parse().unwrap();
-    let bob = "bob".parse().unwrap();
-    let members = vec![alice, bob];
-
-    let resolved = participants_for_session(
-        crate::tables::SPACE_KIND_DM,
-        PURPOSE_AV_CALL,
-        &members,
-        &[alice],
-    );
-    assert_eq!(resolved, vec![alice, bob]);
-}
-
-#[test]
-fn validate_session_participants_requires_sender_and_space_members() {
-    let alice = "alice".parse().unwrap();
-    let bob = "bob".parse().unwrap();
-    let carol = "carol".parse().unwrap();
-    let members = vec![alice, bob];
-
-    let ok = validate_session_participants(alice, &members, &[bob, alice]).unwrap();
-    assert_eq!(ok, vec![alice, bob]);
-
-    let err = validate_session_participants(alice, &members, &[bob]).unwrap_err();
-    assert!(err.to_string().contains("caller must be included"));
-
-    let err = validate_session_participants(alice, &members, &[alice, carol]).unwrap_err();
-    assert!(err.to_string().contains("not a member of the space"));
-}
-
-#[test]
-fn allocate_pair_session_id_is_lex_ordered() {
-    let alice = "alice".parse().unwrap();
-    let bob = "bob".parse().unwrap();
-    let id = allocate_pair_session_id(bob, alice);
+    let id = pair_session_id_for(bob, alice);
     assert_eq!(id, "wrtc:pair:alice:bob");
-    assert_eq!(allocate_pair_session_id(alice, bob), id);
+    assert_eq!(pair_session_id_for(alice, bob), id);
 }
 
 #[test]
 fn parse_pair_session_id_round_trip() {
     let alice = "alice".parse().unwrap();
     let bob = "bob".parse().unwrap();
-    let id = allocate_pair_session_id(alice, bob);
+    let id = pair_session_id_for(alice, bob);
     let parsed = parse_pair_session_id(&id).unwrap();
     assert_eq!(parsed, vec![alice, bob]);
 }
@@ -120,7 +46,7 @@ fn authorize_pair_session_join_allows_participants_only() {
     let alice = "alice".parse().unwrap();
     let bob = "bob".parse().unwrap();
     let carol = "carol".parse().unwrap();
-    let id = allocate_pair_session_id(alice, bob);
+    let id = pair_session_id_for(alice, bob);
 
     let alice_auth = authorize_session_join(&id, alice, 0);
     assert!(alice_auth.authorized);
@@ -136,12 +62,24 @@ fn authorize_pair_session_join_allows_participants_only() {
 }
 
 #[test]
-fn allocate_session_id_is_stable_prefix() {
+fn is_session_participant_recognizes_pair_ids() {
     let alice = "alice".parse().unwrap();
     let bob = "bob".parse().unwrap();
-    let id = allocate_session_id("space:abc", PURPOSE_CHAT_DATA, &[alice, bob], 1, alice);
+    let carol = "carol".parse().unwrap();
+    let id = pair_session_id_for(alice, bob);
+
+    assert!(is_session_participant(&id, alice));
+    assert!(is_session_participant(&id, bob));
+    assert!(!is_session_participant(&id, carol));
+}
+
+#[test]
+fn session_id_for_is_stable_prefix() {
+    let alice = "alice".parse().unwrap();
+    let bob = "bob".parse().unwrap();
+    let id = session_id_for("space:abc", PURPOSE_CHAT_DATA, &[alice, bob], 1, alice);
     assert!(id.starts_with("wrtc:"));
-    let id2 = allocate_session_id("space:abc", PURPOSE_CHAT_DATA, &[alice, bob], 1, alice);
+    let id2 = session_id_for("space:abc", PURPOSE_CHAT_DATA, &[alice, bob], 1, alice);
     assert_eq!(id, id2);
 }
 

@@ -73,17 +73,8 @@ impl Spaces for ChatPlugin {
 
 impl Sessions for ChatPlugin {
     #[psibase_plugin::authorized(Medium, whitelist = ["homepage"])]
-    fn create_session(
-        space_id: String,
-        purpose: SessionPurpose,
-        participants: Vec<String>,
-    ) -> Result<(), Error> {
-        let participants = parse_members(participants)?;
-        chat::Wrapper::add_to_tx().createSession(
-            space_id,
-            purpose_to_chain(purpose),
-            participants,
-        );
+    fn create_session(space_id: String, purpose: SessionPurpose) -> Result<(), Error> {
+        chat::Wrapper::add_to_tx().createSession(space_id, purpose_to_chain(purpose));
         Ok(())
     }
 

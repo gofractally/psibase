@@ -24,10 +24,10 @@ fn test_create_av_call_supersedes_existing_active_session(
         .ensureGroup(vec![bob, carol])
         .get()?;
     let first = Wrapper::push_from(&chain, alice)
-        .createSession(space.space_id.clone(), "av-call".into(), vec![alice, bob])
+        .createSession(space.space_id.clone(), "av-call".into())
         .get()?;
     let second = Wrapper::push_from(&chain, alice)
-        .createSession(space.space_id, "av-call".into(), vec![alice, bob])
+        .createSession(space.space_id, "av-call".into())
         .get()?;
 
     assert_ne!(first.session_id, second.session_id);
@@ -59,7 +59,7 @@ fn test_create_av_call_after_explicit_close(
         .ensureGroup(vec![bob, carol])
         .get()?;
     let first = Wrapper::push_from(&chain, alice)
-        .createSession(space.space_id.clone(), "av-call".into(), vec![alice, bob])
+        .createSession(space.space_id.clone(), "av-call".into())
         .get()?;
 
     Wrapper::push_from(&chain, alice)
@@ -67,7 +67,7 @@ fn test_create_av_call_after_explicit_close(
         .get()?;
 
     let second = Wrapper::push_from(&chain, alice)
-        .createSession(space.space_id, "av-call".into(), vec![alice, bob])
+        .createSession(space.space_id, "av-call".into())
         .get()?;
 
     assert_ne!(first.session_id, second.session_id);
@@ -87,7 +87,7 @@ fn test_create_av_call_session(chain: psibase::Chain) -> Result<(), psibase::Err
 
     let space = Wrapper::push_from(&chain, alice).ensureDm(bob).get()?;
     let session = Wrapper::push_from(&chain, alice)
-        .createSession(space.space_id.clone(), "av-call".into(), vec![alice, bob])
+        .createSession(space.space_id.clone(), "av-call".into())
         .get()?;
 
     assert!(session.session_id.starts_with("wrtc:"));
@@ -112,7 +112,8 @@ fn test_create_av_call_session(chain: psibase::Chain) -> Result<(), psibase::Err
         .getCallEvents(session.session_id.clone())
         .get()?;
     assert_eq!(events.len(), 1);
-    assert_eq!(events[0].kind, 1);
+    // SESSION_EVENT_CALL_STARTED
+    assert_eq!(events[0].kind, 5);
     assert_eq!(events[0].account, alice);
 
     Ok(())
@@ -134,7 +135,7 @@ fn test_create_group_av_call_session(chain: psibase::Chain) -> Result<(), psibas
         .get()?;
 
     let session = Wrapper::push_from(&chain, alice)
-        .createSession(group.space_id.clone(), "av-call".into(), vec![alice, bob])
+        .createSession(group.space_id.clone(), "av-call".into())
         .get()?;
 
     assert_eq!(session.purpose, "av-call");
@@ -167,12 +168,12 @@ fn test_create_av_call_session_rejects_non_space_participant(
     chain.new_account(carol).unwrap();
 
     let space = Wrapper::push_from(&chain, alice).ensureDm(bob).get()?;
-    let err = Wrapper::push_from(&chain, alice)
-        .createSession(space.space_id, "av-call".into(), vec![alice, carol])
+    let err = Wrapper::push_from(&chain, carol)
+        .createSession(space.space_id, "av-call".into())
         .get()
         .expect_err("carol is not a space member");
     assert!(
-        err.to_string().contains("not a member of the space"),
+        err.to_string().contains("not a member of space"),
         "unexpected error: {err}"
     );
 
@@ -199,11 +200,7 @@ fn test_create_group_av_call_session_rejects_non_space_member(
         .get()?;
 
     let err = Wrapper::push_from(&chain, dave)
-        .createSession(
-            group.space_id,
-            "av-call".into(),
-            vec![dave, alice, bob, carol],
-        )
+        .createSession(group.space_id, "av-call".into())
         .get()
         .expect_err("dave is not a space member");
     assert!(
@@ -229,7 +226,7 @@ fn test_av_call_webrtc_session_event_translates_to_call_timeline(
 
     let space = Wrapper::push_from(&chain, alice).ensureDm(bob).get()?;
     let session = Wrapper::push_from(&chain, alice)
-        .createSession(space.space_id, "av-call".into(), vec![alice, bob])
+        .createSession(space.space_id, "av-call".into())
         .get()?;
     let session_id = session.session_id.clone();
 
@@ -262,11 +259,12 @@ fn test_av_call_webrtc_session_event_translates_to_call_timeline(
         .get()?;
     assert_eq!(events.len(), 3);
     let kinds: Vec<u8> = events.iter().map(|e| e.kind).collect();
+    // SESSION_EVENT_*: joined=1, ended=4, call_started=5
     assert!(kinds.contains(&1));
-    assert!(kinds.contains(&2));
+    assert!(kinds.contains(&4));
     assert!(kinds.contains(&5));
-    assert!(events.iter().any(|e| e.kind == 2 && e.account == bob));
-    assert!(events.iter().any(|e| e.kind == 5 && e.account == alice));
+    assert!(events.iter().any(|e| e.kind == 1 && e.account == bob));
+    assert!(events.iter().any(|e| e.kind == 4 && e.account == alice));
 
     let ended = Wrapper::push_from(&chain, alice)
         .getSession(session_id)
@@ -293,7 +291,7 @@ fn test_av_call_timeline_graphql_surfaces_started_and_ended(
 
     let space = Wrapper::push_from(&chain, alice).ensureDm(bob).get()?;
     let session = Wrapper::push_from(&chain, alice)
-        .createSession(space.space_id.clone(), "av-call".into(), vec![alice, bob])
+        .createSession(space.space_id.clone(), "av-call".into())
         .get()?;
     let session_id = session.session_id.clone();
 
@@ -357,7 +355,7 @@ fn test_group_av_call_session_graphql_returns_full_participant_set(
         .ensureGroup(vec![bob, carol])
         .get()?;
     let session = Wrapper::push_from(&chain, bob)
-        .createSession(group.space_id.clone(), "av-call".into(), vec![bob, alice])
+        .createSession(group.space_id.clone(), "av-call".into())
         .get()?;
 
     let token = chain.login(alice, Wrapper::SERVICE)?;
@@ -418,14 +416,10 @@ fn test_chat_data_and_av_call_sessions_coexist_in_space(
 
     let space = Wrapper::push_from(&chain, alice).ensureDm(bob).get()?;
     let chat_data = Wrapper::push_from(&chain, alice)
-        .createSession(
-            space.space_id.clone(),
-            "chat-data".into(),
-            vec![alice, bob],
-        )
+        .createSession(space.space_id.clone(), "chat-data".into())
         .get()?;
     let av_call = Wrapper::push_from(&chain, alice)
-        .createSession(space.space_id.clone(), "av-call".into(), vec![alice, bob])
+        .createSession(space.space_id.clone(), "av-call".into())
         .get()?;
 
     assert_ne!(chat_data.session_id, av_call.session_id);

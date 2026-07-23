@@ -23,13 +23,6 @@ pub fn canonical_space_members(
     members
 }
 
-pub fn canonical_space_members_with_sender(
-    sender: AccountNumber,
-    members: impl IntoIterator<Item = AccountNumber>,
-) -> Vec<AccountNumber> {
-    canonical_space_members(std::iter::once(sender).chain(members))
-}
-
 pub fn validate_space_members(members: &[AccountNumber]) -> Result<(), SpaceError> {
     if members.len() < 2 {
         return Err(SpaceError::InvalidMemberSet(
@@ -68,13 +61,6 @@ pub fn dm_members(
     Ok(canonical_space_members([sender, other]))
 }
 
-pub fn group_members(
-    sender: AccountNumber,
-    others: impl IntoIterator<Item = AccountNumber>,
-) -> Vec<AccountNumber> {
-    canonical_space_members_with_sender(sender, others)
-}
-
 pub fn validate_group_members(members: &[AccountNumber]) -> Result<(), SpaceError> {
     if members.len() < 3 {
         return Err(SpaceError::InvalidMemberSet(
@@ -88,17 +74,14 @@ pub fn sender_is_member(members: &[AccountNumber], sender: AccountNumber) -> boo
     members.iter().any(|member| *member == sender)
 }
 
-pub fn space_exists(space_id: &str) -> bool {
-    space_row(space_id).is_some()
-}
-
 pub fn space_row(space_id: &str) -> Option<SpaceRow> {
     SpaceTable::read()
         .get_index_pk()
         .get(&space_id.to_owned())
 }
 
-pub fn open_space(members: Vec<AccountNumber>, created_at: i64) -> Result<SpaceRow, SpaceError> {
+/// Get-or-create a Space for the canonical member set.
+pub fn ensure_space(members: Vec<AccountNumber>, created_at: i64) -> Result<SpaceRow, SpaceError> {
     let members = canonical_space_members(members);
     let kind = space_kind_for_members(&members)?;
     if kind == SPACE_KIND_GROUP {
@@ -132,7 +115,7 @@ pub fn open_space(members: Vec<AccountNumber>, created_at: i64) -> Result<SpaceR
 }
 
 pub fn ensure_sender_is_member(space_id: &str, sender: AccountNumber) -> Result<(), SpaceError> {
-    if !space_exists(space_id) {
+    if space_row(space_id).is_none() {
         return Err(SpaceError::UnknownSpace(format!(
             "unknown space {space_id}"
         )));
@@ -156,8 +139,7 @@ pub fn is_space_member(space_id: &str, member: AccountNumber) -> bool {
 pub fn members_of(space_id: &str) -> Vec<AccountNumber> {
     SpaceMemberTable::read()
         .get_index_pk()
-        .iter()
-        .filter(|row| row.space_id == space_id)
+        .range((space_id.to_owned(), AccountNumber::MIN)..=(space_id.to_owned(), AccountNumber::MAX))
         .map(|row| row.member)
         .collect()
 }
@@ -165,10 +147,16 @@ pub fn members_of(space_id: &str) -> Vec<AccountNumber> {
 pub fn spaces_for_user(user: AccountNumber) -> Vec<SpaceRow> {
     let member_table = SpaceMemberTable::read();
     let space_table = SpaceTable::read();
-    member_table
-        .get_index_by_member_space()
-        .iter()
-        .filter(|row| row.member == user)
+    let index = member_table.get_index_by_member_space();
+    let start = (user, String::new());
+    // Secondary is (member, space_id); exclusive end at the next account prefix.
+    let member_rows = if user.value == u64::MAX {
+        index.range(start..)
+    } else {
+        let end = (AccountNumber::from(user.value + 1), String::new());
+        index.range(start..end)
+    };
+    member_rows
         .filter_map(|row| space_table.get_index_pk().get(&row.space_id))
         .collect()
 }

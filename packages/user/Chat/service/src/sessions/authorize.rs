@@ -3,10 +3,18 @@ use psibase::{AccountNumber, Table};
 use crate::tables::{SessionJoinAuth, SessionParticipantTable};
 
 use super::lookup::{participants_of_session, session_is_expired, session_row};
-use super::pair::authorize_pair_session_join;
+use super::pair::{authorize_pair_session_join, parse_pair_session_id};
 use super::types::SESSION_STATUS_ACTIVE;
 
+/// True if `account` may participate in this session id.
+///
+/// Objective sessions use `SessionParticipantTable`. Pair transport ids
+/// (`wrtc:pair:lower:higher`, PR5+) authorize from the id itself — same rule as
+/// [`authorize_session_join`].
 pub fn is_session_participant(session_id: &str, account: AccountNumber) -> bool {
+    if let Some(participants) = parse_pair_session_id(session_id) {
+        return participants.iter().any(|p| *p == account);
+    }
     SessionParticipantTable::read()
         .get_index_pk()
         .get(&(session_id.to_owned(), account))

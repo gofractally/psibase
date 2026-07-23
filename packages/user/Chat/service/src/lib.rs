@@ -143,7 +143,7 @@ pub mod spaces;
 pub mod service {
     use crate::sessions;
     use crate::spaces::{
-        dm_members, group_members, open_space, space_with_members, spaces_for_user,
+        canonical_space_members, dm_members, ensure_space, space_with_members, spaces_for_user,
         validate_group_members,
     };
     use crate::tables::{
@@ -180,7 +180,7 @@ pub mod service {
             crate::spaces::sender_is_member(&members, sender),
             "caller must be included in space members",
         );
-        let row = open_space(members, now_micros()).expect("open space");
+        let row = ensure_space(members, now_micros()).expect("ensure space");
         space_with_members(row)
     }
 
@@ -189,7 +189,7 @@ pub mod service {
     fn ensureDm(contact: AccountNumber) -> Space {
         let sender = get_sender();
         let members = dm_members(sender, contact).expect("invalid dm members");
-        let row = open_space(members, now_micros()).expect("open space");
+        let row = ensure_space(members, now_micros()).expect("ensure space");
         space_with_members(row)
     }
 
@@ -197,19 +197,16 @@ pub mod service {
     #[allow(non_snake_case)]
     fn ensureGroup(other_members: Vec<AccountNumber>) -> Space {
         let sender = get_sender();
-        let members = group_members(sender, other_members);
+        let members = canonical_space_members(std::iter::once(sender).chain(other_members));
         validate_group_members(&members).expect("invalid group members");
-        let row = open_space(members, now_micros()).expect("open space");
+        let row = ensure_space(members, now_micros()).expect("ensure space");
         space_with_members(row)
     }
 
     #[action]
     #[allow(non_snake_case)]
     fn getSpace(space_id: String) -> Option<Space> {
-        let row = crate::tables::SpaceTable::read()
-            .get_index_pk()
-            .get(&space_id)?;
-        Some(space_with_members(row))
+        crate::spaces::space_row(&space_id).map(space_with_members)
     }
 
     #[action]
@@ -230,20 +227,9 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn createSession(
-        space_id: String,
-        purpose: String,
-        participants: Vec<AccountNumber>,
-    ) -> Session {
+    fn createSession(space_id: String, purpose: String) -> Session {
         let sender = get_sender();
-        sessions::create_session(
-            &space_id,
-            &purpose,
-            participants,
-            sender,
-            now_micros(),
-        )
-        .expect("createSession")
+        sessions::create_session(&space_id, &purpose, sender, now_micros()).expect("createSession")
     }
 
     #[action]
@@ -261,7 +247,7 @@ pub mod service {
             account!("x-wrtcsig"),
             "permission denied: webrtcSessionEvent only callable by x-wrtcsig",
         );
-        sessions::apply_webrtc_session_event(event, now_micros()).expect("webrtcSessionEvent");
+        sessions::record_webrtc_session_event(event, now_micros()).expect("webrtcSessionEvent");
     }
 
     #[action]
@@ -281,7 +267,7 @@ pub mod service {
     #[action]
     #[allow(non_snake_case)]
     fn getSession(session_id: String) -> Option<Session> {
-        sessions::session_row(&session_id).map(sessions::session_to_view)
+        sessions::session_row(&session_id).map(sessions::session_with_participants)
     }
 
     #[action]

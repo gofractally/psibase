@@ -33,8 +33,21 @@ pub fn append_session_event(
 fn session_event_exists(session_id: &str, kind: u8, account: AccountNumber) -> bool {
     SessionEventTable::read()
         .get_index_pk()
-        .iter()
-        .any(|row| row.session_id == session_id && row.kind == kind && row.account == account)
+        .range(
+            (
+                session_id.to_owned(),
+                i64::MIN,
+                u8::MIN,
+                AccountNumber::MIN,
+            )
+                ..=(
+                    session_id.to_owned(),
+                    i64::MAX,
+                    u8::MAX,
+                    AccountNumber::MAX,
+                ),
+        )
+        .any(|row| row.kind == kind && row.account == account)
 }
 
 /// Participant-committed session event after x-wrtcsig join/leave (objective write).
@@ -46,7 +59,7 @@ pub fn commit_webrtc_session_event(
     now: i64,
 ) -> Result<(), SessionError> {
     if !is_session_participant(session_id, account) {
-        return Err(SessionError::NotMember(format!(
+        return Err(SessionError::NotParticipant(format!(
             "account is not a participant in session {session_id}"
         )));
     }
@@ -67,13 +80,13 @@ pub fn commit_webrtc_session_event(
         }
         SESSION_EVENT_SESSION_FAILED | SESSION_EVENT_SESSION_ENDED => {}
         _ => {
-            return Err(SessionError::InvalidPurpose(format!(
+            return Err(SessionError::UnsupportedEventKind(format!(
                 "unsupported webrtc session event kind {kind}"
             )));
         }
     }
 
-    apply_webrtc_session_event(
+    record_webrtc_session_event(
         WebRtcSessionEvent {
             session_id: session_id.to_owned(),
             kind,
@@ -84,7 +97,10 @@ pub fn commit_webrtc_session_event(
     )
 }
 
-pub fn apply_webrtc_session_event(event: WebRtcSessionEvent, now: i64) -> Result<(), SessionError> {
+pub fn record_webrtc_session_event(
+    event: WebRtcSessionEvent,
+    now: i64,
+) -> Result<(), SessionError> {
     let row = session_row(&event.session_id).ok_or_else(|| {
         SessionError::UnknownSession(format!("unknown session {}", event.session_id))
     })?;
@@ -129,7 +145,7 @@ pub fn close_session(
     let row = session_row(session_id)
         .ok_or_else(|| SessionError::UnknownSession(format!("unknown session {session_id}")))?;
     if !is_session_participant(session_id, sender) {
-        return Err(SessionError::NotMember(format!(
+        return Err(SessionError::NotParticipant(format!(
             "account is not a participant in session {session_id}"
         )));
     }

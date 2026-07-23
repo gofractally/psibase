@@ -16,8 +16,11 @@ pub fn canonical_pair_accounts(
     }
 }
 
-/// Deterministic pair transport session id.
-pub fn allocate_pair_session_id(a: AccountNumber, b: AccountNumber) -> String {
+/// Deterministic pair transport session id (`wrtc:pair:{lower}:{higher}`).
+///
+/// Canonical formatter for the PR5+ L2 mesh: clients/transport invent this id
+/// (no objective `SessionRow`). Chat authorizes joins by parsing the same form.
+pub fn pair_session_id_for(a: AccountNumber, b: AccountNumber) -> String {
     let (lower, higher) = canonical_pair_accounts(a, b);
     format!("{PAIR_SESSION_PREFIX}{lower}:{higher}")
 }
@@ -30,10 +33,6 @@ pub fn parse_pair_session_id(session_id: &str) -> Option<Vec<AccountNumber>> {
         return None;
     }
     Some(vec![lower.parse().ok()?, higher.parse().ok()?])
-}
-
-pub fn is_pair_session_id(session_id: &str) -> bool {
-    parse_pair_session_id(session_id).is_some()
 }
 
 pub(crate) fn authorize_pair_session_join(

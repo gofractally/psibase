@@ -95,11 +95,7 @@ mod service {
     }
 
     #[action]
-    fn createSession(
-        space_id: String,
-        purpose: String,
-        participants: Vec<AccountNumber>,
-    ) -> Session {
+    fn createSession(space_id: String, purpose: String) -> Session {
         unimplemented!()
     }
 

@@ -42,12 +42,12 @@ interface sessions {
     use types.{session-purpose};
 
     /// Create (or reuse, for some purposes) an active WebRTC session for a Space.
+    /// Participants are always the full Space membership.
     ///
     /// Parameters:
     /// * `space-id` - Objective Space id from spaces.ensure-*
     /// * `purpose` - Session purpose (`chat-data` or `av-call`)
-    /// * `participants` - Accounts allowed to join (must be Space members)
-    create-session: func(space-id: string, purpose: session-purpose, participants: list<string>) -> result<_, error>;
+    create-session: func(space-id: string, purpose: session-purpose) -> result<_, error>;
 
     /// End an active WebRTC session.
     ///
@@ -56,7 +56,7 @@ interface sessions {
     /// * `reason` - Short reason recorded on the session event (e.g. `ended`, `cancelled`)
     close-session: func(session-id: string, reason: string) -> result<_, error>;
 
-    /// Commit a WebRTC session lifecycle event (join/leave/ended/failed) used for
+    /// Commit a WebRTC session event (join/leave/ended/failed) used for
     /// Meet call-timeline history.
     ///
     /// Parameters:

@@ -9,10 +9,12 @@ pub const SESSION_STATUS_ACTIVE: u8 = 1;
 pub const SESSION_STATUS_ENDED: u8 = 2;
 pub const SESSION_STATUS_FAILED: u8 = 3;
 
+/// Stored on `SessionEventRow.kind` and returned on `CallEvent.kind` (one encoding).
 pub const SESSION_EVENT_PARTICIPANT_JOINED: u8 = 1;
 pub const SESSION_EVENT_PARTICIPANT_LEFT: u8 = 2;
 pub const SESSION_EVENT_SESSION_FAILED: u8 = 3;
 pub const SESSION_EVENT_SESSION_ENDED: u8 = 4;
+pub const SESSION_EVENT_CALL_STARTED: u8 = 5;
 
 /// Default objective session TTL (24 hours).
 pub const DEFAULT_SESSION_TTL_US: i64 = 86_400_000_000;
@@ -24,7 +26,7 @@ pub enum SessionError {
     #[error("{0}")]
     UnknownSpace(String),
     #[error("{0}")]
-    NotMember(String),
+    NotParticipant(String),
     #[error("{0}")]
     InvalidParticipants(String),
     #[error("{0}")]
@@ -32,14 +34,14 @@ pub enum SessionError {
     #[error("{0}")]
     SessionNotActive(String),
     #[error("{0}")]
-    UnauthorizedCaller(String),
+    UnsupportedEventKind(String),
 }
 
 impl From<SpaceError> for SessionError {
     fn from(err: SpaceError) -> Self {
         match err {
             SpaceError::UnknownSpace(msg) => SessionError::UnknownSpace(msg),
-            SpaceError::NotMember(msg) => SessionError::NotMember(msg),
+            SpaceError::NotMember(msg) => SessionError::NotParticipant(msg),
             SpaceError::InvalidMemberSet(msg) => SessionError::InvalidParticipants(msg),
         }
     }
