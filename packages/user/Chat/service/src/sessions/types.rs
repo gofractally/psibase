@@ -2,8 +2,6 @@ use crate::spaces::SpaceError;
 
 pub const PURPOSE_CHAT_DATA: &str = "chat-data";
 pub const PURPOSE_AV_CALL: &str = "av-call";
-/// Pair-only transport sessions (`wrtc:pair:lower:higher`) — no objective Space row.
-pub const PAIR_SESSION_PREFIX: &str = "wrtc:pair:";
 
 pub const SESSION_STATUS_ACTIVE: u8 = 1;
 pub const SESSION_STATUS_ENDED: u8 = 2;
