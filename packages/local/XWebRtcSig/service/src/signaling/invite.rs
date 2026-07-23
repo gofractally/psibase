@@ -3,7 +3,9 @@ use psibase::{AccountNumber, ExactAccountNumber};
 
 use crate::protocol::{ChatAppMetadata, DataChannelSpec, ServerFrame};
 
-use super::constants::{APP_SERVICE_CHAT, PURPOSE_AV_CALL, PURPOSE_CHAT_DATA, TRANSPORT_AUDIO, TRANSPORT_VIDEO};
+use super::constants::{
+    APP_SERVICE_CHAT, PURPOSE_AV_CALL, PURPOSE_CHAT_DATA, TRANSPORT_AUDIO, TRANSPORT_VIDEO,
+};
 
 pub const CHAT_DATA_CHANNEL_LABEL: &str = "chat";
 
@@ -41,7 +43,7 @@ pub fn session_invite_frame(auth: &chat::SessionJoinAuth, from: AccountNumber) -
     ServerFrame::SessionInvite {
         session_id: auth.session_id.clone(),
         app_service: APP_SERVICE_CHAT.into(),
-        app_session_id: auth.space_uuid.clone(),
+        app_session_id: auth.space_id.clone(),
         purpose: auth.purpose.clone(),
         from: from.into(),
         participants,
@@ -49,7 +51,7 @@ pub fn session_invite_frame(auth: &chat::SessionJoinAuth, from: AccountNumber) -
         data_channels,
         expires_at: auth.expires_at,
         app_metadata: ChatAppMetadata {
-            space_uuid: auth.space_uuid.clone(),
+            space_uuid: auth.space_id.clone(),
         },
     }
 }

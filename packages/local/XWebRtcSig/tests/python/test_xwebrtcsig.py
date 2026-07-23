@@ -158,17 +158,17 @@ def _ensure_test_accounts(node, *accounts):
 
 
 def _create_chat_data_session(node, alice='alice', bob='bob'):
-    """Ensure DM space and chat-data session; return (space_uuid, session_id)."""
+    """Ensure DM space and chat-data session; return (space_id, session_id)."""
     dm_trace = node.push_action(alice, 'chat', 'ensureDm', {'contact': bob})
     dm = _chat_action_return(node, dm_trace, 'ensureDm')
-    space_uuid = dm['space_uuid'] if isinstance(dm, dict) else dm.space_uuid
+    space_id = dm['space_id'] if isinstance(dm, dict) else dm.space_id
     node.wait(new_block())
     sess_trace = node.push_action(
         alice,
         'chat',
         'createSession',
         {
-            'space_uuid': space_uuid,
+            'space_id': space_id,
             'purpose': 'chat-data',
             'participants': [alice, bob],
         },
@@ -178,13 +178,13 @@ def _create_chat_data_session(node, alice='alice', bob='bob'):
         session['session_id'] if isinstance(session, dict) else session.session_id
     )
     node.wait(new_block())
-    return space_uuid, session_id
+    return space_id, session_id
 
 
 def _create_group_chat_data_session(
     node, creator='alice', other_members=('bob', CAROL)
 ):
-    """Ensure group Space and N-party chat-data session; return (space_uuid, session_id)."""
+    """Ensure group Space and N-party chat-data session; return (space_id, session_id)."""
     _ensure_test_accounts(node, creator, *other_members)
     group_trace = node.push_action(
         creator,
@@ -193,7 +193,7 @@ def _create_group_chat_data_session(
         {'other_members': list(other_members)},
     )
     group = _chat_action_return(node, group_trace, 'ensureGroup')
-    space_uuid = group['space_uuid'] if isinstance(group, dict) else group.space_uuid
+    space_id = group['space_id'] if isinstance(group, dict) else group.space_id
     node.wait(new_block())
     participants = [creator, *other_members]
     sess_trace = node.push_action(
@@ -201,7 +201,7 @@ def _create_group_chat_data_session(
         'chat',
         'createSession',
         {
-            'space_uuid': space_uuid,
+            'space_id': space_id,
             'purpose': 'chat-data',
             'participants': participants,
         },
@@ -211,13 +211,13 @@ def _create_group_chat_data_session(
         session['session_id'] if isinstance(session, dict) else session.session_id
     )
     node.wait(new_block())
-    return space_uuid, session_id
+    return space_id, session_id
 
 
 def _create_group_av_call_session(
     node, creator='alice', other_members=('bob', CAROL)
 ):
-    """Ensure group Space and N-party av-call session; return (space_uuid, session_id)."""
+    """Ensure group Space and N-party av-call session; return (space_id, session_id)."""
     _ensure_test_accounts(node, creator, *other_members)
     group_trace = node.push_action(
         creator,
@@ -226,7 +226,7 @@ def _create_group_av_call_session(
         {'other_members': list(other_members)},
     )
     group = _chat_action_return(node, group_trace, 'ensureGroup')
-    space_uuid = group['space_uuid'] if isinstance(group, dict) else group.space_uuid
+    space_id = group['space_id'] if isinstance(group, dict) else group.space_id
     node.wait(new_block())
     participants = [creator, *other_members]
     sess_trace = node.push_action(
@@ -234,7 +234,7 @@ def _create_group_av_call_session(
         'chat',
         'createSession',
         {
-            'space_uuid': space_uuid,
+            'space_id': space_id,
             'purpose': 'av-call',
             'participants': participants,
         },
@@ -244,21 +244,21 @@ def _create_group_av_call_session(
         session['session_id'] if isinstance(session, dict) else session.session_id
     )
     node.wait(new_block())
-    return space_uuid, session_id
+    return space_id, session_id
 
 
 def _create_av_call_session(node, alice='alice', bob='bob'):
-    """Ensure DM space and av-call session; return (space_uuid, session_id)."""
+    """Ensure DM space and av-call session; return (space_id, session_id)."""
     dm_trace = node.push_action(alice, 'chat', 'ensureDm', {'contact': bob})
     dm = _chat_action_return(node, dm_trace, 'ensureDm')
-    space_uuid = dm['space_uuid'] if isinstance(dm, dict) else dm.space_uuid
+    space_id = dm['space_id'] if isinstance(dm, dict) else dm.space_id
     node.wait(new_block())
     sess_trace = node.push_action(
         alice,
         'chat',
         'createSession',
         {
-            'space_uuid': space_uuid,
+            'space_id': space_id,
             'purpose': 'av-call',
             'participants': [alice, bob],
         },
@@ -268,7 +268,7 @@ def _create_av_call_session(node, alice='alice', bob='bob'):
         session['session_id'] if isinstance(session, dict) else session.session_id
     )
     node.wait(new_block())
-    return space_uuid, session_id
+    return space_id, session_id
 
 
 def _commit_webrtc_session_event(node, sender, session_id, kind, reason):
@@ -502,7 +502,7 @@ class TestXWebRtcSig(unittest.TestCase):
     def test_chat_data_join_session_invite(self, cluster):
         """Authorized participant joinSession receives chat-data sessionInvite."""
         a = self._boot_with_chat_and_sig(cluster)
-        _space_uuid, session_id = _create_chat_data_session(a)
+        _space_id, session_id = _create_chat_data_session(a)
         ta = Transact(a).login('alice')
         url = websocket_url(a, '/ws', service='x-wrtcsig')
 
@@ -535,7 +535,7 @@ class TestXWebRtcSig(unittest.TestCase):
     def test_av_call_join_records_webrtc_session_event(self, cluster):
         """joinSession lifecycle wire-back invokes chat webrtcSessionEvent (§6.4)."""
         a = self._boot_with_chat_and_sig(cluster)
-        _space_uuid, session_id = _create_av_call_session(a)
+        _space_id, session_id = _create_av_call_session(a)
         tb = Transact(a).login('bob')
         url = websocket_url(a, '/ws', service='x-wrtcsig')
 
@@ -577,7 +577,7 @@ class TestXWebRtcSig(unittest.TestCase):
         """Non-participant joinSession is rejected; no chat bodies on websocket."""
         a = self._boot_with_chat_and_sig(cluster)
         _ensure_test_accounts(a, CAROL)
-        _space_uuid, session_id = _create_chat_data_session(a)
+        _space_id, session_id = _create_chat_data_session(a)
         tc = Transact(a).login(CAROL)
         url = websocket_url(a, '/ws', service='x-wrtcsig')
 
@@ -612,7 +612,7 @@ class TestXWebRtcSig(unittest.TestCase):
     def test_chat_data_signal_relay(self, cluster):
         """joinSession on both peers then offer signal relays to the other socket."""
         a = self._boot_with_chat_and_sig(cluster)
-        _space_uuid, session_id = _create_chat_data_session(a)
+        _space_id, session_id = _create_chat_data_session(a)
         ta = Transact(a).login('alice')
         tb = Transact(a).login('bob')
         url = websocket_url(a, '/ws', service='x-wrtcsig')
@@ -811,7 +811,7 @@ class TestXWebRtcSig(unittest.TestCase):
     def test_group_chat_data_join_three_party_invite(self, cluster):
         """N-party group joinSession returns sessionInvite with all participants."""
         a = self._boot_with_chat_and_sig(cluster)
-        space_uuid, session_id = _create_group_chat_data_session(a)
+        space_id, session_id = _create_group_chat_data_session(a)
         ta = Transact(a).login('alice')
         url = websocket_url(a, '/ws', service='x-wrtcsig')
 
@@ -842,7 +842,7 @@ class TestXWebRtcSig(unittest.TestCase):
                 self.assertTrue(invite['dataChannels'][0]['ordered'])
                 self.assertEqual(
                     invite.get('appMetadata', {}).get('spaceUuid'),
-                    space_uuid,
+                    space_id,
                 )
 
         import asyncio
@@ -853,7 +853,7 @@ class TestXWebRtcSig(unittest.TestCase):
         """Non-member cannot join N-party group chat-data session."""
         a = self._boot_with_chat_and_sig(cluster)
         _ensure_test_accounts(a, DAVE)
-        _space_uuid, session_id = _create_group_chat_data_session(a)
+        _space_id, session_id = _create_group_chat_data_session(a)
         td = Transact(a).login(DAVE)
         url = websocket_url(a, '/ws', service='x-wrtcsig')
 
@@ -881,7 +881,7 @@ class TestXWebRtcSig(unittest.TestCase):
     def test_group_chat_data_signal_mesh_relay(self, cluster):
         """Three peers join; SDP/ICE signals relay to each session participant."""
         a = self._boot_with_chat_and_sig(cluster)
-        _space_uuid, session_id = _create_group_chat_data_session(a)
+        _space_id, session_id = _create_group_chat_data_session(a)
         ta = Transact(a).login('alice')
         tb = Transact(a).login('bob')
         tc = Transact(a).login(CAROL)
@@ -965,7 +965,7 @@ class TestXWebRtcSig(unittest.TestCase):
         """Non-member cannot signal in N-party group chat-data session."""
         a = self._boot_with_chat_and_sig(cluster)
         _ensure_test_accounts(a, DAVE)
-        _space_uuid, session_id = _create_group_chat_data_session(a)
+        _space_id, session_id = _create_group_chat_data_session(a)
         ta = Transact(a).login('alice')
         td = Transact(a).login(DAVE)
         url = websocket_url(a, '/ws', service='x-wrtcsig')
@@ -1016,7 +1016,7 @@ class TestXWebRtcSig(unittest.TestCase):
     def test_group_av_call_join_three_party_invite(self, cluster):
         """N-party av-call joinSession returns sessionInvite with audio/video transports."""
         a = self._boot_with_chat_and_sig(cluster)
-        space_uuid, session_id = _create_group_av_call_session(a)
+        space_id, session_id = _create_group_av_call_session(a)
         ta = Transact(a).login('alice')
         url = websocket_url(a, '/ws', service='x-wrtcsig')
 
@@ -1046,7 +1046,7 @@ class TestXWebRtcSig(unittest.TestCase):
                 self.assertEqual(invite['dataChannels'], [])
                 self.assertEqual(
                     invite.get('appMetadata', {}).get('spaceUuid'),
-                    space_uuid,
+                    space_id,
                 )
 
         import asyncio
@@ -1057,7 +1057,7 @@ class TestXWebRtcSig(unittest.TestCase):
         """Non-member cannot join N-party group av-call session."""
         a = self._boot_with_chat_and_sig(cluster)
         _ensure_test_accounts(a, DAVE)
-        _space_uuid, session_id = _create_group_av_call_session(a)
+        _space_id, session_id = _create_group_av_call_session(a)
         td = Transact(a).login(DAVE)
         url = websocket_url(a, '/ws', service='x-wrtcsig')
 
@@ -1085,7 +1085,7 @@ class TestXWebRtcSig(unittest.TestCase):
     def test_group_av_call_signal_mesh_relay(self, cluster):
         """Three peers join av-call; SDP/ICE signals relay among session participants."""
         a = self._boot_with_chat_and_sig(cluster)
-        _space_uuid, session_id = _create_group_av_call_session(a)
+        _space_id, session_id = _create_group_av_call_session(a)
         ta = Transact(a).login('alice')
         tb = Transact(a).login('bob')
         tc = Transact(a).login(CAROL)
@@ -1171,7 +1171,7 @@ class TestXWebRtcSig(unittest.TestCase):
     def test_av_call_leave_session_end_event(self, cluster):
         """leaveSession on av-call triggers sessionEnded fanout and chat lifecycle."""
         a = self._boot_with_chat_and_sig(cluster)
-        _space_uuid, session_id = _create_av_call_session(a)
+        _space_id, session_id = _create_av_call_session(a)
         ta = Transact(a).login('alice')
         tb = Transact(a).login('bob')
         url = websocket_url(a, '/ws', service='x-wrtcsig')
@@ -1235,7 +1235,7 @@ class TestXWebRtcSig(unittest.TestCase):
     def test_av_call_socket_close_while_ringing_notifies_peer(self, cluster):
         """Caller websocket close during ringing fans out transport sessionEnded."""
         a = self._boot_with_chat_and_sig(cluster)
-        _space_uuid, session_id = _create_av_call_session(a)
+        _space_id, session_id = _create_av_call_session(a)
         ta = Transact(a).login('alice')
         tb = Transact(a).login('bob')
         url = websocket_url(a, '/ws', service='x-wrtcsig')
@@ -1293,7 +1293,7 @@ class TestXWebRtcSig(unittest.TestCase):
     def test_chat_data_signal_before_join_rejected(self, cluster):
         """Signal before joinSession returns not-joined error."""
         a = self._boot_with_chat_and_sig(cluster)
-        _space_uuid, session_id = _create_chat_data_session(a)
+        _space_id, session_id = _create_chat_data_session(a)
         ta = Transact(a).login('alice')
         url = websocket_url(a, '/ws', service='x-wrtcsig')
 
@@ -1322,7 +1322,7 @@ class TestXWebRtcSig(unittest.TestCase):
     def test_chat_data_signal_buffered_until_recipient_joins(self, cluster):
         """Offer before recipient joinSession is buffered and flushed on join."""
         a = self._boot_with_chat_and_sig(cluster)
-        _space_uuid, session_id = _create_chat_data_session(a)
+        _space_id, session_id = _create_chat_data_session(a)
         ta = Transact(a).login('alice')
         tb = Transact(a).login('bob')
         url = websocket_url(a, '/ws', service='x-wrtcsig')
@@ -1439,7 +1439,7 @@ class TestXWebRtcSig(unittest.TestCase):
     def test_av_call_websocket_rejects_chat_and_media_payloads(self, cluster):
         """Av-call session websocket carries signaling only — no chat or legacy media frames."""
         a = self._boot_with_chat_and_sig(cluster)
-        _space_uuid, session_id = _create_av_call_session(a)
+        _space_id, session_id = _create_av_call_session(a)
         ta = Transact(a).login('alice')
         url = websocket_url(a, '/ws', service='x-wrtcsig')
 
@@ -1521,7 +1521,7 @@ class TestChatDataP2pHarness(TestXWebRtcSig):
             self.skipTest('pip install aiortc')
 
         a = TestXWebRtcSig()._boot_with_chat_and_sig(cluster)
-        _space_uuid, session_id = _create_chat_data_session(a)
+        _space_id, session_id = _create_chat_data_session(a)
         ta = Transact(a).login('alice')
         tb = Transact(a).login('bob')
         url = websocket_url(a, '/ws', service='x-wrtcsig')
@@ -1561,7 +1561,7 @@ class TestChatDataP2pHarness(TestXWebRtcSig):
             self.skipTest('pip install aiortc')
 
         a = TestXWebRtcSig()._boot_with_chat_and_sig(cluster)
-        _space_uuid, session_id = _create_chat_data_session(a)
+        _space_id, session_id = _create_chat_data_session(a)
         ta = Transact(a).login('alice')
         tb = Transact(a).login('bob')
         url = websocket_url(a, '/ws', service='x-wrtcsig')
@@ -1616,7 +1616,7 @@ class TestChatDataP2pHarness(TestXWebRtcSig):
 
         a = TestXWebRtcSig()._boot_with_chat_and_sig(cluster)
         _ensure_test_accounts(a, CAROL)
-        space_uuid, session_id = _create_group_chat_data_session(a)
+        space_id, session_id = _create_group_chat_data_session(a)
         ta = Transact(a).login('alice')
         tb = Transact(a).login('bob')
         tc = Transact(a).login(CAROL)
@@ -1627,7 +1627,7 @@ class TestChatDataP2pHarness(TestXWebRtcSig):
                 unix_connect=lambda path, hdrs: _unix_connect(a, path, hdrs),
                 url=url,
                 session_id=session_id,
-                space_uuid=space_uuid,
+                space_uuid=space_id,
                 alice='alice',
                 bob='bob',
                 carol=CAROL,
@@ -1663,7 +1663,7 @@ class TestChatDataP2pHarness(TestXWebRtcSig):
 
         a = TestXWebRtcSig()._boot_with_chat_and_sig(cluster)
         _ensure_test_accounts(a, CAROL)
-        space_uuid, session_id = _create_group_chat_data_session(a)
+        space_id, session_id = _create_group_chat_data_session(a)
         ta = Transact(a).login('alice')
         tb = Transact(a).login('bob')
         tc = Transact(a).login(CAROL)
@@ -1674,7 +1674,7 @@ class TestChatDataP2pHarness(TestXWebRtcSig):
                 unix_connect=lambda path, hdrs: _unix_connect(a, path, hdrs),
                 url=url,
                 session_id=session_id,
-                space_uuid=space_uuid,
+                space_uuid=space_id,
                 alice='alice',
                 bob='bob',
                 carol=CAROL,
@@ -1715,7 +1715,7 @@ class TestChatDataP2pHarness(TestXWebRtcSig):
 
         a = TestXWebRtcSig()._boot_with_chat_and_sig(cluster)
         _ensure_test_accounts(a, CAROL)
-        space_uuid, session_id = _create_group_chat_data_session(a)
+        space_id, session_id = _create_group_chat_data_session(a)
         ta = Transact(a).login('alice')
         tb = Transact(a).login('bob')
         tc = Transact(a).login(CAROL)
@@ -1726,7 +1726,7 @@ class TestChatDataP2pHarness(TestXWebRtcSig):
                 unix_connect=lambda path, hdrs: _unix_connect(a, path, hdrs),
                 url=url,
                 session_id=session_id,
-                space_uuid=space_uuid,
+                space_uuid=space_id,
                 alice='alice',
                 bob='bob',
                 carol=CAROL,
@@ -1749,7 +1749,7 @@ class TestChatDataP2pHarness(TestXWebRtcSig):
     def test_group_chat_data_join_out_of_order(self, cluster):
         """C joins before B before A; all receive sessionInvite with full roster."""
         a = self._boot_with_chat_and_sig(cluster)
-        _space_uuid, session_id = _create_group_chat_data_session(a)
+        _space_id, session_id = _create_group_chat_data_session(a)
         ta = Transact(a).login('alice')
         tb = Transact(a).login('bob')
         tc = Transact(a).login(CAROL)
@@ -1796,7 +1796,7 @@ class TestChatDataP2pHarness(TestXWebRtcSig):
     def test_group_participant_joined_after_ws_reconnect(self, cluster):
         """Bob closes WS and rejoins; alice receives participantJoined for bob."""
         a = self._boot_with_chat_and_sig(cluster)
-        _space_uuid, session_id = _create_group_chat_data_session(a)
+        _space_id, session_id = _create_group_chat_data_session(a)
         ta = Transact(a).login('alice')
         tb = Transact(a).login('bob')
         url = websocket_url(a, '/ws', service='x-wrtcsig')
