@@ -152,6 +152,12 @@ pub mod service {
     /// Sets the Content Security Policy for the specified path (or "*" for a global CSP).
     /// If a specific CSP is set, it takes precedence over the global CSP.
     /// If no specific or global CSP is set, a default CSP is used.
+    ///
+    /// The CSP string may include the keyword `{root}`, which is replaced at
+    /// serve time with the deployment root host (including port when present),
+    /// e.g. `psibase.localhost:8080` or `example.com`. Use this for
+    /// subdomain-scoped sources such as `connect-src 'self' {root} *.{root}`
+    /// so the same policy works across deployments without hardcoding hosts.
     #[action]
     fn setCsp(path: String, csp: String) {
         unimplemented!()

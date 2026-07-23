@@ -2,6 +2,7 @@
 
 #include <psibase/Rpc.hpp>
 #include <psibase/Service.hpp>
+#include <string_view>
 
 namespace SystemService
 {
@@ -130,6 +131,12 @@ namespace SystemService
       /// Sets the Content Security Policy for the specified path (or "*" for a global CSP).
       /// If a specific CSP is set, it takes precedence over the global CSP.
       /// If no specific or global CSP is set, a default CSP is used.
+      ///
+      /// The CSP string may include the keyword `{root}`, which is replaced at
+      /// serve time with the deployment root host (including port when present),
+      /// e.g. `psibase.localhost:8080` or `example.com`. Use this for
+      /// subdomain-scoped sources such as `connect-src 'self' {root} *.{root}`
+      /// so the same policy works across deployments without hardcoding hosts.
       void setCsp(std::string path, std::string csp);
 
       /// Deletes the Content Security Policy for the specified path (or "*" for the global CSP).
@@ -159,7 +166,8 @@ namespace SystemService
       bool                              useCache(const psibase::AccountNumber& account);
       std::optional<psibase::HttpReply> serveSitesApp(const psibase::HttpRequest& request);
       std::string                       getCspHeader(const std::optional<SitesContentRow>& content,
-                                                     const psibase::AccountNumber&         account);
+                                                     const psibase::AccountNumber&         account,
+                                                     std::string_view rootDomain);
    };
 
    PSIO_REFLECT(Sites,

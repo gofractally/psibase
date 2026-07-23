@@ -81,6 +81,11 @@ namespace SystemService
         connect-src:
           * `blob:` for fetch-compiling blob urls
           * `*` allows fetching plugins, as well as websocket connections
+
+        CSP strings (default or user-defined via setCsp) may include the
+        keyword `{root}`, which is replaced at serve time with the deployment
+        root host including port when present (e.g. psibase.localhost:8080 or
+        example.com). See expandCspKeywords.
       */
       const std::string DEFAULT_CSP_HEADER =                               //
           "default-src 'self';"                                            //
@@ -91,6 +96,39 @@ namespace SystemService
           "frame-src *;"                                                   //
           "connect-src * blob:;"                                           //
           ;
+
+      // Port suffix from the Host header (e.g. ":8080"), empty if none.
+      // Mirrors HttpServer::hostHeaderPortSuffix — request.host is stored
+      // without the port, so the raw Host header is the source of truth.
+      std::string_view hostHeaderPortSuffix(const HttpRequest& req)
+      {
+         if (auto host = req.getHeader("host"))
+         {
+            std::string_view h = *host;
+            if (auto pos = h.rfind(':'); pos != std::string_view::npos)
+            {
+               if (h.find(']', pos) == std::string_view::npos)
+                  return h.substr(pos);
+            }
+         }
+         return {};
+      }
+
+      // Root domain for CSP host sources: rootHost + optional port.
+      // Scheme-relative so the same policy works over http (local) and https.
+      std::string cspRootDomain(std::string_view rootHost, const HttpRequest& req)
+      {
+         std::string root{rootHost};
+         root.append(hostHeaderPortSuffix(req));
+         return root;
+      }
+
+      // Replace `{root}` with the active deployment root domain.
+      std::string expandCspKeywords(std::string csp, std::string_view rootDomain)
+      {
+         boost::replace_all(csp, "{root}", rootDomain);
+         return csp;
+      }
 
       // Accepted content encodings
       constexpr std::string_view validEncodings[] = {
@@ -422,7 +460,8 @@ namespace SystemService
 
          if (content)
          {
-            std::string cspHeader = getCspHeader(content, content->account);
+            std::string cspHeader =
+                getCspHeader(content, content->account, cspRootDomain(rootHost, request));
             auto etag = psio::hex(content->contentHash.data(), content->contentHash.data() + 8);
 
             if (useCache(content->account) && shouldCache(request, etag))
@@ -702,7 +741,8 @@ namespace SystemService
    }
 
    std::string Sites::getCspHeader(const std::optional<SitesContentRow>& content,
-                                   const AccountNumber&                  account)
+                                   const AccountNumber&                  account,
+                                   std::string_view                      rootDomain)
    {
       std::string cspHeader = DEFAULT_CSP_HEADER;
       if (content && content->csp.has_value())
@@ -717,7 +757,7 @@ namespace SystemService
             cspHeader = *siteConfig->globalCsp;
          }
       }
-      return cspHeader;
+      return expandCspKeywords(std::move(cspHeader), rootDomain);
    }
 
    bool Sites::useCache(const AccountNumber& account)
