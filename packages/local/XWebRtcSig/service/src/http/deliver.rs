@@ -10,7 +10,6 @@ use crate::state::subjective::{
     close_socket_tx, disconnect_presence_fanout_tx, drain_pending_outbound_tx,
     enqueue_outbound_frames_tx, sweep_all_known_sessions_tx,
 };
-use crate::trace::xrtcsig_trace;
 
 /// Extra ICE JSON merged into welcome. Empty for now (default STUN only).
 /// Placeholder for coming node-configured TURN.
@@ -18,31 +17,8 @@ pub(crate) fn turn_ice_servers_json() -> String {
     "[]".into()
 }
 
-#[cfg_attr(not(feature = "rt-trace"), allow(dead_code))]
-pub(crate) fn frame_kind(frame: &ServerFrame) -> &'static str {
-    match frame {
-        ServerFrame::Welcome { .. } => "welcome",
-        ServerFrame::Error { .. } => "error",
-        ServerFrame::SessionInvite { .. } => "sessionInvite",
-        ServerFrame::ParticipantJoined { .. } => "participantJoined",
-        ServerFrame::ParticipantState { .. } => "participantState",
-        ServerFrame::Signal { .. } => "signal",
-        ServerFrame::SessionEnded { .. } => "sessionEnded",
-        ServerFrame::Pong => "pong",
-        ServerFrame::PresenceSnapshot { .. } => "presenceSnapshot",
-        ServerFrame::Presence { .. } => "presence",
-        ServerFrame::SessionSnapshot { .. } => "sessionSnapshot",
-        ServerFrame::TransportLost { .. } => "transportLost",
-    }
-}
-
 pub(crate) fn send_frame(socket: i32, frame: &ServerFrame) {
     let payload = encode_server_frame(frame).expect("server frame must serialize");
-    xrtcsig_trace!(
-        "[xrtcsig-trace] send sock={} kind={}\n",
-        socket,
-        frame_kind(frame),
-    );
     XHttp::call().send(socket, payload.into_bytes(), WEBSOCKET_TEXT);
 }
 
@@ -120,39 +96,13 @@ pub(crate) fn cleanup_socket(socket: i32) {
         .as_ref()
         .map(|r| disconnect_presence_fanout_tx(r.user, r.was_final_socket()));
 
-    #[cfg(feature = "rt-trace")]
-    {
-        let teardown_targets: Vec<i32> = tear_down_frames.iter().map(|(s, _)| *s).collect();
-        xrtcsig_trace!(
-            "[xrtcsig-trace] cleanup-tear-down sock={} teardown_targets={:?}\n",
-            socket,
-            teardown_targets,
-        );
-    }
     for (peer_socket, frame) in tear_down_frames {
         send_frame(peer_socket, &frame);
     }
 
-    let Some(removed) = removed else {
-        xrtcsig_trace!("[xrtcsig-trace] cleanup-no-row sock={}\n", socket);
-        return;
-    };
-    #[cfg(not(feature = "rt-trace"))]
-    let _ = &removed;
     let Some(fanout) = disconnect_fanout else {
         return;
     };
-    #[cfg(feature = "rt-trace")]
-    {
-        let disconnect_targets: Vec<i32> = fanout.peer_deltas.iter().map(|(s, _)| *s).collect();
-        xrtcsig_trace!(
-            "[xrtcsig-trace] cleanup-disconnect sock={} user={} final={} disconnect_targets={:?}\n",
-            socket,
-            removed.user,
-            removed.was_final_socket(),
-            disconnect_targets,
-        );
-    }
     for (peer_socket, frame) in fanout.peer_deltas {
         send_frame(peer_socket, &frame);
     }

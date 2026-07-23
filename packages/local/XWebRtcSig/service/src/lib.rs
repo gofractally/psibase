@@ -4,7 +4,6 @@ mod http;
 pub mod protocol;
 pub mod signaling;
 pub mod state;
-pub mod trace;
 
 pub mod cleanup;
 pub mod ice_config;
@@ -27,8 +26,6 @@ mod service {
     use crate::state::subjective::{
         connect_presence_fanout_tx, get_socket_tx, apply_client_ready_tx, upsert_socket_tx,
     };
-    #[cfg(feature = "rt-trace")]
-    use crate::trace::xrtcsig_trace;
     use psibase::services::x_http::Wrapper as XHttp;
     use psibase::{
         get_sender, services::transact::Wrapper as Transact, HttpReply, HttpRequest, MethodNumber,
@@ -74,16 +71,6 @@ mod service {
         upsert_socket_tx(socket, user, now);
         send_welcome(socket, user, now, &turn_json);
         let fanout = connect_presence_fanout_tx(user);
-        #[cfg(feature = "rt-trace")]
-        {
-            let peer_targets: Vec<i32> = fanout.peer_deltas.iter().map(|(s, _)| *s).collect();
-            xrtcsig_trace!(
-                "[xrtcsig-trace] accept sock={} user={} peer_delta_targets={:?}\n",
-                socket,
-                user,
-                peer_targets,
-            );
-        }
         send_frame(socket, &fanout.snapshot);
         enqueue_peer_frames(now, fanout.peer_deltas);
         // Sweep after responding to the new connection so a dead peer socket
@@ -134,23 +121,6 @@ mod service {
         let now = Transact::call().currentBlock().time.microseconds;
         let user = session.user;
 
-        #[cfg(feature = "rt-trace")]
-        let frame_kind: &'static str = match &frame {
-            ClientFrame::ClientReady { .. } => "clientReady",
-            ClientFrame::Ping => "ping",
-            ClientFrame::JoinSession { .. } => "joinSession",
-            ClientFrame::Signal { .. } => "signal",
-            ClientFrame::LeaveSession { .. } => "leaveSession",
-            ClientFrame::ParticipantState { .. } => "participantState",
-        };
-        #[cfg(feature = "rt-trace")]
-        xrtcsig_trace!(
-            "[xrtcsig-trace] recv sock={} user={} frame={}\n",
-            socket,
-            user,
-            frame_kind,
-        );
-
         match frame {
             ClientFrame::ClientReady {
                 client_instance_id,
@@ -184,18 +154,6 @@ mod service {
             }
             session_frame => {
                 let dispatch = dispatch_client_frame(socket, user, now, session_frame);
-                #[cfg(feature = "rt-trace")]
-                {
-                    let dispatch_targets: Vec<i32> =
-                        dispatch.frames.iter().map(|(s, _)| *s).collect();
-                    xrtcsig_trace!(
-                        "[xrtcsig-trace] recv-dispatch sock={} user={} frame={} targets={:?}\n",
-                        socket,
-                        user,
-                        frame_kind,
-                        dispatch_targets,
-                    );
-                }
                 deliver_frames(socket, dispatch.frames, now);
                 // Run stale-session sweep after the requesting socket has been
                 // answered — same ordering contract as cleanup_socket.

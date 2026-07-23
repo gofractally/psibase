@@ -2,10 +2,6 @@ use psibase::AccountNumber;
 
 use crate::protocol::{encode_server_frame, ServerFrame, SignalKind};
 use crate::state::{enqueue_pending_signal, get_session_join, touch_session_liveness};
-#[cfg(feature = "rt-trace")]
-use crate::state::{user_live_sockets, session_joins};
-#[cfg(feature = "rt-trace")]
-use crate::trace::xrtcsig_trace;
 
 use super::constants::{is_supported_purpose, query_session_auth, error_for_socket};
 use super::fanout::{fanout_signal_to_peer, drain_and_deliver_pending_signals};
@@ -100,22 +96,6 @@ pub fn handle_signal(
                 }
             }
             delivers.extend(drain_and_deliver_pending_signals(&session_id, to, now));
-            #[cfg(feature = "rt-trace")]
-            if delivers.is_empty() {
-                let join_socks: Vec<i32> = session_joins(&session_id)
-                    .into_iter()
-                    .filter(|join| join.account == to)
-                    .map(|join| join.socket)
-                    .collect();
-                let live = user_live_sockets(to);
-                xrtcsig_trace!(
-                    "[xrtcsig-trace] signal-no-delivery session={} to={} join_socks={:?} live_socks={:?}\n",
-                    session_id,
-                    to,
-                    join_socks,
-                    live,
-                );
-            }
             delivers
         }
     }
