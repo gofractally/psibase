@@ -46,9 +46,10 @@ fn without_tapos(actions: Vec<Action>, expiration: TimePointSec) -> Transaction 
 fn genesis_transaction<R: Read + Seek>(
     expiration: TimePointSec,
     service_packages: &mut [PackagedService<R>],
+    essential_services: &EssentialServices,
 ) -> Result<SignedTransaction, anyhow::Error> {
     let mut services = vec![];
-    let mut essential = EssentialServices::new();
+    let mut essential = essential_services.clone();
     for s in service_packages {
         s.get_genesis(&mut services)?;
         // Only install the transact service and its dependencies
@@ -117,13 +118,14 @@ pub fn get_initial_actions<
     initial_producer: AccountNumber,
     install_ui: bool,
     service_packages: &mut [PackagedService<R>],
+    essential_services: &EssentialServices,
     compression_level: u32,
     builder: &mut TransactionBuilder<SignedTransaction, F>,
     schemas: &SchemaMap,
 ) -> Result<(), anyhow::Error> {
     let has_packages = true;
 
-    let mut essential = EssentialServices::new();
+    let mut essential = essential_services.clone();
     for s in &mut service_packages[..] {
         if essential.is_empty() {
             builder.set_label(format!("Installing code for {}", s.name()));
@@ -262,6 +264,7 @@ pub fn create_boot_transactions<R: Read + Seek>(
     install_ui: bool,
     expiration: TimePointSec,
     service_packages: &mut [PackagedService<R>],
+    essential_services: &EssentialServices,
     compression_level: u32,
 ) -> Result<
     (
@@ -272,7 +275,11 @@ pub fn create_boot_transactions<R: Read + Seek>(
 > {
     validate_dependencies(service_packages)?;
     let (schemas, _) = get_schemas(&mut service_packages[..])?;
-    let mut boot_transactions = vec![genesis_transaction(expiration, service_packages)?];
+    let mut boot_transactions = vec![genesis_transaction(
+        expiration,
+        service_packages,
+        essential_services,
+    )?];
 
     const TARGET_SIZE: usize = 1024 * 1024;
     let mut builder = TransactionBuilder::new(TARGET_SIZE, |actions| {
@@ -287,6 +294,7 @@ pub fn create_boot_transactions<R: Read + Seek>(
         initial_producer,
         install_ui,
         service_packages,
+        essential_services,
         compression_level,
         &mut builder,
         &schemas,

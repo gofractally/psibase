@@ -45,13 +45,17 @@ impl Boot for XAdminPlugin {
         tx_signing_key: Option<Pem>,
         compression_level: u32,
     ) -> Result<(Tx, Vec<(Tx, u32, u32)>, Vec<String>), String> {
+        let initial_key = parse_public_key_pem(block_signing_key)?;
+        let tx_key = parse_public_key_pem(tx_signing_key)?;
+
         let mut ops = Vec::new();
         for s in js_packages {
             ops.push(PackageOpFull::Install(
                 PackagedService::new(Cursor::new(s)).map_err(|e| e.to_string())?,
             ));
         }
-        sort_package_ops(&mut ops, &PackageList::new()).map_err(|e| e.to_string())?;
+        let essential = EssentialServices::with_key(&initial_key);
+        sort_package_ops(&mut ops, &PackageList::new(), &essential).map_err(|e| e.to_string())?;
 
         let mut packages: Vec<_> = ops
             .into_iter()
@@ -68,9 +72,6 @@ impl Boot for XAdminPlugin {
         let expiration = TimePointSec::from(now_plus_120secs);
         let prod = ExactAccountNumber::from_str(&producer).map_err(|e| e.to_string())?;
 
-        let initial_key = parse_public_key_pem(block_signing_key)?;
-        let tx_key = parse_public_key_pem(tx_signing_key)?;
-
         let (boot_transactions, groups) = create_boot_transactions(
             &initial_key,
             &tx_key,
@@ -78,6 +79,7 @@ impl Boot for XAdminPlugin {
             true,
             expiration,
             &mut packages[..],
+            &essential,
             compression_level,
         )
         .map_err(|e| e.to_string())?;

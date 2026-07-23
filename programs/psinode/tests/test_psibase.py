@@ -452,6 +452,21 @@ class TestPsibase(unittest.TestCase):
         self.assertIsNotNone(result['getAccount'])
 
     @testutil.psinode_test
+    def test_boot_with_key(self, cluster):
+        a = cluster.complete(*testutil.generate_names(1), softhsm=testutil.libsofthsm2())[0]
+
+        device = a.unlock_softhsm()
+        with a.post('/native/admin/keys', service='x-admin', json={'service': 'verify-sig', 'device': device}) as reply:
+            reply.raise_for_status()
+            key = bytes.fromhex(reply.json()[0]['rawData'])
+
+        keyfile = os.path.join(a.dir, 'key.pub')
+        with open(keyfile, 'wb') as f:
+            f.write(key)
+        packages = ['Minimal', 'Explorer']
+        a.run_psibase(['boot'] + a.node_args() + ['-p', a.producer, '--block-key', keyfile] + packages)
+
+    @testutil.psinode_test
     def test_json_trace(self, cluster):
         (a,) = cluster.complete(*testutil.generate_names(1));
         a.boot(packages=['Minimal', 'Explorer'])
