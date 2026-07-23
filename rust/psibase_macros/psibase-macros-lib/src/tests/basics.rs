@@ -4,7 +4,7 @@ mod tests {
 
     #[test]
     #[should_panic]
-    // Events can only have one of 3 values: history, ui, or merkle
+    // Events can only have one of 2 values: history or merkle
     // How to test the error text?
     fn test_event_attribute_parsing_event_type() {
         use quote::quote;
@@ -39,7 +39,7 @@ mod tests {
                 fn add(a: i32, b: i32) -> i32 {
                     a + b
                 }
-                #[event(history, ui)]
+                #[event(history, merkle)]
                 fn something() {
 
                 }
