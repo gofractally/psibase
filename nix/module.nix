@@ -3,8 +3,7 @@
   lib,
   pkgs,
   ...
-}:
-let
+}: let
   cfg = config.services.psibase;
   softhsmPkg = cfg.softHsm.package;
   softhsmConf = pkgs.writeText "softhsm2.conf" ''
@@ -12,8 +11,7 @@ let
     objectstore.backend = file
     log.level = INFO
   '';
-in
-{
+in {
   options.services.psibase = {
     enable = lib.mkEnableOption "psibase node (psinode)";
 
@@ -92,7 +90,7 @@ in
 
     extraArgs = lib.mkOption {
       type = lib.types.listOf lib.types.str;
-      default = [ ];
+      default = [];
       example = [
         "--peer"
         "https://example.com/"
@@ -102,7 +100,7 @@ in
 
     environment = lib.mkOption {
       type = lib.types.attrsOf lib.types.str;
-      default = { };
+      default = {};
       example = {
         PSIBASE_USERNAME_FIELD = "X-Auth-User";
       };
@@ -146,12 +144,11 @@ in
   config = lib.mkIf cfg.enable (
     let
       effectivePkcs11 =
-        if cfg.pkcs11Module != null then
-          cfg.pkcs11Module
-        else if cfg.softHsm.enable then
-          "${softhsmPkg}/lib/softhsm/libsofthsm2.so"
-        else
-          null;
+        if cfg.pkcs11Module != null
+        then cfg.pkcs11Module
+        else if cfg.softHsm.enable
+        then "${softhsmPkg}/lib/softhsm/libsofthsm2.so"
+        else null;
 
       psinodeArgs =
         [
@@ -166,7 +163,7 @@ in
           "--producer"
           cfg.producer
         ]
-        ++ lib.optionals cfg.p2p [ "--p2p" ]
+        ++ lib.optionals cfg.p2p ["--p2p"]
         ++ lib.optionals (cfg.databaseCacheSize != null) [
           "--database-cache-size"
           cfg.databaseCacheSize
@@ -180,8 +177,7 @@ in
       softhsmEnv = lib.optionalAttrs cfg.softHsm.enable {
         SOFTHSM2_CONF = "${softhsmConf}";
       };
-    in
-    {
+    in {
       assertions = [
         {
           assertion = !cfg.softHsm.enable || cfg.softHsm.pinFile != null;
@@ -189,7 +185,7 @@ in
         }
       ];
 
-      users.groups.psibase = { };
+      users.groups.psibase = {};
       users.users.psibase = {
         isSystemUser = true;
         group = "psibase";
@@ -199,12 +195,12 @@ in
       };
 
       environment.systemPackages =
-        [ cfg.package ]
+        [cfg.package]
         ++ lib.optionals cfg.softHsm.enable [
           softhsmPkg
         ];
 
-      networking.firewall.allowedTCPPorts = lib.mkIf cfg.openFirewall [ cfg.listen ];
+      networking.firewall.allowedTCPPorts = lib.mkIf cfg.openFirewall [cfg.listen];
 
       # SoftHSM token dir + conf live outside the store; conf content is fixed
       # in the store, tokens are mutable state under tokenDir.
@@ -215,10 +211,10 @@ in
 
       systemd.services.psibase-softhsm-init = lib.mkIf cfg.softHsm.enable {
         description = "Initialize SoftHSM token for psibase (once)";
-        wantedBy = [ "multi-user.target" ];
-        before = [ "psibase.service" ];
-        requiredBy = [ "psibase.service" ];
-        after = [ "local-fs.target" ];
+        wantedBy = ["multi-user.target"];
+        before = ["psibase.service"];
+        requiredBy = ["psibase.service"];
+        after = ["local-fs.target"];
 
         serviceConfig = {
           Type = "oneshot";
@@ -263,10 +259,10 @@ in
 
       systemd.services.psibase = {
         description = "Psibase node (psinode)";
-        wantedBy = [ "multi-user.target" ];
-        after = [ "network-online.target" ] ++ lib.optionals cfg.softHsm.enable [ "psibase-softhsm-init.service" ];
-        wants = [ "network-online.target" ];
-        requires = lib.optionals cfg.softHsm.enable [ "psibase-softhsm-init.service" ];
+        wantedBy = ["multi-user.target"];
+        after = ["network-online.target"] ++ lib.optionals cfg.softHsm.enable ["psibase-softhsm-init.service"];
+        wants = ["network-online.target"];
+        requires = lib.optionals cfg.softHsm.enable ["psibase-softhsm-init.service"];
 
         environment = cfg.environment // softhsmEnv;
 
