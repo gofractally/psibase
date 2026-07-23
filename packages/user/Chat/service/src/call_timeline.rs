@@ -1,68 +1,34 @@
-use psibase::Table;
+use psibase::{AccountNumber, Table};
 
 use crate::sessions::{
-    session_row, sessions_for_space, PURPOSE_AV_CALL, SESSION_EVENT_PARTICIPANT_JOINED,
-    SESSION_EVENT_PARTICIPANT_LEFT, SESSION_EVENT_SESSION_ENDED, SESSION_EVENT_SESSION_FAILED,
+    session_row, sessions_for_space, PURPOSE_AV_CALL, SESSION_EVENT_CALL_STARTED,
+    SESSION_EVENT_PARTICIPANT_JOINED, SESSION_EVENT_PARTICIPANT_LEFT,
+    SESSION_EVENT_SESSION_ENDED, SESSION_EVENT_SESSION_FAILED,
 };
-use crate::tables::{CallEvent, SessionEventRow, SessionEventTable};
+use crate::tables::{CallEvent, SessionEventTable};
 
-pub const SESSION_EVENT_CALL_STARTED: u8 = 5;
-
-pub const CALL_TIMELINE_STARTED: u8 = 1;
-pub const CALL_TIMELINE_PARTICIPANT_JOINED: u8 = 2;
-pub const CALL_TIMELINE_PARTICIPANT_LEFT: u8 = 3;
-pub const CALL_TIMELINE_FAILED: u8 = 4;
-pub const CALL_TIMELINE_ENDED: u8 = 5;
-
-fn session_events_for(session_id: &str) -> Vec<SessionEventRow> {
-    SessionEventTable::read()
-        .get_index_pk()
-        .iter()
-        .filter(|row| row.session_id == session_id)
-        .collect()
-}
-
-fn map_session_event_to_call_timeline(row: &SessionEventRow) -> Option<u8> {
-    match row.kind {
-        SESSION_EVENT_CALL_STARTED => Some(CALL_TIMELINE_STARTED),
-        SESSION_EVENT_PARTICIPANT_JOINED => Some(CALL_TIMELINE_PARTICIPANT_JOINED),
-        SESSION_EVENT_PARTICIPANT_LEFT => Some(CALL_TIMELINE_PARTICIPANT_LEFT),
-        SESSION_EVENT_SESSION_FAILED => Some(CALL_TIMELINE_FAILED),
-        SESSION_EVENT_SESSION_ENDED => Some(CALL_TIMELINE_ENDED),
-        _ => None,
-    }
-}
-
-fn map_terminal_reason(reason: &str) -> &'static str {
+fn map_ui_reason(kind: u8, reason: &str) -> &'static str {
     match reason {
         "declined" => "declined",
         "timeout" | "missed" => "missed",
         "cancelled" => "cancelled",
+        _ if kind == SESSION_EVENT_SESSION_FAILED => "failed",
         _ => "ended",
     }
 }
 
-fn map_failure_reason(reason: &str) -> &'static str {
-    match reason {
-        "declined" => "declined",
-        "timeout" | "missed" => "missed",
-        "cancelled" => "cancelled",
-        _ => "failed",
-    }
-}
-
-/// Maps objective call timeline kind + reason to UI wire event type, if surfaced.
+/// Maps stored session-event kind + reason to UI wire event type, if surfaced.
 pub fn call_timeline_ui_event(kind: u8, reason: &str) -> Option<&'static str> {
     match kind {
-        CALL_TIMELINE_STARTED => Some("started"),
-        CALL_TIMELINE_ENDED => Some(map_terminal_reason(reason)),
-        CALL_TIMELINE_FAILED => Some(map_failure_reason(reason)),
-        CALL_TIMELINE_PARTICIPANT_JOINED | CALL_TIMELINE_PARTICIPANT_LEFT => None,
+        SESSION_EVENT_CALL_STARTED => Some("started"),
+        SESSION_EVENT_SESSION_ENDED => Some(map_ui_reason(kind, reason)),
+        SESSION_EVENT_SESSION_FAILED => Some(map_ui_reason(kind, reason)),
+        SESSION_EVENT_PARTICIPANT_JOINED | SESSION_EVENT_PARTICIPANT_LEFT => None,
         _ => None,
     }
 }
 
-/// Derives objective call timeline semantics from stored session events for av-call.
+/// Objective call timeline for an av-call session (`CallEvent.kind` == `SESSION_EVENT_*`).
 pub fn call_events_for_session(session_id: &str) -> Vec<CallEvent> {
     let Some(session) = session_row(session_id) else {
         return vec![];
@@ -71,17 +37,39 @@ pub fn call_events_for_session(session_id: &str) -> Vec<CallEvent> {
         return vec![];
     }
 
-    let mut events: Vec<CallEvent> = session_events_for(session_id)
-        .into_iter()
-        .filter_map(|row| {
-            map_session_event_to_call_timeline(&row).map(|kind| CallEvent {
-                space_id: session.space_id.clone(),
-                session_id: session_id.to_owned(),
-                kind,
-                account: row.account,
-                reason: row.reason,
-                at: row.at,
-            })
+    let mut events: Vec<CallEvent> = SessionEventTable::read()
+        .get_index_pk()
+        .range(
+            (
+                session_id.to_owned(),
+                i64::MIN,
+                u8::MIN,
+                AccountNumber::MIN,
+            )
+                ..=(
+                    session_id.to_owned(),
+                    i64::MAX,
+                    u8::MAX,
+                    AccountNumber::MAX,
+                ),
+        )
+        .filter(|row| {
+            matches!(
+                row.kind,
+                SESSION_EVENT_CALL_STARTED
+                    | SESSION_EVENT_PARTICIPANT_JOINED
+                    | SESSION_EVENT_PARTICIPANT_LEFT
+                    | SESSION_EVENT_SESSION_FAILED
+                    | SESSION_EVENT_SESSION_ENDED
+            )
+        })
+        .map(|row| CallEvent {
+            space_id: session.space_id.clone(),
+            session_id: session_id.to_owned(),
+            kind: row.kind,
+            account: row.account,
+            reason: row.reason,
+            at: row.at,
         })
         .collect();
     events.sort_by_key(|event| (event.at, event.kind, event.account.value));
@@ -103,42 +91,22 @@ mod unit_tests {
     use super::*;
 
     #[test]
-    fn map_session_event_kinds_to_call_timeline_kinds() {
-        assert_eq!(
-            map_session_event_to_call_timeline(&SessionEventRow {
-                session_id: "wrtc:1".into(),
-                kind: SESSION_EVENT_PARTICIPANT_JOINED,
-                account: "bob".parse().unwrap(),
-                reason: "joined".into(),
-                at: 1,
-            }),
-            Some(CALL_TIMELINE_PARTICIPANT_JOINED)
-        );
-        assert_eq!(
-            map_session_event_to_call_timeline(&SessionEventRow {
-                session_id: "wrtc:1".into(),
-                kind: SESSION_EVENT_CALL_STARTED,
-                account: "alice".parse().unwrap(),
-                reason: "started".into(),
-                at: 0,
-            }),
-            Some(CALL_TIMELINE_STARTED)
-        );
-    }
-
-    #[test]
     fn call_timeline_ui_event_maps_terminal_reasons() {
         assert_eq!(
-            call_timeline_ui_event(CALL_TIMELINE_ENDED, "declined"),
+            call_timeline_ui_event(SESSION_EVENT_SESSION_ENDED, "declined"),
             Some("declined")
         );
         assert_eq!(
-            call_timeline_ui_event(CALL_TIMELINE_FAILED, "timeout"),
+            call_timeline_ui_event(SESSION_EVENT_SESSION_FAILED, "timeout"),
             Some("missed")
         );
         assert_eq!(
-            call_timeline_ui_event(CALL_TIMELINE_PARTICIPANT_JOINED, "joined"),
+            call_timeline_ui_event(SESSION_EVENT_PARTICIPANT_JOINED, "joined"),
             None
+        );
+        assert_eq!(
+            call_timeline_ui_event(SESSION_EVENT_CALL_STARTED, "started"),
+            Some("started")
         );
     }
 }

@@ -4,7 +4,8 @@ use crate::tables::{Session, SessionParticipantTable, SessionRow, SessionTable};
 
 use super::types::SESSION_STATUS_ACTIVE;
 
-pub fn allocate_session_id(
+/// Deterministic objective session id (sha256 of create inputs).
+pub fn session_id_for(
     space_id: &str,
     purpose: &str,
     participants: &[AccountNumber],
@@ -24,7 +25,7 @@ pub fn allocate_session_id(
 }
 
 /// Objective session ids hash creation time; bump `created_at` until unused.
-pub fn allocate_unique_session_id(
+pub fn unique_session_id_for(
     space_id: &str,
     purpose: &str,
     participants: &[AccountNumber],
@@ -32,8 +33,7 @@ pub fn allocate_unique_session_id(
     created_by: AccountNumber,
 ) -> (String, i64) {
     loop {
-        let session_id =
-            allocate_session_id(space_id, purpose, participants, created_at, created_by);
+        let session_id = session_id_for(space_id, purpose, participants, created_at, created_by);
         if session_row(&session_id).is_none() {
             return (session_id, created_at);
         }
@@ -50,8 +50,10 @@ pub fn session_row(session_id: &str) -> Option<SessionRow> {
 pub fn participants_of_session(session_id: &str) -> Vec<AccountNumber> {
     SessionParticipantTable::read()
         .get_index_pk()
-        .iter()
-        .filter(|row| row.session_id == session_id)
+        .range(
+            (session_id.to_owned(), AccountNumber::MIN)
+                ..=(session_id.to_owned(), AccountNumber::MAX),
+        )
         .map(|row| row.participant)
         .collect()
 }
@@ -60,7 +62,7 @@ pub fn session_is_expired(row: &SessionRow, now: i64) -> bool {
     row.expires_at > 0 && now >= row.expires_at
 }
 
-pub fn session_to_view(row: SessionRow) -> Session {
+pub fn session_with_participants(row: SessionRow) -> Session {
     let session_id = row.session_id.clone();
     Session {
         session_id: row.session_id,
@@ -80,6 +82,8 @@ pub fn active_session_for_space(space_id: &str, purpose: &str) -> Option<Session
 }
 
 pub fn sessions_for_space(space_id: &str, purpose: &str) -> Vec<SessionRow> {
+    // No secondary: (space_id, purpose, session_id) exceeds maxKeySize (128).
+    // Both ids are ~70-byte `space:`/`wrtc:` hashes.
     SessionTable::read()
         .get_index_pk()
         .iter()

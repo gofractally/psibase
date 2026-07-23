@@ -18,11 +18,7 @@ fn test_create_chat_data_session(chain: psibase::Chain) -> Result<(), psibase::E
 
     let space = Wrapper::push_from(&chain, alice).ensureDm(bob).get()?;
     let session = Wrapper::push_from(&chain, alice)
-        .createSession(
-            space.space_id.clone(),
-            "chat-data".into(),
-            vec![alice, bob],
-        )
+        .createSession(space.space_id.clone(), "chat-data".into())
         .get()?;
 
     assert!(session.session_id.starts_with("wrtc:"));
@@ -59,12 +55,12 @@ fn test_create_session_rejects_non_space_participant(
     chain.new_account(carol).unwrap();
 
     let space = Wrapper::push_from(&chain, alice).ensureDm(bob).get()?;
-    let err = Wrapper::push_from(&chain, alice)
-        .createSession(space.space_id, "chat-data".into(), vec![alice, carol])
+    let err = Wrapper::push_from(&chain, carol)
+        .createSession(space.space_id, "chat-data".into())
         .get()
         .expect_err("carol is not a space member");
     assert!(
-        err.to_string().contains("not a member of the space"),
+        err.to_string().contains("not a member of space"),
         "unexpected error: {err}"
     );
 
@@ -83,7 +79,7 @@ fn test_create_session_rejects_unknown_space(
     chain.new_account(bob).unwrap();
 
     let err = Wrapper::push_from(&chain, alice)
-        .createSession("space:missing".into(), "chat-data".into(), vec![alice, bob])
+        .createSession("space:missing".into(), "chat-data".into())
         .get()
         .expect_err("unknown space");
     assert!(err.to_string().contains("unknown space"));
@@ -106,7 +102,7 @@ fn test_webrtc_session_event_from_sig_service(
 
     let space = Wrapper::push_from(&chain, alice).ensureDm(bob).get()?;
     let session = Wrapper::push_from(&chain, alice)
-        .createSession(space.space_id, "chat-data".into(), vec![alice, bob])
+        .createSession(space.space_id, "chat-data".into())
         .get()?;
     let session_id = session.session_id.clone();
 
@@ -161,7 +157,7 @@ fn test_webrtc_session_event_rejects_non_sig_sender(
 
     let space = Wrapper::push_from(&chain, alice).ensureDm(bob).get()?;
     let session = Wrapper::push_from(&chain, alice)
-        .createSession(space.space_id, "chat-data".into(), vec![alice, bob])
+        .createSession(space.space_id, "chat-data".into())
         .get()?;
 
     let err = Wrapper::push_from(&chain, alice)
@@ -191,14 +187,10 @@ fn test_create_session_returns_existing_active_session(
 
     let space = Wrapper::push_from(&chain, alice).ensureDm(bob).get()?;
     let first = Wrapper::push_from(&chain, alice)
-        .createSession(
-            space.space_id.clone(),
-            "chat-data".into(),
-            vec![alice, bob],
-        )
+        .createSession(space.space_id.clone(), "chat-data".into())
         .get()?;
     let second = Wrapper::push_from(&chain, alice)
-        .createSession(space.space_id, "chat-data".into(), vec![alice, bob])
+        .createSession(space.space_id, "chat-data".into())
         .get()?;
 
     assert_eq!(first.session_id, second.session_id);
@@ -218,7 +210,7 @@ fn test_close_session_by_participant(chain: psibase::Chain) -> Result<(), psibas
 
     let space = Wrapper::push_from(&chain, alice).ensureDm(bob).get()?;
     let session = Wrapper::push_from(&chain, alice)
-        .createSession(space.space_id, "chat-data".into(), vec![alice, bob])
+        .createSession(space.space_id, "chat-data".into())
         .get()?;
     let session_id = session.session_id.clone();
 
@@ -255,7 +247,7 @@ fn test_close_session_rejects_non_participant(
 
     let space = Wrapper::push_from(&chain, alice).ensureDm(bob).get()?;
     let session = Wrapper::push_from(&chain, alice)
-        .createSession(space.space_id, "chat-data".into(), vec![alice, bob])
+        .createSession(space.space_id, "chat-data".into())
         .get()?;
 
     let err = Wrapper::push_from(&chain, carol)
@@ -285,7 +277,7 @@ fn test_authorize_session_join_rejects_non_participant(
 
     let space = Wrapper::push_from(&chain, alice).ensureDm(bob).get()?;
     let session = Wrapper::push_from(&chain, alice)
-        .createSession(space.space_id, "chat-data".into(), vec![alice, bob])
+        .createSession(space.space_id, "chat-data".into())
         .get()?;
 
     let auth = Wrapper::push_from(&chain, carol)
@@ -308,11 +300,7 @@ fn test_session_graphql_queries(chain: psibase::Chain) -> Result<(), psibase::Er
 
     let space = Wrapper::push_from(&chain, alice).ensureDm(bob).get()?;
     let session = Wrapper::push_from(&chain, alice)
-        .createSession(
-            space.space_id.clone(),
-            "chat-data".into(),
-            vec![alice, bob],
-        )
+        .createSession(space.space_id.clone(), "chat-data".into())
         .get()?;
 
     let token = chain.login(alice, Wrapper::SERVICE)?;
@@ -380,7 +368,7 @@ fn test_webrtc_session_event_participant_joined(
 
     let space = Wrapper::push_from(&chain, alice).ensureDm(bob).get()?;
     let session = Wrapper::push_from(&chain, alice)
-        .createSession(space.space_id, "chat-data".into(), vec![alice, bob])
+        .createSession(space.space_id, "chat-data".into())
         .get()?;
 
     Wrapper::push_from(&chain, sig)
@@ -416,7 +404,7 @@ fn test_webrtc_session_event_session_failed(
 
     let space = Wrapper::push_from(&chain, alice).ensureDm(bob).get()?;
     let session = Wrapper::push_from(&chain, alice)
-        .createSession(space.space_id, "chat-data".into(), vec![alice, bob])
+        .createSession(space.space_id, "chat-data".into())
         .get()?;
     let session_id = session.session_id.clone();
 

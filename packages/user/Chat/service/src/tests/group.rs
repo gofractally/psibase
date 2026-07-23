@@ -25,11 +25,7 @@ fn test_create_group_chat_data_session(chain: psibase::Chain) -> Result<(), psib
 
     // Caller may pass a subset; group chat-data resolves to all Space members (N-party).
     let session = Wrapper::push_from(&chain, alice)
-        .createSession(
-            group.space_id.clone(),
-            "chat-data".into(),
-            vec![alice, bob],
-        )
+        .createSession(group.space_id.clone(), "chat-data".into())
         .get()?;
 
     assert!(session.session_id.starts_with("wrtc:"));
@@ -75,11 +71,7 @@ fn test_create_group_session_rejects_non_space_member(
         .get()?;
 
     let err = Wrapper::push_from(&chain, dave)
-        .createSession(
-            group.space_id,
-            "chat-data".into(),
-            vec![dave, alice, bob, carol],
-        )
+        .createSession(group.space_id, "chat-data".into())
         .get()
         .expect_err("dave is not a space member");
     assert!(
@@ -108,11 +100,7 @@ fn test_group_session_graphql_returns_full_participant_set(
         .ensureGroup(vec![bob, carol])
         .get()?;
     let session = Wrapper::push_from(&chain, bob)
-        .createSession(
-            group.space_id.clone(),
-            "chat-data".into(),
-            vec![bob, alice, carol],
-        )
+        .createSession(group.space_id.clone(), "chat-data".into())
         .get()?;
 
     let token = chain.login(alice, Wrapper::SERVICE)?;
@@ -195,11 +183,7 @@ fn test_group_webrtc_session_event_joined_and_left(
         .ensureGroup(vec![bob, carol])
         .get()?;
     let session = Wrapper::push_from(&chain, alice)
-        .createSession(
-            group.space_id,
-            "chat-data".into(),
-            vec![alice, bob, carol],
-        )
+        .createSession(group.space_id, "chat-data".into())
         .get()?;
     let session_id = session.session_id.clone();
 
@@ -285,11 +269,7 @@ fn test_group_authorize_session_join_rejects_non_member(
         .ensureGroup(vec![bob, carol])
         .get()?;
     let session = Wrapper::push_from(&chain, alice)
-        .createSession(
-            group.space_id,
-            "chat-data".into(),
-            vec![alice, bob, carol],
-        )
+        .createSession(group.space_id, "chat-data".into())
         .get()?;
 
     let auth = Wrapper::push_from(&chain, dave)

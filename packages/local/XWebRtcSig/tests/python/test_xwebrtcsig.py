@@ -170,7 +170,6 @@ def _create_chat_data_session(node, alice='alice', bob='bob'):
         {
             'space_id': space_id,
             'purpose': 'chat-data',
-            'participants': [alice, bob],
         },
     )
     session = _chat_action_return(node, sess_trace, 'createSession')
@@ -195,7 +194,6 @@ def _create_group_chat_data_session(
     group = _chat_action_return(node, group_trace, 'ensureGroup')
     space_id = group['space_id'] if isinstance(group, dict) else group.space_id
     node.wait(new_block())
-    participants = [creator, *other_members]
     sess_trace = node.push_action(
         creator,
         'chat',
@@ -203,7 +201,6 @@ def _create_group_chat_data_session(
         {
             'space_id': space_id,
             'purpose': 'chat-data',
-            'participants': participants,
         },
     )
     session = _chat_action_return(node, sess_trace, 'createSession')
@@ -228,7 +225,6 @@ def _create_group_av_call_session(
     group = _chat_action_return(node, group_trace, 'ensureGroup')
     space_id = group['space_id'] if isinstance(group, dict) else group.space_id
     node.wait(new_block())
-    participants = [creator, *other_members]
     sess_trace = node.push_action(
         creator,
         'chat',
@@ -236,7 +232,6 @@ def _create_group_av_call_session(
         {
             'space_id': space_id,
             'purpose': 'av-call',
-            'participants': participants,
         },
     )
     session = _chat_action_return(node, sess_trace, 'createSession')
@@ -260,7 +255,6 @@ def _create_av_call_session(node, alice='alice', bob='bob'):
         {
             'space_id': space_id,
             'purpose': 'av-call',
-            'participants': [alice, bob],
         },
     )
     session = _chat_action_return(node, sess_trace, 'createSession')
@@ -569,8 +563,9 @@ class TestXWebRtcSig(unittest.TestCase):
         kinds = [
             row['kind'] if isinstance(row, dict) else row.kind for row in events
         ]
-        self.assertIn(1, kinds)  # started
-        self.assertIn(2, kinds)  # participant joined
+        # SESSION_EVENT_*: call_started=5, participant_joined=1
+        self.assertIn(5, kinds)  # started
+        self.assertIn(1, kinds)  # participant joined
 
     @testutil.psinode_test
     def test_chat_data_join_rejects_non_participant(self, cluster):

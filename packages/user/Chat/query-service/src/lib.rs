@@ -88,10 +88,6 @@ mod service {
                 .collect())
         }
 
-        async fn chat_ready(&self) -> bool {
-            true
-        }
-
         /// Active objective session for a Space and purpose (e.g. chat-data), if any.
         async fn active_session(
             &self,
@@ -100,13 +96,13 @@ mod service {
         ) -> async_graphql::Result<Option<Session>> {
             let _ = self.require_authenticated()?;
             Ok(sessions::active_session_for_space(&space_id, &purpose)
-                .map(sessions::session_to_view))
+                .map(sessions::session_with_participants))
         }
 
-        /// Objective session metadata for x-webrtc-sig join authorization (no SDP/ICE).
+        /// Objective session metadata for x-wrtcsig join authorization (no SDP/ICE).
         async fn session(&self, session_id: String) -> async_graphql::Result<Option<Session>> {
             let _ = self.require_authenticated()?;
-            Ok(sessions::session_row(&session_id).map(sessions::session_to_view))
+            Ok(sessions::session_row(&session_id).map(sessions::session_with_participants))
         }
 
         /// Whether the authenticated account may join this session (active, unexpired, participant).
