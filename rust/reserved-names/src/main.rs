@@ -86,6 +86,12 @@ fn confusable_variants(name: &str) -> Vec<String> {
             for spelling in *class {
                 if let Some(tail) = rest.strip_prefix(spelling) {
                     for replacement in *class {
+                        // Identity replacements are already covered by the
+                        // leave-as-is branch above; skip them to avoid an
+                        // exponential blow-up of redundant recursive calls.
+                        if replacement == spelling {
+                            continue;
+                        }
                         expand(tail, &format!("{prefix}{replacement}"), results);
                     }
                 }
