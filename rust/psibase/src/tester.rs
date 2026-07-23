@@ -1069,14 +1069,17 @@ pub struct ChainEmptyResult {
 }
 
 impl ChainEmptyResult {
+    #[track_caller]
     pub fn get(&self) -> Result<(), anyhow::Error> {
         if let Some(e) = &self.trace.error {
-            Err(anyhow!("{}", e))
+            let loc = std::panic::Location::caller();
+            Err(anyhow!("{} (at {}:{})", e, loc.file(), loc.line()))
         } else {
             Ok(())
         }
     }
 
+    #[track_caller]
     pub fn match_error(self, msg: &str) -> Result<TransactionTrace, anyhow::Error> {
         self.trace.match_error(msg)
     }
@@ -1088,6 +1091,7 @@ pub struct ChainResult<T: fracpack::UnpackOwned> {
 }
 
 impl<T: fracpack::UnpackOwned> ChainResult<T> {
+    #[track_caller]
     pub fn get(&self) -> Result<T, anyhow::Error> {
         self.get_with_debug(false)
     }
@@ -1107,9 +1111,11 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
             || act.sender == AccountNumber::default())
     }
 
+    #[track_caller]
     pub fn get_with_debug(&self, debug: bool) -> Result<T, anyhow::Error> {
         if let Some(e) = &self.trace.error {
-            return Err(anyhow!("{}", e));
+            let loc = std::panic::Location::caller();
+            return Err(anyhow!("{} (at {}:{})", e, loc.file(), loc.line()));
         }
         if let Some(transact) = self.trace.action_traces.last() {
             let at = transact
@@ -1140,9 +1146,15 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
                 return Ok(unpacked_ret);
             }
         }
-        Err(anyhow!("Can't find action in trace"))
+        let loc = std::panic::Location::caller();
+        Err(anyhow!(
+            "Can't find action in trace (at {}:{})",
+            loc.file(),
+            loc.line()
+        ))
     }
 
+    #[track_caller]
     pub fn match_error(self, msg: &str) -> Result<TransactionTrace, anyhow::Error> {
         self.trace.match_error(msg)
     }

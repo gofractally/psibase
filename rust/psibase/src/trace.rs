@@ -77,29 +77,37 @@ pub struct TransactionTrace {
 }
 
 impl TransactionTrace {
+    #[track_caller]
     pub fn ok(self) -> Result<TransactionTrace, anyhow::Error> {
         if let Some(e) = self.error {
-            Err(anyhow::anyhow!("{}", e))
+            let loc = std::panic::Location::caller();
+            Err(anyhow::anyhow!("{} (at {}:{})", e, loc.file(), loc.line()))
         } else {
             Ok(self)
         }
     }
 
+    #[track_caller]
     pub fn match_error(self, msg: &str) -> Result<TransactionTrace, anyhow::Error> {
+        let loc = std::panic::Location::caller();
         if let Some(e) = &self.error {
             if e.contains(msg) {
                 Ok(self)
             } else {
                 Err(anyhow::anyhow!(
-                    "Transaction was expected to fail with \"{}\", but failed with \"{}\"",
+                    "Transaction was expected to fail with \"{}\", but failed with \"{}\" (at {}:{})",
                     msg,
-                    e
+                    e,
+                    loc.file(),
+                    loc.line()
                 ))
             }
         } else {
             Err(anyhow::anyhow!(
-                "Transaction was expected to fail with \"{}\", but succeeded",
+                "Transaction was expected to fail with \"{}\", but succeeded (at {}:{})",
                 msg,
+                loc.file(),
+                loc.line()
             ))
         }
     }
