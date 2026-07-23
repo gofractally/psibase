@@ -463,8 +463,12 @@ class TestPsibase(unittest.TestCase):
         keyfile = os.path.join(a.dir, 'key.pub')
         with open(keyfile, 'wb') as f:
             f.write(key)
+        txkey = PrivateKey()
+        txkeyfile = os.path.join(a.dir, 'txkey.pub')
+        with open(txkeyfile, 'w') as f:
+            f.write(txkey.spki())
         packages = ['Minimal', 'Explorer']
-        a.run_psibase(['boot'] + a.node_args() + ['-p', a.producer, '--block-key', keyfile] + packages)
+        a.run_psibase(['boot'] + a.node_args() + ['-p', a.producer, '--block-key', keyfile, '--account-key', txkeyfile] + packages)
 
     @testutil.psinode_test
     def test_json_trace(self, cluster):

@@ -194,8 +194,8 @@ pub fn get_initial_actions<
     // Create producer account
     if let Some(key) = tx_signing_key {
         // Set transaction signing key for producer
-        builder.push(accounts::Wrapper::pack().newAccount(
-            producers::ROOT,
+        builder.push(accounts::Wrapper::pack_from(accounts::SERVICE).newAccount(
+            initial_producer,
             auth_sig::SERVICE,
             true,
         ))?;
