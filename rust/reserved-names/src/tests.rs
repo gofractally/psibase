@@ -1,4 +1,5 @@
 use super::*;
+use psibase::MAX_ACCOUNT_NAME_LENGTH;
 
 fn set(names: &[&str]) -> BTreeSet<String> {
     names.iter().map(|s| s.to_string()).collect()

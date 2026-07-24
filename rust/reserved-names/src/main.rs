@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context};
 use clap::Parser;
-use psibase::{AccountNumber, Meta, PackageRef, PackagedService, MAX_ACCOUNT_NAME_LENGTH};
+use psibase::{AccountNumber, Meta, PackageRef, PackagedService};
 use std::collections::BTreeSet;
 use std::fs::File;
 use std::io::{BufReader, Write};
@@ -106,9 +106,9 @@ struct Generated {
 }
 
 /// Generates the reserved name list: every confusable variant of `seeds`
-/// (including the seeds themselves), minus variants that exceed the maximum
-/// account name length or don't round-trip through the AccountNumber
-/// encoding.
+/// (including the seeds themselves), minus variants that aren't valid
+/// AccountNumbers (e.g. over-length after substitution, or names that
+/// don't round-trip through the encoding).
 ///
 /// Names that real packages create are reserved too. This doesn't prevent
 /// installing those packages later: account creation during installation
@@ -120,12 +120,6 @@ fn generate(seeds: &BTreeSet<String>) -> Generated {
     for seed in seeds {
         let mut any_valid = false;
         for variant in confusable_variants(seed) {
-            // Substitutions like m -> rn can push a variant past the
-            // maximum name length; such variants simply don't exist as
-            // account names, so drop them.
-            if variant.len() > MAX_ACCOUNT_NAME_LENGTH as usize {
-                continue;
-            }
             if AccountNumber::from_exact(&variant).is_ok() {
                 any_valid = true;
                 reserved.insert(variant);
