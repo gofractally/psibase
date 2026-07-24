@@ -891,7 +891,7 @@ dependencies = [
 
 [[package]]
 name = "fracpack"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "custom_error",
  "hex",
@@ -1879,7 +1879,7 @@ dependencies = [
 
 [[package]]
 name = "psibase"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -1941,7 +1941,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-derive"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "darling 0.14.4",
  "proc-macro-error",
@@ -1956,7 +1956,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-lib"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "colored-diff",
  "darling 0.20.11",
@@ -1975,7 +1975,7 @@ checksum = "824a4a32ab0318fedcd1c101a8d644d157741c9de1cf716a94368e6447a67946"
 
 [[package]]
 name = "psibase_macros"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "psibase-macros-derive",
  "psibase-rust-workspace-hack",
@@ -1983,7 +1983,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_names"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "psibase-rust-workspace-hack",
  "seahash",
@@ -3637,7 +3637,7 @@ checksum = "9edde0db4769d2dc68579893f2306b26c6ecfbe0ef499b013d731b7b9247e0b9"
 
 [[package]]
 name = "x-admin"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "chrono",
  "pem",

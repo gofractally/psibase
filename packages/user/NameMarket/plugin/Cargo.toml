@@ -7,7 +7,7 @@ publish.workspace = true
 
 [dependencies]
 psibase_plugin.workspace = true
-name-market = { path = "../service/", version = "0.23.0" }
+name-market = { path = "../service/", version = "0.24.0" }
 psibase.workspace = true
 serde.workspace = true
 serde_json.workspace = true

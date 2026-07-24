@@ -24,8 +24,9 @@ use psibase::fracpack::{Pack, Unpack};
 use psibase::services::packages::PackageSource;
 use psibase::{
     fetch_all_schemas, make_refs, method, solve_dependencies, AccountNumber, Action,
-    InstalledPackageInfo, PackageDisposition, PackageList, PackageManifest, PackagedService,
-    Schema, SchemaFetcher, SchemaMap, ServiceWrapper, StagedUpload, TransactionBuilder,
+    EssentialServices, InstalledPackageInfo, PackageDisposition, PackageList, PackageManifest,
+    PackagedService, Schema, SchemaFetcher, SchemaMap, ServiceWrapper, StagedUpload,
+    TransactionBuilder,
 };
 
 use psibase::services::{
@@ -508,8 +509,13 @@ impl PrivateApi for PackagesPlugin {
             &mut schemas,
         ))
         .map_err(|e| ErrorType::JsonError(e.to_string()))?;
-        psibase::sort_package_ops(&mut packages, &installed, &schemas)
-            .map_err(|e| ErrorType::PackageResolutionError(e.to_string()))?;
+        psibase::sort_package_ops(
+            &mut packages,
+            &installed,
+            &schemas,
+            &EssentialServices::empty(),
+        )
+        .map_err(|e| ErrorType::PackageResolutionError(e.to_string()))?;
         apply_packages(
             packages,
             uploader,

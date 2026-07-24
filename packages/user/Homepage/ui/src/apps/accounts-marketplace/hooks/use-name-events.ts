@@ -21,7 +21,7 @@ export const useNameEvents = (
 
     return useQuery({
         queryKey: QueryKey.nameMarketEvents(user, params),
-        queryFn: () => fetchNameEventsPage(params),
+        queryFn: () => fetchNameEventsPage(user!, params),
         enabled: !!user && enabled,
     });
 };

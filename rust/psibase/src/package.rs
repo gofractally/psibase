@@ -7,9 +7,9 @@ use crate::services::{
 use crate::{
     deserialize_pretty_action, new_account_owned_action, preapprove_action, reg_server,
     schema_types, set_code_action, solve_dependencies, version_match, AccountNumber, Action,
-    Checksum256, CodeRow, CustomPrettyAction, GenesisService, Hex, MethodNumber, MethodString,
-    NullSchemaFetcher, PackageDisposition, PackageOp, PackagePreference, Schema, SchemaFetcher,
-    ServiceWrapper, ToSchema, TypeMatchExt, Version,
+    AnyPublicKey, Checksum256, CodeRow, CustomPrettyAction, GenesisService, Hex, MethodNumber,
+    MethodString, NullSchemaFetcher, PackageDisposition, PackageOp, PackagePreference, Schema,
+    SchemaFetcher, ServiceWrapper, ToSchema, TypeMatchExt, Version,
 };
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
@@ -1609,6 +1609,7 @@ pub async fn fetch_packages<R: PackageRegistry + ?Sized, F: SchemaFetcher>(
     existing: &PackageList,
     fetcher: &F,
     schemas: &mut SchemaMap,
+    essential_services: &EssentialServices,
 ) -> Result<Vec<PackageOpFull<R::R>>, anyhow::Error> {
     let mut result = Vec::with_capacity(ops.len());
     for op in ops {
@@ -1621,8 +1622,7 @@ pub async fn fetch_packages<R: PackageRegistry + ?Sized, F: SchemaFetcher>(
         })
     }
     fetch_all_schemas(&result, fetcher, schemas).await?;
-    // add all schemas required by packages
-    sort_package_ops(&mut result, existing, schemas)?;
+    sort_package_ops(&mut result, existing, schemas, essential_services)?;
     Ok(result)
 }
 
@@ -1794,6 +1794,7 @@ fn get_package_order<R: Read + Seek>(
     packages: &Vec<PackageOpFull<R>>,
     existing: &PackageList,
     schemas: &SchemaMap,
+    essential_services: &EssentialServices,
 ) -> Result<Vec<usize>, anyhow::Error> {
     let mut permutation = vec![usize::MAX; packages.len()];
     let mut indexes = HashMap::new();
@@ -1803,7 +1804,6 @@ fn get_package_order<R: Read + Seek>(
     let graph = build_package_order_graph(packages, existing, schemas)?;
 
     // Process packages containing essential services first
-    let essential_services = EssentialServices::new();
     let mut i = 0;
     for package in packages {
         match package {
@@ -1845,8 +1845,9 @@ pub fn sort_package_ops<R: Read + Seek>(
     packages: &mut Vec<PackageOpFull<R>>,
     existing: &PackageList,
     schemas: &SchemaMap,
+    essential_services: &EssentialServices,
 ) -> Result<(), anyhow::Error> {
-    let mut order = get_package_order(packages, existing, schemas)?;
+    let mut order = get_package_order(packages, existing, schemas, essential_services)?;
     apply_permutation(packages, &mut order);
     Ok(())
 }
@@ -1876,15 +1877,23 @@ pub fn make_ref(package: &str) -> Result<PackageRef, anyhow::Error> {
 }
 
 // services that should be installed first
+#[derive(Debug, Clone)]
 pub struct EssentialServices {
     remaining: Vec<AccountNumber>,
 }
 
 impl EssentialServices {
-    pub fn new() -> Self {
+    pub fn empty() -> Self {
         Self {
-            remaining: vec![transact::SERVICE, producers::SERVICE, setcode::SERVICE],
+            remaining: Vec::new(),
         }
+    }
+    pub fn with_key(block_signing_key: &Option<AnyPublicKey>) -> Self {
+        let mut remaining = vec![transact::SERVICE, producers::SERVICE, setcode::SERVICE];
+        if let Some(key) = block_signing_key {
+            remaining.push(key.key.service)
+        }
+        Self { remaining }
     }
     pub fn remove(&mut self, accounts: &[AccountNumber]) {
         for account in accounts {
@@ -1920,25 +1929,31 @@ pub trait PackageRegistry {
         &self,
         packages: &[String],
         local: bool,
+        essential_services: &EssentialServices,
     ) -> Result<Vec<PackagedService<Self::R>>, anyhow::Error> {
         let installed = PackageList::new();
         let packages = installed
             .resolve_changes(self, packages, false, local)
             .await?;
         let mut schemas = SchemaMap::new();
-        Ok(
-            fetch_packages(self, packages, &installed, &NullSchemaFetcher, &mut schemas)
-                .await?
-                .into_iter()
-                .map(|op| {
-                    if let PackageOpFull::Install(package) = op {
-                        package
-                    } else {
-                        panic!("Only install is expected when there are no existing packages")
-                    }
-                })
-                .collect(),
+        Ok(fetch_packages(
+            self,
+            packages,
+            &installed,
+            &NullSchemaFetcher,
+            &mut schemas,
+            essential_services,
         )
+        .await?
+        .into_iter()
+        .map(|op| {
+            if let PackageOpFull::Install(package) = op {
+                package
+            } else {
+                panic!("Only install is expected when there are no existing packages")
+            }
+        })
+        .collect())
     }
 }
 

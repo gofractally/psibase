@@ -62,15 +62,6 @@ namespace psibase
       return result;
    }
 
-   auto databaseStatusKey() -> KeyPrefixType
-   {
-      return std::tuple{databaseStatusTable, nativeTablePrimaryIndex};
-   }
-   auto DatabaseStatusRow::key() -> KeyPrefixType
-   {
-      return databaseStatusKey();
-   }
-
    auto notifyKey(NotifyType type) -> NotifyKeyType
    {
       return std::tuple{notifyTable, nativeTablePrimaryIndex, type};
