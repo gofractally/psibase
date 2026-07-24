@@ -158,36 +158,32 @@ namespace psibase
          const psio::json::any*           data;
       };
 
-      PrettyActionRef parsePrettyAction(const psio::schema_types::CompiledType*,
-                                        const psio::json::any& in)
+      PrettyActionRef parsePrettyAction(const psio::schema_types::CompiledType* ty,
+                                        const psio::json::any&                  in)
       {
          PrettyActionRef act;
          auto*           obj = in.get_if<psio::json::any_object>();
-         if (!obj)
-            abortMessage("Expected object");
-         for (const auto& [name, value] : *obj)
+         check(obj != nullptr, "Expected object");
+         auto* objTy = std::get_if<psio::schema_types::Object>(&ty->original_type->value);
+         check(objTy != nullptr, "Expected object type");
+         check(objTy->members.size() == 4, "wrong size");
+         auto getField = [&](std::string_view name, bool required = true) -> const psio::json::any*
          {
-            if (name == "sender")
-            {
-               act.sender = accountFromJson(value);
-            }
-            else if (name == "service")
-            {
-               act.service = accountFromJson(value);
-            }
-            else if (name == "method")
-            {
-               act.method = methodFromJson(value);
-            }
-            else if (name == "rawData")
-            {
-               act.rawData = bytesFromJson(value);
-            }
-            else if (name == "data")
-            {
-               act.data = &value;
-            }
-         }
+            auto pos =
+                std::ranges::find_if(*obj, [&](const auto& entry) { return entry.key == name; });
+            if (pos != obj->end())
+               return &pos->value;
+            else if (required)
+               abortMessage("Missing field " + std::string(name));
+            else
+               return nullptr;
+         };
+         act.sender  = accountFromJson(*getField(objTy->members[0].name));
+         act.service = accountFromJson(*getField(objTy->members[1].name));
+         act.method  = methodFromJson(*getField(objTy->members[2].name));
+         if (auto* rawData = getField(objTy->members[3].name, false))
+            act.rawData = bytesFromJson(*rawData);
+         act.data = getField("data", false);
          return act;
       }
 
