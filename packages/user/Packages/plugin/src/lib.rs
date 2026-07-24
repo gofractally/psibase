@@ -23,18 +23,20 @@ use exports::packages::plugin::queries::Guest as Queries;
 use psibase::fracpack::{Pack, Unpack};
 use psibase::services::packages::PackageSource;
 use psibase::{
-    make_refs, method, solve_dependencies, AccountNumber, Action, EssentialServices,
-    InstalledPackageInfo, PackageDisposition, PackageList, PackageManifest, PackagedService,
-    SchemaMap, ServiceWrapper, StagedUpload, TransactionBuilder,
+    fetch_all_schemas, make_refs, method, solve_dependencies, AccountNumber, Action,
+    EssentialServices, InstalledPackageInfo, PackageDisposition, PackageList, PackageManifest,
+    PackagedService, Schema, SchemaFetcher, SchemaMap, ServiceWrapper, StagedUpload,
+    TransactionBuilder,
 };
 
 use psibase::services::{
     packages as PackagesService, setcode as SetCodeService, sites as SitesService,
 };
 
+use async_trait::async_trait;
+use futures::executor::block_on;
 use std::cell::Cell;
-use std::collections::HashSet;
-use std::io::{Cursor, Read, Seek};
+use std::io::Cursor;
 
 impl From<types::PackageRef> for psibase::PackageRef {
     fn from(value: types::PackageRef) -> psibase::PackageRef {
@@ -285,27 +287,15 @@ fn get_installed_manifest(
     Ok(serde_json::from_str(&json).map_err(|e| ErrorType::JsonError(e.to_string()))?)
 }
 
-fn load_schemas<R: Read + Seek>(
-    package: &mut PackagedService<R>,
-    schemas: &mut SchemaMap,
-) -> Result<(), HostTypes::Error> {
-    package
-        .get_all_schemas(schemas)
-        .map_err(|e| ErrorType::PackageFormatError(e.to_string()))?;
-    let mut required = HashSet::new();
-    package
-        .get_required_schemas(&mut required)
-        .map_err(|e| ErrorType::PackageFormatError(e.to_string()))?;
-    for account in required {
-        if !schemas.contains_key(&account) {
-            schemas.insert(
-                account,
-                serde_json::from_str(&Server::get_json(&format!("/schema?service={account}"))?)
-                    .map_err(|e| ErrorType::JsonError(e.to_string()))?,
-            );
-        }
+struct PluginSchemaFetcher;
+
+#[async_trait(?Send)]
+impl SchemaFetcher for PluginSchemaFetcher {
+    async fn fetch_schema(&self, service: AccountNumber) -> Result<Schema, anyhow::Error> {
+        Ok(serde_json::from_str(&Server::get_json(&format!(
+            "/schema?service={service}"
+        ))?)?)
     }
-    Ok(())
 }
 
 #[allow(non_snake_case)]
@@ -354,8 +344,8 @@ fn apply_packages<
     sender: AccountNumber,
     compression_level: u32,
     installed: PackageList,
+    mut schemas: SchemaMap,
 ) -> Result<(), HostTypes::Error> {
-    let mut schemas = SchemaMap::new();
     let updated_packages = installed.into_updated(&ops, sender);
     for mut op in ops {
         match &op {
@@ -386,7 +376,6 @@ fn apply_packages<
             }
         }
         if let Some(package) = op.new() {
-            load_schemas(package, &mut schemas)?;
             files.set_label(format!(
                 "Uploading files for {}-{}",
                 package.name(),
@@ -513,8 +502,20 @@ impl PrivateApi for PackagesPlugin {
             .into_iter()
             .map(|op| op.try_into())
             .collect::<Result<Vec<_>, _>>()?;
-        psibase::sort_package_ops(&mut packages, &installed, &EssentialServices::empty())
-            .map_err(|e| ErrorType::PackageResolutionError(e.to_string()))?;
+        let mut schemas = SchemaMap::new();
+        block_on(fetch_all_schemas(
+            &packages,
+            &PluginSchemaFetcher,
+            &mut schemas,
+        ))
+        .map_err(|e| ErrorType::JsonError(e.to_string()))?;
+        psibase::sort_package_ops(
+            &mut packages,
+            &installed,
+            &schemas,
+            &EssentialServices::empty(),
+        )
+        .map_err(|e| ErrorType::PackageResolutionError(e.to_string()))?;
         apply_packages(
             packages,
             uploader,
@@ -523,6 +524,7 @@ impl PrivateApi for PackagesPlugin {
             sender,
             compression_level.into(),
             installed,
+            schemas,
         )?;
 
         if trx_builder.num_transactions() != 0 {
