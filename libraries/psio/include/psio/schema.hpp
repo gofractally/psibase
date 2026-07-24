@@ -531,6 +531,20 @@ namespace psio
 
       struct CustomHandler
       {
+         template <typename T>
+         CustomHandler(T* arg)
+             : userData(const_cast<void*>(static_cast<const void*>(arg))),
+               match(&T::match),
+               frac2json([](void* data, const CompiledType* ty, FracStream& in, StreamBase& out)
+                         { return static_cast<T*>(data)->frac2json(ty, in, out); }),
+               json2frac([](void*                                   data,
+                            const psio::schema_types::CompiledType* ty,
+                            const psio::json::any&                  in,
+                            psio::StreamBase&                       out)
+                         { static_cast<T*>(data)->json2frac(ty, in, out); }),
+               is_empty_container(&T::is_empty_container)
+         {
+         }
          template <typename T, typename U = void>
          CustomHandler(const T&, U* arg = nullptr)
              : userData(const_cast<void*>(static_cast<const void*>(arg))),
