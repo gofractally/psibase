@@ -35,6 +35,7 @@ if(DEFINED IS_WASM)
     add_sys_cargo_psibase_test(StagedTx)
     add_sys_cargo_psibase_test(VirtualServer)
 
+    add_usr_cargo_psibase_test(Chat)
     add_usr_cargo_psibase_test(DiffAdjust)
     add_usr_cargo_psibase_test(Identity)
     add_usr_cargo_psibase_test(Registry)

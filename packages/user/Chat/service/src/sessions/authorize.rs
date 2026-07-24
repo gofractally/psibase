@@ -1,0 +1,48 @@
+use psibase::{AccountNumber, Table};
+
+use crate::tables::{SessionJoinAuth, SessionParticipantTable};
+
+use super::lookup::{participants_of_session, session_is_expired, session_row};
+use super::types::SESSION_STATUS_ACTIVE;
+
+/// True if `account` is listed on an objective session's participant table.
+pub fn is_session_participant(session_id: &str, account: AccountNumber) -> bool {
+    SessionParticipantTable::read()
+        .get_index_pk()
+        .get(&(session_id.to_owned(), account))
+        .is_some()
+}
+
+pub fn authorize_session_join(
+    session_id: &str,
+    account: AccountNumber,
+    now: i64,
+) -> SessionJoinAuth {
+    let Some(row) = session_row(session_id) else {
+        return SessionJoinAuth {
+            session_id: session_id.to_owned(),
+            authorized: false,
+            purpose: String::new(),
+            space_id: String::new(),
+            participants: vec![],
+            status: 0,
+            expires_at: 0,
+            expired: false,
+        };
+    };
+    let participants = participants_of_session(session_id);
+    let expired = session_is_expired(&row, now);
+    let authorized = row.status == SESSION_STATUS_ACTIVE
+        && !expired
+        && is_session_participant(session_id, account);
+    SessionJoinAuth {
+        session_id: session_id.to_owned(),
+        authorized,
+        purpose: row.purpose,
+        space_id: row.space_id,
+        participants,
+        status: row.status,
+        expires_at: row.expires_at,
+        expired,
+    }
+}

@@ -1,0 +1,166 @@
+#[psibase::service(name = "chat+1")]
+#[allow(non_snake_case)]
+mod service {
+    use async_graphql::*;
+    use chat::call_timeline;
+    use chat::sessions;
+    use chat::spaces::{space_with_members, spaces_for_user};
+    use chat::tables::{
+        Session, SessionJoinAuth, SpaceRow, SPACE_KIND_DM, SPACE_KIND_GROUP,
+    };
+    use psibase::services::transact::Wrapper as TransactSvc;
+    use psibase::*;
+
+    #[derive(Enum, Copy, Clone, Eq, PartialEq)]
+    enum SpaceKind {
+        #[graphql(name = "DM")]
+        Dm,
+        #[graphql(name = "GROUP")]
+        Group,
+    }
+
+    impl SpaceKind {
+        fn from_row_kind(kind: u8, member_count: usize) -> Self {
+            match kind {
+                SPACE_KIND_DM => SpaceKind::Dm,
+                SPACE_KIND_GROUP => SpaceKind::Group,
+                _ if member_count == 2 => SpaceKind::Dm,
+                _ => SpaceKind::Group,
+            }
+        }
+    }
+
+    /// GraphQL shape adds `kind` enum; differs from `tables::Space`.
+    #[derive(SimpleObject)]
+    struct SpaceEntry {
+        space_id: String,
+        members: Vec<AccountNumber>,
+        kind: SpaceKind,
+    }
+
+    /// GraphQL shape maps `kind` → UI `event` string; differs from `tables::CallEvent`.
+    #[derive(SimpleObject)]
+    struct CallEventEntry {
+        space_id: String,
+        session_id: String,
+        event: String,
+        account: AccountNumber,
+        reason: String,
+        at: i64,
+    }
+
+    fn now_micros() -> i64 {
+        TransactSvc::call().currentBlock().time.microseconds
+    }
+
+    fn space_entry_from_row(row: SpaceRow) -> SpaceEntry {
+        let space = space_with_members(row.clone());
+        let member_count = space.members.len();
+        SpaceEntry {
+            space_id: space.space_id,
+            members: space.members,
+            kind: SpaceKind::from_row_kind(row.kind, member_count),
+        }
+    }
+
+    struct Query {
+        user: Option<AccountNumber>,
+    }
+
+    impl Query {
+        fn require_authenticated(&self) -> async_graphql::Result<AccountNumber> {
+            self.user.ok_or_else(|| {
+                async_graphql::Error::new(
+                    "permission denied: an authorized session is required for this query.",
+                )
+            })
+        }
+    }
+
+    #[Object]
+    impl Query {
+        /// Lists Spaces the authenticated user belongs to (DM and group).
+        async fn my_spaces(&self) -> async_graphql::Result<Vec<SpaceEntry>> {
+            let user = self.require_authenticated()?;
+            Ok(spaces_for_user(user)
+                .into_iter()
+                .map(space_entry_from_row)
+                .collect())
+        }
+
+        /// Active objective session for a Space and purpose (e.g. chat-data), if any.
+        async fn active_session(
+            &self,
+            space_id: String,
+            purpose: String,
+        ) -> async_graphql::Result<Option<Session>> {
+            let _ = self.require_authenticated()?;
+            Ok(sessions::active_session_for_space(&space_id, &purpose)
+                .map(sessions::session_with_participants))
+        }
+
+        /// Objective session metadata for x-wrtcsig join authorization (no SDP/ICE).
+        async fn session(&self, session_id: String) -> async_graphql::Result<Option<Session>> {
+            let _ = self.require_authenticated()?;
+            Ok(sessions::session_row(&session_id).map(sessions::session_with_participants))
+        }
+
+        /// Whether the authenticated account may join this session (active, unexpired, participant).
+        async fn session_join_auth(
+            &self,
+            session_id: String,
+        ) -> async_graphql::Result<SessionJoinAuth> {
+            let user = self.require_authenticated()?;
+            Ok(sessions::authorize_session_join(
+                &session_id,
+                user,
+                now_micros(),
+            ))
+        }
+
+        /// Call timeline for a Space (av-call sessions).
+        async fn call_events(
+            &self,
+            space_id: String,
+        ) -> async_graphql::Result<Vec<CallEventEntry>> {
+            let user = self.require_authenticated()?;
+            if !chat::spaces::is_space_member(&space_id, user) {
+                return Err(async_graphql::Error::new(
+                    "permission denied: account is not a member of this space",
+                ));
+            }
+            Ok(call_timeline::call_events_for_space(&space_id)
+                .into_iter()
+                .filter_map(|row| {
+                    call_timeline::call_timeline_ui_event(row.kind, &row.reason).map(|event| {
+                        CallEventEntry {
+                            space_id: row.space_id,
+                            session_id: row.session_id,
+                            event: event.into(),
+                            account: row.account,
+                            reason: row.reason,
+                            at: row.at,
+                        }
+                    })
+                })
+                .collect())
+        }
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn serveSys(
+        request: HttpRequest,
+        _socket: Option<i32>,
+        user: Option<AccountNumber>,
+    ) -> Option<HttpReply> {
+        assert_eq!(
+            get_sender(),
+            psibase::services::http_server::SERVICE,
+            "permission denied: serveSys only callable by 'http'",
+        );
+
+        None.or_else(|| serve_graphql(&request, Query { user }))
+            .or_else(|| serve_graphiql(&request))
+    }
+}
