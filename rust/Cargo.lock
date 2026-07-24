@@ -3635,6 +3635,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "reserved-names"
+version = "0.24.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "psibase",
+ "psibase-rust-workspace-hack",
+ "serde_json",
+ "zip",
+]
+
+[[package]]
 name = "rfc6979"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
