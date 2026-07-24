@@ -1090,8 +1090,10 @@ impl<R: Read + Seek> PackagedService<R> {
 
     pub fn get_all_schemas(&self, schemas: &mut SchemaMap) -> Result<(), anyhow::Error> {
         for (account, _, info) in &self.services {
-            if let Some(schema) = info.schema.clone() {
-                schemas.insert(*account, schema);
+            if !schemas.contains_key(account) {
+                if let Some(schema) = info.schema.clone() {
+                    schemas.insert(*account, schema);
+                }
             }
         }
         Ok(())
