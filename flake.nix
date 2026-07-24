@@ -178,10 +178,17 @@
         # unpinned `cargo install wasm-tools`.
         wasmTools = pkgs.wasm-tools;
 
+        # Expose nix's GNU Make as `gmake` too, so CMake doesn't pick the host's gmake
+        gnumakeGmake = pkgs.runCommand "gnumake-gmake" { } ''
+          mkdir -p $out/bin
+          ln -s ${pkgs.gnumake}/bin/make $out/bin/gmake
+        '';
+
         commonPackages = with pkgs; [
           cmake
           ninja
           gnumake
+          gnumakeGmake
           autoconf
           automake
           libtool
