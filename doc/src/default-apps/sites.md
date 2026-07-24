@@ -28,6 +28,26 @@ If the baseline CSP is insufficient, the `sites` service allows users to customi
 
 The priority of the CSP header applied to content is given to a header set for a specific path, then the header set for an entire site, and finally will default to the default policy if no custom headers were provided.
 
+Note that a custom CSP **completely replaces** the baseline for the content it covers — the policies are not merged — so a custom CSP should be stated as a complete policy.
+
+#### The `{root}` keyword
+
+User-defined (and default) CSP strings may include the keyword `{root}`. At serve time, `{root}` is replaced with the deployment root host of the request, including the port when present (e.g. `psibase.localhost:8080` in local development, or `example.com` in production).
+
+Host sources that use `{root}` are typically written scheme-relative (no `http://`/`https://` prefix) so the same policy works over both local HTTP and production HTTPS. For example:
+
+```
+default-src 'self'; connect-src 'self' {root} *.{root}; frame-src supervisor.{root};
+```
+
+becomes, on a local node:
+
+```
+default-src 'self'; connect-src 'self' psibase.localhost:8080 *.psibase.localhost:8080; frame-src supervisor.psibase.localhost:8080;
+```
+
+This lets apps loosen or tighten CSP for sibling subdomains without hardcoding a specific deployment domain (and without falling back to `*`, which would discard subdomain-specific clamping).
+
 ## HTTP caching
 
 On upload, the `sites` server calculates and stores a hash of the content at each path. The server now returns the hash in an [`etag`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/ETag) header, as well as setting the `cache-control` header to `no-cache`.
