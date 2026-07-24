@@ -67,7 +67,7 @@ namespace
          if (!row)
             return false;
 
-         const CompiledType* ctype = cache.getSchemaType(db, row->service(), row->type());
+         const CompiledType* ctype = cache.getSchemaType({}, db, row->service(), row->type());
          if (!ctype)
             return true;
 
@@ -162,7 +162,7 @@ namespace
          EventWrapper        wrapper;
          auto                events = EventConfig{}.openEvents(item.db, KvMode::read);
          std::vector<char>   data;
-         const CompiledType* ctype = cache.getSchemaType(item.db, item.service, item.event);
+         const CompiledType* ctype = cache.getSchemaType({}, item.db, item.service, item.event);
          wrapper.set(ctype);
          std::vector<char> subkey{key.begin(), key.begin() + prefixLen};
          subkey.back() = item.info.indexNum;

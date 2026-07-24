@@ -43,7 +43,7 @@ void Events::addIndex(psibase::EventDb       db,
                       std::uint8_t           column)
 {
    check(getSender() == service, "Wrong sender");
-   const CompiledType* type = SchemaCache::instance().getSchemaType(db, service, event);
+   const CompiledType* type = SchemaCache::instance().getSchemaType({}, db, service, event);
    check(!!type, "Unknown event");
    check(column < type->children.size(), "Unknown column");
    auto secondary = EventConfig{}.open<SecondaryIndexTable>();
