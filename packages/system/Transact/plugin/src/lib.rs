@@ -141,9 +141,10 @@ impl Intf for TransactPlugin {
     }
 
     fn set_propose_latch(account: Option<String>) -> Result<(), HostTypes::Error> {
+        // Whitelisting accounts so that the accounts user prompts can stage transactions even when accounts is not the act
         assert_authorized_with_whitelist(
             FunctionName::set_propose_latch,
-            vec![Host::client::get_active_app()],
+            vec![Host::client::get_active_app(), String::from("accounts")],
         )?;
 
         let Some(acct) = account else {

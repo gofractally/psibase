@@ -9,6 +9,7 @@ import { BrandedGlowingCard } from "@shared/components/branded-glowing-card";
 import { useAppForm } from "@shared/components/form/app-form";
 import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
 import { useBranding } from "@shared/hooks/use-branding";
+import { useImportExisting } from "@shared/hooks/use-import-existing";
 import { b64ToPem, validateB64 } from "@shared/lib/b64-key-utils";
 import { zAccount } from "@shared/lib/schemas/account";
 import { Button } from "@shared/shadcn/ui/button";
@@ -32,7 +33,6 @@ import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 import { useCanCreateAccount } from "./hooks/use-can-create-account";
 import { useConnectAccount } from "./hooks/use-connect-account";
-import { useImportExisting } from "./hooks/use-import-existing";
 import { AuthServices } from "./types";
 
 export const ImportPrompt = ({ isPrompt }: { isPrompt?: boolean }) => {
@@ -71,10 +71,14 @@ export const ImportPrompt = ({ isPrompt }: { isPrompt?: boolean }) => {
         } catch (e) {
             console.error("Import and login failed");
             console.error(e);
-            form.fieldInfo.privateKey.instance?.setErrorMap({
-                onSubmit:
-                    "Error signing in. Check your private key and try again.",
-            });
+            const message =
+                "Error signing in. Check your private key and try again.";
+            form.setFieldMeta("privateKey", (prev) => ({
+                ...prev,
+                isTouched: true,
+                errors: [message],
+                errorMap: { onSubmit: message },
+            }));
         }
     };
 

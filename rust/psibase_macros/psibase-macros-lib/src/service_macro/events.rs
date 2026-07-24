@@ -7,7 +7,6 @@ use syn::{AttrStyle, Attribute, ItemFn};
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub enum EventType {
     History,
-    Ui,
     Merkle,
 }
 
@@ -37,7 +36,6 @@ pub struct EventOptions {
 #[derive(Debug, FromMeta)]
 struct RawEventOptions {
     history: Flag,
-    ui: Flag,
     merkle: Flag,
     public: Flag,
     private: Flag,
@@ -49,13 +47,6 @@ impl RawEventOptions {
         if self.history.is_present() {
             db = Some(EventType::History);
         }
-        if self.ui.is_present() {
-            if db.is_some() {
-                emit_error!(self.ui.span(), "duplicate event specifier");
-            } else {
-                db = Some(EventType::Ui);
-            }
-        }
         if self.merkle.is_present() {
             if db.is_some() {
                 emit_error!(self.merkle.span(), "duplicate event specifier");
@@ -64,7 +55,7 @@ impl RawEventOptions {
             }
         }
         if db.is_none() {
-            emit_error!(location, "expected history, ui, or merkle");
+            emit_error!(location, "expected history or merkle");
         }
         if self.public.is_present() && self.private.is_present() {
             emit_error!(self.public.span(), "duplicate access specifier");

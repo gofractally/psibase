@@ -1,8 +1,12 @@
 [package]
 name = "psibase_service"
 version.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
 edition.workspace = true
-publish.workspace = true
+description = "Library to support psibase service development"
+license.workspace = true
 
 [dependencies]
 psibase.workspace = true

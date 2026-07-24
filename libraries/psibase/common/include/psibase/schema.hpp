@@ -86,7 +86,6 @@ namespace psibase
           std::map<std::string, psio::schema_types::FunctionType, CompareMethodNumber>;
       ActionMap actions;
       using EventMap = std::map<std::string, EventType, CompareMethodNumber>;
-      EventMap ui;
       EventMap history;
       EventMap merkle;
 
@@ -383,10 +382,6 @@ namespace psibase
          std::vector<psio::schema_types::AnyType*> typeRefs;
          psio::SchemaBuilder                       builder;
          makeActions<T>(builder, result.actions, typeRefs);
-         if constexpr (requires { typename T::Events::Ui; })
-         {
-            makeEvents<typename T::Events::Ui>(builder, result.ui, typeRefs);
-         }
          if constexpr (requires { typename T::Events::History; })
          {
             makeEvents<typename T::Events::History>(builder, result.history, typeRefs);
@@ -432,7 +427,7 @@ namespace psibase
       std::vector<const psio::schema_types::AnyType*> eventTypes() const
       {
          std::vector<const psio::schema_types::AnyType*> result;
-         for (const auto* m : {&ui, &history, &merkle})
+         for (const auto* m : {&history, &merkle})
          {
             for (const auto& [_, type] : *m)
             {
@@ -443,7 +438,7 @@ namespace psibase
       }
       // checks that all names and indexes are valid
       void checkValid() const;
-      PSIO_REFLECT(ServiceSchema, service, types, actions, ui, history, merkle, database)
+      PSIO_REFLECT(ServiceSchema, service, types, actions, history, merkle, database)
    };
 
    psio::schema_types::CustomTypes psibase_types();

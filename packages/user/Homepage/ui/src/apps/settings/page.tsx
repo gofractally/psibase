@@ -4,15 +4,13 @@ import { UserProfileSection } from "./components/user-profile-section";
 import { UserSettingsSection } from "./components/user-settings-section";
 
 export const SettingsPage = () => {
-    const { data: systemToken, isLoading: isSystemTokenLoading } =
-        useSystemToken({});
-    const systemTokenEnabled = !isSystemTokenLoading && systemToken?.id !== "";
+    const { data: systemToken } = useSystemToken();
 
     return (
         <div className="p-4">
             <div className="mx-auto max-w-screen-md space-y-8">
                 <UserProfileSection />
-                {systemTokenEnabled && (
+                {systemToken && (
                     <div className="border-t pt-8">
                         <UserSettingsSection />
                     </div>

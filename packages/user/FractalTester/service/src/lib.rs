@@ -65,7 +65,7 @@ mod service {
 
     #[action]
     fn setup() {
-        check(get_sender() == Wrapper::SERVICE, "Unauthorized");
+        assert_eq!(get_sender(), Wrapper::SERVICE, "Unauthorized");
 
         if ConfigRow::is_init() {
             return;

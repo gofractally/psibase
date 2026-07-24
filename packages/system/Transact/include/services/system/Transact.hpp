@@ -154,8 +154,8 @@ namespace SystemService
       /// * `true`: The authorizers are sufficient to authorize a transaction from the sender.
       /// * `false`: The authorizers are not sufficient to authorize a transaction from the sender.
       bool isAuthSys(psibase::AccountNumber              sender,
-                     std::vector<psibase::AccountNumber> authorizers, 
-                     std::optional<ServiceMethod> method);
+                     std::vector<psibase::AccountNumber> authorizers,
+                     std::optional<ServiceMethod>        method);
 
       /// Check whether a specified set of rejecter accounts are sufficient to reject (cancel) a
       /// transaction from a specified sender.
@@ -169,8 +169,8 @@ namespace SystemService
       /// * `true`: The rejecters are sufficient to reject a transaction from the sender.
       /// * `false`: The rejecters are not sufficient to reject a transaction from the sender.
       bool isRejectSys(psibase::AccountNumber              sender,
-                       std::vector<psibase::AccountNumber> rejecters, 
-                       std::optional<ServiceMethod> method);
+                       std::vector<psibase::AccountNumber> rejecters,
+                       std::optional<ServiceMethod>        method);
    };
    PSIO_REFLECT(AuthInterface,
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
@@ -444,6 +444,28 @@ namespace SystemService
       /// Enable/disable resource monitoring
       void resMonitoring(bool enable);
 
+      /// Returns true if resource monitoring is enabled
+      bool isResMonitoring();
+
+      /// Suppress billing/tracking for the next `numWrites` disk writes.
+      ///
+      /// Intended for wrapping privileged-service writes that are modified
+      /// by both wasm and native code (e.g. status row). The caller is expected
+      /// to perform exactly `numWrites` writes/frees and then call `endSkipBilling`.
+      ///
+      /// Only callable by privileged services.
+      void skipBilling(uint32_t numWrites);
+
+      /// Asserts that all writes promised by `skipBilling` were consumed.
+      ///
+      /// Only callable by privileged services.
+      void endSkipBilling();
+
+      /// Attribute subsequent disk writes to the system account until `numBytes`
+      /// bytes have been written or the transaction ends. `numBytes = 0` clears
+      /// the override. Callable only by the VirtualServer service.
+      void systemWrite(uint64_t numBytes);
+
       /// Get the currently executing transaction
       psio::view<const psibase::Transaction> getTransaction() const;
 
@@ -476,15 +498,13 @@ namespace SystemService
             /// Emitted at the start of each block
             void blockStart(psibase::BlockNum blockNum, psibase::BlockTime blockTime) {}
          };
-         struct Ui
-         {
-         };
          struct Merkle
          {
          };
       };
    };
    PSIO_REFLECT(Transact,
+                allowHashedMethods(),
                 method(startBoot, bootTransactions),
                 method(finishBoot),
                 method(startBlock),
@@ -497,6 +517,10 @@ namespace SystemService
                 method(runAs, action, allowedActions),
                 method(checkFirstAuth, id, transaction),
                 method(resMonitoring, enable),
+                method(isResMonitoring),
+                method(skipBilling, numWrites),
+                method(endSkipBilling),
+                method(systemWrite, numBytes),
                 method(getTransaction),
                 method(isTransaction),
                 method(currentBlock),
@@ -510,7 +534,6 @@ namespace SystemService
    PSIBASE_REFLECT_EVENTS(Transact);
    PSIBASE_REFLECT_HISTORY_EVENTS(Transact, method(blockStart, blockNum, blockTime));
    PSIBASE_PUBLIC_EVENT(Transact::Events::History::blockStart)
-   PSIBASE_REFLECT_UI_EVENTS(Transact);
    PSIBASE_REFLECT_MERKLE_EVENTS(Transact);
 
    // The status will never be nullopt during transaction execution or during RPC.

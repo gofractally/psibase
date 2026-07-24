@@ -101,7 +101,6 @@ pub struct Schema {
     pub service: AccountNumber,
     pub types: fracpack::Schema,
     pub actions: ActionMap,
-    pub ui: EventMap,
     pub history: EventMap,
     pub merkle: EventMap,
     pub database: Option<IndexMap<String, Vec<TableInfo>>>,
@@ -138,11 +137,7 @@ pub(crate) fn assert_schemas_equivalent(lhs: &Schema, rhs: &Schema) {
             panic!("Extra action {}", name);
         }
     }
-    for (levents, revents) in [
-        (&lhs.ui, &rhs.ui),
-        (&lhs.history, &rhs.history),
-        (&lhs.merkle, &rhs.merkle),
-    ] {
+    for (levents, revents) in [(&lhs.history, &rhs.history), (&lhs.merkle, &rhs.merkle)] {
         for (name, lty) in levents {
             if let Some(rty) = revents.get(name) {
                 if !matcher.compare(&lty.type_, &rty.type_) {
@@ -277,7 +272,6 @@ impl ToDatabaseSchema for EmptyDatabase {
 }
 
 pub trait ToServiceSchema {
-    type UiEvents: ToEventsSchema;
     type HistoryEvents: ToEventsSchema;
     type MerkleEvents: ToEventsSchema;
     type Actions: ToActionsSchema;
@@ -286,22 +280,15 @@ pub trait ToServiceSchema {
     fn schema() -> Schema {
         let mut builder = SchemaBuilder::new();
         let mut actions = Self::Actions::to_schema(&mut builder);
-        let mut ui = Self::UiEvents::to_schema(&mut builder);
         let mut history = Self::HistoryEvents::to_schema(&mut builder);
         let mut merkle = Self::MerkleEvents::to_schema(&mut builder);
         let mut database = Self::Database::to_schema(&mut builder);
-        let types = builder.build_ext(&mut (
-            &mut actions,
-            &mut ui,
-            &mut history,
-            &mut merkle,
-            &mut database,
-        ));
+        let types =
+            builder.build_ext(&mut (&mut actions, &mut history, &mut merkle, &mut database));
         Schema {
             service: Self::SERVICE,
             types,
             actions,
-            ui,
             history,
             merkle,
             database,
@@ -315,7 +302,6 @@ pub trait ToServiceSchema {
             service: Self::SERVICE,
             types,
             actions,
-            ui: Default::default(),
             history: Default::default(),
             merkle: Default::default(),
             database: Default::default(),

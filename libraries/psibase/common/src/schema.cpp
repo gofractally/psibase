@@ -97,7 +97,6 @@ void psibase::ServiceSchema::checkValid() const
       if (type.result)
          types.checkType(*type.result);
    }
-   checkEvents(types, ui);
    checkEvents(types, history);
    checkEvents(types, merkle);
    if (database)

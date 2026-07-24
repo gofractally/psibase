@@ -1,9 +1,20 @@
 import { motion } from "framer-motion";
-import { Book, BookUser, Coins, Mail, MoveRight, ArrowRightLeft, } from "lucide-react";
+import {
+    ArrowRightLeft,
+    Book,
+    BookUser,
+    Coins,
+    Mail,
+    MoveRight,
+    Store,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
 import { siblingUrl } from "@psibase/common-lib";
+
+import { useAccountMarketplaceVisibility } from "@/apps/accounts-marketplace/hooks/use-account-marketplace-visibility";
+import { ACCOUNT_MARKETPLACE_PATH } from "@/apps/accounts-marketplace/route";
 
 import { zAccount } from "@shared/lib/schemas/account";
 
@@ -16,6 +27,7 @@ export const AppSchema = z
     .and(
         z.union([
             z.object({ service: zAccount }),
+            z.object({ path: z.string() }),
             z.object({ href: z.string().url() }),
         ]),
     );
@@ -48,7 +60,13 @@ const apps: App[] = [
         service: zAccount.parse("contacts"),
     },
     {
-        title: "Doc",
+        title: "Account marketplace",
+        description: "Buy and claim account names.",
+        icon: <Store className="h-6 w-6" />,
+        path: ACCOUNT_MARKETPLACE_PATH,
+    },
+    {
+        title: "Docs",
         description: "Review technical documentation and guides.",
         icon: <Book className="h-6 w-6" />,
         href: siblingUrl(null, "docs", null),
@@ -57,19 +75,32 @@ const apps: App[] = [
 
 const App = () => {
     const navigate = useNavigate();
+    const {
+        visible: isAccountMarketplaceVisible,
+        isLoading: isAccountMarketplaceLoading,
+    } = useAccountMarketplaceVisibility();
+
+    const visibleApps = apps.filter((app) => {
+        if ("path" in app && app.path === ACCOUNT_MARKETPLACE_PATH) {
+            return isAccountMarketplaceVisible && !isAccountMarketplaceLoading;
+        }
+        return true;
+    });
 
     const handleNavigation = (app: App) => {
-        if ("service" in app) {
-            navigate(`/${app.service}`);
-        } else {
+        if ("href" in app) {
             window.location.href = app.href;
+        } else if ("path" in app) {
+            navigate(`/${app.path}`);
+        } else {
+            navigate(`/${app.service}`);
         }
     };
 
     return (
         <main className="container mx-auto p-6">
             <div className="grid gap-8 md:grid-cols-2">
-                {apps.map((app, i) => (
+                {visibleApps.map((app, i) => (
                     <motion.div
                         key={app.title}
                         initial={{ opacity: 0, y: 20 }}
