@@ -12,8 +12,8 @@ use crate::{
     self as psibase, account, actions::login_action, create_boot_transactions, fetch_packages,
     get_optional_result_bytes, get_result_bytes, services, status_key, tester_raw, AccountNumber,
     Action, ActionFormatter, BlockTime, Caller, Checksum256, CodeByHashRow, CodeRow, DbId,
-    DirectoryRegistry, Error, HostConfigRow, HttpBody, HttpHeader, HttpReply, HttpRequest,
-    InnerTraceEnum, JointRegistry, KvHandle, KvMode, PackageOpFull, PackageRegistry,
+    DirectoryRegistry, Error, EssentialServices, HostConfigRow, HttpBody, HttpHeader, HttpReply,
+    HttpRequest, InnerTraceEnum, JointRegistry, KvHandle, KvMode, PackageOpFull, PackageRegistry,
     PackagedService, RunMode, Schema, SchemaFetcher, SchemaMap, Seconds, ServiceWrapper,
     SignedTransaction, StatusRow, Table, TableRecord, Tapos, TimePointSec, TimePointUSec, ToKey,
     Transaction, TransactionBuilder, TransactionTrace,
@@ -150,7 +150,8 @@ impl Chain {
     }
 
     pub fn boot_with<R: PackageRegistry>(&self, reg: &R, services: &[String]) -> Result<(), Error> {
-        let mut services = block_on(reg.resolve(services, false))?;
+        let essential = EssentialServices::with_key(&None);
+        let mut services = block_on(reg.resolve(services, false, &essential))?;
 
         const COMPRESSION_LEVEL: u32 = 4;
         let (boot_tx, subsequent_tx) = create_boot_transactions(
@@ -160,6 +161,7 @@ impl Chain {
             false,
             TimePointSec { seconds: 120 },
             &mut services[..],
+            &essential,
             COMPRESSION_LEVEL,
         )
         .unwrap();
@@ -247,7 +249,8 @@ impl Chain {
         let packages_dir = packages_root.join("packages");
         let registry = DirectoryRegistry::new(packages_dir);
         let package_names = vec!["XDefault".to_string()];
-        let packages = block_on(registry.resolve(&package_names, true)).unwrap();
+        let packages =
+            block_on(registry.resolve(&package_names, true, &EssentialServices::empty())).unwrap();
         let mut requests = Vec::new();
         let mut early_requests = Vec::new();
         unsafe {
@@ -770,7 +773,12 @@ impl Chain {
             installed.insert_installed(p)
         }
         let packages = block_on(installed.resolve_changes(reg, packages, false, false))?;
-        let packages = block_on(fetch_packages(reg, packages, &installed))?;
+        let packages = block_on(fetch_packages(
+            reg,
+            packages,
+            &installed,
+            &EssentialServices::empty(),
+        ))?;
         let updated_packages = installed.into_updated(&packages, sender);
 
         let mut schemas = SchemaMap::new();
