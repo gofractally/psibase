@@ -1068,19 +1068,6 @@ impl<R: Read + Seek> PackagedService<R> {
         Ok((accounts, services))
     }
 
-    // returns accounts whose schemas are required
-    pub fn get_required_schemas(
-        &mut self,
-        out: &mut HashSet<AccountNumber>,
-    ) -> Result<(), anyhow::Error> {
-        for act in &self.postinstall {
-            if act.raw_data.is_none() {
-                out.insert(act.service.parse()?);
-            }
-        }
-        Ok(())
-    }
-
     // Gets schemas for services in this package.
     // Removes the accounts found from accounts.
     pub fn get_schemas(
