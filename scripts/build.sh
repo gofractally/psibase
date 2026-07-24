@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 export RUSTC_WRAPPER=sccache
 

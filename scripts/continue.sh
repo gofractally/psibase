@@ -5,7 +5,7 @@ set -euo pipefail
 # Same as launch but doesn't first delete the db.
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 usage() {
     cat <<EOF

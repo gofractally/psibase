@@ -4,7 +4,7 @@
     {
       "label": "Build",
       "type": "shell",
-      "command": ".vscode/scripts/build.sh",
+      "command": "scripts/build.sh",
       "group": {
         "kind": "build",
         "isDefault": true
@@ -18,7 +18,7 @@
     {
       "label": "Continue",
       "type": "shell",
-      "command": ".vscode/scripts/continue.sh 8080 myprod $HOST_IP",
+      "command": "scripts/continue.sh 8080 myprod $HOST_IP",
       "options": {
         "statusbar": {
           "label": "$(play) Continue"
@@ -28,7 +28,7 @@
     {
       "label": "Launch",
       "type": "shell",
-      "command": ".vscode/scripts/launch.sh 8080 myprod $HOST_IP",
+      "command": "scripts/launch.sh 8080 myprod $HOST_IP",
       "options": {
         "statusbar": {
           "label": "$(play) Launch"
@@ -38,7 +38,7 @@
     {
       "label": "Launch Secure",
       "type": "shell",
-      "command": ".vscode/scripts/slaunch.sh 8080 myprod $HOST_IP /usr/lib/softhsm/libsofthsm2.so",
+      "command": "scripts/slaunch.sh 8080 myprod $HOST_IP /usr/lib/softhsm/libsofthsm2.so",
       "options": {
         "statusbar": {
           "label": "$(play)$(lock) Launch Secure"
