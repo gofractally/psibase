@@ -65,6 +65,7 @@ psibase_macros = { path = "./psibase_macros", version = "0.24.0" }
 psibase-macros-derive = { path = "./psibase_macros/psibase-macros-derive", version = "0.24.0" }
 psibase_service = { path = "./psibase_service", version = "0.24.0" }
 url = "2.5.4"
+zip = { version = "7.2", default-features = false, features = ["deflate"] }
 psibase-rust-workspace-hack = "0.2.0"
 
 [patch.crates-io.psibase-rust-workspace-hack]

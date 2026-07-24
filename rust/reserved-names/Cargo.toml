@@ -14,5 +14,5 @@ anyhow = { workspace = true }
 clap = { workspace = true }
 psibase = { workspace = true }
 serde_json = { workspace = true }
-zip = { version = "7.2", default-features = false, features = ["deflate"] }
+zip.workspace = true
 psibase-rust-workspace-hack.workspace = true
