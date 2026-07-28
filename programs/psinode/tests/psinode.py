@@ -75,6 +75,9 @@ class Cluster(object):
         result = Node(dir=os.path.join(self.dir, hostname), hostname=hostname, producer=name, **kw)
         self.nodes[hostname] = result
         return result
+    def disconnected(self, *names, **kw):
+        '''Create a set of nodes with no connections'''
+        return tuple(self.make_node(name, **kw) for name in names)
     def star(self, *names, **kw):
         '''Create a star graph with the first node in the center'''
         nodes = [self.make_node(name, **kw) for name in names]
@@ -449,7 +452,7 @@ def _init_softhsm(dir, pin):
     return env
 
 class Node(API):
-    def __init__(self, executable='psinode', dir=None, hostname=None, producer=None, p2p=True, listen=[], log_filter=None, log_format=None, database_cache_size=None, start=True, softhsm=None, trustfile=None):
+    def __init__(self, executable='psinode', dir=None, hostname=None, producer=None, p2p=True, listen=[], log_filter=None, log_format=None, database_cache_size=None, start=True, softhsm=None, trustfile=None, env={}):
         '''
         Create a new psinode server
         If dir is not specified, the server will reside in a temporary directory
@@ -464,7 +467,7 @@ class Node(API):
         self.producer = producer
         self.socketpath = os.path.join(self.dir, 'socket')
         self.logpath = os.path.join(self.dir, 'psinode.log')
-        self.env = {}
+        self.env = dict(env)
         session = requests.Session()
         session.mount('http://', _LocalAdapter(self.socketpath))
         super().__init__('http://%s/' % hostname, session)
