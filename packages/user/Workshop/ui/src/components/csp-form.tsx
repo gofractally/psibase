@@ -92,12 +92,12 @@ export const CspForm = ({
                                 Policy (CSP) settings. The global CSP applies by
                                 default, but specific paths with their own CSP
                                 will take precedence. Use the{" "}
-                                <code className="text-xs">{"{root}"}</code>{" "}
+                                <code className="text-xs">{"{{root}}"}</code>{" "}
                                 keyword for the deployment root domain
                                 (including port when present), e.g.{" "}
                                 <code className="text-xs">
                                     {
-                                        "connect-src 'self' {root} *.{root}"
+                                        "connect-src 'self' {{root}} *.{{root}}"
                                     }
                                 </code>
                                 .

@@ -30,14 +30,14 @@ The priority of the CSP header applied to content is given to a header set for a
 
 Note that a custom CSP **completely replaces** the baseline for the content it covers — the policies are not merged — so a custom CSP should be stated as a complete policy.
 
-#### The `{root}` keyword
+#### The `{{root}}` keyword
 
-User-defined (and default) CSP strings may include the keyword `{root}`. At serve time, `{root}` is replaced with the deployment root host of the request, including the port when present (e.g. `psibase.localhost:8080` in local development, or `example.com` in production).
+User-defined (and default) CSP strings may include the keyword `{{root}}`. At serve time, `{{root}}` is replaced with the deployment root host of the request, including the port when present (e.g. `psibase.localhost:8080` in local development, or `example.com` in production).
 
-Host sources that use `{root}` are typically written scheme-relative (no `http://`/`https://` prefix) so the same policy works over both local HTTP and production HTTPS. For example:
+Host sources that use `{{root}}` are typically written scheme-relative (no `http://`/`https://` prefix) so the same policy works over both local HTTP and production HTTPS. For example:
 
 ```
-default-src 'self'; connect-src 'self' {root} *.{root}; frame-src supervisor.{root};
+default-src 'self'; connect-src 'self' {{root}} *.{{root}}; frame-src supervisor.{{root}};
 ```
 
 becomes, on a local node:
