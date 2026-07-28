@@ -254,7 +254,8 @@ void Sockets::shutdown()
    l.unlock();
    for (const auto& sock : tmpsockets)
    {
-      sock->abandon();
+      if (sock)
+         sock->abandon();
    }
    tmpsockets.clear();
 }
