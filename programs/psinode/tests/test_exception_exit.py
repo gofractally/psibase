@@ -10,12 +10,26 @@ from psibase import *
 from threading import Thread, Semaphore
 from requests import ConnectionError
 from http.server import *
+import urllib3
+import websockets
 
 # Since this test stops psinode with an error, we want
 # sanitizer errors to cause a signal instead to fail the test.
 ENV = {'ASAN_OPTIONS': 'abort_on_error=1'}
 
 expected = "Lorem ipsum dolor sit amet"
+
+def websocket_url(node, path='/', service=None):
+    url = urllib3.util.parse_url(node.url)
+    if service is not None:
+        host = service + '.' + url.host
+    else:
+        host = url.host
+    return urllib3.util.Url('ws', url.auth, host, url.port, path).url
+
+async def echo(connection):
+    async for msg in connection:
+        await connection.send(msg)
 
 class TestExceptionExit(unittest.TestCase):
     @testutil.psinode_test
@@ -76,6 +90,25 @@ class TestExceptionExit(unittest.TestCase):
             server.shutdown()
             t.join()
             server.server_close()
+
+    @testutil.psinode_test
+    async def test_proxy_websocket(self, cluster):
+        (a,) = cluster.complete(*testutil.generate_names(1), env=ENV)
+        a.boot(packages=['Minimal', 'Explorer'])
+        a.install_local(['XProxy'])
+
+        async with websockets.serve(echo, host='127.0.0.1', port=0) as server:
+            with a.post('/set_origin_server', service='x-proxy', json={"subdomain":"x-proxy", "host":"localhost:%d" % server.sockets[0].getsockname()[1]}) as reply:
+                reply.raise_for_status()
+
+            url = websocket_url(a, '/', service='x-proxy')
+            async with websockets.unix_connect(a.socketpath, url, compression=None) as websocket:
+                # Send a round-trip message, to make sure that the connection
+                # is fully established
+                await websocket.send(expected)
+                self.assertEqual(await websocket.recv(), expected)
+
+                self.cause_exception(a)
 
     @testutil.psinode_test
     def test_incoming_p2p(self, cluster):
