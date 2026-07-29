@@ -1,8 +1,9 @@
 # Psibase runtime package (psinode + psibase CLI + share/psibase data).
 #
-# Initial strategy: repackage the published Ubuntu SDK tarball and patchelf it
-# for NixOS. Replace this body with a pure source mkDerivation later; keep the
-# same $out/{bin,share/psibase} layout so the NixOS module does not care.
+# Repackages the published Ubuntu release tarball and patchelfs it for NixOS;
+# it does not build psibase from source. The NixOS module depends only on the
+# $out/{bin,share/psibase} layout, so any derivation producing that layout can
+# be substituted via services.psibase.package.
 #
 # This is deliberately NOT a psidk: the published tarball is the full SDK, and
 # the dev toolchain is the dev shell's job (see flake.nix). See installPhase.
