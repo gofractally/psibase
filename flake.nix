@@ -343,26 +343,39 @@
           '';
         };
 
-        packages = rec {
-          wasi-sdk = wasiSdk;
-          # Prebuilt runtime package (see nix/package.nix). Pure source build is follow-up.
-          psibase = pkgs.callPackage ./nix/package.nix { };
-          default = psibase;
-        };
+        # wasi-sdk is available on all systems; the prebuilt runtime package is
+        # x86_64-linux only
+        packages =
+          {
+            wasi-sdk = wasiSdk;
+          }
+          // pkgs.lib.optionalAttrs (system == "x86_64-linux") rec {
+            psibase = pkgs.callPackage ./nix/package.nix { };
+            default = psibase;
+          };
       }
     )
     // {
-      overlays.default = final: prev: {
-        psibase = self.packages.${final.stdenv.hostPlatform.system}.psibase;
-      };
+      overlays.default = final: prev:
+        let
+          system = final.stdenv.hostPlatform.system;
+        in
+        if self.packages.${system} or { } ? psibase then {
+          psibase = self.packages.${system}.psibase;
+        } else { };
 
       # System-independent NixOS module. Import as:
       #   imports = [ inputs.psibase.nixosModules.psibase ];
+      # Default package is only set on systems that ship packages.psibase (today:
+      # x86_64-linux). On other systems set services.psibase.package explicitly.
       nixosModules.psibase =
         { pkgs, lib, ... }:
         {
           imports = [ ./nix/module.nix ];
-          services.psibase.package = lib.mkDefault self.packages.${pkgs.stdenv.hostPlatform.system}.psibase;
+        }
+        // lib.optionalAttrs (self.packages.${pkgs.stdenv.hostPlatform.system} or { } ? psibase) {
+          services.psibase.package =
+            lib.mkDefault self.packages.${pkgs.stdenv.hostPlatform.system}.psibase;
         };
       nixosModules.default = self.nixosModules.psibase;
     };

@@ -16,7 +16,11 @@
   srcUrl = "https://github.com/gofractally/psibase/releases/download/v${version}/psidk-ubuntu-2404.tar.gz";
   srcHash = "sha256-l9bdB9RKz9FQLiBnXaQsHNoveOTMt1r5xRghLTfqKsQ=";
 in
-  stdenv.mkDerivation rec {
+  # Ubuntu SDK tarball is x86_64 ELF; exporting it on other systems yields a
+  # broken derivation. Fail at eval with a clear message instead.
+  lib.throwIfNot stdenv.hostPlatform.isx86_64
+  "prebuilt psibase is only available on x86_64-linux (got ${stdenv.hostPlatform.system}); override services.psibase.package"
+  (stdenv.mkDerivation {
     pname = "psibase";
     inherit version;
 
@@ -60,4 +64,4 @@ in
       platforms = ["x86_64-linux"];
       mainProgram = "psinode";
     };
-  }
+  })

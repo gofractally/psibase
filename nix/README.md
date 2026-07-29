@@ -188,8 +188,7 @@ After each psinode restart, unlock the HSM device in **x-admin** (same as the do
 
 ## Package notes
 
-- `nix build .#psibase` installs the current prebuilt SDK release (x86_64-linux) with binaries patched for NixOS.
-- Pure Nix source builds and aarch64 packages are planned follow-ups; until then you can override `services.psibase.package` with your own derivation if needed.
+- `nix build .#psibase` installs the current prebuilt SDK release (x86_64-linux only) with binaries patched for NixOS.
 
 # Relationship to Docker
 
