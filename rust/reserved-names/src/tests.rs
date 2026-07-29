@@ -102,11 +102,14 @@ fn over_length_variants_are_dropped() {
 
 #[test]
 fn warns_only_when_no_variant_is_valid() {
-    // Individual invalid variants of a good seed are dropped silently.
-    let seeds = set(&["billing"]);
+    // "mmmmmmmmm" (9 chars) produces over-length variants when multiple
+    // m's expand to rn; those are dropped silently, and the seed itself
+    // is still reserved so it is not reported as unused.
+    let seeds = set(&["mmmmmmmmm"]);
     let generated = generate(&seeds);
-    assert!(!generated.reserved.is_empty());
+    assert!(generated.reserved.contains(&"mmmmmmmmm".to_string()));
     assert!(generated.unused_seeds.is_empty());
+    assert!(confusable_variants("mmmmmmmmm").len() > generated.reserved.len());
 
     // A seed with no valid base or variants is the only case worth reporting.
     let seeds = set(&["!!!"]);
