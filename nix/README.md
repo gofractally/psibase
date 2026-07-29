@@ -188,7 +188,9 @@ After each psinode restart, unlock the HSM device in **x-admin** (same as the do
 
 ## Package notes
 
-- `nix build .#psibase` installs the current prebuilt SDK release (x86_64-linux only) with binaries patched for NixOS.
+- `nix build .#psibase` repackages the prebuilt release tarball (x86_64-linux only) with binaries patched for NixOS.
+- It is a **runtime** package, not a psidk: only `bin/{psinode,psibase,psitest}` and `share/psibase` (`config.in`, `packages`, `wasm`, `services`, `licenses`) plus man pages. The 241M `share/wasi-sysroot` and the CMake/Python dev helpers are dropped, since building services is the dev shell's job. Trimmed output is 74M vs. 314M unpacked.
+- The layout contract is `$out/{bin,share/psibase}`: both `psinode` and the `psibase` CLI locate their data relative to the resolved executable path, stripping a trailing `bin`. Preserve it if you swap in a source build.
 
 # Relationship to Docker
 
