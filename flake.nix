@@ -366,17 +366,29 @@
 
       # System-independent NixOS module. Import as:
       #   imports = [ inputs.psibase.nixosModules.psibase ];
-      # Default package is only set on systems that ship packages.psibase (today:
-      # x86_64-linux). On other systems set services.psibase.package explicitly.
-      nixosModules.psibase =
-        { pkgs, lib, ... }:
-        {
-          imports = [ ./nix/module.nix ];
-        }
-        // lib.optionalAttrs (self.packages.${pkgs.stdenv.hostPlatform.system} or { } ? psibase) {
-          services.psibase.package =
-            lib.mkDefault self.packages.${pkgs.stdenv.hostPlatform.system}.psibase;
-        };
+      #
+      # Shape matters here. The outer module must be a plain attrset whose
+      # attribute *structure* does not depend on module arguments: resolving
+      # `imports` forces that structure, and touching `pkgs` at that point pulls
+      # in config._module.args before config exists (infinite recursion). So
+      # `pkgs` is confined to the nested module below, and only inside the option
+      # *value*, which stays lazy. For the same reason the default is always
+      # defined rather than conditionally present; on systems with no prebuilt
+      # package it throws only if the user never sets services.psibase.package.
+      nixosModules.psibase = {
+        imports = [
+          ./nix/module.nix
+          (
+            { pkgs, lib, ... }:
+            {
+              services.psibase.package = lib.mkDefault (
+                self.packages.${pkgs.stdenv.hostPlatform.system}.psibase
+                  or (throw "psibase: no prebuilt package for ${pkgs.stdenv.hostPlatform.system}; set services.psibase.package explicitly")
+              );
+            }
+          )
+        ];
+      };
       nixosModules.default = self.nixosModules.psibase;
     };
 }

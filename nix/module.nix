@@ -129,8 +129,13 @@ in {
 
       tokenDir = lib.mkOption {
         type = lib.types.path;
-        default = "/var/lib/psibase/softhsm/tokens";
-        description = "Directory for SoftHSM token storage (persistent).";
+        default = "${cfg.dataDir}/softhsm/tokens";
+        defaultText = lib.literalExpression ''"''${config.services.psibase.dataDir}/softhsm/tokens"'';
+        description = ''
+          Directory for SoftHSM token storage (persistent). Defaults under
+          `services.psibase.dataDir` so relocating the node state keeps tokens
+          with the chain database unless you set this explicitly.
+        '';
       };
 
       tokenLabel = lib.mkOption {
