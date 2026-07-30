@@ -72,6 +72,18 @@ in {
       description = "psinode --database-cache-size (e.g. \"2GiB\"). Null uses psinode default.";
     };
 
+    httpTimeout = lib.mkOption {
+      type = lib.types.nullOr lib.types.ints.unsigned;
+      default = null;
+      example = 120;
+      description = ''
+        Idle HTTP connection timeout in seconds (psinode --http-timeout).
+        Null uses the psinode default (typically 4s). Raise this when large
+        uploads (e.g. x-admin push_boot over a high-latency path) would
+        otherwise be closed before the body finishes.
+      '';
+    };
+
     pkcs11Module = lib.mkOption {
       type = lib.types.nullOr lib.types.path;
       default = null;
@@ -172,6 +184,10 @@ in {
         ++ lib.optionals (cfg.databaseCacheSize != null) [
           "--database-cache-size"
           cfg.databaseCacheSize
+        ]
+        ++ lib.optionals (cfg.httpTimeout != null) [
+          "--http-timeout"
+          (toString cfg.httpTimeout)
         ]
         ++ lib.optionals (effectivePkcs11 != null) [
           "--pkcs11-module"
