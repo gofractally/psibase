@@ -109,15 +109,30 @@ impl Api for ProfilesPlugin {
         assert_authorized_with_whitelist(FunctionName::upload_avatar, vec!["homepage".into()])?;
 
         let max_avatar_size: usize = 100 * 1024;
+        const ALLOWED_CONTENT_TYPES: &[&str] =
+            &["image/png", "image/jpeg", "image/webp", "image/gif"];
 
         if avatar.content.len() > max_avatar_size {
             return Err(ErrorType::AvatarTooBig("100KB".to_string()).into());
         }
 
+        let content_type = avatar
+            .content_type
+            .split(';')
+            .next()
+            .unwrap_or(&avatar.content_type)
+            .trim();
+        if !ALLOWED_CONTENT_TYPES
+            .iter()
+            .any(|allowed| content_type.eq_ignore_ascii_case(allowed))
+        {
+            return Err(ErrorType::InvalidAvatarContentType(avatar.content_type).into());
+        }
+
         let file = File {
-            content_type: avatar.content_type,
+            content_type: content_type.to_ascii_lowercase(),
             content: avatar.content,
-            path: "/profile/avatar".to_string(),
+            path: "/profile/avatar.image".to_string(),
         };
 
         bindings::sites::plugin::api::upload(&file, 11)
@@ -126,7 +141,7 @@ impl Api for ProfilesPlugin {
     fn remove_avatar() -> Result<(), Error> {
         assert_authorized_with_whitelist(FunctionName::remove_avatar, vec!["homepage".into()])?;
 
-        bindings::sites::plugin::api::remove("/profile/avatar")
+        bindings::sites::plugin::api::remove("/profile/avatar.image")
     }
 
     fn has_read_permission() -> bool {

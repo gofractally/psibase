@@ -10,4 +10,6 @@ plugin_error! {
     UnauthorizedApp() => "App sender must be home page",
     ContactAlreadyExists(account: String) => "Contact already exists: {account}",
     AvatarTooBig(size: String) => "Avatar exceeds max file size of {size}",
+    InvalidAvatarContentType(content_type: String) =>
+        "Avatar content type not allowed: {content_type}",
 }
