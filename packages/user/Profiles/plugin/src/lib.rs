@@ -109,8 +109,13 @@ impl Api for ProfilesPlugin {
         assert_authorized_with_whitelist(FunctionName::upload_avatar, vec!["homepage".into()])?;
 
         let max_avatar_size: usize = 100 * 1024;
-        const ALLOWED_CONTENT_TYPES: &[&str] =
-            &["image/png", "image/jpeg", "image/webp", "image/gif"];
+        const ALLOWED_CONTENT_TYPES: &[&str] = &[
+            "image/png",
+            "image/jpeg",
+            "image/webp",
+            "image/gif",
+            "image/svg+xml",
+        ];
 
         if avatar.content.len() > max_avatar_size {
             return Err(ErrorType::AvatarTooBig("100KB".to_string()).into());

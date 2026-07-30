@@ -18,14 +18,6 @@ mod service {
         }
     }
 
-    fn cors_headers() -> Vec<HttpHeader> {
-        vec![
-            HttpHeader::new("Access-Control-Allow-Origin", "*"),
-            HttpHeader::new("Access-Control-Allow-Methods", "GET, OPTIONS, HEAD"),
-            HttpHeader::new("Access-Control-Allow-Headers", "*"),
-        ]
-    }
-
     fn etag_for(hash: &Checksum256) -> String {
         Hex(&hash.0[..8]).to_string()
     }
@@ -35,7 +27,7 @@ mod service {
             status: HttpStatus::NotFound as u16,
             contentType: "text/html".into(),
             body: Hex(b"Not Found".to_vec()),
-            headers: cors_headers(),
+            headers: allow_cors_with_origin("*"),
         }
     }
 
@@ -69,7 +61,7 @@ mod service {
             .get_header("If-None-Match")
             .is_some_and(|v| v == etag)
         {
-            let mut headers = cors_headers();
+            let mut headers = allow_cors_with_origin("*");
             headers.push(HttpHeader::new("ETag", &etag));
             return Some(HttpReply {
                 status: HttpStatus::NotModified as u16,
@@ -85,7 +77,7 @@ mod service {
             Hex(Sites::call().getData(account, AVATAR_PATH.into(), true))
         };
 
-        let mut headers = cors_headers();
+        let mut headers = allow_cors_with_origin("*");
         headers.push(HttpHeader::new("Cache-Control", "no-cache"));
         headers.push(HttpHeader::new("ETag", &etag));
 
