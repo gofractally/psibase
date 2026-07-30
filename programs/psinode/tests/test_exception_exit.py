@@ -102,13 +102,17 @@ class TestExceptionExit(unittest.TestCase):
                 reply.raise_for_status()
 
             url = websocket_url(a, '/', service='x-proxy')
-            async with websockets.unix_connect(a.socketpath, url, compression=None) as websocket:
-                # Send a round-trip message, to make sure that the connection
-                # is fully established
-                await websocket.send(expected)
-                self.assertEqual(await websocket.recv(), expected)
+            try:
+                async with websockets.unix_connect(a.socketpath, url, compression=None) as websocket:
+                    # Send a round-trip message, to make sure that the connection
+                    # is fully established
+                    await websocket.send(expected)
+                    self.assertEqual(await websocket.recv(), expected)
 
-                self.cause_exception(a)
+                    self.cause_exception(a)
+            except websocket.exceptions.ConnectionClosedError:
+                # the connection is closed abnormally when the node exits
+                pass
 
     @testutil.psinode_test
     def test_incoming_p2p(self, cluster):
