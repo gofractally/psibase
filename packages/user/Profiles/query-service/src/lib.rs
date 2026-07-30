@@ -43,7 +43,7 @@ mod service {
             return None;
         };
 
-        if account_str.is_empty() || account_str.contains('/') {
+        if account_str.is_empty() {
             return Some(not_found());
         }
 
