@@ -110,7 +110,7 @@ class TestExceptionExit(unittest.TestCase):
                     self.assertEqual(await websocket.recv(), expected)
 
                     self.cause_exception(a)
-            except websocket.exceptions.ConnectionClosedError:
+            except websockets.exceptions.ConnectionClosedError:
                 # the connection is closed abnormally when the node exits
                 pass
 
