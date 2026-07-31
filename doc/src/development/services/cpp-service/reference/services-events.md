@@ -66,13 +66,7 @@ auto result =
 
 ## Defining events
 
-See the following for a description of the various types of events:
-
-- [psibase::DbId::historyEvent]
-- [psibase::DbId::uiEvent]
-- [psibase::DbId::merkleEvent]
-
-To define events for a service, declare the event functions as below, then reflect them using the 4 macros below. Each of the `History`, `Ui`, and `Merkle` structs must be present and reflected, even when they don't have any events declared within.
+To define events for a service, declare the event functions as below, then reflect them using the 3 macros below. Each of the `History` and `Merkle` structs must be present and reflected, even when they don't have any events declared within.
 
 After you have defined your events, use [psibase::Service::emit] to emit them and [psibase::Service::events] to read them.
 
@@ -85,11 +79,6 @@ struct MyService: psibase::Service<MyService> {
          // they only define the interface
          void myEvent(uint32_t a, std::string s);
          void anotherEvent(psibase::AccountNumber account);
-      };
-
-      // Events which live a short time
-      struct Ui {
-         void updateDisplay();
       };
 
       // Events which live in Merkle trees
@@ -109,10 +98,6 @@ PSIBASE_REFLECT_HISTORY_EVENTS(
    method(myEvent, a, s),
    method(anotherEvent, account))
 
-PSIBASE_REFLECT_UI_EVENTS(
-   MyService,
-   method(updateDisplay))
-
 PSIBASE_REFLECT_MERKLE_EVENTS(
    MyService,
    method(credit, from, to, amount))
@@ -120,14 +105,12 @@ PSIBASE_REFLECT_MERKLE_EVENTS(
 
 ## Recursion safety
 
-- By default, services support recursion. TODO: make it opt-in instead.
+- By default, services do not support recursion. Recursion can be enabled explicitly with [psibase::Service::recurse] in places where reentering the service is known to be safe.
 - When a service is called multiple times within a transaction, including recursively, each action gets a fresh `DerivedService` instance. However, it runs in the same WASM memory space as the other executing actions for that service. Global variables and static variables are shared.
 - Potential hazards to watch out for:
   - If a call modifies member variables within a Service instance, other calls aren't likely to see it.
   - If a call modifies global or static variables, this will effect both the other currently-executing calls, and subsequent calls.
   - If a call modifies the database, other currently-executing calls will see the change only if they read or re-read the database.
-  - When you call into any service; assume it can call you back unless you opted out of recursion. TODO: make it possible to opt out of recursion.
-  - Calling other services while you are iterating through the database can be dangerous, since they can call back into you, causing you to change the database.
 
 The notes above use the following definition of "call":
 

@@ -23,9 +23,9 @@ use exports::packages::plugin::queries::Guest as Queries;
 use psibase::fracpack::{Pack, Unpack};
 use psibase::services::packages::PackageSource;
 use psibase::{
-    make_refs, method, solve_dependencies, AccountNumber, Action, InstalledPackageInfo,
-    PackageDisposition, PackageList, PackageManifest, PackagedService, SchemaMap, ServiceWrapper,
-    StagedUpload, TransactionBuilder,
+    make_refs, method, solve_dependencies, AccountNumber, Action, EssentialServices,
+    InstalledPackageInfo, PackageDisposition, PackageList, PackageManifest, PackagedService,
+    SchemaMap, ServiceWrapper, StagedUpload, TransactionBuilder,
 };
 
 use psibase::services::{
@@ -513,7 +513,7 @@ impl PrivateApi for PackagesPlugin {
             .into_iter()
             .map(|op| op.try_into())
             .collect::<Result<Vec<_>, _>>()?;
-        psibase::sort_package_ops(&mut packages, &installed)
+        psibase::sort_package_ops(&mut packages, &installed, &EssentialServices::empty())
             .map_err(|e| ErrorType::PackageResolutionError(e.to_string()))?;
         apply_packages(
             packages,

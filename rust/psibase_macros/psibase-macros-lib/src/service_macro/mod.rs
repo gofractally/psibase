@@ -74,7 +74,6 @@ fn process_mod(
     let constant = proc_macro2::TokenStream::from_str(&options.constant).unwrap();
     let actions = proc_macro2::TokenStream::from_str(&options.actions).unwrap();
     let history_events = proc_macro2::TokenStream::from_str(&options.history_events).unwrap();
-    let ui_events = proc_macro2::TokenStream::from_str(&options.ui_events).unwrap();
     let merkle_events = proc_macro2::TokenStream::from_str(&options.merkle_events).unwrap();
     let event_structs_mod = proc_macro2::TokenStream::from_str(&options.event_structs).unwrap();
     let wrapper = proc_macro2::TokenStream::from_str(&options.wrapper).unwrap();
@@ -274,7 +273,6 @@ fn process_mod(
         items.push(parse_quote! {
             impl #psibase_mod::ToServiceSchema for #wrapper {
                 type Actions = #actions<#psibase_mod::JustSchema>;
-                type UiEvents = #ui_events;
                 type HistoryEvents = #history_events;
                 type MerkleEvents = #merkle_events;
                 type Database = #database_wrapper;
@@ -303,14 +301,6 @@ fn process_mod(
 
         items.push(parse_quote! {
             #[automatically_derived]
-            pub struct #ui_events {
-                event_log: #psibase_mod::EventDb,
-                sender: #psibase_mod::AccountNumber,
-            }
-        });
-
-        items.push(parse_quote! {
-            #[automatically_derived]
             pub struct #merkle_events {
                 event_log: #psibase_mod::EventDb,
                 sender: #psibase_mod::AccountNumber,
@@ -325,7 +315,6 @@ fn process_mod(
 
         for (id, event_name) in [
             (EventType::History, &history_events),
-            (EventType::Ui, &ui_events),
             (EventType::Merkle, &merkle_events),
         ] {
             if !event_fns.contains_key(&id) {
@@ -355,17 +344,14 @@ fn process_mod(
         for (kind, fns) in event_fns {
             let event_name = match kind {
                 EventType::History => &history_events,
-                EventType::Ui => &ui_events,
                 EventType::Merkle => &merkle_events,
             };
             let db = match kind {
                 EventType::History => quote! {HistoryEvent},
-                EventType::Ui => quote! {UiEvent},
                 EventType::Merkle => quote! {MerkleEvent},
             };
             let event_module_name = match kind {
                 EventType::History => quote!(history),
-                EventType::Ui => quote!(ui),
                 EventType::Merkle => quote!(merkle),
             };
             let mut event_callers = proc_macro2::TokenStream::new();

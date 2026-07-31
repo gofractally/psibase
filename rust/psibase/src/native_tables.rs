@@ -13,7 +13,7 @@ pub type NativeIndex = u8;
 pub const STATUS_TABLE: NativeTable = 1;
 pub const CODE_TABLE: NativeTable = 2;
 pub const CODE_BY_HASH_TABLE: NativeTable = 3;
-pub const DATABASE_STATUS_TABLE: NativeTable = 4;
+// pub const DATABASE_STATUS_TABLE: NativeTable = 4;
 pub const TRANSACTION_WASM_CONFIG_TABLE: NativeTable = 5;
 pub const PROOF_WASM_CONFIG_TABLE: NativeTable = 6; // Also for first auth
 pub const CONFIG_TABLE: NativeTable = 7;
@@ -132,23 +132,6 @@ impl CodeByHashRow {
             self.vmType,
             self.vmVersion,
         )
-    }
-}
-
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
-#[fracpack(fracpack_mod = "fracpack")]
-pub struct DatabaseStatusRow {
-    nextHistoryEventNumber: u64,
-    nextUIEventNumber: u64,
-    nextMerkleEventNumber: u64,
-
-    blockMerkleEventNumber: u64,
-}
-
-impl DatabaseStatusRow {
-    pub const DB: DbId = DbId::Native;
-    pub fn key(&self) -> (NativeTable, NativeIndex) {
-        (DATABASE_STATUS_TABLE, NATIVE_TABLE_PRIMARY_INDEX)
     }
 }
 
