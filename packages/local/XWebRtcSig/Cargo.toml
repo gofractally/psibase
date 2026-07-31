@@ -1,0 +1,23 @@
+[package]
+name = "x-webrtc-sig-pkg"
+description = "Node-local WebRTC signaling and presence package"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish.workspace = true
+
+[package.metadata.psibase]
+package-name = "XWebRtcSig"
+scope = "local"
+services = ["x-wrtcsig"]
+
+[package.metadata.psibase.dependencies]
+XHttp = "0.23.0"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+x-wrtcsig = { path = "service", version = "0.23.0" }

@@ -11,7 +11,7 @@ use psibase::fracpack::{Pack, Unpack};
 
 use crate::bindings::{
     host::{
-        common::admin as HostAdmin,
+        common::{admin as HostAdmin, client::get_sender},
         db::store::{Bucket, Database, DbMode, StorageDuration},
         types::types::{BodyTypes, Error, PostRequest},
     },
@@ -70,9 +70,17 @@ impl Api for HostAuth {
 
     fn get_active_query_token(app: String, user: String) -> Option<String> {
         check_caller(
-            &["host", "supervisor"],
+            &["host", "supervisor", "homepage"],
             "get-active-query-token@host:auth/api",
         );
+        let caller = get_sender();
+        if caller == "homepage" {
+            assert!(
+                app == "homepage",
+                "[get-active-query-token@host:auth/api] Unauthorized caller: {}",
+                caller
+            );
+        }
 
         Bucket::new(DB, &bucket_id(&user))
             .get(&app)
