@@ -1,0 +1,72 @@
+package chat:plugin;
+
+interface types {
+    /// Why a WebRTC session exists for a Space.
+    /// Maps to the objective Chat service purpose strings (`chat-data`, `av-call`).
+    enum session-purpose {
+        /// Data-channel messaging mesh for the Space
+        chat-data,
+        /// Audio/video Meet for the Space
+        av-call,
+    }
+}
+
+/// Create or reuse objective Spaces (durable conversation membership).
+interface spaces {
+    use host:types/types.{error};
+
+    /// Ensure a Space exists for the given member set (sender must be included).
+    /// Creates the Space if missing; otherwise reuses the existing canonical Space.
+    ///
+    /// Parameters:
+    /// * `members` - Account names that belong in the Space
+    ensure-space: func(members: list<string>) -> result<_, error>;
+
+    /// Ensure a two-person DM Space between the caller and `contact`.
+    ///
+    /// Parameters:
+    /// * `contact` - The other participant's account name
+    ensure-dm: func(contact: string) -> result<_, error>;
+
+    /// Ensure a group Space that includes the caller and `other-members`.
+    ///
+    /// Parameters:
+    /// * `other-members` - Additional member account names (excluding the caller)
+    ensure-group: func(other-members: list<string>) -> result<_, error>;
+}
+
+/// Create and close WebRTC sessions (signaling authorization tickets).
+/// Sessions are not Spaces and do not carry media or chat bodies.
+interface sessions {
+    use host:types/types.{error};
+    use types.{session-purpose};
+
+    /// Create (or reuse, for some purposes) an active WebRTC session for a Space.
+    /// Participants are always the full Space membership.
+    ///
+    /// Parameters:
+    /// * `space-id` - Objective Space id from spaces.ensure-*
+    /// * `purpose` - Session purpose (`chat-data` or `av-call`)
+    create-session: func(space-id: string, purpose: session-purpose) -> result<_, error>;
+
+    /// End an active WebRTC session.
+    ///
+    /// Parameters:
+    /// * `session-id` - Session id from create-session
+    /// * `reason` - Short reason recorded on the session event (e.g. `ended`, `cancelled`)
+    close-session: func(session-id: string, reason: string) -> result<_, error>;
+
+    /// Commit a WebRTC session event (join/leave/ended/failed) used for
+    /// Meet call-timeline history.
+    ///
+    /// Parameters:
+    /// * `session-id` - Target av-call (or related) session
+    /// * `kind` - Session event kind code understood by the Chat service
+    /// * `reason` - Optional detail (e.g. `declined`, `missed`, `joined`)
+    commit-webrtc-session-event: func(session-id: string, kind: u8, reason: string) -> result<_, error>;
+}
+
+world imports {
+    import spaces;
+    import sessions;
+}
