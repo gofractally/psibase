@@ -1625,13 +1625,20 @@ async fn apply_packages<
     compression_level: u32,
     existing: PackageList,
 ) -> Result<SchemaMap, anyhow::Error> {
-    let ops = fetch_packages(reg, ops, &existing, &EssentialServices::empty()).await?;
-    let updated_packages = existing.into_updated(&ops, sender);
     let mut schemas = SchemaMap::new();
+    let ops = fetch_packages(
+        reg,
+        ops,
+        &existing,
+        &HttpSchemaFetcher { client, base_url },
+        &mut schemas,
+        &EssentialServices::empty(),
+    )
+    .await?;
+    let updated_packages = existing.into_updated(&ops, sender);
     for op in ops {
         match op {
             PackageOpFull::Install(mut package) => {
-                package.load_schemas(base_url, client, &mut schemas).await?;
                 out.set_label(format!(
                     "Installing {}-{}",
                     package.name(),
@@ -1659,7 +1666,6 @@ async fn apply_packages<
                 files.push_all(std::mem::take(&mut uploader.actions))?;
             }
             PackageOpFull::Replace(meta, mut package) => {
-                package.load_schemas(base_url, client, &mut schemas).await?;
                 // TODO: skip unmodified files (?)
                 out.set_label(format!(
                     "Updating {}-{} -> {}-{}",
@@ -2068,10 +2074,13 @@ async fn do_install_local<T: Read + Seek>(
     let progress = ProgressBar::new(to_install.len() as u64).with_style(
         ProgressStyle::with_template("{wide_bar} {pos}/{len}\n{msg}")?,
     );
+    let mut schemas = SchemaMap::new();
     let to_install = fetch_packages(
         &package_registry,
         to_install,
         &installed,
+        &NullSchemaFetcher,
+        &mut schemas,
         &EssentialServices::empty(),
     )
     .await?;
