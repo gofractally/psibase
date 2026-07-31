@@ -6,9 +6,9 @@ use crate::services::{
 };
 use crate::{
     new_account_owned_action, preapprove_action, reg_server, schema_types, set_code_action,
-    solve_dependencies, version_match, AccountNumber, Action, Checksum256, CodeRow, GenesisService,
-    Hex, MethodNumber, MethodString, Pack, PackageDisposition, PackageOp, PackagePreference,
-    Schema, ServiceWrapper, ToSchema, Unpack, Version,
+    solve_dependencies, version_match, AccountNumber, Action, AnyPublicKey, Checksum256, CodeRow,
+    GenesisService, Hex, MethodNumber, MethodString, Pack, PackageDisposition, PackageOp,
+    PackagePreference, Schema, ServiceWrapper, ToSchema, Unpack, Version,
 };
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
@@ -1380,6 +1380,7 @@ pub async fn fetch_packages<R: PackageRegistry + ?Sized>(
     reg: &R,
     ops: Vec<PackageOp>,
     existing: &PackageList,
+    essential_services: &EssentialServices,
 ) -> Result<Vec<PackageOpFull<R::R>>, anyhow::Error> {
     let mut result = Vec::with_capacity(ops.len());
     for op in ops {
@@ -1391,7 +1392,7 @@ pub async fn fetch_packages<R: PackageRegistry + ?Sized>(
             PackageOp::Remove(meta) => PackageOpFull::Remove(meta),
         })
     }
-    sort_package_ops(&mut result, existing)?;
+    sort_package_ops(&mut result, existing, essential_services)?;
     Ok(result)
 }
 
@@ -1561,6 +1562,7 @@ fn topological_sort_impl(
 fn get_package_order<R: Read + Seek>(
     packages: &Vec<PackageOpFull<R>>,
     existing: &PackageList,
+    essential_services: &EssentialServices,
 ) -> Result<Vec<usize>, anyhow::Error> {
     let mut permutation = vec![usize::MAX; packages.len()];
     let mut indexes = HashMap::new();
@@ -1570,7 +1572,6 @@ fn get_package_order<R: Read + Seek>(
     let graph = build_package_order_graph(packages, existing)?;
 
     // Process packages containing essential services first
-    let essential_services = EssentialServices::new();
     let mut i = 0;
     for package in packages {
         match package {
@@ -1611,8 +1612,9 @@ fn apply_permutation<T>(vec: &mut Vec<T>, permutation: &mut [usize]) {
 pub fn sort_package_ops<R: Read + Seek>(
     packages: &mut Vec<PackageOpFull<R>>,
     existing: &PackageList,
+    essential_services: &EssentialServices,
 ) -> Result<(), anyhow::Error> {
-    let mut order = get_package_order(packages, existing)?;
+    let mut order = get_package_order(packages, existing, essential_services)?;
     apply_permutation(packages, &mut order);
     Ok(())
 }
@@ -1642,15 +1644,23 @@ pub fn make_ref(package: &str) -> Result<PackageRef, anyhow::Error> {
 }
 
 // services that should be installed first
+#[derive(Debug, Clone)]
 pub struct EssentialServices {
     remaining: Vec<AccountNumber>,
 }
 
 impl EssentialServices {
-    pub fn new() -> Self {
+    pub fn empty() -> Self {
         Self {
-            remaining: vec![transact::SERVICE, producers::SERVICE, setcode::SERVICE],
+            remaining: Vec::new(),
         }
+    }
+    pub fn with_key(block_signing_key: &Option<AnyPublicKey>) -> Self {
+        let mut remaining = vec![transact::SERVICE, producers::SERVICE, setcode::SERVICE];
+        if let Some(key) = block_signing_key {
+            remaining.push(key.key.service)
+        }
+        Self { remaining }
     }
     pub fn remove(&mut self, accounts: &[AccountNumber]) {
         for account in accounts {
@@ -1686,22 +1696,25 @@ pub trait PackageRegistry {
         &self,
         packages: &[String],
         local: bool,
+        essential_services: &EssentialServices,
     ) -> Result<Vec<PackagedService<Self::R>>, anyhow::Error> {
         let installed = PackageList::new();
         let packages = installed
             .resolve_changes(self, packages, false, local)
             .await?;
-        Ok(fetch_packages(self, packages, &installed)
-            .await?
-            .into_iter()
-            .map(|op| {
-                if let PackageOpFull::Install(package) = op {
-                    package
-                } else {
-                    panic!("Only install is expected when there are no existing packages")
-                }
-            })
-            .collect())
+        Ok(
+            fetch_packages(self, packages, &installed, essential_services)
+                .await?
+                .into_iter()
+                .map(|op| {
+                    if let PackageOpFull::Install(package) = op {
+                        package
+                    } else {
+                        panic!("Only install is expected when there are no existing packages")
+                    }
+                })
+                .collect(),
+        )
     }
 }
 

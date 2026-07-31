@@ -24,6 +24,8 @@ pub struct NetworkVariables {
     pub per_block_sys_cpu_ns: u64,
     /// Amount of storage space in bytes allocated to objective state
     pub obj_storage_bytes: u64,
+    /// Amount of storage space in bytes allocated to subjective (node-local) state
+    pub subj_storage_bytes: u64,
 }
 
 /// Parameters related to the automatic management of an account resource buffer.
@@ -38,21 +40,49 @@ pub struct BufferConfig {
     pub capacity: u64,
 }
 
-/// Virtual Server Service
+/// # Virtual Server Service
 ///
-/// This service defines a "virtual server" that represents the "server" with which
-/// a user interacts when they connect to any full node on the network.
+/// This service defines a "virtual server" that represents the subset of a real server that
+/// a node operator dedicates to running their network node. A user then interacts with one
+/// or more virtual servers that are peered together to form a network. The network has
+/// effective specifications that are derived from (and necessarily lower than) the virtual
+/// server specs. The difference in specs comes from various overhead costs incurred by the
+/// management of the network.
 ///
-/// This service distinguishes between the specs of the network itself, and
-/// the specs of an individual node that runs the virtual server. The actual node
-/// specs must meet or exceed the specs defined for the virtual server. And the
-/// derived network specs will always be less than the virtual server specs to account
-/// for various overheads (e.g. from running a distributed network, desired replay
-/// speed, etc).
+/// Example diagram:
 ///
-/// This service also defines a billing system that allows for the network to meter
-/// the consumption of resources by users. A user must send system tokens to this service,
-/// which are then held in reserve for the user.
+/// .------------------------.  .------------------------.  .------------------------.
+/// |     Actual Server 1    |  |     Actual Server 2    |  |     Actual Server 3    |
+/// |                        |  |                        |  |                        |
+/// |    100 Gbps network    |  |    50 Gbps network     |  |    100 Gbps network    |
+/// |       2 TB disk        |  |       1 TB disk        |  |      300 GB disk       |
+/// |                        |  |                        |  |                        |
+/// | .--------------------. |  | .--------------------. |  | .--------------------. |
+/// | |  Virtual Server 1  | |  | |  Virtual Server 2  | |  | |  Virtual Server 3  | |
+/// | |  10 Gbps network   | |  | |  10 Gbps network   | |  | |  10 Gbps network   | |
+/// | |    100 GB disk     | |  | |    100 GB disk     | |  | |    100 GB disk     | |
+/// | '---------+----------' |  | '---------+----------' |  | '---------+----------' |
+/// '-----------|------------'  '-----------|------------'  '-----------|------------'
+///             |                           |                           |
+///             |                           V                           |
+///             |        .--------------------------------------.       |
+///             |        |               Network                |       |
+///             +------->|  .--------------------------------.  |<------+
+///                      |  |            1 Gbps              |  |
+///                      |  |    50 GB replicated storage    |  |
+///                      |  |    50 GB node-local storage    |  |
+///                      |  '-------------------------------'   |
+///                      '-------------------^------------------'
+///                                          |
+///                                          v
+///                                    .-----------.
+///                                    |   User    |
+///                                    '-----------'
+///
+/// This service also manages monitoring all of the network's resource consumption, and exposes
+/// an interface that can be used to tune a billing system for rate-limiting per-account resource
+/// consumption. Users can send system tokens into a "reserve" that can be subsequently redeemed for
+/// resource consumption.
 ///
 /// As physical resources (CPU, disk space, network bandwidth, etc.) are consumed, the
 /// real-time price of the resource is billed to the user's reserved balance. Reserved system
@@ -70,9 +100,9 @@ pub struct BufferConfig {
 /// 2 - Call `init_billing`: Initializes the billing system. To call this, the system token
 ///     must have already been set in the `Tokens` service. The specified `fee_receiver` will
 ///     receive all of the system token fees paid for resources by users.
-/// 3 - Call `enable_billing`: When ready (when existing users have accumulated system tokens),
-///     calling this action will enable the billing system. To call this, the caller must have
-///     already filled their resource buffer because the action to enable billing is itself billed.
+/// 3 - Call `enable_billing`: When ready, calling this action enables the
+///     billing system. The caller must have already filled their resource buffer because
+///     this action is itself billed.
 ///
 /// > Note: typically, step 1 should be called at system boot, and therefore the network should
 /// >       always at least have some server specs and derived network specs.
@@ -80,6 +110,63 @@ pub struct BufferConfig {
 /// After each of the above steps, the billing service will be enabled, and users will be
 /// required to buy resources to transact with the network. Use the other actions in this
 /// service to manage server specs, network variables, and billing parameters, as needed.
+///
+/// ## Curve under-collateralization
+///
+/// Capacity limited resources are managed via a constant-product curve that reports the quantity
+/// of reserve tokens required to be held as collateral for the current utilization levels of the
+/// resource.
+///
+/// This service attempts to balance the required collateral as reported by the state of the curve
+/// with the actual collateral as measured by the relay subaccount token balance. The curve for a
+/// capacity-limited resource can be undercollateralized in certain well-defined scenarios (e.g.
+/// consumption before billing is enabled).
+///
+/// An undercollateralized curve recollateralizes as users free bytes: a free sells bytes
+/// back to the relay, reducing the required reserve. The user's refund is still paid (if
+/// collateral allows), but the fee portion is retained in the curve rather than paid out.
+/// The fee receiver is paid only once the curve is fully collateralized.
+///
+/// Example disk recollateralization flow diagram (simplified for clarity) for a transaction that
+/// frees bytes:
+///
+/// ```text
+///                                                                 Example values:
+///                                                                 Total collateral: $15
+///                                                                 Required reserve: $100
+///
+///            .---------------.
+///           (   free bytes    )                                   Total free: $20
+///            '-------+-------'                                    Required reserve: $80
+///                    |
+///                    v
+///      +--------------------------+
+///      |  Split gross-refund into |                               Refund: $10
+///      |  refund + fee            |                               Fee: $10
+///      +----+----------------+----+
+///           |                |
+///           |                v
+///           |     +-------------------------------+
+///           |     | Calculate final refund:       |               Final refund:
+///           |     | min(refund, collateral)       |               min(10, 15) = $10
+///           |     +-----+-------------+-----------+
+///           |           |             |
+///           |           |             v
+///           |           |      +---------------------------+
+///           |           |      | Send final refund to user |
+///           |           |      +---------------------------+
+///           v           v
+///      +----------------------------------------------------+
+///      | Calculate final fee:                               |     Final fee:
+///      | Final fee can only come from collateral left over  |     min(fee, max(collateral - final refund - required reserve, 0))
+///      | after the refund and the curve's required reserve. |     min(10, max(15 - 10 - 80, 0)) = $0
+///      +-----------------+----------------------------------+
+///                        |
+///                        v
+///        +--------------------------------+
+///        | Send final fee to fee receiver |
+///        +--------------------------------+
+/// ```
 #[crate::service(name = "vserver", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
@@ -99,8 +186,7 @@ mod service {
 
     /// Initializes the billing system
     ///
-    /// If no specs are provided, some default specs are used that define a server
-    ///   with minimal specs.
+    /// The `fee_receiver` account will receive all resource billing fees.
     ///
     /// After calling this action, the billing system is NOT yet enabled. The
     /// `enable_billing` action must be called explicitly to enable user billing.
@@ -137,13 +223,9 @@ mod service {
         unimplemented!()
     }
 
-    /// Enable or disable the billing system
-    ///
-    /// If billing is disabled, resource consumption will still be tracked, but the resources will
-    /// not be automatically metered by the network. This is insecure and allows users to abuse
-    /// the network by consuming all of the network's resources.
+    /// Enable the billing system
     #[action]
-    fn enable_billing(enabled: bool) {
+    fn enable_billing() {
         unimplemented!()
     }
 
@@ -191,18 +273,6 @@ mod service {
         unimplemented!()
     }
 
-    /// Gets the amount of resources available for the caller
-    #[action]
-    fn res_balance() -> Quantity {
-        unimplemented!()
-    }
-
-    /// Gets the amount of resources available for the caller's specified sub-account
-    #[action]
-    fn res_balance_sub(sub_account: String) -> Quantity {
-        unimplemented!()
-    }
-
     /// Reserves system tokens for future resource consumption by the sender
     ///
     /// The reserve is consumed when interacting with metered network functionality.
@@ -232,7 +302,7 @@ mod service {
         unimplemented!()
     }
 
-    /// Returns the current cost (in system tokens) of a typically sized resource buffer
+    /// Returns the current cost of a typically sized resource buffer
     #[action]
     fn std_buffer_cost() -> Quantity {
         unimplemented!()
@@ -344,6 +414,27 @@ mod service {
         unimplemented!()
     }
 
+    /// Reduce the disk-pricing reserve budget by `delta_supply`.
+    ///
+    /// The reserve budget caps the system tokens that may be sold into the disk-pricing
+    /// relay. Reducing it lowers the spot price of disk.
+    #[action]
+    fn reduce_disk_budget(delta_supply: Quantity) {
+        unimplemented!()
+    }
+
+    /// Returns the current cost of consuming the specified number of bytes
+    #[action]
+    fn get_disk_cost(bytes: u64) -> Quantity {
+        unimplemented!()
+    }
+
+    /// Gets the estimated refund amount for freeing the specified number of bytes
+    #[action]
+    fn disk_ref_quote(bytes: u64) -> Quantity {
+        unimplemented!()
+    }
+
     /// Called by the system to indicate that the specified user has consumed a
     /// given amount of network bandwidth.
     ///
@@ -364,8 +455,33 @@ mod service {
         unimplemented!()
     }
 
+    /// A notification called at the end of a transaction in which to do any final
+    /// per-tx accounting or cleanup.
+    #[action]
+    fn finishTx() {
+        unimplemented!()
+    }
+
+    /// Called by the system when `user` causes a write to any database.
+    ///
+    /// `amount_bytes` is positive for consumption and negative for a free
+    ///
+    /// If billing is enabled, the user may be billed from (or refunded to)
+    ///   their resource buffer, depending on the specified database and the
+    ///  amount of bytes consumed/freed.
+    #[action]
+    fn useDiskSys(user: AccountNumber, db_id: DbId, amount_bytes: i64) {
+        unimplemented!()
+    }
+
     #[action]
     fn get_resources(user: AccountNumber) -> Quantity {
+        unimplemented!()
+    }
+
+    /// Whether the current block can hold another transaction
+    #[action]
+    fn can_push_tx() -> bool {
         unimplemented!()
     }
 
@@ -374,7 +490,14 @@ mod service {
         unimplemented!()
     }
 
-    /// This actions specifies which account is primarily responsible for
+    /// A notification called before the start of a transaction that specifies the primary
+    /// actor responsible for the transaction. Used for any pre-tx initialization.
+    #[action]
+    fn prestartTx(actor: AccountNumber) {
+        unimplemented!()
+    }
+
+    /// This action specifies which account is primarily responsible for
     /// paying the bill for any consumed resources.
     ///
     /// A time limit for the execution of the current tx/query will be set based
@@ -406,7 +529,7 @@ mod service {
     }
 
     #[event(history)]
-    fn block_summary(net_usage_ppm: u32, cpu_usage_ppm: u32) {}
+    fn block_summary(net_usage_ppm: u32, cpu_usage_ppm: u32, disk_usage_ppm: u32) {}
 }
 
 #[test]

@@ -21,14 +21,7 @@ namespace psibase
                              SystemService::AuthSig::PrivateKeyInfo>;
    using KeyList = std::vector<KeyPair>;
 
-   inline std::string show(bool include, TransactionTrace t)
-   {
-      if (include || t.error)
-         std::cout << prettyTrace(trimRawData(t)) << "\n";
-      if (t.error)
-         return *t.error;
-      return {};
-   }
+   std::string show(bool include, TransactionTrace t);
 
    inline bool isUserAction(const Action& action)
    {
@@ -127,7 +120,7 @@ namespace psibase
       {
          if (_t.error.has_value())
          {
-            std::cout << prettyTrace(trimRawData(_t)).c_str();
+            show(true, _t);
          }
 
          if (_return.has_value())

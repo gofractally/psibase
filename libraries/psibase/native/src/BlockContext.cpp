@@ -60,14 +60,6 @@ namespace psibase
       if (!status)
          status.emplace();
 
-      auto dbStatus = db.kvGet<DatabaseStatusRow>(DatabaseStatusRow::db, databaseStatusKey());
-      if (!dbStatus)
-      {
-         dbStatus.emplace();
-         if (!isReadOnly)
-            db.kvPut(DatabaseStatusRow::db, dbStatus->key(), *dbStatus);
-      }
-
       current.header.producer = producer;
       current.header.term     = term;
       if (status->head)
@@ -751,11 +743,6 @@ namespace psibase
       status->head->header.authCode.reset();
       if (isGenesisBlock)
          status->chainId = status->head->blockId;
-
-      auto dbStatus = db.kvGet<DatabaseStatusRow>(DatabaseStatusRow::db, databaseStatusKey());
-      check(!!dbStatus, "databaseStatus not set");
-      dbStatus->blockMerkleEventNumber = dbStatus->nextMerkleEventNumber;
-      db.kvPut(DatabaseStatusRow::db, dbStatus->key(), *dbStatus);
 
       // These values will be replaced at the start of the next block.
       // Changing the these here gives services running in RPC mode

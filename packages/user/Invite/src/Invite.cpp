@@ -86,13 +86,18 @@ namespace
       // The basic `createAccount` action (manually measured):
       // * 293 bytes of network bandwidth -> Round up to 300
       // * 6.7MS of CPU time              -> Round up to 7ms
-      const uint64_t CREATE_ACTION_NET_BYTES = 300;
-      const uint64_t CREATE_ACTION_CPU_NS    = 7000000;
+      // * 318 bytes of disk              -> Round up to 320
+      const uint64_t CREATE_ACTION_NET_BYTES  = 300;
+      const uint64_t CREATE_ACTION_CPU_NS     = 7000000;
+      const uint64_t CREATE_ACTION_DISK_BYTES = 320;
 
-      auto net_cost        = to<VirtualServer>().get_net_cost(CREATE_ACTION_NET_BYTES);
-      auto cpu_cost        = to<VirtualServer>().get_cpu_cost(CREATE_ACTION_CPU_NS);
-      auto create_act_cost = (net_cost + cpu_cost);
-      create_act_cost += create_act_cost / 10;  // 10% buffer for additional net/cpu leeway
+      auto virtualServer = to<VirtualServer>();
+      auto net_cost      = virtualServer.get_net_cost(CREATE_ACTION_NET_BYTES);
+      auto cpu_cost      = virtualServer.get_cpu_cost(CREATE_ACTION_CPU_NS);
+      auto disk_cost     = virtualServer.get_disk_cost(CREATE_ACTION_DISK_BYTES);
+
+      auto create_act_cost = (net_cost + cpu_cost + disk_cost);
+      create_act_cost += create_act_cost / 10;  // 10% buffer for additional resource leeway
       return create_act_cost;
    }
 

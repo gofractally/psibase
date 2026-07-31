@@ -85,10 +85,6 @@ void psibase::ServiceSchema::checkValid() const
       if (type.result)
          types.checkType(*type.result);
    }
-   for (const auto& [name, type] : ui)
-   {
-      types.checkType(type);
-   }
    for (const auto& [name, type] : history)
    {
       types.checkType(type);

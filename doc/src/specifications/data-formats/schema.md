@@ -175,7 +175,6 @@ The schema schema defines both the JSON format and the binary (fracpack) format 
       "service": "@AccountNumber",
       "types": "@typemap",
       "actions": "@actions",
-      "ui": "@events",
       "history": "@events",
       "merkle": "@events"
     }

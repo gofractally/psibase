@@ -49,7 +49,7 @@ interface api {
 
     /// Sets the auth service used to authenticate the currently logged-in user
     /// Currently calling this is restricted to the homepage app.
-    set-auth-service: func(service-name: string) -> result<_, error>; 
+    set-auth-service: func(service-name: string) -> result<_, error>;
 
     /// Gets the account name of the user logged into the active application.
     /// May also return None if no user is logged in.
@@ -58,6 +58,30 @@ interface api {
     /// Generates a random account number not in use on the network
     /// Supports optional prefix of up to 9 chars, must not start with "x-"
     gen-rand-account: func(prefix: option<string>) -> result<string, error>;
+}
+
+/// This interface is only callable by the accounts app itself.
+interface admin {
+    use host:types/types.{error};
+
+    /// Gets the names of all apps to which the user has connected
+    get-connected-apps: func(user: string) -> list<string>;
+
+    /// Adds an account into the accounts table so that it can be used on this device.
+    import-account: func(account: string);
+
+    /// Removes an account from the accounts table and disconnects it from any connected
+    /// apps so that it can no longer be used on this device.
+    remove-account: func(account: string);
+
+    /// Gets a list of all accounts that are known by the accounts app on this device.
+    get-all-accounts: func() -> list<string>;
+
+    /// Get a list of auth accounts
+    get-auth-services: func() -> result<list<string>, error>;
+
+    /// preapprove an account for creation within this transaction
+    preapprove-account: func(account: string);
 }
 
 world imports {

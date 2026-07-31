@@ -10,6 +10,23 @@ using namespace SystemService;
 
 namespace
 {
+   bool isResMonitoring()
+   {
+      return to<Transact>().isResMonitoring();
+   }
+
+   void skipBilling()
+   {
+      if (isResMonitoring())
+         to<Transact>().skipBilling(1);
+   }
+
+   void endSkipBilling()
+   {
+      if (isResMonitoring())
+         to<Transact>().endSkipBilling();
+   }
+
    auto compare_claim = [](const Claim& lhs, const Claim& rhs)
    { return std::tie(lhs.service, lhs.rawData) < std::tie(rhs.service, rhs.rawData); };
 
@@ -112,7 +129,9 @@ namespace SystemService
       status->consensus.next = {{std::move(consensus), status->consensus.current.services,
                                  status->consensus.current.wasmConfig},
                                 status->current.blockNum};
+      skipBilling();
       table.put(*status);
+      endSkipBilling();
    }
 
    void Producers::setProducers(std::vector<psibase::Producer> prods)
@@ -139,7 +158,9 @@ namespace SystemService
                status->consensus.current.data),
            status->consensus.current.services, status->consensus.current.wasmConfig},
           status->current.blockNum};
+      skipBilling();
       table.put(*status);
+      endSkipBilling();
    }
 
    void Producers::regCandidate(const std::string& endpoint, psibase::Claim claim)

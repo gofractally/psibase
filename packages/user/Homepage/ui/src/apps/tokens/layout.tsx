@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Outlet } from "react-router-dom";
 
-import { NoTokensWarning } from "@/apps/tokens/components/no-tokens-warning";
 import {
     type Token,
     useUserTokenBalances,
@@ -19,7 +18,7 @@ import { UntransferableTokenWarning } from "./components/transfer/untransferable
 import { useTransferActions } from "./hooks/use-transfer-actions";
 
 export interface TokensOutletContext {
-    selectedToken: Token;
+    selectedToken: Token | undefined;
     currentUser: string | null;
     isLoading: boolean;
 }
@@ -32,7 +31,6 @@ export const TokensLayout = () => {
     const currentUser = isSuccess ? currentUserData : null;
 
     const tokens = useMemo(() => data ?? [], [data]);
-    const isNoTokens = currentUser && tokens.length == 0;
 
     const [selectedTokenId, setSelectedTokenId] = useState<string>("");
 
@@ -65,34 +63,25 @@ export const TokensLayout = () => {
 
     return (
         <PageContainer className="space-y-6">
-            {isNoTokens ? (
-                <NoTokensWarning />
-            ) : (
-                <>
-                    <AutoDebitSwitch currentUser={currentUser} />
-                    <GlowingCard>
-                        <CardContent className="@container space-y-2">
-                            {!isLoading && (
-                                <>
-                                    <TokenSelector
-                                        tokens={tokens}
-                                        selectedToken={selectedToken}
-                                        onChange={handleTokenSelect}
-                                        onClickAvailableBalance={
-                                            handleSetMaxAmount ?? undefined
-                                        }
-                                    />
-                                    {selectedToken?.isTransferable ===
-                                        false && <UntransferableTokenWarning />}
-                                </>
-                            )}
-                        </CardContent>
-                    </GlowingCard>
-                    <Outlet
-                        context={{ selectedToken, currentUser, isLoading }}
-                    />
-                </>
+            <AutoDebitSwitch currentUser={currentUser} />
+            {tokens.length > 0 && (
+                <GlowingCard>
+                    <CardContent className="@container space-y-2">
+                        <TokenSelector
+                            tokens={tokens}
+                            selectedToken={selectedToken}
+                            onChange={handleTokenSelect}
+                            onClickAvailableBalance={
+                                handleSetMaxAmount ?? undefined
+                            }
+                        />
+                        {selectedToken?.isTransferable === false && (
+                            <UntransferableTokenWarning />
+                        )}
+                    </CardContent>
+                </GlowingCard>
             )}
+            <Outlet context={{ selectedToken, currentUser, isLoading }} />
         </PageContainer>
     );
 };
