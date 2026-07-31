@@ -8,6 +8,7 @@ mod service {
 
     const AVATAR_PATH: &str = "/profile/avatar.image";
     const AVATAR_PREFIX: &str = "/avatar/";
+    const ALLOWED_CONTENT_TYPES: &[&str] = &["image/png", "image/jpeg", "image/webp", "image/gif"];
 
     struct Query;
 
@@ -22,12 +23,34 @@ mod service {
         Hex(&hash.0[..8]).to_string()
     }
 
+    fn normalize_content_type(content_type: &str) -> &str {
+        content_type
+            .split(';')
+            .next()
+            .unwrap_or(content_type)
+            .trim()
+    }
+
+    fn is_allowed_content_type(content_type: &str) -> bool {
+        let content_type = normalize_content_type(content_type);
+        ALLOWED_CONTENT_TYPES
+            .iter()
+            .any(|allowed| content_type.eq_ignore_ascii_case(allowed))
+    }
+
+    fn avatar_headers(extra: impl IntoIterator<Item = HttpHeader>) -> Vec<HttpHeader> {
+        let mut headers = allow_cors_with_origin("*");
+        headers.push(HttpHeader::new("X-Content-Type-Options", "nosniff"));
+        headers.extend(extra);
+        headers
+    }
+
     fn not_found() -> HttpReply {
         HttpReply {
             status: HttpStatus::NotFound as u16,
             contentType: "text/html".into(),
             body: Hex(b"Not Found".to_vec()),
-            headers: allow_cors_with_origin("*"),
+            headers: avatar_headers([]),
         }
     }
 
@@ -55,19 +78,22 @@ mod service {
             return Some(not_found());
         };
 
+        if !is_allowed_content_type(&props.contentType) {
+            return Some(not_found());
+        }
+
+        let content_type = normalize_content_type(&props.contentType).to_ascii_lowercase();
         let etag = etag_for(&props.contentHash);
 
         if request
             .get_header("If-None-Match")
             .is_some_and(|v| v == etag)
         {
-            let mut headers = allow_cors_with_origin("*");
-            headers.push(HttpHeader::new("ETag", &etag));
             return Some(HttpReply {
                 status: HttpStatus::NotModified as u16,
                 contentType: String::new(),
                 body: Hex(Vec::new()),
-                headers,
+                headers: avatar_headers([HttpHeader::new("ETag", &etag)]),
             });
         }
 
@@ -77,15 +103,14 @@ mod service {
             Hex(Sites::call().getData(account, AVATAR_PATH.into(), true))
         };
 
-        let mut headers = allow_cors_with_origin("*");
-        headers.push(HttpHeader::new("Cache-Control", "no-cache"));
-        headers.push(HttpHeader::new("ETag", &etag));
-
         Some(HttpReply {
             status: HttpStatus::Ok as u16,
-            contentType: props.contentType,
+            contentType: content_type,
             body,
-            headers,
+            headers: avatar_headers([
+                HttpHeader::new("Cache-Control", "no-cache"),
+                HttpHeader::new("ETag", &etag),
+            ]),
         })
     }
 
