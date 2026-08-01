@@ -4,5 +4,6 @@
         "tsBuildInfoFile": ".tmp/tsconfig.app.tsbuildinfo",
         "baseUrl": "./"
     },
-    "include": ["src"]
+    "include": ["src"],
+    "exclude": ["**/*.test.ts", "**/*.spec.ts"]
 }

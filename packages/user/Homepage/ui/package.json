@@ -6,7 +6,11 @@
         "dev": "vite",
         "build": "node ../../../if-build-needed.mjs 'tsc -b --noEmit && vite build'",
         "lint": "eslint .",
-        "preview": "vite preview"
+        "preview": "vite preview",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "e2e": "playwright test --config e2e/playwright.config.ts",
+        "e2e:headed": "playwright test --config e2e/playwright.config.ts --headed"
     },
     "dependencies": {
         "@hookform/resolvers": "^5.1.1",
@@ -32,13 +36,16 @@
         "zod": "^3.24.2"
     },
     "devDependencies": {
+        "@playwright/test": "^1.60.0",
         "@types/node": "^22.15.0",
         "@types/react": "^19.1.0",
         "@types/react-dom": "^19.1.0",
         "@types/react-router-dom": "5.3.3",
         "eslint": "^9.15.0",
+        "happy-dom": "^20.10.2",
         "typescript": "^5.7.3",
         "vite": "^5.4.1",
-        "vite-plugin-svgr": "^4.3.0"
+        "vite-plugin-svgr": "^4.3.0",
+        "vitest": "2.1.9"
     }
 }

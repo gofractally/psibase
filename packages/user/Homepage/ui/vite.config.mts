@@ -14,6 +14,10 @@ verifyViteCache(appDirectory);
 
 // https://vitejs.dev/config/
 export default defineConfig((config) => ({
+    test: {
+        environment: "happy-dom",
+        include: ["src/**/*.test.ts", "e2e/**/*.test.ts"],
+    },
     plugins: [
         createSharedViteConfig({
             manualChunks: {
