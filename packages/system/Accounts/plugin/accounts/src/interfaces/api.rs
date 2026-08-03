@@ -3,7 +3,6 @@ use crate::bindings::host::common::{client as Client, server as Server};
 use crate::bindings::transact::plugin::intf as Transact;
 use crate::db::apps_table::*;
 use crate::errors::ErrorType::*;
-use crate::helpers::generate_account;
 use crate::plugin::AccountsPlugin;
 
 use crate::trust::*;
@@ -74,10 +73,5 @@ impl API for AccountsPlugin {
     fn get_current_user() -> Option<String> {
         assert_authorized(FunctionName::get_current_user).unwrap();
         AppsTable::new(&Client::get_active_app()).get_logged_in_user()
-    }
-
-    fn gen_rand_account(prefix: Option<String>) -> Result<String, Error> {
-        assert_authorized(FunctionName::gen_rand_account)?;
-        generate_account(prefix)
     }
 }
