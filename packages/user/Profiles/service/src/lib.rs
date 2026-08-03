@@ -1,3 +1,21 @@
+pub const ALLOWED_AVATAR_CONTENT_TYPES: &[&str] =
+    &["image/png", "image/jpeg", "image/webp", "image/gif"];
+
+pub fn normalize_content_type(content_type: &str) -> &str {
+    content_type
+        .split(';')
+        .next()
+        .unwrap_or(content_type)
+        .trim()
+}
+
+pub fn is_allowed_content_type(content_type: &str) -> bool {
+    let content_type = normalize_content_type(content_type);
+    ALLOWED_AVATAR_CONTENT_TYPES
+        .iter()
+        .any(|allowed| content_type.eq_ignore_ascii_case(allowed))
+}
+
 #[psibase::service_tables]
 pub mod tables {
     use async_graphql::SimpleObject;
