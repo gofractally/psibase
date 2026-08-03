@@ -13,7 +13,7 @@ pub mod service {
     use psibase::{
         services::{
             auth_dyn::{self, policy::DynamicAuthPolicy},
-            guilds::GuildSubaccount,
+            guilds::GuildRole,
             transact::ServiceMethod,
         },
         *,
@@ -469,15 +469,17 @@ pub mod service {
         }
     }
 
-    fn account_policy(account: AccountNumber) -> Option<auth_dyn::policy::DynamicAuthPolicy> {
-        let (base, subaccount) = account.split();
+    fn account_policy(account: AccountNumber) -> DynamicAuthPolicy {
+        let guild = Guild::get_assert(account.base());
 
-        let guild = Guild::get(base)?;
-        GuildSubaccount::from_subaccount(subaccount).map(|subaccount| match subaccount {
-            GuildSubaccount::Base => guild.auth_policy(),
-            GuildSubaccount::Council => guild.council_role_auth(),
-            GuildSubaccount::Rep => guild.rep_role_auth(),
-        })
+        if !account.is_subaccount() {
+            return guild.auth_policy();
+        }
+
+        match GuildRole::from_subaccount(account.subaccount()).expect("unknown guild subaccount") {
+            GuildRole::Council => guild.council_role_auth(),
+            GuildRole::Rep => guild.rep_role_auth(),
+        }
     }
 
     /// Get policy action used by AuthDyn service.
@@ -493,8 +495,6 @@ pub mod service {
         use psibase::services::accounts as Accounts;
         use psibase::services::setcode as SetCode;
         use psibase::services::staged_tx as StagedTx;
-
-        let policy = account_policy(account).expect("account not supported");
 
         if method.is_some_and(|method| {
             let banned_service_methods: Vec<ServiceMethod> = vec![
@@ -526,7 +526,7 @@ pub mod service {
         }) {
             DynamicAuthPolicy::impossible()
         } else {
-            policy
+            account_policy(account)
         }
     }
 
@@ -536,7 +536,10 @@ pub mod service {
     /// * `account` - Account being checked.
     #[action]
     pub fn has_policy(account: AccountNumber) -> bool {
-        account_policy(account).is_some()
+        let known_subaccount =
+            !account.is_subaccount() || GuildRole::from_subaccount(account.subaccount()).is_some();
+
+        known_subaccount && Guild::get(account.base()).is_some()
     }
 
     #[event(history)]

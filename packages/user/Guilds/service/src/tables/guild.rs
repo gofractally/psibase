@@ -9,8 +9,7 @@ use psibase::services::fractals::weighted_normalization::{
     weighted_normalization,
 };
 use psibase::{
-    get_sender, get_service, AccountNumber, Flags, Memo,
-    ServiceWrapper, Subaccount, Table,
+    get_sender, get_service, AccountNumber, Flags, Memo, ServiceWrapper, Subaccount, Table,
 };
 
 use crate::constants::{
@@ -21,7 +20,7 @@ use crate::helpers::{two_thirds_plus_one, RollingBits16};
 use crate::tables::tables::{
     EvaluationInstance, Guild, GuildFlags, GuildMember, GuildMemberTable, GuildTable,
 };
-use psibase::services::guilds::GuildSubaccount;
+use psibase::services::guilds::GuildRole;
 
 impl Guild {
     fn new(
@@ -88,8 +87,9 @@ impl Guild {
             AuthDyn::call_as(new_account).set_mgmt(new_account, get_service());
             Accounts::call_as(new_account).setAuthServ(AuthDyn::SERVICE);
         };
-        create_sub_account(GuildSubaccount::Council.subaccount());
-        create_sub_account(GuildSubaccount::Rep.subaccount());
+        for role in GuildRole::ALL {
+            create_sub_account(role.to_subaccount());
+        }
 
         new_guild_instance
     }
@@ -129,7 +129,7 @@ impl Guild {
         let guild = Self::get_assert(guild);
         assert_eq!(
             sub_account,
-            GuildSubaccount::Council.subaccount(),
+            GuildRole::Council.to_subaccount(),
             "sender must be council role account of guild",
         );
         guild
@@ -140,7 +140,7 @@ impl Guild {
         let guild = Self::get_assert(guild);
         assert_eq!(
             sub_account,
-            GuildSubaccount::Rep.subaccount(),
+            GuildRole::Rep.to_subaccount(),
             "sender must be representative role account of guild",
         );
         guild
@@ -221,9 +221,9 @@ impl Guild {
 
     fn authorizing_subaccount(&self) -> Subaccount {
         if self.rep.is_some() {
-            GuildSubaccount::Rep.subaccount()
+            GuildRole::Rep.to_subaccount()
         } else {
-            GuildSubaccount::Council.subaccount()
+            GuildRole::Council.to_subaccount()
         }
     }
 

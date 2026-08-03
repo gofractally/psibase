@@ -2,21 +2,25 @@ use crate::Subaccount;
 
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum GuildSubaccount {
-    Base = 0,
+pub enum GuildRole {
     Council = 1,
     Rep = 2,
 }
 
-impl GuildSubaccount {
-    pub fn subaccount(self) -> Subaccount {
+impl GuildRole {
+    /// Every role a guild has, each of which gets its own subaccount.
+    pub const ALL: [Self; 2] = [Self::Council, Self::Rep];
+
+    pub fn to_subaccount(self) -> Subaccount {
         Subaccount(self as u8)
     }
 
+    /// `None` if the subaccount holds no guild role, including the guild's own
+    /// base account.
     pub fn from_subaccount(subaccount: Subaccount) -> Option<Self> {
-        [Self::Base, Self::Council, Self::Rep]
+        Self::ALL
             .into_iter()
-            .find(|candidate| candidate.subaccount() == subaccount)
+            .find(|candidate| candidate.to_subaccount() == subaccount)
     }
 }
 
