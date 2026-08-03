@@ -11,11 +11,11 @@ plugin = "registry-plugin"
 postinstall = [{ sender = "registry", service = "registry", method = "init" }]
 
 [package.metadata.psibase.dependencies]
-Host = "0.23.0"
-HttpServer = "0.23.0"
-Sites = "0.23.0"
-Transact = "0.23.0"
-Permissions = "0.23.0"
+Host = "0.24.0"
+HttpServer = "0.24.0"
+Sites = "0.24.0"
+Transact = "0.24.0"
+Permissions = "0.24.0"
 
 [dependencies]
 psibase.workspace = true
@@ -27,4 +27,4 @@ url = "2.5.2"
 psibase-user-workspace-hack.workspace = true
 
 [dev-dependencies]
-registry-pkg = { path = "..", version = "0.23.0" }
+registry-pkg = { path = "..", version = "0.24.0" }

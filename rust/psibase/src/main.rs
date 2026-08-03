@@ -18,13 +18,13 @@ use psibase::{
     new_account_owned_action, preapprove_action, push_transaction, push_transaction_optimistic,
     push_transactions, reg_server, set_auth_service_action, set_code_action, set_key_action,
     set_owner_action, sign_transaction, AccountNumber, Action, ActionFormatter, AnyPrivateKey,
-    AnyPublicKey, ChainUrl, Checksum256, DirectoryRegistry, ExactAccountNumber, FileSetRegistry,
-    FilteredRegistry, HTTPRegistry, HttpSchemaFetcher, JointRegistry, Meta, NullSchemaFetcher,
-    PackageDataFile, PackageInfo, PackageList, PackageOp, PackageOpFull, PackageOrigin,
-    PackagePreference, PackageRef, PackageRegistry, PackagedService, PrettyAction, SchemaFetcher,
-    SchemaMap, Seconds, ServiceInfo, ServiceWrapper, SignedTransaction, StagedUpload, Tapos,
-    TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace,
-    Version,
+    AnyPublicKey, ChainUrl, Checksum256, DirectoryRegistry, EssentialServices, ExactAccountNumber,
+    FileSetRegistry, FilteredRegistry, HTTPRegistry, HttpSchemaFetcher, JointRegistry, Meta,
+    NullSchemaFetcher, PackageDataFile, PackageInfo, PackageList, PackageOp, PackageOpFull,
+    PackageOrigin, PackagePreference, PackageRef, PackageRegistry, PackagedService, PrettyAction,
+    SchemaFetcher, SchemaMap, Seconds, ServiceInfo, ServiceWrapper, SignedTransaction,
+    StagedUpload, Tapos, TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder,
+    TransactionTrace, Version,
 };
 use regex::Regex;
 use reqwest::Url;
@@ -1236,7 +1236,10 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
         &mut package_registry,
     )
     .await?;
-    let mut packages = package_registry.resolve(&package_names, false).await?;
+    let essential = EssentialServices::with_key(&args.block_key);
+    let mut packages = package_registry
+        .resolve(&package_names, false, &essential)
+        .await?;
     let (boot_transactions, groups) = create_boot_transactions(
         &args.block_key,
         &args.account_key,
@@ -1244,6 +1247,7 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
         true,
         expiration,
         &mut packages,
+        &essential,
         args.compression_level,
     )?;
 
@@ -1621,13 +1625,20 @@ async fn apply_packages<
     compression_level: u32,
     existing: PackageList,
 ) -> Result<SchemaMap, anyhow::Error> {
-    let ops = fetch_packages(reg, ops, &existing).await?;
-    let updated_packages = existing.into_updated(&ops, sender);
     let mut schemas = SchemaMap::new();
+    let ops = fetch_packages(
+        reg,
+        ops,
+        &existing,
+        &HttpSchemaFetcher { client, base_url },
+        &mut schemas,
+        &EssentialServices::empty(),
+    )
+    .await?;
+    let updated_packages = existing.into_updated(&ops, sender);
     for op in ops {
         match op {
             PackageOpFull::Install(mut package) => {
-                package.load_schemas(base_url, client, &mut schemas).await?;
                 out.set_label(format!(
                     "Installing {}-{}",
                     package.name(),
@@ -1655,7 +1666,6 @@ async fn apply_packages<
                 files.push_all(std::mem::take(&mut uploader.actions))?;
             }
             PackageOpFull::Replace(meta, mut package) => {
-                package.load_schemas(base_url, client, &mut schemas).await?;
                 // TODO: skip unmodified files (?)
                 out.set_label(format!(
                     "Updating {}-{} -> {}-{}",
@@ -2064,7 +2074,16 @@ async fn do_install_local<T: Read + Seek>(
     let progress = ProgressBar::new(to_install.len() as u64).with_style(
         ProgressStyle::with_template("{wide_bar} {pos}/{len}\n{msg}")?,
     );
-    let to_install = fetch_packages(&package_registry, to_install, &installed).await?;
+    let mut schemas = SchemaMap::new();
+    let to_install = fetch_packages(
+        &package_registry,
+        to_install,
+        &installed,
+        &NullSchemaFetcher,
+        &mut schemas,
+        &EssentialServices::empty(),
+    )
+    .await?;
     progress.set_message("Installing packages");
     let res: Result<(), anyhow::Error> = async {
         for op in to_install {

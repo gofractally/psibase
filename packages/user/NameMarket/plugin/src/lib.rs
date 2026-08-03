@@ -348,7 +348,7 @@ fn require_active_market_ask(length: u8, sys_token_id: u32) -> Result<u64, Error
 }
 
 impl Authorized for NameMarketPlugin {
-    #[psibase_plugin::authorized(Medium)]
+    #[psibase_plugin::authorized(Medium, whitelist = ["accounts", "homepage", "config"])]
     fn graphql(query: String) -> Result<String, Error> {
         CommonServer::post_graphql_get_json(&query)
     }

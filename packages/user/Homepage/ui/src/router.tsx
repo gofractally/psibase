@@ -1,6 +1,7 @@
 import { createBrowserRouter } from "react-router-dom";
 
 import { configuredApps } from "./configured-apps";
+import { getAppPath } from "./app-config";
 import { Layout } from "./layout";
 import Dashboard from "./pages/dashboard";
 import { Invite } from "./pages/invite";
@@ -17,7 +18,7 @@ export default createBrowserRouter([
                 element: <Dashboard />,
             },
             ...configuredApps.map((app) => ({
-                path: app.service,
+                path: getAppPath(app),
                 element: app.element,
                 children: app.children.map((child) => ({
                     path: child.path,
