@@ -22,7 +22,7 @@ in {
         Package providing `psinode`, `psibase`, and `share/psibase` data.
         Importing `inputs.psibase.nixosModules.psibase` sets this to the
         flake package by default; set it explicitly if you import
-        `nix/module.nix` directly.
+        `nix/deploy/module.nix` directly.
       '';
     };
 

@@ -1,5 +1,5 @@
 {
-  description = "Psibase dev environment";
+  description = "Psibase Nix flake (dev shell + NixOS module)";
 
   inputs = {
     # Package versions are intended to match `psibase-contributor`. Places where that's
@@ -350,7 +350,7 @@
             wasi-sdk = wasiSdk;
           }
           // pkgs.lib.optionalAttrs (system == "x86_64-linux") rec {
-            psibase = pkgs.callPackage ./nix/package.nix { };
+            psibase = pkgs.callPackage ./nix/deploy/package.nix { };
             default = psibase;
           };
       }
@@ -377,7 +377,7 @@
       # package it throws only if the user never sets services.psibase.package.
       nixosModules.psibase = {
         imports = [
-          ./nix/module.nix
+          ./nix/deploy/module.nix
           (
             { pkgs, lib, ... }:
             {

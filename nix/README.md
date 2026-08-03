@@ -1,7 +1,10 @@
 # Nix-Based Development Environment for Psibase (Linux)
 
 How to use Nix as an alternative to the Docker-based development environment (psibase-contributor).
-**Dev shell platforms: Linux x86_64 and Linux aarch64.** The prebuilt `psibase` package and the `services.psibase` NixOS module are x86_64-linux only.
+**Platform: Linux x86_64.**
+
+For running a long-lived node on NixOS (`services.psibase` and the prebuilt package), see [`deploy/README.md`](deploy/README.md).
+
 Not (yet) supported: macOS
 
 # Overview
@@ -107,92 +110,10 @@ nix develop
 
 # Files
 
-- `flake.nix` / `flake.lock` — Nix flake at repo root
-- `nix/rust-toolchain.toml` — Rust version and targets
-- `nix/package.nix` — Installable `psibase` package (`psinode` + `psibase` CLI)
-- `nix/module.nix` — NixOS module (`services.psibase`)
-
-# NixOS service (run a chain)
-
-The flake exposes a NixOS module so you can enable a node with:
-
-```nix
-# flake.nix (your NixOS host)
-{
-  inputs.psibase.url = "github:gofractally/psibase"; # or a local path
-
-  outputs = { nixpkgs, psibase, ... }: {
-    nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
-      modules = [
-        psibase.nixosModules.psibase
-        {
-          services.psibase = {
-            enable = true;
-            host = "psibase.example.com";
-            listen = 8090;
-            producer = "prod";   # omit for a non-producing node
-            p2p = true;
-            databaseCacheSize = "2GiB";
-            # openFirewall = true;  # usually false when behind a reverse proxy
-
-            # SoftHSM2 for PKCS #11 block-signing keys (parity with docker deploy)
-            softHsm = {
-              enable = true;
-              pinFile = config.sops.secrets.softhsm_pin.path; # or any file with the PIN
-            };
-
-            # Reverse proxy injects this after authenticating admin (e.g. Caddy basic_auth)
-            environment = {
-              PSIBASE_USERNAME_FIELD = "X-Auth-User";
-            };
-          };
-        }
-      ];
-    };
-  };
-}
-```
-
-Then:
-
-```bash
-sudo nixos-rebuild switch --flake .#myhost
-```
-
-The service starts `psinode` as the `psibase` user under `/var/lib/psibase/db`. A **new** chain still needs a one-time boot (with the service already running):
-
-```bash
-psibase -a http://HOST:PORT boot -p prod
-```
-
-Use the same producer name you set in `services.psibase.producer`.
-
-### SoftHSM / block production
-
-With `softHsm.enable = true` the module:
-
-1. Writes a SoftHSM config pointing at a persistent token directory
-2. Runs a oneshot that initializes the token once (using `pinFile`)
-3. Starts psinode with `--pkcs11-module=…/libsofthsm2.so` and `SOFTHSM2_CONF`
-
-After each psinode restart, unlock the HSM device in **x-admin** (same as the docker deploy) before the node can sign blocks. Do not put `$` or `#` in the SoftHSM PIN.
-
-### Production notes (vs docker compose)
-
-| Concern | Module / host responsibility |
-|--------|-------------------------------|
-| psinode + SoftHSM + p2p + cache | `services.psibase` |
-| TLS / reverse proxy / admin basic auth | your host (Caddy, Traefik, …) |
-| Dynamic DNS, log aggregation, disk UI | site-specific (not in this module) |
-
-## Package notes
-
-- `nix build .#psibase` repackages the prebuilt release tarball (x86_64-linux only) with binaries patched for NixOS.
-- It is a **runtime** package, not a psidk: only `bin/{psinode,psibase,psitest}` and `share/psibase` (`config.in`, `packages`, `wasm`, `services`, `licenses`) plus man pages. The 241M `share/wasi-sysroot` and the CMake/Python dev helpers are dropped, since building services is the dev shell's job. Trimmed output is 74M vs. 314M unpacked.
-- It repackages a release tarball; it does not build psibase from source.
-- The layout contract is `$out/{bin,share/psibase}`: both `psinode` and the `psibase` CLI locate their data relative to the resolved executable path, stripping a trailing `bin`. Any derivation producing that layout can be used instead via `services.psibase.package`.
+- `flake.nix` / `flake.lock` — Nix flake at repo root (dev shell + deploy exports)
+- `nix/rust-toolchain.toml` — Rust version and targets for the dev shell
+- `nix/deploy/` — runtime package and NixOS module ([docs](deploy/README.md))
 
 # Relationship to Docker
 
-Docker (psibase-contributor) remains a supported path. Nix is an **additional** option for Linux: one clone of psibase, then `nix develop` and build. For running a long-lived node on NixOS, prefer `services.psibase` over the dev shell.
+Docker (psibase-contributor) remains a supported path. Nix is an **additional** option for Linux: one clone of psibase, then `nix develop` and build. For running a long-lived node on NixOS, prefer `services.psibase` over the dev shell — see [`deploy/README.md`](deploy/README.md).
