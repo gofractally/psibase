@@ -124,26 +124,25 @@ impl Guild {
         Self::get_assert(get_sender())
     }
 
-    pub fn by_council_sender() -> Self {
-        let (guild, sub_account) = get_sender().split();
-        let guild = Self::get_assert(guild);
+    /// Asserts the sender is the given role's account of a guild, and returns
+    /// that guild.
+    fn by_role_sender(role: GuildRole) -> Self {
+        let (guild, subaccount) = get_sender().split();
         assert_eq!(
-            sub_account,
-            GuildRole::Council.to_subaccount(),
-            "sender must be council role account of guild",
+            GuildRole::from_subaccount(subaccount),
+            Some(role),
+            "sender must be {} role account of guild",
+            role,
         );
-        guild
+        Self::get_assert(guild)
+    }
+
+    pub fn by_council_sender() -> Self {
+        Self::by_role_sender(GuildRole::Council)
     }
 
     pub fn by_rep_sender() -> Self {
-        let (guild, sub_account) = get_sender().split();
-        let guild = Self::get_assert(guild);
-        assert_eq!(
-            sub_account,
-            GuildRole::Rep.to_subaccount(),
-            "sender must be representative role account of guild",
-        );
-        guild
+        Self::by_role_sender(GuildRole::Rep)
     }
 
     pub fn guilds_of_fractal(fractal: AccountNumber) -> Vec<Self> {

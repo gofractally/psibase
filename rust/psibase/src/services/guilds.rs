@@ -24,6 +24,15 @@ impl GuildRole {
     }
 }
 
+impl std::fmt::Display for GuildRole {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Council => "council",
+            Self::Rep => "representative",
+        })
+    }
+}
+
 #[crate::service(name = "guilds", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 pub mod Service {
