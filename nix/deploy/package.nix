@@ -109,6 +109,28 @@ in
           ;;
       esac
 
+      # The $out/{bin,share/psibase} contract that psinode, the psibase CLI and
+      # services.psibase all resolve against. The installPhase already fails on
+      # a missing *source* path; this guards the other direction -- that the
+      # tree which shipped is the one they expect.
+      for p in \
+        bin/psinode bin/psibase bin/psitest \
+        share/psibase/config.in \
+        share/psibase/packages \
+        share/psibase/wasm; do
+        if [ ! -e "$out/$p" ]; then
+          echo "missing from layout: $p" >&2
+          exit 1
+        fi
+      done
+
+      # test -e follows symlinks, so this also proves the relative
+      # x-admin/packages -> ../../packages link still resolves after cp -a.
+      if [ ! -e "$out/share/psibase/services/x-admin/packages" ]; then
+        echo "share/psibase/services/x-admin/packages does not resolve" >&2
+        exit 1
+      fi
+
       runHook postInstallCheck
     '';
 

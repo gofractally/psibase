@@ -11,6 +11,11 @@
     objectstore.backend = file
     log.level = INFO
   '';
+  # Driven through `script` (see the init unit). Keeping the label in its own
+  # script avoids nesting shell quoting inside `script -c`.
+  softhsmInitToken = pkgs.writeShellScript "psibase-softhsm-init-token" ''
+    exec softhsm2-util --init-token --free --label ${lib.escapeShellArg cfg.softHsm.tokenLabel}
+  '';
 in {
   options.services.psibase = {
     enable = lib.mkEnableOption "psibase node (psinode)";
@@ -202,11 +207,10 @@ in {
 
       # tokenDir defaults under dataDir, but it is configurable, so list it
       # separately rather than assuming containment.
-      readWritePaths =
-        lib.unique (
-          [cfg.dataDir]
-          ++ lib.optional cfg.softHsm.enable cfg.softHsm.tokenDir
-        );
+      readWritePaths = lib.unique (
+        [cfg.dataDir]
+        ++ lib.optional cfg.softHsm.enable cfg.softHsm.tokenDir
+      );
     in {
       assertions = [
         {
@@ -249,10 +253,11 @@ in {
 
       systemd.services.psibase-softhsm-init = lib.mkIf cfg.softHsm.enable {
         description = "Initialize SoftHSM token for psibase (once)";
-        wantedBy = ["multi-user.target"];
-        before = ["psibase.service"];
-        requiredBy = ["psibase.service"];
+        # Ordering is declared once, on the consumer (psibase.service below),
+        # whose `requires` also pulls this unit in.
         after = ["local-fs.target"];
+
+        path = [pkgs.coreutils pkgs.gawk pkgs.util-linux softhsmPkg];
 
         serviceConfig = {
           Type = "oneshot";
@@ -265,14 +270,28 @@ in {
             mkdir -p ${lib.escapeShellArg cfg.softHsm.tokenDir}
             chown psibase:psibase ${lib.escapeShellArg cfg.softHsm.tokenDir}
 
-            run_util() {
-              ${pkgs.util-linux}/bin/runuser -u psibase -- \
-                env SOFTHSM2_CONF="$SOFTHSM2_CONF" \
-                ${softhsmPkg}/bin/softhsm2-util "$@"
+            # SHELL is forced because runuser adopts the target user's login
+            # shell, and psibase is a system user with nologin -- which `script`
+            # would otherwise use to run the init command.
+            as_psibase() {
+              runuser -u psibase -- \
+                env SOFTHSM2_CONF="$SOFTHSM2_CONF" PATH="$PATH" \
+                    SHELL=${pkgs.runtimeShell} "$@"
             }
 
-            if run_util --show-slots 2>/dev/null \
-              | grep -F -q ${lib.escapeShellArg cfg.softHsm.tokenLabel}; then
+            # Exact match on the Label field. A substring grep over --show-slots
+            # would also match a token labelled e.g.
+            # "${cfg.softHsm.tokenLabel}-old", or the label appearing anywhere
+            # else in the output.
+            if as_psibase softhsm2-util --show-slots 2>/dev/null \
+              | awk -v want=${lib.escapeShellArg cfg.softHsm.tokenLabel} '
+                  /^[[:space:]]*Label:/ {
+                    sub(/^[[:space:]]*Label:[[:space:]]*/, "")
+                    sub(/[[:space:]]+$/, "")
+                    if ($0 == want) found = 1
+                  }
+                  END { exit !found }
+                '; then
               echo "SoftHSM token '${cfg.softHsm.tokenLabel}' already present"
               exit 0
             fi
@@ -283,12 +302,24 @@ in {
               exit 1
             fi
 
-            run_util \
-              --init-token \
-              --free \
-              --label ${lib.escapeShellArg cfg.softHsm.tokenLabel} \
-              --pin "$pin" \
-              --so-pin "$pin"
+            # softhsm2-util takes PINs either on argv (--pin/--so-pin, which is
+            # world-readable through /proc/PID/cmdline for the life of this
+            # oneshot) or interactively via getpass(), which insists on a tty
+            # that a systemd unit does not have. `script` supplies the tty, so
+            # the PIN travels on stdin instead of argv. Prompt order is
+            # SO PIN, reenter, user PIN, reenter.
+            #
+            # Output is discarded rather than logged: getpass() disables echo
+            # only once it is actually reached, so anything failing earlier
+            # makes `script` copy the raw PIN from the pty straight into the
+            # journal. Losing the diagnostic is the cheaper mistake.
+            if ! printf '%s\n%s\n%s\n%s\n' "$pin" "$pin" "$pin" "$pin" \
+              | as_psibase timeout 60 script -qec ${softhsmInitToken} /dev/null \
+                  >/dev/null 2>&1; then
+              echo "softhsm2-util --init-token failed; output suppressed because" >&2
+              echo "it can contain the PIN. Re-run by hand to diagnose." >&2
+              exit 1
+            fi
 
             echo "Initialized SoftHSM token '${cfg.softHsm.tokenLabel}'"
           '';

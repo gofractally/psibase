@@ -353,16 +353,70 @@
             psibase = pkgs.callPackage ./nix/deploy/package.nix { };
             default = psibase;
           };
+
+        # `nix flake check` runs all of these. The two *-eval checks are
+        # evaluation-only (unsafeDiscardStringContext keeps the forced drvPath
+        # from becoming a build dependency), so they cost seconds and catch the
+        # eval-regression class that the VM test is far too slow to guard.
+        checks = pkgs.lib.optionalAttrs (system == "x86_64-linux") {
+          # Forces a full NixOS system using the module, which also enforces
+          # its assertions, without building the system.
+          module-eval =
+            let
+              sys = nixpkgs.lib.nixosSystem {
+                inherit system;
+                modules = [
+                  self.nixosModules.psibase
+                  {
+                    boot.loader.grub.enable = false;
+                    fileSystems."/" = { device = "/dev/null"; fsType = "ext4"; };
+                    system.stateVersion = "25.05";
+                    services.psibase = {
+                      enable = true;
+                      producer = "prod";
+                      p2p = true;
+                      softHsm = {
+                        enable = true;
+                        pinFile = "/run/secrets/psibase-pin";
+                      };
+                    };
+                  }
+                ];
+              };
+            in
+            pkgs.runCommand "psibase-module-eval" { } ''
+              echo ${builtins.unsafeDiscardStringContext sys.config.system.build.toplevel.drvPath} > $out
+            '';
+
+          # Regression guard: an overlay whose attribute *structure* depends on
+          # final/prev deadlocks the package-set fixpoint. Only resolving it
+          # against a real nixpkgs catches that.
+          overlay-eval =
+            let
+              overlaid = import nixpkgs {
+                inherit system;
+                overlays = [ self.overlays.default ];
+              };
+            in
+            pkgs.runCommand "psibase-overlay-eval" { } ''
+              echo ${builtins.unsafeDiscardStringContext overlaid.psibase.drvPath} > $out
+            '';
+
+          vm = import ./nix/deploy/test.nix { inherit pkgs self; };
+        };
       }
     )
     // {
-      overlays.default = final: prev:
-        let
-          system = final.stdenv.hostPlatform.system;
-        in
-        if self.packages.${system} or { } ? psibase then {
-          psibase = self.packages.${system}.psibase;
-        } else { };
+      # The attribute set's *structure* must not depend on final/prev: computing
+      # the overlay's attribute names would then force the package-set fixpoint
+      # that is still being built (infinite recursion). So `psibase` is always
+      # defined and only its *value* is system-dependent. Same reasoning as the
+      # nixosModules comment below.
+      overlays.default = final: prev: {
+        psibase =
+          self.packages.${prev.stdenv.hostPlatform.system}.psibase
+            or (throw "psibase: no prebuilt package for ${prev.stdenv.hostPlatform.system}");
+      };
 
       # System-independent NixOS module. Import as:
       #   imports = [ inputs.psibase.nixosModules.psibase ];
