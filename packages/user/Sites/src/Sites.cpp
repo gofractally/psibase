@@ -97,9 +97,17 @@ namespace SystemService
           "connect-src * blob:;"                                           //
           ;
 
-      // Port suffix from the Host header (e.g. ":8080"), empty if none.
-      // Mirrors HttpServer::hostHeaderPortSuffix — request.host is stored
-      // without the port, so the raw Host header is the source of truth.
+      // Port suffix from the Host header (e.g. ":8080"), empty if absent or not
+      // a plausible port. request.host is stored without the port, so the raw
+      // Host header is the source of truth.
+      //
+      // The Host header is client-controlled and this value is interpolated into
+      // the CSP response header, so only ':' followed by 1-5 digits is accepted.
+      // Without that check a request carrying
+      //    Host: psibase.localhost:8080 https://evil.com
+      // would append the whole tail to every {{root}} host source, adding an
+      // attacker-chosen origin to the policy. Rejecting fails closed: with no
+      // suffix the policy is narrower than intended, never wider.
       std::string_view hostHeaderPortSuffix(const HttpRequest& req)
       {
          if (auto host = req.getHeader("host"))
@@ -107,7 +115,14 @@ namespace SystemService
             std::string_view h = *host;
             if (auto pos = h.rfind(':'); pos != std::string_view::npos)
             {
-               if (h.find(']', pos) == std::string_view::npos)
+               // A ']' after the last ':' means that colon is inside a
+               // bracketed IPv6 literal, so there is no port.
+               if (h.find(']', pos) != std::string_view::npos)
+                  return {};
+
+               std::string_view digits = h.substr(pos + 1);
+               if (!digits.empty() && digits.size() <= 5 &&
+                   digits.find_first_not_of("0123456789") == std::string_view::npos)
                   return h.substr(pos);
             }
          }
