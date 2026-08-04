@@ -11,10 +11,20 @@
   openssl,
   zlib,
 }: let
-  version = "0.24.0-pre";
+  # HELD BACK DELIBERATELY -- do not bump to match the source tree version.
+  #
+  # 0.24.0-pre cannot complete a production boot: supplying a block signing key
+  # (which is what x-admin's production boot does) aborts with
+  #   service 'producers' aborted with message: Unknown service account: verify-sig
+  # Reproduce with the command in nix/deploy/test.nix. A boot with --account-key
+  # fails differently ('account already exists'), so both key paths are broken.
+  #
+  # Bumping also needs installPhase changes: 0.24 removes share/psibase/services.
+  #
   # Bump version + hash together when cutting a new release package (README.md).
+  version = "0.23.0-pre";
   srcUrl = "https://github.com/gofractally/psibase/releases/download/v${version}/psidk-ubuntu-2404.tar.gz";
-  srcHash = "sha256-gjjLXCbycLyVOCd6mWH3VmnaC5TagVfqKzp4OHulOfk=";
+  srcHash = "sha256-l9bdB9RKz9FQLiBnXaQsHNoveOTMt1r5xRghLTfqKsQ=";
 in
   # Ubuntu SDK tarball is x86_64 ELF; exporting it on other systems yields a
   # broken derivation. Fail at eval with a clear message instead.
@@ -72,6 +82,11 @@ in
       install -Dm644 share/psibase/config.in $out/share/psibase/config.in
       cp -a share/psibase/packages $out/share/psibase/packages
       cp -a share/psibase/wasm $out/share/psibase/wasm
+      # services/ is a dir plus one relative symlink (x-admin/packages ->
+      # ../../packages). Removed in 0.24, where these moved into packages/, so
+      # this line must go when the pin is eventually bumped -- the build will
+      # fail loudly at that point rather than silently shipping a short tree.
+      cp -a share/psibase/services $out/share/psibase/services
 
       # Nice to have, but not worth failing a node build over.
       if [ -d share/psibase/licenses ]; then
@@ -119,6 +134,13 @@ in
           exit 1
         fi
       done
+
+      # test -e follows symlinks, so this also proves the relative
+      # x-admin/packages -> ../../packages link still resolves after cp -a.
+      if [ ! -e "$out/share/psibase/services/x-admin/packages" ]; then
+        echo "share/psibase/services/x-admin/packages does not resolve" >&2
+        exit 1
+      fi
 
       runHook postInstallCheck
     '';

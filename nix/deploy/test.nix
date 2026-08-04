@@ -5,6 +5,17 @@
 # boots a producing node with SoftHSM and p2p enabled, then boots an actual
 # chain so that WASM execution -- the reason MemoryDenyWriteExecute is not set
 # -- is exercised rather than assumed.
+#
+# Not covered: a boot that supplies a block signing key. That is broken in
+# 0.24.0-pre and would make this check permanently red. Reproduce with:
+#
+#   openssl ecparam -name prime256v1 -genkey -noout -out k.pem
+#   openssl ec -in k.pem -pubout -out pub.pem
+#   psibase boot -a http://psibase.localhost:8080 -p prod --block-key pub.pem ProdDefault
+#   => service 'producers' aborted with message: Unknown service account: verify-sig
+#
+# Restore this once upstream fixes it -- it is the path x-admin's production
+# boot uses, so it matters more than the unsigned boot exercised below.
 {
   pkgs,
   self,
@@ -12,8 +23,11 @@
 pkgs.testers.runNixOSTest {
   name = "psibase-node";
 
-  nodes.machine = {...}: {
+  nodes.machine = {pkgs, ...}: {
     imports = [self.nixosModules.psibase];
+
+    # To generate a block signing key for the signed boot path.
+    environment.systemPackages = [pkgs.openssl];
 
     services.psibase = {
       enable = true;
@@ -63,8 +77,17 @@ pkgs.testers.runNixOSTest {
     # Boot a real chain. This pushes the default package set through
     # native/admin/push_boot and executes WASM services, so it is the only part
     # of the test that exercises the JIT under the systemd sandbox.
+    # ProdDefault rather than the default set: it is what a real deployment
+    # installs ("production-ready apps, secure authentication"), so it exercises
+    # more of what this module is for. Note this is still an *unsigned* boot --
+    # see the note below about the signed path.
+    # A *signed* boot with a block signing key -- the path x-admin's production
+    # boot uses, and the one 0.24.0-pre breaks (see header). Booting unsigned
+    # would not exercise it.
+    machine.succeed("openssl ecparam -name prime256v1 -genkey -noout -out /tmp/k.pem")
+    machine.succeed("openssl ec -in /tmp/k.pem -pubout -out /tmp/pub.pem")
     machine.succeed(
-        "psibase boot -a http://psibase.localhost:8080 -p prod",
+        "psibase boot -a http://psibase.localhost:8080 -p prod --block-key /tmp/pub.pem ProdDefault",
         timeout=900,
     )
 
