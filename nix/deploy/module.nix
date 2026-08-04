@@ -78,9 +78,10 @@ in {
       example = 120;
       description = ''
         Idle HTTP connection timeout in seconds (psinode --http-timeout).
-        Null uses the psinode default (typically 4s). Raise this when large
-        uploads (e.g. x-admin push_boot over a high-latency path) would
-        otherwise be closed before the body finishes.
+        Raise this when large uploads (e.g. x-admin push_boot over a
+        high-latency path) would otherwise be closed before the body finishes.
+
+        Prefer null: psinode then uses `<dataDir>/db/config`, which x-admin can edit at runtime. A value set here overrides that file on every restart.
       '';
     };
 
@@ -198,6 +199,14 @@ in {
       softhsmEnv = lib.optionalAttrs cfg.softHsm.enable {
         SOFTHSM2_CONF = "${softhsmConf}";
       };
+
+      # tokenDir defaults under dataDir, but it is configurable, so list it
+      # separately rather than assuming containment.
+      readWritePaths =
+        lib.unique (
+          [cfg.dataDir]
+          ++ lib.optional cfg.softHsm.enable cfg.softHsm.tokenDir
+        );
     in {
       assertions = [
         {
@@ -207,11 +216,12 @@ in {
       ];
 
       users.groups.psibase = {};
+      # dataDir is created by tmpfiles below rather than createHome, so its mode
+      # is explicit and it exists before the (sandboxed) unit starts.
       users.users.psibase = {
         isSystemUser = true;
         group = "psibase";
         home = cfg.dataDir;
-        createHome = true;
         description = "Psibase node user";
       };
 
@@ -223,12 +233,19 @@ in {
 
       networking.firewall.allowedTCPPorts = lib.mkIf cfg.openFirewall [cfg.listen];
 
+      # dataDir must exist and be writable before psinode starts, since
+      # ProtectSystem=strict makes everything outside ReadWritePaths read-only.
+      # <dataDir>/db is deliberately NOT pre-created: triedent creates it (see
+      # create_directories in libraries/triedent/src/database.cpp).
+      #
       # SoftHSM token dir + conf live outside the store; conf content is fixed
       # in the store, tokens are mutable state under tokenDir.
-      systemd.tmpfiles.rules = lib.optionals cfg.softHsm.enable [
-        "d ${cfg.dataDir}/softhsm 0750 psibase psibase -"
-        "d ${cfg.softHsm.tokenDir} 0750 psibase psibase -"
-      ];
+      systemd.tmpfiles.rules =
+        ["d ${cfg.dataDir} 0750 psibase psibase -"]
+        ++ lib.optionals cfg.softHsm.enable [
+          "d ${cfg.dataDir}/softhsm 0750 psibase psibase -"
+          "d ${cfg.softHsm.tokenDir} 0750 psibase psibase -"
+        ];
 
       systemd.services.psibase-softhsm-init = lib.mkIf cfg.softHsm.enable {
         description = "Initialize SoftHSM token for psibase (once)";
@@ -294,10 +311,39 @@ in {
           ExecStart = lib.escapeShellArgs psinodeArgs;
           Restart = "on-failure";
           RestartSec = 5;
-          # triedent memory-maps large regions; without this the OOM killer or
-          # mlock failures are likely.
+
+          # triedent memory-maps and mlocks large regions; without this psinode
+          # drops into its degraded "slow" mode (see the isSlow() warning in
+          # programs/psinode/main.cpp).
           LimitMEMLOCK = "infinity";
-          LimitCORE = "infinity";
+
+          # Hardening. Deliberately omitted, and why:
+          #   MemoryDenyWriteExecute - psinode executes WASM; W^X breaks the JIT.
+          #   SystemCallFilter       - not validated against triedent's mmap/mlock
+          #                            behaviour; a wrong filter is a start-time
+          #                            failure on a production node.
+          #   ProcSubset=pid         - hides /proc/meminfo, which cache sizing reads.
+          #   PrivateUsers           - incompatible with LimitMEMLOCK above.
+          ProtectSystem = "strict";
+          ProtectHome = true;
+          ReadWritePaths = readWritePaths;
+          PrivateTmp = true;
+          PrivateDevices = true;
+          ProtectProc = "invisible";
+          NoNewPrivileges = true;
+          ProtectClock = true;
+          ProtectHostname = true;
+          ProtectKernelLogs = true;
+          ProtectKernelModules = true;
+          ProtectKernelTunables = true;
+          ProtectControlGroups = true;
+          RestrictNamespaces = true;
+          RestrictRealtime = true;
+          RestrictSUIDSGID = true;
+          LockPersonality = true;
+          # AF_NETLINK is required: glibc's getaddrinfo uses it for AI_ADDRCONFIG
+          # when resolving p2p peer hostnames.
+          RestrictAddressFamilies = ["AF_INET" "AF_INET6" "AF_UNIX" "AF_NETLINK"];
         };
       };
     }

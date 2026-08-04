@@ -45,7 +45,7 @@
   };
 
   outputs = { self, nixpkgs, flake-utils, fenix, nixpkgs-cargo-component, nixpkgs-cargo-generate, nixpkgs-cursor-cli, nixpkgs-mdbook, nixpkgs-mdbook-mermaid, nixpkgs-mdbook-plugins, nixpkgs-mdbook-linkcheck, nixpkgs-mdbook-pagetoc, nixpkgs-nodejs }:
-    flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (system:
+    flake-utils.lib.eachSystem [ "x86_64-linux" ] (system:
       let
         pkgs = import nixpkgs {
           inherit system;

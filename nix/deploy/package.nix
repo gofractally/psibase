@@ -1,12 +1,8 @@
 # Psibase runtime package (psinode + psibase CLI + share/psibase data).
 #
-# Repackages the published Ubuntu release tarball and patchelfs it for NixOS;
-# it does not build psibase from source. The NixOS module depends only on the
-# $out/{bin,share/psibase} layout, so any derivation producing that layout can
-# be substituted via services.psibase.package.
-#
-# This is deliberately NOT a psidk: the published tarball is the full SDK, and
-# the dev toolchain is the dev shell's job (see flake.nix). See installPhase.
+# Repackages the published Ubuntu release tarball and patchelfs it for NixOS.
+# What this package is, what it deliberately omits, and how to bump it:
+# see ./README.md. Comments here cover only per-path install decisions.
 {
   lib,
   stdenv,
@@ -16,7 +12,7 @@
   zlib,
 }: let
   version = "0.23.0-pre";
-  # Bump version + hash together when cutting a new release package.
+  # Bump version + hash together when cutting a new release package (README.md).
   srcUrl = "https://github.com/gofractally/psibase/releases/download/v${version}/psidk-ubuntu-2404.tar.gz";
   srcHash = "sha256-l9bdB9RKz9FQLiBnXaQsHNoveOTMt1r5xRghLTfqKsQ=";
 in
@@ -55,14 +51,11 @@ in
     installPhase = ''
       runHook preInstall
 
-      # Install only the runtime, not the SDK. The psidk tarball unpacks to
-      # 314M, of which share/wasi-sysroot is 241M of WASM sysroot headers and
-      # static libs for building services -- dead weight on a node, and the dev
-      # shell provides its own wasi-sdk anyway. Also skipped: share/psibase/cmake,
-      # share/psibase/python (psitest helpers), share/gdb, and
-      # bin/psidk-cmake-args. So enumerate what the runtime actually uses; a
-      # missing path fails the build rather than silently shipping a broken
-      # layout.
+      # Enumerate what the runtime actually uses rather than copying the tree:
+      # a missing path then fails the build instead of silently shipping a
+      # broken layout. Consciously skipped: share/wasi-sysroot,
+      # share/psibase/cmake, share/psibase/python (psitest helpers), share/gdb,
+      # and bin/psidk-cmake-args -- all dev-shell concerns.
       #
       # psitest is included because `psibase create-snapshot` / `load-snapshot`
       # are external subcommands: psibase runs share/psibase/wasm/psibase-*.wasm
