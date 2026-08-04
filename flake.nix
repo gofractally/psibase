@@ -343,22 +343,20 @@
           '';
         };
 
-        # wasi-sdk is available on all systems; the prebuilt runtime package is
-        # x86_64-linux only
-        packages =
-          {
-            wasi-sdk = wasiSdk;
-          }
-          // pkgs.lib.optionalAttrs (system == "x86_64-linux") rec {
-            psibase = pkgs.callPackage ./nix/deploy/package.nix { };
-            default = psibase;
-          };
+        # Single-system flake (see eachSystem above). package.nix carries its
+        # own x86_64 guard, so re-adding a system fails loudly at eval instead
+        # of silently producing a broken package.
+        packages = rec {
+          wasi-sdk = wasiSdk;
+          psibase = pkgs.callPackage ./nix/deploy/package.nix { };
+          default = psibase;
+        };
 
         # `nix flake check` runs all of these. The two *-eval checks are
         # evaluation-only (unsafeDiscardStringContext keeps the forced drvPath
         # from becoming a build dependency), so they cost seconds and catch the
         # eval-regression class that the VM test is far too slow to guard.
-        checks = pkgs.lib.optionalAttrs (system == "x86_64-linux") {
+        checks = {
           # Forces a full NixOS system using the module, which also enforces
           # its assertions, without building the system.
           module-eval =

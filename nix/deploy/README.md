@@ -42,6 +42,16 @@ psibase boot -a http://HOST:PORT -p prod
 `http://psibase.localhost:8080/` and also reads `PSINODE_URL`, so it can be
 omitted when those match.
 
+## Not handled by this module
+
+TLS, reverse proxy and admin auth are yours. psinode does not authenticate
+`/native/admin/`, so terminate TLS and authenticate admin in a proxy (Caddy,
+Traefik, nginx) in front of the node, passing the authenticated user through:
+
+```nix
+services.psibase.environment.PSIBASE_USERNAME_FIELD = "X-Auth-User";
+```
+
 ## SoftHSM / block production
 
 With `softHsm.enable = true` the module writes a SoftHSM config pointing at a persistent token directory, runs a oneshot that initializes the token once from `pinFile`, and starts `psinode` with `--pkcs11-module=…/libsofthsm2.so` and `SOFTHSM2_CONF` set.

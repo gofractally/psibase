@@ -103,7 +103,13 @@ in {
     openFirewall = lib.mkOption {
       type = lib.types.bool;
       default = false;
-      description = "Open the listen port in the firewall.";
+      description = ''
+        Open the listen port in the firewall.
+
+        Usually false: psinode does not authenticate `/native/admin/`, so
+        exposing the port directly publishes an unauthenticated admin API
+        (push_boot, PKCS #11 key unlock). Put a reverse proxy in front.
+      '';
     };
 
     extraArgs = lib.mkOption {
