@@ -154,8 +154,8 @@ namespace SystemService
       /// * `true`: The authorizers are sufficient to authorize a transaction from the sender.
       /// * `false`: The authorizers are not sufficient to authorize a transaction from the sender.
       bool isAuthSys(psibase::AccountNumber              sender,
-                     std::vector<psibase::AccountNumber> authorizers, 
-                     std::optional<ServiceMethod> method);
+                     std::vector<psibase::AccountNumber> authorizers,
+                     std::optional<ServiceMethod>        method);
 
       /// Check whether a specified set of rejecter accounts are sufficient to reject (cancel) a
       /// transaction from a specified sender.
@@ -169,8 +169,8 @@ namespace SystemService
       /// * `true`: The rejecters are sufficient to reject a transaction from the sender.
       /// * `false`: The rejecters are not sufficient to reject a transaction from the sender.
       bool isRejectSys(psibase::AccountNumber              sender,
-                       std::vector<psibase::AccountNumber> rejecters, 
-                       std::optional<ServiceMethod> method);
+                       std::vector<psibase::AccountNumber> rejecters,
+                       std::optional<ServiceMethod>        method);
    };
    PSIO_REFLECT(AuthInterface,
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
@@ -498,9 +498,6 @@ namespace SystemService
             /// Emitted at the start of each block
             void blockStart(psibase::BlockNum blockNum, psibase::BlockTime blockTime) {}
          };
-         struct Ui
-         {
-         };
          struct Merkle
          {
          };
@@ -536,7 +533,6 @@ namespace SystemService
    PSIBASE_REFLECT_TABLES(Transact, Transact::Tables)
    PSIBASE_REFLECT_EVENTS(Transact);
    PSIBASE_REFLECT_HISTORY_EVENTS(Transact, method(blockStart, blockNum, blockTime));
-   PSIBASE_REFLECT_UI_EVENTS(Transact);
    PSIBASE_REFLECT_MERKLE_EVENTS(Transact);
 
    // The status will never be nullopt during transaction execution or during RPC.

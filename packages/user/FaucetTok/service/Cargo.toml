@@ -10,8 +10,8 @@ publish.workspace = true
 [package.metadata.psibase]
 plugin = "faucet-tok-plugin"
 postinstall = [
-    { sender = "tokens", service = "transact", method = "runAs", data = { action = { sender = "tokens", service = "faucet-tok", method = "create_token", rawData = "0000" }, allowedActions = [{service = "tokens", method = "setSysToken"}] } },
-    { sender = "symbol", service = "transact", method = "runAs", data = { action = { sender = "symbol", service = "faucet-tok", method = "set_symbol", rawData = "0000" }, allowedActions = [{service = "symbol", method = "admin_create"}] } }
+    { sender = "tokens", service = "transact", method = "runAs", data = { action = { sender = "tokens", service = "faucet-tok", method = "create_token", data = {} }, allowedActions = [{service = "tokens", method = "setSysToken"}] } },
+    { sender = "symbol", service = "transact", method = "runAs", data = { action = { sender = "symbol", service = "faucet-tok", method = "set_symbol", data = {} }, allowedActions = [{service = "symbol", method = "admin_create"}] } }
 ]
 
 [dependencies]
@@ -21,13 +21,13 @@ psibase-user-workspace-hack.workspace = true
 serde.workspace = true
 
 [package.metadata.psibase.dependencies]
-Sites = "0.24.0"
-HttpServer = "0.24.0"
-Tokens = "0.24.0"
-Symbol = "0.24.0"
-Transact = "0.24.0"
-TransactService = "0.24.0"
-Nft = "0.24.0"
+Sites = "0.25.0"
+HttpServer = "0.25.0"
+Tokens = "0.25.0"
+Symbol = "0.25.0"
+Transact = "0.25.0"
+TransactService = "0.25.0"
+Nft = "0.25.0"
 
 [dev-dependencies]
-faucet-tok-pkg = { path = "..", version = "0.24.0" }
+faucet-tok-pkg = { path = "..", version = "0.25.0" }

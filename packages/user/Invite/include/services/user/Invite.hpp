@@ -102,7 +102,6 @@ namespace UserService
             {
                void updated(uint32_t inviteId, psibase::AccountNumber actor, std::string_view event);
             };
-            struct Ui {};
             struct Merkle {};
          };
          // clang-format on
@@ -123,7 +122,6 @@ namespace UserService
       PSIBASE_REFLECT_HISTORY_EVENTS(Invite,
          method(updated, inviteId, actor, event),
       );
-      PSIBASE_REFLECT_UI_EVENTS(Invite);
       PSIBASE_REFLECT_MERKLE_EVENTS(Invite);
       PSIBASE_REFLECT_TABLES(Invite, Invite::Tables)
       // clang-format on

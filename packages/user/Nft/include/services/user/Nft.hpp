@@ -51,9 +51,6 @@ namespace UserService
          };
          // clang-format on
 
-         struct Ui
-         {
-         };
          struct Merkle
          {
             void transferred(NID nftId, Account creditor, Account debitor, MemoView memo) {}
@@ -85,7 +82,6 @@ namespace UserService
       method(credited, nftId, sender, receiver, memo),
       method(uncredited, nftId, sender, receiver, memo)
    );
-   PSIBASE_REFLECT_UI_EVENTS(Nft);
    PSIBASE_REFLECT_MERKLE_EVENTS(Nft,
       method(transferred, nftId, creditor, debitor, memo)
    );

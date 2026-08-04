@@ -1,3 +1,4 @@
+import { getRequiredPackages } from "@/lib/get-required-packages";
 import { PackageInfo } from "@/types";
 
 interface InstallationOptions {
@@ -20,9 +21,5 @@ export const getDefaultSelectedPackages = (
             `Failed to find relevant package for ${relevantPackageName}`,
         );
 
-    return packages.filter(
-        (pack) =>
-            relevantPackage.depends.some((p) => p.name === pack.name) ||
-            relevantPackage.name == pack.name,
-    );
+    return getRequiredPackages(packages, [relevantPackageName]);
 };
