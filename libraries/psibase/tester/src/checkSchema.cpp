@@ -52,7 +52,6 @@ namespace psibase
             return std::format("Extra action {}", name);
       }
       for (auto [levents, revents] : {
-               std::pair{&lhs.ui, &rhs.ui},
                std::pair{&lhs.history, &rhs.history},
                std::pair{&lhs.merkle, &rhs.merkle},
            })

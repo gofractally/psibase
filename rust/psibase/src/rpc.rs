@@ -178,15 +178,6 @@ impl<'a> SchemaFetcher for HttpSchemaFetcher<'a> {
     }
 }
 
-pub struct NullSchemaFetcher;
-
-#[async_trait(?Send)]
-impl SchemaFetcher for NullSchemaFetcher {
-    async fn fetch_schema(&self, _service: AccountNumber) -> Result<Schema, anyhow::Error> {
-        Err(anyhow::anyhow!("Schema fetching disabled"))
-    }
-}
-
 trait OptionProgressBar {
     fn suspend<F: FnOnce() -> R, R>(&self, f: F) -> R;
 }

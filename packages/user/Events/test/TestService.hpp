@@ -14,9 +14,6 @@ struct TestService : psibase::Service
    void sendTime(psibase::TimePointSec t);
    struct Events
    {
-      struct Ui
-      {
-      };
       struct History
       {
          void testEvent(int32_t i, double d, std::vector<int32_t> v, std::string s) {}
@@ -47,7 +44,6 @@ PSIBASE_REFLECT_HISTORY_EVENTS(TestService,
                                method(str, s),
                                method(account, a),
                                method(time, t));
-PSIBASE_REFLECT_UI_EVENTS(TestService);
 PSIBASE_REFLECT_MERKLE_EVENTS(TestService);
 
 PSIBASE_REFLECT_TABLES(TestService)

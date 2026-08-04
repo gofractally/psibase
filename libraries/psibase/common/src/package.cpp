@@ -98,6 +98,153 @@ namespace psibase
          return result;
       }
 
+      AccountNumber accountFromJson(const psio::json::any& name)
+      {
+         if (auto* s = name.get_if<std::string>())
+         {
+            if (s->empty())
+            {
+               return AccountNumber{};
+            }
+            else
+            {
+               auto result = AccountNumber{*s};
+               check(result != AccountNumber{}, "invalid account");
+               return result;
+            }
+         }
+         else
+         {
+            abortMessage("expected string");
+         }
+      }
+
+      MethodNumber methodFromJson(const psio::json::any& name)
+      {
+         if (auto* s = name.get_if<std::string>())
+         {
+            return MethodNumber{*s};
+         }
+         else
+         {
+            abortMessage("expected string");
+         }
+      }
+
+      std::vector<char> bytesFromJson(const psio::json::any& data)
+      {
+         if (auto* s = data.get_if<std::string>())
+         {
+            std::vector<char> result;
+            if (!psio::from_hex(*s, result))
+               abortMessage("expected hex string");
+            return result;
+         }
+         else
+         {
+            abortMessage("expected string");
+         }
+      }
+
+      psio::schema_types::CustomTypes action_types(
+          const std::span<const PackagedService>* packages);
+
+      struct PrettyActionRef
+      {
+         AccountNumber                    sender;
+         AccountNumber                    service;
+         MethodNumber                     method;
+         std::optional<std::vector<char>> rawData;
+         const psio::json::any*           data;
+      };
+
+      PrettyActionRef parsePrettyAction(const psio::schema_types::CompiledType* ty,
+                                        const psio::json::any&                  in)
+      {
+         PrettyActionRef act;
+         auto*           obj = in.get_if<psio::json::any_object>();
+         check(obj != nullptr, "Expected object");
+         auto* objTy = std::get_if<psio::schema_types::Object>(&ty->original_type->value);
+         check(objTy != nullptr, "Expected object type");
+         check(objTy->members.size() == 4, "wrong size");
+         auto getField = [&](std::string_view name, bool required = true) -> const psio::json::any*
+         {
+            auto pos =
+                std::ranges::find_if(*obj, [&](const auto& entry) { return entry.key == name; });
+            if (pos != obj->end())
+               return &pos->value;
+            else if (required)
+               abortMessage("Missing field " + std::string(name));
+            else
+               return nullptr;
+         };
+         act.sender  = accountFromJson(*getField(objTy->members[0].name));
+         act.service = accountFromJson(*getField(objTy->members[1].name));
+         act.method  = methodFromJson(*getField(objTy->members[2].name));
+         if (auto* rawData = getField(objTy->members[3].name, false))
+            act.rawData = bytesFromJson(*rawData);
+         act.data = getField("data", false);
+         return act;
+      }
+
+      struct ActionParser
+      {
+         static bool match(const psio::schema_types::CompiledType* ty)
+         {
+            return psio::schema_types::matchCustomType(ty, (Action*)nullptr);
+         }
+         static bool frac2json(const psio::schema_types::CompiledType*,
+                               psio::FracStream& in,
+                               psio::StreamBase& out)
+         {
+            abortMessage("not implemented");
+         }
+         static void json2frac(const std::span<const PackagedService>* packages,
+                               const psio::schema_types::CompiledType* ty,
+                               const psio::json::any&                  in,
+                               psio::StreamBase&                       out)
+         {
+            auto act = parsePrettyAction(ty, in);
+
+            if (act.data)
+            {
+               auto* schema = getSchema(*packages, act.service);
+               if (!schema)
+                  abortMessage("Cannot find schema for " + act.service.str());
+               auto pos = schema->actions.find(act.method.str());
+               check(pos != schema->actions.end(), "Action not found");
+               const auto&                        ty = pos->second.params;
+               psio::schema_types::CompiledSchema cschema{
+                   schema->types, action_types(packages), {&ty}};
+               auto* cty = cschema.get(ty.resolve(schema->types));
+               act.rawData.emplace();
+               psio::vector_stream stream{*act.rawData};
+               to_frac(*cty, *act.data, stream, cschema.builtin);
+            }
+            if (!act.rawData)
+            {
+               abortMessage("Missing field rawData");
+            }
+            to_frac(Action{.sender  = act.sender,
+                           .service = act.service,
+                           .method  = act.method,
+                           .rawData = act.rawData.value()},
+                    out);
+         }
+         static bool is_empty_container(const psio::schema_types::CompiledType*,
+                                        const psio::json::any& in)
+         {
+            return false;
+         }
+      };
+
+      psio::schema_types::CustomTypes action_types(const std::span<const PackagedService>* packages)
+      {
+         auto result = psibase_types();
+         result.insert("Action", psio::schema_types::CustomHandler{ActionParser{}, packages});
+         return result;
+      }
+
       Action to_action(PrettyAction&& act, std::span<const PackagedService> packages)
       {
          auto service = AccountNumber{act.service};
@@ -113,7 +260,7 @@ namespace psibase
          auto pos = schema->actions.find(act.method.str());
          check(pos != schema->actions.end(), "Action not found");
          const auto&                        ty = pos->second.params;
-         psio::schema_types::CompiledSchema cschema{schema->types, psibase_types(), {&ty}};
+         psio::schema_types::CompiledSchema cschema{schema->types, action_types(&packages), {&ty}};
          auto*                              cty = cschema.get(ty.resolve(schema->types));
          if (!act.data)
             act.data = psio::json::any_object{};
@@ -128,9 +275,64 @@ namespace psibase
          return std::ranges::find(package.meta.services, account) != package.meta.services.end();
       }
 
+      struct ActionAccountCollector
+      {
+         std::span<const PackagedService> packages;
+         std::vector<AccountNumber>&      accounts;
+         std::vector<AccountNumber>&      services;
+         static bool                      match(const psio::schema_types::CompiledType* ty)
+         {
+            return psio::schema_types::matchCustomType(ty, (Action*)nullptr);
+         }
+         static bool frac2json(const psio::schema_types::CompiledType*,
+                               psio::FracStream& in,
+                               psio::StreamBase& out)
+         {
+            abortMessage("not implemented");
+         }
+         void json2frac(const psio::schema_types::CompiledType* ty,
+                        const psio::json::any&                  in,
+                        psio::StreamBase&                       out)
+         {
+            auto act = parsePrettyAction(ty, in);
+
+            if (act.sender != AccountNumber{})
+               accounts.push_back(act.sender);
+            services.push_back(act.service);
+
+            if (act.data)
+            {
+               collect(act.service, act.method, *act.data);
+            }
+            to_frac(Action{}, out);
+         }
+         static bool is_empty_container(const psio::schema_types::CompiledType*,
+                                        const psio::json::any& in)
+         {
+            return false;
+         }
+
+         void collect(AccountNumber service, MethodNumber method, const psio::json::any& data)
+         {
+            auto* schema = getSchema(packages, service);
+            if (!schema)
+               abortMessage("Cannot find schema for " + service.str());
+            auto pos = schema->actions.find(method.str());
+            check(pos != schema->actions.end(), "Action not found");
+            const auto& ty     = pos->second.params;
+            auto        custom = psibase_types();
+            custom.insert("Action", this);
+            psio::schema_types::CompiledSchema cschema{schema->types, std::move(custom), {&ty}};
+            auto*                              cty = cschema.get(ty.resolve(schema->types));
+            std::vector<char>                  rawData;
+            psio::vector_stream                stream{rawData};
+            to_frac(*cty, data, stream, cschema.builtin);
+         }
+      };
+
       struct RequiredAccounts
       {
-         explicit RequiredAccounts(PackagedService& package)
+         RequiredAccounts(PackagedService& package, std::span<const PackagedService> packages)
          {
             bool local = package.meta.scope == "local";
 
@@ -153,10 +355,14 @@ namespace psibase
                }
             }
 
+            ActionAccountCollector collector{packages, accounts, services};
             for (const auto& act : readPostinstall(package))
             {
+               auto service = AccountNumber{act.service};
                accounts.push_back(act.sender);
-               services.push_back(AccountNumber{act.service});
+               services.push_back(service);
+               if (act.data)
+                  collector.collect(service, act.method, *act.data);
             }
 
             std::ranges::sort(accounts);
@@ -169,6 +375,7 @@ namespace psibase
                auto res = std::ranges::unique(services);
                services.erase(res.begin(), res.end());
             }
+            packages = {};
          }
          std::vector<AccountNumber> accounts;
          std::vector<AccountNumber> services;
@@ -680,7 +887,7 @@ namespace psibase
       {
          std::vector<std::string_view>        all_required_packages;
          std::unordered_set<std::string_view> visited;
-         for (auto service : RequiredAccounts{package}.services)
+         for (auto service : RequiredAccounts{package, packages}.services)
          {
             auto pos = provides_service.find(service);
             if (pos == provides_service.end())

@@ -13,19 +13,19 @@ package-name = "Evaluations"
 services = ["evaluations"]
 
 [package.metadata.psibase.dependencies]
-Accounts = "0.23.0"
-Aes = "0.23.0"
-Base64 = "0.23.0"
-Host = "0.23.0"
-HttpServer = "0.23.0"
-Sites = "0.23.0"
-Transact = "0.23.0"
+Accounts = "0.24.0"
+Aes = "0.24.0"
+Base64 = "0.24.0"
+Host = "0.24.0"
+HttpServer = "0.24.0"
+Sites = "0.24.0"
+Transact = "0.24.0"
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-evaluations = { path = "service", version = "0.23.0" }
-r-evaluations = { path = "query-service", version = "0.23.0" }
-evaluations-plugin = { path = "plugin", version = "0.23.0" }
+evaluations = { path = "service", version = "0.24.0" }
+r-evaluations = { path = "query-service", version = "0.24.0" }
+evaluations-plugin = { path = "plugin", version = "0.24.0" }
 psibase-user-workspace-hack.workspace = true

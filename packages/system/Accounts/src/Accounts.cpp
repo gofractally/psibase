@@ -60,6 +60,11 @@ namespace SystemService
                                      name.base().str()));
          }
       }
+      else if (name.str().starts_with("x-"))
+      {
+         check(getSender() == getReceiver(),
+               "The 'x-' account prefix is reserved for infrastructure providers");
+      }
       else
       {
          check(getSender() == getReceiver() || getSender() == AccountNumber("namemarket"),

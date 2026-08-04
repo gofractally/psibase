@@ -25,4 +25,4 @@ psibase-user-workspace-hack.workspace = true
 
 [dev-dependencies]
 pem = "3.0"
-name-market-pkg = { path = "..", version = "0.23.0" }
+name-market-pkg = { path = "..", version = "0.24.0" }

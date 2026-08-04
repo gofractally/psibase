@@ -159,7 +159,6 @@ namespace UserService
                }
             }
          }
-         // UI events do not need to maintain compatibility
          for (const auto& [name, ty] : existing->schema.history)
          {
             auto pos = schema.history.find(name);

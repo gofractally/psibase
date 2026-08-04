@@ -312,7 +312,7 @@ include(libraries/psibase/sdk/pack_service.cmake)
 
 set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/packages)
 
-set(PSIBASE_VERSION 0.23)
+set(PSIBASE_VERSION 0.24)
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/TransactService.psi
@@ -1244,7 +1244,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Network initializes with development-only apps, insecure authentication, and no governance."
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
-                    Docs DiffAdjust Evaluations Events Fractals FractalCore Guilds Explorer Homepage Host HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
+                    Docs DiffAdjust Evaluations Events Fractals FractalCore Guilds Explorer Homepage Host HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens NameMarket TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop
 )
 
@@ -1254,7 +1254,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Network initializes with production-ready apps, secure authentication, and no governance."
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
-                    Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Guilds Homepage Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
+                    Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Guilds Homepage Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens NameMarket TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop
 )
 
@@ -1292,20 +1292,30 @@ psibase_package(
     PACKAGE_DEPENDS XHttp XAdmin XDb XPackages XPeers XRun XSites XTimer XTransact
 )
 
-function(write_package_index target dir)
+function(write_package_index target dir reserve)
     set(deps ${CMAKE_CURRENT_SOURCE_DIR}/make_package_index.sh)
+    set(package-files)
     foreach(service IN LISTS ARGN)
         list(APPEND deps ${service} ${dir}/${service}.psi)
+        list(APPEND package-files ${dir}/${service}.psi)
     endforeach()
+    set(extra-commands)
+    set(extra-packages)
+    if (reserve)
+        set(extra-commands COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/reserved-names -o ${dir}/ReservedNames.psi --name ReservedNames --version ${PSIBASE_VERSION}.0 --names ${CMAKE_CURRENT_SOURCE_DIR}/rust/reserved-names/generic-names.txt ${package-files})
+        set(extra-packages ReservedNames)
+        list(APPEND deps reserved-names ${CMAKE_CURRENT_BINARY_DIR}/rust/release/reserved-names ${CMAKE_CURRENT_SOURCE_DIR}/rust/reserved-names/generic-names.txt)
+    endif()
     add_custom_command(
         OUTPUT ${dir}/index.json
         DEPENDS ${deps}
-        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/make_package_index.sh ${CMAKE_COMMAND} ${dir} ${ARGN} >${dir}/index.json
+        ${extra-commands}
+        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/make_package_index.sh ${CMAKE_COMMAND} ${dir} ${ARGN} ${extra-packages} >${dir}/index.json
     )
     add_custom_target(${target} ALL DEPENDS ${dir}/index.json)
 endfunction()
 
-write_package_index(package-index ${SERVICE_DIR}
+write_package_index(package-index ${SERVICE_DIR} 1
     Accounts AccountsService Aes AuthAny AuthDyn AuthDelegate AuthDelegateService AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
     Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage VirtualServer WebCrypto Workshop Config
@@ -1366,6 +1376,7 @@ install(
           ${SERVICE_DIR}/Producers.psi
           ${SERVICE_DIR}/Profiles.psi
           ${SERVICE_DIR}/Registry.psi
+          ${SERVICE_DIR}/ReservedNames.psi
           ${SERVICE_DIR}/SetCode.psi
           ${SERVICE_DIR}/Sites.psi
           ${SERVICE_DIR}/StagedTx.psi
@@ -1535,7 +1546,17 @@ psibase_package(
     PACKAGE_DEPENDS "XHttp(^${PSIBASE_VERSION}.0)"
 )
 
-write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket Loop XSocketList WSEcho XDelay XWithServer)
+write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages 0 PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket Loop XSocketList WSEcho XDelay XWithServer)
+
+ExternalProject_Add(
+    reserved-names
+    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/rust
+    BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/reserved-names
+    CONFIGURE_COMMAND ""
+    BUILD_COMMAND   cargo build -r --bin reserved-names --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+    BUILD_ALWAYS 1
+    INSTALL_COMMAND ""
+)
 
 ExternalProject_Add(
     rust

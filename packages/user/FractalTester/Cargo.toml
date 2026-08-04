@@ -16,5 +16,5 @@ services = ["frac-tester"]
 crate-type = ["rlib"]
 
 [dependencies]
-frac-tester = { path = "service", version = "0.23.0" }
+frac-tester = { path = "service", version = "0.24.0" }
 psibase-user-workspace-hack.workspace = true

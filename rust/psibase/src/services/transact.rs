@@ -333,6 +333,36 @@ mod service {
         unimplemented!()
     }
 
+    /// Returns true if resource monitoring is enabled
+    #[action]
+    fn isResMonitoring() -> bool {
+        unimplemented!()
+    }
+
+    /// The next `numWrites` db writes will not be billed.
+    ///
+    /// This may only be called by privileged services, and must be paired
+    /// with a call to `endSkipBilling` when the specified number of writes
+    /// have been performed.
+    #[action]
+    fn skipBilling(numWrites: u32) {
+        unimplemented!()
+    }
+
+    /// Asserts that all writes promised by [skipBilling](Self::skipBilling) were consumed.
+    #[action]
+    fn endSkipBilling() {
+        unimplemented!()
+    }
+
+    /// Attribute subsequent disk writes to the system account until `numBytes`
+    /// bytes have been written or the transaction ends. `numBytes = 0` clears
+    ///  the override. Callable only by the VirtualServer service.
+    #[action]
+    fn systemWrite(numBytes: u64) {
+        unimplemented!()
+    }
+
     /// Get the currently executing transaction
     #[action]
     fn getTransaction() -> crate::Transaction {
