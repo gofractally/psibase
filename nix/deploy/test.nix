@@ -6,16 +6,23 @@
 # chain so that WASM execution -- the reason MemoryDenyWriteExecute is not set
 # -- is exercised rather than assumed.
 #
-# Not covered: a boot that supplies a block signing key. That is broken in
-# 0.24.0-pre and would make this check permanently red. Reproduce with:
+# Not covered: a boot that supplies a block signing key -- the path x-admin's
+# production boot uses. Two separate reasons, both established by experiment:
 #
-#   openssl ecparam -name prime256v1 -genkey -noout -out k.pem
-#   openssl ec -in k.pem -pubout -out pub.pem
-#   psibase boot -a http://psibase.localhost:8080 -p prod --block-key pub.pem ProdDefault
-#   => service 'producers' aborted with message: Unknown service account: verify-sig
+#  1. It is broken on 0.24.0-pre, which is why the package pin is held at 0.23
+#     (see nix/deploy/package.nix). Reproduce with:
+#       openssl ecparam -name prime256v1 -genkey -noout -out k.pem
+#       openssl ec -in k.pem -pubout -out pub.pem
+#       psibase boot -a http://psibase.localhost:8080 -p prod --block-key pub.pem ProdDefault
+#       => service 'producers' aborted: Unknown service account: verify-sig
 #
-# Restore this once upstream fixes it -- it is the path x-admin's production
-# boot uses, so it matters more than the unsigned boot exercised below.
+#  2. Even on 0.23 it cannot run in this harness. Signature verification makes
+#     installing the package set far slower, the boot transaction expiration is
+#     fixed with no CLI override, and the guest exceeds it -- "transaction has
+#     expired" partway through the install, at 1 and at 4 cores alike.
+#
+# So the boot below is unsigned. That is a real coverage gap, not a choice:
+# the signed path is the one production uses.
 {
   pkgs,
   self,
@@ -23,11 +30,8 @@
 pkgs.testers.runNixOSTest {
   name = "psibase-node";
 
-  nodes.machine = {pkgs, ...}: {
+  nodes.machine = {...}: {
     imports = [self.nixosModules.psibase];
-
-    # To generate a block signing key for the signed boot path.
-    environment.systemPackages = [pkgs.openssl];
 
     services.psibase = {
       enable = true;
@@ -79,15 +83,10 @@ pkgs.testers.runNixOSTest {
     # of the test that exercises the JIT under the systemd sandbox.
     # ProdDefault rather than the default set: it is what a real deployment
     # installs ("production-ready apps, secure authentication"), so it exercises
-    # more of what this module is for. Note this is still an *unsigned* boot --
-    # see the note below about the signed path.
-    # A *signed* boot with a block signing key -- the path x-admin's production
-    # boot uses, and the one 0.24.0-pre breaks (see header). Booting unsigned
-    # would not exercise it.
-    machine.succeed("openssl ecparam -name prime256v1 -genkey -noout -out /tmp/k.pem")
-    machine.succeed("openssl ec -in /tmp/k.pem -pubout -out /tmp/pub.pem")
+    # more of what this module is for. Still an *unsigned* boot -- see the
+    # header for why the signed path is not covered.
     machine.succeed(
-        "psibase boot -a http://psibase.localhost:8080 -p prod --block-key /tmp/pub.pem ProdDefault",
+        "psibase boot -a http://psibase.localhost:8080 -p prod ProdDefault",
         timeout=900,
     )
 
