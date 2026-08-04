@@ -1,0 +1,16 @@
+[workspace]
+resolver = "2"
+members = ["packages/example"]
+
+[workspace.package]
+version = "0.23.0"
+edition = "2021"
+rust-version = "1.86"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+# Pin to the SDK train (see nix/release.nix psibaseCrateVersion). Keep Cargo.lock
+# committed so `cargo` does not pull transitive crates that need a newer rustc.
+psibase = "=0.23.0"
+serde = { version = "1", features = ["derive"] }

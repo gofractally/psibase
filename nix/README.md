@@ -117,10 +117,12 @@ nix develop
 - `nix/deploy/` — runtime package and NixOS module ([docs](deploy/README.md))
 - `nix/sdk/` — Rust package-dev SDK (`packages.psidk`, `devShells.sdk`; [docs](sdk/README.md), [plan](sdk-dx-plan.md))
 
-### Package SDK shell (no monorepo build)
+### Package SDK (no monorepo build)
 
 ```bash
 nix develop .#sdk
+# scaffold:  nix flake init -t path:$PWD#package
+# local chain: psidk-up / psidk-down
 ```
 
 See [`sdk/README.md`](sdk/README.md).

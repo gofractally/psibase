@@ -6,30 +6,62 @@ and without a local `build/` tree. See [`../sdk-dx-plan.md`](../sdk-dx-plan.md).
 ## Quick start (x86_64-linux)
 
 ```bash
-# From this flake (local checkout or a release tag):
-nix develop github:gofractally/psibase/v0.23.0-pre#sdk
-# or, in a checkout of this branch:
-nix develop .#sdk
+# Scaffold a workspace (after this flake is on a remote tag/branch):
+mkdir my-apps && cd my-apps
+nix flake init -t github:gofractally/psibase#package
+
+# Or from a local checkout of this branch:
+nix flake init -t path:/path/to/psibase#package
+
+direnv allow   # or: nix develop
+psidk-up
+cd packages/example
+cargo-psibase package
+cargo-psibase install -a http://psibase.localhost:8080/
+psidk-down
 ```
 
-What you get:
+While the SDK exists only on a local branch, point the scaffold’s flake input at it:
+
+```bash
+nix flake lock --override-input psibase path:/path/to/psibase
+```
+
+## What `nix develop .#sdk` provides
 
 - Prebuilt `psinode` / `psibase` / `psitest` from `packages.psidk`
+- `cargo-psibase` from the Release tarball when present; otherwise **installed from
+  crates.io** at `nix/release.nix` → `cargoPsibaseVersion` (currently `0.23.0`)
 - Rust 1.86 + wasm targets, cargo-component / cargo-generate / cargo-edit
 - Node 20 + Yarn, wasm-pack / wasm-tools / binaryen
 - Flake `wasi-sdk`, mkcert, SoftHSM
-- `PSIBASE_DATADIR` pointing at the store `share/psibase` (full package set)
+- `PSIBASE_DATADIR` → store `share/psibase` (full package set)
+- **Local chain:** `psidk-up` / `psidk-down` (or `psidk-devnet up|down|status`)
 
 You do **not** get: C++/Boost/CMake native toolchain, mdbook, monorepo `build/` on `PATH`.
 
-### `cargo-psibase` (interim)
+### Local chain (`psidk-up`)
 
-Current Release tarballs omit `bin/cargo-psibase`. Until a tag ships it in psidk:
+| | |
+|--|--|
+| Host | `psibase.localhost` (required for virtual hosting — not a bare IP) |
+| Default API | `http://psibase.localhost:8080/` |
+| State | `$XDG_STATE_HOME/psibase-devnet` (override with `PSIBASE_DEVNET_DIR`) |
+| Boot | Runs `psibase boot` with the packaged set after `psinode` listens |
 
-```bash
-cargo install cargo-psibase --version 0.23.0 --locked
-# or auto-install on shell entry:
-PSIBASE_SDK_INSTALL_CARGO_PSIBASE=1 nix develop .#sdk
+Same role as `.vscode/scripts/launch.sh` for contributors, but for out-of-tree SDK
+users and **includes boot**.
+
+## Flake template (`#package`)
+
+`nix/sdk/template/` — standalone workspace:
+
+```text
+Cargo.toml                 # workspace
+packages/example/          # first app (rename / add siblings)
+flake.nix                  # default shell = psibase#sdk
+.envrc
+Cargo.lock                 # pinned for Rust 1.86 (do not regenerate casually)
 ```
 
 ## Package artifact only
@@ -39,17 +71,7 @@ nix build .#psidk
 ./result/bin/psibase --version
 ```
 
-| Included in `packages.psidk` | Excluded (Rust-only) |
-|------------------------------|----------------------|
-| `bin/{psinode,psibase,psitest}` | `share/wasi-sysroot` (~241M) |
-| `bin/cargo-psibase` when present in the tarball | `share/psibase/cmake` |
-| Full `share/psibase/packages` | `bin/psidk-cmake-args` |
-| `share/psibase/{config.in,wasm,services,python,licenses}` | `share/gdb` |
-| man pages | |
-
-Layout contract: `$out/{bin,share/psibase}`.
-
-Shared Releases pin: [`../release.nix`](../release.nix).
+Shared Releases pin: [`../release.nix`](../release.nix) (`version`, `cargoPsibaseVersion`, `psibaseCrateVersion`).
 
 ## Not this SDK
 
@@ -57,14 +79,4 @@ Shared Releases pin: [`../release.nix`](../release.nix).
 |---------|--------|
 | Contributor monorepo toolchain | `nix develop` / `nix/dev/shell.nix` |
 | Thin node runtime / NixOS | `packages.psibase` / `nix/deploy/` |
-| Flake templates / local-chain helper | later plan phases |
-
-## Manual local chain (until Phase 4)
-
-```bash
-nix develop .#sdk
-mkdir -p /tmp/psibase-devnet && cd /tmp/psibase-devnet
-psinode ./db --host psibase.localhost --listen 8080 &
-# wait for listen, then:
-psibase boot -a http://psibase.localhost:8080/ -p prod
-```
+| Contributor Launch/Continue | `.vscode/scripts/launch.sh` |

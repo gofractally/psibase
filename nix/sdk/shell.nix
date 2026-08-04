@@ -13,6 +13,8 @@
   psidk,
 }:
 let
+  release = import ../release.nix;
+
   cargoComponent = (import nixpkgs-cargo-component { inherit system; }).cargo-component;
   cargoToolsPkgs = import nixpkgs-cargo-generate { inherit system; };
   cargoGenerate = cargoToolsPkgs.cargo-generate;
@@ -50,11 +52,149 @@ let
     '';
   };
 
-  # Match nix/release.nix / published crates until the tarball ships cargo-psibase.
-  cargoPsibaseCrateVersion = "0.23.0";
+  psidkDevnet = pkgs.writeShellApplication {
+    name = "psidk-devnet";
+    runtimeInputs = [
+      psidk
+      pkgs.curl
+      pkgs.coreutils
+      pkgs.gnugrep
+    ];
+    excludeShellChecks = [ "SC2034" ];
+    text = ''
+      HOST="''${PSIBASE_DEVNET_HOST:-psibase.localhost}"
+      PORT="''${PSIBASE_DEVNET_PORT:-8080}"
+      PRODUCER="''${PSIBASE_DEVNET_PRODUCER:-myprod}"
+      ADMIN_IP="''${PSIBASE_ADMIN_IP:-''${HOST_IP:-127.0.0.1}}"
+      STATE_DIR="''${PSIBASE_DEVNET_DIR:-''${XDG_STATE_HOME:-$HOME/.local/state}/psibase-devnet}"
+
+      usage() {
+        cat <<EOF
+      Usage: psidk-devnet <command> [options]
+
+      Commands:
+        up [port] [producer] [state-dir]   Start fresh chain, boot, print API URL
+        down                               Stop the chain started by up
+        status                             Show pid / API if running
+
+      Environment:
+        PSIBASE_DEVNET_HOST / PORT / PRODUCER / DIR
+        PSIBASE_ADMIN_IP / HOST_IP
+
+      API URL uses a hostname (not a bare IP) for virtual hosting.
+      EOF
+      }
+
+      api_url() { echo "http://''${HOST}:''${PORT}/"; }
+
+      wait_http() {
+        local n code
+        for n in $(seq 1 60); do
+          code=$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 1 \
+            -H "Host: x-admin.''${HOST}" "http://127.0.0.1:''${PORT}/" 2>/dev/null || echo 000)
+          if [[ "$code" =~ ^[0-9]+$ ]] && [[ "$code" != "000" ]]; then
+            return 0
+          fi
+          sleep 0.25
+        done
+        echo "error: psinode did not accept HTTP on port ''${PORT}" >&2
+        return 1
+      }
+
+      cmd_up() {
+        PORT="''${1:-$PORT}"
+        PRODUCER="''${2:-$PRODUCER}"
+        STATE_DIR="''${3:-$STATE_DIR}"
+        mkdir -p "$STATE_DIR"
+        local pidfile="$STATE_DIR/psinode.pid"
+        local logfile="$STATE_DIR/psinode.log"
+        local dbdir="$STATE_DIR/db"
+        if [[ -f "$pidfile" ]] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
+          echo "error: psinode already running (pid $(cat "$pidfile")). Run: psidk-down" >&2
+          exit 1
+        fi
+        rm -rf "$dbdir"
+        mkdir -p "$dbdir"
+        echo "Starting psinode (host=''${HOST} port=''${PORT} producer=''${PRODUCER})"
+        echo "  state: $STATE_DIR"
+        PSIBASE_ADMIN_IP="$ADMIN_IP" \
+          psinode "$dbdir" -p "$PRODUCER" -l "$PORT" --host "$HOST" \
+          >"$logfile" 2>&1 &
+        echo $! >"$pidfile"
+        wait_http
+        echo "Booting chain…"
+        psibase boot -a "$(api_url)" -p "$PRODUCER"
+        echo ""
+        echo "Devnet ready."
+        echo "  API:      $(api_url)"
+        echo "  Admin:    http://x-admin.''${HOST}:''${PORT}/"
+        echo "  Producer: ''${PRODUCER}"
+        echo "  Stop:     psidk-down"
+        echo ""
+        echo "  cargo-psibase install -a $(api_url)"
+      }
+
+      cmd_down() {
+        local pidfile="$STATE_DIR/psinode.pid"
+        if [[ ! -f "$pidfile" ]]; then
+          echo "No pid file at $pidfile (nothing to stop)."
+          return 0
+        fi
+        local pid
+        pid=$(cat "$pidfile")
+        if kill -0 "$pid" 2>/dev/null; then
+          kill "$pid" 2>/dev/null || true
+          for _ in $(seq 1 20); do
+            kill -0 "$pid" 2>/dev/null || break
+            sleep 0.1
+          done
+          kill -9 "$pid" 2>/dev/null || true
+          echo "Stopped psinode (pid $pid)."
+        else
+          echo "Stale pid file (process $pid not running)."
+        fi
+        rm -f "$pidfile"
+      }
+
+      cmd_status() {
+        local pidfile="$STATE_DIR/psinode.pid"
+        if [[ -f "$pidfile" ]] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
+          echo "running pid=$(cat "$pidfile") api=$(api_url) state=$STATE_DIR"
+        else
+          echo "stopped state=$STATE_DIR"
+          return 1
+        fi
+      }
+
+      cmd="''${1:-}"
+      shift || true
+      case "$cmd" in
+        up) cmd_up "$@" ;;
+        down) cmd_down "$@" ;;
+        status) cmd_status "$@" ;;
+        -h|--help|help|"") usage ;;
+        *)
+          echo "unknown command: $cmd" >&2
+          usage >&2
+          exit 1
+          ;;
+      esac
+    '';
+  };
+
+  # Convenience wrappers matching the plan's psidk-up / psidk-down names.
+  psidkUp = pkgs.writeShellScriptBin "psidk-up" ''
+    exec ${psidkDevnet}/bin/psidk-devnet up "$@"
+  '';
+  psidkDown = pkgs.writeShellScriptBin "psidk-down" ''
+    exec ${psidkDevnet}/bin/psidk-devnet down "$@"
+  '';
 
   sdkPackages = with pkgs; [
     psidk
+    psidkDevnet
+    psidkUp
+    psidkDown
     rustToolchain
     cargoComponent
     cargoGenerate
@@ -106,7 +246,7 @@ pkgs.mkShell {
 
     # psidk tools first — never monorepo build/ paths.
     export PATH="${psidk}/bin:$PATH:${wasiSdk}/bin"
-    # Interim cargo-psibase from `cargo install` lands here (see below).
+    # crates.io cargo-psibase (when not in the release tarball) lands here.
     export PATH="$PATH:$HOME/.cargo/bin"
 
     export PSIBASE_DATADIR="${psidk}/share/psibase"
@@ -132,16 +272,24 @@ pkgs.mkShell {
       fi
     fi
 
-    # Interim: release tarballs through v0.24.0-pre omit bin/cargo-psibase.
-    # Once a tagged Release ships it in psidk, this block becomes a no-op.
-    # Opt-in auto-install (network): PSIBASE_SDK_INSTALL_CARGO_PSIBASE=1
-    if ! command -v cargo-psibase >/dev/null 2>&1; then
-      if [ "''${PSIBASE_SDK_INSTALL_CARGO_PSIBASE:-}" = "1" ]; then
-        echo "cargo-psibase not in psidk; installing ${cargoPsibaseCrateVersion} via cargo (interim)…"
-        cargo install cargo-psibase --version ${cargoPsibaseCrateVersion} --locked \
-          || echo "warning: cargo install cargo-psibase failed"
+    # Prefer tarball cargo-psibase when the Release ships it; otherwise install
+    # the crates.io build matching nix/release.nix cargoPsibaseVersion.
+    _psibase_sdk_ensure_cargo_psibase() {
+      local want="${release.cargoPsibaseVersion}"
+      local have=""
+      if [ -x "${psidk}/bin/cargo-psibase" ]; then
+        return 0
       fi
-    fi
+      if command -v cargo-psibase >/dev/null 2>&1; then
+        have="$(cargo-psibase --version 2>/dev/null | awk '{print $2}')"
+        if [ "$have" = "$want" ]; then
+          return 0
+        fi
+      fi
+      echo "Installing cargo-psibase $want from crates.io (matches SDK pin)…"
+      cargo install cargo-psibase --version "$want" --locked --force
+    }
+    _psibase_sdk_ensure_cargo_psibase
 
     if [ "$NIX_SHELL_DEPTH" -eq 1 ]; then
       echo ""
@@ -151,17 +299,12 @@ pkgs.mkShell {
       echo "  Yarn:     $(yarn --version)"
       echo "  WASI SDK: ${wasiSdk}"
       echo "  psibase:  $(psibase --version 2>/dev/null | head -1)"
-      if command -v cargo-psibase >/dev/null 2>&1; then
-        echo "  cargo-psibase: $(command -v cargo-psibase)"
-      else
-        echo "  cargo-psibase: MISSING (not in release tarball yet)"
-        echo "    fix:  cargo install cargo-psibase --version ${cargoPsibaseCrateVersion} --locked"
-        echo "    or:   PSIBASE_SDK_INSTALL_CARGO_PSIBASE=1 nix develop .#sdk"
-      fi
+      echo "  cargo-psibase: $(command -v cargo-psibase) ($(cargo-psibase --version 2>/dev/null || echo '?'))"
       echo "  PSIBASE_DATADIR=$PSIBASE_DATADIR"
       echo ""
-      echo "  No monorepo build/ on PATH. Local chain helper: Phase 4."
-      echo "  Docs: nix/sdk/README.md"
+      echo "  Local chain:  psidk-up   /   psidk-down   (or psidk-devnet up|down|status)"
+      echo "  Scaffold:     nix flake init -t path:./#package   (see nix/sdk/README.md)"
+      echo "  Docs:         nix/sdk/README.md"
       echo ""
     fi
   '';

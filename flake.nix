@@ -220,6 +220,15 @@
       }
     )
     // {
+      # Package-dev scaffold: nix flake init -t .#package
+      templates = {
+        package = {
+          path = ./nix/sdk/template;
+          description = "Standalone Rust psibase package workspace (packages/<app>)";
+        };
+        default = self.templates.package;
+      };
+
       overlays.default = final: prev: {
         psibase =
           self.packages.${prev.stdenv.hostPlatform.system}.psibase
