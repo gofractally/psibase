@@ -1,8 +1,5 @@
 # Psibase runtime package (psinode + psibase CLI + share/psibase data).
-#
-# Repackages the published Ubuntu release tarball and patchelfs it for NixOS.
-# What this package is, what it deliberately omits, and how to bump it:
-# see ./README.md. Comments here cover only per-path install decisions.
+# Bump notes and layout: ./README.md
 {
   lib,
   stdenv,
@@ -11,23 +8,12 @@
   openssl,
   zlib,
 }: let
-  # HELD BACK DELIBERATELY -- do not bump to match the source tree version.
-  #
-  # 0.24.0-pre cannot complete a production boot: supplying a block signing key
-  # (which is what x-admin's production boot does) aborts with
-  #   service 'producers' aborted with message: Unknown service account: verify-sig
-  # Reproduce with the command in nix/deploy/test.nix. A boot with --account-key
-  # fails differently ('account already exists'), so both key paths are broken.
-  #
-  # Bumping also needs installPhase changes: 0.24 removes share/psibase/services.
-  #
-  # Bump version + hash together when cutting a new release package (README.md).
+  # Held at 0.23: 0.24 production boot fails (verify-sig). See test.nix.
+  # Bumping also needs installPhase changes (0.24 drops share/psibase/services).
   version = "0.23.0-pre";
   srcUrl = "https://github.com/gofractally/psibase/releases/download/v${version}/psidk-ubuntu-2404.tar.gz";
   srcHash = "sha256-l9bdB9RKz9FQLiBnXaQsHNoveOTMt1r5xRghLTfqKsQ=";
 in
-  # Ubuntu SDK tarball is x86_64 ELF; exporting it on other systems yields a
-  # broken derivation. Fail at eval with a clear message instead.
   lib.throwIfNot stdenv.hostPlatform.isx86_64
   "prebuilt psibase is only available on x86_64-linux (got ${stdenv.hostPlatform.system}); override services.psibase.package"
   (stdenv.mkDerivation {
@@ -45,15 +31,12 @@ in
       autoPatchelfHook
     ];
 
-    # The release binaries link only these; CMake's ICU_LIBRARY_DIR does not
-    # produce a libicu* NEEDED entry, so no ICU pin is required here.
     buildInputs = [
       openssl
       zlib
       stdenv.cc.cc.lib
     ];
 
-    # Prebuilt release binaries; do not strip (especially the Rust psibase CLI).
     dontStrip = true;
     dontConfigure = true;
     dontBuild = true;
@@ -61,34 +44,17 @@ in
     installPhase = ''
       runHook preInstall
 
-      # Enumerate what the runtime actually uses rather than copying the tree:
-      # a missing path then fails the build instead of silently shipping a
-      # broken layout. Consciously skipped: share/wasi-sysroot,
-      # share/psibase/cmake, share/psibase/python (psitest helpers), share/gdb,
-      # and bin/psidk-cmake-args -- all dev-shell concerns.
-      #
-      # psitest is included because `psibase create-snapshot` / `load-snapshot`
-      # are external subcommands: psibase runs share/psibase/wasm/psibase-*.wasm
-      # via a psitest sibling in bin/ (rust/psibase/src/main.rs).
       for prog in psinode psibase psitest; do
         install -Dm755 "bin/$prog" "$out/bin/$prog"
       done
 
       mkdir -p $out/share/psibase
-      # psinode reads config.in when initializing a database; both psinode
-      # (--database-template) and `psibase boot` read packages/ as their default
-      # package registry. Both locate these relative to the resolved exe path,
-      # so this layout must stay $out/{bin,share/psibase}.
       install -Dm644 share/psibase/config.in $out/share/psibase/config.in
       cp -a share/psibase/packages $out/share/psibase/packages
       cp -a share/psibase/wasm $out/share/psibase/wasm
-      # services/ is a dir plus one relative symlink (x-admin/packages ->
-      # ../../packages). Removed in 0.24, where these moved into packages/, so
-      # this line must go when the pin is eventually bumped -- the build will
-      # fail loudly at that point rather than silently shipping a short tree.
+      # Drop this line when bumping past 0.23 (services/ removed in 0.24).
       cp -a share/psibase/services $out/share/psibase/services
 
-      # Nice to have, but not worth failing a node build over.
       if [ -d share/psibase/licenses ]; then
         cp -a share/psibase/licenses $out/share/psibase/licenses
       fi
@@ -103,12 +69,8 @@ in
     installCheckPhase = ''
       runHook preInstallCheck
 
-      # Catch a patchelf/soname regression here instead of on the node.
       $out/bin/psibase --version
-      # psinode prints its version to stderr and exits 1 by design
-      # (programs/psinode/main.cpp), so check the output, not the status.
-      # Deliberately not a pipeline: stdenv runs with `set -o pipefail`, so
-      # piping psinode's output into grep would fail on its exit status.
+      # psinode --version writes to stderr and exits 1.
       psinodeVersion=$($out/bin/psinode --version 2>&1 || true)
       echo "psinode --version: $psinodeVersion"
       case "$psinodeVersion" in
@@ -119,10 +81,6 @@ in
           ;;
       esac
 
-      # The $out/{bin,share/psibase} contract that psinode, the psibase CLI and
-      # services.psibase all resolve against. The installPhase already fails on
-      # a missing *source* path; this guards the other direction -- that the
-      # tree which shipped is the one they expect.
       for p in \
         bin/psinode bin/psibase bin/psitest \
         share/psibase/config.in \
@@ -135,8 +93,6 @@ in
         fi
       done
 
-      # test -e follows symlinks, so this also proves the relative
-      # x-admin/packages -> ../../packages link still resolves after cp -a.
       if [ ! -e "$out/share/psibase/services/x-admin/packages" ]; then
         echo "share/psibase/services/x-admin/packages does not resolve" >&2
         exit 1

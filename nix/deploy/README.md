@@ -56,7 +56,8 @@ services.psibase.environment.PSIBASE_USERNAME_FIELD = "X-Auth-User";
 
 With `softHsm.enable = true` the module writes a SoftHSM config pointing at a persistent token directory, runs a oneshot that initializes the token once from `pinFile`, and starts `psinode` with `--pkcs11-module=…/libsofthsm2.so` and `SOFTHSM2_CONF` set.
 
-`pinFile` normally comes from a secrets manager, so this has to go in a module *function* — `config` is not in scope inside a bare attrset:
+`pinFile` must be a runtime path string (e.g. sops), not a Nix path literal.
+Use a module function so `config` is in scope:
 
 ```nix
 ({ config, ... }: {
@@ -67,7 +68,7 @@ With `softHsm.enable = true` the module writes a SoftHSM config pointing at a pe
 })
 ```
 
-**After every `psinode` restart, unlock the HSM device in x-admin before the node can sign blocks.** This is the same manual step as the docker deploy. The module does not automate it, and a producing node will silently fail to sign until it is done.
+**After every `psinode` restart, unlock the HSM in x-admin** before the node can sign blocks.
 
 ## Package
 
@@ -93,19 +94,5 @@ nix build .#checks.x86_64-linux.vm             # boots a node with SoftHSM (minu
 nix flake check                                # all of the above
 ```
 
-The two `*-eval` checks are evaluation-only and cost seconds — run them after
-touching `module.nix` or `flake.nix`. `overlay-eval` exists because an overlay
-whose attribute *structure* depends on `final`/`prev` deadlocks the package-set
-fixpoint, which nothing else catches.
-
-`vm` is the only check that exercises the systemd sandbox. It boots a producing
-node and asserts that psinode starts under `ProtectSystem=strict`, that triedent
-can create its database, that `LimitMEMLOCK` survives the sandbox, that the
-SoftHSM token initializes without the PIN reaching argv or the journal, and that
-re-running init is idempotent.
-
-It does **not** boot a chain, so the following are still unproven by CI and need
-a real node: WASM execution under the sandbox (psinode JITs, which is why
-`MemoryDenyWriteExecute` is not set), block signing through the HSM, p2p peer
-resolution (`RestrictAddressFamilies` + `AF_NETLINK`), and a `tokenDir` placed
-outside `dataDir`.
+`vm` boots SoftHSM + an unsigned `ProdDefault` chain under the systemd sandbox.
+Not covered: signed/production boot, HSM unlock/signing, real p2p peers.

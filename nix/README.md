@@ -1,9 +1,9 @@
 # Nix-Based Development Environment for Psibase (Linux)
 
 How to use Nix as an alternative to the Docker-based development environment (psibase-contributor).
-**Platform: Linux x86_64.**
+**Supported platforms: Linux x86_64 and Linux aarch64.**
 
-For running a long-lived node on NixOS (`services.psibase` and the prebuilt package), see [`deploy/README.md`](deploy/README.md).
+For running a long-lived node on NixOS (`services.psibase` and the prebuilt package; **x86_64-linux only**), see [`deploy/README.md`](deploy/README.md).
 
 Not (yet) supported: macOS
 

@@ -11,8 +11,6 @@
     objectstore.backend = file
     log.level = INFO
   '';
-  # Driven through `script` (see the init unit). Keeping the label in its own
-  # script avoids nesting shell quoting inside `script -c`.
   softhsmInitToken = pkgs.writeShellScript "psibase-softhsm-init-token" ''
     exec softhsm2-util --init-token --free --label ${lib.escapeShellArg cfg.softHsm.tokenLabel}
   '';
@@ -83,10 +81,8 @@ in {
       example = 120;
       description = ''
         Idle HTTP connection timeout in seconds (psinode --http-timeout).
-        Raise this when large uploads (e.g. x-admin push_boot over a
-        high-latency path) would otherwise be closed before the body finishes.
-
-        Prefer null: psinode then uses `<dataDir>/db/config`, which x-admin can edit at runtime. A value set here overrides that file on every restart.
+        Null uses `<dataDir>/db/config` (editable via x-admin). A value set
+        here overrides that file on every restart.
       '';
     };
 
@@ -104,11 +100,8 @@ in {
       type = lib.types.bool;
       default = false;
       description = ''
-        Open the listen port in the firewall.
-
-        Usually false: psinode does not authenticate `/native/admin/`, so
-        exposing the port directly publishes an unauthenticated admin API
-        (push_boot, PKCS #11 key unlock). Put a reverse proxy in front.
+        Open the listen port in the firewall. Usually false: psinode does not
+        authenticate `/native/admin/`. Put a reverse proxy in front.
       '';
     };
 
@@ -142,12 +135,14 @@ in {
       };
 
       pinFile = lib.mkOption {
-        type = lib.types.nullOr lib.types.path;
+        type = lib.types.nullOr lib.types.str;
         default = null;
+        example = "/run/secrets/softhsm_pin";
         description = ''
-          File containing the SoftHSM user/SO PIN (single line, no trailing
-          comment). Typically a sops-nix secret path. Used only to initialize
-          the token once; unlock at runtime is done via x-admin.
+          Absolute runtime path to the SoftHSM PIN file (single line).
+          Typically `config.sops.secrets.<name>.path`. Do not use a Nix path
+          literal (`./pin.txt`); that copies the secret into the store.
+          Used only to initialize the token; unlock at runtime via x-admin.
         '';
       };
 
@@ -155,11 +150,7 @@ in {
         type = lib.types.path;
         default = "${cfg.dataDir}/softhsm/tokens";
         defaultText = lib.literalExpression ''"''${config.services.psibase.dataDir}/softhsm/tokens"'';
-        description = ''
-          Directory for SoftHSM token storage (persistent). Defaults under
-          `services.psibase.dataDir` so relocating the node state keeps tokens
-          with the chain database unless you set this explicitly.
-        '';
+        description = "Directory for SoftHSM token storage.";
       };
 
       tokenLabel = lib.mkOption {
@@ -211,8 +202,6 @@ in {
         SOFTHSM2_CONF = "${softhsmConf}";
       };
 
-      # tokenDir defaults under dataDir, but it is configurable, so list it
-      # separately rather than assuming containment.
       readWritePaths = lib.unique (
         [cfg.dataDir]
         ++ lib.optional cfg.softHsm.enable cfg.softHsm.tokenDir
@@ -226,8 +215,6 @@ in {
       ];
 
       users.groups.psibase = {};
-      # dataDir is created by tmpfiles below rather than createHome, so its mode
-      # is explicit and it exists before the (sandboxed) unit starts.
       users.users.psibase = {
         isSystemUser = true;
         group = "psibase";
@@ -235,11 +222,6 @@ in {
         description = "Psibase node user";
       };
 
-      # Installed system-wide rather than kept to the unit, which many
-      # services.* avoid. Deliberate: booting a chain is a required manual step
-      # that runs the psibase CLI against the node, and softhsm2-util is how an
-      # operator inspects the token. Both are worth having on PATH, at the cost
-      # of also placing psitest and share/psibase in the system profile.
       environment.systemPackages =
         [cfg.package]
         ++ lib.optionals cfg.softHsm.enable [
@@ -248,13 +230,7 @@ in {
 
       networking.firewall.allowedTCPPorts = lib.mkIf cfg.openFirewall [cfg.listen];
 
-      # dataDir must exist and be writable before psinode starts, since
-      # ProtectSystem=strict makes everything outside ReadWritePaths read-only.
-      # <dataDir>/db is deliberately NOT pre-created: triedent creates it (see
-      # create_directories in libraries/triedent/src/database.cpp).
-      #
-      # SoftHSM token dir + conf live outside the store; conf content is fixed
-      # in the store, tokens are mutable state under tokenDir.
+      # <dataDir>/db is created by triedent, not tmpfiles.
       systemd.tmpfiles.rules =
         ["d ${cfg.dataDir} 0750 psibase psibase -"]
         ++ lib.optionals cfg.softHsm.enable [
@@ -264,8 +240,6 @@ in {
 
       systemd.services.psibase-softhsm-init = lib.mkIf cfg.softHsm.enable {
         description = "Initialize SoftHSM token for psibase (once)";
-        # Ordering is declared once, on the consumer (psibase.service below),
-        # whose `requires` also pulls this unit in.
         after = ["local-fs.target"];
 
         path = [pkgs.coreutils pkgs.gawk pkgs.util-linux softhsmPkg];
@@ -273,27 +247,20 @@ in {
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
-          # Root so we can read a root-owned sops pin file; token files are
-          # created as the psibase user so psinode can use them.
+          # Root: read root-owned sops pin; create tokens as psibase.
           ExecStart = pkgs.writeShellScript "psibase-softhsm-init" ''
             set -euo pipefail
             export SOFTHSM2_CONF=${lib.escapeShellArg softhsmConf}
             mkdir -p ${lib.escapeShellArg cfg.softHsm.tokenDir}
             chown psibase:psibase ${lib.escapeShellArg cfg.softHsm.tokenDir}
 
-            # SHELL is forced because runuser adopts the target user's login
-            # shell, and psibase is a system user with nologin -- which `script`
-            # would otherwise use to run the init command.
+            # psibase is nologin; script needs a real shell.
             as_psibase() {
               runuser -u psibase -- \
                 env SOFTHSM2_CONF="$SOFTHSM2_CONF" PATH="$PATH" \
                     SHELL=${pkgs.runtimeShell} "$@"
             }
 
-            # Exact match on the Label field. A substring grep over --show-slots
-            # would also match a token labelled e.g.
-            # "${cfg.softHsm.tokenLabel}-old", or the label appearing anywhere
-            # else in the output.
             if as_psibase softhsm2-util --show-slots 2>/dev/null \
               | awk -v want=${lib.escapeShellArg cfg.softHsm.tokenLabel} '
                   /^[[:space:]]*Label:/ {
@@ -313,17 +280,7 @@ in {
               exit 1
             fi
 
-            # softhsm2-util takes PINs either on argv (--pin/--so-pin, which is
-            # world-readable through /proc/PID/cmdline for the life of this
-            # oneshot) or interactively via getpass(), which insists on a tty
-            # that a systemd unit does not have. `script` supplies the tty, so
-            # the PIN travels on stdin instead of argv. Prompt order is
-            # SO PIN, reenter, user PIN, reenter.
-            #
-            # Output is discarded rather than logged: getpass() disables echo
-            # only once it is actually reached, so anything failing earlier
-            # makes `script` copy the raw PIN from the pty straight into the
-            # journal. Losing the diagnostic is the cheaper mistake.
+            # PIN via stdin+pty (not argv). Discard output: failures can leak PIN.
             if ! printf '%s\n%s\n%s\n%s\n' "$pin" "$pin" "$pin" "$pin" \
               | as_psibase timeout 60 script -qec ${softhsmInitToken} /dev/null \
                   >/dev/null 2>&1; then
@@ -354,18 +311,8 @@ in {
           Restart = "on-failure";
           RestartSec = 5;
 
-          # triedent memory-maps and mlocks large regions; without this psinode
-          # drops into its degraded "slow" mode (see the isSlow() warning in
-          # programs/psinode/main.cpp).
           LimitMEMLOCK = "infinity";
 
-          # Hardening. Deliberately omitted, and why:
-          #   MemoryDenyWriteExecute - psinode executes WASM; W^X breaks the JIT.
-          #   SystemCallFilter       - not validated against triedent's mmap/mlock
-          #                            behaviour; a wrong filter is a start-time
-          #                            failure on a production node.
-          #   ProcSubset=pid         - hides /proc/meminfo, which cache sizing reads.
-          #   PrivateUsers           - incompatible with LimitMEMLOCK above.
           ProtectSystem = "strict";
           ProtectHome = true;
           ReadWritePaths = readWritePaths;
@@ -383,8 +330,7 @@ in {
           RestrictRealtime = true;
           RestrictSUIDSGID = true;
           LockPersonality = true;
-          # AF_NETLINK is required: glibc's getaddrinfo uses it for AI_ADDRCONFIG
-          # when resolving p2p peer hostnames.
+          # AF_NETLINK: getaddrinfo (AI_ADDRCONFIG) for peer hostnames.
           RestrictAddressFamilies = ["AF_INET" "AF_INET6" "AF_UNIX" "AF_NETLINK"];
         };
       };

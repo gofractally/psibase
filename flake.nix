@@ -45,7 +45,7 @@
   };
 
   outputs = { self, nixpkgs, flake-utils, fenix, nixpkgs-cargo-component, nixpkgs-cargo-generate, nixpkgs-cursor-cli, nixpkgs-mdbook, nixpkgs-mdbook-mermaid, nixpkgs-mdbook-plugins, nixpkgs-mdbook-linkcheck, nixpkgs-mdbook-pagetoc, nixpkgs-nodejs }:
-    flake-utils.lib.eachSystem [ "x86_64-linux" ] (system:
+    flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (system:
       let
         pkgs = import nixpkgs {
           inherit system;
@@ -343,22 +343,22 @@
           '';
         };
 
-        # Single-system flake (see eachSystem above). package.nix carries its
-        # own x86_64 guard, so re-adding a system fails loudly at eval instead
-        # of silently producing a broken package.
-        packages = rec {
-          wasi-sdk = wasiSdk;
-          psibase = pkgs.callPackage ./nix/deploy/package.nix { };
-          default = psibase;
-        };
+        # Prebuilt package is x86_64-only; aarch64 still gets wasi-sdk + devShell.
+        packages =
+          {
+            wasi-sdk = wasiSdk;
+          }
+          // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isx86_64 (
+            let
+              psibase = pkgs.callPackage ./nix/deploy/package.nix { };
+            in
+            {
+              inherit psibase;
+              default = psibase;
+            }
+          );
 
-        # `nix flake check` runs all of these. The two *-eval checks are
-        # evaluation-only (unsafeDiscardStringContext keeps the forced drvPath
-        # from becoming a build dependency), so they cost seconds and catch the
-        # eval-regression class that the VM test is far too slow to guard.
-        checks = {
-          # Forces a full NixOS system using the module, which also enforces
-          # its assertions, without building the system.
+        checks = pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isx86_64 {
           module-eval =
             let
               sys = nixpkgs.lib.nixosSystem {
@@ -386,9 +386,6 @@
               echo ${builtins.unsafeDiscardStringContext sys.config.system.build.toplevel.drvPath} > $out
             '';
 
-          # Regression guard: an overlay whose attribute *structure* depends on
-          # final/prev deadlocks the package-set fixpoint. Only resolving it
-          # against a real nixpkgs catches that.
           overlay-eval =
             let
               overlaid = import nixpkgs {
@@ -405,28 +402,13 @@
       }
     )
     // {
-      # The attribute set's *structure* must not depend on final/prev: computing
-      # the overlay's attribute names would then force the package-set fixpoint
-      # that is still being built (infinite recursion). So `psibase` is always
-      # defined and only its *value* is system-dependent. Same reasoning as the
-      # nixosModules comment below.
       overlays.default = final: prev: {
         psibase =
           self.packages.${prev.stdenv.hostPlatform.system}.psibase
             or (throw "psibase: no prebuilt package for ${prev.stdenv.hostPlatform.system}");
       };
 
-      # System-independent NixOS module. Import as:
-      #   imports = [ inputs.psibase.nixosModules.psibase ];
-      #
-      # Shape matters here. The outer module must be a plain attrset whose
-      # attribute *structure* does not depend on module arguments: resolving
-      # `imports` forces that structure, and touching `pkgs` at that point pulls
-      # in config._module.args before config exists (infinite recursion). So
-      # `pkgs` is confined to the nested module below, and only inside the option
-      # *value*, which stays lazy. For the same reason the default is always
-      # defined rather than conditionally present; on systems with no prebuilt
-      # package it throws only if the user never sets services.psibase.package.
+      # imports = [ inputs.psibase.nixosModules.psibase ];
       nixosModules.psibase = {
         imports = [
           ./nix/deploy/module.nix
@@ -444,3 +426,4 @@
       nixosModules.default = self.nixosModules.psibase;
     };
 }
+
