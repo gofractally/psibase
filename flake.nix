@@ -1,5 +1,5 @@
 {
-  description = "Psibase Nix flake (dev shell + NixOS module)";
+  description = "Psibase Nix flake (contributor shell, package SDK, NixOS module)";
 
   inputs = {
     # Package versions are intended to match `psibase-contributor`. Places where that's
@@ -119,25 +119,43 @@
       in
       {
         # Contributor toolchain — see nix/dev/shell.nix (shell-only flake inputs).
-        devShells.default = import ./nix/dev/shell.nix {
-          inherit
-            pkgs
-            system
-            fenix
-            wasiSdk
-            nixpkgs-cargo-component
-            nixpkgs-cargo-generate
-            nixpkgs-cursor-cli
-            nixpkgs-mdbook
-            nixpkgs-mdbook-mermaid
-            nixpkgs-mdbook-plugins
-            nixpkgs-mdbook-linkcheck
-            nixpkgs-mdbook-pagetoc
-            nixpkgs-nodejs
-            ;
-        };
+        # Package-dev SDK shell — nix/sdk/shell.nix (subset of inputs; x86_64 only).
+        devShells =
+          {
+            default = import ./nix/dev/shell.nix {
+              inherit
+                pkgs
+                system
+                fenix
+                wasiSdk
+                nixpkgs-cargo-component
+                nixpkgs-cargo-generate
+                nixpkgs-cursor-cli
+                nixpkgs-mdbook
+                nixpkgs-mdbook-mermaid
+                nixpkgs-mdbook-plugins
+                nixpkgs-mdbook-linkcheck
+                nixpkgs-mdbook-pagetoc
+                nixpkgs-nodejs
+                ;
+            };
+          }
+          // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isx86_64 {
+            sdk = import ./nix/sdk/shell.nix {
+              inherit
+                pkgs
+                system
+                fenix
+                wasiSdk
+                nixpkgs-cargo-component
+                nixpkgs-cargo-generate
+                nixpkgs-nodejs
+                ;
+              psidk = pkgs.callPackage ./nix/sdk/package.nix { };
+            };
+          };
 
-        # Prebuilt packages are x86_64-only; aarch64 still gets wasi-sdk + devShell.
+        # Prebuilt packages are x86_64-only; aarch64 still gets wasi-sdk + contributor shell.
         # Uses only nixpkgs (+ wasiSdk for the wasi-sdk output) — does not import
         # contributor shell inputs (nix/dev/shell.nix).
         packages =

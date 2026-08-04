@@ -115,7 +115,15 @@ nix develop
 - `nix/release.nix` — shared GitHub Releases tarball pin (`packages.psibase` + `packages.psidk`)
 - `nix/dev/` — contributor `devShells.default` ([`shell.nix`](dev/shell.nix))
 - `nix/deploy/` — runtime package and NixOS module ([docs](deploy/README.md))
-- `nix/sdk/` — Rust package-dev SDK (`packages.psidk`; [docs](sdk/README.md), [plan](sdk-dx-plan.md))
+- `nix/sdk/` — Rust package-dev SDK (`packages.psidk`, `devShells.sdk`; [docs](sdk/README.md), [plan](sdk-dx-plan.md))
+
+### Package SDK shell (no monorepo build)
+
+```bash
+nix develop .#sdk
+```
+
+See [`sdk/README.md`](sdk/README.md).
 
 # Relationship to Docker
 
