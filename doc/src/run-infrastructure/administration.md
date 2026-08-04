@@ -121,7 +121,7 @@ Example:
     "peers": ["http://psibase.io/"],
     "producer": "prod",
     "pkcs11-modules": ["libsofthsm2.so"],
-    "hosts": ["psibase.localhost", "psibase.127.0.0.1.sslip.io"],
+    "hosts": ["psibase.localhost"],
     "listen": [
         {
             "protocol": "http",
