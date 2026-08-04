@@ -235,6 +235,11 @@ in {
         description = "Psibase node user";
       };
 
+      # Installed system-wide rather than kept to the unit, which many
+      # services.* avoid. Deliberate: booting a chain is a required manual step
+      # that runs the psibase CLI against the node, and softhsm2-util is how an
+      # operator inspects the token. Both are worth having on PATH, at the cost
+      # of also placing psitest and share/psibase in the system profile.
       environment.systemPackages =
         [cfg.package]
         ++ lib.optionals cfg.softHsm.enable [
