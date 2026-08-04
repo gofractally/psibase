@@ -35,8 +35,12 @@ sudo nixos-rebuild switch --flake .#myhost
 Service runs `psinode` as user `psibase` under `/var/lib/psibase/db`. Boot a new chain once the service is up:
 
 ```bash
-psibase -a http://HOST:PORT boot -p prod
+psibase boot -a http://HOST:PORT -p prod
 ```
+
+`-a`/`--api` is a subcommand argument, not a global one. It defaults to
+`http://psibase.localhost:8080/` and also reads `PSINODE_URL`, so it can be
+omitted when those match.
 
 ## SoftHSM / block production
 
