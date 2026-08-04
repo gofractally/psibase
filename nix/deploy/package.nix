@@ -11,10 +11,10 @@
   openssl,
   zlib,
 }: let
-  version = "0.23.0-pre";
+  version = "0.24.0-pre";
   # Bump version + hash together when cutting a new release package (README.md).
   srcUrl = "https://github.com/gofractally/psibase/releases/download/v${version}/psidk-ubuntu-2404.tar.gz";
-  srcHash = "sha256-l9bdB9RKz9FQLiBnXaQsHNoveOTMt1r5xRghLTfqKsQ=";
+  srcHash = "sha256-gjjLXCbycLyVOCd6mWH3VmnaC5TagVfqKzp4OHulOfk=";
 in
   # Ubuntu SDK tarball is x86_64 ELF; exporting it on other systems yields a
   # broken derivation. Fail at eval with a clear message instead.
@@ -72,11 +72,6 @@ in
       install -Dm644 share/psibase/config.in $out/share/psibase/config.in
       cp -a share/psibase/packages $out/share/psibase/packages
       cp -a share/psibase/wasm $out/share/psibase/wasm
-      # services/ is a dir plus one relative symlink (x-admin/packages ->
-      # ../../packages). psinode's database_template_path() points here but is
-      # currently uncalled, and nothing else in-tree reads it -- kept anyway
-      # because it costs nothing and is part of the published data layout.
-      cp -a share/psibase/services $out/share/psibase/services
 
       # Nice to have, but not worth failing a node build over.
       if [ -d share/psibase/licenses ]; then
@@ -117,19 +112,13 @@ in
         bin/psinode bin/psibase bin/psitest \
         share/psibase/config.in \
         share/psibase/packages \
+        share/psibase/packages/index.json \
         share/psibase/wasm; do
         if [ ! -e "$out/$p" ]; then
           echo "missing from layout: $p" >&2
           exit 1
         fi
       done
-
-      # test -e follows symlinks, so this also proves the relative
-      # x-admin/packages -> ../../packages link still resolves after cp -a.
-      if [ ! -e "$out/share/psibase/services/x-admin/packages" ]; then
-        echo "share/psibase/services/x-admin/packages does not resolve" >&2
-        exit 1
-      fi
 
       runHook postInstallCheck
     '';
