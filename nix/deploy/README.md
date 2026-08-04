@@ -78,7 +78,8 @@ It is a *runtime* package, not a psidk: `bin/{psinode,psibase,psitest}` plus `sh
 
 The layout contract is `$out/{bin,share/psibase}`: both `psinode` and the `psibase` CLI locate their data relative to the resolved executable path. Any derivation producing that layout can be substituted via `services.psibase.package`.
 
-To bump to a new release, update `version` and `srcHash` in `package.nix` together:
+To bump to a new release, update `version` / `srcUrl` / `srcHash` in
+[`../release.nix`](../release.nix) (shared with `packages.psidk`):
 
 ```bash
 nix store prefetch-file --hash-type sha256 \

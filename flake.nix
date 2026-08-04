@@ -137,8 +137,9 @@
             ;
         };
 
-        # Prebuilt package is x86_64-only; aarch64 still gets wasi-sdk + devShell.
-        # Uses only nixpkgs + wasiSdk — does not import contributor shell inputs.
+        # Prebuilt packages are x86_64-only; aarch64 still gets wasi-sdk + devShell.
+        # Uses only nixpkgs (+ wasiSdk for the wasi-sdk output) — does not import
+        # contributor shell inputs (nix/dev/shell.nix).
         packages =
           {
             wasi-sdk = wasiSdk;
@@ -146,9 +147,10 @@
           // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isx86_64 (
             let
               psibase = pkgs.callPackage ./nix/deploy/package.nix { };
+              psidk = pkgs.callPackage ./nix/sdk/package.nix { };
             in
             {
-              inherit psibase;
+              inherit psibase psidk;
               default = psibase;
             }
           );

@@ -110,9 +110,12 @@ nix develop
 
 # Files
 
-- `flake.nix` / `flake.lock` — Nix flake at repo root (dev shell + deploy exports)
+- `flake.nix` / `flake.lock` — Nix flake at repo root (dev shell + deploy + SDK exports)
 - `nix/rust-toolchain.toml` — Rust version and targets for the dev shell
+- `nix/release.nix` — shared GitHub Releases tarball pin (`packages.psibase` + `packages.psidk`)
+- `nix/dev/` — contributor `devShells.default` ([`shell.nix`](dev/shell.nix))
 - `nix/deploy/` — runtime package and NixOS module ([docs](deploy/README.md))
+- `nix/sdk/` — Rust package-dev SDK (`packages.psidk`; [docs](sdk/README.md), [plan](sdk-dx-plan.md))
 
 # Relationship to Docker
 

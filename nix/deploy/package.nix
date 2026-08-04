@@ -1,5 +1,6 @@
 # Psibase runtime package (psinode + psibase CLI + share/psibase data).
 # Bump notes and layout: ./README.md
+# Shared release pin: ../release.nix (also used by packages.psidk).
 {
   lib,
   stdenv,
@@ -8,24 +9,22 @@
   openssl,
   zlib,
 }: let
-  # Held at 0.23: 0.24 production boot fails (verify-sig). See test.nix.
-  # Bumping also needs installPhase changes (0.24 drops share/psibase/services).
-  version = "0.23.0-pre";
-  srcUrl = "https://github.com/gofractally/psibase/releases/download/v${version}/psidk-ubuntu-2404.tar.gz";
-  srcHash = "sha256-l9bdB9RKz9FQLiBnXaQsHNoveOTMt1r5xRghLTfqKsQ=";
+  release = import ../release.nix;
 in
+  # Ubuntu SDK tarball is x86_64 ELF; exporting it on other systems yields a
+  # broken derivation. Fail at eval with a clear message instead.
   lib.throwIfNot stdenv.hostPlatform.isx86_64
   "prebuilt psibase is only available on x86_64-linux (got ${stdenv.hostPlatform.system}); override services.psibase.package"
   (stdenv.mkDerivation {
     pname = "psibase";
-    inherit version;
+    inherit (release) version;
 
     src = fetchurl {
-      url = srcUrl;
-      hash = srcHash;
+      url = release.srcUrl;
+      hash = release.srcHash;
     };
 
-    sourceRoot = "psidk-ubuntu-2404";
+    sourceRoot = release.sourceRoot;
 
     nativeBuildInputs = [
       autoPatchelfHook

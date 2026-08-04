@@ -1568,6 +1568,10 @@ ExternalProject_Add(
     INSTALL_COMMAND ""
 )
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase TYPE BIN COMPONENT Client)
+# Required by the Rust package-dev SDK (nix packages.psidk). Was previously
+# built but never installed into the release tarball.
+install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/cargo-psibase TYPE BIN COMPONENT Client)
+
 
 option(BUILD_EXAMPLES "Build examples" ON)
 if(BUILD_EXAMPLES)
