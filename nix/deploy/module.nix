@@ -41,6 +41,17 @@ in {
       description = "Hostname for the service HTTP interface (psinode --host).";
     };
 
+    listenAddress = lib.mkOption {
+      type = lib.types.str;
+      default = "127.0.0.1";
+      example = "0.0.0.0";
+      description = ''
+        IP address on which psinode listens. The loopback default keeps the
+        unauthenticated admin API behind a local reverse proxy. Set this to
+        `0.0.0.0` only when remote access is intentional.
+      '';
+    };
+
     listen = lib.mkOption {
       type = lib.types.port;
       default = 8080;
@@ -54,7 +65,7 @@ in {
       description = ''
         Block producer name (psinode --producer). Null means a non-producing node.
         After the service is up, boot a new chain once with:
-          psibase -a http://HOST:PORT boot -p PRODUCER
+          psibase boot -a http://HOST:PORT -p PRODUCER
         If using SoftHSM for block signing, unlock the token via x-admin after start.
       '';
     };
@@ -101,7 +112,8 @@ in {
       default = false;
       description = ''
         Open the listen port in the firewall. Usually false: psinode does not
-        authenticate `/native/admin/`. Put a reverse proxy in front.
+        authenticate `/native/admin/`. Put a reverse proxy in front. To accept
+        remote connections directly, also set `listenAddress` to `0.0.0.0`.
       '';
     };
 
@@ -170,6 +182,15 @@ in {
         then "${softhsmPkg}/lib/softhsm/libsofthsm2.so"
         else null;
 
+      listenEndpoint =
+        let
+          address =
+            if lib.hasInfix ":" cfg.listenAddress && !lib.hasPrefix "[" cfg.listenAddress
+            then "[${cfg.listenAddress}]"
+            else cfg.listenAddress;
+        in
+        "${address}:${toString cfg.listen}";
+
       psinodeArgs =
         [
           "${cfg.package}/bin/psinode"
@@ -177,7 +198,7 @@ in {
           "--host"
           cfg.host
           "--listen"
-          (toString cfg.listen)
+          listenEndpoint
         ]
         ++ lib.optionals (cfg.producer != null) [
           "--producer"

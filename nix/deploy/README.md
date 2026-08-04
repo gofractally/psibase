@@ -52,6 +52,16 @@ Traefik, nginx) in front of the node, passing the authenticated user through:
 services.psibase.environment.PSIBASE_USERNAME_FIELD = "X-Auth-User";
 ```
 
+For that reason, psinode listens on `127.0.0.1` by default. If a remote proxy
+connects directly to psinode, explicitly expose it:
+
+```nix
+services.psibase = {
+  listenAddress = "0.0.0.0";
+  openFirewall = true;
+};
+```
+
 ## SoftHSM / block production
 
 With `softHsm.enable = true` the module writes a SoftHSM config pointing at a persistent token directory, runs a oneshot that initializes the token once from `pinFile`, and starts `psinode` with `--pkcs11-module=…/libsofthsm2.so` and `SOFTHSM2_CONF` set.
