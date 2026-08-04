@@ -93,7 +93,7 @@ export const CspForm = ({
                                 default, but specific paths with their own CSP
                                 will take precedence. Use the{" "}
                                 <code className="text-xs">{"{{root}}"}</code>{" "}
-                                keyword for the deployment root domain
+                                keyword for the root domain
                                 (including port when present), e.g.{" "}
                                 <code className="text-xs">
                                     {

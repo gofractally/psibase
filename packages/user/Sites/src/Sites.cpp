@@ -83,8 +83,8 @@ namespace SystemService
           * `*` allows fetching plugins, as well as websocket connections
 
         CSP strings (default or user-defined via setCsp) may include the
-        keyword `{{root}}`, which is replaced at serve time with the deployment
-        root host including port when present (e.g. psibase.localhost:8080 or
+        keyword `{{root}}`, which is replaced at serve time with the root domain
+        including port when present (e.g. psibase.localhost:8080 or
         example.com). See expandCspKeywords.
       */
       const std::string DEFAULT_CSP_HEADER =                               //
@@ -123,7 +123,7 @@ namespace SystemService
          return root;
       }
 
-      // Replace `{{root}}` with the active deployment root domain.
+      // Replace `{{root}}` with the active root domain.
       std::string expandCspKeywords(std::string csp, std::string_view rootDomain)
       {
          boost::replace_all(csp, "{{root}}", rootDomain);

@@ -32,7 +32,7 @@ Note that a custom CSP **completely replaces** the baseline for the content it c
 
 #### The `{{root}}` keyword
 
-User-defined (and default) CSP strings may include the keyword `{{root}}`. At serve time, `{{root}}` is replaced with the deployment root host of the request, including the port when present (e.g. `psibase.localhost:8080` in local development, or `example.com` in production).
+User-defined (and default) CSP strings may include the keyword `{{root}}`. At serve time, `{{root}}` is replaced with the root domain of the request, including the port when present (e.g. `psibase.localhost:8080` in local development, or `example.com` in production).
 
 Host sources that use `{{root}}` are typically written scheme-relative (no `http://`/`https://` prefix) so the same policy works over both local HTTP and production HTTPS. For example:
 
@@ -46,7 +46,7 @@ becomes, on a local node:
 default-src 'self'; connect-src 'self' psibase.localhost:8080 *.psibase.localhost:8080; frame-src supervisor.psibase.localhost:8080;
 ```
 
-This lets apps loosen or tighten CSP for sibling subdomains without hardcoding a specific deployment domain (and without falling back to `*`, which would discard subdomain-specific clamping).
+This lets apps loosen or tighten CSP for sibling subdomains without hardcoding a specific root domain (and without falling back to `*`, which would discard subdomain-specific clamping).
 
 ## HTTP caching
 
