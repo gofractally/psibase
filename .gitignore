@@ -4,7 +4,8 @@
 .DS_Store
 .nyc_output
 .vscode
-.zed/tasks.json
+.zed/*
+!.zed/*.sample
 .trunk
 .cursor
 .cursorignore
@@ -42,3 +43,4 @@ target/
 **/install-state.gz
 .clangd
 AGENTS.md
+.direnv

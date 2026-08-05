@@ -7,315 +7,7 @@ pub use crate::tables::DEFAULT_AUTO_FILL_THRESHOLD_PERCENT;
 
 mod billing;
 mod math_utils;
-
-mod tx_cache {
-    use psibase::{abort_message, AccountNumber};
-    use std::cell::{Cell, RefCell};
-    use std::collections::HashMap;
-    use std::thread::LocalKey;
-
-    /// Mutably access a billing cache
-    fn with_cache<T: 'static, R>(
-        cache: &'static LocalKey<RefCell<Option<T>>>,
-        f: impl FnOnce(&mut T) -> R,
-    ) -> R {
-        cache.with_borrow_mut(|m| match m.as_mut() {
-            Some(inner) => f(inner),
-            None => abort_message("resource billing attempted during end-of-tx settlement"),
-        })
-    }
-
-    /// Drain a billing cache, subsequent access panics.
-    fn drain_cache<T: 'static>(cache: &'static LocalKey<RefCell<Option<T>>>) -> T {
-        cache.with_borrow_mut(|m| match m.take() {
-            Some(inner) => inner,
-            None => abort_message("resource billing attempted during end-of-tx settlement"),
-        })
-    }
-
-    thread_local! {
-        static BILLABLE_ACCOUNT: Cell<Option<AccountNumber>> = const { Cell::new(None) };
-        static BILL_TO_SUB: RefCell<Option<HashMap<AccountNumber, String>>> = const { RefCell::new(None) };
-        static DISK_NET: RefCell<Option<HashMap<AccountNumber, (i64, i64)>>> = const { RefCell::new(None) };
-    }
-
-    pub fn get_billable_account() -> Option<AccountNumber> {
-        BILLABLE_ACCOUNT.with(|cell| cell.get())
-    }
-
-    pub fn set_billable_account(account: AccountNumber) {
-        BILLABLE_ACCOUNT.with(|cell| cell.set(Some(account)));
-    }
-
-    pub fn get_sub(user: AccountNumber) -> Option<String> {
-        BILL_TO_SUB.with_borrow(|map| map.as_ref().and_then(|m| m.get(&user).cloned()))
-    }
-
-    pub fn set_sub(user: AccountNumber, sub_account: String) {
-        BILL_TO_SUB.with_borrow_mut(|map| {
-            map.get_or_insert_with(HashMap::new)
-                .insert(user, sub_account);
-        });
-    }
-
-    pub fn add_disk_usage(user: AccountNumber, amount_bytes: i64, cost: i64) {
-        DISK_NET.with_borrow_mut(|map| {
-            let entry = map
-                .get_or_insert_with(HashMap::new)
-                .entry(user)
-                .or_insert((0, 0));
-            entry.0 = entry
-                .0
-                .checked_add(amount_bytes)
-                .unwrap_or_else(|| abort_message("disk usage amount overflow"));
-            entry.1 = entry
-                .1
-                .checked_add(cost)
-                .unwrap_or_else(|| abort_message("disk usage cost overflow"));
-        });
-    }
-
-    pub fn drain_disk_usage() -> Vec<(AccountNumber, i64, i64)> {
-        DISK_NET.with_borrow_mut(|map| {
-            map.take()
-                .map(|m| m.into_iter().map(|(k, (a, c))| (k, a, c)).collect())
-                .unwrap_or_default()
-        })
-    }
-
-    /// Cache of account resource balances.
-    /// We track updates to user resources in the cache so we can do a settlement of the actual token
-    /// balances once at the end of the transaction.
-    pub mod balance_cache {
-        use crate::tables::tables::UserSettings;
-        use crate::tx_cache::{drain_cache, with_cache};
-        use psibase::services::tokens::Quantity;
-        use psibase::{abort_message, AccountNumber};
-        use std::cell::RefCell;
-        use std::collections::HashMap;
-
-        type Payer = (AccountNumber, Option<String>);
-
-        #[derive(Clone, Copy)]
-        struct Balance {
-            available: i128,
-            initial: i128,
-        }
-
-        impl Balance {
-            fn from_live((account, sub): &Payer) -> Self {
-                let value = UserSettings::get_resource_balance(*account, sub.clone()).value as i128;
-                Balance {
-                    available: value,
-                    initial: value,
-                }
-            }
-
-            // The amount to settle
-            fn delta(self) -> i128 {
-                self.available - self.initial
-            }
-        }
-
-        thread_local! {
-            static BALANCES: RefCell<Option<HashMap<Payer, Balance>>> =
-                RefCell::new(Some(HashMap::new()));
-        }
-
-        fn with<R>(f: impl FnOnce(&mut HashMap<Payer, Balance>) -> R) -> R {
-            with_cache(&BALANCES, f)
-        }
-
-        /// Applies `delta` to the payer's balance, aborts on overdraft.
-        fn adjust(account: AccountNumber, sub: Option<String>, delta: i128) {
-            with(|m| {
-                let bal = m
-                    .entry((account, sub.clone()))
-                    .or_insert_with_key(Balance::from_live);
-                bal.available += delta;
-                if bal.available < 0 {
-                    let who = UserSettings::to_sub_account_key(account, sub);
-                    abort_message(&format!("{} has insufficient resource balance", who));
-                }
-            });
-        }
-
-        pub fn charge(account: AccountNumber, sub: Option<String>, cost: u64) {
-            adjust(account, sub, -(cost as i128));
-        }
-
-        pub fn refund(account: AccountNumber, sub: Option<String>, amount: u64) {
-            adjust(account, sub, amount as i128);
-        }
-
-        /// Returns whether the payer already has a pending accrual in this tx.
-        pub fn has_pending(account: AccountNumber, sub: Option<String>) -> bool {
-            with(|m| m.contains_key(&(account, sub)))
-        }
-
-        /// The current resource balance for the specified account.
-        ///
-        /// Caches on cache-miss.
-        pub fn get_available(account: AccountNumber, sub: Option<String>) -> Quantity {
-            with(|m| {
-                let bal = m
-                    .entry((account, sub))
-                    .or_insert_with_key(Balance::from_live);
-                Quantity::new(bal.available.max(0) as u64)
-            })
-        }
-
-        /// Handles mid-tx resource purchase/deletion.
-        /// Shifts available+initial together so the delta is unchanged but the new balance is spendable.
-        /// No-op if the account hasn't yet been touched for billing.
-        pub fn update_balance(account: AccountNumber, sub: Option<String>, delta: i128) {
-            with(|m| {
-                if let Some(bal) = m.get_mut(&(account, sub)) {
-                    bal.available += delta;
-                    bal.initial += delta;
-                }
-            });
-        }
-
-        pub fn drain_balances() -> Vec<(Payer, i128)> {
-            drain_cache(&BALANCES)
-                .into_iter()
-                .map(|(payer, b)| (payer, b.delta()))
-                .collect()
-        }
-    }
-
-    /// Per-tx billing accrual, settled at end of tx
-    pub mod accrual {
-        fn is_system_user(user: psibase::AccountNumber) -> bool {
-            user == psibase::AccountNumber::new(0)
-        }
-
-        /// Rate-limited resources: consumption cost is directly credited to the fee receiver.
-        pub mod rate_limited {
-            use super::is_system_user;
-            use crate::resource_type::ResourceType;
-            use crate::tx_cache::{balance_cache, drain_cache, with_cache};
-            use psibase::AccountNumber;
-            use std::cell::RefCell;
-            use std::collections::HashMap;
-
-            #[derive(Default)]
-            pub struct Accrual {
-                pub fee: u64,
-            }
-
-            thread_local! {
-                static STATE: RefCell<Option<HashMap<ResourceType, Accrual>>> =
-                    RefCell::new(Some(HashMap::new()));
-            }
-
-            pub fn consume(
-                resource: ResourceType,
-                user: AccountNumber,
-                sub: Option<String>,
-                cost: u64,
-            ) {
-                if cost == 0 {
-                    return;
-                }
-                if is_system_user(user) {
-                    psibase::abort_message("System user consumes rate-limited resources!");
-                }
-                balance_cache::charge(user, sub, cost);
-                with_cache(&STATE, |m| m.entry(resource).or_default().fee += cost);
-            }
-
-            pub fn drain() -> Vec<(ResourceType, Accrual)> {
-                drain_cache(&STATE).into_iter().collect()
-            }
-        }
-
-        /// Capacity-limited resources: consumption cost is sent as a reserve into a relay. When freed, relay refund is split between
-        /// the user and the fee receiver.
-        ///
-        /// In rare cases (system writes or writes when billing is disabled), the relay may become under-collateralized. In such cases,
-        /// tokens that would be sent to the fee receiver are instead used to recollateralize the relay.
-        pub mod capacity_limited {
-            use super::is_system_user;
-            use crate::resource_type::ResourceType;
-            use crate::tables::capacity_limit_pricing::relay_sub_account;
-            use crate::tables::tables::CapacityPricing;
-            use crate::tx_cache::{balance_cache, drain_cache, with_cache};
-            use crate::Wrapper;
-            use psibase::AccountNumber;
-            use std::cell::RefCell;
-            use std::collections::HashMap;
-
-            #[derive(Default)]
-            pub struct Accrual {
-                pub relay_delta: i128,
-                pub fee: u64,
-            }
-
-            thread_local! {
-                static STATE: RefCell<Option<HashMap<ResourceType, Accrual>>> =
-                    RefCell::new(Some(HashMap::new()));
-            }
-
-            fn with<R>(resource: ResourceType, f: impl FnOnce(&mut Accrual) -> R) -> R {
-                with_cache(&STATE, |m| f(m.entry(resource).or_default()))
-            }
-
-            pub fn get_collateral(resource: ResourceType) -> u64 {
-                let sub = relay_sub_account(resource);
-                let actual = balance_cache::get_available(Wrapper::SERVICE, sub).value as i128;
-                let pending = with(resource, |a| a.relay_delta);
-                (actual + pending).max(0) as u64
-            }
-
-            pub fn consume(
-                resource: ResourceType,
-                user: AccountNumber,
-                sub: Option<String>,
-                cost: u64,
-            ) {
-                if is_system_user(user) || cost == 0 {
-                    return;
-                }
-                balance_cache::charge(user, sub, cost);
-                with(resource, |a| a.relay_delta += cost as i128);
-            }
-
-            pub fn free(
-                resource: ResourceType,
-                user: AccountNumber,
-                sub: Option<String>,
-                user_refund: u64,
-                fee: u64,
-            ) -> u64 {
-                let total_out = user_refund + fee;
-                if is_system_user(user) || total_out == 0 {
-                    return 0;
-                }
-                let collateral = get_collateral(resource);
-                let refund = user_refund.min(collateral);
-
-                // Fee only comes from collateral beyond the refund and what the curve must keep.
-                let required_reserve = CapacityPricing::get_assert(resource).required_reserve();
-                let fee = fee.min(collateral.saturating_sub(refund + required_reserve));
-
-                with(resource, |a| {
-                    a.relay_delta -= (refund + fee) as i128;
-                    a.fee += fee;
-                });
-                if refund > 0 {
-                    balance_cache::refund(user, sub, refund);
-                }
-                refund
-            }
-
-            pub fn drain() -> Vec<(ResourceType, Accrual)> {
-                drain_cache(&STATE).into_iter().collect()
-            }
-        }
-    }
-}
+mod tx_cache;
 
 /// # Virtual Server Service
 ///
@@ -739,7 +431,8 @@ mod service {
     /// billable account.
     #[action]
     fn bill_to_sub(sub_account: String) {
-        let billable_account = tx_cache::get_billable_account().expect("Billable account not set");
+        let billable_account =
+            tx_cache::billable::get_billable_account().expect("Billable account not set");
 
         assert!(
             !sub_account.is_empty(),
@@ -755,7 +448,7 @@ mod service {
             "Billable sub-account does not exist",
         );
 
-        tx_cache::set_sub(sender, sub_account.clone());
+        tx_cache::billable::set_sub(sender, sub_account.clone());
 
         if sender == billable_account {
             CpuLimit::rpc().setCpuLimit(get_cpu_limit(sender, Some(sub_account.clone())));
@@ -961,7 +654,7 @@ mod service {
         assert_eq!(get_sender(), Transact::SERVICE, "[useNetSys] Unauthorized");
 
         let amount_bits = amount_bytes.checked_mul(8).expect("network usage overflow");
-        let sub = tx_cache::get_sub(user);
+        let sub = tx_cache::billable::get_sub(user);
         let raw_cost = RateLimitPricing::get_assert(Net).consume(amount_bits);
         let cost = if is_billing_enabled() { raw_cost } else { 0 };
         accrual::rate_limited::consume(Net, user, sub, cost);
@@ -982,7 +675,7 @@ mod service {
     fn useCpuSys(user: AccountNumber, amount_ns: u64) {
         assert_eq!(get_sender(), Transact::SERVICE, "[useCpuSys] Unauthorized");
 
-        let sub = tx_cache::get_sub(user);
+        let sub = tx_cache::billable::get_sub(user);
         let raw_cost = RateLimitPricing::get_assert(Cpu).consume(amount_ns);
         let cost = if is_billing_enabled() { raw_cost } else { 0 };
         accrual::rate_limited::consume(Cpu, user, sub, cost);
@@ -1001,7 +694,7 @@ mod service {
     fn finishTx() {
         assert_eq!(get_sender(), Transact::SERVICE, "[finishTx] Unauthorized");
 
-        for (disk_user, disk_amount, disk_cost) in tx_cache::drain_disk_usage() {
+        for (disk_user, disk_amount, disk_cost) in tx_cache::disk::drain_disk_usage() {
             if disk_amount == 0 && disk_cost == 0 {
                 continue;
             }
@@ -1043,7 +736,7 @@ mod service {
         }
 
         let billing = is_billing_enabled();
-        let sub = tx_cache::get_sub(user);
+        let sub = tx_cache::billable::get_sub(user);
 
         let cost = match db_id {
             DbId::Service | DbId::Native => {
@@ -1084,7 +777,7 @@ mod service {
 
         // Avoiding a flood of events for writing individual records. Accumulate in the tx_cache and emit
         // one event at the end of the tx (`finishTx`).
-        tx_cache::add_disk_usage(user, amount_bytes, cost);
+        tx_cache::disk::add_disk_usage(user, amount_bytes, cost);
     }
 
     #[action]
@@ -1184,7 +877,7 @@ mod service {
     fn setBillableAcc(account: AccountNumber) {
         assert_eq!(get_sender(), Transact::SERVICE, "Unauthorized");
 
-        tx_cache::set_billable_account(account);
+        tx_cache::billable::set_billable_account(account);
 
         CpuLimit::rpc().setCpuLimit(get_cpu_limit(account, None));
     }

@@ -13,22 +13,22 @@ package-name = "Fractals"
 services = ["fractals", "de-facto"]
 
 [package.metadata.psibase.dependencies]
-DynLd = "0.24.0"
-HttpServer = "0.24.0"
-Accounts = "0.24.0"
-Base64 = "0.24.0"
-Guilds = "0.24.0"
-Host = "0.24.0"
-Permissions = "0.24.0"
-Sites = "0.24.0"
-Transact = "0.24.0"
+DynLd = "0.25.0"
+Accounts = "0.25.0"
+Base64 = "0.25.0"
+Guilds = "0.25.0"
+Host = "0.25.0"
+HttpServer = "0.25.0"
+Permissions = "0.25.0"
+Sites = "0.25.0"
+Transact = "0.25.0"
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-fractals = { path = "service", version = "0.24.0" }
-de-facto = { path = "de-facto", version = "0.24.0" }
-r-fractals = { path = "query-service", version = "0.24.0" }
-fractals-plugin = { path = "plugin", version = "0.24.0" }
+fractals = { path = "service", version = "0.25.0" }
+de-facto = { path = "de-facto", version = "0.25.0" }
+r-fractals = { path = "query-service", version = "0.25.0" }
+fractals-plugin = { path = "plugin", version = "0.25.0" }
 psibase-user-workspace-hack.workspace = true
