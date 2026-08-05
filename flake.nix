@@ -13,8 +13,7 @@
     flake-utils.url = "github:numtide/flake-utils";
 
     # --- Contributor shell only (imported from nix/dev/shell.nix; not used by
-    # packages.psibase or nixosModules.psibase). Laziness means `nix build .#psibase`
-    # does not evaluate these pins. ---
+    # packages.psibase or nixosModules.psibase). ---
     fenix = {
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -48,25 +47,23 @@
     nixpkgs-nodejs.url = "github:NixOS/nixpkgs/fea57dc5b57285d33918813d2f3695024d8fc9e8";
   };
 
-  outputs =
-    {
-      self,
-      nixpkgs,
-      flake-utils,
-      fenix,
-      nixpkgs-cargo-component,
-      nixpkgs-cargo-generate,
-      nixpkgs-cursor-cli,
-      nixpkgs-mdbook,
-      nixpkgs-mdbook-mermaid,
-      nixpkgs-mdbook-plugins,
-      nixpkgs-mdbook-linkcheck,
-      nixpkgs-mdbook-pagetoc,
-      nixpkgs-nodejs,
-    }:
-    flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
-      system:
-      let
+  outputs = {
+    self,
+    nixpkgs,
+    flake-utils,
+    fenix,
+    nixpkgs-cargo-component,
+    nixpkgs-cargo-generate,
+    nixpkgs-cursor-cli,
+    nixpkgs-mdbook,
+    nixpkgs-mdbook-mermaid,
+    nixpkgs-mdbook-plugins,
+    nixpkgs-mdbook-linkcheck,
+    nixpkgs-mdbook-pagetoc,
+    nixpkgs-nodejs,
+  }:
+    flake-utils.lib.eachSystem ["x86_64-linux" "aarch64-linux"] (
+      system: let
         pkgs = import nixpkgs {
           inherit system;
           config.allowUnfree = true;
@@ -82,11 +79,11 @@
           pname = "wasi-sdk";
           version = "29";
 
-          src =
-            let
-              base = "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-${version}";
-            in
-            if pkgs.stdenv.hostPlatform.isAarch64 then
+          src = let
+            base = "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-${version}";
+          in
+            if pkgs.stdenv.hostPlatform.isAarch64
+            then
               pkgs.fetchurl {
                 url = "${base}/wasi-sdk-${version}.0-arm64-linux.tar.gz";
                 sha256 = "sha256-BSrXczl9yeWqmftM/vaUF15rHoG7KtHTyOez/IFEG3w=";
@@ -116,8 +113,21 @@
             runHook postInstall
           '';
         };
-      in
-      {
+      in {
+        # `nix fmt` for every .nix file in the repo.
+        # Wrapped so bare `nix fmt` formats the whole tree: this Nix invokes the
+        # formatter with no arguments, and alejandra then reads stdin instead.
+        formatter = pkgs.writeShellApplication {
+          name = "alejandra-repo";
+          runtimeInputs = [pkgs.alejandra];
+          text = ''
+            if [ "$#" -eq 0 ]; then
+              exec alejandra .
+            fi
+            exec alejandra "$@"
+          '';
+        };
+
         # Contributor toolchain — see nix/dev/shell.nix (shell-only flake inputs).
         devShells.default = import ./nix/dev/shell.nix {
           inherit
@@ -145,57 +155,54 @@
           }
           // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isx86_64 (
             let
-              psibase = pkgs.callPackage ./nix/deploy/package.nix { };
-            in
-            {
+              psibase = pkgs.callPackage ./nix/deploy/package.nix {};
+            in {
               inherit psibase;
               default = psibase;
             }
           );
 
         checks = pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isx86_64 {
-          module-eval =
-            let
-              sys = nixpkgs.lib.nixosSystem {
-                inherit system;
-                modules = [
-                  self.nixosModules.psibase
-                  {
-                    boot.loader.grub.enable = false;
-                    fileSystems."/" = {
-                      device = "/dev/null";
-                      fsType = "ext4";
-                    };
-                    system.stateVersion = "25.05";
-                    services.psibase = {
+          module-eval = let
+            sys = nixpkgs.lib.nixosSystem {
+              inherit system;
+              modules = [
+                self.nixosModules.psibase
+                {
+                  boot.loader.grub.enable = false;
+                  fileSystems."/" = {
+                    device = "/dev/null";
+                    fsType = "ext4";
+                  };
+                  system.stateVersion = "25.05";
+                  services.psibase = {
+                    enable = true;
+                    producer = "prod";
+                    p2p = true;
+                    softHsm = {
                       enable = true;
-                      producer = "prod";
-                      p2p = true;
-                      softHsm = {
-                        enable = true;
-                        pinFile = "/run/secrets/psibase-pin";
-                      };
+                      pinFile = "/run/secrets/psibase-pin";
                     };
-                  }
-                ];
-              };
-            in
-            pkgs.runCommand "psibase-module-eval" { } ''
+                  };
+                }
+              ];
+            };
+          in
+            pkgs.runCommand "psibase-module-eval" {} ''
               echo ${builtins.unsafeDiscardStringContext sys.config.system.build.toplevel.drvPath} > $out
             '';
 
-          overlay-eval =
-            let
-              overlaid = import nixpkgs {
-                inherit system;
-                overlays = [ self.overlays.default ];
-              };
-            in
-            pkgs.runCommand "psibase-overlay-eval" { } ''
+          overlay-eval = let
+            overlaid = import nixpkgs {
+              inherit system;
+              overlays = [self.overlays.default];
+            };
+          in
+            pkgs.runCommand "psibase-overlay-eval" {} ''
               echo ${builtins.unsafeDiscardStringContext overlaid.psibase.drvPath} > $out
             '';
 
-          vm = import ./nix/deploy/test.nix { inherit pkgs self; };
+          vm = import ./nix/deploy/test.nix {inherit pkgs self;};
         };
       }
     )
@@ -211,8 +218,11 @@
         imports = [
           ./nix/deploy/module.nix
           (
-            { pkgs, lib, ... }:
             {
+              pkgs,
+              lib,
+              ...
+            }: {
               services.psibase.package = lib.mkDefault (
                 self.packages.${pkgs.stdenv.hostPlatform.system}.psibase
                   or (throw "psibase: no prebuilt package for ${pkgs.stdenv.hostPlatform.system}; set services.psibase.package explicitly")
