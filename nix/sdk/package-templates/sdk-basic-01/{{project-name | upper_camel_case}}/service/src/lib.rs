@@ -12,7 +12,7 @@ mod service {
     #[action]
     #[allow(non_snake_case)]
     fn setExampleThing(thing: String) {
-        use psibase::*;
+        // `Wrapper` comes from the `#[psibase::service]` macro expansion.
         Wrapper::emit().history().updated(String::new(), thing);
     }
 
@@ -31,7 +31,6 @@ mod service {
 #[cfg(test)]
 mod tests {
     use crate::Wrapper;
-    use psibase::*;
 
     #[psibase::test_case(packages("{{project-name | upper_camel_case}}"))]
     fn test_get_thing(chain: psibase::Chain) -> Result<(), psibase::Error> {

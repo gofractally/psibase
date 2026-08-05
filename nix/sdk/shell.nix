@@ -244,9 +244,21 @@ let
       fi
       shift || true
 
+      # Flake copies live in the Nix store (mode 0444). cargo-generate copies
+      # those modes into its work dir then fails with EACCES when rewriting files.
+      TEMPLATE_SRC="$TEMPLATES/sdk-basic-01"
+      if [[ ! -d "$TEMPLATE_SRC" ]]; then
+        echo "error: missing template at $TEMPLATE_SRC" >&2
+        exit 1
+      fi
+      WORK="$(mktemp -d "${TMPDIR:-/tmp}/psidk-new.XXXXXX")"
+      trap 'rm -rf "$WORK"' EXIT
+      cp -a "$TEMPLATE_SRC" "$WORK/template"
+      chmod -R u+w "$WORK/template"
+
       echo "Generating '$NAME' into $PACKAGES_DIR (psibase $VERSION)…"
       cargo generate \
-        --path "$TEMPLATES/sdk-basic-01" \
+        --path "$WORK/template" \
         --destination "$PACKAGES_DIR" \
         --init \
         -v \
