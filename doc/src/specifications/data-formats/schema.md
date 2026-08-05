@@ -194,12 +194,20 @@ The schema schema defines both the JSON format and the binary (fracpack) format 
   "@events": {
     "Custom": {
       "id": "map",
-      "type": {"List": {"Object": {"name":"@string", "type": "@type"}}}
+      "type": {"List": {"Object": {"name":"@string", "type": "@event"}}}
     }
   },
   "@fn": {
-    "params": "@type",
-    "result": {"Option": "@type"}
+    "Object": {
+      "params": "@type",
+      "result": {"Option": "@type"}
+    }
+  },
+  "@event": {
+    "Object": {
+      "type": "@type",
+      "access": "@string"
+    }
   },
   "@type": {
     "Variant": {
@@ -214,7 +222,7 @@ The schema schema defines both the JSON format and the binary (fracpack) format 
       "Float": {"Object": {"exp": "@u32", "mantissa": "@u32"}},
       "FracPack": "@type",
       "Custom": {"Object": {"type": "@type", "id": "@string"}},
-      "@Type": "@string",
+      "@Type": "@string"
     }
   },
   "@u8": {"Int": {"bits": 8, "isSigned": false}},

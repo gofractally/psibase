@@ -60,8 +60,10 @@ namespace psibase
          {
             if (auto rty = revents->find(name); rty != revents->end())
             {
-               if (!matcher.match(lty, rty->second))
+               if (!matcher.match(lty.type, rty->second.type))
                   return std::format("Type for event {} does not match", name);
+               if (lty.access != rty->second.access)
+                  return std::format("Access for event {} does not match", name);
             }
             else
             {
