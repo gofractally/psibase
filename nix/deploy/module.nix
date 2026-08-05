@@ -182,14 +182,12 @@ in {
         then "${softhsmPkg}/lib/softhsm/libsofthsm2.so"
         else null;
 
-      listenEndpoint =
-        let
-          address =
-            if lib.hasInfix ":" cfg.listenAddress && !lib.hasPrefix "[" cfg.listenAddress
-            then "[${cfg.listenAddress}]"
-            else cfg.listenAddress;
-        in
-        "${address}:${toString cfg.listen}";
+      listenEndpoint = let
+        address =
+          if lib.hasInfix ":" cfg.listenAddress && !lib.hasPrefix "[" cfg.listenAddress
+          then "[${cfg.listenAddress}]"
+          else cfg.listenAddress;
+      in "${address}:${toString cfg.listen}";
 
       psinodeArgs =
         [
