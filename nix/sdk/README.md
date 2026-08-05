@@ -10,12 +10,12 @@ mkdir my-apps && cd my-apps
 nix flake init -t github:gofractally/psibase/mm/nix-pkg-dev#package
 direnv allow   # or: nix develop
 
-psidk-up 8090
-psidk-new my-app
+psiapp chain up 8090
+psiapp new my-app
 cd packages/MyApp/ui && yarn && yarn build
 cd .. && cargo-psibase package
 cargo-psibase install -a http://psibase.localhost:8090/
-psidk-down
+psiapp chain down
 ```
 
 ## What `nix develop .#sdk` provides
@@ -27,12 +27,12 @@ psidk-down
 - Node 20 + Yarn, wasm-pack / wasm-tools / binaryen
 - Flake `wasi-sdk`, mkcert, SoftHSM
 - `PSIBASE_DATADIR` → store `share/psibase` (full package set)
-- **Local chain:** `psidk-up` / `psidk-down` (or `psidk-devnet up|down|status`)
-- **New app:** `psidk-new <name>` → `nix/sdk/package-templates` (out-of-tree `basic-01`)
+- **Local chain:** `psiapp chain up|down|status`
+- **New app:** `psiapp new <name>` → `nix/sdk/package-templates` (out-of-tree `basic-01`)
 
 You do **not** get: C++/Boost/CMake native toolchain, mdbook, monorepo `build/` on `PATH`.
 
-### Local chain (`psidk-up`)
+### Local chain (`psiapp chain`)
 
 | | |
 |--|--|
@@ -44,7 +44,7 @@ You do **not** get: C++/Boost/CMake native toolchain, mdbook, monorepo `build/` 
 Keep **psibase CLI and chain on the same release** (SDK 0.23 tooling with an
 SDK-booted chain). A newer monorepo `build/psibase` will garble account names.
 
-### New app (`psidk-new`)
+### New app (`psiapp new`)
 
 Runs `cargo-generate` against [`package-templates/`](package-templates/) into
 `./packages`. That tree vendors Host/Transact/Permissions WIT and uses crates.io

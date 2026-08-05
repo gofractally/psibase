@@ -54,16 +54,24 @@ let
     '';
   };
 
-  psidkDevnet = pkgs.writeShellApplication {
-    name = "psidk-devnet";
+  # Package-dev CLI (release tarball / packages.psidk stay named "psidk").
+  #   psiapp chain up|down|status …
+  #   psiapp new <name>
+  psiapp = pkgs.writeShellApplication {
+    name = "psiapp";
     runtimeInputs = [
       psidk
+      cargoGenerate
       pkgs.curl
       pkgs.coreutils
+      pkgs.findutils
       pkgs.gnugrep
+      pkgs.gnused
     ];
     excludeShellChecks = [ "SC2034" ];
     text = ''
+      set -euo pipefail
+
       HOST="''${PSIBASE_DEVNET_HOST:-psibase.localhost}"
       PORT="''${PSIBASE_DEVNET_PORT:-8080}"
       PRODUCER="''${PSIBASE_DEVNET_PRODUCER:-myprod}"
@@ -72,14 +80,15 @@ let
 
       usage() {
         cat <<EOF
-      Usage: psidk-devnet <command> [options]
+      Usage: psiapp <command> …
 
       Commands:
-        up [port] [producer] [state-dir]   Start fresh chain, boot, print API URL
-        down                               Stop the chain started by up
-        status                             Show pid / API if running
+        chain up [port] [producer] [state-dir]   Start fresh chain, boot, print API URL
+        chain down                               Stop the chain started by up
+        chain status                             Show pid / API if running
+        new <project-name>                       Scaffold app into ./packages
 
-      Environment:
+      Environment (chain):
         PSIBASE_DEVNET_HOST / PORT / PRODUCER / DIR
         PSIBASE_ADMIN_IP / HOST_IP
 
@@ -103,7 +112,7 @@ let
         return 1
       }
 
-      cmd_up() {
+      chain_up() {
         PORT="''${1:-$PORT}"
         PRODUCER="''${2:-$PRODUCER}"
         STATE_DIR="''${3:-$STATE_DIR}"
@@ -112,7 +121,7 @@ let
         local logfile="$STATE_DIR/psinode.log"
         local dbdir="$STATE_DIR/db"
         if [[ -f "$pidfile" ]] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
-          echo "error: psinode already running (pid $(cat "$pidfile")). Run: psidk-down" >&2
+          echo "error: psinode already running (pid $(cat "$pidfile")). Run: psiapp chain down" >&2
           exit 1
         fi
         rm -rf "$dbdir"
@@ -131,12 +140,12 @@ let
         echo "  API:      $(api_url)"
         echo "  Admin:    http://x-admin.''${HOST}:''${PORT}/"
         echo "  Producer: ''${PRODUCER}"
-        echo "  Stop:     psidk-down"
+        echo "  Stop:     psiapp chain down"
         echo ""
         echo "  cargo-psibase install -a $(api_url)"
       }
 
-      cmd_down() {
+      chain_down() {
         local pidfile="$STATE_DIR/psinode.pid"
         if [[ ! -f "$pidfile" ]]; then
           echo "No pid file at $pidfile (nothing to stop)."
@@ -158,7 +167,7 @@ let
         rm -f "$pidfile"
       }
 
-      cmd_status() {
+      chain_status() {
         local pidfile="$STATE_DIR/psinode.pid"
         if [[ -f "$pidfile" ]] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
           echo "running pid=$(cat "$pidfile") api=$(api_url) state=$STATE_DIR"
@@ -168,50 +177,30 @@ let
         fi
       }
 
-      cmd="''${1:-}"
-      shift || true
-      case "$cmd" in
-        up) cmd_up "$@" ;;
-        down) cmd_down "$@" ;;
-        status) cmd_status "$@" ;;
-        -h|--help|help|"") usage ;;
-        *)
-          echo "unknown command: $cmd" >&2
-          usage >&2
-          exit 1
-          ;;
-      esac
-    '';
-  };
+      cmd_chain() {
+        local sub="''${1:-}"
+        shift || true
+        case "$sub" in
+          up) chain_up "$@" ;;
+          down) chain_down "$@" ;;
+          status) chain_status "$@" ;;
+          -h|--help|help|"")
+            cat <<EOF
+      Usage: psiapp chain <up|down|status> …
 
-  # Convenience wrappers matching the plan's psidk-up / psidk-down names.
-  psidkUp = pkgs.writeShellScriptBin "psidk-up" ''
-    exec ${psidkDevnet}/bin/psidk-devnet up "$@"
-  '';
-  psidkDown = pkgs.writeShellScriptBin "psidk-down" ''
-    exec ${psidkDevnet}/bin/psidk-devnet down "$@"
-  '';
+        up [port] [producer] [state-dir]   Start fresh chain, boot, print API URL
+        down                               Stop the chain started by up
+        status                             Show pid / API if running
+      EOF
+            ;;
+          *)
+            echo "unknown chain subcommand: $sub" >&2
+            echo "Try: psiapp chain --help" >&2
+            exit 1
+            ;;
+        esac
+      }
 
-  # Scaffold a full app (service + query + plugin + UI) into ./packages via cargo-generate.
-  psidkNew = pkgs.writeShellApplication {
-    name = "psidk-new";
-    runtimeInputs = [
-      cargoGenerate
-      pkgs.coreutils
-      pkgs.findutils
-      pkgs.gnugrep
-      pkgs.gnused
-    ];
-    text = ''
-      set -euo pipefail
-      VERSION="''${PSIBASE_CRATE_VERSION:-${release.psibaseCrateVersion}}"
-      TEMPLATES="''${PSIBASE_PACKAGE_TEMPLATES:-}"
-      if [[ -z "$TEMPLATES" || ! -d "$TEMPLATES" ]]; then
-        echo "error: PSIBASE_PACKAGE_TEMPLATES not set (enter nix develop .#sdk)" >&2
-        exit 1
-      fi
-
-      # Find workspace root: directory containing packages/Cargo.toml
       find_packages_dir() {
         local d
         d="$(pwd)"
@@ -230,73 +219,92 @@ let
         return 1
       }
 
-      PACKAGES_DIR="$(find_packages_dir)" || {
-        echo "error: no packages/Cargo.toml found above $(pwd)" >&2
-        echo "  Run from an SDK workspace (flake init -t …#package), or cd into it." >&2
-        exit 1
+      cmd_new() {
+        local VERSION="''${PSIBASE_CRATE_VERSION:-${release.psibaseCrateVersion}}"
+        local TEMPLATES="''${PSIBASE_PACKAGE_TEMPLATES:-}"
+        if [[ -z "$TEMPLATES" || ! -d "$TEMPLATES" ]]; then
+          echo "error: PSIBASE_PACKAGE_TEMPLATES not set (enter nix develop .#sdk)" >&2
+          exit 1
+        fi
+
+        local PACKAGES_DIR
+        PACKAGES_DIR="$(find_packages_dir)" || {
+          echo "error: no packages/Cargo.toml found above $(pwd)" >&2
+          echo "  Run from an SDK workspace (flake init -t …#package), or cd into it." >&2
+          exit 1
+        }
+
+        local NAME="''${1:-}"
+        if [[ -z "$NAME" ]]; then
+          echo "Usage: psiapp new <project-name>" >&2
+          echo "  Creates packages/<AppName>/ (service, query-service, plugin, ui)" >&2
+          exit 1
+        fi
+        shift || true
+
+        # Flake copies live in the Nix store (mode 0444). cargo-generate copies
+        # those modes into its work dir then fails with EACCES when rewriting files.
+        local TEMPLATE_SRC="$TEMPLATES/sdk-basic-01"
+        if [[ ! -d "$TEMPLATE_SRC" ]]; then
+          echo "error: missing template at $TEMPLATE_SRC" >&2
+          exit 1
+        fi
+        # ''${...} so Nix does not eat the bash parameter expansion.
+        local WORK
+        WORK="$(mktemp -d "''${TMPDIR:-/tmp}/psiapp-new.XXXXXX")"
+        trap 'rm -rf "$WORK"' EXIT
+        cp -a "$TEMPLATE_SRC" "$WORK/template"
+        chmod -R u+w "$WORK/template"
+
+        echo "Generating '$NAME' into $PACKAGES_DIR (psibase $VERSION)…"
+        cargo generate \
+          --path "$WORK/template" \
+          --destination "$PACKAGES_DIR" \
+          --init \
+          -v \
+          --allow-commands \
+          --name "$NAME" \
+          --define "version=$VERSION" \
+          --define "description=''${PSIBASE_NEW_DESCRIPTION:-An example application}" \
+          "$@"
+
+        # Hook scripts must remain available during generate; strip leftovers.
+        rm -f "$PACKAGES_DIR"/*.rhai
+
+        if [[ -d "$PACKAGES_DIR/.workspace-placeholder" ]]; then
+          rm -rf "$PACKAGES_DIR/.workspace-placeholder"
+          if grep -q '\.workspace-placeholder' "$PACKAGES_DIR/Cargo.toml"; then
+            grep -v '\.workspace-placeholder' "$PACKAGES_DIR/Cargo.toml" >"$PACKAGES_DIR/Cargo.toml.tmp"
+            mv "$PACKAGES_DIR/Cargo.toml.tmp" "$PACKAGES_DIR/Cargo.toml"
+          fi
+        fi
+
+        local CAMEL
+        CAMEL="$(echo "$NAME" | sed -E 's/(^|-)([a-z])/\U\2/g')"
+        echo ""
+        echo "Next:"
+        echo "  cd $PACKAGES_DIR/$CAMEL/ui && yarn && yarn build"
+        echo "  cd $PACKAGES_DIR/$CAMEL && cargo-psibase package"
       }
 
-      NAME="''${1:-}"
-      if [[ -z "$NAME" ]]; then
-        echo "Usage: psidk-new <project-name>" >&2
-        echo "  Creates packages/<AppName>/ (service, query-service, plugin, ui)" >&2
-        exit 1
-      fi
+      cmd="''${1:-}"
       shift || true
-
-      # Flake copies live in the Nix store (mode 0444). cargo-generate copies
-      # those modes into its work dir then fails with EACCES when rewriting files.
-      TEMPLATE_SRC="$TEMPLATES/sdk-basic-01"
-      if [[ ! -d "$TEMPLATE_SRC" ]]; then
-        echo "error: missing template at $TEMPLATE_SRC" >&2
-        exit 1
-      fi
-      # ''${...} so Nix does not eat the bash parameter expansion.
-      WORK="$(mktemp -d "''${TMPDIR:-/tmp}/psidk-new.XXXXXX")"
-      trap 'rm -rf "$WORK"' EXIT
-      cp -a "$TEMPLATE_SRC" "$WORK/template"
-      chmod -R u+w "$WORK/template"
-
-      echo "Generating '$NAME' into $PACKAGES_DIR (psibase $VERSION)…"
-      cargo generate \
-        --path "$WORK/template" \
-        --destination "$PACKAGES_DIR" \
-        --init \
-        -v \
-        --allow-commands \
-        --name "$NAME" \
-        --define "version=$VERSION" \
-        --define "description=''${PSIBASE_NEW_DESCRIPTION:-An example application}" \
-        "$@"
-
-      # Hook scripts are not ignorable during generate (post hooks need them);
-      # strip any that cargo-generate left at the packages/ root.
-      rm -f "$PACKAGES_DIR"/*.rhai
-
-      # Drop the init placeholder once a real app exists.
-      if [[ -d "$PACKAGES_DIR/.workspace-placeholder" ]]; then
-        rm -rf "$PACKAGES_DIR/.workspace-placeholder"
-        if grep -q '\.workspace-placeholder' "$PACKAGES_DIR/Cargo.toml"; then
-          # Portable-ish delete of that members line
-          grep -v '\.workspace-placeholder' "$PACKAGES_DIR/Cargo.toml" >"$PACKAGES_DIR/Cargo.toml.tmp"
-          mv "$PACKAGES_DIR/Cargo.toml.tmp" "$PACKAGES_DIR/Cargo.toml"
-        fi
-      fi
-
-      CAMEL="$(echo "$NAME" | sed -E 's/(^|-)([a-z])/\U\2/g')"
-      echo ""
-      echo "Next:"
-      echo "  cd $PACKAGES_DIR/$CAMEL/ui && yarn && yarn build"
-      echo "  cd $PACKAGES_DIR/$CAMEL && cargo-psibase package"
+      case "$cmd" in
+        chain) cmd_chain "$@" ;;
+        new) cmd_new "$@" ;;
+        -h|--help|help|"") usage ;;
+        *)
+          echo "unknown command: $cmd" >&2
+          usage >&2
+          exit 1
+          ;;
+      esac
     '';
   };
 
   sdkPackages = with pkgs; [
     psidk
-    psidkDevnet
-    psidkUp
-    psidkDown
-    psidkNew
+    psiapp
     rustToolchain
     cargoComponent
     cargoGenerate
@@ -408,8 +416,8 @@ pkgs.mkShell {
       echo "  cargo-psibase: $(command -v cargo-psibase) ($(cargo-psibase --version 2>/dev/null || echo '?'))"
       echo "  PSIBASE_DATADIR=$PSIBASE_DATADIR"
       echo ""
-      echo "  Local chain:  psidk-up   /   psidk-down   (or psidk-devnet up|down|status)"
-      echo "  New app:      psidk-new <name>   (cargo-generate → packages/<App>)"
+      echo "  Local chain:  psiapp chain up|down|status"
+      echo "  New app:      psiapp new <name>   (cargo-generate → packages/<App>)"
       echo "  Workspace:    nix flake init -t …#package   (see nix/sdk/README.md)"
       echo "  Docs:         nix/sdk/README.md"
       echo ""

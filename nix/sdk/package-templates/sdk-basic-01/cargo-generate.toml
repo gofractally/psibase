@@ -1,5 +1,5 @@
 # Do not put hook scripts in [template].ignore — cargo-generate drops ignored
-# files before post hooks run. psidk-new removes stray *.rhai from packages/
+# files before post hooks run. psiapp new removes stray *.rhai from packages/
 # after a successful generate.
 
 [placeholders]

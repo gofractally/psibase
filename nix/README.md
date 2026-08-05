@@ -122,7 +122,7 @@ nix develop
 ```bash
 nix develop .#sdk
 # scaffold:  nix flake init -t path:$PWD#package
-# local chain: psidk-up / psidk-down
+# local chain: psiapp chain up|down
 ```
 
 See [`sdk/README.md`](sdk/README.md).

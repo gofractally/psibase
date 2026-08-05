@@ -1,6 +1,6 @@
 # SDK package templates (`cargo-generate`)
 
-Out-of-tree app scaffold for `nix develop .#sdk` / `psidk-new`.
+Out-of-tree app scaffold for `nix develop .#sdk` / `psiapp new`.
 
 Unlike `package-templates/basic-01` (monorepo: Host WIT paths, `@shared` UI,
 workspace-hack), this tree:
@@ -14,7 +14,7 @@ workspace-hack), this tree:
 From an SDK workspace root (directory that contains `packages/Cargo.toml`):
 
 ```bash
-psidk-new my-app
+psiapp new my-app
 # or:
 cargo generate -p "$PSIBASE_PACKAGE_TEMPLATES" --destination ./packages --init \
   -v --allow-commands --name my-app --define version=0.23.0

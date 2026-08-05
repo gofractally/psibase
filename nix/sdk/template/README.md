@@ -13,21 +13,21 @@ nix flake init -t github:gofractally/psibase/mm/nix-pkg-dev#package
 ├── flake.nix / .envrc      # pulls in psibase#sdk
 └── packages/
     ├── Cargo.toml          # workspace (crates.io psibase pin)
-    └── <App>/              # from `psidk-new` — service, query, plugin, ui
+    └── <App>/              # from `psiapp new` — service, query, plugin, ui
 ```
 
 ## Develop
 
 ```bash
 direnv allow   # or: nix develop
-psidk-up 8090  # avoid ports already in use (e.g. 8080)
+psiapp chain up 8090  # avoid ports already in use (e.g. 8080)
 
-psidk-new my-app
+psiapp new my-app
 cd packages/MyApp/ui && yarn && yarn build
 cd .. && cargo-psibase package
 cargo-psibase install -a http://psibase.localhost:8090/
 
-psidk-down
+psiapp chain down
 ```
 
 Use the SDK shell’s `psibase` (same release as the chain). A monorepo `build/`
