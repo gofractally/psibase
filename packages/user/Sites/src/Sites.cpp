@@ -98,12 +98,12 @@ namespace SystemService
           ;
 
       // Port suffix from the Host header (e.g. ":8080"), empty if absent or not
-      // a plausible port. request.host is stored without the port, so the raw
+      // a valid port. request.host is stored without the port, so the raw
       // Host header is the source of truth.
       //
       // The Host header is client-controlled and this value is interpolated into
-      // the CSP response header, so only ':' followed by 1-5 digits is accepted.
-      // Without that check a request carrying
+      // the CSP response header, so only ':' followed by a decimal port in
+      // 0..65535 is accepted. Without that check a request carrying
       //    Host: psibase.localhost:8080 https://evil.com
       // would append the whole tail to every {{root}} host source, adding an
       // attacker-chosen origin to the policy. Rejecting fails closed: with no
@@ -121,9 +121,17 @@ namespace SystemService
                   return {};
 
                std::string_view digits = h.substr(pos + 1);
-               if (!digits.empty() && digits.size() <= 5 &&
-                   digits.find_first_not_of("0123456789") == std::string_view::npos)
-                  return h.substr(pos);
+               if (digits.empty() || digits.size() > 5 ||
+                   digits.find_first_not_of("0123456789") != std::string_view::npos)
+                  return {};
+
+               unsigned port = 0;
+               for (char c : digits)
+                  port = port * 10 + static_cast<unsigned>(c - '0');
+               if (port > 65535)
+                  return {};
+
+               return h.substr(pos);
             }
          }
          return {};

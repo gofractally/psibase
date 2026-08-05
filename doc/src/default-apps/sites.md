@@ -32,7 +32,7 @@ Note that a custom CSP **completely replaces** the baseline for the content it c
 
 #### The `{{root}}` keyword
 
-User-defined (and default) CSP strings may include the keyword `{{root}}`. At serve time, `{{root}}` is replaced with the root domain of the request, including the port when present (e.g. `psibase.localhost:8080` in local development, or `example.com` in production).
+User-defined CSP strings may include the keyword `{{root}}`. At serve time, any `{{root}}` in the CSP that will be sent is replaced with the root domain of the request, including the port when present (e.g. `psibase.localhost:8080` in local development, or `example.com` in production).
 
 Host sources that use `{{root}}` are typically written scheme-relative (no `http://`/`https://` prefix) so the same policy works over both local HTTP and production HTTPS. For example:
 
