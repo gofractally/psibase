@@ -8,6 +8,7 @@
   "prettier.prettierPath": "packages/.yarn/sdks/prettier/index.cjs",
   "js/ts.tsdk.path": "packages/.yarn/sdks/typescript/lib",
   "js/ts.tsdk.promptToUseWorkspaceVersion": true,
+  "rust-analyzer.server.path": "rust-analyzer",
   "rust-analyzer.linkedProjects": ["rust/Cargo.toml", "packages/user/Cargo.toml", "packages/system/Cargo.toml", "packages/Cargo.toml"],
   "editor.formatOnSave": true,
   "[markdown]": {
