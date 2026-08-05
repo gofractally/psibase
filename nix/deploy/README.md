@@ -92,7 +92,7 @@ Use a module function so `config` is in scope:
 
 `nix build .#psibase` repackages the published release tarball and patchelfs it for the Nix store. It does **not** build psibase from source.
 
-It is a *runtime* package, not a psidk: `bin/{psinode,psibase,psitest}` plus `share/psibase` (`config.in`, `packages`, `wasm`, `services`, `licenses`) and man pages. The 241M `share/wasi-sysroot` and the CMake/Python dev helpers are dropped, since building services is the dev shell's job — trimmed output is 74M against 314M unpacked.
+It is a *runtime* package, not a psidk: `bin/{psinode,psibase,psitest}` plus `share/psibase` (`config.in`, `packages`, `wasm`, `licenses`) and man pages. The 241M `share/wasi-sysroot` and the CMake/Python dev helpers are dropped, since building services is the dev shell's job — trimmed output is ~75M against ~300M unpacked.
 
 The layout contract is `$out/{bin,share/psibase}`: both `psinode` and the `psibase` CLI locate their data relative to the resolved executable path. Any derivation producing that layout can be substituted via `services.psibase.package`.
 

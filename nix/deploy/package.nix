@@ -8,11 +8,9 @@
   openssl,
   zlib,
 }: let
-  # Held at 0.23: 0.24 production boot fails (verify-sig). See test.nix.
-  # Bumping also needs installPhase changes (0.24 drops share/psibase/services).
-  version = "0.23.0-pre";
+  version = "0.25.0-pre";
   srcUrl = "https://github.com/gofractally/psibase/releases/download/v${version}/psidk-ubuntu-2404.tar.gz";
-  srcHash = "sha256-l9bdB9RKz9FQLiBnXaQsHNoveOTMt1r5xRghLTfqKsQ=";
+  srcHash = "sha256-fhA6TfGVW5Mw0Yvthe0fEm8BW58fMJLvg0QUsUXfzWw=";
 in
   lib.throwIfNot stdenv.hostPlatform.isx86_64
   "prebuilt psibase is only available on x86_64-linux (got ${stdenv.hostPlatform.system}); override services.psibase.package"
@@ -52,8 +50,6 @@ in
       install -Dm644 share/psibase/config.in $out/share/psibase/config.in
       cp -a share/psibase/packages $out/share/psibase/packages
       cp -a share/psibase/wasm $out/share/psibase/wasm
-      # Drop this line when bumping past 0.23 (services/ removed in 0.24).
-      cp -a share/psibase/services $out/share/psibase/services
 
       if [ -d share/psibase/licenses ]; then
         cp -a share/psibase/licenses $out/share/psibase/licenses
@@ -86,17 +82,13 @@ in
         share/psibase/config.in \
         share/psibase/packages \
         share/psibase/packages/index.json \
+        share/psibase/packages/ProdDefault.psi \
         share/psibase/wasm; do
         if [ ! -e "$out/$p" ]; then
           echo "missing from layout: $p" >&2
           exit 1
         fi
       done
-
-      if [ ! -e "$out/share/psibase/services/x-admin/packages" ]; then
-        echo "share/psibase/services/x-admin/packages does not resolve" >&2
-        exit 1
-      fi
 
       runHook postInstallCheck
     '';

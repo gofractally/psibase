@@ -1,5 +1,5 @@
 # NixOS VM test for services.psibase (sandbox + unsigned ProdDefault boot).
-# Signed/production boot is not covered (0.24 verify-sig; 0.23 expires in harness).
+# Not covered: signed boot, HSM unlock/signing, real p2p peers.
 {
   pkgs,
   self,
