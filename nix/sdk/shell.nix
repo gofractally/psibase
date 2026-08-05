@@ -251,7 +251,8 @@ let
         echo "error: missing template at $TEMPLATE_SRC" >&2
         exit 1
       fi
-      WORK="$(mktemp -d "${TMPDIR:-/tmp}/psidk-new.XXXXXX")"
+      # ''${...} so Nix does not eat the bash parameter expansion.
+      WORK="$(mktemp -d "''${TMPDIR:-/tmp}/psidk-new.XXXXXX")"
       trap 'rm -rf "$WORK"' EXIT
       cp -a "$TEMPLATE_SRC" "$WORK/template"
       chmod -R u+w "$WORK/template"
