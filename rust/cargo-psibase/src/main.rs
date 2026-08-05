@@ -650,7 +650,7 @@ fn write_service_crate(root: &Path) -> Result<PathBuf, Error> {
     write!(
         &mut File::create(&manifest)?,
         "{}",
-        include_str!("service/Cargo.toml")
+        include_str!("service/Cargo.toml.in")
     )?;
     std::fs::create_dir(root.join("src"))?;
     write!(

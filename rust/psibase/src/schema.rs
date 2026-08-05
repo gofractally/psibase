@@ -34,7 +34,21 @@ impl std::fmt::Display for MethodString {
     }
 }
 
-type EventMap = IndexMap<MethodString, AnyType>;
+#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, PartialEq, Eq, ToSchema)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct EventType {
+    #[serde(rename = "type")]
+    pub type_: AnyType,
+    pub access: String,
+}
+
+impl VisitTypes for EventType {
+    fn visit_types<F: FnMut(&mut AnyType) -> ()>(&mut self, f: &mut F) {
+        self.type_.visit_types(f);
+    }
+}
+
+type EventMap = IndexMap<MethodString, EventType>;
 
 type ActionMap = IndexMap<MethodString, FunctionType>;
 
@@ -126,8 +140,11 @@ pub(crate) fn assert_schemas_equivalent(lhs: &Schema, rhs: &Schema) {
     for (levents, revents) in [(&lhs.history, &rhs.history), (&lhs.merkle, &rhs.merkle)] {
         for (name, lty) in levents {
             if let Some(rty) = revents.get(name) {
-                if !matcher.compare(lty, rty) {
+                if !matcher.compare(&lty.type_, &rty.type_) {
                     panic!("Type for event {} does not match", name);
+                }
+                if &lty.access != &rty.access {
+                    panic!("Access for event {} does not match", name);
                 }
             } else {
                 panic!("Missing event {}", name)
@@ -235,7 +252,7 @@ pub trait ToActionsSchema {
 }
 
 pub trait ToEventsSchema {
-    fn to_schema(builder: &mut SchemaBuilder) -> IndexMap<MethodString, AnyType>;
+    fn to_schema(builder: &mut SchemaBuilder) -> IndexMap<MethodString, EventType>;
 }
 
 pub trait ToIndexSchema {
