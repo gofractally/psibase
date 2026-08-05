@@ -1,10 +1,6 @@
-[template]
-# Hook/support scripts live beside the app tree but must not land in ./packages.
-ignore = [
-  "helpers.rhai",
-  "add-to-workspace.rhai",
-  "validate-project-name.rhai",
-]
+# Do not put hook scripts in [template].ignore — cargo-generate drops ignored
+# files before post hooks run. psidk-new removes stray *.rhai from packages/
+# after a successful generate.
 
 [placeholders]
 description = { prompt = "Enter a description of the package", default = "An example application", type = "string" }

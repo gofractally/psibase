@@ -269,6 +269,10 @@ let
         --define "description=''${PSIBASE_NEW_DESCRIPTION:-An example application}" \
         "$@"
 
+      # Hook scripts are not ignorable during generate (post hooks need them);
+      # strip any that cargo-generate left at the packages/ root.
+      rm -f "$PACKAGES_DIR"/*.rhai
+
       # Drop the init placeholder once a real app exists.
       if [[ -d "$PACKAGES_DIR/.workspace-placeholder" ]]; then
         rm -rf "$PACKAGES_DIR/.workspace-placeholder"
