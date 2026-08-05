@@ -13,7 +13,6 @@ package-name = "FractalGen"
 services = ["fractal-gen"]
 
 [package.metadata.psibase.dependencies]
-DynLd = "0.25.0"
 Sites = "0.25.0"
 HttpServer = "0.25.0"
 
