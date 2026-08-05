@@ -52,22 +52,22 @@ omitted when those match.
 
 ### Not handled by this module
 
-TLS, reverse proxy and admin auth are yours. psinode does not authenticate
-`/native/admin/`, so terminate TLS and authenticate admin in a proxy (Caddy,
-Traefik, nginx) in front of the node, passing the authenticated user through:
-
-```nix
-services.psibase.environment.PSIBASE_USERNAME_FIELD = "X-Auth-User";
-```
-
-For that reason, psinode listens on `127.0.0.1` by default. If a remote proxy
-connects directly to psinode, explicitly expose it:
+TLS and reverse proxy are yours. psinode listens on `127.0.0.1` by default;
+XAdmin already authenticates `/native/admin/` (loopback, HTTP Basic, on-chain
+admins, or a trusted proxy header). If a remote proxy connects directly to
+psinode, expose it explicitly:
 
 ```nix
 services.psibase = {
   listenAddress = "0.0.0.0";
   openFirewall = true;
 };
+```
+
+Optional: pass the authenticated user from a trusted local proxy:
+
+```nix
+services.psibase.environment.PSIBASE_USERNAME_FIELD = "X-Auth-User";
 ```
 
 ### SoftHSM / block production
