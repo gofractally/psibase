@@ -114,7 +114,10 @@ nix develop
 
 - `flake.nix` / `flake.lock` — Nix flake at repo root (dev shell + deploy exports)
 - `nix/rust-toolchain.toml` — Rust version and targets for the dev shell
+- `nix/dev/` — the contributor `nix develop` shell and its pinned tooling
 - `nix/deploy/` — runtime package and NixOS module ([docs](deploy/README.md))
+
+All `.nix` files are formatted with [alejandra](https://github.com/kamadorueda/alejandra); run `nix fmt`.
 
 # Relationship to Docker
 
