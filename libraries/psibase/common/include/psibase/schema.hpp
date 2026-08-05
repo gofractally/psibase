@@ -64,6 +64,19 @@ namespace psibase
       return "unknown";
    }
 
+   struct EventType
+   {
+      psio::schema_types::AnyType type;
+      std::string                 access = "public";
+      PSIO_REFLECT(EventType, type, access)
+   };
+
+   template <auto T>
+   constexpr std::string_view eventAccess(void*, nt_wrap<T>*)
+   {
+      return "private";
+   }
+
    /// Represents the schema for a service
    struct ServiceSchema
    {
@@ -72,7 +85,7 @@ namespace psibase
       using ActionMap =
           std::map<std::string, psio::schema_types::FunctionType, CompareMethodNumber>;
       ActionMap actions;
-      using EventMap = std::map<std::string, psio::schema_types::AnyType, CompareMethodNumber>;
+      using EventMap = std::map<std::string, EventType, CompareMethodNumber>;
       EventMap history;
       EventMap merkle;
 
@@ -137,29 +150,48 @@ namespace psibase
                 ++i;
              });
       }
+
+      template <typename T, auto... E>
+      static std::span<const std::string_view> makeEventsAccess(T*, psio::MemberList<E...>*)
+      {
+         if constexpr (sizeof...(E) > 0)
+         {
+            static constexpr std::string_view result[] = {
+                eventAccess((T*)nullptr, static_cast<nt_wrap<E>*>(nullptr))...};
+            return result;
+         }
+         else
+         {
+            return {};
+         }
+      }
+
       template <typename T>
       static void makeEvents(psio::SchemaBuilder&                       builder,
                              EventMap&                                  out,
                              std::vector<psio::schema_types::AnyType*>& eventTypes)
       {
          std::size_t i = 0;
-         psio::for_each_member_type((typename psio::reflect<T>::member_functions*)nullptr,
-                                    [&](auto member)
-                                    {
-                                       std::span<const char* const> names =
-                                           psio::reflect<T>::member_function_names[i];
-                                       using m = psio::MemberPtrType<decltype(member)>;
-                                       if constexpr (m::isFunction)
-                                       {
-                                          auto [pos, inserted] = out.try_emplace(
-                                              names[0], makeParams<m>(builder, names.subspan(1)));
-                                          if (inserted)
-                                          {
-                                             eventTypes.push_back(&pos->second);
-                                          }
-                                       }
-                                       ++i;
-                                    });
+         auto        access =
+             makeEventsAccess((T*)nullptr, (typename psio::reflect<T>::member_functions*)nullptr);
+         psio::for_each_member_type(
+             (typename psio::reflect<T>::member_functions*)nullptr,
+             [&](auto member)
+             {
+                std::span<const char* const> names = psio::reflect<T>::member_function_names[i];
+                using m                            = psio::MemberPtrType<decltype(member)>;
+                if constexpr (m::isFunction)
+                {
+                   auto [pos, inserted] = out.try_emplace(
+                       names[0], EventType{.type   = makeParams<m>(builder, names.subspan(1)),
+                                           .access = std::string(access[i])});
+                   if (inserted)
+                   {
+                      eventTypes.push_back(&pos->second.type);
+                   }
+                }
+                ++i;
+             });
       }
 
       template <auto K, auto... M>
@@ -382,11 +414,14 @@ namespace psibase
       }
 
      public:
-      const psio::schema_types::AnyType* getType(psibase::EventDb db, MethodNumber event)
+      const psio::schema_types::AnyType* getType(bool             canReadPrivate,
+                                                 psibase::EventDb db,
+                                                 MethodNumber     event)
       {
          if (const auto* dbTypes = getDb(db))
-            if (auto pos = dbTypes->find(event); pos != dbTypes->end())
-               return pos->second.resolve(types);
+            if (auto pos = dbTypes->find(event);
+                pos != dbTypes->end() && (canReadPrivate || pos->second.access == "public"))
+               return pos->second.type.resolve(types);
          return nullptr;
       }
       std::vector<const psio::schema_types::AnyType*> eventTypes() const
@@ -396,7 +431,7 @@ namespace psibase
          {
             for (const auto& [_, type] : *m)
             {
-               result.push_back(&type);
+               result.push_back(&type.type);
             }
          }
          return result;

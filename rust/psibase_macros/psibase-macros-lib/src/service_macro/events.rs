@@ -1,11 +1,75 @@
-use proc_macro_error::{abort, emit_error};
+use darling::{util::Flag, FromMeta};
+use proc_macro_error::emit_error;
 use quote::quote;
+use std::fmt::Display;
 use syn::{AttrStyle, Attribute, ItemFn};
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub enum EventType {
     History,
     Merkle,
+}
+
+pub enum EventAccess {
+    Private,
+    Public,
+}
+
+impl Display for EventAccess {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Private => "private",
+                Self::Public => "public",
+            }
+        )
+    }
+}
+
+pub struct EventOptions {
+    pub db: EventType,
+    pub access: EventAccess,
+}
+
+#[derive(Debug, FromMeta)]
+struct RawEventOptions {
+    history: Flag,
+    merkle: Flag,
+    public: Flag,
+    private: Flag,
+}
+
+impl RawEventOptions {
+    fn to_options(&self, location: &impl quote::ToTokens) -> EventOptions {
+        let mut db = None;
+        if self.history.is_present() {
+            db = Some(EventType::History);
+        }
+        if self.merkle.is_present() {
+            if db.is_some() {
+                emit_error!(self.merkle.span(), "duplicate event specifier");
+            } else {
+                db = Some(EventType::Merkle);
+            }
+        }
+        if db.is_none() {
+            emit_error!(location, "expected history or merkle");
+        }
+        if self.public.is_present() && self.private.is_present() {
+            emit_error!(self.public.span(), "duplicate access specifier");
+        }
+        let access = if self.public.is_present() {
+            EventAccess::Public
+        } else {
+            EventAccess::Private
+        };
+        EventOptions {
+            db: db.unwrap_or(EventType::History),
+            access,
+        }
+    }
 }
 
 pub fn process_event_callers(
@@ -67,37 +131,29 @@ pub fn process_event_schema(
     psibase_mod: &proc_macro2::TokenStream,
     event_mod: &proc_macro2::TokenStream,
     f: &ItemFn,
+    options: &EventOptions,
     insertions: &mut proc_macro2::TokenStream,
 ) {
     let name = &f.sig.ident;
     let name_str = name.to_string();
+    let access = options.access.to_string();
 
     *insertions = quote! {
         #insertions
-        events.insert(#psibase_mod::MethodString(#name_str.to_string()), builder.insert::<#event_mod::#name>());
+        events.insert(#psibase_mod::MethodString(#name_str.to_string()), #psibase_mod::EventType{ type_: builder.insert::<#event_mod::#name>(), access: #access.to_string() });
     }
 }
 
-pub fn parse_event_attr(attr: &Attribute) -> Option<EventType> {
+pub fn parse_event_attr(attr: &Attribute) -> Option<EventOptions> {
     if let AttrStyle::Outer = attr.style {
         if attr.meta.path().is_ident("event") {
-            let mut event_type = None;
-            let _ = attr.parse_nested_meta(|meta| {
-                if event_type.is_some() {
-                    abort!(attr, "Invalid number of event types; expected: 1.");
+            match RawEventOptions::from_meta(&attr.meta) {
+                Ok(opt) => return Some(opt.to_options(&attr.meta)),
+                Err(err) => {
+                    emit_error!(attr, "{}", err);
+                    return None;
                 }
-                if meta.path.is_ident("history") {
-                    event_type = Some(EventType::History);
-                    return Ok(());
-                }
-                if meta.path.is_ident("merkle") {
-                    event_type = Some(EventType::Merkle);
-                    return Ok(());
-                }
-                emit_error!(attr.meta, "expected history or merkle");
-                return Err(meta.error("expected history or merkle"));
-            });
-            return event_type;
+            }
         }
     }
     None
