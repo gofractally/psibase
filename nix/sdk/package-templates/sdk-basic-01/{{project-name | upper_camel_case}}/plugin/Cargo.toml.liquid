@@ -1,0 +1,28 @@
+[package]
+name = "{{project-name}}-plugin"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+{{project-name}} = { path = "../service/", version = "{{version}}" }
+psibase.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+wit-bindgen-rt.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[package.metadata.component]
+package = "{{project-name}}:plugin"
+
+[package.metadata.component.target]
+world = "impl"
+
+[package.metadata.component.target.dependencies]
+"host:types" = { path = "wit/deps/host-types/world.wit" }
+"host:common" = { path = "wit/deps/host-common/world.wit" }
+"transact:plugin" = { path = "wit/deps/transact/world.wit" }
+"permissions:plugin" = { path = "wit/deps/permissions/world.wit" }

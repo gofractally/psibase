@@ -11,6 +11,8 @@
   nixpkgs-nodejs,
   # packages.psidk
   psidk,
+  # nix/sdk/package-templates (out-of-tree cargo-generate tree)
+  packageTemplates,
 }:
 let
   release = import ../release.nix;
@@ -190,11 +192,94 @@ let
     exec ${psidkDevnet}/bin/psidk-devnet down "$@"
   '';
 
+  # Scaffold a full app (service + query + plugin + UI) into ./packages via cargo-generate.
+  psidkNew = pkgs.writeShellApplication {
+    name = "psidk-new";
+    runtimeInputs = [
+      cargoGenerate
+      pkgs.coreutils
+      pkgs.findutils
+      pkgs.gnugrep
+      pkgs.gnused
+    ];
+    text = ''
+      set -euo pipefail
+      VERSION="''${PSIBASE_CRATE_VERSION:-${release.psibaseCrateVersion}}"
+      TEMPLATES="''${PSIBASE_PACKAGE_TEMPLATES:-}"
+      if [[ -z "$TEMPLATES" || ! -d "$TEMPLATES" ]]; then
+        echo "error: PSIBASE_PACKAGE_TEMPLATES not set (enter nix develop .#sdk)" >&2
+        exit 1
+      fi
+
+      # Find workspace root: directory containing packages/Cargo.toml
+      find_packages_dir() {
+        local d
+        d="$(pwd)"
+        while [[ "$d" != "/" ]]; do
+          if [[ -f "$d/packages/Cargo.toml" ]]; then
+            echo "$d/packages"
+            return 0
+          fi
+          if [[ -f "$d/Cargo.toml" ]] && grep -q '^\[workspace\]' "$d/Cargo.toml" 2>/dev/null \
+            && [[ "$(basename "$d")" == "packages" ]]; then
+            echo "$d"
+            return 0
+          fi
+          d="$(dirname "$d")"
+        done
+        return 1
+      }
+
+      PACKAGES_DIR="$(find_packages_dir)" || {
+        echo "error: no packages/Cargo.toml found above $(pwd)" >&2
+        echo "  Run from an SDK workspace (flake init -t …#package), or cd into it." >&2
+        exit 1
+      }
+
+      NAME="''${1:-}"
+      if [[ -z "$NAME" ]]; then
+        echo "Usage: psidk-new <project-name>" >&2
+        echo "  Creates packages/<AppName>/ (service, query-service, plugin, ui)" >&2
+        exit 1
+      fi
+      shift || true
+
+      echo "Generating '$NAME' into $PACKAGES_DIR (psibase $VERSION)…"
+      cargo generate \
+        --path "$TEMPLATES/sdk-basic-01" \
+        --destination "$PACKAGES_DIR" \
+        --init \
+        -v \
+        --allow-commands \
+        --name "$NAME" \
+        --define "version=$VERSION" \
+        --define "description=''${PSIBASE_NEW_DESCRIPTION:-An example application}" \
+        "$@"
+
+      # Drop the init placeholder once a real app exists.
+      if [[ -d "$PACKAGES_DIR/.workspace-placeholder" ]]; then
+        rm -rf "$PACKAGES_DIR/.workspace-placeholder"
+        if grep -q '\.workspace-placeholder' "$PACKAGES_DIR/Cargo.toml"; then
+          # Portable-ish delete of that members line
+          grep -v '\.workspace-placeholder' "$PACKAGES_DIR/Cargo.toml" >"$PACKAGES_DIR/Cargo.toml.tmp"
+          mv "$PACKAGES_DIR/Cargo.toml.tmp" "$PACKAGES_DIR/Cargo.toml"
+        fi
+      fi
+
+      CAMEL="$(echo "$NAME" | sed -E 's/(^|-)([a-z])/\U\2/g')"
+      echo ""
+      echo "Next:"
+      echo "  cd $PACKAGES_DIR/$CAMEL/ui && yarn && yarn build"
+      echo "  cd $PACKAGES_DIR/$CAMEL && cargo-psibase package"
+    '';
+  };
+
   sdkPackages = with pkgs; [
     psidk
     psidkDevnet
     psidkUp
     psidkDown
+    psidkNew
     rustToolchain
     cargoComponent
     cargoGenerate
@@ -250,6 +335,10 @@ pkgs.mkShell {
     export PATH="$PATH:$HOME/.cargo/bin"
 
     export PSIBASE_DATADIR="${psidk}/share/psibase"
+    export PSIBASE_PACKAGE_TEMPLATES="${packageTemplates}"
+    export PSIBASE_CRATE_VERSION="${release.psibaseCrateVersion}"
+    # Keep schema gen on the SDK train (contributor build/ psitest is often newer).
+    export CARGO_PSIBASE_PSITEST="${psidk}/bin/psitest"
 
     export CARGO_COMPONENT_CACHE_DIR="''${CARGO_COMPONENT_CACHE_DIR:-$HOME/.cache/cargo-component}"
     export WASM_PACK_CACHE="''${WASM_PACK_CACHE:-$HOME/.cache/wasm-pack}"
@@ -303,7 +392,8 @@ pkgs.mkShell {
       echo "  PSIBASE_DATADIR=$PSIBASE_DATADIR"
       echo ""
       echo "  Local chain:  psidk-up   /   psidk-down   (or psidk-devnet up|down|status)"
-      echo "  Scaffold:     nix flake init -t path:./#package   (see nix/sdk/README.md)"
+      echo "  New app:      psidk-new <name>   (cargo-generate → packages/<App>)"
+      echo "  Workspace:    nix flake init -t …#package   (see nix/sdk/README.md)"
       echo "  Docs:         nix/sdk/README.md"
       echo ""
     fi

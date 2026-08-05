@@ -660,6 +660,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "demo"
+version = "0.23.0"
+dependencies = [
+ "async-graphql",
+ "demo-pkg",
+ "psibase",
+ "psibase_macros",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "demo-pkg"
+version = "0.23.0"
+dependencies = [
+ "demo",
+ "demo-plugin",
+ "r-demo",
+]
+
+[[package]]
+name = "demo-plugin"
+version = "0.23.0"
+dependencies = [
+ "demo",
+ "psibase",
+ "serde",
+ "serde_json",
+ "wit-bindgen-rt",
+]
+
+[[package]]
 name = "der"
 version = "0.7.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -768,14 +800,6 @@ checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
  "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "example"
-version = "0.23.0"
-dependencies = [
- "psibase",
- "serde",
 ]
 
 [[package]]
@@ -1880,6 +1904,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1fbf4db142a473a8d80c26bbf18454ed458bf8d26c8219c331daecfdbd079001"
 dependencies = [
  "proc-macro2",
+]
+
+[[package]]
+name = "r-demo"
+version = "0.23.0"
+dependencies = [
+ "async-graphql",
+ "demo",
+ "psibase",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -3197,6 +3232,15 @@ checksum = "524e57b2c537c0f9b1e69f1965311ec12182b4122e45035b1508cd24d2adadb1"
 dependencies = [
  "cfg-if",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "wit-bindgen-rt"
+version = "0.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b2de7a3b06b9725d129b5cbd1beca968feed919c433305a23da46843185ecdd6"
+dependencies = [
+ "bitflags 2.13.1",
 ]
 
 [[package]]

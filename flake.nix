@@ -152,6 +152,7 @@
                 nixpkgs-nodejs
                 ;
               psidk = pkgs.callPackage ./nix/sdk/package.nix { };
+              packageTemplates = ./nix/sdk/package-templates;
             };
           };
 

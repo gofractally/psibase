@@ -6,7 +6,8 @@
     #   psibase.url = "github:gofractally/psibase/v0.23.0";
     # While developing against a local checkout:
     #   nix flake lock --override-input psibase path:/path/to/psibase
-    psibase.url = "github:gofractally/psibase";
+    # Use a release tag when available. Until SDK lands on main:
+    psibase.url = "github:gofractally/psibase/mm/nix-pkg-dev";
   };
 
   outputs =

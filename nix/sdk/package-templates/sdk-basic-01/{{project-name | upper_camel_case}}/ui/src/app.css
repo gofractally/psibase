@@ -1,0 +1,11 @@
+.app {
+  max-width: 480px;
+  margin: 2rem auto;
+  font-family: system-ui, sans-serif;
+}
+
+.field {
+  display: block;
+  width: 100%;
+  margin: 0.5rem 0 1rem;
+}
