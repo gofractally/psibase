@@ -1,6 +1,14 @@
-# NixOS deploy
+# Deploying psibase with Nix
 
-Prebuilt `psibase` package and `services.psibase` NixOS module (x86_64-linux).
+Two separate things live here:
+
+- **`packages.psibase`** — the psibase binaries as a Nix package.
+- **`nixosModules.psibase`** — a `services.psibase` module that runs `psinode` as
+  a hardened systemd service. **NixOS only**, by construction.
+
+Both are x86_64-linux only.
+
+## NixOS module
 
 ```nix
 # flake.nix (your NixOS host)
@@ -42,7 +50,7 @@ psibase boot -a http://HOST:PORT -p prod
 `http://psibase.localhost:8080/` and also reads `PSINODE_URL`, so it can be
 omitted when those match.
 
-## Not handled by this module
+### Not handled by this module
 
 TLS, reverse proxy and admin auth are yours. psinode does not authenticate
 `/native/admin/`, so terminate TLS and authenticate admin in a proxy (Caddy,
@@ -62,7 +70,7 @@ services.psibase = {
 };
 ```
 
-## SoftHSM / block production
+### SoftHSM / block production
 
 With `softHsm.enable = true` the module writes a SoftHSM config pointing at a persistent token directory, runs a oneshot that initializes the token once from `pinFile`, and starts `psinode` with `--pkcs11-module=…/libsofthsm2.so` and `SOFTHSM2_CONF` set.
 
@@ -82,7 +90,7 @@ Use a module function so `config` is in scope:
 
 ## Package
 
-`nix build .#psibase` repackages the published release tarball and patchelfs it for NixOS. It does **not** build psibase from source.
+`nix build .#psibase` repackages the published release tarball and patchelfs it for the Nix store. It does **not** build psibase from source.
 
 It is a *runtime* package, not a psidk: `bin/{psinode,psibase,psitest}` plus `share/psibase` (`config.in`, `packages`, `wasm`, `services`, `licenses`) and man pages. The 241M `share/wasi-sysroot` and the CMake/Python dev helpers are dropped, since building services is the dev shell's job — trimmed output is 74M against 314M unpacked.
 
