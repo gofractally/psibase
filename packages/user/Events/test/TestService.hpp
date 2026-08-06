@@ -36,7 +36,6 @@ PSIO_REFLECT(TestService,
              method(sendAccount, a),
              method(sendTime, t))
 
-PSIBASE_REFLECT_EVENTS(TestService);
 PSIBASE_REFLECT_HISTORY_EVENTS(TestService,
                                method(testEvent, i, d, v, s),
                                method(opt, opt),

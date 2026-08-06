@@ -58,7 +58,6 @@ namespace UserService
       method(unsave, msg_id, sender, subject, body, datetime),
       method(serveSys, request)
    );
-   PSIBASE_REFLECT_EVENTS(Chainmail);
    PSIBASE_REFLECT_HISTORY_EVENTS(Chainmail,
       method(sent, sender, receiver, subject, body, datetime),
       method(archive, msg_id),

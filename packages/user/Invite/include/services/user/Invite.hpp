@@ -118,7 +118,6 @@ namespace UserService
          method(getInvite, inviteId),
          method(getExpDate, inviteId),
       );
-      PSIBASE_REFLECT_EVENTS(Invite);
       PSIBASE_REFLECT_HISTORY_EVENTS(Invite,
          method(updated, inviteId, actor, event),
       );

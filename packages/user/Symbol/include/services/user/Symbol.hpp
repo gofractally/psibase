@@ -70,7 +70,6 @@ namespace UserService
       method(getMapBySym, symbol),
       method(delLength, length),
    );
-   PSIBASE_REFLECT_EVENTS(Symbol);
    PSIBASE_REFLECT_HISTORY_EVENTS(Symbol,
       method(symEvent, symbol, actor, action),
    );

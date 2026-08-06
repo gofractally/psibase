@@ -396,7 +396,6 @@ namespace UserService
       method(getBalConf, account, tokenId, index),
       method(getTokenConf, tokenId, index),
     );
-   PSIBASE_REFLECT_EVENTS(Tokens);
    PSIBASE_REFLECT_HISTORY_EVENTS(Tokens,
       method(configured, tokenId, action, memo),
       method(supplyChanged, tokenId, actor, action, amount, memo),
