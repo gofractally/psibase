@@ -361,8 +361,6 @@ namespace UserService
             void supplyChanged(TID tokenId, Account actor, std::string action, std::string amount, Memo memo) {}
             void balChanged(TID tokenId, Account account, Account counterParty, std::string action, std::string amount, Memo memo) {}
          };
-
-         struct Merkle{};
       };
       // clang-format on
    };
@@ -401,7 +399,6 @@ namespace UserService
       method(supplyChanged, tokenId, actor, action, amount, memo),
       method(balChanged, tokenId, account, counterParty, action, amount, memo),
    );
-   PSIBASE_REFLECT_MERKLE_EVENTS(Tokens);
    PSIBASE_REFLECT_TABLES(Tokens, Tokens::Tables)
    // clang-format on
 

@@ -23,9 +23,6 @@ struct TestService : psibase::Service
          void account(psibase::AccountNumber a);
          void time(psibase::TimePointSec t);
       };
-      struct Merkle
-      {
-      };
    };
 };
 PSIO_REFLECT(TestService,
@@ -43,6 +40,5 @@ PSIBASE_REFLECT_HISTORY_EVENTS(TestService,
                                method(str, s),
                                method(account, a),
                                method(time, t));
-PSIBASE_REFLECT_MERKLE_EVENTS(TestService);
 
 PSIBASE_REFLECT_TABLES(TestService)

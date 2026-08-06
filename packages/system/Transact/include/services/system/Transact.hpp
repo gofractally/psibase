@@ -498,9 +498,6 @@ namespace SystemService
             /// Emitted at the start of each block
             void blockStart(psibase::BlockNum blockNum, psibase::BlockTime blockTime) {}
          };
-         struct Merkle
-         {
-         };
       };
    };
    PSIO_REFLECT(Transact,
@@ -533,7 +530,6 @@ namespace SystemService
    PSIBASE_REFLECT_TABLES(Transact, Transact::Tables)
    PSIBASE_REFLECT_HISTORY_EVENTS(Transact, method(blockStart, blockNum, blockTime));
    PSIBASE_PUBLIC_EVENT(Transact::Events::History::blockStart)
-   PSIBASE_REFLECT_MERKLE_EVENTS(Transact);
 
    // The status will never be nullopt during transaction execution or during RPC.
    // It will be nullopt when called by a test wasm before the genesis transaction
