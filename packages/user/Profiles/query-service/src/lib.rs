@@ -2,12 +2,9 @@
 #[allow(non_snake_case)]
 mod service {
     use async_graphql::*;
-    use profiles::tables::Profile;
-    use psibase::services::http_server::Wrapper as HttpServer;
-    use psibase::services::sites::Wrapper as Sites;
+    use profiles::tables::{AvatarTable, Profile};
     use psibase::*;
 
-    const AVATAR_PATH: &str = "/profile/avatar.avatar";
     const AVATAR_PREFIX: &str = "/avatar/";
 
     struct Query;
@@ -30,8 +27,7 @@ mod service {
         }
     }
 
-    /// Proxies `GET|HEAD /avatar/<account>` from the profiles subdomain to the
-    /// avatar stored on that account's Sites content (`/profile/avatar.avatar`).
+    /// Serves `GET|HEAD /avatar/<account>` from the Profiles avatar table.
     fn serve_avatar(request: &HttpRequest) -> Option<HttpReply> {
         if request.method != "GET" && request.method != "HEAD" {
             return None;
@@ -50,32 +46,30 @@ mod service {
             return Some(not_found());
         };
 
-        let Some(props) = Sites::call().getProps(account, AVATAR_PATH.into()) else {
+        let Some(avatar) = AvatarTable::read().get_index_pk().get(&account) else {
             return Some(not_found());
         };
 
-        if !profiles::is_allowed_content_type(&props.contentType) {
-            return Some(not_found());
-        }
-
-        let root_host = HttpServer::call().rootHost(request.host.clone());
-        let mut site_request = request.clone();
-        site_request.host = format!("{account}.{root_host}");
-        site_request.target = AVATAR_PATH.into();
-
-        let Some(mut reply) = Sites::call().serveSys(site_request, None) else {
+        let Some(content_type) = profiles::content_type_mime(avatar.content_type) else {
             return Some(not_found());
         };
 
-        reply
-            .headers
-            .push(HttpHeader::new("X-Content-Type-Options", "nosniff"));
-        if reply.status == HttpStatus::Ok as u16 {
-            reply.contentType =
-                profiles::normalize_content_type(&reply.contentType).to_ascii_lowercase();
-        }
+        let mut headers = allow_cors_with_origin("*");
+        headers.push(HttpHeader::new("X-Content-Type-Options", "nosniff"));
+        headers.push(HttpHeader::new("Cache-Control", "no-cache"));
 
-        Some(reply)
+        let body = if request.method == "HEAD" {
+            Hex(Vec::new())
+        } else {
+            Hex(avatar.content)
+        };
+
+        Some(HttpReply {
+            status: HttpStatus::Ok as u16,
+            contentType: content_type.into(),
+            body,
+            headers,
+        })
     }
 
     #[action]
