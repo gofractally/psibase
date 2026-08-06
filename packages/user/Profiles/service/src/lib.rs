@@ -1,9 +1,12 @@
 pub const MAX_AVATAR_SIZE: usize = 100 * 1024;
 
-const AVATAR_CONTENT_TYPE_PNG: u8 = 0;
-const AVATAR_CONTENT_TYPE_JPEG: u8 = 1;
-const AVATAR_CONTENT_TYPE_WEBP: u8 = 2;
-const AVATAR_CONTENT_TYPE_GIF: u8 = 3;
+/// On-chain id for an allowed avatar image MIME type.
+pub type ImgContentType = u8;
+
+const AVATAR_CONTENT_TYPE_PNG: ImgContentType = 0;
+const AVATAR_CONTENT_TYPE_JPEG: ImgContentType = 1;
+const AVATAR_CONTENT_TYPE_WEBP: ImgContentType = 2;
+const AVATAR_CONTENT_TYPE_GIF: ImgContentType = 3;
 
 fn normalize_content_type(content_type: &str) -> &str {
     content_type
@@ -13,8 +16,8 @@ fn normalize_content_type(content_type: &str) -> &str {
         .trim()
 }
 
-/// Maps a MIME content-type string to the on-chain `u8` id.
-pub fn parse_content_type(content_type: &str) -> Option<u8> {
+/// Maps a MIME content-type string to the on-chain id.
+pub fn parse_content_type(content_type: &str) -> Option<ImgContentType> {
     match normalize_content_type(content_type).to_ascii_lowercase().as_str() {
         "image/png" => Some(AVATAR_CONTENT_TYPE_PNG),
         "image/jpeg" => Some(AVATAR_CONTENT_TYPE_JPEG),
@@ -25,7 +28,7 @@ pub fn parse_content_type(content_type: &str) -> Option<u8> {
 }
 
 /// Maps an on-chain content-type id to its MIME string.
-pub fn content_type_mime(content_type: u8) -> Option<&'static str> {
+pub fn content_type_mime(content_type: ImgContentType) -> Option<&'static str> {
     match content_type {
         AVATAR_CONTENT_TYPE_PNG => Some("image/png"),
         AVATAR_CONTENT_TYPE_JPEG => Some("image/jpeg"),
@@ -37,6 +40,7 @@ pub fn content_type_mime(content_type: u8) -> Option<&'static str> {
 
 #[psibase::service_tables]
 pub mod tables {
+    use crate::ImgContentType;
     use psibase::AccountNumber;
     use psibase::{Fracpack, ToSchema};
     use serde::{Deserialize, Serialize};
@@ -60,8 +64,7 @@ pub mod tables {
         #[primary_key]
         pub account: AccountNumber,
 
-        /// Closed enum; see `parse_content_type` / `content_type_mime`.
-        pub content_type: u8,
+        pub content_type: ImgContentType,
         pub content: Vec<u8>,
     }
 }
@@ -69,7 +72,7 @@ pub mod tables {
 #[psibase::service(name = "profiles", tables = "tables")]
 pub mod service {
     use crate::tables::{Avatar, AvatarTable, Profile, ProfileTable};
-    use crate::{content_type_mime, MAX_AVATAR_SIZE};
+    use crate::{content_type_mime, ImgContentType, MAX_AVATAR_SIZE};
     use psibase::*;
 
     #[action]
@@ -95,7 +98,7 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn uploadAvatar(image: Vec<u8>, contentType: u8) {
+    fn uploadAvatar(image: Vec<u8>, contentType: ImgContentType) {
         assert!(
             image.len() <= MAX_AVATAR_SIZE,
             "Avatar exceeds max file size of {MAX_AVATAR_SIZE} bytes"
