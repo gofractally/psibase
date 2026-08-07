@@ -1,6 +1,6 @@
 import { zAccount } from "@shared/lib/schemas/account";
 
-export const EVALUATIONS_SERVICE = zAccount.parse("evaluations");
+export const EVALUATIONS_SERVICE = zAccount.parse("evaluation");
 export const FRACTALS_SERVICE = zAccount.parse("fractals");
 export const GUILDS_SERVICE = zAccount.parse("guilds");
 export const COUNCIL_SEATS = 6;

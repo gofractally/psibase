@@ -301,6 +301,7 @@ add_rs_component_workspace(packages/:Plugins
     workshop
     fractal-core
     config
+    homepage
     producers
 )
 
@@ -311,7 +312,7 @@ include(libraries/psibase/sdk/pack_service.cmake)
 
 set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/packages)
 
-set(PSIBASE_VERSION 0.23)
+set(PSIBASE_VERSION 0.25)
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/TransactService.psi
@@ -322,14 +323,14 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Transact.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Transact-schema.json
         FLAGS isPrivileged
-        SERVER r-transact
-    SERVICE r-transact
+        SERVER transact+1
+    SERVICE transact+1
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RTransact.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RTransact-schema.json
         FLAGS isPrivileged
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Transact/src/postinstall.json
     DEPENDS wasm
-    PACKAGE_DEPENDS "AccountsService(^${PSIBASE_VERSION}.0)" "CpuLimit(^${PSIBASE_VERSION}.0)" "Db(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "AccountsService(^${PSIBASE_VERSION}.0)" "CpuLimit(^${PSIBASE_VERSION}.0)" "Db(^${PSIBASE_VERSION}.0)" "EventsService(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -351,9 +352,9 @@ psibase_package(
     SERVICE accounts
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Accounts.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Accounts-schema.json
-        SERVER r-accounts
+        SERVER accounts+1
         POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Accounts/postinstall.json
-    SERVICE r-accounts
+    SERVICE accounts+1
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RAccounts-schema.json
     DEPENDS wasm
@@ -371,7 +372,7 @@ psibase_package(
         POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Accounts/postinstall-ui.json
     DEPENDS ${Accounts_js_DEP}
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "AccountsService(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)" "ClientData(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Invite(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "AccountsService(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)" "ClientData(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "NameMarket(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Invite(^${PSIBASE_VERSION}.0)" "Tokens(^${PSIBASE_VERSION}.0)" 
 )
 
 psibase_package(
@@ -391,7 +392,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Brotli compression/decompression plugin"
     PACKAGE_DEPENDS "Host(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
-    SERVICE brotli-codec
+    SERVICE brotli
         DATA ${Plugins_OUTPUT_FILE_brotli_codec} /plugin.wasm
     DEPENDS ${Plugins_DEP}
 )
@@ -612,8 +613,8 @@ psibase_package(
     SERVICE auth-sig
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthSig.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/AuthSig-schema.json
-        SERVER r-auth-sig
-    SERVICE r-auth-sig
+        SERVER auth-sig+1
+    SERVICE auth-sig+1
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthSig.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RAuthSig-schema.json
     SERVICE verify-sig
@@ -668,11 +669,11 @@ psibase_package(
     NAME AuthDelegateService
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Auth service that delegates authorization to another account"
-    SERVICE auth-delegate
+    SERVICE auth-delg
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthDelegate.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/AuthDelegate-schema.json
-        SERVER r-auth-dlg
-    SERVICE r-auth-dlg
+        SERVER auth-delg+1
+    SERVICE auth-delg+1
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthDelegate.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RAuthDelegate-schema.json
     DEPENDS wasm
@@ -684,7 +685,7 @@ psibase_package(
     NAME AuthDelegate
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Auth service that delegates authorization to another account"
-    SERVICE auth-delegate
+    SERVICE auth-delg
         DATA ${Plugins_OUTPUT_FILE_auth_delegate} /plugin.wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "AuthDelegateService(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)"
@@ -747,8 +748,8 @@ psibase_package(
     SERVICE dyn-ld
         WASM ${CMAKE_CURRENT_BINARY_DIR}/DynLd.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/DynLd-schema.json
-        SERVER r-dyn-ld
-    SERVICE r-dyn-ld
+        SERVER dyn-ld+1
+    SERVICE dyn-ld+1
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RDynLd.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RDynLd-schema.json
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
@@ -762,9 +763,11 @@ psibase_package(
     DESCRIPTION "Network homepage"
     SERVICE homepage
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Homepage/ui/dist/*  /
+        DATA ${Plugins_OUTPUT_FILE_homepage} /plugin.wasm
         POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Homepage/postinstall.json
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "AccountsService(^${PSIBASE_VERSION}.0)" "Profiles(^${PSIBASE_VERSION}.0)" "Branding(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "AccountsService(^${PSIBASE_VERSION}.0)" "Profiles(^${PSIBASE_VERSION}.0)" "Branding(^${PSIBASE_VERSION}.0)" "NameMarket(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)"
     DEPENDS ${Homepage_js_DEP}
+    DEPENDS ${Plugins_DEP}
 )
 
 cargo_psibase_package(
@@ -775,10 +778,9 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
-    OUTPUT ${SERVICE_DIR}/PremAccounts.psi
-    PATH packages/user/PremAccounts
+    OUTPUT ${SERVICE_DIR}/NameMarket.psi
+    PATH packages/user/NameMarket
     TARGET_DIR ${USER_WORKSPACE_TARGET}
-    DEPENDS ${PremAccounts_js_DEP}
 )
 
 psibase_package(
@@ -817,8 +819,8 @@ psibase_package(
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Producers-schema.json
         DATA ${Plugins_OUTPUT_FILE_producers} /plugin.wasm
         FLAGS isPrivileged
-        SERVER r-producers
-    SERVICE r-producers
+        SERVER producers+1
+    SERVICE producers+1
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RProducers.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RProducers-schema.json
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Producers/src/postinstall.json
@@ -830,13 +832,13 @@ psibase_package(
     OUTPUT ${SERVICE_DIR}/HttpServer.psi
     NAME HttpServer
     VERSION ${PSIBASE_VERSION}.0
-    DESCRIPTION "The `http-server` service routes HTTP requests to the appropriate service"
-    SERVICE http-server
+    DESCRIPTION "The `http` service routes HTTP requests to the appropriate service"
+    SERVICE http
         WASM ${CMAKE_CURRENT_BINARY_DIR}/HttpServer.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/HttpServer-schema.json
-        SERVER rhttp-server
+        SERVER http+1
         FLAGS isPrivileged
-    SERVICE rhttp-server
+    SERVICE http+1
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RHttpServer.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RHttpServer-schema.json
     DEPENDS wasm
@@ -852,9 +854,9 @@ psibase_package(
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/SetCode-schema.json
         DATA ${Plugins_OUTPUT_FILE_setcode} /plugin.wasm
         FLAGS isPrivileged
-        SERVER r-setcode
+        SERVER setcode+1
         INIT
-    SERVICE r-setcode
+    SERVICE setcode+1
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RSetCode.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RSetCode-schema.json
     DEPENDS wasm
@@ -863,23 +865,38 @@ psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/Events.psi
-    NAME Events
+    OUTPUT ${SERVICE_DIR}/EventsService.psi
+    NAME EventsService
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Indexes events and provides querying"
     SERVICE events
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Events.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Events-schema.json
-        SERVER r-events
-    SERVICE event-index
+        SERVER events+1
+    SERVICE events+2
         WASM ${CMAKE_CURRENT_BINARY_DIR}/EventIndex.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/EventIndex-schema.json
-    SERVICE r-events
+    SERVICE events+1
         WASM ${CMAKE_CURRENT_BINARY_DIR}/REvents.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/REvents-schema.json
-        POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Events/src/postinstall.json
     DEPENDS wasm
-    PACKAGE_DEPENDS "Transact(^${PSIBASE_VERSION}.0)" "TransactService(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/Events.psi
+    NAME Events
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Indexes events and provides querying"
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Events/src/postinstall.json
+    DEPENDS wasm
+    # FIXME: The existence of this service forces anything that depends
+    # on Events to be installed after it. Figure out a way to represent
+    # this constraint more directly.
+    SERVICE events+3
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/Nop.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Nop-schema.json
+    PACKAGE_DEPENDS "EventsService(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "TransactService(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -906,9 +923,9 @@ psibase_package(
     SERVICE invite
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Invite.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Invite-schema.json
-        SERVER r-invite
+        SERVER invite+1
         INIT
-    SERVICE r-invite
+    SERVICE invite+1
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RInvite.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RInvite-schema.json
     DEPENDS wasm
@@ -942,9 +959,10 @@ psibase_package(
     DESCRIPTION "Handler for client-side permissions"
     PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "CommonApi(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Permissions/postinstall.json
-    SERVICE permissions
+    SERVICE perms
         DATA ${Plugins_OUTPUT_FILE_permissions} /plugin.wasm
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Permissions/ui/dist/* /
+        EXPORT permissions
     DEPENDS ${Permissions_js_DEP}
     DEPENDS ${Plugins_DEP}
 )
@@ -993,6 +1011,7 @@ psibase_package(
         "Registry(^${PSIBASE_VERSION})" 
         "StagedTx(^${PSIBASE_VERSION})" 
         "Packages(^${PSIBASE_VERSION})"
+        "NameMarket(^${PSIBASE_VERSION})"
         "Producers(^${PSIBASE_VERSION})"
         "StagedTx(^${PSIBASE_VERSION})"
         "Transact(^${PSIBASE_VERSION})"
@@ -1002,7 +1021,6 @@ psibase_package(
         "VirtualServer(^${PSIBASE_VERSION})"
         "Chainmail(^${PSIBASE_VERSION})"
         "ClientData(^${PSIBASE_VERSION})"
-        "PremAccounts(^${PSIBASE_VERSION})"
     SERVICE config
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Config/ui/dist/* /
         DATA ${Plugins_OUTPUT_FILE_config} /plugin.wasm
@@ -1027,7 +1045,7 @@ psibase_package(
         "StagedTx(^${PSIBASE_VERSION})" 
         "Transact(^${PSIBASE_VERSION})"
         "Fractals(^${PSIBASE_VERSION})"
-    SERVICE fractal-core
+    SERVICE fractal-cr
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/FractalCore/ui/dist/* /
         DATA ${Plugins_OUTPUT_FILE_fractal_core} /plugin.wasm
     DEPENDS ${FractalCore_js_DEP}
@@ -1040,8 +1058,17 @@ psibase_package(
     NAME TokenUsers
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Creates accounts alice & bob, and gives each some system tokens. Not for production use."
-    PACKAGE_DEPENDS "AccountsService(^${PSIBASE_VERSION}.0)" "FaucetTok(^${PSIBASE_VERSION}.0)" 
+    PACKAGE_DEPENDS "AccountsService(^${PSIBASE_VERSION}.0)" "FaucetTok(^${PSIBASE_VERSION}.0)" "Tokens(^${PSIBASE_VERSION}.0)" 
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Tokens/src/TokenUsers.json
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/DevNameMarkets.psi
+    NAME DevNameMarkets
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Creates the default name markets. Not for production use."
+    PACKAGE_DEPENDS "NameMarket(^${PSIBASE_VERSION}.0)" "FaucetTok(^${PSIBASE_VERSION}.0)"
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/NameMarket/src/DevNameMarkets.json
 )
 
 psibase_package(
@@ -1052,9 +1079,9 @@ psibase_package(
     SERVICE packages
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Packages.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Packages-schema.json
-        SERVER r-packages
+        SERVER packages+1
         DATA ${Plugins_OUTPUT_FILE_packages} /plugin.wasm
-    SERVICE r-packages
+    SERVICE packages+1
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RPackages.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RPackages-schema.json
     DEPENDS wasm ${Plugins_DEP}
@@ -1217,8 +1244,8 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Network initializes with development-only apps, insecure authentication, and no governance."
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
-                    Docs DiffAdjust Evaluations Events Fractals FractalCore Guilds Explorer Homepage Host HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
-                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens PremAccounts TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop
+                    Docs DiffAdjust Evaluations Events Fractals FractalCore Guilds Explorer Homepage Host HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
+                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens NameMarket TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop
 )
 
 psibase_package(
@@ -1227,8 +1254,8 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Network initializes with production-ready apps, secure authentication, and no governance."
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
-                    Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Guilds Homepage Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
-                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens PremAccounts TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop
+                    Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Guilds Homepage Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
+                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens NameMarket TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop
 )
 
 psibase_package(
@@ -1265,23 +1292,33 @@ psibase_package(
     PACKAGE_DEPENDS XHttp XAdmin XDb XPackages XPeers XRun XSites XTimer XTransact
 )
 
-function(write_package_index target dir)
+function(write_package_index target dir reserve)
     set(deps ${CMAKE_CURRENT_SOURCE_DIR}/make_package_index.sh)
+    set(package-files)
     foreach(service IN LISTS ARGN)
         list(APPEND deps ${service} ${dir}/${service}.psi)
+        list(APPEND package-files ${dir}/${service}.psi)
     endforeach()
+    set(extra-commands)
+    set(extra-packages)
+    if (reserve)
+        set(extra-commands COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/reserved-names -o ${dir}/ReservedNames.psi --name ReservedNames --version ${PSIBASE_VERSION}.0 --names ${CMAKE_CURRENT_SOURCE_DIR}/rust/reserved-names/generic-names.txt ${package-files})
+        set(extra-packages ReservedNames)
+        list(APPEND deps reserved-names ${CMAKE_CURRENT_BINARY_DIR}/rust/release/reserved-names ${CMAKE_CURRENT_SOURCE_DIR}/rust/reserved-names/generic-names.txt)
+    endif()
     add_custom_command(
         OUTPUT ${dir}/index.json
         DEPENDS ${deps}
-        COMMAND /bin/bash ${CMAKE_CURRENT_SOURCE_DIR}/make_package_index.sh ${CMAKE_COMMAND} ${dir} ${ARGN} >${dir}/index.json
+        ${extra-commands}
+        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/make_package_index.sh ${CMAKE_COMMAND} ${dir} ${ARGN} ${extra-packages} >${dir}/index.json
     )
     add_custom_target(${target} ALL DEPENDS ${dir}/index.json)
 endfunction()
 
-write_package_index(package-index ${SERVICE_DIR}
+write_package_index(package-index ${SERVICE_DIR} 1
     Accounts AccountsService Aes AuthAny AuthDyn AuthDelegate AuthDelegateService AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
-    Docs DiffAdjust DynLd Events Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry
-    Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap PremAccounts Transact TransactService Homepage VirtualServer WebCrypto Workshop Config
+    Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry
+    Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage VirtualServer WebCrypto Workshop Config
     XAdmin XBasic XDb XDefault XHttp XPackages XPeers XProxy XRun XSites XTimer XTransact)
 
 install(
@@ -1312,6 +1349,7 @@ install(
           ${SERVICE_DIR}/Docs.psi
           ${SERVICE_DIR}/DynLd.psi
           ${SERVICE_DIR}/Events.psi
+          ${SERVICE_DIR}/EventsService.psi
           ${SERVICE_DIR}/Evaluations.psi
           ${SERVICE_DIR}/Explorer.psi
           ${SERVICE_DIR}/FaucetTok.psi
@@ -1333,10 +1371,12 @@ install(
           ${SERVICE_DIR}/Nop.psi
           ${SERVICE_DIR}/Packages.psi
           ${SERVICE_DIR}/Permissions.psi
-          ${SERVICE_DIR}/PremAccounts.psi
+          ${SERVICE_DIR}/NameMarket.psi
+          ${SERVICE_DIR}/DevNameMarkets.psi
           ${SERVICE_DIR}/Producers.psi
           ${SERVICE_DIR}/Profiles.psi
           ${SERVICE_DIR}/Registry.psi
+          ${SERVICE_DIR}/ReservedNames.psi
           ${SERVICE_DIR}/SetCode.psi
           ${SERVICE_DIR}/Sites.psi
           ${SERVICE_DIR}/StagedTx.psi
@@ -1374,11 +1414,11 @@ psibase_package(
     NAME PSubjective
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Test service for parallel access to the subjective database"
-    SERVICE psubjective
+    SERVICE psubj
         WASM ${CMAKE_CURRENT_BINARY_DIR}/PSubjectiveService.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/PSubjectiveService-schema.json
         FLAGS isPrivileged
-        SERVER psubjective
+        SERVER psubj
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
     DEPENDS wasm
 )
@@ -1430,10 +1470,10 @@ psibase_package(
     NAME KeepSocket
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Accepts HTTP requests, but never returns a response"
-    SERVICE s-keep-sock
+    SERVICE s-keepsock
         WASM ${CMAKE_CURRENT_BINARY_DIR}/KeepSocketService.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/KeepSocketService-schema.json
-        SERVER s-keep-sock
+        SERVER s-keepsock
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
     DEPENDS wasm
 )
@@ -1455,10 +1495,10 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Lists active sockets"
     LOCAL
-    SERVICE x-sock-list
+    SERVICE x-socklist
         WASM ${CMAKE_CURRENT_BINARY_DIR}/XSocketListService.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XSocketListService-schema.json
-        SERVER x-sock-list
+        SERVER x-socklist
         FLAGS isPrivileged
     DEPENDS wasm
 )
@@ -1506,7 +1546,17 @@ psibase_package(
     PACKAGE_DEPENDS "XHttp(^${PSIBASE_VERSION}.0)"
 )
 
-write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket Loop XSocketList WSEcho XDelay XWithServer)
+write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages 0 PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket Loop XSocketList WSEcho XDelay XWithServer)
+
+ExternalProject_Add(
+    reserved-names
+    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/rust
+    BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/reserved-names
+    CONFIGURE_COMMAND ""
+    BUILD_COMMAND   cargo build -r --bin reserved-names --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+    BUILD_ALWAYS 1
+    INSTALL_COMMAND ""
+)
 
 ExternalProject_Add(
     rust

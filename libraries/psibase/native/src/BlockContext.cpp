@@ -60,14 +60,6 @@ namespace psibase
       if (!status)
          status.emplace();
 
-      auto dbStatus = db.kvGet<DatabaseStatusRow>(DatabaseStatusRow::db, databaseStatusKey());
-      if (!dbStatus)
-      {
-         dbStatus.emplace();
-         if (!isReadOnly)
-            db.kvPut(DatabaseStatusRow::db, dbStatus->key(), *dbStatus);
-      }
-
       current.header.producer = producer;
       current.header.term     = term;
       if (status->head)
@@ -142,32 +134,23 @@ namespace psibase
       if (current.header.blockNum == 2)
          return;
 
-      checkActive();
-      active = false;
-
-      Action action{
-          .sender  = {},
-          .service = transactionServiceNum,
-          .method  = MethodNumber("startBlock"),
-          .rawData = psio::to_frac(std::tuple()),
-      };
-      SignedTransaction  trx;
-      TransactionTrace   trace;
-      TransactionContext tc{*this, trx, trace, DbMode::transaction()};
-      auto&              atrace = trace.actionTraces.emplace_back();
+      SignedTransaction trx{.transaction{Transaction{
+          .tapos   = {.expiration = std::chrono::ceil<Seconds>(current.header.time + Seconds(1))},
+          .actions = {{
+              .sender  = {},
+              .service = transactionServiceNum,
+              .method  = MethodNumber("startBlock"),
+              .rawData = psio::to_frac(std::tuple()),
+          }},
+      }}};
+      TransactionTrace  trace;
 
       // Failure here aborts the block since Transact relies on startBlock
       // functioning correctly. Fixing this type of failure requires forking
       // the chain, just like fixing bugs which block transactions within
       // Transact's processTransaction may require forking the chain.
       //
-      // TODO: log failure
-      tc.execNonTrxAction(0, action, atrace);
-      BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
-      PSIBASE_LOG(trxLogger, debug) << "startBlock succeeded";
-      // printf("%s\n", prettyTrace(atrace).c_str());
-
-      active = true;
+      pushTransaction(std::move(trx), trace, std::nullopt, false, true);
    }
 
    void BlockContext::callOnBlock()
@@ -564,22 +547,6 @@ namespace psibase
       }
    }
 
-   Checksum256 BlockContext::makeEventMerkleRoot()
-   {
-      auto dbStatus = db.kvGet<DatabaseStatusRow>(DatabaseStatusRow::db, databaseStatusKey());
-      check(!!dbStatus, "databaseStatus not set");
-
-      Merkle m;
-      for (std::uint64_t i   = dbStatus->blockMerkleEventNumber,
-                         end = dbStatus->nextMerkleEventNumber;
-           i != end; ++i)
-      {
-         auto data = db.kvGetRaw(DbId::merkleEvent, psio::convert_to_key(i));
-         m.push(EventInfo{i, std::span{data->pos, data->end}});
-      }
-      return m.root();
-   }
-
    Checksum256 BlockContext::makeTransactionMerkle()
    {
       Merkle m;
@@ -768,7 +735,7 @@ namespace psibase
 
       status->current.consensusState = current.header.consensusState = sha256(status->consensus);
       status->current.trxMerkleRoot = current.header.trxMerkleRoot = makeTransactionMerkle();
-      status->current.eventMerkleRoot = current.header.eventMerkleRoot = makeEventMerkleRoot();
+      current.header.eventMerkleRoot = status->current.eventMerkleRoot;
 
       status->head = current;  // Also calculates blockId
       // authCode can be loaded from the database. We don't need an
@@ -776,11 +743,6 @@ namespace psibase
       status->head->header.authCode.reset();
       if (isGenesisBlock)
          status->chainId = status->head->blockId;
-
-      auto dbStatus = db.kvGet<DatabaseStatusRow>(DatabaseStatusRow::db, databaseStatusKey());
-      check(!!dbStatus, "databaseStatus not set");
-      dbStatus->blockMerkleEventNumber = dbStatus->nextMerkleEventNumber;
-      db.kvPut(DatabaseStatusRow::db, dbStatus->key(), *dbStatus);
 
       // These values will be replaced at the start of the next block.
       // Changing the these here gives services running in RPC mode

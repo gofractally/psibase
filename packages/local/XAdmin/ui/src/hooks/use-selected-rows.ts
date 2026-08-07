@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 
 import { getId } from "@/lib/get-id";
+import { getRequiredPackages } from "@/lib/get-required-packages";
 import { detectChange } from "@/lib/row-elements";
 
 import { PackageInfo, PackageInfoSchema } from "../types";
@@ -17,12 +18,45 @@ const ChangeWarningSchema = z.object({
     removedPackage: PackageInfoSchema,
 });
 
+const getTransitiveDependants = (
+    removingPackageName: string,
+    selectedPackages: PackageInfo[],
+): PackageInfo[] => {
+    const reverseDeps = new Map<string, PackageInfo[]>();
+    for (const pack of selectedPackages) {
+        for (const dep of pack.depends) {
+            const list = reverseDeps.get(dep.name) ?? [];
+            list.push(pack);
+            reverseDeps.set(dep.name, list);
+        }
+    }
+
+    const dependants = new Map<string, PackageInfo>();
+    const queue = [removingPackageName];
+
+    while (queue.length > 0) {
+        const current = queue.shift()!;
+        for (const pack of reverseDeps.get(current) ?? []) {
+            if (
+                pack.name !== removingPackageName &&
+                !dependants.has(pack.name)
+            ) {
+                dependants.set(pack.name, pack);
+                queue.push(pack.name);
+            }
+        }
+    }
+
+    return [...dependants.values()];
+};
+
 const getChangeWarning = (
     removingPackagename: string,
     selectedPackages: PackageInfo[],
 ) => {
-    const dependants = selectedPackages.filter((pack) =>
-        pack.depends.map((x) => x.name).includes(removingPackagename),
+    const dependants = getTransitiveDependants(
+        removingPackagename,
+        selectedPackages,
     );
 
     if (dependants.length > 0) {
@@ -50,14 +84,9 @@ export const useSelectedRows = (
             if (!pack) throw new Error("Failed to find package");
             if (change.isAddition) {
                 const newSelected = Object.keys(incomingRows);
-                const dependenciesOfPackage = pack.depends.map(
-                    (pack) => pack.name,
+                const deps = getRequiredPackages(allPackages, [pack.name]).map(
+                    getId,
                 );
-                const deps = allPackages
-                    .filter((pack) =>
-                        dependenciesOfPackage.some((p) => p == pack.name),
-                    )
-                    .map(getId);
 
                 const final = [...newSelected, ...deps]
                     .filter((item, index, arr) => arr.indexOf(item) == index)

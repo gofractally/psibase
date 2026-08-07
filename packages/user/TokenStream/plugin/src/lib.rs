@@ -46,7 +46,7 @@ impl Api for TokenStreamPlugin {
 
         bindings::tokens::plugin::user::credit(
             token_id,
-            &"token-stream".to_string(),
+            &token_stream::SERVICE.to_string(),
             &amount,
             &memo,
         )?;

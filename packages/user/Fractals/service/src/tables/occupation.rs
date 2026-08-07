@@ -1,11 +1,10 @@
 use psibase::{
-    check,
     services::tokens::{Decimal, Precision},
     AccountNumber, Table,
 };
 
-use psibase::services::fractals::weighted_normalization::HasScore;
 use crate::tables::tables::{Occupation, OccupationTable};
+use psibase::services::fractals::weighted_normalization::HasScore;
 
 impl Occupation {
     fn new(fractal: AccountNumber, index: u8, occupation: AccountNumber) -> Self {
@@ -39,7 +38,7 @@ impl Occupation {
     pub fn set_ordered_occupations(fractal: AccountNumber, new_occupations: Vec<AccountNumber>) {
         let occupations_length = new_occupations.len();
 
-        check(
+        assert!(
             occupations_length <= u8::MAX as usize,
             "too many occupations",
         );

@@ -105,6 +105,12 @@ mod service {
         unimplemented!()
     }
 
+    /// Get the accounts this auth service delegates authority to for a sender.
+    #[action]
+    fn getDlgsSys(sender: AccountNumber) -> Vec<AccountNumber> {
+        unimplemented!()
+    }
+
     /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
     /// transaction from a specified sender.
     ///
@@ -129,7 +135,7 @@ mod service {
     /// * `true`: If the sender is among the rejecters
     /// * `false`: If the sender is not among the rejecters
     #[action]
-    fn isRejectSys(sender: AccountNumber, authorizers: Vec<AccountNumber>) -> bool {
+    fn isRejectSys(sender: AccountNumber, rejecters: Vec<AccountNumber>) -> bool {
         unimplemented!()
     }
 

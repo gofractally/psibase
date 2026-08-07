@@ -1,13 +1,14 @@
 use std::fmt;
 
 use crate::{
-    method, schema_types,
-    services::{db, transact},
-    AccountNumber, Action, Hex, MethodString, Pack, Schema, SchemaMap,
+    field_names, field_types, method, schema_types,
+    services::{db, transact, virtual_server},
+    AccountNumber, Action, CustomPrettyAction, Hex, MethodNumber, MethodString, Schema, SchemaMap,
+    ServiceMethod, SharedAction, TypeMatchExt,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
-use fracpack::{CompiledSchema, Unpack};
+use fracpack::{CompiledSchema, CompiledType, CustomHandler, FracInputStream, Pack, Unpack};
 use futures::future::{FutureExt, LocalBoxFuture, Shared};
 use serde::{
     ser::{SerializeSeq, SerializeStruct},
@@ -15,7 +16,7 @@ use serde::{
 };
 use serde_aux::prelude::deserialize_number_from_string;
 use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::Write;
 use std::rc::Rc;
 
@@ -76,29 +77,37 @@ pub struct TransactionTrace {
 }
 
 impl TransactionTrace {
+    #[track_caller]
     pub fn ok(self) -> Result<TransactionTrace, anyhow::Error> {
         if let Some(e) = self.error {
-            Err(anyhow::anyhow!("{}", e))
+            let loc = std::panic::Location::caller();
+            Err(anyhow::anyhow!("{} (at {}:{})", e, loc.file(), loc.line()))
         } else {
             Ok(self)
         }
     }
 
+    #[track_caller]
     pub fn match_error(self, msg: &str) -> Result<TransactionTrace, anyhow::Error> {
+        let loc = std::panic::Location::caller();
         if let Some(e) = &self.error {
             if e.contains(msg) {
                 Ok(self)
             } else {
                 Err(anyhow::anyhow!(
-                    "Transaction was expected to fail with \"{}\", but failed with \"{}\"",
+                    "Transaction was expected to fail with \"{}\", but failed with \"{}\" (at {}:{})",
                     msg,
-                    e
+                    e,
+                    loc.file(),
+                    loc.line()
                 ))
             }
         } else {
             Err(anyhow::anyhow!(
-                "Transaction was expected to fail with \"{}\", but succeeded",
+                "Transaction was expected to fail with \"{}\", but succeeded (at {}:{})",
                 msg,
+                loc.file(),
+                loc.line()
             ))
         }
     }
@@ -176,7 +185,8 @@ fn format_string(mut s: &str, indent: usize, f: &mut fmt::Formatter<'_>) -> fmt:
 
 fn format_console(c: &ConsoleTrace, indent: usize, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "{:indent$}console:    ", "")?;
-    format_string(&c.console, indent + 12, f)
+    format_string(&c.console, indent + 12, f)?;
+    writeln!(f)
 }
 
 fn format_event(_: &EventTrace, indent: usize, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -213,7 +223,11 @@ fn format_action_trace(
         "", atrace.action.sender, atrace.action.service, action_name
     )?;
     if let Some(action_type) = action_type {
-        let custom = schema_types();
+        let mut custom = schema_types();
+        let service_method = CustomResolvedServiceMethod::new(schemas, std::mem::drop);
+        custom.insert("ServiceMethod".to_string(), &service_method);
+        let custom_action = CustomPrettyAction::new(&*schemas);
+        custom.insert("Action".to_string(), &custom_action);
         let mut cschema = CompiledSchema::new(&schema.unwrap().types, &custom);
         if !atrace.action.rawData.is_empty() {
             cschema.extend(&action_type.params);
@@ -279,6 +293,175 @@ fn format_transaction_trace(
     Ok(())
 }
 
+fn use_disk_sys_amount(action: &Action) -> Option<i64> {
+    use crate as psibase;
+    if action.service == virtual_server::SERVICE && action.method == method!("useDiskSys") {
+        let args = virtual_server::action_structs::useDiskSys::unpacked(&action.rawData).ok()?;
+        Some(args.amount_bytes)
+    } else {
+        None
+    }
+}
+
+fn subtree_disk_net(atrace: &ActionTrace) -> i64 {
+    let mut net = use_disk_sys_amount(&atrace.action).unwrap_or(0);
+    for inner in &atrace.inner_traces {
+        if let InnerTraceEnum::ActionTrace(c) = &inner.inner {
+            net += subtree_disk_net(c);
+        }
+    }
+    net
+}
+
+fn has_disk_activity(atrace: &ActionTrace) -> bool {
+    if use_disk_sys_amount(&atrace.action).is_some() {
+        return true;
+    }
+    for inner in &atrace.inner_traces {
+        if let InnerTraceEnum::ActionTrace(c) = &inner.inner {
+            if has_disk_activity(c) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn collect_direct_disk<'a>(
+    atrace: &'a ActionTrace,
+    deltas: &mut Vec<i64>,
+    shown_children: &mut Vec<&'a ActionTrace>,
+) {
+    use crate as psibase;
+    for inner in &atrace.inner_traces {
+        if let InnerTraceEnum::ActionTrace(c) = &inner.inner {
+            let is_kv_notify =
+                c.action.service == transact::SERVICE && c.action.method == method!("kvNotify");
+            if let Some(amount) = use_disk_sys_amount(&c.action) {
+                deltas.push(amount);
+            } else if is_kv_notify {
+                collect_direct_disk(c, deltas, shown_children);
+            } else if has_disk_activity(c) {
+                shown_children.push(c);
+            }
+        }
+    }
+}
+
+fn format_signed_col(amount: Option<i64>, width: usize) -> String {
+    match amount {
+        None => " ".repeat(width),
+        Some(n) => format!("{:>+width$}", n, width = width),
+    }
+}
+
+const COL_WIDTH: usize = 8;
+const COLS_TOTAL: usize = COL_WIDTH * 2 + 4;
+
+fn format_disk_usage_action(
+    schemas: &SchemaMap,
+    atrace: &ActionTrace,
+    indent: usize,
+    show_all_ops: bool,
+    f: &mut fmt::Formatter<'_>,
+) -> fmt::Result {
+    let schema = schemas.get(&atrace.action.service);
+    let entry_placeholder = MethodString("<entry>".to_string());
+    let action_name = MethodString(atrace.action.method.to_string());
+    let action_name = if atrace.action.method.value == 0 {
+        &entry_placeholder
+    } else {
+        schema
+            .and_then(|schema| schema.actions.get_key_value(&action_name))
+            .map_or(&action_name, |(name, _)| name)
+    };
+
+    let mut deltas = Vec::new();
+    let mut shown_children = Vec::new();
+    collect_direct_disk(atrace, &mut deltas, &mut shown_children);
+
+    let direct_disk: i64 = deltas.iter().sum();
+    let child_disk: i64 = shown_children.iter().copied().map(subtree_disk_net).sum();
+    let self_col = if direct_disk == 0 {
+        None
+    } else {
+        Some(direct_disk)
+    };
+    let children_col = if shown_children.is_empty() {
+        None
+    } else {
+        Some(child_disk)
+    };
+
+    writeln!(
+        f,
+        "{}  {}  {:indent$}{}::{}",
+        format_signed_col(self_col, COL_WIDTH),
+        format_signed_col(children_col, COL_WIDTH),
+        "",
+        atrace.action.service,
+        action_name,
+    )?;
+
+    if show_all_ops && !deltas.is_empty() {
+        write!(f, "{:>COLS_TOTAL$}{:indent$}  ", "", "")?;
+        for (i, d) in deltas.iter().enumerate() {
+            if i != 0 {
+                write!(f, " ")?;
+            }
+            write!(f, "{:+}", d)?;
+        }
+        writeln!(f)?;
+    }
+
+    for c in shown_children {
+        format_disk_usage_action(schemas, c, indent + 2, show_all_ops, f)?;
+    }
+
+    Ok(())
+}
+
+fn format_transaction_disk_usage_trace(
+    schemas: &SchemaMap,
+    ttrace: &TransactionTrace,
+    show_all_ops: bool,
+    f: &mut fmt::Formatter<'_>,
+) -> fmt::Result {
+    let total: i64 = ttrace.action_traces.iter().map(subtree_disk_net).sum();
+    writeln!(f, "Total disk usage: {:+} bytes", total)?;
+    writeln!(
+        f,
+        "{:>w1$}  {:>w2$}  action",
+        "self",
+        "children",
+        w1 = COL_WIDTH,
+        w2 = COL_WIDTH,
+    )?;
+    for a in &ttrace.action_traces {
+        if has_disk_activity(a) {
+            format_disk_usage_action(schemas, a, 0, show_all_ops, f)?;
+        }
+    }
+    Ok(())
+}
+
+pub struct DisplayDiskUsageTrace<'a> {
+    schemas: &'a RefCell<HashMap<AccountNumber, Schema>>,
+    trace: &'a TransactionTrace,
+    show_all_ops: bool,
+}
+
+impl fmt::Display for DisplayDiskUsageTrace<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        format_transaction_disk_usage_trace(
+            &self.schemas.borrow(),
+            self.trace,
+            self.show_all_ops,
+            f,
+        )
+    }
+}
+
 fn format_error_stack<T: std::fmt::Write>(
     schemas: &SchemaMap,
     atrace: &ActionTrace,
@@ -334,6 +517,15 @@ pub trait SchemaFetcher {
     async fn fetch_schema(&self, service: AccountNumber) -> Result<Schema, anyhow::Error>;
 }
 
+pub struct NullSchemaFetcher;
+
+#[async_trait(?Send)]
+impl SchemaFetcher for NullSchemaFetcher {
+    async fn fetch_schema(&self, _service: AccountNumber) -> Result<Schema, anyhow::Error> {
+        Err(anyhow::anyhow!("Schema fetching disabled"))
+    }
+}
+
 pub struct DisplayTransactionTrace<'a> {
     schemas: &'a RefCell<HashMap<AccountNumber, Schema>>,
     trace: &'a TransactionTrace,
@@ -355,6 +547,25 @@ struct ActionFormatterImpl<'a, F: SchemaFetcher + 'a> {
 
 pub struct ActionFormatter<'a, F: SchemaFetcher + 'a> {
     storage: Rc<ActionFormatterImpl<'a, F>>,
+}
+
+pub fn restore_lifetime<'a, 'b, T>(outer: &'a [T], inner: &'b [T]) -> Option<&'a [T]> {
+    let inner_p = inner.as_ptr_range();
+    let outer_p = outer.as_ptr_range();
+    if inner_p.start as usize >= outer_p.start as usize
+        && inner_p.end as usize <= outer_p.end as usize
+    {
+        let sz = size_of::<T>();
+        let start = inner_p.start as usize - outer_p.start as usize;
+        let end = inner_p.end as usize - outer_p.start as usize;
+        if start % sz == 0 {
+            Some(&outer[(start / sz)..(end / sz)])
+        } else {
+            None
+        }
+    } else {
+        return None;
+    }
 }
 
 impl<'a, F: SchemaFetcher + 'a> ActionFormatter<'a, F> {
@@ -400,8 +611,68 @@ impl<'a, F: SchemaFetcher + 'a> ActionFormatter<'a, F> {
     pub async fn prepare_event_trace(&self, _etrace: &EventTrace) -> Result<(), anyhow::Error> {
         Ok(())
     }
+    pub async fn prepare_action_impl<'b>(
+        &self,
+        act: SharedAction<'b>,
+        nested_actions: &mut Vec<SharedAction<'b>>,
+        services: &mut HashSet<AccountNumber>,
+    ) {
+        let schemas = self.storage.schemas.borrow();
+        if let Some(schema) = schemas.get(&act.service) {
+            let mut custom = schema_types();
+            let services = RefCell::new(services);
+            let service_method =
+                CustomResolvedServiceMethod::new(&*schemas, |service_method: ServiceMethod| {
+                    if !schemas.contains_key(&service_method.service) {
+                        services.borrow_mut().insert(service_method.service);
+                    }
+                });
+            custom.insert("ServiceMethod".to_string(), &service_method);
+            let nested_actions = RefCell::new(nested_actions);
+            let custom_action = CustomActionCollector::new(|inner: SharedAction| {
+                if let Some(raw_data) = restore_lifetime(act.rawData.0, inner.rawData.0) {
+                    nested_actions.borrow_mut().push(SharedAction {
+                        sender: inner.sender,
+                        service: inner.service,
+                        method: inner.method,
+                        rawData: raw_data.into(),
+                    });
+                }
+            });
+            custom.insert("Action".to_string(), &custom_action);
+            let mut cschema = CompiledSchema::new(&schema.types, &custom);
+            let action_name = MethodString(act.method.to_string());
+            if let Some(action_type) = schema.actions.get(&action_name) {
+                cschema.extend(&action_type.params);
+                let _ = cschema.verify(&action_type.params, act.rawData.0);
+            }
+        }
+    }
+    pub async fn prepare_action<'b>(&self, act: SharedAction<'b>) {
+        let mut actions = vec![act];
+        let mut services = HashSet::new();
+        while let Some(act) = actions.pop() {
+            let _ = self.add_service(act.service).await;
+            self.prepare_action_impl(act, &mut actions, &mut services)
+                .await;
+        }
+        for service in services {
+            let _ = self.add_service(service).await;
+        }
+    }
     pub async fn prepare_action_trace(&self, atrace: &ActionTrace) -> Result<(), anyhow::Error> {
         let mut res = self.add_service(atrace.action.service).await;
+        if res.is_ok() {
+            if !atrace.action.rawData.is_empty() {
+                self.prepare_action(SharedAction {
+                    sender: atrace.action.sender,
+                    service: atrace.action.service,
+                    method: atrace.action.method,
+                    rawData: (&atrace.action.rawData.0[..]).into(),
+                })
+                .await;
+            }
+        }
         for inner in &atrace.inner_traces {
             match &inner.inner {
                 InnerTraceEnum::EventTrace(e) => res = res.and(self.prepare_event_trace(e).await),
@@ -456,6 +727,17 @@ impl<'a, F: SchemaFetcher + 'a> ActionFormatter<'a, F> {
         DisplayTransactionTrace {
             schemas: &self.storage.schemas,
             trace: ttrace,
+        }
+    }
+    pub fn display_disk_usage_trace<'b>(
+        &'b self,
+        ttrace: &'b TransactionTrace,
+        show_all_ops: bool,
+    ) -> DisplayDiskUsageTrace<'b> {
+        DisplayDiskUsageTrace {
+            schemas: &self.storage.schemas,
+            trace: ttrace,
+            show_all_ops,
         }
     }
 }
@@ -593,7 +875,11 @@ impl<'a, 'b> Serialize for UnpackedTrace<'a, &'b ActionTrace> {
         let mut unpacked_retval = None;
 
         if let Some(action_type) = action_type {
-            let custom = schema_types();
+            let mut custom = schema_types();
+            let service_method = CustomResolvedServiceMethod::new(self.schemas, std::mem::drop);
+            custom.insert("ServiceMethod".to_string(), &service_method);
+            let custom_action = CustomPrettyAction::new(&self.schemas);
+            custom.insert("Action".to_string(), &custom_action);
             let mut cschema = CompiledSchema::new(&schema.unwrap().types, &custom);
             if !atrace.action.rawData.is_empty() {
                 cschema.extend(&action_type.params);
@@ -672,5 +958,133 @@ impl<'a, 'b> Serialize for UnpackedTrace<'a, &'b InnerTraceEnum> {
                 },
             ),
         }
+    }
+}
+
+// Uses on-chain schemas to resolve the original
+// spelling of methods.
+struct CustomResolvedServiceMethod<'a, F> {
+    schemas: &'a HashMap<AccountNumber, Schema>,
+    f: F,
+}
+
+impl<'a, F> CustomResolvedServiceMethod<'a, F> {
+    fn new(schemas: &'a SchemaMap, f: F) -> Self {
+        CustomResolvedServiceMethod { schemas, f }
+    }
+}
+
+impl<'b, F: Fn(ServiceMethod) -> ()> CustomHandler for CustomResolvedServiceMethod<'b, F> {
+    fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool {
+        if let Some([service, method]) = field_types::<2>(ty) {
+            schema.matches_u64(service) && schema.matches_u64(method)
+        } else {
+            false
+        }
+    }
+    fn frac2json(
+        &self,
+        _schema: &CompiledSchema,
+        ty: &CompiledType,
+        src: &mut FracInputStream,
+        _allow_empty_container: bool,
+    ) -> Result<serde_json::Value, fracpack::Error> {
+        let [sname, mname] = field_names::<2>(ty).unwrap();
+        let value = ServiceMethod::unpack(src)?;
+        let mut method = MethodString(value.method.to_string());
+        if let Some(schema) = self.schemas.get(&value.service) {
+            if let Some((key, _)) = schema.actions.get_key_value(&method) {
+                method = key.clone();
+            }
+        }
+        let mut result = serde_json::Map::with_capacity(2);
+        result.insert(sname.to_owned(), value.service.to_string().into());
+        result.insert(mname.to_owned(), method.0.into());
+        Ok(result.into())
+    }
+    fn json2frac(
+        &self,
+        _schema: &CompiledSchema,
+        ty: &CompiledType,
+        val: &serde_json::Value,
+        dest: &mut Vec<u8>,
+    ) -> Result<(), serde_json::Error> {
+        use serde::de::Error;
+        let [sname, mname] = field_names::<2>(ty).unwrap();
+        let Some(object) = val.as_object() else {
+            Err(serde_json::Error::custom("expected object"))?
+        };
+        let value =
+            ServiceMethod {
+                service: AccountNumber::deserialize(object.get(sname).ok_or_else(|| {
+                    serde_json::Error::custom(format!("missing field {}", sname))
+                })?)?,
+                method: MethodNumber::deserialize(object.get(mname).ok_or_else(|| {
+                    serde_json::Error::custom(format!("missing field {}", mname))
+                })?)?,
+            };
+        Ok(value.pack(dest))
+    }
+    fn fracpack_verify(
+        &self,
+        _schema: &CompiledSchema,
+        _ty: &CompiledType,
+        src: &mut FracInputStream,
+        _allow_empty_container: bool,
+    ) -> Result<(), fracpack::Error> {
+        let value = ServiceMethod::unpack(src)?;
+        (self.f)(value);
+        Ok(())
+    }
+    fn is_empty_container(&self, _ty: &CompiledType, _value: &serde_json::Value) -> bool {
+        false
+    }
+}
+
+struct CustomActionCollector<F> {
+    f: F,
+}
+
+impl<F> CustomActionCollector<F> {
+    fn new(f: F) -> Self {
+        Self { f }
+    }
+}
+
+impl<F: Fn(SharedAction) -> ()> CustomHandler for CustomActionCollector<F> {
+    fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool {
+        schema.matches_action(ty)
+    }
+    fn frac2json(
+        &self,
+        _schema: &CompiledSchema,
+        _ty: &CompiledType,
+        _src: &mut FracInputStream,
+        _allow_empty_container: bool,
+    ) -> Result<serde_json::Value, fracpack::Error> {
+        unimplemented!()
+    }
+    fn json2frac(
+        &self,
+        _schema: &CompiledSchema,
+        _ty: &CompiledType,
+        _val: &serde_json::Value,
+        _dest: &mut Vec<u8>,
+    ) -> Result<(), serde_json::Error> {
+        unimplemented!()
+    }
+    fn fracpack_verify(
+        &self,
+        _schema: &CompiledSchema,
+        _ty: &CompiledType,
+        src: &mut FracInputStream,
+        _allow_empty_container: bool,
+    ) -> Result<(), fracpack::Error> {
+        let value = SharedAction::unpack(src)?;
+        (self.f)(value);
+        Ok(())
+    }
+    fn is_empty_container(&self, _ty: &CompiledType, _value: &serde_json::Value) -> bool {
+        false
     }
 }

@@ -1,4 +1,4 @@
-#[psibase::service(name = "de-facto")]
+#[psibase::service(name = "fractals+2")]
 pub mod service {
     use psibase::{
         services::auth_dyn::{self, policy::DynamicAuthPolicy},

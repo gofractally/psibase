@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 WORKSPACE_ROOT=$1
 BUILDER_IMAGE=$2
 UBUNTU_BUILD_VER=$3

@@ -12,12 +12,6 @@ std::string psibase::to_string(DbId db)
          return "native";
       case DbId::blockLog:
          return "blockLog";
-      case DbId::historyEvent:
-         return "historyEvent";
-      case DbId::uiEvent:
-         return "uiEvent";
-      case DbId::merkleEvent:
-         return "merkleEvent";
       case DbId::blockProof:
          return "blockProof";
       case DbId::subjective:

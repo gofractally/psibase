@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { EVALUATIONS_SERVICE } from "@shared/domains/fractal/lib/constants";
 import { supervisor } from "@shared/lib/supervisor";
 
 export const getProposal = async (
@@ -10,7 +11,7 @@ export const getProposal = async (
     const pars = {
         method: "getProposal",
         params: [owner, evaluationId, groupId],
-        service: "evaluations",
+        service: EVALUATIONS_SERVICE,
         intf: "user",
     };
     const res = await supervisor.functionCall(pars);

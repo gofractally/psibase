@@ -81,6 +81,11 @@ namespace SystemService
          authTable.put(AuthRecord{.account = getSender(), .pubkey = std::move(key)});
       }
 
+      std::vector<psibase::AccountNumber> AuthSig::getDlgsSys(psibase::AccountNumber sender)
+      {
+         return {};
+      }
+
       bool AuthSig::isAuthSys(psibase::AccountNumber              sender,
                               std::vector<psibase::AccountNumber> authorizers)
       {

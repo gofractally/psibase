@@ -239,6 +239,15 @@ namespace SystemService
    using TxStatsTable = psibase::Table<TxStatsRecord, psibase::SingletonKey{}>;
    PSIO_REFLECT_TYPENAME(TxStatsTable)
 
+   // This is used to limit the size of blocks before the chain
+   struct BlockSizeRecord
+   {
+      uint32_t currentBlockSize;
+   };
+   PSIO_REFLECT(BlockSizeRecord, currentBlockSize)
+   using BlockSizeTable = psibase::Table<BlockSizeRecord, psibase::SingletonKey{}>;
+   PSIO_REFLECT_TYPENAME(BlockSizeTable)
+
    // Transactions enter this service through the push_transaction endpoint
    // or over p2p (recv). Speculative execution and signature verification
    // are dispatched asynchronously. When they complete, the transaction
@@ -246,7 +255,7 @@ namespace SystemService
    class RTransact : public psibase::Service
    {
      public:
-      static constexpr auto service = psibase::AccountNumber{"r-transact"};
+      static constexpr auto service = psibase::AccountNumber{"transact+1"};
       using Subjective              = psibase::SubjectiveTables<PendingTransactionTable,
                                                                 TransactionDataTable,
                                                                 AvailableSequenceTable,
@@ -261,7 +270,8 @@ namespace SystemService
       using WriteOnly               = psibase::WriteOnlyTables<UnappliedTransactionTable,
                                                                ReversibleBlocksTable,
                                                                TxSuccessTable,
-                                                               VerifyIdTable>;
+                                                               VerifyIdTable,
+                                                               BlockSizeTable>;
 
       std::optional<psibase::SignedTransaction>                    next();
       std::optional<std::vector<std::optional<psibase::RunToken>>> preverify(

@@ -4,6 +4,7 @@
 #include <psibase/AccountNumber.hpp>
 #include <psibase/MethodNumber.hpp>
 #include <psibase/Table.hpp>
+#include <psibase/crypto.hpp>
 #include <psibase/db.hpp>
 #include <psibase/schema.hpp>
 #include <psio/reflect.hpp>
@@ -12,7 +13,36 @@
 
 namespace UserService
 {
+   using psibase::EventDb;
    using psibase::ServiceSchema;
+
+   struct EventNumberRecord
+   {
+      EventDb              type;
+      psibase::EventNumber nextEventNumber;
+      PSIO_REFLECT(EventNumberRecord, type, nextEventNumber)
+   };
+   using EventNumberTable = psibase::Table<EventNumberRecord, &EventNumberRecord::type>;
+   PSIO_REFLECT_TYPENAME(EventNumberTable)
+
+   struct EventRecord
+   {
+      psibase::EventNumber   id;
+      psibase::AccountNumber service;
+      psibase::MethodNumber  type;
+      std::vector<char>      rawData;
+      PSIO_REFLECT(EventRecord, id, service, type, rawData);
+   };
+   using EventTable = psibase::Table<EventRecord, &EventRecord::id>;
+   PSIO_REFLECT_TYPENAME(EventTable)
+
+   struct EventMerkleRecord
+   {
+      psibase::Merkle merkle;
+      PSIO_REFLECT(EventMerkleRecord, merkle)
+   };
+   using EventMerkleTable = psibase::Table<EventMerkleRecord, psibase::SingletonKey{}>;
+   PSIO_REFLECT_TYPENAME(EventMerkleTable)
 
    struct SecondaryIndexInfo
    {
@@ -38,7 +68,7 @@ namespace UserService
 
    struct SecondaryIndexRecord
    {
-      psibase::DbId                   db;
+      EventDb                         db;
       psibase::AccountNumber          service;
       psibase::MethodNumber           event;
       std::vector<SecondaryIndexInfo> indexes;
@@ -52,7 +82,7 @@ namespace UserService
    struct PendingIndexRecord
    {
       std::uint64_t          seq;
-      psibase::DbId          db;
+      EventDb                db;
       psibase::AccountNumber service;
       psibase::MethodNumber  event;
       SecondaryIndexInfo     info;
@@ -73,7 +103,7 @@ namespace UserService
    // For each db, tracks the lowest event number that has not been indexed.
    struct DbIndexStatus
    {
-      psibase::DbId db;
+      EventDb       db;
       std::uint64_t nextEventNumber;
    };
    PSIO_REFLECT(DbIndexStatus, db, nextEventNumber);
@@ -84,7 +114,7 @@ namespace UserService
    // onBlock will clear entries as it processes them.
    struct IndexDirtyRecord
    {
-      psibase::DbId          db;
+      EventDb                db;
       psibase::AccountNumber service;
       psibase::MethodNumber  event;
       using PrimaryKey = psibase::

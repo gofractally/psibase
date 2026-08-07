@@ -5,6 +5,7 @@ use crate::{Pack, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
 use serde_aux::field_attributes::deserialize_number_from_string;
 
+pub const MIN_ALLOWED_ACCOUNT_LENGTH: u8 = 8;
 // TODO: tables
 #[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema)]
 #[fracpack(fracpack_mod = "fracpack")]

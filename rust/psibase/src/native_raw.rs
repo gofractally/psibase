@@ -116,11 +116,6 @@ extern "C" {
     /// If key already exists, then replace the existing value.
     pub fn kvPut(db: KvHandle, key: *const u8, key_len: u32, value: *const u8, value_len: u32);
 
-    /// Add a sequentially-numbered record
-    ///
-    /// Returns the id.
-    pub fn putSequential(db: crate::DbId, value: *const u8, value_len: u32) -> u64;
-
     /// Remove a key-value pair if it exists
     pub fn kvRemove(db: KvHandle, key: *const u8, key_len: u32);
 
@@ -129,12 +124,6 @@ extern "C" {
     /// If key exists, then sets result to value and returns size. If key does not
     /// exist, returns `u32::MAX` and clears result. Use [getResult] to get result.
     pub fn kvGet(db: KvHandle, key: *const u8, key_len: u32) -> u32;
-
-    /// Get a sequentially-numbered record
-    ///
-    /// If `id` is available, then sets result to value and returns size. If id does
-    /// not exist, returns `u32::MAX` and clears result.
-    pub fn getSequential(db: crate::DbId, id: u64) -> u32;
 
     /// Get the first key-value pair which is greater than or equal to the provided
     /// key

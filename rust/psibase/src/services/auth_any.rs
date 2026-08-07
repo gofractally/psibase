@@ -21,6 +21,11 @@ mod service {
     }
 
     #[action]
+    fn getDlgsSys(sender: AccountNumber) -> Vec<AccountNumber> {
+        unimplemented!()
+    }
+
+    #[action]
     fn isAuthSys(sender: AccountNumber, authorizers: Vec<AccountNumber>) -> bool {
         unimplemented!()
     }

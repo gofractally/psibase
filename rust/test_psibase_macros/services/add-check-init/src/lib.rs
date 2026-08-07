@@ -11,11 +11,10 @@ mod service_tables {
     }
 }
 
-#[psibase::service(name = "addcheckinit", tables = "service_tables")]
+#[psibase::service(name = "addckinit", tables = "service_tables")]
 #[allow(non_snake_case)]
 pub mod service {
     use crate::service_tables::{InitRow, InitTable};
-    use psibase::check;
     use psibase::Table;
 
     #[action]
@@ -33,10 +32,7 @@ pub mod service {
     #[pre_action(exclude(init, init2, check_inited))]
     fn check_init() {
         let table = InitTable::new();
-        check(
-            table.get_index_pk().get(&()).is_some(),
-            "service not inited",
-        );
+        table.get_index_pk().get(&()).expect("service not inited");
     }
 
     #[action]

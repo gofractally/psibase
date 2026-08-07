@@ -25,8 +25,6 @@ These functions wrap the [Raw Native Functions](#raw-native-functions).
 - [psibase::getCurrentActionView]
 - [psibase::getKey]
 - [psibase::getResult]
-- [psibase::getSequential]
-- [psibase::getSequentialRaw]
 - [psibase::kvGet]
 - [psibase::kvGetOrDefault]
 - [psibase::kvGetRaw]
@@ -42,8 +40,6 @@ These functions wrap the [Raw Native Functions](#raw-native-functions).
 - [psibase::kvPutRaw]
 - [psibase::kvRemove]
 - [psibase::kvRemoveRaw]
-- [psibase::putSequential]
-- [psibase::putSequentialRaw]
 - [psibase::setRetval]
 - [psibase::setRetvalBytes]
 - [psibase::writeConsole]
@@ -56,8 +52,6 @@ These functions wrap the [Raw Native Functions](#raw-native-functions).
 {{#cpp-doc ::psibase::getCurrentActionView}}
 {{#cpp-doc ::psibase::getKey}}
 {{#cpp-doc ::psibase::getResult}}
-{{#cpp-doc ::psibase::getSequential}}
-{{#cpp-doc ::psibase::getSequentialRaw}}
 {{#cpp-doc ::psibase::kvGet}}
 {{#cpp-doc ::psibase::kvGetOrDefault}}
 {{#cpp-doc ::psibase::kvGetRaw}}
@@ -73,8 +67,6 @@ These functions wrap the [Raw Native Functions](#raw-native-functions).
 {{#cpp-doc ::psibase::kvPutRaw}}
 {{#cpp-doc ::psibase::kvRemove}}
 {{#cpp-doc ::psibase::kvRemoveRaw}}
-{{#cpp-doc ::psibase::putSequential}}
-{{#cpp-doc ::psibase::putSequentialRaw}}
 {{#cpp-doc ::psibase::setRetval}}
 {{#cpp-doc ::psibase::setRetvalBytes}}
 {{#cpp-doc ::psibase::writeConsole}}
@@ -90,14 +82,12 @@ This is the set of raw native functions (wasm imports). They are available for s
 - [psibase::raw::getCurrentAction]
 - [psibase::raw::getKey]
 - [psibase::raw::getResult]
-- [psibase::raw::getSequential]
 - [psibase::raw::kvGet]
 - [psibase::raw::kvGreaterEqual]
 - [psibase::raw::kvLessThan]
 - [psibase::raw::kvMax]
 - [psibase::raw::kvPut]
 - [psibase::raw::kvRemove]
-- [psibase::raw::putSequential]
 - [psibase::raw::setRetval]
 - [psibase::raw::writeConsole]
 - [psibase::raw::checkoutSubjective]
@@ -110,14 +100,12 @@ This is the set of raw native functions (wasm imports). They are available for s
 {{#cpp-doc ::psibase::raw::getCurrentAction}}
 {{#cpp-doc ::psibase::raw::getKey}}
 {{#cpp-doc ::psibase::raw::getResult}}
-{{#cpp-doc ::psibase::raw::getSequential}}
 {{#cpp-doc ::psibase::raw::kvGet}}
 {{#cpp-doc ::psibase::raw::kvGreaterEqual}}
 {{#cpp-doc ::psibase::raw::kvLessThan}}
 {{#cpp-doc ::psibase::raw::kvMax}}
 {{#cpp-doc ::psibase::raw::kvPut}}
 {{#cpp-doc ::psibase::raw::kvRemove}}
-{{#cpp-doc ::psibase::raw::putSequential}}
 {{#cpp-doc ::psibase::raw::setRetval}}
 {{#cpp-doc ::psibase::raw::writeConsole}}
 {{#cpp-doc ::psibase::raw::checkoutSubjective}}

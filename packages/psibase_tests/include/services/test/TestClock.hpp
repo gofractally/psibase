@@ -5,7 +5,7 @@
 
 struct TestClock : psibase::Service
 {
-   static constexpr auto     service      = psibase::AccountNumber{"clock-service"};
+   static constexpr auto     service      = psibase::AccountNumber{"clock-svc"};
    static constexpr uint64_t serviceFlags = 0;
 
    void testReal(bool indirect);

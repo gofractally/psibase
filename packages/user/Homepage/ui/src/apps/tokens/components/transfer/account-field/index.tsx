@@ -130,7 +130,7 @@ export const FieldAccount = withFieldGroup({
                                         aria-invalid={!field.state.meta.isValid}
                                         className="aria-expanded:border-ring aria-expanded:ring-ring/50 aria-expanded:dark:border-ring
                                         aria-expanded:dark:ring-ring/50 aria-invalid:ring-destructive/20 aria-invalid:dark:ring-destructive/40
-                                        aria-invalid:border-destructive aria-invalid:dark:border-destructive justify-between aria-expanded:ring-[3px]"
+                                        aria-invalid:border-destructive aria-invalid:dark:border-destructive h-9 justify-between aria-expanded:ring-[3px]"
                                     >
                                         <Placeholder
                                             placeholder={placeholder}

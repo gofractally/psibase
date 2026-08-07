@@ -11,7 +11,8 @@ class Tokens(Service):
         for edge in balances['userBalances']['edges']:
             node = edge['node']
             if node['tokenId'] == token:
-                return int(node['balance'].replace('.', '')) 
+                return int(node['balance'].replace('.', ''))
+        return 0
 
 class Transact(Service):
     service = 'transact'

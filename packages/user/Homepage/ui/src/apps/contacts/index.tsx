@@ -1,11 +1,11 @@
-import { AppConfigType } from "@/configured-apps";
+import { defineAppConfig } from "@/app-config";
 import { BookUser } from "lucide-react";
 
 import { zAccount } from "@shared/lib/schemas/account";
 
 import { ContactsPage } from "./page";
 
-export const contactsConfig: AppConfigType = {
+export const contactsConfig = defineAppConfig({
     service: zAccount.parse("contacts"),
     name: "Contacts",
     description: "Manage your contacts.",
@@ -20,4 +20,4 @@ export const contactsConfig: AppConfigType = {
             name: "Home",
         },
     ],
-};
+});

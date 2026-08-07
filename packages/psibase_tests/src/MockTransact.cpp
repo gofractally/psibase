@@ -12,7 +12,6 @@ namespace TestService
    struct MockTransact : psibase::Service
    {
       static constexpr auto service = SystemService::Transact::service;
-      void                  startBlock();
       /// Called by native code on objective writes to the database
       void kvNotify(psibase::AccountNumber service,
                     psibase::DbId          db,
@@ -21,17 +20,13 @@ namespace TestService
                     std::uint32_t          newValueLen);
       void setConsensus(psibase::ConsensusData consensus);
    };
-   PSIO_REFLECT(MockTransact,
-                method(startBlock),
-                method(kvNotify, service, db, keyLen, oldValueLen, newValueLen))
+   PSIO_REFLECT(MockTransact, method(kvNotify, service, db, keyLen, oldValueLen, newValueLen))
 
 }  // namespace TestService
 
 using namespace TestService;
 using namespace SystemService;
 using namespace psibase;
-
-void MockTransact::startBlock() {}
 
 void MockTransact::kvNotify(psibase::AccountNumber service,
                             psibase::DbId          db,
@@ -62,6 +57,8 @@ extern "C" [[clang::export_name("processTransaction")]] void processTransaction(
 
    for (auto act : args.transaction()->actions())
    {
+      if (isStartBlock(act))
+         continue;
       check(act.service() == Producers::service, "wrong service");
       check(act.method() == MethodNumber{"setConsensus"}, "wrong method");
       auto [consensus] = psio::from_frac<std::tuple<ConsensusData>>(act.rawData());

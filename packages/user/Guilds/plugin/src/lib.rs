@@ -75,7 +75,7 @@ impl Queries for GuildsPlugin {
 impl AdminFractal for GuildsPlugin {
     #[psibase_plugin::authorized(High, whitelist = ["fractals"])]
     fn set_role_map(role_id: u8, guild: String) -> Result<(), Error> {
-        Guilds::add_to_tx().set_role_map(role_id, guild.as_str().into());
+        Guilds::add_to_tx().set_role_map(role_id, guild.parse().unwrap());
         Ok(())
     }
 
@@ -212,15 +212,15 @@ impl AdminGuild for GuildsPlugin {
         guild_account: String,
     ) -> Result<(), Error> {
         Guilds::add_to_tx().create_guild(
-            fractal.as_str().into(),
-            guild_account.as_str().into(),
+            fractal.parse().unwrap(),
+            guild_account.parse().unwrap(),
             Memo::try_from(display_name).unwrap(),
             accounts::plugin::api::gen_rand_account(Some("c-"))?
-                .as_str()
-                .into(),
+                .parse()
+                .unwrap(),
             accounts::plugin::api::gen_rand_account(Some("r-"))?
-                .as_str()
-                .into(),
+                .parse()
+                .unwrap(),
         );
         Ok(())
     }
@@ -257,7 +257,7 @@ impl AdminGuild for GuildsPlugin {
 
     #[psibase_plugin::authorized(Medium, whitelist = [parent_fractal(&guild_account)?.as_str()])]
     fn set_guild_rep(guild_account: String, rep: String) -> Result<(), Error> {
-        Guilds::add_to_tx().set_g_rep(rep.as_str().into());
+        Guilds::add_to_tx().set_g_rep(rep.parse().unwrap());
         Ok(())
     }
 
@@ -278,7 +278,7 @@ impl AdminGuild for GuildsPlugin {
         Guilds::add_to_tx().set_rguilds(
             ranked_guilds
                 .into_iter()
-                .map(|g| AccountNumber::from(g.as_str()))
+                .map(|g| AccountNumber::from_str(g.as_str()).unwrap())
                 .collect(),
         );
         Ok(())
@@ -305,7 +305,7 @@ impl AdminGuild for GuildsPlugin {
 
     #[psibase_plugin::authorized(High, whitelist = [parent_fractal(&guild_account)?.as_str()])]
     fn start_eval(guild_account: String) -> Result<(), Error> {
-        Guilds::add_to_tx().start_eval(guild_account.as_str().into());
+        Guilds::add_to_tx().start_eval(guild_account.parse().unwrap());
         Ok(())
     }
 }
@@ -313,13 +313,13 @@ impl AdminGuild for GuildsPlugin {
 impl UserGuild for GuildsPlugin {
     #[psibase_plugin::authorized(Medium, whitelist = [parent_fractal(&guild_account)?.as_str()])]
     fn apply_guild(guild_account: String, extra_info: String) -> Result<(), Error> {
-        Guilds::add_to_tx().apply_guild(guild_account.as_str().into(), extra_info);
+        Guilds::add_to_tx().apply_guild(guild_account.parse().unwrap(), extra_info);
         Ok(())
     }
 
     #[psibase_plugin::authorized(Medium, whitelist = [parent_fractal(&guild_account)?.as_str()])]
     fn cancel_guild_app(guild_account: String) -> Result<(), Error> {
-        Guilds::add_to_tx().cancel_g_app(guild_account.as_str().into());
+        Guilds::add_to_tx().cancel_g_app(guild_account.parse().unwrap());
         Ok(())
     }
 
@@ -331,8 +331,8 @@ impl UserGuild for GuildsPlugin {
         endorses: bool,
     ) -> Result<(), Error> {
         Guilds::add_to_tx().at_mem_app(
-            guild_account.as_str().into(),
-            applicant.as_str().into(),
+            guild_account.parse().unwrap(),
+            applicant.parse().unwrap(),
             comment,
             endorses,
         );
@@ -341,7 +341,7 @@ impl UserGuild for GuildsPlugin {
 
     #[psibase_plugin::authorized(Medium, whitelist = [parent_fractal(&guild_account)?.as_str()])]
     fn remove_attestation(guild_account: String, applicant: String) -> Result<(), Error> {
-        Guilds::add_to_tx().rm_attest(guild_account.as_str().into(), applicant.as_str().into());
+        Guilds::add_to_tx().rm_attest(guild_account.parse().unwrap(), applicant.parse().unwrap());
         Ok(())
     }
 
@@ -371,7 +371,7 @@ impl UserGuild for GuildsPlugin {
         )?;
 
         Guilds::add_to_tx().inv_g_member(
-            guild_account.as_str().into(),
+            guild_account.parse().unwrap(),
             d.invite_id,
             d.payload,
             num_accounts,
@@ -383,13 +383,13 @@ impl UserGuild for GuildsPlugin {
 
     #[psibase_plugin::authorized(Medium, whitelist = [parent_fractal(&guild_account)?.as_str()])]
     fn register_candidacy(guild_account: String, active: bool) -> Result<(), Error> {
-        Guilds::add_to_tx().reg_can(guild_account.as_str().into(), active);
+        Guilds::add_to_tx().reg_can(guild_account.parse().unwrap(), active);
         Ok(())
     }
 
     #[psibase_plugin::authorized(Medium, whitelist = [parent_fractal(&guild_account)?.as_str()])]
     fn set_guild_app_info(guild_account: String, extra_info: String) -> Result<(), Error> {
-        Guilds::add_to_tx().set_g_app(guild_account.as_str().into(), extra_info);
+        Guilds::add_to_tx().set_g_app(guild_account.parse().unwrap(), extra_info);
         Ok(())
     }
 }

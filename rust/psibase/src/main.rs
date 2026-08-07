@@ -18,12 +18,13 @@ use psibase::{
     new_account_owned_action, preapprove_action, push_transaction, push_transaction_optimistic,
     push_transactions, reg_server, set_auth_service_action, set_code_action, set_key_action,
     set_owner_action, sign_transaction, AccountNumber, Action, ActionFormatter, AnyPrivateKey,
-    AnyPublicKey, ChainUrl, Checksum256, DirectoryRegistry, ExactAccountNumber, FileSetRegistry,
-    FilteredRegistry, HTTPRegistry, HttpSchemaFetcher, JointRegistry, Meta, NullSchemaFetcher,
-    PackageDataFile, PackageInfo, PackageList, PackageOp, PackageOpFull, PackageOrigin,
-    PackagePreference, PackageRef, PackageRegistry, PackagedService, PrettyAction, SchemaFetcher,
-    SchemaMap, Seconds, ServiceInfo, SignedTransaction, StagedUpload, Tapos, TaposRefBlock,
-    TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace, Version,
+    AnyPublicKey, ChainUrl, Checksum256, DirectoryRegistry, EssentialServices, ExactAccountNumber,
+    FileSetRegistry, FilteredRegistry, HTTPRegistry, HttpSchemaFetcher, JointRegistry, Meta,
+    NullSchemaFetcher, PackageDataFile, PackageInfo, PackageList, PackageOp, PackageOpFull,
+    PackageOrigin, PackagePreference, PackageRef, PackageRegistry, PackagedService, PrettyAction,
+    SchemaFetcher, SchemaMap, Seconds, ServiceInfo, ServiceWrapper, SignedTransaction,
+    StagedUpload, Tapos, TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder,
+    TransactionTrace, Version,
 };
 use regex::Regex;
 use reqwest::Url;
@@ -394,6 +395,10 @@ struct UpgradeArgs {
     #[clap(long)]
     local: bool,
 
+    /// Automatically accept install confirmation
+    #[clap(short = 'y', long)]
+    yes: bool,
+
     /// Configure compression level to use for uploaded files
     /// (1=fastest, 11=most compression)
     #[clap(short = 'z', long, value_name = "LEVEL", default_value = "4", value_parser = clap::value_parser!(u32).range(1..=11))]
@@ -749,9 +754,9 @@ async fn push(mut args: PushArgs) -> Result<(), anyhow::Error> {
     let mut schemas = SchemaMap::new();
 
     for action in &actions {
-        if !schemas.contains_key(&action.service) {
+        if !schemas.contains_key(&action.service.parse()?) {
             schemas.insert(
-                action.service,
+                action.service.parse()?,
                 crate::as_json(
                     client.get(
                         packages::SERVICE
@@ -1231,7 +1236,10 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
         &mut package_registry,
     )
     .await?;
-    let mut packages = package_registry.resolve(&package_names, false).await?;
+    let essential = EssentialServices::with_key(&args.block_key);
+    let mut packages = package_registry
+        .resolve(&package_names, false, &essential)
+        .await?;
     let (boot_transactions, groups) = create_boot_transactions(
         &args.block_key,
         &args.account_key,
@@ -1239,6 +1247,7 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
         true,
         expiration,
         &mut packages,
+        &essential,
         args.compression_level,
     )?;
 
@@ -1616,13 +1625,20 @@ async fn apply_packages<
     compression_level: u32,
     existing: PackageList,
 ) -> Result<SchemaMap, anyhow::Error> {
-    let ops = fetch_packages(reg, ops, &existing).await?;
-    let updated_packages = existing.into_updated(&ops, sender);
     let mut schemas = SchemaMap::new();
+    let ops = fetch_packages(
+        reg,
+        ops,
+        &existing,
+        &HttpSchemaFetcher { client, base_url },
+        &mut schemas,
+        &EssentialServices::empty(),
+    )
+    .await?;
+    let updated_packages = existing.into_updated(&ops, sender);
     for op in ops {
         match op {
             PackageOpFull::Install(mut package) => {
-                package.load_schemas(base_url, client, &mut schemas).await?;
                 out.set_label(format!(
                     "Installing {}-{}",
                     package.name(),
@@ -1650,7 +1666,6 @@ async fn apply_packages<
                 files.push_all(std::mem::take(&mut uploader.actions))?;
             }
             PackageOpFull::Replace(meta, mut package) => {
-                package.load_schemas(base_url, client, &mut schemas).await?;
                 // TODO: skip unmodified files (?)
                 out.set_label(format!(
                     "Updating {}-{} -> {}-{}",
@@ -1843,6 +1858,44 @@ async fn do_install<T: Read + Seek>(
     Ok(())
 }
 
+fn confirm_install(yes: bool, to_install: &[PackageOp]) -> Result<bool, anyhow::Error> {
+    if to_install.is_empty() {
+        eprintln!("Nothing to install.");
+        return Ok(false);
+    } else {
+        eprintln!("The following changes will be applied:");
+        to_install
+            .iter()
+            .map(|op| match op {
+                PackageOp::Install(info) => format!("Install {}-{}", info.name, info.version),
+                PackageOp::Replace(old, new) => {
+                    if old.version == new.version {
+                        format!("Reinstall {} {}", old.name, old.version)
+                    } else {
+                        format!("Upgrade {} {} -> {}", old.name, old.version, new.version)
+                    }
+                }
+                PackageOp::Remove(meta) => format!("Remove {}-{}", meta.name, meta.version),
+            })
+            .for_each(|line| eprintln!("  {}", line));
+    }
+
+    if !yes {
+        let term = Term::stderr();
+        if term.is_term() {
+            let proceed = Confirm::new()
+                .with_prompt("Proceed?")
+                .default(true)
+                .interact_on(&term)?;
+            if !proceed {
+                eprintln!("Install aborted.");
+                return Ok(false);
+            }
+        }
+    }
+    Ok(true)
+}
+
 async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
     let mut client = build_client(&args.node_args.proxy).await?;
     let installed = if args.local {
@@ -1865,39 +1918,8 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
         .resolve_changes(&package_registry, &packages, args.reinstall, args.local)
         .await?;
 
-    if to_install.is_empty() {
-        println!("Nothing to install.");
+    if !confirm_install(args.yes, &to_install)? {
         return Ok(());
-    } else {
-        println!("The following changes will be applied:");
-        to_install
-            .iter()
-            .map(|op| match op {
-                PackageOp::Install(info) => format!("Install {}-{}", info.name, info.version),
-                PackageOp::Replace(old, new) => {
-                    if old.version == new.version {
-                        format!("Reinstall {} {}", old.name, old.version)
-                    } else {
-                        format!("Upgrade {} {} -> {}", old.name, old.version, new.version)
-                    }
-                }
-                PackageOp::Remove(meta) => format!("Remove {}-{}", meta.name, meta.version),
-            })
-            .for_each(|line| println!("  {}", line));
-    }
-
-    if !args.yes {
-        let term = Term::stderr();
-        if term.is_term() {
-            let proceed = Confirm::new()
-                .with_prompt("Proceed?")
-                .default(true)
-                .interact_on(&term)?;
-            if !proceed {
-                println!("Install aborted.");
-                return Ok(());
-            }
-        }
     }
 
     if args.local {
@@ -2052,7 +2074,16 @@ async fn do_install_local<T: Read + Seek>(
     let progress = ProgressBar::new(to_install.len() as u64).with_style(
         ProgressStyle::with_template("{wide_bar} {pos}/{len}\n{msg}")?,
     );
-    let to_install = fetch_packages(&package_registry, to_install, &installed).await?;
+    let mut schemas = SchemaMap::new();
+    let to_install = fetch_packages(
+        &package_registry,
+        to_install,
+        &installed,
+        &NullSchemaFetcher,
+        &mut schemas,
+        &EssentialServices::empty(),
+    )
+    .await?;
     progress.set_message("Installing packages");
     let res: Result<(), anyhow::Error> = async {
         for op in to_install {
@@ -2200,6 +2231,10 @@ async fn upgrade(args: &UpgradeArgs) -> Result<(), anyhow::Error> {
             args.local,
         )
         .await?;
+
+    if !confirm_install(args.yes, &to_install)? {
+        return Ok(());
+    }
 
     if args.local {
         do_install_local(

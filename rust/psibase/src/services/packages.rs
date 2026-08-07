@@ -88,6 +88,11 @@ mod service {
     }
 
     #[action]
+    fn getSchema(service: AccountNumber) -> Option<Schema> {
+        unimplemented!()
+    }
+
+    #[action]
     fn setSources(sources: Vec<PackageSource>) {
         unimplemented!()
     }

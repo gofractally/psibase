@@ -1,6 +1,6 @@
 use async_graphql::ComplexObject;
 use psibase::services::fractals::constants::PPM;
-use psibase::{check, check_some, services::tokens::Quantity, AccountNumber, Table};
+use psibase::{services::tokens::Quantity, AccountNumber, ServiceWrapper, Table};
 
 use crate::tables::tables::{Config, Fractal, FractalMember, Levy, LevyTable, RewardStream};
 
@@ -32,17 +32,14 @@ impl Levy {
         amount: Quantity,
         send_to_stream: bool,
     ) -> Self {
-        check(ppm > 0 && ppm <= PPM, "ppm must be between 1 - 1,000,000");
-        check_some(
-            FractalMember::get(fractal, member),
-            "cannot levy a non-member",
-        );
+        assert!(ppm > 0 && ppm <= PPM, "ppm must be between 1 - 1,000,000");
+        FractalMember::get(fractal, member).expect("cannot levy a non-member");
 
         let total_existing_levy_ppm = Self::levies_of_member(fractal, member)
             .into_iter()
             .fold(0 as u32, |acc, levy| acc + levy.rate_ppm);
 
-        check(
+        assert!(
             total_existing_levy_ppm + ppm <= PPM,
             "accumulated levy ppms breach 100%",
         );

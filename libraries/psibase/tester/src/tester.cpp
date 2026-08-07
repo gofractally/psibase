@@ -62,6 +62,25 @@ namespace
       return result;
    }
 
+   struct TestChainSchemas
+   {
+      std::map<psibase::AccountNumber, psibase::ServiceSchema> schemas;
+      const psibase::ServiceSchema* operator()(psibase::AccountNumber service)
+      {
+         auto pos = schemas.find(service);
+         if (pos != schemas.end())
+            return &pos->second;
+
+         auto table = UserService::Packages{}.open<UserService::InstalledSchemaTable>();
+         if (auto row = table.get(service))
+         {
+            auto [pos, inserted] = schemas.try_emplace(service, std::move(row->schema));
+            return &pos->second;
+         }
+         return nullptr;
+      }
+   };
+
 }  // namespace
 
 using psibase::tester::raw::selectedChain;
@@ -131,7 +150,10 @@ void psibase::expect(TransactionTrace t, const std::string& expected, bool alway
    std::string error = t.error ? *t.error : "";
    bool bad = (expected.empty() && !error.empty()) || error.find(expected) == std::string::npos;
    if (bad || always_show)
-      std::cout << prettyTrace(trimRawData(std::move(t))) << "\n";
+   {
+      auto schemas = TestChainSchemas{};
+      std::cout << prettyTrace(t, std::ref(schemas)) << "\n";
+   }
    if (bad)
    {
       if (expected.empty())
@@ -139,6 +161,18 @@ void psibase::expect(TransactionTrace t, const std::string& expected, bool alway
       else
          check(false, "transaction was expected to fail with " + expected);
    }
+}
+
+std::string psibase::show(bool include, TransactionTrace t)
+{
+   if (include || t.error)
+   {
+      auto schemas = TestChainSchemas{};
+      std::cout << prettyTrace(t, std::ref(schemas)) << "\n";
+   }
+   if (t.error)
+      return *t.error;
+   return {};
 }
 
 namespace
@@ -281,6 +315,19 @@ namespace
       expect(tester::runAction(self.nativeHandle(), RunMode::rpc, true, xhttp.startSession()));
    }
 
+   psibase::SignedTransaction makeStartBlock(psibase::TimePointUSec expiration)
+   {
+      return {.transaction{{
+          .tapos   = {.expiration = std::chrono::ceil<psibase::Seconds>(expiration)},
+          .actions = {{
+              .sender  = {},
+              .service = psibase::transactionServiceNum,
+              .method  = psibase::MethodNumber("startBlock"),
+              .rawData = psio::to_frac(std::tuple()),
+          }},
+      }}};
+   }
+
 }  // namespace
 
 psibase::TestChain::TestChain(uint32_t chain_id, bool clone, bool pub, bool init, bool writable)
@@ -404,11 +451,16 @@ void psibase::TestChain::startBlock(BlockTime tp)
    {
       tester::raw::startBlock(id, (tp - Seconds(1)).time_since_epoch().count(), producer.value,
                               term, commitNum);
+      expect(tester::pushTransaction(id, makeStartBlock(tp)));
       finishBlock();
       commitNum = status->head.value().header.blockNum;
    }
    tester::raw::startBlock(id, tp.time_since_epoch().count(), producer.value, term, commitNum);
-   status    = kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
+   status = kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
+   if (status && status->head)
+   {
+      expect(tester::pushTransaction(id, makeStartBlock(tp + Seconds(1))));
+   }
    producing = true;
 }
 
@@ -762,9 +814,9 @@ std::string psibase::TestChain::login(AccountNumber user, AccountNumber service)
 {
    transactor<LoginInterface> loginTransactor{user, service};
    Tapos             tapos{.expiration = std::chrono::time_point_cast<std::chrono::seconds>(
-                                 std::chrono::system_clock::now()) +
-                             std::chrono::seconds(10),
-                           .flags = Tapos::do_not_broadcast_flag};
+                                             std::chrono::system_clock::now()) +
+                                         std::chrono::seconds(10),
+                           .flags      = Tapos::do_not_broadcast_flag};
    Transaction       trx{.tapos = tapos, .actions = {loginTransactor.loginSys("psibase.io")}};
    SignedTransaction strx{trx};
    auto reply = post<SystemService::LoginReply>(SystemService::Transact::service, "/login",

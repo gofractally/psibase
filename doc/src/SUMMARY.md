@@ -19,6 +19,7 @@
     - [Snapshots](specifications/blockchain/snapshots.md)
   - [App architecture](specifications/app-architecture/README.md)
     - [Events](specifications/app-architecture/events.md)
+    - [HTTP Requests](specifications/app-architecture/http-requests.md)
     - [Plugins](specifications/app-architecture/plugins.md)
     - [Services](specifications/app-architecture/services.md)
     - [Supervisor](specifications/app-architecture/supervisor.md)
@@ -69,7 +70,6 @@
     - [User onboarding]()
     - [Reference]()
       - [External script](development/front-ends/reference/external.md)
-      - [HTTP requests](development/front-ends/reference/http-requests.md)
       - [JS libraries](development/front-ends/reference/js-libraries.md)
 
 - [Running infrastructure](run-infrastructure/README.md)

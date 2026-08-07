@@ -4,7 +4,7 @@ pub mod tables {
     use psibase::services::auth_dyn::int_wrapper;
     use psibase::services::transact::ServiceMethod;
     use psibase::{
-        check, check_some, services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber, Fracpack,
+        services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber, Fracpack, ServiceWrapper,
         Table, ToSchema,
     };
     use serde::{Deserialize, Serialize};
@@ -32,7 +32,7 @@ pub mod tables {
         }
 
         pub fn get_assert(account: AccountNumber) -> Self {
-            check_some(Self::get(account), "failed to find management")
+            Self::get(account).expect("failed to find management")
         }
 
         pub fn has_policy(&self) -> bool {
@@ -50,7 +50,7 @@ pub mod tables {
         }
 
         pub fn assert_has_policy(&self) {
-            check(
+            assert!(
                 self.has_policy(),
                 "management service does not support user",
             )
@@ -66,7 +66,6 @@ pub mod tables {
 pub mod service {
     use crate::tables::Management;
     use psibase::services::accounts::Wrapper as Accounts;
-    use psibase::services::auth_dyn::policy::WeightedAuthorizer;
     use psibase::services::transact::ServiceMethod;
     use psibase::*;
 
@@ -77,8 +76,9 @@ pub mod service {
             // Idempotency safety: if management already exists, only the current
             // manager may call this again — prevents other callers from being
             // misled into thinking they now manage the account.
-            check(
-                management.manager == get_sender(),
+            assert_eq!(
+                management.manager,
+                get_sender(),
                 "new manager conflicts with pre-existing manager",
             );
         } else {
@@ -89,22 +89,22 @@ pub mod service {
 
     #[action]
     fn set_mgmt(account: AccountNumber, manager: AccountNumber) {
-        check(Accounts::call().exists(account), "account does not exist");
+        assert!(Accounts::call().exists(account), "account does not exist");
 
         let sender = get_sender();
         let existing_management = Management::get(account);
         if let Some(existing_management) = existing_management {
-            check(
-                sender == existing_management.manager,
+            assert_eq!(
+                sender, existing_management.manager,
                 "existing managements must be updated by management account",
             )
         } else {
-            check(
+            assert!(
                 Accounts::call().exists(manager),
                 "manager account does not exist",
             );
-            check(
-                sender == account,
+            assert_eq!(
+                sender, account,
                 "new policies must be created by user account",
             );
         }
@@ -131,13 +131,23 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
+    fn getDlgsSys(sender: AccountNumber, method: Option<ServiceMethod>) -> Vec<AccountNumber> {
+        Management::get_assert(sender)
+            .dynamic_policy(method)
+            .authorizers
+            .into_iter()
+            .map(|authorizer| authorizer.account)
+            .collect()
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
     fn isAuthSys(
         sender: AccountNumber,
         authorizers: Vec<AccountNumber>,
         method: Option<ServiceMethod>,
-        authSet: Option<Vec<AccountNumber>>,
     ) -> bool {
-        is_auth(sender, authorizers, method, authSet, true)
+        is_auth(sender, authorizers, method, true)
     }
 
     #[action]
@@ -146,44 +156,18 @@ pub mod service {
         sender: AccountNumber,
         rejecters: Vec<AccountNumber>,
         method: Option<ServiceMethod>,
-        authSet: Option<Vec<AccountNumber>>,
     ) -> bool {
-        is_auth(sender, rejecters, method, authSet, false)
-    }
-
-    fn is_auth_other(
-        sender: AccountNumber,
-        authorizers: Vec<AccountNumber>,
-        auth_set: Vec<AccountNumber>,
-        is_approval: bool,
-    ) -> bool {
-        use psibase::services::transact::auth_interface::AuthWrapper;
-
-        let auth_service = AuthWrapper::call_to(Accounts::call().getAuthOf(sender));
-
-        if is_approval {
-            auth_service.isAuthSys(sender, authorizers, None, Some(auth_set))
-        } else {
-            auth_service.isRejectSys(sender, authorizers, None, Some(auth_set))
-        }
+        is_auth(sender, rejecters, method, false)
     }
 
     fn is_auth(
         sender: AccountNumber,
         authorizers: Vec<AccountNumber>,
         method: Option<ServiceMethod>,
-        auth_set: Option<Vec<AccountNumber>>,
         is_approval: bool,
     ) -> bool {
-        // Make sure we're not in a loop
-        let mut auth_set = auth_set.unwrap_or_default();
-        if auth_set.contains(&sender) {
-            return false;
-        }
-        auth_set.push(sender);
-
         let policy = Management::get_assert(sender).dynamic_policy(method);
-        check(policy.threshold != 0, "multi auth threshold cannot be 0");
+        assert_ne!(policy.threshold, 0, "multi auth threshold cannot be 0");
 
         let total_possible_weight = policy
             .authorizers
@@ -200,42 +184,19 @@ pub mod service {
             total_possible_weight - policy.threshold + 1
         };
 
-        let (already_approved, to_check): (Vec<WeightedAuthorizer>, Vec<WeightedAuthorizer>) =
-            policy
-                .authorizers
-                .into_iter()
-                .partition(|authorizer| authorizers.contains(&authorizer.account));
-
-        let mut total_weight_approved = already_approved
+        let total_weight_approved = policy
+            .authorizers
             .into_iter()
-            .fold(0, |acc, authorizer| authorizer.weight + acc);
+            .filter(|authorizer| authorizers.contains(&authorizer.account))
+            .fold(0, |acc, authorizer| acc + authorizer.weight);
 
-        if total_weight_approved >= required_weight {
-            return true;
-        }
-
-        for weight_authorizer in to_check {
-            let is_auth = is_auth_other(
-                weight_authorizer.account,
-                authorizers.clone(),
-                auth_set.clone(),
-                is_approval,
-            );
-            if is_auth {
-                total_weight_approved += weight_authorizer.weight;
-                if total_weight_approved >= required_weight {
-                    return true;
-                }
-            }
-        }
-
-        false
+        total_weight_approved >= required_weight
     }
 
     #[action]
     #[allow(non_snake_case)]
     fn canAuthUserSys(user: AccountNumber) {
-        let management = check_some(Management::get(user), "no manager set for user");
+        let management = Management::get(user).expect("no manager set for user");
         management.assert_has_policy();
     }
 }

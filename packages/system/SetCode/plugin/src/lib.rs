@@ -4,7 +4,6 @@ mod bindings;
 use bindings::*;
 use exports::setcode::plugin::api::Guest as Api;
 use psibase::services::setcode::action_structs::{setCode, stageCode};
-use psibase::AccountNumber;
 use transact::plugin::intf::add_action_to_transaction;
 
 use crate::trust::*;
@@ -38,7 +37,7 @@ impl Api for SetcodePlugin {
         add_action_to_transaction(
             setCode::ACTION_NAME,
             &setCode {
-                service: AccountNumber::from(account.as_str()),
+                service: account.parse().unwrap(),
                 vmType: 0,
                 vmVersion: 0,
                 code: code.into(),
@@ -57,7 +56,7 @@ impl Api for SetcodePlugin {
         add_action_to_transaction(
             stageCode::ACTION_NAME,
             &stageCode {
-                service: AccountNumber::from(account.as_str()),
+                service: account.parse().unwrap(),
                 id,
                 vmType: 0,
                 vmVersion: 0,

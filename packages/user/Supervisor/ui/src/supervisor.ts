@@ -112,8 +112,6 @@ export class Supervisor implements AppInterface {
         }
     }
 
-    private preloadLock: Promise<void> = Promise.resolve();
-
     // This step loads the full plugin tree (downloading + parsing + JCO transpiling)
     //
     // This does not instantiate wasms, with the exception of core system plugin wasms,
@@ -123,11 +121,7 @@ export class Supervisor implements AppInterface {
     // The caller should dispose of all instantiated plugins after the entry function
     //  finishes.
     private preload(plugins: QualifiedPluginId[]): Promise<void> {
-        const myPreload = this.preloadLock
-            .catch(() => {})
-            .then(() => this.doPreload(plugins));
-        this.preloadLock = myPreload.catch(() => {});
-        return myPreload;
+        return this.doPreload(plugins);
     }
 
     private async doPreload(plugins: QualifiedPluginId[]) {
@@ -387,6 +381,12 @@ export class Supervisor implements AppInterface {
         return ret;
     }
 
+    private cleanupSessionState(): void {
+        this.context = undefined;
+        this.parentOrigination = undefined;
+        this.embedder = undefined;
+    }
+
     // This is an entrypoint that returns the JSON interface for a plugin.
     async getJson(callerOrigin: string, id: string, plugin: QualifiedPluginId) {
         try {
@@ -399,22 +399,29 @@ export class Supervisor implements AppInterface {
             this.replyToParent(id, e);
         } finally {
             this.plugins.disposeAll();
+            this.cleanupSessionState();
         }
     }
 
     // This is an entrypoint for apps to preload plugins.
     // Intended to be used on pageload to prepare the plugins that an app requires,
     //   which accelerates the responsiveness of the plugins for subsequent calls.
-    async preloadPlugins(callerOrigin: string, plugins: QualifiedPluginId[]) {
+    async preloadPlugins(
+        callerOrigin: string,
+        id: string,
+        plugins: QualifiedPluginId[],
+    ) {
+        let result: unknown = null;
         try {
             await networkNamePromise;
             this.setParentOrigination(callerOrigin);
             await this.preload(plugins);
         } catch (e) {
-            console.error("TODO: Return an error to the caller.");
-            console.error(e);
+            result = e;
         } finally {
             this.plugins.disposeAll();
+            this.replyToParent(id, result);
+            this.cleanupSessionState();
         }
     }
 
@@ -461,8 +468,6 @@ export class Supervisor implements AppInterface {
 
             // Send plugin result to parent window
             this.replyToParent(id, result);
-
-            this.context = undefined;
         } catch (e) {
             let result: any;
             if (e instanceof PromptSignal && e.kind === "prompt") {
@@ -493,9 +498,9 @@ export class Supervisor implements AppInterface {
                     : e;
             }
             this.replyToParent(id, result);
-            this.context = undefined;
         } finally {
             this.plugins.disposeAll();
+            this.cleanupSessionState();
         }
     }
 }

@@ -68,8 +68,10 @@ namespace SystemService
 
    void HttpServer::registerServer(AccountNumber server)
    {
+      auto sender = getSender();
+      check(!sender.subaccount(), "Subaccounts do not have domain names");
       Tables{getReceiver()}.open<RegServTable>().put(RegisteredServiceRow{
-          .service = getSender(),
+          .service = sender,
           .server  = server,
       });
    }
@@ -310,6 +312,20 @@ namespace SystemService
          return;
       }
 
+      // Subaccounts don't have domain names. This is a defensive check
+      // that should never be reached, because the subaccount separator
+      // is not allowed in a hostname.
+      if (service_opt->subaccount())
+      {
+         std::string msg = "The resource '" + req.target + "' was not found";
+         sendReplyImpl(HttpServer::service, sock,
+                       {.status      = HttpStatus::notFound,
+                        .contentType = "text/html",
+                        .body        = std::vector(msg.begin(), msg.end()),
+                        .headers     = allowCors()});
+         return;
+      }
+
       // If the subdomain has a redirect set, that takes precedence
       if (auto dest = getRedirect(*service_opt))
       {
@@ -408,6 +424,7 @@ namespace SystemService
    void HttpServer::setRedirect(AccountNumber destination)
    {
       auto sender = getSender();
+      check(!sender.subaccount(), "Subaccounts do not have domain names");
       check(destination != sender, "redirect destination must not be the sender");
       Tables{getReceiver()}.open<RedirectTable>().put(RedirectRow{
           .account     = sender,

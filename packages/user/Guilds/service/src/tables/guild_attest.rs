@@ -1,5 +1,5 @@
 use async_graphql::ComplexObject;
-use psibase::{check_some, AccountNumber, Table};
+use psibase::{AccountNumber, Table};
 
 use crate::tables::tables::{Guild, GuildAttest, GuildAttestTable, GuildMember};
 
@@ -27,10 +27,7 @@ impl GuildAttest {
         comment: String,
         endorses: bool,
     ) {
-        check_some(
-            GuildMember::get(guild, attester),
-            "must be member of the guild to attest",
-        );
+        GuildMember::get(guild, attester).expect("must be member of the guild to attest");
         Self::new(guild, applicant, attester, comment, endorses).save();
     }
 
@@ -49,10 +46,7 @@ impl GuildAttest {
         applicant: AccountNumber,
         attester: AccountNumber,
     ) -> Self {
-        check_some(
-            Self::get(guild, applicant, attester),
-            "attestation does not exist",
-        )
+        Self::get(guild, applicant, attester).expect("attestation does not exist")
     }
 
     pub fn remove(&self) {

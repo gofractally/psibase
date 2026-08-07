@@ -1,6 +1,8 @@
 use fracpack::{FracInputStream, Pack, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
 
+pub use crate::services::events::EventDb;
+
 /// Identify database to operate on
 ///
 /// Native functions expose a set of databases which serve
@@ -42,74 +44,6 @@ pub enum DbId {
     ///
     /// Transactions don't have access to this, but RPC does.
     BlockLog,
-
-    /// Long-term history event storage
-    ///
-    /// Write-only during transactions, and read-only during RPC.
-    /// Individual nodes may modify this database, expire data from this
-    /// database, or wipe it entirely at will.
-    ///
-    /// TODO: this policy may eventually change to allow time-limited
-    /// read access during transactions.
-    ///
-    /// Key is an auto-incremented, 64-bit unsigned number.
-    ///
-    /// Value must begin with:
-    /// * 32 bit: block number
-    /// * 64 bit: service
-    ///
-    /// Only usable with these native functions:
-    /// * [crate::native_raw::putSequential]
-    /// * [crate::native_raw::getSequential]
-    ///
-    /// TODO: right now the value must begin with the service. Revisit
-    /// whether beginning with the block number is useful.
-    HistoryEvent,
-
-    /// Short-term history event storage
-    ///
-    /// These events are erased once the block that produced them becomes final.
-    /// They notify user interfaces which subscribe to activity.
-    ///
-    /// Write-only during transactions, and read-only during RPC.
-    /// Individual nodes may modify this database, expire data from this
-    /// database, or wipe it entirely at will.
-    ///
-    /// Key is an auto-incremented, 64-bit unsigned number.
-    ///
-    /// Value must begin with:
-    /// * 32 bit: block number
-    /// * 64 bit: service
-    ///
-    /// Only usable with these native functions:
-    /// * [crate::native_raw::putSequential]
-    /// * [crate::native_raw::getSequential]
-    ///
-    /// TODO: right now the value must begin with the service. Revisit
-    /// whether beginning with the block number is useful.
-    UiEvent,
-
-    /// Events which go into the merkle tree
-    ///
-    /// TODO: read support; right now only RPC mode can read
-    ///
-    /// Services may produce these events during transactions and may read them
-    /// up to 1 hour (configurable) after they were produced, or they reach finality,
-    /// which ever is longer.
-    ///
-    /// Key is an auto-incremented, 64-bit unsigned number.
-    ///
-    /// Value must begin with:
-    /// * 32 bit: block number
-    /// * 64 bit: service
-    ///
-    /// Only usable with these native functions:
-    /// * [crate::native_raw::putSequential]
-    /// * [crate::native_raw::getSequential]
-    ///
-    /// TODO: right now the value must begin with the service. Revisit
-    /// whether beginning with the block number is useful.
-    MerkleEvent,
 
     /// block signatures
     BlockProof,

@@ -366,10 +366,8 @@ namespace psibase
       rhf_t::add<&ExecutionContextImpl::exportHandles>("env", "exportHandles");
       rhf_t::add<&ExecutionContextImpl::importHandles>("env", "importHandles");
       rhf_t::add<&ExecutionContextImpl::kvPut>("env", "kvPut");
-      rhf_t::add<&ExecutionContextImpl::putSequential>("env", "putSequential");
       rhf_t::add<&ExecutionContextImpl::kvRemove>("env", "kvRemove");
       rhf_t::add<&ExecutionContextImpl::kvGet>("env", "kvGet");
-      rhf_t::add<&ExecutionContextImpl::getSequential>("env", "getSequential");
       rhf_t::add<&ExecutionContextImpl::kvGreaterEqual>("env", "kvGreaterEqual");
       rhf_t::add<&ExecutionContextImpl::kvLessThan>("env", "kvLessThan");
       rhf_t::add<&ExecutionContextImpl::kvMax>("env", "kvMax");

@@ -242,12 +242,12 @@ void from_json(Timeout& obj, auto& stream)
 
 std::filesystem::path option_path;
 ConfigFileOptions     config_options{.expandValue =
-                                     [](std::string_view key)
-                                 {
+                                         [](std::string_view key)
+                                     {
                                     // shell commands are processed by the shell. They should not go
                                     // through another round of expansion.
                                     return !key.ends_with(".command");
-                                 },
+                                     },
                                      .allowUnregistered = true};
 std::filesystem::path parse_path(std::string_view             s,
                                  const std::filesystem::path& context = option_path)
@@ -858,7 +858,7 @@ Perf get_perf(const SharedState& state)
    result.timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
                           std::chrono::steady_clock::now().time_since_epoch())
                           .count();
-   result.memory = getMemStats(state);
+   result.memory    = getMemStats(state);
    for (const auto& entry : std::filesystem::directory_iterator("/proc/self/task"))
    {
       result.tasks.push_back(getThreadInfo(entry, clk_tck));
@@ -1357,11 +1357,10 @@ void run(const std::string&              db_path,
    // is destroyed.
    auto http_config = std::make_shared<http::http_config>();
 
-   // The runQueue needs to out-live the chainContext, so
-   // that notify is safe.
-   RunQueue runQueue{sharedState};
-
+   RunQueue                runQueue{sharedState};
    boost::asio::io_context chainContext;
+
+   auto shutdown_sockets = psio::finally{[&system] { system->sockets->shutdown(); }};
 
    auto server_work = boost::asio::make_work_guard(chainContext);
 
@@ -1495,6 +1494,15 @@ void run(const std::string&              db_path,
               });
        });
 
+   auto stop_threads =
+       psio::finally{[&chainContext, &tpool]
+                     {
+                        tpool.setNumThreads(0);
+                        auto& ectx = static_cast<boost::asio::execution_context&>(chainContext);
+                        if (boost::asio::has_service<http::server_service>(ectx))
+                           boost::asio::use_service<http::server_service>(ectx).stop();
+                     }};
+
    if (!listen.empty())
    {
       // TODO: command-line options
@@ -1503,7 +1511,7 @@ void run(const std::string&              db_path,
       http_config->idle_timeout_us  = http_timeout.duration.count();
       http_config->listen           = listen;
       http_config->status           = http::http_status{
-                    .slow = system->sharedDatabase.isSlow(), .startup = 1, .needgenesis = 1};
+          .slow = system->sharedDatabase.isSlow(), .startup = 1, .needgenesis = 1};
 
       // TODO: speculative execution on non-producers
       http_config->push_boot_async =
@@ -1813,17 +1821,6 @@ void run(const std::string&              db_path,
    }
 
    tpool.setNumThreads(service_threads);
-
-   auto remove_http_handlers = psio::finally{[&http_config, &system]
-                                             {
-                                                {
-                                                   std::lock_guard l{http_config->mutex};
-                                                   http_config->push_boot_async = nullptr;
-                                                }
-                                                {
-                                                   system->sockets->shutdown();
-                                                }
-                                             }};
 
    node.set_producer_id(producer);
    {

@@ -16,8 +16,8 @@ mod service {
     use psibase::services::sites::Wrapper as SitesSvc;
     use psibase::services::transact::Wrapper as TransactSvc;
     use psibase::{
-        check, get_sender, serve_graphql, AccountNumber, DbId, HttpReply, HttpRequest,
-        MethodNumber, RawKey, Table, TableQuery, TimePointSec,
+        get_sender, serve_graphql, AccountNumber, EventDb, HttpReply, HttpRequest, MethodNumber,
+        RawKey, ServiceWrapper, Table, TableQuery, TimePointSec,
     };
 
     #[action]
@@ -27,17 +27,27 @@ mod service {
 
         SitesSvc::call().enableSpa(true);
 
-        EventsSvc::call().addIndex(DbId::HistoryEvent, SERVICE, MethodNumber::from("sent"), 0);
-        EventsSvc::call().addIndex(DbId::HistoryEvent, SERVICE, MethodNumber::from("sent"), 1);
+        EventsSvc::call().addIndex(
+            EventDb::HistoryEvent,
+            SERVICE,
+            MethodNumber::from("sent"),
+            0,
+        );
+        EventsSvc::call().addIndex(
+            EventDb::HistoryEvent,
+            SERVICE,
+            MethodNumber::from("sent"),
+            1,
+        );
     }
 
     /// Send message
     /// by emiting a `sent` event
     #[action]
     fn send(receiver: AccountNumber, subject: String, body: String) {
-        check(
+        assert!(
             AccountsSvc::call().exists(receiver),
-            &format!("receiver account {} doesn't exist", receiver),
+            "receiver account {receiver} doesn't exist"
         );
         let datetime = TransactSvc::call().currentBlock().time.seconds();
         Wrapper::emit()
@@ -77,10 +87,7 @@ mod service {
         body: String,
         datetime: i64,
     ) {
-        check(
-            get_sender() == receiver,
-            &format!("only receiver of email can save it"),
-        );
+        assert_eq!(get_sender(), receiver, "only receiver of email can save it");
 
         let saved_messages_table = SavedMessageTable::new();
         saved_messages_table
