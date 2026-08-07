@@ -753,8 +753,9 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
    {
       PSIBASE_SUBJECTIVE_TX
       {
-         auto result     = serveGraphQL(request, Query{});
-         result->headers = allowCorsCredentials(request, XAdmin::service);
+         auto result = serveGraphQL(request, Query{});
+         if (result)
+            result->headers = allowCorsCredentials(request, XAdmin::service);
          return result;
       }
    }
