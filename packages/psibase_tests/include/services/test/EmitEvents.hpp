@@ -52,7 +52,6 @@ namespace TestService
                 method(emitExample, r),
                 method(serveSys, request))
 
-   PSIBASE_REFLECT_EVENTS(EmitEvents)
    PSIBASE_REFLECT_HISTORY_EVENTS(EmitEvents,  //
                                   method(e, s, i),
                                   method(e2, r))
