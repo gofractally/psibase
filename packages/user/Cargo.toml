@@ -1,6 +1,9 @@
 [workspace]
 resolver = "2"
 members = [
+    "Banx",
+    "Banx/service",
+    "Banx/plugin",
     "Branding",
     "Branding/service",
     "Branding/plugin",
@@ -68,6 +71,10 @@ members = [
     "NameMarket/service",
     "NameMarket/query-service",
     "NameMarket/plugin",
+    "Banx",
+    "Banx/service",
+    "Banx/query-service",
+    "Banx/plugin",
 ]
 
 exclude = [
