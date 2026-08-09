@@ -1,0 +1,26 @@
+[package]
+name = "banx-pkg"                      # Crate name
+description = "ftb"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish.workspace = true
+
+[package.metadata.psibase]
+package-name = "Banx"
+services = ["banx"]
+
+[package.metadata.psibase.dependencies]
+HttpServer = "0.25.0"
+Sites = "0.25.0"
+Permissions = "0.25.0"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+banx = { path = "service", version = "0.25.0" }
+r-banx = { path = "query-service", version = "0.25.0" }
+banx-plugin = { path = "plugin", version = "0.25.0" }
