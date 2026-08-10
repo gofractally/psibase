@@ -856,23 +856,36 @@ pub mod service {
     /// - Steve: credit line to Gary (capacity for Gary to owe Steve)
     /// - Gary: [`st_rte_pol`] toward Steve (fee + max accept rate)
     ///
-    /// `Alice.path_pay([Gary, Steve], 5)`:
+    /// `Alice.path_pay([Gary, Steve], 5, min_return)`:
     /// 1. **First leg** — Alice draws **5** on Gary's line only (no routing
     ///    policy). Obligation: Alice owes Gary 5.
     /// 2. **Later legs** — current party is intermediate. Requires **their**
     ///    routing policy with the next creditor. Opens next obligation at
     ///    `amount_in - fee` (e.g. Gary owes Steve **4.90**). Fails if policy
     ///    missing or next line rate &gt; `max_accept_rate`.
+    /// 3. **`min_return`** — after all fees, the last creditor must receive at
+    ///    least this much principal on their leg (slippage guard if an
+    ///    intermediate raises fees between UI quote and execution). Else the
+    ///    whole tx fails and no legs stick.
     ///
-    /// Single-hop `path_pay([Steve], 5)` is a direct line draw (plugin can wrap
-    /// this as a friendlier "debit" API).
+    /// Single-hop `path_pay([Steve], 5, min_return)` is a direct line draw;
+    /// typically `min_return == amount` (or ≤ amount).
     #[action]
-    fn path_pay(creditors: Vec<AccountNumber>, asset_id: u32, amount: Quantity) {
+    fn path_pay(
+        creditors: Vec<AccountNumber>,
+        asset_id: u32,
+        amount: Quantity,
+        min_return: Quantity,
+    ) {
         assert!(
             !creditors.is_empty(),
             "path_pay must include at least one creditor"
         );
         assert!(amount.value > 0, "path_pay amount must be positive");
+        assert!(
+            min_return.value <= amount.value,
+            "min_return cannot exceed path amount"
+        );
 
         let mut debtor = get_sender();
         let mut forward = amount;
@@ -891,6 +904,12 @@ pub mod service {
 
             debtor = creditor;
         }
+
+        // `forward` is what the last creditor was drawn for (after all skims).
+        assert!(
+            forward.value >= min_return.value,
+            "path_pay final amount below min_return"
+        );
     }
 
     #[pre_action(exclude(init))]

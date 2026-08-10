@@ -70,14 +70,64 @@ mod tests {
             .st_rte_pol(steve, asset_id, Quantity::new(0), 20_000, 1_000_000)
             .get()?;
 
+        // min_return 490: exact residual after 2% fee on 500.
         Wrapper::push_from(&chain, alice)
-            .path_pay(vec![gary, steve], asset_id, amount)
+            .path_pay(vec![gary, steve], asset_id, amount, Quantity::new(490))
             .get()?;
 
         // Alice owes Gary 500; Gary owes Steve 490 (2% fee).
         assert_eq!(Obligation::exposure(gary, alice, asset_id).value, 500);
         assert_eq!(Obligation::exposure(steve, gary, asset_id).value, 490);
         assert_eq!(Obligation::exposure(steve, alice, asset_id).value, 0);
+
+        Ok(())
+    }
+
+    /// min_return rejects path if intermediate fees leave too little for payee.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_path_pay_min_return(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+
+        let alice = account!("alice");
+        let gary = account!("gary");
+        let steve = account!("steve");
+        chain.new_account(alice).unwrap();
+        chain.new_account(gary).unwrap();
+        chain.new_account(steve).unwrap();
+
+        let asset_id = 1u32;
+        Wrapper::push_from(&chain, gary)
+            .st_crd_lne(alice, asset_id, Quantity::new(10_000), false, 0)
+            .get()?;
+        Wrapper::push_from(&chain, steve)
+            .st_crd_lne(gary, asset_id, Quantity::new(10_000), false, 0)
+            .get()?;
+        // Fixed fee 50 on 100 → final 50.
+        Wrapper::push_from(&chain, gary)
+            .st_rte_pol(steve, asset_id, Quantity::new(50), 0, 1_000_000)
+            .get()?;
+
+        // UI expected ~100 but requires min 80 — fails after fee.
+        let result = Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![gary, steve],
+                asset_id,
+                Quantity::new(100),
+                Quantity::new(80),
+            )
+            .get();
+        assert!(result.is_err());
+
+        // min_return 50 succeeds.
+        Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![gary, steve],
+                asset_id,
+                Quantity::new(100),
+                Quantity::new(50),
+            )
+            .get()?;
+        assert_eq!(Obligation::exposure(steve, gary, asset_id).value, 50);
 
         Ok(())
     }
@@ -106,7 +156,7 @@ mod tests {
 
         // No Gary st_rte_pol(steve) — second leg must fail.
         let result = Wrapper::push_from(&chain, alice)
-            .path_pay(vec![gary, steve], asset_id, Quantity::new(100))
+            .path_pay(vec![gary, steve], asset_id, Quantity::new(100), Quantity::new(0))
             .get();
         assert!(result.is_err());
 
@@ -139,7 +189,7 @@ mod tests {
             .get()?;
 
         let result = Wrapper::push_from(&chain, alice)
-            .path_pay(vec![gary, steve], asset_id, Quantity::new(100))
+            .path_pay(vec![gary, steve], asset_id, Quantity::new(100), Quantity::new(0))
             .get();
         assert!(result.is_err());
 
@@ -162,7 +212,7 @@ mod tests {
             .get()?;
 
         Wrapper::push_from(&chain, alice)
-            .path_pay(vec![steve], asset_id, Quantity::new(50))
+            .path_pay(vec![steve], asset_id, Quantity::new(50), Quantity::new(50))
             .get()?;
 
         assert_eq!(Obligation::exposure(steve, alice, asset_id).value, 50);
@@ -187,7 +237,7 @@ mod tests {
             .st_crd_lne(alice, asset_id, Quantity::new(1_000), false, 0)
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .path_pay(vec![bob], asset_id, amount)
+            .path_pay(vec![bob], asset_id, amount, amount)
             .get()?;
 
         assert_eq!(Obligation::exposure(bob, alice, asset_id).value, 100);
@@ -218,7 +268,7 @@ mod tests {
             .st_crd_lne(alice, asset_id, Quantity::new(10_000), false, 100_000)
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .path_pay(vec![bob], asset_id, Quantity::new(100))
+            .path_pay(vec![bob], asset_id, Quantity::new(100), Quantity::new(100))
             .get()?;
 
         Wrapper::push_from(&chain, bob)
