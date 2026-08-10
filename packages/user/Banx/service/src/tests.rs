@@ -3,7 +3,7 @@
 #[cfg(test)]
 mod tests {
     use crate::tables::interest::{accrue_delta, ACCRUAL_DENOM};
-    use crate::tables::{Obligation, PathHop, PPM_SCALE, RATE_SCALE};
+    use crate::tables::{Asset, Obligation, PathHop, PPM_SCALE, RATE_SCALE};
     use crate::Wrapper;
     use psibase::services::tokens::Quantity;
     use psibase::*;
@@ -14,6 +14,40 @@ mod tests {
 
     fn never() -> TimePointSec {
         TimePointSec { seconds: 0 }
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_init_seeds_default_assets(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+
+        let fiat = [
+            (account!("usd"), "United States dollar"),
+            (account!("aud"), "Australian dollar"),
+            (account!("gbp"), "British pound sterling"),
+            (account!("euro"), "Euro"),
+        ];
+        for (symbol, description) in fiat {
+            let asset = Asset::get_assert(symbol);
+            assert_eq!(asset.symbol, symbol);
+            assert_eq!(asset.precision.value(), 4);
+            assert_eq!(asset.description.to_string(), description);
+        }
+
+        let gold = Asset::get_assert(account!("gold"));
+        assert_eq!(gold.precision.value(), 6);
+        assert_eq!(
+            gold.description.to_string(),
+            "Gold; 1.000000 = 1 gram of gold"
+        );
+
+        let silver = Asset::get_assert(account!("silver"));
+        assert_eq!(silver.precision.value(), 6);
+        assert_eq!(
+            silver.description.to_string(),
+            "Silver; 1.000000 = 1 gram of silver"
+        );
+
+        Ok(())
     }
 
     #[psibase::test_case(packages("Banx"))]

@@ -2,8 +2,8 @@
 pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::{
-        services::tokens::Quantity, AccountNumber, Fracpack, ServiceWrapper, Table, TimePointSec,
-        ToSchema,
+        services::tokens::{Precision, Quantity},
+        AccountNumber, Fracpack, Memo, ServiceWrapper, Table, TimePointSec, ToSchema,
     };
     use serde::{Deserialize, Serialize};
 
@@ -104,11 +104,48 @@ pub mod tables {
         }
     }
 
+    /// Registered currency / asset: symbol, decimal precision, and description.
+    #[table(name = "AssetTable", index = 5)]
+    #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
+    pub struct Asset {
+        #[primary_key]
+        pub symbol: AccountNumber,
+        pub precision: Precision,
+        /// Human-readable description (max 80 bytes).
+        pub description: Memo,
+    }
+
+    impl Asset {
+        fn save(&self) {
+            AssetTable::read_write().put(self).unwrap();
+        }
+
+        pub fn get(symbol: AccountNumber) -> Option<Self> {
+            AssetTable::read().get_index_pk().get(&symbol)
+        }
+
+        pub fn get_assert(symbol: AccountNumber) -> Self {
+            Self::get(symbol).expect("asset not found")
+        }
+
+        pub fn new(symbol: AccountNumber, precision: Precision, description: Memo) -> Self {
+            Self {
+                symbol,
+                precision,
+                description,
+            }
+        }
+
+        pub fn add(symbol: AccountNumber, precision: Precision, description: Memo) {
+            assert!(Self::get(symbol).is_none(), "symbol already exists");
+            Self::new(symbol, precision, description).save();
+        }
+    }
+
     /// Scale for rates/takes: `out = in * rate / RATE_SCALE`.
     /// Equal to [`PPM_SCALE`]; `RATE_SCALE` = identity (1:1).
     pub const RATE_SCALE: u64 = PPM_SCALE as u64;
 
-    /// @deprecated alias — prefer [`RATE_SCALE`].
     pub const FX_RATE_SCALE: u64 = RATE_SCALE;
 
     fn assert_policy_live(expires_at: TimePointSec) {
@@ -119,18 +156,12 @@ pub mod tables {
             .currentBlock()
             .time
             .seconds();
-        assert!(
-            now.seconds <= expires_at.seconds,
-            "policy expired"
-        );
+        assert!(now.seconds <= expires_at.seconds, "policy expired");
     }
 
     /// `out = (in - fee_fixed) * rate / RATE_SCALE`.
     fn apply_rate(amount_in: Quantity, fee_fixed: Quantity, rate: u64) -> Quantity {
-        assert!(
-            fee_fixed < amount_in,
-            "fixed fee consumes entire amount"
-        );
+        assert!(fee_fixed < amount_in, "fixed fee consumes entire amount");
         let after = amount_in - fee_fixed;
         let out = (after.value as u128)
             .checked_mul(rate as u128)
@@ -138,7 +169,7 @@ pub mod tables {
             / (RATE_SCALE as u128);
         let out = u64::try_from(out).expect("rate out exceeds u64");
         assert!(out > 0, "rate conversion rounded to zero");
-        Quantity::new(out)
+        out.into()
     }
 
     /// One hop in [`service::path_pay`]: draw on `account` in `asset_id`.
@@ -318,7 +349,10 @@ pub mod tables {
             to_interest_rate: u32,
             expires_at: TimePointSec,
         ) {
-            assert!(from_asset != to_asset, "currency convert requires different assets");
+            assert!(
+                from_asset != to_asset,
+                "currency convert requires different assets"
+            );
             assert!(fx_rate > 0, "fx_rate must be positive");
             assert!(
                 to_interest_rate <= PPM_SCALE,
@@ -349,18 +383,14 @@ pub mod tables {
             assert!(creditor != self.debtor, "creditor must differ from debtor");
 
             Obligation::accrue_pair(creditor, self.debtor, self.from_asset);
-            let available =
-                Obligation::exposure(creditor, self.debtor, self.from_asset).value;
+            let available = Obligation::exposure(creditor, self.debtor, self.from_asset).value;
             let take = amount_from.value.min(available);
             assert!(take > 0, "nothing to convert in from_asset");
 
             Obligation::apply_reduction(creditor, self.debtor, self.from_asset, take);
 
             let to_qty = apply_rate(Quantity::new(take), self.fee_fixed, self.fx_rate);
-            assert!(
-                to_qty.value >= min_to.value,
-                "convert output below min_to"
-            );
+            assert!(to_qty.value >= min_to.value, "convert output below min_to");
 
             Obligation::credit_pair(
                 creditor,
@@ -471,7 +501,7 @@ pub mod tables {
             Self::get(id).expect("obligation does not exist")
         }
 
-        fn for_pair(creditor: AccountNumber, debtor: AccountNumber, asset_id: u32) -> Vec<Self> {
+        fn pairs(creditor: AccountNumber, debtor: AccountNumber, asset_id: u32) -> Vec<Self> {
             ObligationTable::read()
                 .get_index_by_set()
                 .range((creditor, debtor, asset_id, 0)..(creditor, debtor, asset_id, u32::MAX))
@@ -480,12 +510,8 @@ pub mod tables {
 
         /// Total exposure creditor←debtor for asset: Σ(principal + accrued interest).
         /// Does **not** accrue; call [`accrue_pair`] first when freshness matters.
-        pub fn exposure(
-            creditor: AccountNumber,
-            debtor: AccountNumber,
-            asset_id: u32,
-        ) -> Quantity {
-            Self::for_pair(creditor, debtor, asset_id)
+        pub fn exposure(creditor: AccountNumber, debtor: AccountNumber, asset_id: u32) -> Quantity {
+            Self::pairs(creditor, debtor, asset_id)
                 .into_iter()
                 .fold(Quantity::new(0), |acc, o| {
                     acc + o.remaining_principal + o.accrued_interest
@@ -498,7 +524,7 @@ pub mod tables {
             asset_id: u32,
             interest_rate: u32,
         ) -> Option<Self> {
-            Self::for_pair(creditor, debtor, asset_id)
+            Self::pairs(creditor, debtor, asset_id)
                 .into_iter()
                 .find(|obligation| obligation.interest_rate == interest_rate)
         }
@@ -600,7 +626,7 @@ pub mod tables {
 
         /// Accrue every obligation on this directed pair/asset.
         pub fn accrue_pair(creditor: AccountNumber, debtor: AccountNumber, asset_id: u32) {
-            for mut o in Self::for_pair(creditor, debtor, asset_id) {
+            for mut o in Self::pairs(creditor, debtor, asset_id) {
                 o.accrue();
             }
         }
@@ -628,7 +654,7 @@ pub mod tables {
             if amount == 0 {
                 return;
             }
-            let mut obs = Self::for_pair(creditor, debtor, asset_id);
+            let mut obs = Self::pairs(creditor, debtor, asset_id);
             if obs.is_empty() {
                 return;
             }
@@ -687,11 +713,9 @@ pub mod tables {
             // exposure(creditor, debtor) = what debtor owes creditor.
             let a_owed_by_b = Self::exposure(a, b, asset_id).value; // b owes a
             let b_owed_by_a = Self::exposure(b, a, asset_id).value; // a owes b
-            let cancel = a_owed_by_b
-                .min(b_owed_by_a)
-                .min(max_amount.value);
+            let cancel = a_owed_by_b.min(b_owed_by_a).min(max_amount.value);
             if cancel == 0 {
-                return Quantity::new(0);
+                return 0.into();
             }
 
             Self::apply_reduction(a, b, asset_id, cancel);
@@ -898,9 +922,12 @@ pub mod tables {
 #[psibase::service(name = "banx", tables = "tables")]
 pub mod service {
     use crate::tables::{
-        CreditLine, CurrencyPolicy, InitRow, InitTable, Obligation, PathHop, RoutingPolicy,
+        Asset, CreditLine, CurrencyPolicy, InitRow, InitTable, Obligation, PathHop, RoutingPolicy,
     };
-    use psibase::{services::tokens::Quantity, AccountNumber, TimePointSec, *};
+    use psibase::{
+        services::tokens::{Precision, Quantity},
+        AccountNumber, Memo, TimePointSec, *,
+    };
 
     #[action]
     fn init() {
@@ -911,6 +938,28 @@ pub mod service {
                     next_obligation_id: 1,
                 })
                 .unwrap();
+
+            let fiat_precision = Precision::new(4).expect("fiat asset precision");
+            for (symbol, description) in [
+                (account!("usd"), "United States dollar"),
+                (account!("aud"), "Australian dollar"),
+                (account!("gbp"), "British pound sterling"),
+                (account!("euro"), "Euro"),
+            ] {
+                Asset::add(symbol, fiat_precision, description.into());
+            }
+
+            let metal_precision = Precision::new(6).expect("metal asset precision");
+            Asset::add(
+                account!("gold"),
+                metal_precision,
+                "1.000000 = 1 gram of gold".into(),
+            );
+            Asset::add(
+                account!("silver"),
+                metal_precision,
+                "1.000000 = 1 gram of silver".into(),
+            );
         }
     }
 
@@ -1002,16 +1051,15 @@ pub mod service {
         assert!(sender != counterparty, "cannot convert with self");
 
         // Debtor owns the policy; resolve who is debtor vs creditor on this claim.
-        let (creditor, debtor) =
-            if CurrencyPolicy::get(sender, from_asset, to_asset).is_some() {
-                // Sender posted the policy → sender is debtor; counterparty is creditor.
-                (counterparty, sender)
-            } else if CurrencyPolicy::get(counterparty, from_asset, to_asset).is_some() {
-                // Counterparty is debtor; sender is creditor holding the claim.
-                (sender, counterparty)
-            } else {
-                panic!("CurrencyPolicy not found for debtor/assets");
-            };
+        let (creditor, debtor) = if CurrencyPolicy::get(sender, from_asset, to_asset).is_some() {
+            // Sender posted the policy → sender is debtor; counterparty is creditor.
+            (counterparty, sender)
+        } else if CurrencyPolicy::get(counterparty, from_asset, to_asset).is_some() {
+            // Counterparty is debtor; sender is creditor holding the claim.
+            (sender, counterparty)
+        } else {
+            panic!("CurrencyPolicy not found for debtor/assets");
+        };
 
         let policy = CurrencyPolicy::get_assert(debtor, from_asset, to_asset);
         policy.convert(creditor, amount_from, min_to);
@@ -1075,8 +1123,7 @@ pub mod service {
                 );
                 CreditLine::debit(creditor, debtor, out_asset, forward);
             } else {
-                let policy =
-                    RoutingPolicy::get_assert(creditor, debtor, in_asset, out_asset);
+                let policy = RoutingPolicy::get_assert(creditor, debtor, in_asset, out_asset);
                 forward = policy.path_draw(forward);
                 in_asset = out_asset;
             }
