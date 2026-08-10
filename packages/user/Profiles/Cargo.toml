@@ -16,8 +16,9 @@ services = ["profiles"]
 Accounts = "0.25.0"
 Host = "0.25.0"
 HttpServer = "0.25.0"
-Transact = "0.25.0"
 Permissions = "0.25.0"
+Sites = "0.25.0"
+Transact = "0.25.0"
 
 [lib]
 crate-type = ["rlib"]

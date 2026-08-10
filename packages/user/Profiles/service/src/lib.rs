@@ -18,7 +18,10 @@ fn normalize_content_type(content_type: &str) -> &str {
 
 /// Maps a MIME content-type string to the on-chain id.
 pub fn parse_content_type(content_type: &str) -> Option<ImgContentType> {
-    match normalize_content_type(content_type).to_ascii_lowercase().as_str() {
+    match normalize_content_type(content_type)
+        .to_ascii_lowercase()
+        .as_str()
+    {
         "image/png" => Some(AVATAR_CONTENT_TYPE_PNG),
         "image/jpeg" => Some(AVATAR_CONTENT_TYPE_JPEG),
         "image/webp" => Some(AVATAR_CONTENT_TYPE_WEBP),
@@ -40,14 +43,19 @@ pub fn content_type_mime(content_type: ImgContentType) -> Option<&'static str> {
 
 #[psibase::service_tables]
 pub mod tables {
-    use crate::ImgContentType;
     use psibase::AccountNumber;
     use psibase::{Fracpack, ToSchema};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "ProfileTable", index = 0)]
     #[derive(
-        Default, Fracpack, ToSchema, async_graphql::SimpleObject, Serialize, Deserialize, Debug,
+        Default,
+        Fracpack,
+        ToSchema,
+        async_graphql::SimpleObject,
+        Serialize,
+        Deserialize,
+        Debug,
         Clone,
     )]
     pub struct Profile {
@@ -57,22 +65,13 @@ pub mod tables {
         pub display_name: String,
         pub bio: String,
     }
-
-    #[table(name = "AvatarTable", index = 1)]
-    #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug, Clone)]
-    pub struct Avatar {
-        #[primary_key]
-        pub account: AccountNumber,
-
-        pub content_type: ImgContentType,
-        pub content: Vec<u8>,
-    }
 }
 
 #[psibase::service(name = "profiles", tables = "tables")]
 pub mod service {
-    use crate::tables::{Avatar, AvatarTable, Profile, ProfileTable};
+    use crate::tables::{Profile, ProfileTable};
     use crate::{content_type_mime, ImgContentType, MAX_AVATAR_SIZE};
+    use psibase::services::sites::Wrapper as Sites;
     use psibase::*;
 
     #[action]
@@ -103,28 +102,23 @@ pub mod service {
             image.len() <= MAX_AVATAR_SIZE,
             "Avatar exceeds max file size of {MAX_AVATAR_SIZE} bytes"
         );
-        assert!(
-            content_type_mime(contentType).is_some(),
-            "Avatar content type not allowed"
-        );
+        let Some(content_type) = content_type_mime(contentType) else {
+            abort_message("Avatar content type not allowed");
+        };
 
         let caller = get_sender();
-        AvatarTable::new()
-            .put(&Avatar {
-                account: caller,
-                content_type: contentType,
-                content: image,
-            })
-            .unwrap();
+        Sites::call().storeSys(
+            format!("/avatar/{caller}"),
+            content_type.to_string(),
+            None,
+            Hex(image),
+        );
     }
 
     #[action]
     #[allow(non_snake_case)]
     fn removeAvatar() {
         let caller = get_sender();
-        let table = AvatarTable::new();
-        if let Some(avatar) = table.get_index_pk().get(&caller) {
-            table.remove(&avatar);
-        }
+        Sites::call().remove(format!("/avatar/{caller}"));
     }
 }
