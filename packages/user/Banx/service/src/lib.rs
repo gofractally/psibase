@@ -64,10 +64,36 @@ pub mod tables {
 
     #[table(name = "InitTable", index = 0)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
-    pub struct InitRow {}
+    pub struct InitRow {
+        /// Next primary key for [`Obligation`] rows.
+        pub next_obligation_id: u32,
+    }
     impl InitRow {
         #[primary_key]
         fn pk(&self) {}
+
+        fn get_assert() -> Self {
+            InitTable::read()
+                .get_index_pk()
+                .get(&())
+                .expect("service not inited")
+        }
+
+        fn save(&self) {
+            InitTable::read_write().put(self).unwrap();
+        }
+
+        /// Allocate a unique obligation primary key.
+        pub fn alloc_obligation_id() -> u32 {
+            let mut row = Self::get_assert();
+            let id = row.next_obligation_id;
+            row.next_obligation_id = row
+                .next_obligation_id
+                .checked_add(1)
+                .expect("obligation id overflow");
+            row.save();
+            id
+        }
     }
 
     /// Opt-in that the (creditor, debtor, asset) edge may be used in a multi-hop
@@ -181,7 +207,7 @@ pub mod tables {
         }
 
         /// Draw `amount` on this routed edge (full amount; fee is applied by
-        /// [`service::hop`] when reducing the forward amount for later hops).
+        /// [`service::path_pay`] when reducing the forward amount for later hops).
         pub fn debit(&self, amount: Quantity) {
             CreditLine::debit(self.creditor, self.debtor, self.asset_id, amount);
         }
@@ -195,7 +221,7 @@ pub mod tables {
     /// - **Obligation** owns claim state: create/merge by rate, grow principal
     ///   ([`Self::credit`]), interest ([`Self::accrue`]), and pair exposure.
     /// - **CreditLine** gates *draws* (limit / deplete / line rate) then calls
-    ///   into obligation credit — used by both `debit` and `hop`.
+    ///   into obligation credit — used by both `debit` and `path_pay`.
     /// - **deposit** credits an obligation with no line check (receiver books a
     ///   liability to the depositor).
     ///
@@ -215,27 +241,23 @@ pub mod tables {
     /// `debtor = receiver` (the account that called `deposit`). There is still
     /// no local balance row — the depositor's "credit" *is* this obligation.
     ///
-    /// # Repayment (deposit + net)
+    /// # Repayment (deposit, which auto-nets)
     ///
     /// There is no Banx cash balance and no separate "repay with money" ledger
-    /// entry. **Repayment is a deposit (counter-obligation) then netting**
-    /// against existing claims between the same pair (and asset).
+    /// entry. **Repayment is a deposit** that books a counter-obligation and
+    /// immediately **nets** against existing claims for the pair/asset.
     ///
     /// ## Physical / off-chain cash (or any external transfer)
     ///
     /// Example: Alice already owes Bob 100 (obligation O1: Bob creditor, Alice
     /// debtor). Alice hands Bob $100 cash off-chain.
     ///
-    /// 1. **Bob books a deposit** for Alice: `deposit(depositor = Alice, …)`
-    ///    creates O2 — Alice creditor, Bob debtor for 100 (Bob's liability to
-    ///    Alice, like a bank credit in Alice's favour).
-    /// 2. **Net** O2 against O1 (and any other mutual obligations in that
-    ///    pair/asset). Equal amounts cancel; a remainder stays as a single
-    ///    direction of net debt.
+    /// Bob calls `deposit(depositor = Alice, …)`: books O2 (Alice creditor, Bob
+    /// debtor) then **auto-nets** against O1. Equal amounts cancel; a remainder
+    /// stays as a single direction of net debt.
     ///
-    /// Cash never becomes a local balance: it becomes a **deposit obligation**
-    /// booked by the receiver, then netted against what was owed. Same pattern
-    /// for any external value.
+    /// Cash never becomes a local balance: it becomes a deposit claim that is
+    /// immediately netted against opposite exposure when possible.
     ///
     /// ## On-graph repayment
     ///
@@ -243,9 +265,12 @@ pub mod tables {
     /// one via routing — that obligation is likewise **netted**, not "spent as
     /// balance." Netting is the only settlement primitive inside Banx.
     ///
-    /// Implementation of net (waterfall across rates/interest vs principal,
-    /// partial nets, who may trigger net) is separate; this type is the
-    /// claim being created and reduced.
+    /// # Netting
+    ///
+    /// [`Obligation::net_pair`] cancels equal value both ways after accruing.
+    /// Reduction is fixed protocol policy: **accrued interest first, then
+    /// principal**; across obligations, **highest `interest_rate` first**
+    /// (then older `created_at`, then lower `id` for ties).
     #[table(name = "ObligationTable", index = 2)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct Obligation {
@@ -339,7 +364,7 @@ pub mod tables {
         ) -> Self {
             let now = Self::now();
             Self {
-                id: 1,
+                id: InitRow::alloc_obligation_id(),
                 creditor,
                 debtor,
                 asset_id,
@@ -349,6 +374,22 @@ pub mod tables {
                 interest_remainder: 0,
                 last_interest_accrual: now,
                 created_at: now,
+            }
+        }
+
+        fn is_clear(&self) -> bool {
+            self.remaining_principal.value == 0 && self.accrued_interest.value == 0
+        }
+
+        fn delete(&self) {
+            ObligationTable::read_write().erase(&self.id);
+        }
+
+        fn persist_or_delete(&self) {
+            if self.is_clear() {
+                self.delete();
+            } else {
+                self.save();
             }
         }
 
@@ -400,6 +441,100 @@ pub mod tables {
             }
         }
 
+        /// Highest rate first; ties by older `created_at`, then lower `id`.
+        fn sort_for_net(obs: &mut [Self]) {
+            obs.sort_by(|a, b| {
+                b.interest_rate
+                    .cmp(&a.interest_rate)
+                    .then_with(|| a.created_at.seconds.cmp(&b.created_at.seconds))
+                    .then_with(|| a.id.cmp(&b.id))
+            });
+        }
+
+        /// Reduce claims on this directed pair by `amount`.
+        ///
+        /// Protocol policy (not caller-configurable): sort by highest rate,
+        /// then clear **all interest** in that order, then **principal**.
+        pub fn apply_reduction(
+            creditor: AccountNumber,
+            debtor: AccountNumber,
+            asset_id: u32,
+            amount: u64,
+        ) {
+            if amount == 0 {
+                return;
+            }
+            let mut obs = Self::for_pair(creditor, debtor, asset_id);
+            if obs.is_empty() {
+                return;
+            }
+
+            Self::sort_for_net(&mut obs);
+            Self::apply_reduction_waterfall(&mut obs, amount);
+
+            for o in &obs {
+                o.persist_or_delete();
+            }
+        }
+
+        /// Interest first (globally, highest-rate order), then principal.
+        fn apply_reduction_waterfall(obs: &mut [Self], amount: u64) {
+            let mut left = amount;
+            for o in obs.iter_mut() {
+                if left == 0 {
+                    break;
+                }
+                let take = left.min(o.accrued_interest.value);
+                o.accrued_interest = (o.accrued_interest.value - take).into();
+                left -= take;
+            }
+            for o in obs.iter_mut() {
+                if left == 0 {
+                    break;
+                }
+                let take = left.min(o.remaining_principal.value);
+                o.remaining_principal = (o.remaining_principal.value - take).into();
+                if o.remaining_principal.value == 0 {
+                    o.interest_remainder = 0;
+                }
+                left -= take;
+            }
+        }
+
+        /// Net mutual obligations between `a` and `b` for `asset_id`.
+        ///
+        /// 1. Accrue both directions.
+        /// 2. `cancel = min(exposure each way, max_amount)`.
+        /// 3. Reduce each direction by `cancel` (interest then principal;
+        ///    highest rate first).
+        ///
+        /// Either party may call; only reduces claims.
+        pub fn net_pair(
+            a: AccountNumber,
+            b: AccountNumber,
+            asset_id: u32,
+            max_amount: Quantity,
+        ) -> Quantity {
+            assert!(a != b, "cannot net with self");
+
+            Self::accrue_pair(a, b, asset_id);
+            Self::accrue_pair(b, a, asset_id);
+
+            // exposure(creditor, debtor) = what debtor owes creditor.
+            let a_owed_by_b = Self::exposure(a, b, asset_id).value; // b owes a
+            let b_owed_by_a = Self::exposure(b, a, asset_id).value; // a owes b
+            let cancel = a_owed_by_b
+                .min(b_owed_by_a)
+                .min(max_amount.value);
+            if cancel == 0 {
+                return Quantity::new(0);
+            }
+
+            Self::apply_reduction(a, b, asset_id, cancel);
+            Self::apply_reduction(b, a, asset_id, cancel);
+            Quantity::new(cancel)
+        }
+
         /// Grow principal on this claim (shared by deposit and line draws).
         /// Accrues first so interest is finalized on the prior principal balance.
         fn credit(&mut self, amount: Quantity) {
@@ -424,7 +559,12 @@ pub mod tables {
             Self::get_existing_or_new(creditor, debtor, asset_id, interest_rate).credit(amount);
         }
 
-        /// Book a deposit: `receiver` owes `depositor` (bank-liability style).
+        /// Book a deposit: `receiver` owes `depositor` (bank-liability style),
+        /// then **auto-net** the pair so mutual claims cancel as far as possible.
+        ///
+        /// 1. Credit the reverse obligation (depositor creditor, receiver debtor).
+        /// 2. [`net_pair`] with unlimited `max_amount` (interest first, highest
+        ///    rate first). Remainder stays one-way if exposures were unequal.
         pub fn deposit(
             depositor: AccountNumber,
             receiver: AccountNumber,
@@ -433,6 +573,7 @@ pub mod tables {
             interest_rate: u32,
         ) {
             Self::credit_pair(depositor, receiver, asset_id, interest_rate, amount);
+            Self::net_pair(depositor, receiver, asset_id, Quantity::new(u64::MAX));
         }
 
         fn save(&self) {
@@ -464,11 +605,11 @@ pub mod tables {
     /// (one-shot / grant-style capacity); that is an additional constraint on
     /// top of the exposure cap.
     ///
-    /// # Draw path (shared by `debit` and `hop`)
+    /// # Draw path (shared by `debit` and `path_pay`)
     ///
     /// [`CreditLine::debit`] only enforces capacity and line terms, then
-    /// [`Obligation::credit_pair`] grows the claim. Direct `debit` and multi-hop
-    /// `hop` both end here so path payments cannot bypass the revolving cap.
+    /// [`Obligation::credit_pair`] grows the claim. Direct `debit` and
+    /// `path_pay` both end here so path payments cannot bypass the revolving cap.
     #[table(name = "CreditLineTable", index = 3)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct CreditLine {
@@ -553,7 +694,7 @@ pub mod tables {
         /// 2. Optionally deplete `limit` and save.
         /// 3. Credit the obligation bucket at this line's `interest_rate`.
         ///
-        /// Used by the `debit` action and by each edge of `hop` (via
+        /// Used by the `debit` action and by each edge of `path_pay` (via
         /// [`RoutingPolicy::debit`]).
         pub fn debit(
             creditor: AccountNumber,
@@ -600,7 +741,11 @@ pub mod service {
     fn init() {
         let table = InitTable::new();
         if InitTable::read().get_index_pk().get(&()).is_none() {
-            table.put(&InitRow {}).unwrap();
+            table
+                .put(&InitRow {
+                    next_obligation_id: 1,
+                })
+                .unwrap();
         }
     }
 
@@ -626,8 +771,8 @@ pub mod service {
         );
     }
 
-    /// Opt this credit edge into multi-hop routing. Sender is **creditor**;
-    /// `debitor` may draw on sender's line as a hop step.
+    /// Opt this credit edge into path-payment routing. Sender is **creditor**;
+    /// `debitor` may draw on sender's line as a path step.
     ///
     /// Intermediate skim when forwarding: `fee = hop_fee_fixed + amount *
     /// hop_fee_percent / 1e6` (either may be zero; ppm: `500_000` = 50%).
@@ -648,14 +793,15 @@ pub mod service {
         );
     }
 
-    /// Book a **deposit**: sender receives value and credits `depositor`.
+    /// Book a **deposit**: sender receives value and credits `depositor`, then
+    /// **auto-nets** mutual obligations for this asset.
     ///
-    /// Like a bank taking cash: sender becomes **debtor**, `depositor` becomes
-    /// **creditor** for `amount` (an [`Obligation`], not a local balance).
-    /// Typical cash repay path: old creditor calls `deposit` for the payer,
-    /// then **net** against the prior debt (see [`Obligation`]).
+    /// Like a bank taking cash: sender books a liability to `depositor`, then
+    /// cancels against anything the depositor already owed sender (and any
+    /// pre-existing reverse claim). Remainder is one-way net debt.
     ///
-    /// Not a credit-line draw — that is [`debit`].
+    /// Not a credit-line draw — that is [`debit`]. Explicit [`net`] remains for
+    /// settling without a new deposit.
     #[action]
     fn deposit(depositor: AccountNumber, asset_id: u32, amount: Quantity, interest_rate: u32) {
         Obligation::deposit(depositor, get_sender(), asset_id, amount, interest_rate);
@@ -668,17 +814,26 @@ pub mod service {
         Obligation::accrue_pair(creditor, debtor, asset_id);
     }
 
+    /// Net mutual obligations between sender and `counterparty` for `asset_id`.
+    ///
+    /// Accrues both ways, then cancels `min(exposure each way, max_amount)`.
+    /// Reduction policy is fixed: **interest then principal**, **highest rate
+    /// first**. Either party may call; only reduces claims.
+    #[action]
+    fn net(counterparty: AccountNumber, asset_id: u32, max_amount: Quantity) {
+        Obligation::net_pair(get_sender(), counterparty, asset_id, max_amount);
+    }
+
     /// Draw on a credit line: sender is **debtor**, grows obligation to `creditor`.
     ///
-    /// No routing policy or hop fee. For multi-hop path payments use [`hop`].
-    /// To repay: counterparty **deposits** then **net** (see [`Obligation`]).
+    /// No routing policy or path fee. For multi-hop payments use [`path_pay`].
+    /// To repay: counterparty **deposits** (auto-nets; see [`Obligation`]).
     #[action]
     fn debit(creditor: AccountNumber, asset_id: u32, amount: Quantity) {
         CreditLine::debit(creditor, get_sender(), asset_id, amount);
     }
 
-    /// Multi-hop path payment: sender pays `amount` of `asset_id` along
-    /// `creditors`.
+    /// Path payment: sender pays `amount` of `asset_id` along `creditors`.
     ///
     /// # Path
     ///
@@ -686,37 +841,44 @@ pub mod service {
     /// **debtor** and draws the **current forward amount** on the next
     /// **creditor**'s line (requires [`RoutingPolicy`] + [`CreditLine`]).
     ///
-    /// After each intermediate hop, that creditor's fees **skim** the forward
+    /// After each intermediate, that creditor's fees **skim** the forward
     /// amount (`fixed + ppm`; see [`RoutingPolicy`]): they keep a larger claim
     /// on the prior debtor than the liability they take to the next creditor.
     /// The final payee gets the residual after all intermediate fees.
     ///
     /// # Example
     ///
-    /// Alice `hop([bob, charlie], asset, 500)` with Bob fixed `5` + `20_000` ppm:
+    /// Alice `path_pay([bob, charlie], asset, 500)` with Bob fixed `5` +
+    /// `20_000` ppm:
     /// - Alice owes Bob **500**
     /// - Bob owes Charlie **485** (fee 5 + 10)
     /// - Bob keeps **15** net
     #[action]
-    fn hop(creditors: Vec<AccountNumber>, asset_id: u32, amount: Quantity) {
-        assert!(!creditors.is_empty(), "hop path must include at least one creditor");
-        assert!(amount.value > 0, "hop amount must be positive");
+    fn path_pay(creditors: Vec<AccountNumber>, asset_id: u32, amount: Quantity) {
+        assert!(
+            !creditors.is_empty(),
+            "path_pay must include at least one creditor"
+        );
+        assert!(amount.value > 0, "path_pay amount must be positive");
 
         let mut debtor = get_sender();
         let mut forward = amount;
         let last = creditors.len() - 1;
 
         for (i, creditor) in creditors.into_iter().enumerate() {
-            assert!(creditor != debtor, "hop path cannot draw on self");
+            assert!(creditor != debtor, "path_pay cannot draw on self");
 
             let policy = RoutingPolicy::get_assert(creditor, debtor, asset_id);
             // Full forward amount lands as claim on this edge.
             policy.debit(forward);
 
-            // Intermediates skim before the next hop; final payee gets residual.
+            // Intermediates skim before the next edge; final payee gets residual.
             if i < last {
                 forward = policy.amount_after_fee(forward);
-                assert!(forward.value > 0, "nothing left to forward after hop fee");
+                assert!(
+                    forward.value > 0,
+                    "nothing left to forward after path fee"
+                );
             }
 
             debtor = creditor;
@@ -728,15 +890,6 @@ pub mod service {
         let table = InitTable::read();
         table.get_index_pk().get(&()).expect("service not inited");
     }
-
-    #[action]
-    #[allow(non_snake_case)]
-    fn getString() -> String {
-        "".to_string()
-    }
-
-    #[event(history)]
-    pub fn updated(old_thing: String, new_thing: String) {}
 }
 
 #[cfg(test)]

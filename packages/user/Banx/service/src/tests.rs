@@ -3,6 +3,7 @@
 #[cfg(test)]
 mod tests {
     use crate::tables::interest::{accrue_delta, ACCRUAL_DENOM};
+    use crate::tables::Obligation;
     use crate::Wrapper;
     use psibase::services::tokens::Quantity;
     use psibase::*;
@@ -44,7 +45,7 @@ mod tests {
     }
 
     #[psibase::test_case(packages("Banx"))]
-    fn test_hop_stacks_obligations(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    fn test_path_pay_stacks_obligations(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
 
         let alice = account!("alice");
@@ -77,14 +78,14 @@ mod tests {
 
         // Alice pays Carol via Bob: Alice → Bob → Carol.
         Wrapper::push_from(&chain, alice)
-            .hop(vec![bob, carol], asset_id, amount)
+            .path_pay(vec![bob, carol], asset_id, amount)
             .get()?;
 
         Ok(())
     }
 
     #[psibase::test_case(packages("Banx"))]
-    fn test_hop_requires_routing_policy(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    fn test_path_pay_requires_routing_policy(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
 
         let alice = account!("alice");
@@ -97,11 +98,74 @@ mod tests {
             .st_crd_lne(alice, asset_id, Quantity::new(100), false, 0)
             .get()?;
 
-        // Line exists but no routing policy — hop must fail.
+        // Line exists but no routing policy — path_pay must fail.
         let result = Wrapper::push_from(&chain, alice)
-            .hop(vec![bob], asset_id, Quantity::new(10))
+            .path_pay(vec![bob], asset_id, Quantity::new(10))
             .get();
         assert!(result.is_err());
+
+        Ok(())
+    }
+
+    /// Deposit auto-nets: full repay clears both directions.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_deposit_auto_nets_full(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+
+        let asset_id = 1u32;
+        let amount = Quantity::new(100);
+
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, asset_id, Quantity::new(1_000), false, 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .debit(bob, asset_id, amount)
+            .get()?;
+
+        assert_eq!(Obligation::exposure(bob, alice, asset_id).value, 100);
+
+        // Alice pays cash; Bob deposits — auto-net clears the tab.
+        Wrapper::push_from(&chain, bob)
+            .deposit(alice, asset_id, amount, 0)
+            .get()?;
+
+        assert_eq!(Obligation::exposure(bob, alice, asset_id).value, 0);
+        assert_eq!(Obligation::exposure(alice, bob, asset_id).value, 0);
+
+        Ok(())
+    }
+
+    /// Partial deposit auto-nets only the overlapping exposure.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_deposit_auto_nets_partial(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+
+        let asset_id = 1u32;
+
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, asset_id, Quantity::new(10_000), false, 100_000)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .debit(bob, asset_id, Quantity::new(100))
+            .get()?;
+
+        Wrapper::push_from(&chain, bob)
+            .deposit(alice, asset_id, Quantity::new(40), 0)
+            .get()?;
+
+        // 100 - 40 = 60 left Alice owes Bob; reverse cleared by auto-net.
+        assert_eq!(Obligation::exposure(bob, alice, asset_id).value, 60);
+        assert_eq!(Obligation::exposure(alice, bob, asset_id).value, 0);
 
         Ok(())
     }
