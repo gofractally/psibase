@@ -96,7 +96,9 @@ class Chain {
     public async getPeers(): Promise<z.infer<typeof Peers>> {
         const url = siblingUrl(null, "x-peers", "/graphql");
         const query = "query { peers { edges { node { id urls endpoint } } } }";
-        const res: any = await postGraphQLGetJson(url, query);
+        const res: any = await postGraphQLGetJson(url, query, {
+            credentials: "include",
+        });
         return Peers.parse(res.data.peers.edges.map((e: any) => e.node));
     }
 
@@ -179,7 +181,7 @@ class Chain {
                 `Failed to find peer with ID ${id} in existing peers`,
             );
         const url = siblingUrl(null, "x-peers", "/disconnect");
-        await postJson(url, { id });
+        await postJson(url, { id }, { credentials: "include" });
     }
 
     public pushArrayBufferBoot(buffer: ArrayBufferLike) {
@@ -221,7 +223,9 @@ class Chain {
         url: string;
     }): Promise<z.infer<typeof Peer>> {
         const url = siblingUrl(null, "x-peers", "/connect");
-        const result = await postJsonGetJson(url, config);
+        const result = await postJsonGetJson(url, config, {
+            credentials: "include",
+        });
         result.urls = [url];
         return Peer.parse(result);
     }
