@@ -3,7 +3,6 @@ mod bindings;
 
 use std::str::FromStr;
 
-use bindings::accounts;
 use bindings::evaluations::plugin::{admin::close, user as EvaluationsUser};
 use bindings::exports::guilds::plugin::{
     admin_fractal::Guest as AdminFractal,
@@ -215,12 +214,6 @@ impl AdminGuild for GuildsPlugin {
             fractal.parse().unwrap(),
             guild_account.parse().unwrap(),
             Memo::try_from(display_name).unwrap(),
-            accounts::plugin::api::gen_rand_account(Some("c-"))?
-                .parse()
-                .unwrap(),
-            accounts::plugin::api::gen_rand_account(Some("r-"))?
-                .parse()
-                .unwrap(),
         );
         Ok(())
     }

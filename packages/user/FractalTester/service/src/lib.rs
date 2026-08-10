@@ -6,7 +6,7 @@
 ///
 /// The setup flow:
 /// 1. Create 18 accounts with `auth-any`.
-/// 2. Apply each to the system guild (`core-gld-1`).
+/// 2. Apply each to the system guild (`guild-onee`).
 /// 3. Look up the first producer and attest each application as that producer.
 
 #[psibase::service_tables]
@@ -61,7 +61,7 @@ mod service {
         account!("testfrac18"),
     ];
 
-    const SYS_GUILD: AccountNumber = account!("core-gld-1");
+    const SYS_GUILD: AccountNumber = account!("guild-onee");
 
     #[action]
     fn setup() {

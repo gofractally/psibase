@@ -55,9 +55,6 @@ interface api {
     /// May also return None if no user is logged in.
     get-current-user: func() -> option<string>;
 
-    /// Generates a random account number not in use on the network
-    /// Supports optional prefix of up to 9 chars, must not start with "x-"
-    gen-rand-account: func(prefix: option<string>) -> result<string, error>;
 }
 
 /// This interface is only callable by the accounts app itself.

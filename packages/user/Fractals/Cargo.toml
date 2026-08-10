@@ -13,6 +13,7 @@ package-name = "Fractals"
 services = ["fractals", "de-facto"]
 
 [package.metadata.psibase.dependencies]
+DynLd = "0.25.0"
 Accounts = "0.25.0"
 Base64 = "0.25.0"
 Guilds = "0.25.0"
