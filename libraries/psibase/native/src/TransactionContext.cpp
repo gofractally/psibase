@@ -149,8 +149,7 @@ namespace psibase
    // TODO: eliminate extra copies
    static void execProcessTransaction(TransactionContext& self)
    {
-      ProcessTransactionArgs args{.transaction           = self.signedTransaction.transaction,
-                                  .checkFirstAuthAndExit = false};
+      ProcessTransactionArgs args{.transaction = self.signedTransaction.transaction};
 
       Action action{
           .sender  = AccountNumber(),
@@ -415,7 +414,7 @@ namespace psibase
       // interleaving with the regular modules, so they can
       // be cleared safely.
       auto  memidx = impl->altMode ? blockContext.systemContext.executionMemories.size() -
-                                        impl->altExecContexts.size() - 1
+                                         impl->altExecContexts.size() - 1
                                    : impl->executionContexts.size();
       auto& memory = blockContext.systemContext.executionMemories[memidx];
       ExecutionContext            execContext{*this, impl->wasmConfig.vmOptions, memory, service};
