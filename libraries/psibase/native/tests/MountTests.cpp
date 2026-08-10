@@ -308,3 +308,34 @@ TEST_CASE(".. in virtual root")
    mount.mount(dir.path.string(), "/subdir");
    CHECK(readFile(mount.open("/subdir/../../../subdir/one")) == "1");
 }
+
+TEST_CASE("mount file")
+{
+   TempDirectory dir;
+   writeFile(dir.path / "one", "1");
+   Mount mount;
+   mount.mount((dir.path / "one").string(), "/one");
+   CHECK(readFile(mount.open("/one")) == "1");
+}
+
+TEST_CASE("mount file nested")
+{
+   TempDirectory dir;
+   writeFile(dir.path / "one", "1");
+   writeFile(dir.path / "two" / "three", "3");
+   Mount mount;
+   mount.mount((dir.path / "one").string(), "/one");
+   mount.mount((dir.path / "two").string(), "/");
+   CHECK(readFile(mount.open("/one")) == "1");
+}
+
+TEST_CASE("symlink prefix match")
+{
+   TempDirectory dir;
+   writeFile(dir.path / "one" / "two", "2");
+   writeFile(dir.path / "one" / "x" / "two", "2");
+   std::filesystem::create_directory_symlink(dir.path / "onex", dir.path / "one" / "three");
+   Mount mount;
+   mount.mount((dir.path / "one").string(), "/");
+   CHECK_THROWS_AS(readFile(mount.open("/three/two")), std::system_error);
+}
