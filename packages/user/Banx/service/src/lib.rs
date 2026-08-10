@@ -7,6 +7,61 @@ pub mod tables {
     };
     use serde::{Deserialize, Serialize};
 
+    /// Interest math: simple APR on principal, path-independent under subdivision.
+    ///
+    /// # Rate
+    ///
+    /// `interest_rate` is **ppm per year** (parts per million): `10_000` = 1% APR,
+    /// `1_000_000` = 100% APR. Year length is fixed at [`SECONDS_PER_YEAR`] (365
+    /// days) so results do not depend on leap years or wall-clock calendars.
+    ///
+    /// # Accrual (simple, not compounded into principal)
+    ///
+    /// Interest accrues on `remaining_principal` only; `accrued_interest` is a
+    /// separate bucket. Between principal changes:
+    ///
+    /// ```text
+    /// product   = principal * rate_ppm * dt_seconds + remainder
+    /// interest  = product / (1_000_000 * SECONDS_PER_YEAR)
+    /// remainder = product % (1_000_000 * SECONDS_PER_YEAR)
+    /// ```
+    ///
+    /// Carrying `remainder` makes accrual **path-independent**: any sequence of
+    /// accruals over an interval with fixed principal and rate yields the same
+    /// total interest and final remainder as one accrual over the whole
+    /// interval. Calling accrue twice in the same second is a no-op.
+    pub mod interest {
+        /// 365 * 24 * 60 * 60 — fixed, no leap seconds / leap years.
+        pub const SECONDS_PER_YEAR: u128 = 31_536_000;
+        pub const RATE_PPM_DENOM: u128 = 1_000_000;
+        pub const ACCRUAL_DENOM: u128 = RATE_PPM_DENOM * SECONDS_PER_YEAR;
+
+        /// Returns `(interest_units, new_remainder)`.
+        pub fn accrue_delta(
+            principal: u64,
+            rate_ppm: u32,
+            dt_seconds: u64,
+            remainder: u64,
+        ) -> (u64, u64) {
+            if principal == 0 || rate_ppm == 0 || dt_seconds == 0 {
+                return (0, remainder);
+            }
+            let product = (principal as u128)
+                .checked_mul(rate_ppm as u128)
+                .expect("interest: principal * rate overflow")
+                .checked_mul(dt_seconds as u128)
+                .expect("interest: * dt overflow")
+                .checked_add(remainder as u128)
+                .expect("interest: + remainder overflow");
+            let interest = product / ACCRUAL_DENOM;
+            let new_remainder = product % ACCRUAL_DENOM;
+            (
+                u64::try_from(interest).expect("interest: accrued amount exceeds u64"),
+                u64::try_from(new_remainder).expect("interest: remainder exceeds u64"),
+            )
+        }
+    }
+
     #[table(name = "InitTable", index = 0)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
     pub struct InitRow {}
@@ -138,11 +193,18 @@ pub mod tables {
     /// # Layering
     ///
     /// - **Obligation** owns claim state: create/merge by rate, grow principal
-    ///   ([`Self::credit`]), and pair exposure ([`Self::exposure`]).
+    ///   ([`Self::credit`]), interest ([`Self::accrue`]), and pair exposure.
     /// - **CreditLine** gates *draws* (limit / deplete / line rate) then calls
     ///   into obligation credit — used by both `debit` and `hop`.
     /// - **deposit** credits an obligation with no line check (receiver books a
     ///   liability to the depositor).
+    ///
+    /// # Interest
+    ///
+    /// See [`interest`]: simple APR in ppm/year on principal only, with a
+    /// carried `interest_remainder` so frequent accruals match a single long
+    /// accrual. Accrue **before** any principal change and before exposure
+    /// checks that must include up-to-date interest.
     ///
     /// # Deposit
     ///
@@ -196,8 +258,11 @@ pub mod tables {
 
         pub remaining_principal: Quantity,
         pub accrued_interest: Quantity,
-        /// Total owed = remaining_principal + accrued_interest
+        /// Simple APR in ppm per year (`10_000` = 1%). See [`interest`].
         pub interest_rate: u32,
+
+        /// Fractional interest not yet large enough for one unit; see [`interest`].
+        pub interest_remainder: u64,
 
         pub last_interest_accrual: TimePointSec,
         pub created_at: TimePointSec,
@@ -225,7 +290,7 @@ pub mod tables {
         }
 
         /// Total exposure creditor←debtor for asset: Σ(principal + accrued interest).
-        /// Used by credit lines as the outstanding side of the revolving cap.
+        /// Does **not** accrue; call [`accrue_pair`] first when freshness matters.
         pub fn exposure(
             creditor: AccountNumber,
             debtor: AccountNumber,
@@ -259,16 +324,20 @@ pub mod tables {
                 .unwrap_or_else(|| Self::new(creditor, debtor, asset_id, interest_rate))
         }
 
+        fn now() -> TimePointSec {
+            psibase::services::transact::Wrapper::call()
+                .currentBlock()
+                .time
+                .seconds()
+        }
+
         fn new(
             creditor: AccountNumber,
             debtor: AccountNumber,
             asset_id: u32,
             interest_rate: u32,
         ) -> Self {
-            let now = psibase::services::transact::Wrapper::call()
-                .currentBlock()
-                .time
-                .seconds();
+            let now = Self::now();
             Self {
                 id: 1,
                 creditor,
@@ -277,13 +346,64 @@ pub mod tables {
                 remaining_principal: 0.into(),
                 interest_rate,
                 accrued_interest: 0.into(),
+                interest_remainder: 0,
                 last_interest_accrual: now,
                 created_at: now,
             }
         }
 
+        /// Accrue simple interest from `last_interest_accrual` to now.
+        ///
+        /// Path-independent for fixed principal/rate (see [`interest`]). No-op
+        /// if `now <= last_interest_accrual`. Persists when anything changes
+        /// (including advancing the timestamp with zero interest).
+        pub fn accrue(&mut self) {
+            let now = Self::now();
+            let last = self.last_interest_accrual.seconds;
+            if now.seconds <= last {
+                return;
+            }
+            let dt = (now.seconds - last) as u64;
+
+            if self.remaining_principal.value == 0 || self.interest_rate == 0 {
+                // No charge while principal or rate is zero; do not "owe" for
+                // idle time after principal returns — just move the watermark.
+                self.last_interest_accrual = now;
+                self.save();
+                return;
+            }
+
+            let (delta, new_rem) = interest::accrue_delta(
+                self.remaining_principal.value,
+                self.interest_rate,
+                dt,
+                self.interest_remainder,
+            );
+
+            if delta > 0 {
+                self.accrued_interest = self
+                    .accrued_interest
+                    .value
+                    .checked_add(delta)
+                    .expect("accrued interest overflow")
+                    .into();
+            }
+            self.interest_remainder = new_rem;
+            self.last_interest_accrual = now;
+            self.save();
+        }
+
+        /// Accrue every obligation on this directed pair/asset.
+        pub fn accrue_pair(creditor: AccountNumber, debtor: AccountNumber, asset_id: u32) {
+            for mut o in Self::for_pair(creditor, debtor, asset_id) {
+                o.accrue();
+            }
+        }
+
         /// Grow principal on this claim (shared by deposit and line draws).
+        /// Accrues first so interest is finalized on the prior principal balance.
         fn credit(&mut self, amount: Quantity) {
+            self.accrue();
             self.remaining_principal = self
                 .remaining_principal
                 .value
@@ -362,6 +482,7 @@ pub mod tables {
         /// If true, also shrink `limit` by each draw (non-revolving grant).
         /// If false, `limit` stays fixed and only outstanding exposure binds.
         pub deplete_on_debit: bool,
+        /// Rate applied to new draws on this line (ppm APR); see [`interest`].
         pub interest_rate: u32,
     }
 
@@ -442,6 +563,8 @@ pub mod tables {
         ) {
             let mut line = Self::get_assert(creditor, debtor, asset_id);
 
+            // Fresh interest against the revolving cap before measuring exposure.
+            Obligation::accrue_pair(line.creditor, line.debtor, line.asset_id);
             let exposure = Obligation::exposure(line.creditor, line.debtor, line.asset_id);
             if exposure + amount > line.limit {
                 panic!("total outstanding exceeds max limit");
@@ -536,6 +659,13 @@ pub mod service {
     #[action]
     fn deposit(depositor: AccountNumber, asset_id: u32, amount: Quantity, interest_rate: u32) {
         Obligation::deposit(depositor, get_sender(), asset_id, amount, interest_rate);
+    }
+
+    /// Accrue interest on all obligations for a directed pair/asset.
+    /// Permissionless: only advances time-based interest (see [`tables::interest`]).
+    #[action]
+    fn accrue(creditor: AccountNumber, debtor: AccountNumber, asset_id: u32) {
+        Obligation::accrue_pair(creditor, debtor, asset_id);
     }
 
     /// Draw on a credit line: sender is **debtor**, grows obligation to `creditor`.
