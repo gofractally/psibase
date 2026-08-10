@@ -32,77 +32,140 @@ mod tests {
         );
         assert_eq!(rem_split, rem_once, "remainder must match after equivalent time");
 
-        // Same second / zero dt does not move remainder or invent interest.
         let (d0, r0) = accrue_delta(principal, rate_ppm, 0, rem_once);
         assert_eq!(d0, 0);
         assert_eq!(r0, rem_once);
 
-        // Sanity: interest units are principal * rate * t / denom (integer).
         let expect = (principal as u128) * (rate_ppm as u128) * (total_dt as u128) / ACCRUAL_DENOM;
         assert_eq!(interest_once as u128, expect);
 
         Ok(())
     }
 
+    /// Alice → Gary → Steve: Gary's routing + Steve's line; fee on second leg.
     #[psibase::test_case(packages("Banx"))]
-    fn test_path_pay_stacks_obligations(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    fn test_path_pay_alice_gary_steve(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
 
         let alice = account!("alice");
-        let bob = account!("bob");
-        let carol = account!("carol");
+        let gary = account!("gary");
+        let steve = account!("steve");
         chain.new_account(alice).unwrap();
-        chain.new_account(bob).unwrap();
-        chain.new_account(carol).unwrap();
+        chain.new_account(gary).unwrap();
+        chain.new_account(steve).unwrap();
 
         let asset_id = 1u32;
-        let limit = Quantity::new(1_000);
-        let amount = Quantity::new(100);
-        let rate = 0u32;
+        let amount = Quantity::new(500);
 
-        // Bob extends credit to Alice; Carol extends credit to Bob.
-        Wrapper::push_from(&chain, bob)
-            .st_crd_lne(alice, asset_id, limit, false, rate)
+        // Gary extends line to Alice; Steve extends line to Gary.
+        Wrapper::push_from(&chain, gary)
+            .st_crd_lne(alice, asset_id, Quantity::new(10_000), false, 0)
             .get()?;
-        Wrapper::push_from(&chain, carol)
-            .st_crd_lne(bob, asset_id, limit, false, rate)
+        Wrapper::push_from(&chain, steve)
+            .st_crd_lne(gary, asset_id, Quantity::new(10_000), false, 0)
             .get()?;
 
-        // Opt both edges into routing (no fixed / ppm fee).
-        Wrapper::push_from(&chain, bob)
-            .st_rte_pol(alice, asset_id, Quantity::new(0), 0)
-            .get()?;
-        Wrapper::push_from(&chain, carol)
-            .st_rte_pol(bob, asset_id, Quantity::new(0), 0)
+        // Gary opts into path-drawing on Steve: 2% fee (20_000 ppm), accept any rate.
+        Wrapper::push_from(&chain, gary)
+            .st_rte_pol(steve, asset_id, Quantity::new(0), 20_000, 1_000_000)
             .get()?;
 
-        // Alice pays Carol via Bob: Alice → Bob → Carol.
         Wrapper::push_from(&chain, alice)
-            .path_pay(vec![bob, carol], asset_id, amount)
+            .path_pay(vec![gary, steve], asset_id, amount)
             .get()?;
+
+        // Alice owes Gary 500; Gary owes Steve 490 (2% fee).
+        assert_eq!(Obligation::exposure(gary, alice, asset_id).value, 500);
+        assert_eq!(Obligation::exposure(steve, gary, asset_id).value, 490);
+        assert_eq!(Obligation::exposure(steve, alice, asset_id).value, 0);
 
         Ok(())
     }
 
+    /// Steve's line alone is not enough — Gary must set routing toward Steve.
     #[psibase::test_case(packages("Banx"))]
-    fn test_path_pay_requires_routing_policy(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    fn test_path_pay_requires_intermediate_routing(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
 
         let alice = account!("alice");
-        let bob = account!("bob");
+        let gary = account!("gary");
+        let steve = account!("steve");
         chain.new_account(alice).unwrap();
-        chain.new_account(bob).unwrap();
+        chain.new_account(gary).unwrap();
+        chain.new_account(steve).unwrap();
 
         let asset_id = 1u32;
-        Wrapper::push_from(&chain, bob)
-            .st_crd_lne(alice, asset_id, Quantity::new(100), false, 0)
+        Wrapper::push_from(&chain, gary)
+            .st_crd_lne(alice, asset_id, Quantity::new(1_000), false, 0)
+            .get()?;
+        Wrapper::push_from(&chain, steve)
+            .st_crd_lne(gary, asset_id, Quantity::new(1_000), false, 0)
             .get()?;
 
-        // Line exists but no routing policy — path_pay must fail.
+        // No Gary st_rte_pol(steve) — second leg must fail.
         let result = Wrapper::push_from(&chain, alice)
-            .path_pay(vec![bob], asset_id, Quantity::new(10))
+            .path_pay(vec![gary, steve], asset_id, Quantity::new(100))
             .get();
         assert!(result.is_err());
+
+        Ok(())
+    }
+
+    /// Path fails if next hop line rate exceeds Gary's max_accept_rate.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_path_pay_rejects_high_rate(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+
+        let alice = account!("alice");
+        let gary = account!("gary");
+        let steve = account!("steve");
+        chain.new_account(alice).unwrap();
+        chain.new_account(gary).unwrap();
+        chain.new_account(steve).unwrap();
+
+        let asset_id = 1u32;
+        Wrapper::push_from(&chain, gary)
+            .st_crd_lne(alice, asset_id, Quantity::new(1_000), false, 0)
+            .get()?;
+        // Steve charges 40% APR on Gary's facility.
+        Wrapper::push_from(&chain, steve)
+            .st_crd_lne(gary, asset_id, Quantity::new(1_000), false, 400_000)
+            .get()?;
+        // Gary only accepts up to 5%.
+        Wrapper::push_from(&chain, gary)
+            .st_rte_pol(steve, asset_id, Quantity::new(0), 0, 50_000)
+            .get()?;
+
+        let result = Wrapper::push_from(&chain, alice)
+            .path_pay(vec![gary, steve], asset_id, Quantity::new(100))
+            .get();
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    /// Single-hop path_pay is credit-line only (no routing policy).
+    #[psibase::test_case(packages("Banx"))]
+    fn test_path_pay_single_hop_line_only(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+
+        let alice = account!("alice");
+        let steve = account!("steve");
+        chain.new_account(alice).unwrap();
+        chain.new_account(steve).unwrap();
+
+        let asset_id = 1u32;
+        Wrapper::push_from(&chain, steve)
+            .st_crd_lne(alice, asset_id, Quantity::new(1_000), false, 0)
+            .get()?;
+
+        Wrapper::push_from(&chain, alice)
+            .path_pay(vec![steve], asset_id, Quantity::new(50))
+            .get()?;
+
+        assert_eq!(Obligation::exposure(steve, alice, asset_id).value, 50);
 
         Ok(())
     }
@@ -124,12 +187,11 @@ mod tests {
             .st_crd_lne(alice, asset_id, Quantity::new(1_000), false, 0)
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .debit(bob, asset_id, amount)
+            .path_pay(vec![bob], asset_id, amount)
             .get()?;
 
         assert_eq!(Obligation::exposure(bob, alice, asset_id).value, 100);
 
-        // Alice pays cash; Bob deposits — auto-net clears the tab.
         Wrapper::push_from(&chain, bob)
             .deposit(alice, asset_id, amount, 0)
             .get()?;
@@ -156,14 +218,13 @@ mod tests {
             .st_crd_lne(alice, asset_id, Quantity::new(10_000), false, 100_000)
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .debit(bob, asset_id, Quantity::new(100))
+            .path_pay(vec![bob], asset_id, Quantity::new(100))
             .get()?;
 
         Wrapper::push_from(&chain, bob)
             .deposit(alice, asset_id, Quantity::new(40), 0)
             .get()?;
 
-        // 100 - 40 = 60 left Alice owes Bob; reverse cleared by auto-net.
         assert_eq!(Obligation::exposure(bob, alice, asset_id).value, 60);
         assert_eq!(Obligation::exposure(alice, bob, asset_id).value, 0);
 
