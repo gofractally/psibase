@@ -46,9 +46,9 @@ in {
       default = "127.0.0.1";
       example = "0.0.0.0";
       description = ''
-        IP address on which psinode listens. The loopback default keeps the
-        unauthenticated admin API behind a local reverse proxy. Set this to
-        `0.0.0.0` only when remote access is intentional.
+        IP address on which psinode listens. The loopback default accepts only
+        local connections, leaving remote traffic to a reverse proxy. Set this
+        to `0.0.0.0` only when remote access is intentional.
       '';
     };
 
