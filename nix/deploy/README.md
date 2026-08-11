@@ -52,10 +52,8 @@ omitted when those match.
 
 ### Not handled by this module
 
-TLS and reverse proxy are yours. psinode listens on `127.0.0.1` by default;
-XAdmin already authenticates `/native/admin/` (loopback, HTTP Basic, on-chain
-admins, or a trusted proxy header). If a remote proxy connects directly to
-psinode, expose it explicitly:
+TLS and reverse proxy are yours. psinode listens on `127.0.0.1` by default. If a
+remote proxy connects directly to psinode, expose it explicitly:
 
 ```nix
 services.psibase = {
