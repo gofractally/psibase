@@ -224,8 +224,10 @@ pub trait Publish {
 
 impl Publish for SignedTransaction {
     fn publish(self) -> Result<BodyTypes, HostTypes::Error> {
+        // Empty wait_for defaults to "final" (irreversible). UI calls only need
+        // "applied" (executed in a block), which is typically much faster.
         Ok(Server::post(&HostTypes::PostRequest {
-            endpoint: "/push_transaction".to_string(),
+            endpoint: "/push_transaction?wait_for=applied".to_string(),
             body: HostTypes::BodyTypes::Bytes(self.packed()),
         })?)
     }

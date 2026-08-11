@@ -17,6 +17,34 @@ type BootChainParams = {
     onProgressUpdate: (state: BootState) => void;
 };
 
+/**
+ * Push post-genesis boot transactions.
+ *
+ * create_boot_transactions requires these to be pushed (and applied) in order:
+ * during boot the node pops expected hashes from the front of the boot list.
+ * Concurrent in-flight pushes can race sequence assignment and apply out of
+ * order, so we wait for each wait_for=applied response before starting the next.
+ *
+ * The (completed, started) fields from wasm are progress metadata for the
+ * multi-step loader only.
+ */
+async function pushBootTransactions(
+    transactions: [Uint8Array, number, number][],
+    labels: string[],
+    onProgressUpdate: (state: BootState) => void,
+): Promise<boolean> {
+    for (const [t, completed, started] of transactions) {
+        onProgressUpdate(["push", completed + 1, started + 1, labels]);
+        const trace = await chain.pushArrayBufferTransaction(t.buffer);
+        if (trace.error) {
+            onProgressUpdate(trace);
+            console.error(trace.error);
+            return false;
+        }
+    }
+    return true;
+}
+
 export const bootChain = async ({
     packages,
     producerName,
@@ -26,37 +54,47 @@ export const bootChain = async ({
     onProgressUpdate,
 }: BootChainParams): Promise<void> => {
     try {
+        // Prep was a waterfall (config → packages → key). These are independent.
+        const configReady = (async () => {
+            try {
+                await chain.extendConfig({ producer: producerName });
+                queryClient.invalidateQueries({ queryKey: queryKeys.config });
+            } catch {
+                throw new Error("Failed to set producer name");
+            }
+        })();
+
+        const packagesReady = chain.getPackages(packages.map((p) => p.file));
+
+        const keyReady = (async (): Promise<string | undefined> => {
+            if (!blockSigningPubKey) return undefined;
+            try {
+                return await exportKeyToPEM(blockSigningPubKey, "PUBLIC KEY");
+            } catch {
+                throw new Error(
+                    "Failed to export public key to PEM format during boot",
+                );
+            }
+        })();
+
+        let fetchedPackages: ArrayBuffer[];
+        let blockSigningPubKeyPem: string | undefined;
         try {
-            await chain.extendConfig({
-                producer: producerName,
-            });
-            queryClient.invalidateQueries({ queryKey: queryKeys.config });
-        } catch {
-            onProgressUpdate("Failed to set producer name");
+            [, fetchedPackages, blockSigningPubKeyPem] = await Promise.all([
+                configReady,
+                packagesReady,
+                keyReady,
+            ]);
+        } catch (e) {
+            const message =
+                e instanceof Error ? e.message : "Boot preparation failed";
+            onProgressUpdate(message);
             return;
         }
 
-        const fetchedPackages: ArrayBuffer[] = await chain.getPackages(
-            packages.map((pack) => pack.file),
-        );
         const packageBuffers = fetchedPackages.map(
             (buf) => new Uint8Array(buf),
         );
-
-        let blockSigningPubKeyPem: string | undefined;
-        try {
-            if (blockSigningPubKey) {
-                blockSigningPubKeyPem = await exportKeyToPEM(
-                    blockSigningPubKey,
-                    "PUBLIC KEY",
-                );
-            }
-        } catch {
-            onProgressUpdate(
-                "Failed to export public key to PEM format during boot",
-            );
-            return;
-        }
 
         // Something is wrong with the Vite proxy configuration that causes boot to intermittently (but often) fail
         // in a dev environment.
@@ -72,26 +110,26 @@ export const bootChain = async ({
 
         const labels = ["Initializing chain", ...txlabels];
 
-        let i = 1;
         onProgressUpdate(["push", 0, 1, labels]);
-        const trace = await chain.pushArrayBufferBoot(boot_transaction.buffer);
-        if (trace.error) {
-            onProgressUpdate(trace);
-            console.error(trace.error);
+        const bootTrace = await chain.pushArrayBufferBoot(
+            boot_transaction.buffer,
+        );
+        if (bootTrace.error) {
+            onProgressUpdate(bootTrace);
+            console.error(bootTrace.error);
             return;
         }
-        i++;
 
-        for (const [t, completed, started] of transactions) {
-            onProgressUpdate(["push", completed + 1, started + 1, labels]);
-            const trace = await chain.pushArrayBufferTransaction(t.buffer);
-            if (trace.error) {
-                onProgressUpdate(trace);
-                return;
-            }
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            i++;
+        const ok = await pushBootTransactions(
+            transactions,
+            labels,
+            onProgressUpdate,
+        );
+        if (!ok) {
+            onProgressUpdate({ type: "BootComplete", success: false });
+            return;
         }
+
         onProgressUpdate(["push", labels.length, labels.length, labels]);
         onProgressUpdate({ type: "BootComplete", success: true });
     } catch (e) {
