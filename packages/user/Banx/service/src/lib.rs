@@ -75,6 +75,8 @@ pub mod tables {
     pub struct InitRow {
         /// Next primary key for [`Obligation`] rows.
         pub next_obligation_id: u32,
+        /// Next primary key for [`Asset`] rows (u16 space).
+        pub next_asset_id: u16,
     }
     impl InitRow {
         #[primary_key]
@@ -102,13 +104,24 @@ pub mod tables {
             row.save();
             id
         }
+
+        /// Allocate a unique asset id (supports a few thousand assets).
+        pub fn alloc_asset_id() -> u16 {
+            let mut row = Self::get_assert();
+            let id = row.next_asset_id;
+            row.next_asset_id = row.next_asset_id.checked_add(1).expect("asset id overflow");
+            row.save();
+            id
+        }
     }
 
-    /// Registered currency / asset: symbol, decimal precision, and description.
+    /// Registered currency / asset. Compact `id` is used everywhere else;
+    /// `symbol` is the human/name identity.
     #[table(name = "AssetTable", index = 5)]
     #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
     pub struct Asset {
         #[primary_key]
+        pub id: u16,
         pub symbol: AccountNumber,
         pub precision: Precision,
         /// Human-readable description (max 80 bytes).
@@ -116,29 +129,45 @@ pub mod tables {
     }
 
     impl Asset {
+        #[secondary_key(1)]
+        fn by_symbol(&self) -> AccountNumber {
+            self.symbol
+        }
+
         fn save(&self) {
             AssetTable::read_write().put(self).unwrap();
         }
 
-        pub fn get(symbol: AccountNumber) -> Option<Self> {
-            AssetTable::read().get_index_pk().get(&symbol)
+        pub fn get(id: u16) -> Option<Self> {
+            AssetTable::read().get_index_pk().get(&id)
         }
 
-        pub fn get_assert(symbol: AccountNumber) -> Self {
-            Self::get(symbol).expect("asset not found")
+        pub fn get_assert(id: u16) -> Self {
+            Self::get(id).expect("asset not found")
         }
 
-        pub fn new(symbol: AccountNumber, precision: Precision, description: Memo) -> Self {
-            Self {
+        pub fn get_by_symbol(symbol: AccountNumber) -> Option<Self> {
+            AssetTable::read().get_index_by_symbol().get(&symbol)
+        }
+
+        pub fn get_by_symbol_assert(symbol: AccountNumber) -> Self {
+            Self::get_by_symbol(symbol).expect("asset symbol not found")
+        }
+
+        /// Register a new asset; allocates the next `id` from [`InitRow`].
+        pub fn add(symbol: AccountNumber, precision: Precision, description: Memo) -> Self {
+            assert!(
+                Self::get_by_symbol(symbol).is_none(),
+                "asset symbol already exists"
+            );
+            let asset = Self {
+                id: InitRow::alloc_asset_id(),
                 symbol,
                 precision,
                 description,
-            }
-        }
-
-        pub fn add(symbol: AccountNumber, precision: Precision, description: Memo) {
-            assert!(Self::get(symbol).is_none(), "symbol already exists");
-            Self::new(symbol, precision, description).save();
+            };
+            asset.save();
+            asset
         }
     }
 
@@ -180,7 +209,7 @@ pub mod tables {
     )]
     pub struct PathHop {
         pub account: AccountNumber,
-        pub asset_id: u32,
+        pub asset_id: u16,
     }
 
     /// Path routing: **debtor-owned** opt-in to path-draw on `creditor` for
@@ -204,9 +233,9 @@ pub mod tables {
         /// Policy owner: intermediate path-drawing on `creditor`.
         pub debtor: AccountNumber,
         /// Asset of the inbound path amount (prior leg).
-        pub in_asset: u32,
+        pub in_asset: u16,
         /// Asset of the credit line drawn on `creditor`.
-        pub out_asset: u32,
+        pub out_asset: u16,
 
         /// Flat fee in **in_asset** before rate (0 = none).
         pub hop_fee_fixed: Quantity,
@@ -220,7 +249,7 @@ pub mod tables {
 
     impl RoutingPolicy {
         #[primary_key]
-        fn pk(&self) -> (AccountNumber, AccountNumber, u32, u32) {
+        fn pk(&self) -> (AccountNumber, AccountNumber, u16, u16) {
             (self.creditor, self.debtor, self.in_asset, self.out_asset)
         }
 
@@ -231,8 +260,8 @@ pub mod tables {
         fn get(
             creditor: AccountNumber,
             debtor: AccountNumber,
-            in_asset: u32,
-            out_asset: u32,
+            in_asset: u16,
+            out_asset: u16,
         ) -> Option<Self> {
             RoutingPolicyTab::read()
                 .get_index_pk()
@@ -242,8 +271,8 @@ pub mod tables {
         pub fn get_assert(
             creditor: AccountNumber,
             debtor: AccountNumber,
-            in_asset: u32,
-            out_asset: u32,
+            in_asset: u16,
+            out_asset: u16,
         ) -> Self {
             Self::get(creditor, debtor, in_asset, out_asset).expect("RoutingPolicy not found")
         }
@@ -251,8 +280,8 @@ pub mod tables {
         pub fn upsert(
             creditor: AccountNumber,
             debtor: AccountNumber,
-            in_asset: u32,
-            out_asset: u32,
+            in_asset: u16,
+            out_asset: u16,
             hop_fee_fixed: Quantity,
             max_accept_rate: u32,
             fx_rate: u64,
@@ -306,8 +335,8 @@ pub mod tables {
     pub struct CurrencyPolicy {
         /// Debtor who posts the quote (and whose debts may be re-denominated).
         pub debtor: AccountNumber,
-        pub from_asset: u32,
-        pub to_asset: u32,
+        pub from_asset: u16,
+        pub to_asset: u16,
 
         /// Flat fee in **from_asset** before FX (0 = none).
         pub fee_fixed: Quantity,
@@ -321,7 +350,7 @@ pub mod tables {
 
     impl CurrencyPolicy {
         #[primary_key]
-        fn pk(&self) -> (AccountNumber, u32, u32) {
+        fn pk(&self) -> (AccountNumber, u16, u16) {
             (self.debtor, self.from_asset, self.to_asset)
         }
 
@@ -329,21 +358,21 @@ pub mod tables {
             CurrencyPolicyTab::read_write().put(self).unwrap();
         }
 
-        pub fn get(debtor: AccountNumber, from_asset: u32, to_asset: u32) -> Option<Self> {
+        pub fn get(debtor: AccountNumber, from_asset: u16, to_asset: u16) -> Option<Self> {
             CurrencyPolicyTab::read()
                 .get_index_pk()
                 .get(&(debtor, from_asset, to_asset))
         }
 
-        pub fn get_assert(debtor: AccountNumber, from_asset: u32, to_asset: u32) -> Self {
+        pub fn get_assert(debtor: AccountNumber, from_asset: u16, to_asset: u16) -> Self {
             Self::get(debtor, from_asset, to_asset).expect("CurrencyPolicy not found")
         }
 
         /// Debtor posts a convert quote applying to all their creditors.
         pub fn upsert(
             debtor: AccountNumber,
-            from_asset: u32,
-            to_asset: u32,
+            from_asset: u16,
+            to_asset: u16,
             fee_fixed: Quantity,
             fx_rate: u64,
             to_interest_rate: u32,
@@ -473,7 +502,7 @@ pub mod tables {
 
         pub creditor: AccountNumber,
         pub debtor: AccountNumber,
-        pub asset_id: u32,
+        pub asset_id: u16,
 
         pub remaining_principal: Quantity,
         pub accrued_interest: Quantity,
@@ -489,7 +518,7 @@ pub mod tables {
 
     impl Obligation {
         #[secondary_key(1)]
-        fn by_set(&self) -> (AccountNumber, AccountNumber, u32, u32) {
+        fn by_set(&self) -> (AccountNumber, AccountNumber, u16, u32) {
             (self.creditor, self.debtor, self.asset_id, self.id)
         }
 
@@ -501,7 +530,7 @@ pub mod tables {
             Self::get(id).expect("obligation does not exist")
         }
 
-        fn pairs(creditor: AccountNumber, debtor: AccountNumber, asset_id: u32) -> Vec<Self> {
+        fn pairs(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) -> Vec<Self> {
             ObligationTable::read()
                 .get_index_by_set()
                 .range((creditor, debtor, asset_id, 0)..(creditor, debtor, asset_id, u32::MAX))
@@ -510,7 +539,7 @@ pub mod tables {
 
         /// Total exposure creditor←debtor for asset: Σ(principal + accrued interest).
         /// Does **not** accrue; call [`accrue_pair`] first when freshness matters.
-        pub fn exposure(creditor: AccountNumber, debtor: AccountNumber, asset_id: u32) -> Quantity {
+        pub fn exposure(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) -> Quantity {
             Self::pairs(creditor, debtor, asset_id)
                 .into_iter()
                 .fold(Quantity::new(0), |acc, o| {
@@ -521,7 +550,7 @@ pub mod tables {
         pub fn get_by_interest_rate(
             creditor: AccountNumber,
             debtor: AccountNumber,
-            asset_id: u32,
+            asset_id: u16,
             interest_rate: u32,
         ) -> Option<Self> {
             Self::pairs(creditor, debtor, asset_id)
@@ -532,7 +561,7 @@ pub mod tables {
         pub fn get_existing_or_new(
             creditor: AccountNumber,
             debtor: AccountNumber,
-            asset_id: u32,
+            asset_id: u16,
             interest_rate: u32,
         ) -> Self {
             Self::get_by_interest_rate(creditor, debtor, asset_id, interest_rate)
@@ -549,7 +578,7 @@ pub mod tables {
         fn new(
             creditor: AccountNumber,
             debtor: AccountNumber,
-            asset_id: u32,
+            asset_id: u16,
             interest_rate: u32,
         ) -> Self {
             let now = Self::now();
@@ -625,7 +654,7 @@ pub mod tables {
         }
 
         /// Accrue every obligation on this directed pair/asset.
-        pub fn accrue_pair(creditor: AccountNumber, debtor: AccountNumber, asset_id: u32) {
+        pub fn accrue_pair(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) {
             for mut o in Self::pairs(creditor, debtor, asset_id) {
                 o.accrue();
             }
@@ -648,7 +677,7 @@ pub mod tables {
         pub fn apply_reduction(
             creditor: AccountNumber,
             debtor: AccountNumber,
-            asset_id: u32,
+            asset_id: u16,
             amount: u64,
         ) {
             if amount == 0 {
@@ -702,7 +731,7 @@ pub mod tables {
         pub fn net_pair(
             a: AccountNumber,
             b: AccountNumber,
-            asset_id: u32,
+            asset_id: u16,
             max_amount: Quantity,
         ) -> Quantity {
             assert!(a != b, "cannot net with self");
@@ -720,7 +749,7 @@ pub mod tables {
 
             Self::apply_reduction(a, b, asset_id, cancel);
             Self::apply_reduction(b, a, asset_id, cancel);
-            Quantity::new(cancel)
+            cancel.into()
         }
 
         /// Grow principal on this claim (shared by deposit and line draws).
@@ -740,7 +769,7 @@ pub mod tables {
         pub fn credit_pair(
             creditor: AccountNumber,
             debtor: AccountNumber,
-            asset_id: u32,
+            asset_id: u16,
             interest_rate: u32,
             amount: Quantity,
         ) {
@@ -756,12 +785,12 @@ pub mod tables {
         pub fn deposit(
             depositor: AccountNumber,
             receiver: AccountNumber,
-            asset_id: u32,
+            asset_id: u16,
             amount: Quantity,
             interest_rate: u32,
         ) {
             Self::credit_pair(depositor, receiver, asset_id, interest_rate, amount);
-            Self::net_pair(depositor, receiver, asset_id, Quantity::new(u64::MAX));
+            Self::net_pair(depositor, receiver, asset_id, u64::MAX.into());
         }
 
         fn save(&self) {
@@ -803,7 +832,7 @@ pub mod tables {
     pub struct CreditLine {
         pub creditor: AccountNumber,
         pub debtor: AccountNumber,
-        pub asset_id: u32,
+        pub asset_id: u16,
 
         /// Max total outstanding exposure (principal + accrued interest across
         /// all obligations for this pair and asset). See struct docs.
@@ -817,7 +846,7 @@ pub mod tables {
 
     impl CreditLine {
         #[primary_key]
-        fn pk(&self) -> (AccountNumber, AccountNumber, u32) {
+        fn pk(&self) -> (AccountNumber, AccountNumber, u16) {
             (self.creditor, self.debtor, self.asset_id)
         }
 
@@ -828,7 +857,7 @@ pub mod tables {
         fn new(
             creditor: AccountNumber,
             debtor: AccountNumber,
-            asset_id: u32,
+            asset_id: u16,
             limit: Quantity,
             deplete_on_debit: bool,
             interest_rate: u32,
@@ -843,20 +872,20 @@ pub mod tables {
             }
         }
 
-        pub fn get(creditor: AccountNumber, debtor: AccountNumber, asset_id: u32) -> Option<Self> {
+        pub fn get(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) -> Option<Self> {
             CreditLineTable::read()
                 .get_index_pk()
                 .get(&(creditor, debtor, asset_id))
         }
 
-        pub fn get_assert(creditor: AccountNumber, debtor: AccountNumber, asset_id: u32) -> Self {
+        pub fn get_assert(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) -> Self {
             Self::get(creditor, debtor, asset_id).expect("credit line not found")
         }
 
         pub fn upsert_credit_line(
             creditor: AccountNumber,
             debtor: AccountNumber,
-            asset_id: u32,
+            asset_id: u16,
             amount: Quantity,
             deplete_on_debit: bool,
             interest_rate: u32,
@@ -886,7 +915,7 @@ pub mod tables {
         pub fn debit(
             creditor: AccountNumber,
             debtor: AccountNumber,
-            asset_id: u32,
+            asset_id: u16,
             amount: Quantity,
         ) {
             let mut line = Self::get_assert(creditor, debtor, asset_id);
@@ -926,7 +955,7 @@ pub mod service {
     };
     use psibase::{
         services::tokens::{Precision, Quantity},
-        AccountNumber, Memo, TimePointSec, *,
+        AccountNumber, TimePointSec, *,
     };
 
     #[action]
@@ -936,6 +965,7 @@ pub mod service {
             table
                 .put(&InitRow {
                     next_obligation_id: 1,
+                    next_asset_id: 1,
                 })
                 .unwrap();
 
@@ -963,6 +993,15 @@ pub mod service {
         }
     }
 
+    /// Register a new asset. Service-only (`get_sender() == get_service()`).
+    ///
+    /// Returns the allocated `u16` asset id.
+    #[action]
+    fn add_asset(symbol: AccountNumber, precision: Precision, description: Memo) -> u16 {
+        assert_eq!(get_sender(), get_service());
+        Asset::add(symbol, precision, description).id
+    }
+
     /// Set a credit line for the sender as creditor, offering capacity to `debitor`.
     ///
     /// `amount` is the exposure `limit`: max outstanding principal + accrued
@@ -970,7 +1009,7 @@ pub mod service {
     #[action]
     fn st_crd_lne(
         debitor: AccountNumber,
-        asset_id: u32,
+        asset_id: u16,
         amount: Quantity,
         deplete_on_debit: bool,
         interest_rate: u32,
@@ -993,8 +1032,8 @@ pub mod service {
     #[action]
     fn st_rte_pol(
         creditor: AccountNumber,
-        in_asset: u32,
-        out_asset: u32,
+        in_asset: u16,
+        out_asset: u16,
         hop_fee_fixed: Quantity,
         max_accept_rate: u32,
         fx_rate: u64,
@@ -1016,8 +1055,8 @@ pub mod service {
     /// obligations → `to_asset`. See [`CurrencyPolicy`].
     #[action]
     fn st_cur_pol(
-        from_asset: u32,
-        to_asset: u32,
+        from_asset: u16,
+        to_asset: u16,
         fee_fixed: Quantity,
         fx_rate: u64,
         to_interest_rate: u32,
@@ -1042,8 +1081,8 @@ pub mod service {
     #[action]
     fn convert(
         counterparty: AccountNumber,
-        from_asset: u32,
-        to_asset: u32,
+        from_asset: u16,
+        to_asset: u16,
         amount_from: Quantity,
         min_to: Quantity,
     ) {
@@ -1068,19 +1107,19 @@ pub mod service {
     /// Book a **deposit**: sender receives value and credits `depositor`, then
     /// **auto-nets** mutual obligations for this asset.
     #[action]
-    fn deposit(depositor: AccountNumber, asset_id: u32, amount: Quantity, interest_rate: u32) {
+    fn deposit(depositor: AccountNumber, asset_id: u16, amount: Quantity, interest_rate: u32) {
         Obligation::deposit(depositor, get_sender(), asset_id, amount, interest_rate);
     }
 
     /// Accrue interest on all obligations for a directed pair/asset.
     #[action]
-    fn accrue(creditor: AccountNumber, debtor: AccountNumber, asset_id: u32) {
+    fn accrue(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) {
         Obligation::accrue_pair(creditor, debtor, asset_id);
     }
 
     /// Net mutual obligations between sender and `counterparty` for `asset_id`.
     #[action]
-    fn net(counterparty: AccountNumber, asset_id: u32, max_amount: Quantity) {
+    fn net(counterparty: AccountNumber, asset_id: u16, max_amount: Quantity) {
         Obligation::net_pair(get_sender(), counterparty, asset_id, max_amount);
     }
 
@@ -1139,8 +1178,10 @@ pub mod service {
 
     #[pre_action(exclude(init))]
     fn check_init() {
-        let table = InitTable::read();
-        table.get_index_pk().get(&()).expect("service not inited");
+        InitTable::read()
+            .get_index_pk()
+            .get(&())
+            .expect("service not inited");
     }
 }
 

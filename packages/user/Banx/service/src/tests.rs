@@ -5,10 +5,10 @@ mod tests {
     use crate::tables::interest::{accrue_delta, ACCRUAL_DENOM};
     use crate::tables::{Asset, Obligation, PathHop, PPM_SCALE, RATE_SCALE};
     use crate::Wrapper;
-    use psibase::services::tokens::Quantity;
+    use psibase::services::tokens::{Precision, Quantity};
     use psibase::*;
 
-    fn hop(account: AccountNumber, asset_id: u32) -> PathHop {
+    fn hop(account: AccountNumber, asset_id: u16) -> PathHop {
         PathHop { account, asset_id }
     }
 
@@ -26,26 +26,55 @@ mod tests {
             (account!("gbp"), "British pound sterling"),
             (account!("euro"), "Euro"),
         ];
-        for (symbol, description) in fiat {
-            let asset = Asset::get_assert(symbol);
+        for (i, (symbol, description)) in fiat.into_iter().enumerate() {
+            let asset = Asset::get_by_symbol_assert(symbol);
+            assert_eq!(asset.id, (i as u16) + 1);
             assert_eq!(asset.symbol, symbol);
             assert_eq!(asset.precision.value(), 4);
             assert_eq!(asset.description.to_string(), description);
+            assert_eq!(Asset::get_assert(asset.id).symbol, symbol);
         }
 
-        let gold = Asset::get_assert(account!("gold"));
+        let gold = Asset::get_by_symbol_assert(account!("gold"));
+        assert_eq!(gold.id, 5);
         assert_eq!(gold.precision.value(), 6);
         assert_eq!(
             gold.description.to_string(),
             "Gold; 1.000000 = 1 gram of gold"
         );
 
-        let silver = Asset::get_assert(account!("silver"));
+        let silver = Asset::get_by_symbol_assert(account!("silver"));
+        assert_eq!(silver.id, 6);
         assert_eq!(silver.precision.value(), 6);
         assert_eq!(
             silver.description.to_string(),
             "Silver; 1.000000 = 1 gram of silver"
         );
+
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_add_asset_service_only(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+
+        let alice = account!("alice");
+        chain.new_account(alice).unwrap();
+
+        let prec = Precision::new(2).unwrap();
+        let id = Wrapper::push_from(&chain, Wrapper::SERVICE)
+            .add_asset(account!("jpy"), prec, "Japanese yen".into())
+            .get()?;
+        assert_eq!(id, 7);
+        let asset = Asset::get_assert(id);
+        assert_eq!(asset.symbol, account!("jpy"));
+        assert_eq!(asset.precision.value(), 2);
+
+        // Non-service sender rejected.
+        let result = Wrapper::push_from(&chain, alice)
+            .add_asset(account!("cny"), prec, "Chinese yuan".into())
+            .get();
+        assert!(result.is_err());
 
         Ok(())
     }
@@ -87,7 +116,7 @@ mod tests {
         chain.new_account(gary).unwrap();
         chain.new_account(steve).unwrap();
 
-        let usd = 1u32;
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
         let amount = Quantity::new(500);
 
         Wrapper::push_from(&chain, gary)
@@ -134,8 +163,8 @@ mod tests {
         chain.new_account(gary).unwrap();
         chain.new_account(steve).unwrap();
 
-        let aud = 1u32;
-        let usd = 2u32;
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
 
         Wrapper::push_from(&chain, gary)
             .st_crd_lne(alice, aud, Quantity::new(10_000), false, 0)
@@ -191,8 +220,8 @@ mod tests {
             chain.new_account(a).unwrap();
         }
 
-        let aud = 1u32;
-        let usd = 2u32;
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
         let limit = Quantity::new(1_000_000);
         let amount_aud = Quantity::new(10_000);
 
@@ -319,8 +348,8 @@ mod tests {
             chain.new_account(a).unwrap();
         }
 
-        let aud = 1u32;
-        let usd = 2u32;
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
         let limit = Quantity::new(1_000_000);
 
         Wrapper::push_from(&chain, mitchell)
@@ -402,8 +431,8 @@ mod tests {
         chain.new_account(alice).unwrap();
         chain.new_account(gary).unwrap();
 
-        let aud = 1u32;
-        let usd = 2u32;
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
 
         Wrapper::push_from(&chain, gary)
             .st_crd_lne(alice, aud, Quantity::new(10_000), false, 0)
@@ -444,7 +473,7 @@ mod tests {
         chain.new_account(gary).unwrap();
         chain.new_account(steve).unwrap();
 
-        let usd = 1u32;
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
         Wrapper::push_from(&chain, gary)
             .st_crd_lne(alice, usd, Quantity::new(1_000), false, 0)
             .get()?;
@@ -475,7 +504,7 @@ mod tests {
         chain.new_account(gary).unwrap();
         chain.new_account(steve).unwrap();
 
-        let usd = 1u32;
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
         Wrapper::push_from(&chain, gary)
             .st_crd_lne(alice, usd, Quantity::new(10_000), false, 0)
             .get()?;
@@ -524,7 +553,7 @@ mod tests {
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
 
-        let usd = 1u32;
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
         let amount = Quantity::new(100);
 
         Wrapper::push_from(&chain, bob)
