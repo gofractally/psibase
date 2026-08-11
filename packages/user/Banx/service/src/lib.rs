@@ -530,7 +530,7 @@ pub mod tables {
             Self::get(id).expect("obligation does not exist")
         }
 
-        fn pairs(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) -> Vec<Self> {
+        fn obligations(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) -> Vec<Self> {
             ObligationTable::read()
                 .get_index_by_set()
                 .range((creditor, debtor, asset_id, 0)..(creditor, debtor, asset_id, u32::MAX))
@@ -540,7 +540,7 @@ pub mod tables {
         /// Total exposure creditor←debtor for asset: Σ(principal + accrued interest).
         /// Does **not** accrue; call [`accrue_pair`] first when freshness matters.
         pub fn exposure(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) -> Quantity {
-            Self::pairs(creditor, debtor, asset_id)
+            Self::obligations(creditor, debtor, asset_id)
                 .into_iter()
                 .fold(Quantity::new(0), |acc, o| {
                     acc + o.remaining_principal + o.accrued_interest
@@ -553,7 +553,7 @@ pub mod tables {
             asset_id: u16,
             interest_rate: u32,
         ) -> Option<Self> {
-            Self::pairs(creditor, debtor, asset_id)
+            Self::obligations(creditor, debtor, asset_id)
                 .into_iter()
                 .find(|obligation| obligation.interest_rate == interest_rate)
         }
@@ -655,8 +655,8 @@ pub mod tables {
 
         /// Accrue every obligation on this directed pair/asset.
         pub fn accrue_pair(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) {
-            for mut o in Self::pairs(creditor, debtor, asset_id) {
-                o.accrue();
+            for mut pair in Self::obligations(creditor, debtor, asset_id) {
+                pair.accrue();
             }
         }
 
@@ -683,7 +683,7 @@ pub mod tables {
             if amount == 0 {
                 return;
             }
-            let mut obs = Self::pairs(creditor, debtor, asset_id);
+            let mut obs = Self::obligations(creditor, debtor, asset_id);
             if obs.is_empty() {
                 return;
             }
