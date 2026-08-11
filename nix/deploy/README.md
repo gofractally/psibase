@@ -62,7 +62,13 @@ services.psibase = {
 };
 ```
 
-Optional: pass the authenticated user from a trusted local proxy:
+[x-admin](../../doc/src/default-apps/x-admin.md#authentication) authenticates
+`/native/admin/`: local clients are authorized by default, and
+[HTTP Basic auth](../../doc/src/default-apps/x-basic.md) is the simplest way to
+allow remote access.
+
+Only if you must integrate an external auth system, have a trusted local proxy
+pass the authenticated user (easy to get wrong — the header is trusted as-is):
 
 ```nix
 services.psibase.environment.PSIBASE_USERNAME_FIELD = "X-Auth-User";
