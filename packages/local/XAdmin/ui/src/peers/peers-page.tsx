@@ -294,15 +294,15 @@ export const PeersPage = () => {
                             <DialogTitle>Add allowed peer</DialogTitle>
                             <DialogDescription>
                                 Allow an on-chain account to peer with this
-                                node when open P2P is disabled.
+                                node when "Accept all incoming P2P connections" is disabled.
                             </DialogDescription>
                         </DialogHeader>
                         <div className="grid gap-2 py-4">
-                            <Label htmlFor="peer-user-account">Account</Label>
+                            <Label htmlFor="peer-user-account">Account name</Label>
                             <Input
                                 id="peer-user-account"
                                 autoComplete="off"
-                                placeholder="account-name"
+                                placeholder="Account name"
                                 {...peerUserForm.register("account")}
                             />
                             {peerUserForm.formState.errors.account && (
@@ -450,8 +450,8 @@ export const PeersPage = () => {
                                 Allowed peers
                             </h3>
                             <p className="text-muted-foreground text-sm">
-                                Accounts allowed to peer with this node when
-                                open P2P is disabled.
+                                Accounts allowed to peer with this node when "Accept all
+                                incoming P2P connections" is disabled.
                             </p>
                         </div>
                         {peerUsers.length !== 0 && (
