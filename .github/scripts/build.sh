@@ -46,7 +46,12 @@ DOCKER="docker run --rm \
   --user $(id -u):$(id -g) \
   ${BUILDER_IMAGE}"
 
-docker pull ${BUILDER_IMAGE}
+if ! docker image inspect "${BUILDER_IMAGE}" >/dev/null 2>&1; then
+  docker pull "${BUILDER_IMAGE}"
+else
+  echo "Using local image ${BUILDER_IMAGE}"
+fi
+
 echo "===== ccache  ====="
 ${DOCKER} ccache -s
 echo "===== sccache ====="
