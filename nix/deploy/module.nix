@@ -97,13 +97,14 @@ in {
       '';
     };
 
-    pkcs11Module = lib.mkOption {
-      type = lib.types.nullOr lib.types.path;
-      default = null;
-      example = lib.literalExpression "\"\${pkgs.softhsm}/lib/softhsm/libsofthsm2.so\"";
+    pkcs11Modules = lib.mkOption {
+      type = lib.types.listOf lib.types.path;
+      default = [];
+      example = lib.literalExpression "[\"\${pkgs.softhsm}/lib/softhsm/libsofthsm2.so\"]";
       description = ''
-        Path to a PKCS #11 module (psinode --pkcs11-module). When softHsm.enable
-        is true, defaults to SoftHSM's libsofthsm2.so unless overridden.
+        Paths to PKCS #11 modules (psinode --pkcs11-module, repeatable). When
+        softHsm.enable is true, defaults to SoftHSM's libsofthsm2.so unless
+        overridden.
       '';
     };
 
@@ -176,11 +177,9 @@ in {
   config = lib.mkIf cfg.enable (
     let
       effectivePkcs11 =
-        if cfg.pkcs11Module != null
-        then cfg.pkcs11Module
-        else if cfg.softHsm.enable
-        then "${softhsmPkg}/lib/softhsm/libsofthsm2.so"
-        else null;
+        if cfg.pkcs11Modules != []
+        then cfg.pkcs11Modules
+        else lib.optional cfg.softHsm.enable "${softhsmPkg}/lib/softhsm/libsofthsm2.so";
 
       listenEndpoint = let
         address =
@@ -211,10 +210,7 @@ in {
           "--http-timeout"
           (toString cfg.httpTimeout)
         ]
-        ++ lib.optionals (effectivePkcs11 != null) [
-          "--pkcs11-module"
-          effectivePkcs11
-        ]
+        ++ lib.concatMap (module: ["--pkcs11-module" module]) effectivePkcs11
         ++ cfg.extraArgs;
 
       softhsmEnv = lib.optionalAttrs cfg.softHsm.enable {
