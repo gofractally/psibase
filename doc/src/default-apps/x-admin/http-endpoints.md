@@ -287,7 +287,7 @@ All loggers must have the following fields:
 |----------|------------------|------------------------------------------------------------------------------------------------------------------------|
 | `type`   | String           | The type of the logger: [`"console"`](#console-logger), [`"file"`](#file-logger), or [`"local"`](#local-socket-logger) |
 | `filter` | String           | The [filter](../../run-infrastructure/administration/logging.md#log-filters) for the logger                            |
-| `format` | String or Object | Determines the [format](../../run-infrastructure/administration/logging.md#log-fomatters) of log messages              |
+| `format` | String or Object | Determines the [format](../../run-infrastructure/administration/logging.md#log-formatters) of log messages             |
 
 Additional fields are determined by the logger type.
 

@@ -15,11 +15,11 @@ format = [{TimeStamp}] [{Severity}]: {Message}
 
 Each logger should have the following properties
 
-| Property           | Description                                                                                                      |
-|--------------------|------------------------------------------------------------------------------------------------------------------|
-| `type`             | The type of the logger: [`console`](#console-logger), [`file`](#file-logger), or [`local`](#local-socket-logger) |
-| `filter`           | The [filter](#log-filters) for the logger                                                                        |
-| `format`           | Determines the [format](#log-fomatters) of log messages                                                          |
+| Property | Description                                                                                                      |
+|----------|------------------------------------------------------------------------------------------------------------------|
+| `type`   | The type of the logger: [`console`](#console-logger), [`file`](#file-logger), or [`local`](#local-socket-logger) |
+| `filter` | The [filter](#log-filters) for the logger                                                                        |
+| `format` | Determines the [format](#log-formatters) of log messages                                                         |
 
 
 ### Console logger
