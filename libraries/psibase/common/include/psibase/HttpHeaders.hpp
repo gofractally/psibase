@@ -65,4 +65,9 @@ namespace psibase
    /// Parses the X-Forwarded-Proto and Forwarded headers
    /// and returns the first valid protocol ("http" or "https").
    std::optional<std::string> forwardedProto(const HttpRequest& request);
+
+   /// Returns the port suffix of the Host header, including the ':'
+   /// (e.g. ":8080"), or an empty string if the header has no port.
+   /// The result points into the request's headers.
+   std::string_view hostHeaderPortSuffix(const HttpRequest& request);
 }  // namespace psibase

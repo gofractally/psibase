@@ -83,9 +83,9 @@ namespace SystemService
           * `*` allows fetching plugins, as well as websocket connections
 
         CSP strings (default or user-defined via setCsp) may include the
-        keyword `{{root}}`, which is replaced at serve time with the root domain
-        including port when present (e.g. psibase.localhost:8080 or
-        example.com). See expandCspKeywords.
+        keyword `{{root}}`, which is replaced with the root domain including
+        port when present (e.g. psibase.localhost:8080 or example.com).
+        See expandCspKeywords.
       */
       const std::string DEFAULT_CSP_HEADER =                               //
           "default-src 'self';"                                            //
@@ -96,46 +96,6 @@ namespace SystemService
           "frame-src *;"                                                   //
           "connect-src * blob:;"                                           //
           ;
-
-      // Port suffix from the Host header (e.g. ":8080"), empty if absent or not
-      // a valid port. request.host is stored without the port, so the raw
-      // Host header is the source of truth.
-      //
-      // The Host header is client-controlled and this value is interpolated into
-      // the CSP response header, so only ':' followed by a decimal port in
-      // 0..65535 is accepted. Without that check a request carrying
-      //    Host: psibase.localhost:8080 https://evil.com
-      // would append the whole tail to every {{root}} host source, adding an
-      // attacker-chosen origin to the policy. Rejecting fails closed: with no
-      // suffix the policy is narrower than intended, never wider.
-      std::string_view hostHeaderPortSuffix(const HttpRequest& req)
-      {
-         if (auto host = req.getHeader("host"))
-         {
-            std::string_view h = *host;
-            if (auto pos = h.rfind(':'); pos != std::string_view::npos)
-            {
-               // A ']' after the last ':' means that colon is inside a
-               // bracketed IPv6 literal, so there is no port.
-               if (h.find(']', pos) != std::string_view::npos)
-                  return {};
-
-               std::string_view digits = h.substr(pos + 1);
-               if (digits.empty() || digits.size() > 5 ||
-                   digits.find_first_not_of("0123456789") != std::string_view::npos)
-                  return {};
-
-               unsigned port = 0;
-               for (char c : digits)
-                  port = port * 10 + static_cast<unsigned>(c - '0');
-               if (port > 65535)
-                  return {};
-
-               return h.substr(pos);
-            }
-         }
-         return {};
-      }
 
       // Root domain for CSP host sources: rootHost + optional port.
       // Scheme-relative so the same policy works over http (local) and https.
