@@ -14,10 +14,6 @@ Access to `x-admin` is allowed only if
 
 All of these options can also be specified on the command line or in the server's config file. Changes applied through the web API will be saved to the config file and will be remembered across server restarts. Except where noted otherwise, a new configuration takes effect when saved.
 
-### Accept incoming P2P connections
-
-If enabled, the node will accept p2p connections from other nodes.
-
 ### Block Producer Name
 
 The name that the server uses to produce blocks. It must be a valid [account name](../development/services/cpp-service/reference/magic-numbers.md#psibaseaccountnumber). The node will only produce blocks when its producer name is one of the currently active producers specified by the chain. To disable block production, the producer name can be left blank.
@@ -33,3 +29,11 @@ The TCP port on which the server listens. The server must be restarted for a cha
 ### Logger
 
 See [Logging](x-admin/http-endpoints.md#logging) for a list of the available logger types and their parameters.
+
+### Accept all incoming P2P connections
+
+If enabled, the node accepts incoming P2P connections from any peer. If disabled, incoming connections are accepted only from accounts listed under [Allowed peers](#allowed-peers). With the option disabled and an empty allow list, no incoming P2P connections are accepted.
+
+### Allowed peers
+
+A whitelist of on-chain accounts that may open an incoming P2P connection when [Accept all incoming P2P connections](#accept-all-incoming-p2p-connections) is disabled. The list has no effect while that option is enabled, because all incoming peers are already accepted.

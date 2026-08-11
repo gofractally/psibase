@@ -1,5 +1,13 @@
-import { Clipboard, MoreHorizontal, Plus, Trash, Unplug } from "lucide-react";
+import {
+    Clipboard,
+    Info,
+    MoreHorizontal,
+    Plus,
+    Trash,
+    Unplug,
+} from "lucide-react";
 import { useState } from "react";
+import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { useToast } from "@/components/ui/use-toast";
@@ -16,12 +24,15 @@ import {
 } from "@/lib/chain-endpoints";
 
 import { EmptyBlock } from "@shared/components/empty-block";
+import { zAccount } from "@shared/lib/schemas/account";
 import { cn } from "@shared/lib/utils";
+import { Alert, AlertDescription, AlertTitle } from "@shared/shadcn/ui/alert";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Dialog,
     DialogContent,
     DialogDescription,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
@@ -33,6 +44,9 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@shared/shadcn/ui/dropdown-menu";
+import { Input } from "@shared/shadcn/ui/input";
+import { Label } from "@shared/shadcn/ui/label";
+import { Switch } from "@shared/shadcn/ui/switch";
 import {
     Table,
     TableBody,
@@ -41,7 +55,11 @@ import {
     TableRow,
 } from "@shared/shadcn/ui/table";
 
-import { useConfig } from "../hooks/use-config";
+import { useConfig, useConfigUpdate } from "../hooks/use-config";
+import {
+    usePeerUsers,
+    useSetPeerUser,
+} from "../hooks/use-peer-users";
 import { usePeers } from "../hooks/use-peers";
 
 const randomIntFromInterval = (min: number, max: number) =>
@@ -118,10 +136,22 @@ const Status = ({ state }: { state: z.infer<typeof StateEnum> }) => {
     );
 };
 
+const PeerUserFormSchema = z.object({
+    account: zAccount,
+});
+
+type PeerUserForm = z.infer<typeof PeerUserFormSchema>;
+
 export const PeersPage = () => {
     const { data: livePeers, refetch: refetchPeers } = usePeers();
     const { data: config, refetch: refetchConfig } = useConfig();
+    const { mutate: updateConfig, isPending: isUpdatingConfig } =
+        useConfigUpdate();
+    const { data: peerUsers } = usePeerUsers();
+    const { mutateAsync: setPeerUser, isPending: isUpdatingPeerUser } =
+        useSetPeerUser();
     const configPeers = config?.peers || [];
+    const p2pEnabled = config?.p2p ?? false;
 
     const combinedPeers = combinePeers(configPeers, livePeers);
 
@@ -129,6 +159,10 @@ export const PeersPage = () => {
     const { toast } = useToast();
 
     const [showAddModalConnection, setShowModalConnection] = useState(false);
+    const [showAddPeerUser, setShowAddPeerUser] = useState(false);
+    const peerUserForm = useForm<PeerUserForm>({
+        defaultValues: { account: "" },
+    });
 
     const onConnection = async () => {
         setShowModalConnection(false);
@@ -173,6 +207,60 @@ export const PeersPage = () => {
         }
     };
 
+    const onP2pChange = (checked: boolean) => {
+        updateConfig(
+            { p2p: checked },
+            {
+                onError: () => {
+                    toast({
+                        title: "Error",
+                        description: "Failed to update P2P setting",
+                    });
+                },
+            },
+        );
+    };
+
+    const onAddPeerUser = async (values: PeerUserForm) => {
+        const parsed = PeerUserFormSchema.safeParse(values);
+        if (!parsed.success) {
+            const message =
+                parsed.error.issues[0]?.message ?? "Invalid account name";
+            peerUserForm.setError("account", { message });
+            return;
+        }
+
+        try {
+            await setPeerUser({ account: parsed.data.account, accept: true });
+            setShowAddPeerUser(false);
+            peerUserForm.reset({ account: "" });
+            toast({
+                title: "Allowed peer added",
+                description: `${parsed.data.account} can now peer with this node.`,
+            });
+        } catch {
+            toast({
+                title: "Error",
+                description: "Failed to add allowed peer",
+            });
+        }
+    };
+
+    const onRemovePeerUser = async (account: string) => {
+        try {
+            await setPeerUser({ account, accept: false });
+            toast({
+                title: "Allowed peer removed",
+                description: `${account} can no longer peer with this node.`,
+            });
+        } catch {
+            toast({
+                title: "Error",
+                description: "Failed to remove allowed peer",
+            });
+        }
+    };
+
     return (
         <>
             <Dialog
@@ -191,17 +279,73 @@ export const PeersPage = () => {
                 </DialogContent>
             </Dialog>
 
-            <div className="flex justify-between py-2">
-                <div></div>
+            <Dialog
+                open={showAddPeerUser}
+                onOpenChange={(show) => {
+                    setShowAddPeerUser(show);
+                    if (!show) {
+                        peerUserForm.reset({ account: "" });
+                    }
+                }}
+            >
+                <DialogContent>
+                    <form onSubmit={peerUserForm.handleSubmit(onAddPeerUser)}>
+                        <DialogHeader>
+                            <DialogTitle>Add allowed peer</DialogTitle>
+                            <DialogDescription>
+                                Allow an on-chain account to peer with this
+                                node when open P2P is disabled.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-2 py-4">
+                            <Label htmlFor="peer-user-account">Account</Label>
+                            <Input
+                                id="peer-user-account"
+                                autoComplete="off"
+                                placeholder="account-name"
+                                {...peerUserForm.register("account")}
+                            />
+                            {peerUserForm.formState.errors.account && (
+                                <p className="text-destructive text-sm">
+                                    {
+                                        peerUserForm.formState.errors.account
+                                            .message
+                                    }
+                                </p>
+                            )}
+                        </div>
+                        <DialogFooter>
+                            <Button
+                                type="submit"
+                                disabled={isUpdatingPeerUser}
+                            >
+                                Add
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            <div className="my-6 flex items-center space-x-2">
+                <Switch
+                    checked={p2pEnabled}
+                    disabled={isUpdatingConfig || config === undefined}
+                    onCheckedChange={onP2pChange}
+                />
+                <Label>Accept all incoming P2P connections</Label>
+            </div>
+
+            <div className="flex items-center justify-between py-2">
+                <h3 className="text-lg font-semibold tracking-tight">
+                    Connections
+                </h3>
                 {combinedPeers.length !== 0 && (
-                    <div>
-                        <Button
-                            variant="outline"
-                            onClick={() => setShowModalConnection(true)}
-                        >
-                            <Plus size={20} />
-                        </Button>
-                    </div>
+                    <Button
+                        variant="outline"
+                        onClick={() => setShowModalConnection(true)}
+                    >
+                        <Plus size={20} />
+                    </Button>
                 )}
             </div>
             {combinedPeers.length == 0 ? (
@@ -291,6 +435,89 @@ export const PeersPage = () => {
                 </Table>
             )}
             {configPeersError && <div>{configPeersError}</div>}
+
+            <div className="relative mt-10">
+                <div
+                    className={cn(
+                        "transition-all",
+                        p2pEnabled &&
+                            "pointer-events-none select-none opacity-40 blur-[1px]",
+                    )}
+                >
+                    <div className="flex items-center justify-between py-2">
+                        <div>
+                            <h3 className="text-lg font-semibold tracking-tight">
+                                Allowed peers
+                            </h3>
+                            <p className="text-muted-foreground text-sm">
+                                Accounts allowed to peer with this node when
+                                open P2P is disabled.
+                            </p>
+                        </div>
+                        {peerUsers.length !== 0 && (
+                            <Button
+                                variant="outline"
+                                onClick={() => setShowAddPeerUser(true)}
+                            >
+                                <Plus size={20} />
+                            </Button>
+                        )}
+                    </div>
+                    {peerUsers.length === 0 ? (
+                        <EmptyBlock
+                            buttonLabel="Add allowed peer"
+                            onButtonClick={() => setShowAddPeerUser(true)}
+                            title="No allowed peers"
+                            description="Add an account to allow it to peer with this node."
+                        />
+                    ) : (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Account</TableHead>
+                                    <TableHead className="w-12" />
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {peerUsers.map((account) => (
+                                    <TableRow key={account}>
+                                        <TableHead>{account}</TableHead>
+                                        <TableHead>
+                                            <Button
+                                                variant="ghost"
+                                                className="h-8 w-8 p-0"
+                                                disabled={isUpdatingPeerUser}
+                                                onClick={() =>
+                                                    onRemovePeerUser(account)
+                                                }
+                                            >
+                                                <span className="sr-only">
+                                                    Remove {account}
+                                                </span>
+                                                <Trash className="h-4 w-4" />
+                                            </Button>
+                                        </TableHead>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    )}
+                </div>
+
+                {p2pEnabled && (
+                    <div className="absolute inset-0 flex items-center justify-center p-4">
+                        <Alert className="bg-background max-w-md shadow-sm">
+                            <Info />
+                            <AlertTitle>Whitelist disabled</AlertTitle>
+                            <AlertDescription>
+                                Open P2P is accepting all incoming peers. Turn
+                                off &quot;Accept all incoming P2P connections&quot;
+                                above to use the allowed-peers whitelist.
+                            </AlertDescription>
+                        </Alert>
+                    </div>
+                )}
+            </div>
         </>
     );
 };
