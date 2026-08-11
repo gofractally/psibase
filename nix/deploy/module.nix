@@ -111,9 +111,9 @@ in {
       type = lib.types.bool;
       default = false;
       description = ''
-        Open the listen port in the firewall. Usually false: psinode does not
-        authenticate `/native/admin/`. Put a reverse proxy in front. To accept
-        remote connections directly, also set `listenAddress` to `0.0.0.0`.
+        Open the listen port in the firewall. Usually false: put a reverse
+        proxy in front. To accept remote connections directly, also set
+        `listenAddress` to `0.0.0.0`.
       '';
     };
 
