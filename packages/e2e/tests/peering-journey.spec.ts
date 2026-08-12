@@ -1,6 +1,5 @@
 import { expect, test } from "../fixtures/admin-browser";
 import { waitForChain, waitForSync } from "../lib/node-ready";
-import { getRoutableIPv4 } from "../lib/routable-address";
 
 const PRODUCER = "prod";
 const JOIN_TIMEOUT_MS = 60_000;
@@ -18,8 +17,9 @@ test("two joiners peer to a booted producer through the admin UI", async ({
 
     // psinode dials "x-peers." + this URL's host, so the peer URL names a host
     // that resolves for psinode itself. The browser never fetches it.
-    const peerUrl = `http://psibase.test:${producer.port}/`;
-    const producerEndpoint = `${getRoutableIPv4()}:${producer.port}`;
+    const peerUrl = `http://psibase.localhost:${producer.port}/`;
+    // .localhost resolves to loopback for psinode; the peers table shows that address.
+    const producerEndpoint = `127.0.0.1:${producer.port}`;
 
     // A joiner starts without -p and never boots. Peering is independent of
     // consensus membership, so it never has to join the active producer set.

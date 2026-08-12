@@ -4,7 +4,6 @@ import {
     type Page,
 } from "@playwright/test";
 import { getRoutableIPv4 } from "../lib/routable-address";
-import { assertXPeersHostResolves } from "../lib/x-peers-host";
 import {
     expect,
     test as psinodeTest,
@@ -70,7 +69,6 @@ type AdminBrowserFixtures = {
 
 export const test = psinodeTest.extend<AdminBrowserFixtures>({
     browser: async ({ playwright }, use) => {
-        await assertXPeersHostResolves();
         const ip = getRoutableIPv4();
         const browser = await playwright.chromium.launch({
             args: [`--host-resolver-rules=MAP *.psibase.localhost ${ip}`],

@@ -11,26 +11,6 @@ tree). Install browser binaries once:
 yarn playwright install chromium
 ```
 
-### Host entry
-
-psinode resolves peer connections to `x-peers.<domain>`, where the domain comes
-from the peer URL. Peer URLs in this suite are on `psibase.test`, so add this
-entry to `/etc/hosts`, pointing at the machine's routable IPv4 (not
-`127.0.0.1`):
-
-```
-<routable-ipv4> x-peers.psibase.test
-```
-
-The two domains resolve by separate mechanisms, which is why they differ. The
-browser reaches the UI on `psibase.localhost` and gets wildcard resolution for
-`*.psibase.localhost` from `--host-resolver-rules` at launch, needing no hosts
-entry: the `.localhost` suffix makes the origin a secure context, while the
-rule maps it onto the routable address so admin auth is not bypassed via
-loopback. psinode takes no resolver flags and goes through the system resolver,
-which is entitled to short-circuit `.localhost` to loopback — so peer URLs use
-`psibase.test`, where a hosts entry is authoritative.
-
 ## Environment variables
 
 Both paths are relative to the repository root unless absolute:
