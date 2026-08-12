@@ -35,10 +35,16 @@ function attachCollector(context: BrowserContext): ConsoleErrorCollector {
             entries.push(`pageerror: ${error.message}`);
         });
         page.on("requestfailed", (request) => {
-            const failure = request.failure();
-            entries.push(
-                `requestfailed: ${request.url()} (${failure?.errorText ?? "unknown"})`,
-            );
+            const errorText = request.failure()?.errorText ?? "unknown";
+            // A request the page itself cancelled is not a failure. Leaving a
+            // route unmounts its react-query observers, which abort whatever
+            // poll is in flight, so any test that navigates would otherwise
+            // record entries for working behavior. Network-level failures,
+            // including a CORS-blocked request, report ERR_FAILED instead.
+            if (errorText === "net::ERR_ABORTED") {
+                return;
+            }
+            entries.push(`requestfailed: ${request.url()} (${errorText})`);
         });
     };
 

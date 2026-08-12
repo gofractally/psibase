@@ -1,10 +1,8 @@
 import { spawn } from "node:child_process";
 import { resolveBin } from "./psinode-bin";
-import { socketRequest } from "./socket-request";
+import { waitForChain } from "./node-ready";
 
-const ADMIN_HOST = "x-admin.psibase.localhost";
 const BOOT_API_URL = "http://psibase.localhost/";
-const BOOT_POLL_MS = 250;
 const BOOT_TIMEOUT_MS = 120_000;
 
 export type BootChainOptions = {
@@ -46,21 +44,5 @@ export async function bootChain(options: BootChainOptions): Promise<void> {
         });
     });
 
-    const deadline = Date.now() + BOOT_TIMEOUT_MS;
-    while (Date.now() < deadline) {
-        const response = await socketRequest({
-            socketPath: options.socketPath,
-            host: ADMIN_HOST,
-            path: "/native/admin/status",
-        });
-        if (response.statusCode === 200) {
-            const status = JSON.parse(response.body) as string[];
-            if (!status.includes("needgenesis")) {
-                return;
-            }
-        }
-        await new Promise((resolve) => setTimeout(resolve, BOOT_POLL_MS));
-    }
-
-    throw new Error("Timed out waiting for chain boot to complete");
+    await waitForChain(options.socketPath, BOOT_TIMEOUT_MS);
 }

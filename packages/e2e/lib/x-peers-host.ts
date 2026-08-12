@@ -1,7 +1,10 @@
 import dns from "node:dns/promises";
 import { getRoutableIPv4 } from "./routable-address";
 
-export const X_PEERS_HOST = "x-peers.psibase.localhost";
+// psinode dials "x-peers." + the host of the peer URL, and peer URLs in this
+// suite are on psibase.test. Only the browser uses psibase.localhost, and it
+// resolves that name from Chromium's own --host-resolver-rules.
+export const X_PEERS_HOST = "x-peers.psibase.test";
 
 export async function assertXPeersHostResolves(): Promise<void> {
     const expected = getRoutableIPv4();
