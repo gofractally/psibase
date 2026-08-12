@@ -40,7 +40,7 @@ mod tests {
         assert_eq!(gold.precision.value(), 6);
         assert_eq!(
             gold.description.to_string(),
-            "Gold; 1.000000 = 1 gram of gold"
+            "1.000000 = 1 gram of gold"
         );
 
         let silver = Asset::get_by_symbol_assert(account!("silver"));
@@ -48,8 +48,31 @@ mod tests {
         assert_eq!(silver.precision.value(), 6);
         assert_eq!(
             silver.description.to_string(),
-            "Silver; 1.000000 = 1 gram of silver"
+            "1.000000 = 1 gram of silver"
         );
+
+        let more_fiat = [
+            (account!("cad"), 7u16, 4u8, "Canadian dollar"),
+            (account!("chf"), 8, 4, "Swiss franc"),
+            (account!("jpy"), 9, 2, "Japanese yen"),
+            (account!("nzd"), 10, 4, "New Zealand dollar"),
+        ];
+        for (symbol, id, prec, description) in more_fiat {
+            let asset = Asset::get_by_symbol_assert(symbol);
+            assert_eq!(asset.id, id);
+            assert_eq!(asset.precision.value(), prec);
+            assert_eq!(asset.description.to_string(), description);
+        }
+
+        let btc = Asset::get_by_symbol_assert(account!("btc"));
+        assert_eq!(btc.id, 11);
+        assert_eq!(btc.precision.value(), 8);
+        assert_eq!(btc.description.to_string(), "1.00000000 = 1 Bitcoin");
+
+        let eth = Asset::get_by_symbol_assert(account!("eth"));
+        assert_eq!(eth.id, 12);
+        assert_eq!(eth.precision.value(), 8);
+        assert_eq!(eth.description.to_string(), "1.00000000 = 1 Ethereum");
 
         Ok(())
     }
@@ -63,16 +86,16 @@ mod tests {
 
         let prec = Precision::new(2).unwrap();
         let id = Wrapper::push_from(&chain, Wrapper::SERVICE)
-            .add_asset(account!("jpy"), prec, "Japanese yen".into())
+            .add_asset(account!("cny"), prec, "Chinese yuan".into())
             .get()?;
-        assert_eq!(id, 7);
+        assert_eq!(id, 13);
         let asset = Asset::get_assert(id);
-        assert_eq!(asset.symbol, account!("jpy"));
+        assert_eq!(asset.symbol, account!("cny"));
         assert_eq!(asset.precision.value(), 2);
 
         // Non-service sender rejected.
         let result = Wrapper::push_from(&chain, alice)
-            .add_asset(account!("cny"), prec, "Chinese yuan".into())
+            .add_asset(account!("krw"), prec, "Korean won".into())
             .get();
         assert!(result.is_err());
 
