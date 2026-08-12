@@ -17,7 +17,7 @@ world impl {
     include host:common/imports;
     include host:db/imports;
     include clientdata:plugin/imports;
-    include accounts:plugin/imports;
+    include accounts:query/imports;
     include permissions:plugin/imports;
     
     import virtual-server:plugin/transact;

@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use host::common::{client as Client, server as Server};
 use host::types::types as HostTypes;
 
-use accounts::plugin::api as Accounts;
+use accounts::query::api as Accounts;
 use setcode::plugin::api as SetCode;
 use sites::plugin::api as Sites;
 use transact::plugin::admin as TransactAdmin;
