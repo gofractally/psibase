@@ -930,7 +930,12 @@ pub mod tables {
         }
 
         pub fn get_assert(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) -> Self {
-            Self::get(creditor, debtor, asset_id).expect("credit line not found")
+            Self::get(creditor, debtor, asset_id).unwrap_or_else(|| {
+                panic!(
+                    "credit line not found: creditor={}, debtor={}, asset_id={}",
+                    creditor, debtor, asset_id
+                )
+            })
         }
 
         pub fn upsert_credit_line(
