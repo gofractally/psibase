@@ -92,10 +92,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Map x-peers host to routable address
-        run: |
-          routable=$(node --experimental-strip-types -e "import { getRoutableIPv4 } from './packages/e2e/lib/routable-address.ts'; process.stdout.write(getRoutableIPv4());")
-          echo "${routable} x-peers.psibase.test" | sudo tee -a /etc/hosts
       - name: Resolve Playwright version
         id: playwright-version
         run: echo "version=$(node -p "require('./packages/e2e/package.json').devDependencies['@playwright/test']")" >> "$GITHUB_OUTPUT"

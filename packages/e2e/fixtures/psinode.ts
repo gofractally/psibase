@@ -143,8 +143,6 @@ async function startPsinode(
         String(port),
         "--host",
         "psibase.localhost",
-        "--host",
-        "psibase.test",
         "--p2p",
     ];
     if (options.producer !== undefined) {
