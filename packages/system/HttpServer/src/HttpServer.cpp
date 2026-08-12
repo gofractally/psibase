@@ -120,7 +120,8 @@ namespace SystemService
                                                      "Content-Security-Policy",
                                                      "ETag",
                                                      "Location",
-                                                     "Set-Cookie"};
+                                                     "Set-Cookie",
+                                                     "X-Content-Type-Options"};
 
       void sendReplyImpl(AccountNumber service, std::int32_t socket, HttpReply&& result)
       {
