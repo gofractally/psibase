@@ -32,21 +32,4 @@ The TCP port on which the server listens. The server must be restarted for a cha
 
 ### Logger
 
-See [Logging](../run-infrastructure/configuration/logging.md) for a list of the available logger types and their parameters.
-
-## HTTP Endpoints
-
-| Method   | URL               | Description                                                                                                                                                      |
-|----------|-------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `GET`    | `/services/*`     | Returns the wasm for a subjective service                                                                                                                        |
-| `PUT`    | `/services/*`     | Sets the wasm for a subjective service                                                                                                                           |
-| `GET`    | `/admin_accounts` | Returns a JSON list of all on-chain accounts that are authorized to administer the node                                                                          |
-| `POST`   | `/admin_accounts` | Takes a JSON object of the form `{"account": String, "admin": bool}` and either adds or removes the account from the set of administrator accounts for the node. |
-| `GET`    | `/admin_login`    | Returns a token to authenticate as `x-admin` to other services.                                                                                                  |
-| `GET`    | `*`               | Returns static content                                                                                                                                           |
-| `PUT`    | `*`               | Uploads static content                                                                                                                                           |
-| `DELETE` | `*`               | Removes static content                                                                                                                                           |
-
-## Service
-
-{{#cpp-doc ::LocalService::XAdmin}}
+See [Logging](x-admin/http-endpoints.md#logging) for a list of the available logger types and their parameters.
