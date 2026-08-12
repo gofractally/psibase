@@ -51,6 +51,8 @@ namespace
    std::vector<HttpHeader> allowCorsCredentials(const HttpRequest& req, AccountNumber account)
    {
       auto result = allowCors(req, account);
+      if (result.empty())
+         return result;
       result.push_back({"Access-Control-Allow-Credentials", "true"});
       for (auto& h : result)
       {
