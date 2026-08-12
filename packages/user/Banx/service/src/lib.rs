@@ -486,7 +486,9 @@ pub mod tables {
     ///
     /// If the payer already has (or draws) a claim the other way — or obtains
     /// one via routing — that obligation is likewise **netted**, not "spent as
-    /// balance." Netting is the only settlement primitive inside Banx.
+    /// balance." Every [`CreditLine::debit`] (including each `path_pay` hop)
+    /// auto-calls [`Obligation::net_pair`] after crediting. Netting is the only
+    /// settlement primitive inside Banx.
     ///
     /// # Netting
     ///
@@ -910,6 +912,10 @@ pub mod tables {
         /// 1. Enforce revolving exposure cap (interest included).
         /// 2. Optionally deplete `limit` and save.
         /// 3. Credit the obligation bucket at this line's `interest_rate`.
+        /// 4. **Auto-net** the pair for this asset
+        ///    ([`Obligation::net_pair`] with unlimited max) so mutual claims
+        ///    cancel immediately — high-frequency path corridors stay bilaterally
+        ///    compressed without a separate `net` action.
         ///
         /// Used by `path_pay` legs (after any routing checks on multi-hop).
         pub fn debit(
@@ -943,6 +949,13 @@ pub mod tables {
                 line.asset_id,
                 line.interest_rate,
                 amount,
+            );
+            // Cancel mutual exposure for this pair/asset (no-op if reverse is 0).
+            Obligation::net_pair(
+                line.creditor,
+                line.debtor,
+                line.asset_id,
+                u64::MAX.into(),
             );
         }
     }
@@ -1136,6 +1149,9 @@ pub mod service {
     ///
     /// Atomic: all legs succeed or none stick. Terminal payee holds a claim on
     /// the previous hop (not necessarily on the sender).
+    ///
+    /// Each hop **auto-nets** that pair/asset after the draw (via
+    /// [`CreditLine::debit`]), so reverse exposure is settled in-line.
     ///
     /// Standalone rebook of existing debt (no path): [`convert`] /
     /// [`CurrencyPolicy`].

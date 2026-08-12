@@ -1,0 +1,23 @@
+/** Format raw ledger units as a fixed-point decimal using asset precision. */
+export function formatRawAmount(raw: string | number, precision: number): string {
+    const value =
+        typeof raw === "string" ? BigInt(raw || "0") : BigInt(Math.trunc(raw));
+    const neg = value < 0n;
+    const abs = neg ? -value : value;
+    const scale = 10n ** BigInt(precision);
+    const whole = abs / scale;
+    const frac = abs % scale;
+    const fracStr = frac.toString().padStart(precision, "0");
+    const body =
+        precision > 0 ? `${whole.toString()}.${fracStr}` : whole.toString();
+    // Trim trailing zeros after decimal for readability, keep at least one digit if needed
+    const trimmed =
+        precision > 0 ? body.replace(/(\.\d*?[1-9])0+$/, "$1").replace(/\.0+$/, "") : body;
+    return neg ? `-${trimmed}` : trimmed;
+}
+
+/** Placeholder hint for an amount field, e.g. `0.0000` for precision 4. */
+export function amountPlaceholder(precision: number): string {
+    if (precision <= 0) return "0";
+    return `0.${"0".repeat(precision)}`;
+}

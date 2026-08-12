@@ -27,6 +27,7 @@ ExternalProject_Add(CommonApiCommonLib_js
 # Define all UI projects
 set(UI_PROJECTS
     system/Accounts/ui:Accounts_js
+    user/Banx/ui:Banx_js
     user/Evaluations/ui:Evaluations_js
     user/Fractals/ui:Fractals_js
     user/FractalCore/ui:FractalCore_js

@@ -1,16 +1,98 @@
 package banx:plugin;
 
-interface api {
-    use host:types/types.{error};
-    set-example-thing: func(thing: string) -> result<_, error>;
+interface types {
+    record path-hop {
+        account: string,
+        asset-id: u16,
+    }
 }
 
-interface queries {
+interface helpers {
     use host:types/types.{error};
-    get-example-thing: func() -> result<string, error>;
+
+    /// Convert a human decimal string (e.g. `"1.45"`) to raw quantity units for `asset-id`.
+    /// Looks up asset precision via Banx GraphQL.
+    /// Fractions may not exceed the asset's precision; shorter fractions are padded.
+    decimal-to-quantity: func(asset-id: u16, amount: string) -> result<u64, error>;
+
+    /// Convert raw quantity units to a decimal string for `asset-id` (e.g. `14500` → `"1.4500"` at 4 dp).
+    quantity-to-decimal: func(asset-id: u16, amount: u64) -> result<string, error>;
+}
+
+interface api {
+    use host:types/types.{error};
+    use types.{path-hop};
+
+    /// Creditor posts/updates a credit line to `debtor` in `asset-id`.
+    /// `limit` is a human decimal string (e.g. `"100.00"`).
+    /// `interest-rate-ppm` is APR in ppm (10000 = 1%).
+    set-credit-line: func(
+        debtor: string,
+        asset-id: u16,
+        limit: string,
+        deplete-on-debit: bool,
+        interest-rate-ppm: u32,
+    ) -> result<_, error>;
+
+    /// Intermediate posts a path-routing policy toward `creditor`.
+    /// Fee is a human decimal in **in-asset** units.
+    set-routing-policy: func(
+        creditor: string,
+        in-asset: u16,
+        out-asset: u16,
+        hop-fee-fixed: string,
+        max-accept-rate-ppm: u32,
+        fx-rate: u64,
+        expires-at-seconds: u32,
+    ) -> result<_, error>;
+
+    /// Debtor posts a convert quote from `from-asset` → `to-asset`.
+    /// Fee is a human decimal in **from-asset** units.
+    set-currency-policy: func(
+        from-asset: u16,
+        to-asset: u16,
+        fee-fixed: string,
+        fx-rate: u64,
+        to-interest-rate-ppm: u32,
+        expires-at-seconds: u32,
+    ) -> result<_, error>;
+
+    /// Book a deposit: sender receives value and credits `depositor`, then auto-nets.
+    /// `amount` is a human decimal string.
+    deposit: func(
+        depositor: string,
+        asset-id: u16,
+        amount: string,
+        interest-rate-ppm: u32,
+    ) -> result<_, error>;
+
+    /// Net mutual obligations with `counterparty` for `asset-id`.
+    /// `max-amount` is a human decimal string.
+    net: func(counterparty: string, asset-id: u16, max-amount: string) -> result<_, error>;
+
+    /// Convert existing debt via a debtor's currency policy.
+    /// Amounts are human decimal strings in their respective assets.
+    convert: func(
+        counterparty: string,
+        from-asset: u16,
+        to-asset: u16,
+        amount-from: string,
+        min-to: string,
+    ) -> result<_, error>;
+
+    /// Multi-hop path payment. Each hop is (account, asset-id).
+    /// Amounts are human decimal strings in the first/last hop assets respectively.
+    path-pay: func(
+        hops: list<path-hop>,
+        amount: string,
+        min-return: string,
+    ) -> result<_, error>;
+
+    /// Accrue interest on a directed pair/asset.
+    accrue: func(creditor: string, debtor: string, asset-id: u16) -> result<_, error>;
 }
 
 world imports {
     import api;
-    import queries;
+    import helpers;
 }

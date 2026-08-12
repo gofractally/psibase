@@ -1,5 +1,5 @@
 {
-  "name": "banx",
+  "name": "@psibase/banx-ui",
   "private": true,
   "version": "0.0.0",
   "scripts": {

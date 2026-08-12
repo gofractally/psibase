@@ -1,4 +1,4 @@
-import { Link, Outlet } from "react-router-dom";
+import { Link, Outlet, useLocation } from "react-router-dom";
 
 import { AppSidebar } from "@/components/app-sidebar";
 
@@ -17,7 +17,20 @@ import {
     SidebarTrigger,
 } from "@shared/shadcn/ui/sidebar";
 
+const titles: Record<string, string> = {
+    "/": "Dashboard",
+    "/credit-lines": "Credit lines",
+    "/obligations": "Accounts",
+    "/deposit": "Deposit",
+    "/path-pay": "Path pay",
+    "/policies": "Policies",
+    "/assets": "Assets",
+};
+
 export const Layout = () => {
+    const { pathname } = useLocation();
+    const page = titles[pathname] ?? "Banx";
+
     return (
         <SidebarProvider>
             <AppSidebar variant="inset" />
@@ -33,16 +46,12 @@ export const Layout = () => {
                             <BreadcrumbList>
                                 <BreadcrumbItem className="hidden md:block">
                                     <BreadcrumbLink asChild>
-                                        <Link to="/">
-                                            {"banx"}
-                                        </Link>
+                                        <Link to="/">Banx</Link>
                                     </BreadcrumbLink>
                                 </BreadcrumbItem>
                                 <BreadcrumbSeparator className="hidden md:block" />
                                 <BreadcrumbItem>
-                                    <BreadcrumbPage>
-                                        Example Thing Page
-                                    </BreadcrumbPage>
+                                    <BreadcrumbPage>{page}</BreadcrumbPage>
                                 </BreadcrumbItem>
                             </BreadcrumbList>
                         </Breadcrumb>

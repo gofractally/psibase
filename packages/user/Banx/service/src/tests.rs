@@ -572,4 +572,67 @@ mod tests {
 
         Ok(())
     }
+
+    /// path_pay / CreditLine::debit auto-nets mutual claims on the pair.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_path_pay_auto_nets_reverse_draw(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        // Mutual revolving lines.
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, usd, Quantity::new(10_000), false, 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .st_crd_lne(bob, usd, Quantity::new(10_000), false, 0)
+            .get()?;
+
+        // Alice draws 100 on Bob → Bob is creditor, Alice debtor.
+        Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(bob, usd)],
+                Quantity::new(100),
+                Quantity::new(100),
+            )
+            .get()?;
+        assert_eq!(Obligation::exposure(bob, alice, usd).value, 100);
+        assert_eq!(Obligation::exposure(alice, bob, usd).value, 0);
+
+        // Bob draws 100 on Alice → reverse claim auto-nets to zero.
+        Wrapper::push_from(&chain, bob)
+            .path_pay(
+                vec![hop(alice, usd)],
+                Quantity::new(100),
+                Quantity::new(100),
+            )
+            .get()?;
+        assert_eq!(Obligation::exposure(bob, alice, usd).value, 0);
+        assert_eq!(Obligation::exposure(alice, bob, usd).value, 0);
+
+        // Partial reverse: Alice draws 100, Bob draws 40 → Alice still owes 60.
+        Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(bob, usd)],
+                Quantity::new(100),
+                Quantity::new(100),
+            )
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .path_pay(
+                vec![hop(alice, usd)],
+                Quantity::new(40),
+                Quantity::new(40),
+            )
+            .get()?;
+        assert_eq!(Obligation::exposure(bob, alice, usd).value, 60);
+        assert_eq!(Obligation::exposure(alice, bob, usd).value, 0);
+
+        Ok(())
+    }
 }

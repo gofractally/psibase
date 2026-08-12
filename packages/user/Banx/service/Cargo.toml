@@ -10,6 +10,7 @@ server = "r-banx"
 plugin = "banx-plugin"
 data = [{ src = "../ui/dist", dst = "/" }]
 postinstall = [
+    { sender = "banx", service = "sites", method = "enablespa", rawData = "010001" },
     { sender = "banx", service = "banx", method = "init", data = {} },
 ]
 
