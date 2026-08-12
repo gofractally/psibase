@@ -1,14 +1,5 @@
 package accounts:plugin;
 
-interface types {
-    use host:types/types.{pem};
-
-    record account {
-        account-num: string,
-        auth-service: string,
-    }
-}
-
 /// This interface is only available to the top-level app, or its plugin.
 /// The "top-level" app is the app with which the user is directly interacting.
 interface active-app {
@@ -32,32 +23,13 @@ interface active-app {
     connect-account: func() -> result<_, error>;
 }
 
-/// This is the typical API intended to be used by third-party plugins or UIs.
+/// Restricted API for setting the logged-in user's auth service.
 interface api {
     use host:types/types.{error};
-    use types.{account};
-
-    /// Returns true if there is a user logged in to the currently active top-level application.
-    is-logged-in: func() -> bool;
-
-    /// Gets the account details for the specified account name.
-    /// Possible responses:
-    /// - Some(Account) - The account name is valid and exists with specified details
-    /// - None - The account name is valid but has not been created
-    /// - [Error] InvalidAccountName - The account name is not a valid psibase account name
-    get-account: func(name: string) -> result<option<account>, error>;
 
     /// Sets the auth service used to authenticate the currently logged-in user
     /// Currently calling this is restricted to the homepage app.
     set-auth-service: func(service-name: string) -> result<_, error>;
-
-    /// Gets the account name of the user logged into the active application.
-    /// May also return None if no user is logged in.
-    get-current-user: func() -> option<string>;
-
-    /// Generates a random account number not in use on the network
-    /// Supports optional prefix of up to 9 chars, must not start with "x-"
-    gen-rand-account: func(prefix: option<string>) -> result<string, error>;
 }
 
 /// This interface is only callable by the accounts app itself.
