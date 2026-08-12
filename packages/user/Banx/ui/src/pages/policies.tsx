@@ -13,7 +13,12 @@ import {
     useSetGlobalRoutingPolicy,
     useSetRoutingPolicy,
 } from "@/hooks/use-banx-mutations";
-import { formatFxToRate, formatRawAmount } from "@/lib/amount";
+import {
+    amountPlaceholder,
+    formatFxToRate,
+    formatRawAmount,
+    formatToPrecision,
+} from "@/lib/amount";
 import { ppmToPercent } from "@/lib/constants";
 
 import { Button } from "@shared/shadcn/ui/button";
@@ -27,6 +32,14 @@ import {
     TableHeader,
     TableRow,
 } from "@shared/shadcn/ui/table";
+
+/** Policy expiry: 0 = never; otherwise unix seconds. */
+function formatExpiresAt(expiresAt: number): string {
+    if (!expiresAt) return "Never";
+    const d = new Date(expiresAt * 1000);
+    if (Number.isNaN(d.getTime())) return String(expiresAt);
+    return d.toLocaleString();
+}
 
 export function PoliciesPage() {
     const { assets, symbolOf, precisionOf } = useAssetMap();
@@ -217,12 +230,33 @@ export function PoliciesPage() {
                     </div>
                     <div className="grid gap-2 sm:grid-cols-2">
                         <div className="grid gap-2">
-                            <Label>Fee fixed (from-asset decimal)</Label>
+                            <Label>
+                                Fee fixed
+                                {cFrom !== undefined
+                                    ? ` (${symbolOf(cFrom)})`
+                                    : ""}
+                            </Label>
                             <Input
                                 inputMode="decimal"
                                 value={cFee}
                                 onChange={(e) => setCFee(e.target.value)}
+                                placeholder={
+                                    cFrom !== undefined
+                                        ? amountPlaceholder(
+                                              precisionOf(cFrom),
+                                          )
+                                        : "0"
+                                }
                             />
+                            {cFrom !== undefined && (
+                                <p className="text-muted-foreground text-xs font-mono">
+                                    {formatToPrecision(
+                                        cFee,
+                                        precisionOf(cFrom),
+                                    ) ?? "?"}{" "}
+                                    {symbolOf(cFrom)}
+                                </p>
+                            )}
                         </div>
                         <div className="grid gap-2">
                             <Label>Rate (to per 1 from)</Label>
@@ -234,7 +268,12 @@ export function PoliciesPage() {
                             />
                             {cFrom !== undefined && cTo !== undefined && (
                                 <p className="text-muted-foreground text-xs font-mono">
-                                    1 {symbolOf(cFrom)} → {cToRate || "?"}{" "}
+                                    1 {symbolOf(cFrom)} →{" "}
+                                    {formatToPrecision(
+                                        cToRate,
+                                        precisionOf(cTo),
+                                    ) ??
+                                        (cToRate || "?")}{" "}
                                     {symbolOf(cTo)}
                                 </p>
                             )}
@@ -413,6 +452,9 @@ export function PoliciesPage() {
                                     <TableHead className="text-right">
                                         To APR
                                     </TableHead>
+                                    <TableHead className="text-right">
+                                        Expires
+                                    </TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -440,6 +482,9 @@ export function PoliciesPage() {
                                         </TableCell>
                                         <TableCell className="text-right">
                                             {ppmToPercent(p.toInterestRatePpm)}
+                                        </TableCell>
+                                        <TableCell className="text-right text-sm">
+                                            {formatExpiresAt(p.expiresAt)}
                                         </TableCell>
                                     </TableRow>
                                 ))}

@@ -39,3 +39,25 @@ export function amountPlaceholder(precision: number): string {
     if (precision <= 0) return "0";
     return `0.${"0".repeat(precision)}`;
 }
+
+/**
+ * Format a human decimal to full asset precision (pad/truncate fraction).
+ * Invalid/empty input returns null so callers can fall back to "?".
+ */
+export function formatToPrecision(
+    amount: string,
+    precision: number,
+): string | null {
+    const s = amount.trim();
+    if (!s) return null;
+    if (!/^\d+(\.\d*)?$|^\.\d+$/.test(s)) return null;
+
+    const [wholePart, fracPart = ""] = s.includes(".")
+        ? s.split(".", 2)
+        : [s, ""];
+    const whole = wholePart === "" ? "0" : wholePart.replace(/^0+(?=\d)/, "") || "0";
+    if (precision <= 0) return whole;
+
+    const frac = fracPart.slice(0, precision).padEnd(precision, "0");
+    return `${whole}.${frac}`;
+}
