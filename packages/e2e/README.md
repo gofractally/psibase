@@ -14,15 +14,17 @@ yarn playwright install chromium
 ### Host entry
 
 psinode resolves peer connections to `x-peers.<domain>`. Add this entry to
-`/etc/hosts` (replace the address with your machine's routable IPv4 when running
-the multi-node peering journey):
+`/etc/hosts`, pointing at the machine's routable IPv4 (not `127.0.0.1`):
 
 ```
-127.0.0.1 x-peers.psibase.test
+<routable-ipv4> x-peers.psibase.localhost
 ```
 
-Chromium wildcard resolution for `*.psibase.test` is supplied at launch by later
-fixtures; this one name must resolve for psinode itself.
+Chromium wildcard resolution for `*.psibase.localhost` is supplied at launch by
+the admin browser fixture; this one name must resolve for psinode itself. The
+suite uses the `.localhost` suffix so the origin is a secure context, while
+`--host-resolver-rules` maps those names onto the routable address so admin
+auth is not bypassed via loopback.
 
 ## Environment variables
 
