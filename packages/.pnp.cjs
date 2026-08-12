@@ -2774,7 +2774,9 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "./e2e/",\
         "packageDependencies": [\
           ["@playwright/test", "npm:1.48.2"],\
-          ["@psibase/e2e", "workspace:e2e"]\
+          ["@psibase/e2e", "workspace:e2e"],\
+          ["@types/bcryptjs", "npm:2.4.6"],\
+          ["bcryptjs", "npm:2.4.3"]\
         ],\
         "linkType": "SOFT"\
       }]\
@@ -7374,6 +7376,15 @@ const RAW_RUNTIME_STATE =
         "linkType": "HARD"\
       }]\
     ]],\
+    ["@types/bcryptjs", [\
+      ["npm:2.4.6", {\
+        "packageLocation": "../.caches/yarn/@types-bcryptjs-npm-2.4.6-50588b8234-1182663f0c.zip/node_modules/@types/bcryptjs/",\
+        "packageDependencies": [\
+          ["@types/bcryptjs", "npm:2.4.6"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
     ["@types/bn.js", [\
       ["npm:5.2.0", {\
         "packageLocation": "../.caches/yarn/@types-bn.js-npm-5.2.0-3df8f9db07-7a36114b8e.zip/node_modules/@types/bn.js/",\
@@ -9171,6 +9182,15 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "../.caches/yarn/baseline-browser-mapping-npm-2.10.38-1113fa0c5c-44bbea61ec.zip/node_modules/baseline-browser-mapping/",\
         "packageDependencies": [\
           ["baseline-browser-mapping", "npm:2.10.38"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["bcryptjs", [\
+      ["npm:2.4.3", {\
+        "packageLocation": "../.caches/yarn/bcryptjs-npm-2.4.3-32de4957eb-b969467087.zip/node_modules/bcryptjs/",\
+        "packageDependencies": [\
+          ["bcryptjs", "npm:2.4.3"]\
         ],\
         "linkType": "HARD"\
       }]\
