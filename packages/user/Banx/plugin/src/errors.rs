@@ -8,4 +8,5 @@ plugin_error! {
     ConversionError(msg: String) => "Amount conversion error: {msg}",
     AssetNotFound(id: String) => "Asset not found: {id}",
     AmountIsZero() => "Amount must be greater than zero",
+    NoPath(msg: String) => "No path found: {msg}",
 }

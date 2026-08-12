@@ -5,6 +5,15 @@ interface types {
         account: string,
         asset-id: u16,
     }
+
+    /// Result of off-chain multi-hop path discovery for `path-pay`.
+    record path-quote {
+        hops: list<path-hop>,
+        /// Estimated residual after fees (human decimal in last hop asset).
+        amount-out: string,
+        /// Suggested min-return (same as amount-out for now).
+        min-return: string,
+    }
 }
 
 interface helpers {
@@ -21,7 +30,7 @@ interface helpers {
 
 interface api {
     use host:types/types.{error};
-    use types.{path-hop};
+    use types.{path-hop, path-quote};
 
     /// Creditor posts/updates a credit line to `debtor` in `asset-id`.
     /// `limit` is a human decimal string (e.g. `"100.00"`).
@@ -101,6 +110,19 @@ interface api {
         amount: string,
         min-return: string,
     ) -> result<_, error>;
+
+    /// Discover a multi-hop path from `from-account` to `to-account` (TokenSwap-style
+    /// max-residual search over credit lines / routing / FX). Uses a scoped GraphQL
+    /// subgraph around the two endpoints — not a full-network dump.
+    /// `to-asset` empty/none → any final asset; otherwise require that asset on last hop.
+    quote-path: func(
+        from-account: string,
+        to-account: string,
+        amount: string,
+        from-asset: u16,
+        to-asset: option<u16>,
+        max-hops: u8,
+    ) -> result<path-quote, error>;
 
     /// Accrue interest on a directed pair/asset.
     accrue: func(creditor: string, debtor: string, asset-id: u16) -> result<_, error>;

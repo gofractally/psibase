@@ -1,3 +1,6 @@
+/// Off-chain path discovery for multi-hop `path_pay` (TokenSwap-style search).
+pub mod path_find;
+
 #[psibase::service_tables]
 pub mod tables {
     use async_graphql::SimpleObject;
@@ -879,7 +882,9 @@ pub mod tables {
     /// [`Obligation::credit_pair`] grows the claim (merge by same interest rate).
     /// Used by every `path_pay` leg (first leg direct; later legs after routing).
     #[table(name = "CreditLineTable", index = 3)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(
+        Default, Clone, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug,
+    )]
     pub struct CreditLine {
         pub creditor: AccountNumber,
         pub debtor: AccountNumber,

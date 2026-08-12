@@ -1,11 +1,12 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::exports::banx::plugin::api::{Guest as Api, PathHop as WitPathHop};
+use bindings::exports::banx::plugin::api::{Guest as Api, PathHop as WitPathHop, PathQuote};
 use bindings::exports::banx::plugin::helpers::Guest as Helpers;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
+use banx::path_find::find_banx_path;
 use psibase::define_trust;
 use psibase::fracpack::Pack;
 use psibase::services::tokens::{Decimal, Quantity};
@@ -16,6 +17,7 @@ use errors::ErrorType;
 
 mod query {
     pub mod fetch_asset;
+    pub mod fetch_path_graph;
 }
 
 define_trust! {
@@ -23,6 +25,7 @@ define_trust! {
         Low => "
             - Accrue interest on Banx obligations
             - Convert amounts using asset precision
+            - Quote multi-hop paths (read-only GraphQL + search)
         ",
         Medium => "
             - Post credit lines, routing policies, and currency policies
@@ -35,7 +38,7 @@ define_trust! {
     }
     functions {
         None => [decimal_to_quantity, quantity_to_decimal],
-        Low => [accrue],
+        Low => [accrue, quote_path],
         Medium => [
             set_credit_line,
             set_routing_policy,
@@ -274,6 +277,71 @@ impl Api for BanxPlugin {
         }
         .packed();
         add_action_to_transaction(banx::action_structs::path_pay::ACTION_NAME, &packed)
+    }
+
+    fn quote_path(
+        from_account: String,
+        to_account: String,
+        amount: String,
+        from_asset: u16,
+        to_asset: Option<u16>,
+        max_hops: u8,
+    ) -> Result<PathQuote, Error> {
+        trust::assert_authorized(trust::FunctionName::quote_path)?;
+        let from = from_account.trim();
+        let to = to_account.trim();
+        if from.is_empty() || to.is_empty() {
+            return Err(ErrorType::InvalidAccount("from/to required".into()).into());
+        }
+        if from == to {
+            return Err(ErrorType::NoPath("from and to are the same account".into()).into());
+        }
+        let max_hops = max_hops.clamp(1, 12);
+        let amount_raw = parse_amount_nonzero(from_asset, &amount)?;
+        let snap = query::fetch_path_graph::fetch_path_graph(from, to, max_hops)?;
+
+        // Expiry checks: pass now=0 so "never" and future policies both pass offline;
+        // chain re-validates at execute time. (Wall clock in plugin is not authoritative.)
+        let quote = find_banx_path(
+            &snap.lines,
+            &snap.routing,
+            &snap.fx,
+            from,
+            to,
+            amount_raw.value,
+            from_asset,
+            to_asset,
+            max_hops,
+            0,
+        )
+        .ok_or_else(|| {
+            ErrorType::NoPath(format!(
+                "no route from {from} to {to} within {max_hops} hops (scoped graph)"
+            ))
+        })?;
+
+        let last_asset = quote
+            .hops
+            .last()
+            .map(|h| h.asset_id)
+            .unwrap_or(from_asset);
+        let asset = query::fetch_asset::fetch_asset(last_asset)?;
+        let precision = asset.precision()?;
+        let amount_out =
+            Decimal::new(Quantity::new(quote.amount_out), precision).to_string();
+
+        Ok(PathQuote {
+            hops: quote
+                .hops
+                .into_iter()
+                .map(|h| WitPathHop {
+                    account: h.account,
+                    asset_id: h.asset_id,
+                })
+                .collect(),
+            amount_out: amount_out.clone(),
+            min_return: amount_out,
+        })
     }
 
     fn accrue(creditor: String, debtor: String, asset_id: u16) -> Result<(), Error> {

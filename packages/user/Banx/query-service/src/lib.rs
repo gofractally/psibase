@@ -161,6 +161,16 @@ mod service {
         rateScale: String,
     }
 
+    /// Scoped subgraph for path discovery between two accounts.
+    #[derive(SimpleObject, Clone)]
+    struct PathGraphView {
+        /// Accounts discovered while expanding from `from` (includes `from` / `to`).
+        accounts: Vec<String>,
+        creditLines: Vec<CreditLineView>,
+        routingPolicies: Vec<RoutingPolicyView>,
+        currencyPolicies: Vec<CurrencyPolicyView>,
+    }
+
     /// History row from `history.banx.activity`.
     #[derive(Deserialize, SimpleObject)]
     struct ActivityEvent {
@@ -274,6 +284,85 @@ mod service {
                 .filter(|p| p.debtor == debtor)
                 .map(CurrencyPolicyView::from)
                 .collect()
+        }
+
+        /// Scoped credit/routing/FX snapshot for path finding between `from` and `to`.
+        ///
+        /// Expands along credit lines up to `maxHops` from `from` (debtors → creditors),
+        /// always including `to`. Does **not** dump the full network graph.
+        async fn pathGraph(
+            &self,
+            from: AccountNumber,
+            to: AccountNumber,
+            maxHops: Option<u8>,
+        ) -> PathGraphView {
+            let max_hops = maxHops.unwrap_or(6).clamp(1, 12) as usize;
+            use std::collections::HashSet;
+
+            let all_lines: Vec<CreditLine> = CreditLineTable::with_service(banx::SERVICE)
+                .get_index_pk()
+                .iter()
+                .collect();
+
+            let mut debtors: HashSet<String> = HashSet::new();
+            debtors.insert(acct(from));
+            debtors.insert(acct(to));
+
+            let mut selected_lines: Vec<CreditLine> = Vec::new();
+            let mut seen_line: HashSet<(String, String, u16)> = HashSet::new();
+
+            for _ in 0..max_hops {
+                let frontier: HashSet<String> = debtors.clone();
+                let mut grew = false;
+                for line in &all_lines {
+                    let d = acct(line.debtor);
+                    if !frontier.contains(&d) {
+                        continue;
+                    }
+                    let c = acct(line.creditor);
+                    let key = (c.clone(), d, line.asset_id);
+                    if !seen_line.insert(key) {
+                        continue;
+                    }
+                    selected_lines.push(line.clone());
+                    if debtors.insert(c) {
+                        grew = true;
+                    }
+                }
+                if !grew {
+                    break;
+                }
+            }
+
+            let credit_lines: Vec<CreditLineView> = selected_lines
+                .into_iter()
+                .map(CreditLineView::from_line)
+                .collect();
+
+            let routing_policies: Vec<RoutingPolicyView> =
+                RoutingPolicyTab::with_service(banx::SERVICE)
+                    .get_index_pk()
+                    .iter()
+                    .filter(|p| debtors.contains(&acct(p.debtor)))
+                    .map(RoutingPolicyView::from)
+                    .collect();
+
+            let currency_policies: Vec<CurrencyPolicyView> =
+                CurrencyPolicyTab::with_service(banx::SERVICE)
+                    .get_index_pk()
+                    .iter()
+                    .filter(|p| debtors.contains(&acct(p.debtor)))
+                    .map(CurrencyPolicyView::from)
+                    .collect();
+
+            let accounts = debtors.into_iter().collect();
+
+            PathGraphView {
+                accounts,
+                creditLines: credit_lines,
+                routingPolicies: routing_policies,
+                currencyPolicies: currency_policies,
+            }
         }
 
         /// Activity history for `account` with a given `counterparty` and `assetId`.

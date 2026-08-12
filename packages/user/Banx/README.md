@@ -17,7 +17,7 @@ Mutual-credit ledger: credit lines, deposits (auto-net), multi-hop path payments
 
 - `/obligations` — **Accounts** (first nav item): savings-style claims you hold + loan-style liabilities you owe
 - `/payees` — common recipients from the Contacts app; open deposit / loan dialog per contact
-- `/path-pay` — multi-hop draw
+- `/path-pay` — multi-hop draw; **Find path** quotes a route via scoped credit graph + TokenSwap-style search
 - `/policies` — routing + currency policies + convert
 - `/assets` — registered assets
 

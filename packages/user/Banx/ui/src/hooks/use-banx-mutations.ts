@@ -123,6 +123,55 @@ export function usePathPay() {
     });
 }
 
+export type PathQuote = {
+    hops: { account: string; assetId: number }[];
+    amountOut: string;
+    minReturn: string;
+};
+
+/** Off-chain path discovery (scoped graph + TokenSwap-style search). */
+export function useQuotePath() {
+    return useMutation({
+        mutationFn: async (p: {
+            fromAccount: string;
+            toAccount: string;
+            amount: string;
+            fromAsset: number;
+            /** Final hop must be in this asset. */
+            toAsset: number;
+            maxHops: number;
+        }): Promise<PathQuote> => {
+            const res = (await supervisor.functionCall({
+                service: BANX_SERVICE,
+                intf: "api",
+                method: "quotePath",
+                params: [
+                    p.fromAccount,
+                    p.toAccount,
+                    p.amount,
+                    p.fromAsset,
+                    p.toAsset,
+                    p.maxHops,
+                ],
+            })) as {
+                hops: { account: string; assetId: number }[];
+                amountOut: string;
+                minReturn: string;
+            };
+            return {
+                hops: res.hops.map((h) => ({
+                    account: h.account,
+                    assetId: Number(h.assetId),
+                })),
+                amountOut: res.amountOut,
+                minReturn: res.minReturn,
+            };
+        },
+        onError: (e: Error) => toast.error(e.message),
+        onSuccess: () => toast.success("Path found"),
+    });
+}
+
 export function useSetRoutingPolicy() {
     const invalidate = useInvalidateBanx();
     return useMutation({
