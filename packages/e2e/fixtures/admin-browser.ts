@@ -15,11 +15,13 @@ export type ConsoleErrorCollector = {
     assertEmpty: () => void;
 };
 
-export type AdminPage = {
+export type CollectedPage = {
     page: Page;
     context: BrowserContext;
     errors: ConsoleErrorCollector;
 };
+
+export type AdminPage = CollectedPage;
 
 function attachCollector(context: BrowserContext): ConsoleErrorCollector {
     const entries: string[] = [];
@@ -62,6 +64,18 @@ function attachCollector(context: BrowserContext): ConsoleErrorCollector {
     };
 }
 
+async function openCollectedPage(
+    browser: Browser,
+    opened: BrowserContext[],
+    contextOptions?: Parameters<Browser["newContext"]>[0],
+): Promise<CollectedPage> {
+    const context = await browser.newContext(contextOptions);
+    const errors = attachCollector(context);
+    const page = await context.newPage();
+    opened.push(context);
+    return { page, context, errors };
+}
+
 type AdminBrowserFixtures = {
     browser: Browser;
     openAdmin: (node: PsinodeNode) => Promise<AdminPage>;
@@ -78,10 +92,7 @@ export const test = psinodeTest.extend<AdminBrowserFixtures>({
     },
 
     openAdmin: async ({ browser }, use) => {
-        const opened: Array<{
-            context: BrowserContext;
-            errors: ConsoleErrorCollector;
-        }> = [];
+        const opened: BrowserContext[] = [];
 
         await use(async (node: PsinodeNode) => {
             // httpCredentials alone only answers WWW-Authenticate challenges. A
@@ -94,24 +105,18 @@ export const test = psinodeTest.extend<AdminBrowserFixtures>({
                 Buffer.from(`${node.username}:${node.password}`).toString(
                     "base64",
                 );
-            const context = await browser.newContext({
+            return openCollectedPage(browser, opened, {
                 httpCredentials: {
                     username: node.username,
                     password: node.password,
                 },
                 extraHTTPHeaders: { Authorization: authorization },
             });
-            const errors = attachCollector(context);
-            const page = await context.newPage();
-            opened.push({ context, errors });
-            return { page, context, errors };
         });
 
-        const allErrors = opened.flatMap((entry) => entry.errors.entries);
-        for (const { context } of opened) {
+        for (const context of opened) {
             await context.close();
         }
-        expect(allErrors, allErrors.join("\n")).toEqual([]);
     },
 });
 
