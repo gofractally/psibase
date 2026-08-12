@@ -39,7 +39,7 @@ export function AssetsPage() {
                                         {a.id}
                                     </TableCell>
                                     <TableCell className="font-medium uppercase">
-                                        {a.symbol}
+                                        {a.symbol.toUpperCase()}
                                     </TableCell>
                                     <TableCell>{a.precision}</TableCell>
                                     <TableCell className="text-muted-foreground">

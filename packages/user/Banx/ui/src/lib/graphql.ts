@@ -78,7 +78,10 @@ const gql = <T>(query: string) =>
 
 export async function fetchAssets(): Promise<Asset[]> {
     const data = await gql<{ assets: Asset[] }>(`{ assets { id symbol precision description } }`);
-    return zAsset.array().parse(data.assets);
+    return zAsset.array().parse(data.assets).map((a) => ({
+        ...a,
+        symbol: a.symbol.toUpperCase(),
+    }));
 }
 
 export async function fetchCreditLines(account: string): Promise<CreditLine[]> {

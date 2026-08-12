@@ -2,7 +2,6 @@ import {
     ArrowLeftRight,
     Coins,
     GitBranch,
-    Home,
     ScrollText,
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
@@ -22,7 +21,6 @@ const items: {
     end?: boolean;
 }[] = [
     { to: "/obligations", label: "Accounts", icon: ScrollText },
-    { to: "/", label: "Dashboard", icon: Home, end: true },
     { to: "/path-pay", label: "Path pay", icon: GitBranch },
     { to: "/policies", label: "Policies", icon: ArrowLeftRight },
     { to: "/assets", label: "Assets", icon: Coins },

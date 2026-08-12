@@ -723,7 +723,8 @@ function CreditLineDialog({
                             <Input
                                 value={
                                     assets.find((a) => a.id === lineAssetId)
-                                        ?.symbol ?? `Asset #${lineAssetId}`
+                                        ?.symbol.toUpperCase() ??
+                                    `Asset #${lineAssetId}`
                                 }
                                 disabled
                                 readOnly

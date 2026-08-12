@@ -18,7 +18,6 @@ import {
 } from "@shared/shadcn/ui/sidebar";
 
 const titles: Record<string, string> = {
-    "/": "Dashboard",
     "/obligations": "Accounts",
     "/path-pay": "Path pay",
     "/policies": "Policies",
@@ -44,7 +43,7 @@ export const Layout = () => {
                             <BreadcrumbList>
                                 <BreadcrumbItem className="hidden md:block">
                                     <BreadcrumbLink asChild>
-                                        <Link to="/">Banx</Link>
+                                        <Link to="/obligations">Banx</Link>
                                     </BreadcrumbLink>
                                 </BreadcrumbItem>
                                 <BreadcrumbSeparator className="hidden md:block" />

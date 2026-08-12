@@ -13,7 +13,7 @@ import {
 /** Prefer USD; otherwise first listed asset. */
 export function defaultAssetId(assets: Asset[]): number | undefined {
     if (assets.length === 0) return undefined;
-    const usd = assets.find((a) => a.symbol.toLowerCase() === "usd");
+    const usd = assets.find((a) => a.symbol === "USD" || a.symbol.toLowerCase() === "usd");
     return (usd ?? assets[0]).id;
 }
 
@@ -50,7 +50,7 @@ export function AssetSelect({
             <SelectContent>
                 {assets.map((a) => (
                     <SelectItem key={a.id} value={String(a.id)}>
-                        {a.symbol.toUpperCase()}
+                        {a.symbol}
                     </SelectItem>
                 ))}
             </SelectContent>
