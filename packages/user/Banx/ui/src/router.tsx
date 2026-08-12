@@ -5,6 +5,7 @@ import { LoginGate } from "@/components/login-gate";
 import { AssetsPage } from "@/pages/assets";
 import { ObligationsPage } from "@/pages/obligations";
 import { PathPayPage } from "@/pages/path-pay";
+import { PayeesPage } from "@/pages/payees";
 import { PoliciesPage } from "@/pages/policies";
 
 function withGate(page: React.ReactNode) {
@@ -18,6 +19,7 @@ export const router = createBrowserRouter([
         children: [
             { index: true, element: <Navigate to="/obligations" replace /> },
             { path: "obligations", element: withGate(<ObligationsPage />) },
+            { path: "payees", element: withGate(<PayeesPage />) },
             { path: "path-pay", element: withGate(<PathPayPage />) },
             { path: "policies", element: withGate(<PoliciesPage />) },
             { path: "assets", element: withGate(<AssetsPage />) },

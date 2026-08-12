@@ -1,6 +1,7 @@
 import {
     ArrowLeftRight,
     Coins,
+    Contact,
     GitBranch,
     ScrollText,
 } from "lucide-react";
@@ -21,6 +22,7 @@ const items: {
     end?: boolean;
 }[] = [
     { to: "/obligations", label: "Accounts", icon: ScrollText },
+    { to: "/payees", label: "Payees", icon: Contact },
     { to: "/path-pay", label: "Path pay", icon: GitBranch },
     { to: "/policies", label: "Policies", icon: ArrowLeftRight },
     { to: "/assets", label: "Assets", icon: Coins },
