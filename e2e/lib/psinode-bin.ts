@@ -1,19 +1,41 @@
+import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 
 const repoRoot = path.resolve(__dirname, "../..");
 
-export function resolveBin(envVar: string, defaultRel: string): string {
-    const rel = process.env[envVar] ?? defaultRel;
-    const abs = path.resolve(repoRoot, rel);
-    if (!existsSync(abs)) {
-        throw new Error(`${envVar} does not exist: ${abs}`);
+function resolveFromPath(command: string): string | undefined {
+    try {
+        return execFileSync("which", [command], { encoding: "utf8" }).trim();
+    } catch {
+        return undefined;
     }
-    return abs;
+}
+
+export function resolveBin(envVar: string, command: string): string {
+    const configured = process.env[envVar];
+    if (configured !== undefined) {
+        const abs = path.isAbsolute(configured)
+            ? configured
+            : path.resolve(repoRoot, configured);
+        if (!existsSync(abs)) {
+            throw new Error(`${envVar} does not exist: ${abs}`);
+        }
+        return abs;
+    }
+
+    const fromPath = resolveFromPath(command);
+    if (fromPath !== undefined && existsSync(fromPath)) {
+        return fromPath;
+    }
+
+    throw new Error(
+        `${envVar} is unset and '${command}' was not found on PATH`,
+    );
 }
 
 export function resolvePsinodeBin(): string {
-    const psinodeBin = resolveBin("PSINODE_BIN", "build/psinode");
+    const psinodeBin = resolveBin("PSINODE_BIN", "psinode");
     const binDir = path.dirname(psinodeBin);
     const prefix =
         path.basename(binDir) === "bin" ? path.dirname(binDir) : binDir;
@@ -28,5 +50,5 @@ export function resolvePsinodeBin(): string {
 
 export function assertE2ePrerequisites(): void {
     resolvePsinodeBin();
-    resolveBin("PSIBASE_BIN", "build/rust/release/psibase");
+    resolveBin("PSIBASE_BIN", "psibase");
 }

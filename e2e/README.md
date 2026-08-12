@@ -13,15 +13,30 @@ yarn playwright install chromium
 
 ## Environment variables
 
-Both paths are relative to the repository root unless absolute:
+When set, paths are relative to the repository root unless absolute. When
+unset, `psinode` and `psibase` are resolved from `PATH` (direnv adds
+`build/psidk/bin` and `build/rust/release`).
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `PSINODE_BIN` | `build/psinode` | psinode binary |
-| `PSIBASE_BIN` | `build/rust/release/psibase` | psibase CLI binary |
+| Variable | Purpose |
+| --- | --- |
+| `PSINODE_BIN` | psinode binary |
+| `PSIBASE_BIN` | psibase CLI binary |
 
-The config fails immediately (naming the variable) when either path is missing.
-It also requires `share/psibase/packages` next to the psinode install prefix.
+The config fails immediately when a configured path is missing, when neither
+variable is set and the command is absent from `PATH`, or when
+`share/psibase/packages` is missing next to the psinode install prefix.
+
+## CTest
+
+From the build directory:
+
+```bash
+ctest -R e2e
+```
+
+Skips with exit code 77 when Chromium is not installed. Excluded from CI
+container builds via `ctest -LE e2e`; the GitHub Actions `e2e` job runs the
+suite on the runner instead.
 
 ## Running the suite
 

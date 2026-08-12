@@ -12,7 +12,7 @@ export type BootChainOptions = {
 };
 
 export async function bootChain(options: BootChainOptions): Promise<void> {
-    const psibaseBin = resolveBin("PSIBASE_BIN", "build/rust/release/psibase");
+    const psibaseBin = resolveBin("PSIBASE_BIN", "psibase");
     const packages = options.packages ?? ["ProdDefault"];
 
     await new Promise<void>((resolve, reject) => {
