@@ -242,3 +242,19 @@ std::optional<std::string> psibase::forwardedProto(const HttpRequest& request)
    }
    return std::nullopt;
 }
+
+std::string_view psibase::hostHeaderPortSuffix(const HttpRequest& request)
+{
+   if (auto host = request.getHeader("host"))
+   {
+      std::string_view h = *host;
+      if (auto pos = h.rfind(':'); pos != std::string_view::npos)
+      {
+         // A ']' after the last ':' means that the colon is inside a
+         // bracketed IPv6 literal, so there is no port.
+         if (h.find(']', pos) == std::string_view::npos)
+            return h.substr(pos);
+      }
+   }
+   return {};
+}

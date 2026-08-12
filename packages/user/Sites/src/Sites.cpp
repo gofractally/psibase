@@ -81,6 +81,11 @@ namespace SystemService
         connect-src:
           * `blob:` for fetch-compiling blob urls
           * `*` allows fetching plugins, as well as websocket connections
+
+        CSP strings (default or user-defined via setCsp) may include the
+        keyword `{{root}}`, which is replaced with the root domain including
+        port when present (e.g. psibase.localhost:8080 or example.com).
+        See expandCspKeywords.
       */
       const std::string DEFAULT_CSP_HEADER =                               //
           "default-src 'self';"                                            //
@@ -91,6 +96,22 @@ namespace SystemService
           "frame-src *;"                                                   //
           "connect-src * blob:;"                                           //
           ;
+
+      // Root domain for CSP host sources: rootHost + optional port.
+      // Scheme-relative so the same policy works over http (local) and https.
+      std::string cspRootDomain(std::string_view rootHost, const HttpRequest& req)
+      {
+         std::string root{rootHost};
+         root.append(hostHeaderPortSuffix(req));
+         return root;
+      }
+
+      // Replace `{{root}}` with the active root domain.
+      std::string expandCspKeywords(std::string csp, std::string_view rootDomain)
+      {
+         boost::replace_all(csp, "{{root}}", rootDomain);
+         return csp;
+      }
 
       // Accepted content encodings
       constexpr std::string_view validEncodings[] = {
@@ -422,7 +443,8 @@ namespace SystemService
 
          if (content)
          {
-            std::string cspHeader = getCspHeader(content, content->account);
+            std::string cspHeader =
+                getCspHeader(content, content->account, cspRootDomain(rootHost, request));
             auto etag = psio::hex(content->contentHash.data(), content->contentHash.data() + 8);
 
             if (useCache(content->account) && shouldCache(request, etag))
@@ -702,7 +724,8 @@ namespace SystemService
    }
 
    std::string Sites::getCspHeader(const std::optional<SitesContentRow>& content,
-                                   const AccountNumber&                  account)
+                                   const AccountNumber&                  account,
+                                   std::string_view                      rootDomain)
    {
       std::string cspHeader = DEFAULT_CSP_HEADER;
       if (content && content->csp.has_value())
@@ -717,7 +740,7 @@ namespace SystemService
             cspHeader = *siteConfig->globalCsp;
          }
       }
-      return cspHeader;
+      return expandCspKeywords(std::move(cspHeader), rootDomain);
    }
 
    bool Sites::useCache(const AccountNumber& account)
