@@ -15,10 +15,6 @@ const RAW_RUNTIME_STATE =
       "reference": "workspace:."\
     },\
     {\
-      "name": "@psibase/e2e",\
-      "reference": "workspace:e2e"\
-    },\
-    {\
       "name": "@psibase/xadmin-ui",\
       "reference": "workspace:local/XAdmin/ui"\
     },\
@@ -94,7 +90,6 @@ const RAW_RUNTIME_STATE =
     ["@psibase/accounts-ui", ["workspace:system/Accounts/ui"]],\
     ["@psibase/common-lib", ["workspace:user/CommonApi/common/packages/common-lib"]],\
     ["@psibase/config-ui", ["workspace:user/Config/ui"]],\
-    ["@psibase/e2e", ["workspace:e2e"]],\
     ["@psibase/evaluations-ui", ["workspace:user/Evaluations/ui"]],\
     ["@psibase/explorer-ui", ["workspace:user/Explorer/ui"]],\
     ["@psibase/fractal-core-ui", ["workspace:user/FractalCore/ui"]],\
@@ -2653,16 +2648,6 @@ const RAW_RUNTIME_STATE =
         "linkType": "HARD"\
       }]\
     ]],\
-    ["@playwright/test", [\
-      ["npm:1.48.2", {\
-        "packageLocation": "../.caches/yarn/@playwright-test-npm-1.48.2-07215b842c-68bab3bee8.zip/node_modules/@playwright/test/",\
-        "packageDependencies": [\
-          ["@playwright/test", "npm:1.48.2"],\
-          ["playwright", "npm:1.48.2"]\
-        ],\
-        "linkType": "HARD"\
-      }]\
-    ]],\
     ["@polka/url", [\
       ["npm:1.0.0-next.29", {\
         "packageLocation": "../.caches/yarn/@polka-url-npm-1.0.0-next.29-b32b372106-0d58e08184.zip/node_modules/@polka/url/",\
@@ -2765,18 +2750,6 @@ const RAW_RUNTIME_STATE =
           ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
           ["vite", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:5.4.21"],\
           ["zod", "npm:3.25.76"]\
-        ],\
-        "linkType": "SOFT"\
-      }]\
-    ]],\
-    ["@psibase/e2e", [\
-      ["workspace:e2e", {\
-        "packageLocation": "./e2e/",\
-        "packageDependencies": [\
-          ["@playwright/test", "npm:1.48.2"],\
-          ["@psibase/e2e", "workspace:e2e"],\
-          ["@types/bcryptjs", "npm:2.4.6"],\
-          ["bcryptjs", "npm:2.4.3"]\
         ],\
         "linkType": "SOFT"\
       }]\
@@ -7376,15 +7349,6 @@ const RAW_RUNTIME_STATE =
         "linkType": "HARD"\
       }]\
     ]],\
-    ["@types/bcryptjs", [\
-      ["npm:2.4.6", {\
-        "packageLocation": "../.caches/yarn/@types-bcryptjs-npm-2.4.6-50588b8234-1182663f0c.zip/node_modules/@types/bcryptjs/",\
-        "packageDependencies": [\
-          ["@types/bcryptjs", "npm:2.4.6"]\
-        ],\
-        "linkType": "HARD"\
-      }]\
-    ]],\
     ["@types/bn.js", [\
       ["npm:5.2.0", {\
         "packageLocation": "../.caches/yarn/@types-bn.js-npm-5.2.0-3df8f9db07-7a36114b8e.zip/node_modules/@types/bn.js/",\
@@ -9182,15 +9146,6 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "../.caches/yarn/baseline-browser-mapping-npm-2.10.38-1113fa0c5c-44bbea61ec.zip/node_modules/baseline-browser-mapping/",\
         "packageDependencies": [\
           ["baseline-browser-mapping", "npm:2.10.38"]\
-        ],\
-        "linkType": "HARD"\
-      }]\
-    ]],\
-    ["bcryptjs", [\
-      ["npm:2.4.3", {\
-        "packageLocation": "../.caches/yarn/bcryptjs-npm-2.4.3-32de4957eb-b969467087.zip/node_modules/bcryptjs/",\
-        "packageDependencies": [\
-          ["bcryptjs", "npm:2.4.3"]\
         ],\
         "linkType": "HARD"\
       }]\
@@ -12098,14 +12053,6 @@ const RAW_RUNTIME_STATE =
       }]\
     ]],\
     ["fsevents", [\
-      ["patch:fsevents@npm%3A2.3.2#optional!builtin<compat/fsevents>::version=2.3.2&hash=df0bf1", {\
-        "packageLocation": "./.yarn/unplugged/fsevents-patch-19706e7e35/node_modules/fsevents/",\
-        "packageDependencies": [\
-          ["fsevents", "patch:fsevents@npm%3A2.3.2#optional!builtin<compat/fsevents>::version=2.3.2&hash=df0bf1"],\
-          ["node-gyp", "npm:13.0.0"]\
-        ],\
-        "linkType": "HARD"\
-      }],\
       ["patch:fsevents@npm%3A2.3.3#optional!builtin<compat/fsevents>::version=2.3.3&hash=df0bf1", {\
         "packageLocation": "./.yarn/unplugged/fsevents-patch-6b67494872/node_modules/fsevents/",\
         "packageDependencies": [\
@@ -14717,26 +14664,6 @@ const RAW_RUNTIME_STATE =
           ["exsolve", "npm:1.0.8"],\
           ["pathe", "npm:2.0.3"],\
           ["pkg-types", "npm:2.3.1"]\
-        ],\
-        "linkType": "HARD"\
-      }]\
-    ]],\
-    ["playwright", [\
-      ["npm:1.48.2", {\
-        "packageLocation": "../.caches/yarn/playwright-npm-1.48.2-7628504eaa-ecde4ee476.zip/node_modules/playwright/",\
-        "packageDependencies": [\
-          ["fsevents", "patch:fsevents@npm%3A2.3.2#optional!builtin<compat/fsevents>::version=2.3.2&hash=df0bf1"],\
-          ["playwright", "npm:1.48.2"],\
-          ["playwright-core", "npm:1.48.2"]\
-        ],\
-        "linkType": "HARD"\
-      }]\
-    ]],\
-    ["playwright-core", [\
-      ["npm:1.48.2", {\
-        "packageLocation": "./.yarn/unplugged/playwright-core-npm-1.48.2-f1270e8a40/node_modules/playwright-core/",\
-        "packageDependencies": [\
-          ["playwright-core", "npm:1.48.2"]\
         ],\
         "linkType": "HARD"\
       }]\

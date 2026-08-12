@@ -1,0 +1,21 @@
+{
+    "name": "@psibase/e2e",
+    "private": true,
+    "version": "0.0.1",
+    "scripts": {
+        "test": "playwright test"
+    },
+    "devDependencies": {
+        "@eslint/js": "^9.9.0",
+        "@playwright/test": "1.48.2",
+        "@types/bcryptjs": "^2.4.6",
+        "@types/node": "^22.15.0",
+        "bcryptjs": "^2.4.3",
+        "eslint": "^9.15.0",
+        "globals": "^16.2.0",
+        "prettier": "^3.2.5",
+        "typescript": "^5.7.3",
+        "typescript-eslint": "^8.33.1"
+    },
+    "packageManager": "yarn@4.9.1"
+}

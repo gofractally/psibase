@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 
-const repoRoot = path.resolve(__dirname, "../../..");
+const repoRoot = path.resolve(__dirname, "../..");
 
 export function resolveBin(envVar: string, defaultRel: string): string {
     const rel = process.env[envVar] ?? defaultRel;

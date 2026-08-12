@@ -94,7 +94,7 @@ jobs:
           node-version: "22"
       - name: Resolve Playwright version
         id: playwright-version
-        run: echo "version=$(node -p "require('./packages/e2e/package.json').devDependencies['@playwright/test']")" >> "$GITHUB_OUTPUT"
+        run: echo "version=$(node -p "require('./e2e/package.json').devDependencies['@playwright/test']")" >> "$GITHUB_OUTPUT"
       - name: Cache Playwright browsers
         uses: actions/cache@v3
         with:
@@ -102,14 +102,14 @@ jobs:
           key: playwright-${{ steps.playwright-version.outputs.version }}-${{ runner.os }}
       - name: Enable Corepack
         run: corepack enable
-      - name: Install workspace dependencies
-        working-directory: packages
+      - name: Install E2E dependencies
+        working-directory: e2e
         run: yarn install --immutable
       - name: Install Chromium
-        working-directory: packages
-        run: yarn workspace @psibase/e2e exec playwright install chromium --with-deps
+        working-directory: e2e
+        run: yarn exec playwright install chromium --with-deps
       - name: Run E2E suite
-        working-directory: packages/e2e
+        working-directory: e2e
         run: yarn test
       - name: Upload Playwright artifacts
         if: failure()
@@ -117,5 +117,5 @@ jobs:
         with:
           name: playwright-artifacts
           path: |
-            packages/e2e/test-results/artifacts/
-            packages/e2e/test-results/html-report/
+            e2e/test-results/artifacts/
+            e2e/test-results/html-report/
