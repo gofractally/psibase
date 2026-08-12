@@ -144,7 +144,32 @@ export function useSetRoutingPolicy() {
             ]),
         onSuccess: () => {
             invalidate();
-            toast.success("Routing policy saved");
+            toast.success("Routing override saved");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useSetGlobalRoutingPolicy() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            assetId: number;
+            hopFeeFixed: string;
+            hopFeePercentPpm: number;
+            maxAcceptRatePpm: number;
+            expiresAtSeconds: number;
+        }) =>
+            banxCall("setGlobalRoutingPolicy", [
+                p.assetId,
+                p.hopFeeFixed,
+                p.hopFeePercentPpm,
+                p.maxAcceptRatePpm,
+                p.expiresAtSeconds,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Global routing policy saved");
         },
         onError: (e: Error) => toast.error(e.message),
     });

@@ -127,8 +127,7 @@ mod tests {
             .get()?;
 
         Wrapper::push_from(&chain, gary)
-            .st_rte_pol(
-                steve,
+            .st_glb_rte(
                 usd,
                 Quantity::new(0),
                 (PPM_SCALE * 2 / 100),
@@ -185,8 +184,7 @@ mod tests {
             .get()?;
         // Gary routes same-asset USD to Steve (no fee).
         Wrapper::push_from(&chain, gary)
-            .st_rte_pol(
-                steve,
+            .st_glb_rte(
                 usd,
                 Quantity::new(0),
                 0,
@@ -258,8 +256,7 @@ mod tests {
         // --- Routing (same-asset fees) ---
         // Mitchell → John, AUD, 5% hop fee
         Wrapper::push_from(&chain, mitchell)
-            .st_rte_pol(
-                john,
+            .st_glb_rte(
                 aud,
                 Quantity::new(0),
                 PPM_SCALE * 5 / 100,
@@ -269,8 +266,7 @@ mod tests {
             .get()?;
         // John → Mike, USD (after convert), no fee
         Wrapper::push_from(&chain, john)
-            .st_rte_pol(
-                mike,
+            .st_glb_rte(
                 usd,
                 Quantity::new(0),
                 0,
@@ -280,8 +276,7 @@ mod tests {
             .get()?;
         // Mike → Brandon, USD, 1% hop fee
         Wrapper::push_from(&chain, mike)
-            .st_rte_pol(
-                brandon,
+            .st_glb_rte(
                 usd,
                 Quantity::new(0),
                 PPM_SCALE * 1 / 100,
@@ -390,8 +385,7 @@ mod tests {
             .get()?;
 
         Wrapper::push_from(&chain, mitchell)
-            .st_rte_pol(
-                john,
+            .st_glb_rte(
                 aud,
                 Quantity::new(0),
                 PPM_SCALE * 5 / 100,
@@ -400,8 +394,7 @@ mod tests {
             )
             .get()?;
         Wrapper::push_from(&chain, john)
-            .st_rte_pol(
-                mike,
+            .st_glb_rte(
                 usd,
                 Quantity::new(0),
                 0,
@@ -410,8 +403,7 @@ mod tests {
             )
             .get()?;
         Wrapper::push_from(&chain, mike)
-            .st_rte_pol(
-                brandon,
+            .st_glb_rte(
                 usd,
                 Quantity::new(0),
                 PPM_SCALE * 1 / 100,
@@ -543,8 +535,7 @@ mod tests {
             .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0)
             .get()?;
         Wrapper::push_from(&chain, gary)
-            .st_rte_pol(
-                steve,
+            .st_glb_rte(
                 usd,
                 Quantity::new(50),
                 0,

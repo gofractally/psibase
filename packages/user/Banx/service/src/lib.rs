@@ -231,26 +231,26 @@ pub mod tables {
         pub asset_id: u16,
     }
 
-    /// Path routing: **debtor-owned** opt-in to path-draw on `creditor` in a
-    /// **single asset** (no FX). Fees: fixed + percent.
+    /// Path routing fees: fixed + percent, same-asset only (no FX).
     ///
-    /// Currency changes on a path use the previous edge debtor's
-    /// [`CurrencyPolicy`], then this policy for the same-asset forward hop.
+    /// Stored in one table. **`creditor = AccountNumber::new(0)`** means
+    /// **global** for this `(debtor, asset_id)` — applies to any next-hop line.
+    /// A non-zero `creditor` is a per-line override (takes precedence).
     ///
     /// # Alice → Gary (AUD) → Steve (USD)
     ///
     /// 1. Gary: credit line to Alice in AUD.
     /// 2. Alice: currency policy AUD→USD (rebooks Alice→Gary claim).
     /// 3. Steve: credit line to Gary in USD.
-    /// 4. Gary: routing policy toward Steve in **USD** (fees only).
+    /// 4. Gary: global routing in **USD** (`creditor = 0`) or override for Steve.
     #[table(name = "RoutingPolicyTab", index = 1)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct RoutingPolicy {
-        /// Next hop: who the debtor may path-draw on.
+        /// Next hop, or [`Self::GLOBAL_CREDITOR`] (`0`) for all next hops.
         pub creditor: AccountNumber,
-        /// Policy owner: intermediate path-drawing on `creditor`.
+        /// Policy owner: intermediate path-drawing on the next hop.
         pub debtor: AccountNumber,
-        /// Asset of the credit line drawn on `creditor` (same as path asset).
+        /// Asset of the credit line drawn (same as path asset).
         pub asset_id: u16,
 
         /// Flat fee in `asset_id` before percent (0 = none).
@@ -264,6 +264,9 @@ pub mod tables {
     }
 
     impl RoutingPolicy {
+        /// Sentinel `creditor` for a global (any next-hop) policy.
+        pub const GLOBAL_CREDITOR: AccountNumber = AccountNumber::new(0);
+
         #[primary_key]
         fn pk(&self) -> (AccountNumber, AccountNumber, u16) {
             (self.creditor, self.debtor, self.asset_id)
@@ -279,12 +282,8 @@ pub mod tables {
                 .get(&(creditor, debtor, asset_id))
         }
 
-        pub fn get_assert(
-            creditor: AccountNumber,
-            debtor: AccountNumber,
-            asset_id: u16,
-        ) -> Self {
-            Self::get(creditor, debtor, asset_id).expect("RoutingPolicy not found")
+        pub fn is_global(&self) -> bool {
+            self.creditor == Self::GLOBAL_CREDITOR
         }
 
         pub fn upsert(
@@ -304,7 +303,10 @@ pub mod tables {
                 hop_fee_percent <= PPM_SCALE,
                 "hop_fee_percent exceeds 100% (PPM_SCALE)"
             );
-            let _ = CreditLine::get_assert(creditor, debtor, asset_id);
+            // Global: no specific line required at set time. Specific: line must exist.
+            if creditor != Self::GLOBAL_CREDITOR {
+                let _ = CreditLine::get_assert(creditor, debtor, asset_id);
+            }
             Self {
                 creditor,
                 debtor,
@@ -317,19 +319,43 @@ pub mod tables {
             .save();
         }
 
-        /// Path draw: expiry + rate cap + fixed/percent fee → debit line.
-        /// Returns principal drawn in `asset_id`.
-        pub fn path_draw(&self, amount_in: Quantity) -> Quantity {
+        /// Path draw using this policy's fees against a concrete next-hop `creditor`.
+        /// For global rows, pass the hop account (not `GLOBAL_CREDITOR`).
+        pub fn path_draw(&self, next_creditor: AccountNumber, amount_in: Quantity) -> Quantity {
             assert_policy_live(self.expires_at);
-            let line = CreditLine::get_assert(self.creditor, self.debtor, self.asset_id);
+            let creditor = if self.is_global() {
+                next_creditor
+            } else {
+                assert!(
+                    next_creditor == self.creditor,
+                    "routing policy creditor mismatch"
+                );
+                self.creditor
+            };
+            let line = CreditLine::get_assert(creditor, self.debtor, self.asset_id);
             assert!(
                 line.interest_rate <= self.max_accept_rate,
                 "next hop interest rate exceeds routing max_accept_rate"
             );
             let draw = apply_hop_fee(amount_in, self.hop_fee_fixed, self.hop_fee_percent);
-            CreditLine::debit(self.creditor, self.debtor, self.asset_id, draw);
+            CreditLine::debit(creditor, self.debtor, self.asset_id, draw);
             draw
         }
+    }
+
+    /// Specific `(creditor, debtor, asset)` policy, else global `(0, debtor, asset)`.
+    pub fn resolve_routing(
+        next_creditor: AccountNumber,
+        debtor: AccountNumber,
+        asset_id: u16,
+    ) -> RoutingPolicy {
+        if let Some(p) = RoutingPolicy::get(next_creditor, debtor, asset_id) {
+            return p;
+        }
+        if let Some(g) = RoutingPolicy::get(RoutingPolicy::GLOBAL_CREDITOR, debtor, asset_id) {
+            return g;
+        }
+        panic!("RoutingPolicy not found (no specific or global for this asset)");
     }
 
     /// Debtor-posted quote: re-denominate **any** claim against this debtor
@@ -1024,8 +1050,8 @@ pub mod tables {
 #[psibase::service(name = "banx", tables = "tables")]
 pub mod service {
     use crate::tables::{
-        emit_pair_activity, Asset, CreditLine, CurrencyPolicy, InitRow, InitTable, Obligation,
-        PathHop, RoutingPolicy,
+        emit_pair_activity, resolve_routing, Asset, CreditLine, CurrencyPolicy, InitRow, InitTable,
+        Obligation, PathHop, RoutingPolicy,
     };
     use psibase::{
         services::events,
@@ -1122,12 +1148,11 @@ pub mod service {
         );
     }
 
-    /// Sender (path intermediate) opts into same-asset path-drawing on `creditor`.
+    /// Sender (path intermediate) opts into same-asset path-drawing on a
+    /// **specific** `creditor` (overrides global for that pair).
     ///
     /// Requires a credit line in `asset_id` from `creditor` to sender.
-    /// Pricing: `out = (in - hop_fee_fixed) * (1 - hop_fee_percent)`.
-    /// FX lives only on [`CurrencyPolicy`] (and is applied in `path_pay` on
-    /// currency changes).
+    /// Prefer [`st_glb_rte`] unless you need per-creditor fees.
     #[action]
     fn st_rte_pol(
         creditor: AccountNumber,
@@ -1137,8 +1162,36 @@ pub mod service {
         max_accept_rate: u32,
         expires_at: TimePointSec,
     ) {
+        assert!(
+            creditor != RoutingPolicy::GLOBAL_CREDITOR,
+            "use st_glb_rte for global routing (creditor 0)"
+        );
         RoutingPolicy::upsert(
             creditor,
+            get_sender(),
+            asset_id,
+            hop_fee_fixed,
+            hop_fee_percent,
+            max_accept_rate,
+            expires_at,
+        );
+    }
+
+    /// Sender sets **global** routing for this asset (`creditor = 0` row).
+    /// Applies to any next-hop that has extended them a credit line.
+    ///
+    /// Pricing: `out = (in - hop_fee_fixed) * (1 - hop_fee_percent)`.
+    /// Specific [`st_rte_pol`] entries still win when present.
+    #[action]
+    fn st_glb_rte(
+        asset_id: u16,
+        hop_fee_fixed: Quantity,
+        hop_fee_percent: u32,
+        max_accept_rate: u32,
+        expires_at: TimePointSec,
+    ) {
+        RoutingPolicy::upsert(
+            RoutingPolicy::GLOBAL_CREDITOR,
             get_sender(),
             asset_id,
             hop_fee_fixed,
@@ -1291,9 +1344,9 @@ pub mod service {
                 forward = cpol.convert(prev_edge_creditor, forward, Quantity::new(0));
             }
 
-            // Same-asset forward hop via routing policy.
-            let rpol = RoutingPolicy::get_assert(next_creditor, path_debtor, asset_id);
-            forward = rpol.path_draw(forward);
+            // Same-asset forward hop: specific routing, else global (creditor 0).
+            let rpol = resolve_routing(next_creditor, path_debtor, asset_id);
+            forward = rpol.path_draw(next_creditor, forward);
             prev_edge_debtor = path_debtor;
             prev_edge_creditor = next_creditor;
             path_debtor = next_creditor;

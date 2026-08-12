@@ -39,6 +39,7 @@ define_trust! {
         Medium => [
             set_credit_line,
             set_routing_policy,
+            set_global_routing_policy,
             set_currency_policy,
             deposit,
             net,
@@ -130,6 +131,26 @@ impl Api for BanxPlugin {
         }
         .packed();
         add_action_to_transaction(banx::action_structs::st_rte_pol::ACTION_NAME, &packed)
+    }
+
+    fn set_global_routing_policy(
+        asset_id: u16,
+        hop_fee_fixed: String,
+        hop_fee_percent_ppm: u32,
+        max_accept_rate_ppm: u32,
+        expires_at_seconds: u32,
+    ) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::set_global_routing_policy)?;
+        let hop_fee_fixed = parse_amount(asset_id, &hop_fee_fixed)?;
+        let packed = banx::action_structs::st_glb_rte {
+            asset_id,
+            hop_fee_fixed,
+            hop_fee_percent: hop_fee_percent_ppm,
+            max_accept_rate: max_accept_rate_ppm,
+            expires_at: time_point(expires_at_seconds),
+        }
+        .packed();
+        add_action_to_transaction(banx::action_structs::st_glb_rte::ACTION_NAME, &packed)
     }
 
     fn set_currency_policy(

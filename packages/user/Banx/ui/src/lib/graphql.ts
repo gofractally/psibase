@@ -41,6 +41,7 @@ const zRoutingPolicy = z.object({
     hopFeePercentPpm: z.number(),
     maxAcceptRatePpm: z.number(),
     expiresAt: z.number(),
+    isGlobal: z.boolean(),
 });
 
 const zCurrencyPolicy = z.object({
@@ -104,7 +105,7 @@ export async function fetchRoutingPolicies(
 ): Promise<RoutingPolicy[]> {
     const data = await gql<{ routingPolicies: RoutingPolicy[] }>(
         `{ routingPolicies(debtor: "${account}") {
-            creditor debtor assetId hopFeeFixed hopFeePercentPpm maxAcceptRatePpm expiresAt
+            creditor debtor assetId hopFeeFixed hopFeePercentPpm maxAcceptRatePpm expiresAt isGlobal
         } }`,
     );
     return zRoutingPolicy.array().parse(data.routingPolicies);

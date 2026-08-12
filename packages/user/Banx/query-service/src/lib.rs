@@ -99,6 +99,7 @@ mod service {
 
     #[derive(SimpleObject, Clone)]
     struct RoutingPolicyView {
+        /// Empty string when global (`creditor == 0`).
         creditor: String,
         debtor: String,
         assetId: u16,
@@ -106,18 +107,25 @@ mod service {
         hopFeePercentPpm: u32,
         maxAcceptRatePpm: u32,
         expiresAt: i64,
+        isGlobal: bool,
     }
 
     impl From<RoutingPolicy> for RoutingPolicyView {
         fn from(p: RoutingPolicy) -> Self {
+            let is_global = p.is_global();
             Self {
-                creditor: acct(p.creditor),
+                creditor: if is_global {
+                    String::new()
+                } else {
+                    acct(p.creditor)
+                },
                 debtor: acct(p.debtor),
                 assetId: p.asset_id,
                 hopFeeFixed: qty(p.hop_fee_fixed),
                 hopFeePercentPpm: p.hop_fee_percent,
                 maxAcceptRatePpm: p.max_accept_rate,
                 expiresAt: time_sec(p.expires_at),
+                isGlobal: is_global,
             }
         }
     }
@@ -247,7 +255,8 @@ mod service {
             qty(Obligation::exposure(creditor, debtor, assetId))
         }
 
-        /// Routing policies owned by `debtor` (path intermediate).
+        /// Routing policies owned by `debtor`. Includes global rows (`isGlobal`)
+        /// and per-creditor overrides.
         async fn routingPolicies(&self, debtor: AccountNumber) -> Vec<RoutingPolicyView> {
             RoutingPolicyTab::with_service(banx::SERVICE)
                 .get_index_pk()

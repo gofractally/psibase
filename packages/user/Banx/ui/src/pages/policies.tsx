@@ -10,6 +10,7 @@ import {
 import {
     useConvert,
     useSetCurrencyPolicy,
+    useSetGlobalRoutingPolicy,
     useSetRoutingPolicy,
 } from "@/hooks/use-banx-mutations";
 import { formatRawAmount } from "@/lib/amount";
@@ -31,17 +32,23 @@ export function PoliciesPage() {
     const { assets, symbolOf, precisionOf } = useAssetMap();
     const { data: routing = [] } = useRoutingPolicies();
     const { data: currency = [] } = useCurrencyPolicies();
+    const setGlobalRouting = useSetGlobalRoutingPolicy();
     const setRouting = useSetRoutingPolicy();
     const setCurrency = useSetCurrencyPolicy();
     const convert = useConvert();
 
-    // Routing form (same-asset)
-    const [rCreditor, setRCreditor] = useState("");
+    const globalRouting = routing.filter((p) => p.isGlobal);
+    const specificRouting = routing.filter((p) => !p.isGlobal);
+
+    // Global routing form (same-asset, any next hop)
     const [rAsset, setRAsset] = useState<number | undefined>();
     const [rFee, setRFee] = useState("0");
     const [rFeePct, setRFeePct] = useState("0");
     const [rMaxPct, setRMaxPct] = useState("100");
     const [rExp, setRExp] = useState("0");
+
+    // Optional per-creditor override
+    const [rCreditor, setRCreditor] = useState("");
 
     // Currency form
     const [cFrom, setCFrom] = useState<number | undefined>();
@@ -62,7 +69,7 @@ export function PoliciesPage() {
         <div className="space-y-10">
             <PageHeader
                 title="Policies"
-                description="Routing is same-asset only (fixed + percent hop fee). Currency changes on path pay use currency policies (FX). Prefer short expiry for FX quotes. RATE_SCALE = 1e6 = 1:1."
+                description="Global routing applies to every credit line in an asset (stored as creditor = 0). Optional per-creditor overrides. Currency policies handle FX. RATE_SCALE = 1e6 = 1:1."
             />
 
             <section className="grid gap-8 lg:grid-cols-2">
@@ -70,9 +77,8 @@ export function PoliciesPage() {
                     className="grid gap-3 rounded-lg border p-4"
                     onSubmit={(e) => {
                         e.preventDefault();
-                        if (rAsset === undefined || !rCreditor) return;
-                        setRouting.mutate({
-                            creditor: rCreditor.trim(),
+                        if (rAsset === undefined) return;
+                        const fees = {
                             assetId: rAsset,
                             hopFeeFixed: rFee.trim(),
                             hopFeePercentPpm: Math.round(
@@ -82,21 +88,29 @@ export function PoliciesPage() {
                                 Number(rMaxPct) * 10_000,
                             ),
                             expiresAtSeconds: Number(rExp),
-                        });
+                        };
+                        if (rCreditor.trim()) {
+                            setRouting.mutate({
+                                creditor: rCreditor.trim(),
+                                ...fees,
+                            });
+                        } else {
+                            setGlobalRouting.mutate(fees);
+                        }
                     }}
                 >
                     <h2 className="font-medium">Set routing policy</h2>
                     <p className="text-muted-foreground text-xs">
-                        You are the intermediate (debtor). Creditor is the next
-                        hop you may path-draw on — same asset only. FX is not
-                        configured here.
+                        Leave next-hop blank for a <strong>global</strong>{" "}
+                        policy (all lines in this asset). Fill next-hop for a
+                        per-creditor override. Same asset only — no FX here.
                     </p>
                     <div className="grid gap-2">
-                        <Label>Next-hop creditor</Label>
+                        <Label>Next-hop creditor (optional)</Label>
                         <Input
                             value={rCreditor}
                             onChange={(e) => setRCreditor(e.target.value)}
-                            required
+                            placeholder="empty = global"
                         />
                     </div>
                     <div className="grid gap-2">
@@ -147,8 +161,15 @@ export function PoliciesPage() {
                             />
                         </div>
                     </div>
-                    <Button type="submit" disabled={setRouting.isPending}>
-                        Save routing policy
+                    <Button
+                        type="submit"
+                        disabled={
+                            setGlobalRouting.isPending || setRouting.isPending
+                        }
+                    >
+                        {rCreditor.trim()
+                            ? "Save override"
+                            : "Save global routing"}
                     </Button>
                 </form>
 
@@ -304,8 +325,8 @@ export function PoliciesPage() {
                 </form>
             </section>
 
-            <section>
-                <h2 className="mb-2 font-medium">Your routing policies</h2>
+            <section className="space-y-4">
+                <h2 className="font-medium">Your routing policies</h2>
                 {routing.length === 0 ? (
                     <p className="text-muted-foreground text-sm">None</p>
                 ) : (
@@ -313,7 +334,7 @@ export function PoliciesPage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Creditor</TableHead>
+                                    <TableHead>Scope</TableHead>
                                     <TableHead>Asset</TableHead>
                                     <TableHead className="text-right">
                                         Fixed fee
@@ -327,28 +348,38 @@ export function PoliciesPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {routing.map((p) => (
-                                    <TableRow
-                                        key={`${p.creditor}-${p.assetId}`}
-                                    >
-                                        <TableCell>{p.creditor}</TableCell>
-                                        <TableCell>
-                                            {symbolOf(p.assetId)}
-                                        </TableCell>
-                                        <TableCell className="text-right font-mono">
-                                            {formatRawAmount(
-                                                p.hopFeeFixed,
-                                                precisionOf(p.assetId),
-                                            )}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            {ppmToPercent(p.hopFeePercentPpm)}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            {ppmToPercent(p.maxAcceptRatePpm)}
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
+                                {[...globalRouting, ...specificRouting].map(
+                                    (p) => (
+                                        <TableRow
+                                            key={`${p.isGlobal ? "g" : p.creditor}-${p.assetId}`}
+                                        >
+                                            <TableCell>
+                                                {p.isGlobal
+                                                    ? "Global (any line)"
+                                                    : p.creditor}
+                                            </TableCell>
+                                            <TableCell>
+                                                {symbolOf(p.assetId)}
+                                            </TableCell>
+                                            <TableCell className="text-right font-mono">
+                                                {formatRawAmount(
+                                                    p.hopFeeFixed,
+                                                    precisionOf(p.assetId),
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                {ppmToPercent(
+                                                    p.hopFeePercentPpm,
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                {ppmToPercent(
+                                                    p.maxAcceptRatePpm,
+                                                )}
+                                            </TableCell>
+                                        </TableRow>
+                                    ),
+                                )}
                             </TableBody>
                         </Table>
                     </div>
