@@ -1,3 +1,5 @@
+import { useEffect, useMemo } from "react";
+
 import type { Asset } from "@/lib/graphql";
 
 import {
@@ -7,6 +9,13 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@shared/shadcn/ui/select";
+
+/** Prefer USD; otherwise first listed asset. */
+export function defaultAssetId(assets: Asset[]): number | undefined {
+    if (assets.length === 0) return undefined;
+    const usd = assets.find((a) => a.symbol.toLowerCase() === "usd");
+    return (usd ?? assets[0]).id;
+}
 
 export function AssetSelect({
     assets,
@@ -19,9 +28,20 @@ export function AssetSelect({
     onChange: (id: number) => void;
     placeholder?: string;
 }) {
+    const fallbackId = useMemo(() => defaultAssetId(assets), [assets]);
+    // Always show a concrete selection when we can (avoids blank Radix Select).
+    const effectiveId = value ?? fallbackId;
+
+    useEffect(() => {
+        if (value !== undefined || fallbackId === undefined) return;
+        onChange(fallbackId);
+    }, [value, fallbackId, onChange]);
+
     return (
         <Select
-            value={value !== undefined ? String(value) : undefined}
+            value={
+                effectiveId !== undefined ? String(effectiveId) : undefined
+            }
             onValueChange={(v) => onChange(Number(v))}
         >
             <SelectTrigger>
@@ -30,10 +50,7 @@ export function AssetSelect({
             <SelectContent>
                 {assets.map((a) => (
                     <SelectItem key={a.id} value={String(a.id)}>
-                        {a.symbol.toUpperCase()}{" "}
-                        <span className="text-muted-foreground">
-                            (id {a.id}, {a.precision} dp)
-                        </span>
+                        {a.symbol.toUpperCase()}
                     </SelectItem>
                 ))}
             </SelectContent>

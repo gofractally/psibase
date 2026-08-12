@@ -17,8 +17,6 @@ Mutual-credit ledger: credit lines, deposits (auto-net), multi-hop path payments
 
 - `/obligations` — **Accounts** (first nav item): savings-style claims you hold + loan-style liabilities you owe
 - `/` — dashboard (exposure snapshot)
-- `/credit-lines` — list + offer lines
-- `/deposit` — book deposit as receiver
 - `/path-pay` — multi-hop draw
 - `/policies` — routing + currency policies + convert
 - `/assets` — registered assets

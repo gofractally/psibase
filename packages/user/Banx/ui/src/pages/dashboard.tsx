@@ -65,12 +65,6 @@ export function Dashboard() {
                     <Link to="/obligations">Accounts</Link>
                 </Button>
                 <Button asChild variant="outline">
-                    <Link to="/credit-lines">Credit lines</Link>
-                </Button>
-                <Button asChild variant="outline">
-                    <Link to="/deposit">Deposit</Link>
-                </Button>
-                <Button asChild variant="outline">
                     <Link to="/path-pay">Path pay</Link>
                 </Button>
                 <Button asChild variant="outline">

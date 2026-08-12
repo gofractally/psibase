@@ -3,9 +3,7 @@ import {
     Coins,
     GitBranch,
     Home,
-    Landmark,
     ScrollText,
-    Wallet,
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
@@ -25,8 +23,6 @@ const items: {
 }[] = [
     { to: "/obligations", label: "Accounts", icon: ScrollText },
     { to: "/", label: "Dashboard", icon: Home, end: true },
-    { to: "/credit-lines", label: "Credit lines", icon: Landmark },
-    { to: "/deposit", label: "Deposit", icon: Wallet },
     { to: "/path-pay", label: "Path pay", icon: GitBranch },
     { to: "/policies", label: "Policies", icon: ArrowLeftRight },
     { to: "/assets", label: "Assets", icon: Coins },

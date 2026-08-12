@@ -1,6 +1,9 @@
 import { useState } from "react";
 
-import { AssetSelect } from "@/components/asset-select";
+import {
+    AssetSelect,
+    defaultAssetId,
+} from "@/components/asset-select";
 import { PageHeader } from "@/components/page-header";
 import { useAssetMap } from "@/hooks/use-assets";
 import { usePathPay } from "@/hooks/use-banx-mutations";
@@ -26,6 +29,20 @@ export function PathPayPage() {
         setHops((prev) =>
             prev.map((h, idx) => (idx === i ? { ...h, ...patch } : h)),
         );
+    };
+
+    const addHop = () => {
+        setHops((h) => {
+            const prevAsset = h[h.length - 1]?.assetId;
+            return [
+                ...h,
+                {
+                    account: "",
+                    // Carry previous hop's asset, else USD default.
+                    assetId: prevAsset ?? defaultAssetId(assets),
+                },
+            ];
+        });
     };
 
     const onSubmit = (e: React.FormEvent) => {
@@ -89,16 +106,7 @@ export function PathPayPage() {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() =>
-                            setHops((h) => [
-                                ...h,
-                                { account: "", assetId: undefined },
-                            ])
-                        }
-                    >
+                    <Button type="button" variant="outline" onClick={addHop}>
                         Add hop
                     </Button>
                     {hops.length > 1 ? (

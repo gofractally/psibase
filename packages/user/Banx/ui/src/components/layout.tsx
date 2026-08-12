@@ -19,9 +19,7 @@ import {
 
 const titles: Record<string, string> = {
     "/": "Dashboard",
-    "/credit-lines": "Credit lines",
     "/obligations": "Accounts",
-    "/deposit": "Deposit",
     "/path-pay": "Path pay",
     "/policies": "Policies",
     "/assets": "Assets",
