@@ -5,11 +5,15 @@ Playwright end-to-end tests for psibase. The suite runs against Chromium only.
 ## Prerequisites
 
 Build psibase (or point the environment variables below at an unpacked psidk
-tree). Install browser binaries once:
+tree). Install Chromium for the Playwright version pinned in `package.json`
+(`@playwright/test`) once:
 
 ```bash
-yarn playwright install chromium
+yarn exec playwright install chromium
 ```
+
+Without Chromium, `ctest -R e2e` skips the suite (exit code 77) rather than
+failing the build.
 
 ## Environment variables
 
