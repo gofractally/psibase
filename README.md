@@ -74,6 +74,8 @@ Other notes:
 
 > 🔍 You can reference either the [Ubuntu 22.04 dockerfile](https://github.com/gofractally/image-builders/blob/main/docker/ubuntu-2204-builder.Dockerfile) or the [Ubuntu 24.04 dockerfile](https://github.com/gofractally/image-builders/blob/main/docker/ubuntu-2404-builder.Dockerfile) for an example on how an environment could be set up.
 
+> 🌐 An optional browser-based E2E suite lives in [`e2e/`](e2e/). It requires Playwright browser binaries; see [`e2e/README.md`](e2e/README.md) for install steps. You do not need them to build psibase: without Chromium installed, `ctest` reports the suite as **skipped**, not failed.
+
 ### Build
 
 After your environment is set up, then you should be able to use the following build instructions:
