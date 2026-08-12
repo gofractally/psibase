@@ -128,20 +128,18 @@ export function useSetRoutingPolicy() {
     return useMutation({
         mutationFn: async (p: {
             creditor: string;
-            inAsset: number;
-            outAsset: number;
+            assetId: number;
             hopFeeFixed: string;
+            hopFeePercentPpm: number;
             maxAcceptRatePpm: number;
-            fxRate: number;
             expiresAtSeconds: number;
         }) =>
             banxCall("setRoutingPolicy", [
                 p.creditor,
-                p.inAsset,
-                p.outAsset,
+                p.assetId,
                 p.hopFeeFixed,
+                p.hopFeePercentPpm,
                 p.maxAcceptRatePpm,
-                p.fxRate,
                 p.expiresAtSeconds,
             ]),
         onSuccess: () => {

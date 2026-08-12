@@ -35,13 +35,12 @@ export function PoliciesPage() {
     const setCurrency = useSetCurrencyPolicy();
     const convert = useConvert();
 
-    // Routing form
+    // Routing form (same-asset)
     const [rCreditor, setRCreditor] = useState("");
-    const [rIn, setRIn] = useState<number | undefined>();
-    const [rOut, setROut] = useState<number | undefined>();
+    const [rAsset, setRAsset] = useState<number | undefined>();
     const [rFee, setRFee] = useState("0");
+    const [rFeePct, setRFeePct] = useState("0");
     const [rMaxPct, setRMaxPct] = useState("100");
-    const [rFx, setRFx] = useState(String(RATE_SCALE));
     const [rExp, setRExp] = useState("0");
 
     // Currency form
@@ -63,7 +62,7 @@ export function PoliciesPage() {
         <div className="space-y-10">
             <PageHeader
                 title="Policies"
-                description="Routing policies enable multi-hop path pay. Currency policies let debtors re-denominate claims (FX). Prefer short expiry for FX quotes. fx_rate uses RATE_SCALE (1e6 = 1:1)."
+                description="Routing is same-asset only (fixed + percent hop fee). Currency changes on path pay use currency policies (FX). Prefer short expiry for FX quotes. RATE_SCALE = 1e6 = 1:1."
             />
 
             <section className="grid gap-8 lg:grid-cols-2">
@@ -71,17 +70,17 @@ export function PoliciesPage() {
                     className="grid gap-3 rounded-lg border p-4"
                     onSubmit={(e) => {
                         e.preventDefault();
-                        if (rIn === undefined || rOut === undefined || !rCreditor)
-                            return;
+                        if (rAsset === undefined || !rCreditor) return;
                         setRouting.mutate({
                             creditor: rCreditor.trim(),
-                            inAsset: rIn,
-                            outAsset: rOut,
+                            assetId: rAsset,
                             hopFeeFixed: rFee.trim(),
+                            hopFeePercentPpm: Math.round(
+                                Number(rFeePct) * 10_000,
+                            ),
                             maxAcceptRatePpm: Math.round(
                                 Number(rMaxPct) * 10_000,
                             ),
-                            fxRate: Number(rFx),
                             expiresAtSeconds: Number(rExp),
                         });
                     }}
@@ -89,7 +88,8 @@ export function PoliciesPage() {
                     <h2 className="font-medium">Set routing policy</h2>
                     <p className="text-muted-foreground text-xs">
                         You are the intermediate (debtor). Creditor is the next
-                        hop you may path-draw on.
+                        hop you may path-draw on — same asset only. FX is not
+                        configured here.
                     </p>
                     <div className="grid gap-2">
                         <Label>Next-hop creditor</Label>
@@ -99,27 +99,17 @@ export function PoliciesPage() {
                             required
                         />
                     </div>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                        <div className="grid gap-2">
-                            <Label>In asset</Label>
-                            <AssetSelect
-                                assets={assets}
-                                value={rIn}
-                                onChange={setRIn}
-                            />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label>Out asset</Label>
-                            <AssetSelect
-                                assets={assets}
-                                value={rOut}
-                                onChange={setROut}
-                            />
-                        </div>
+                    <div className="grid gap-2">
+                        <Label>Asset</Label>
+                        <AssetSelect
+                            assets={assets}
+                            value={rAsset}
+                            onChange={setRAsset}
+                        />
                     </div>
                     <div className="grid gap-2 sm:grid-cols-2">
                         <div className="grid gap-2">
-                            <Label>Hop fee (in-asset decimal)</Label>
+                            <Label>Hop fee fixed (decimal)</Label>
                             <Input
                                 inputMode="decimal"
                                 value={rFee}
@@ -127,23 +117,24 @@ export function PoliciesPage() {
                             />
                         </div>
                         <div className="grid gap-2">
+                            <Label>Hop fee %</Label>
+                            <Input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                value={rFeePct}
+                                onChange={(e) => setRFeePct(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                        <div className="grid gap-2">
                             <Label>Max accept APR %</Label>
                             <Input
                                 type="number"
                                 min={0}
                                 value={rMaxPct}
                                 onChange={(e) => setRMaxPct(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                        <div className="grid gap-2">
-                            <Label>FX / take rate (scale {RATE_SCALE})</Label>
-                            <Input
-                                type="number"
-                                min={1}
-                                value={rFx}
-                                onChange={(e) => setRFx(e.target.value)}
                             />
                         </div>
                         <div className="grid gap-2">
@@ -323,12 +314,12 @@ export function PoliciesPage() {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Creditor</TableHead>
-                                    <TableHead>In → Out</TableHead>
+                                    <TableHead>Asset</TableHead>
                                     <TableHead className="text-right">
-                                        Fee
+                                        Fixed fee
                                     </TableHead>
                                     <TableHead className="text-right">
-                                        FX
+                                        Fee %
                                     </TableHead>
                                     <TableHead className="text-right">
                                         Max APR
@@ -338,21 +329,20 @@ export function PoliciesPage() {
                             <TableBody>
                                 {routing.map((p) => (
                                     <TableRow
-                                        key={`${p.creditor}-${p.inAsset}-${p.outAsset}`}
+                                        key={`${p.creditor}-${p.assetId}`}
                                     >
                                         <TableCell>{p.creditor}</TableCell>
                                         <TableCell>
-                                            {symbolOf(p.inAsset)} →{" "}
-                                            {symbolOf(p.outAsset)}
+                                            {symbolOf(p.assetId)}
                                         </TableCell>
                                         <TableCell className="text-right font-mono">
                                             {formatRawAmount(
                                                 p.hopFeeFixed,
-                                                precisionOf(p.inAsset),
+                                                precisionOf(p.assetId),
                                             )}
                                         </TableCell>
-                                        <TableCell className="text-right font-mono">
-                                            {p.fxRate}
+                                        <TableCell className="text-right">
+                                            {ppmToPercent(p.hopFeePercentPpm)}
                                         </TableCell>
                                         <TableCell className="text-right">
                                             {ppmToPercent(p.maxAcceptRatePpm)}

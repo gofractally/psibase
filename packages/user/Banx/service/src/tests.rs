@@ -130,10 +130,9 @@ mod tests {
             .st_rte_pol(
                 steve,
                 usd,
-                usd,
                 Quantity::new(0),
+                (PPM_SCALE * 2 / 100),
                 PPM_SCALE,
-                RATE_SCALE * 98 / 100,
                 never(),
             )
             .get()?;
@@ -173,14 +172,25 @@ mod tests {
             .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0)
             .get()?;
 
-        Wrapper::push_from(&chain, gary)
-            .st_rte_pol(
-                steve,
+        // Alice posts FX quote for her debts AUD→USD (0.70).
+        Wrapper::push_from(&chain, alice)
+            .st_cur_pol(
                 aud,
                 usd,
                 Quantity::new(0),
-                PPM_SCALE,
                 RATE_SCALE * 70 / 100,
+                0,
+                never(),
+            )
+            .get()?;
+        // Gary routes same-asset USD to Steve (no fee).
+        Wrapper::push_from(&chain, gary)
+            .st_rte_pol(
+                steve,
+                usd,
+                Quantity::new(0),
+                0,
+                PPM_SCALE,
                 never(),
             )
             .get()?;
@@ -193,7 +203,9 @@ mod tests {
             )
             .get()?;
 
-        assert_eq!(Obligation::exposure(gary, alice, aud).value, 1_000);
+        // After implied convert, Alice owes Gary USD (not AUD).
+        assert_eq!(Obligation::exposure(gary, alice, aud).value, 0);
+        assert_eq!(Obligation::exposure(gary, alice, usd).value, 700);
         assert_eq!(Obligation::exposure(steve, gary, usd).value, 700);
 
         Ok(())
@@ -243,49 +255,57 @@ mod tests {
             .st_crd_lne(mike, usd, limit, false, 0)
             .get()?;
 
-        // --- Routing (debtor-owned outbound) ---
-        // Mitchell → John, AUD→AUD at 0.95
+        // --- Routing (same-asset fees) ---
+        // Mitchell → John, AUD, 5% hop fee
         Wrapper::push_from(&chain, mitchell)
             .st_rte_pol(
                 john,
                 aud,
-                aud,
                 Quantity::new(0),
+                PPM_SCALE * 5 / 100,
                 PPM_SCALE,
-                RATE_SCALE * 95 / 100,
                 never(),
             )
             .get()?;
-        // John → Mike, AUD→USD at 0.65 (currency hop)
+        // John → Mike, USD (after convert), no fee
         Wrapper::push_from(&chain, john)
             .st_rte_pol(
                 mike,
-                aud,
                 usd,
                 Quantity::new(0),
+                0,
                 PPM_SCALE,
-                RATE_SCALE * 65 / 100,
                 never(),
             )
             .get()?;
-        // Mike → Brandon, USD→USD, 1% take (fx_rate = 99%)
+        // Mike → Brandon, USD, 1% hop fee
         Wrapper::push_from(&chain, mike)
             .st_rte_pol(
                 brandon,
                 usd,
+                Quantity::new(0),
+                PPM_SCALE * 1 / 100,
+                PPM_SCALE,
+                never(),
+            )
+            .get()?;
+        // Mitchell posts convert AUD→USD at 0.65 (applied when path hits USD hop)
+        Wrapper::push_from(&chain, mitchell)
+            .st_cur_pol(
+                aud,
                 usd,
                 Quantity::new(0),
-                PPM_SCALE,
-                RATE_SCALE * 99 / 100,
+                RATE_SCALE * 65 / 100,
+                0,
                 never(),
             )
             .get()?;
 
         // 10_000 AUD:
         //   Zac owes Mitchell 10_000 AUD
-        //   Mitchell owes John  9_500 AUD  (×0.95)
-        //   John owes Mike      6_175 USD  (×0.65)
-        //   Mike owes Brandon   6_113 USD  (×0.99)
+        //   Mitchell owes John  9_500 AUD  (5% fee) then convert → 6_175 USD
+        //   John owes Mike      6_175 USD
+        //   Mike owes Brandon   6_113 USD  (1% fee)
         let min_brandon = Quantity::new(6_113);
 
         Wrapper::push_from(&chain, zac)
@@ -307,27 +327,31 @@ mod tests {
             10_000,
             "Zac owes Mitchell 10000 AUD"
         );
+        // Mitchell→John claim converted to USD
         assert_eq!(
             Obligation::exposure(john, mitchell, aud).value,
-            9_500,
-            "Mitchell owes John 9500 AUD after 0.95 rate"
+            0,
+            "Mitchell→John AUD cleared by convert"
         );
-        // USD book
+        assert_eq!(
+            Obligation::exposure(john, mitchell, usd).value,
+            6_175,
+            "Mitchell owes John 6175 USD after convert"
+        );
+        // USD path
         assert_eq!(
             Obligation::exposure(mike, john, usd).value,
             6_175,
-            "John owes Mike 6175 USD after FX"
+            "John owes Mike 6175 USD"
         );
         assert_eq!(
             Obligation::exposure(brandon, mike, usd).value,
             6_113,
-            "Mike owes Brandon 6113 USD after 1% take"
+            "Mike owes Brandon 6113 USD after 1% fee"
         );
 
-        // No cross-currency leakage on wrong pairs
         assert_eq!(Obligation::exposure(mike, john, aud).value, 0);
         assert_eq!(Obligation::exposure(brandon, mike, aud).value, 0);
-        assert_eq!(Obligation::exposure(john, mitchell, usd).value, 0);
 
         Ok(())
     }
@@ -369,21 +393,19 @@ mod tests {
             .st_rte_pol(
                 john,
                 aud,
-                aud,
                 Quantity::new(0),
+                PPM_SCALE * 5 / 100,
                 PPM_SCALE,
-                RATE_SCALE * 95 / 100,
                 never(),
             )
             .get()?;
         Wrapper::push_from(&chain, john)
             .st_rte_pol(
                 mike,
-                aud,
                 usd,
                 Quantity::new(0),
+                0,
                 PPM_SCALE,
-                RATE_SCALE * 65 / 100,
                 never(),
             )
             .get()?;
@@ -391,10 +413,19 @@ mod tests {
             .st_rte_pol(
                 brandon,
                 usd,
+                Quantity::new(0),
+                PPM_SCALE * 1 / 100,
+                PPM_SCALE,
+                never(),
+            )
+            .get()?;
+        Wrapper::push_from(&chain, mitchell)
+            .st_cur_pol(
+                aud,
                 usd,
                 Quantity::new(0),
-                PPM_SCALE,
-                RATE_SCALE * 99 / 100,
+                RATE_SCALE * 65 / 100,
+                0,
                 never(),
             )
             .get()?;
@@ -515,10 +546,9 @@ mod tests {
             .st_rte_pol(
                 steve,
                 usd,
-                usd,
                 Quantity::new(50),
+                0,
                 PPM_SCALE,
-                RATE_SCALE,
                 never(),
             )
             .get()?;

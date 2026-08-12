@@ -48,7 +48,7 @@ export function PathPayPage() {
         <div>
             <PageHeader
                 title="Path pay"
-                description="Draw along a hop list. First hop uses a credit line only; later hops need the intermediate's routing policy. Amounts are human decimals for the first/last hop assets."
+                description="Draw along a hop list. First hop uses a credit line only; later same-asset hops need routing (fixed + % fee). If hop asset changes, path_pay auto-converts the previous claim via the edge debtor's currency policy, then routes. Amounts are human decimals for first/last hop assets."
             />
 
             <form

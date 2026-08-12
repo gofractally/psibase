@@ -36,11 +36,10 @@ const zObligation = z.object({
 const zRoutingPolicy = z.object({
     creditor: z.string(),
     debtor: z.string(),
-    inAsset: z.number(),
-    outAsset: z.number(),
+    assetId: z.number(),
     hopFeeFixed: z.string(),
+    hopFeePercentPpm: z.number(),
     maxAcceptRatePpm: z.number(),
-    fxRate: z.string(),
     expiresAt: z.number(),
 });
 
@@ -105,7 +104,7 @@ export async function fetchRoutingPolicies(
 ): Promise<RoutingPolicy[]> {
     const data = await gql<{ routingPolicies: RoutingPolicy[] }>(
         `{ routingPolicies(debtor: "${account}") {
-            creditor debtor inAsset outAsset hopFeeFixed maxAcceptRatePpm fxRate expiresAt
+            creditor debtor assetId hopFeeFixed hopFeePercentPpm maxAcceptRatePpm expiresAt
         } }`,
     );
     return zRoutingPolicy.array().parse(data.routingPolicies);

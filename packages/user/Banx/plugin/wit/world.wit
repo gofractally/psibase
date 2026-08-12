@@ -34,15 +34,15 @@ interface api {
         interest-rate-ppm: u32,
     ) -> result<_, error>;
 
-    /// Intermediate posts a path-routing policy toward `creditor`.
-    /// Fee is a human decimal in **in-asset** units.
+    /// Intermediate posts a same-asset path-routing policy toward `creditor`.
+    /// `hop-fee-fixed` is a human decimal in `asset-id` units.
+    /// `hop-fee-percent-ppm` is a percent fee in ppm (`10_000` = 1%).
     set-routing-policy: func(
         creditor: string,
-        in-asset: u16,
-        out-asset: u16,
+        asset-id: u16,
         hop-fee-fixed: string,
+        hop-fee-percent-ppm: u32,
         max-accept-rate-ppm: u32,
-        fx-rate: u64,
         expires-at-seconds: u32,
     ) -> result<_, error>;
 

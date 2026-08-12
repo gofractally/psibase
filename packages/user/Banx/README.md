@@ -2,6 +2,8 @@
 
 Mutual-credit ledger: credit lines, deposits (auto-net), multi-hop path payments, and debtor-posted FX/rebook policies. There is no local cash balance — value is obligations between accounts.
 
+**Routing** is same-asset only (fixed + percent hop fee). **Currency changes on `path_pay`** auto-apply the previous edge debtor's **currency policy** (convert), then continue with same-asset routing.
+
 ## Architecture
 
 | Layer | Role |

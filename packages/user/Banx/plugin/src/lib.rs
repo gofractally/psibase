@@ -112,22 +112,20 @@ impl Api for BanxPlugin {
 
     fn set_routing_policy(
         creditor: String,
-        in_asset: u16,
-        out_asset: u16,
+        asset_id: u16,
         hop_fee_fixed: String,
+        hop_fee_percent_ppm: u32,
         max_accept_rate_ppm: u32,
-        fx_rate: u64,
         expires_at_seconds: u32,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::set_routing_policy)?;
-        let hop_fee_fixed = parse_amount(in_asset, &hop_fee_fixed)?;
+        let hop_fee_fixed = parse_amount(asset_id, &hop_fee_fixed)?;
         let packed = banx::action_structs::st_rte_pol {
             creditor: parse_account(&creditor)?,
-            in_asset,
-            out_asset,
+            asset_id,
             hop_fee_fixed,
+            hop_fee_percent: hop_fee_percent_ppm,
             max_accept_rate: max_accept_rate_ppm,
-            fx_rate,
             expires_at: time_point(expires_at_seconds),
         }
         .packed();

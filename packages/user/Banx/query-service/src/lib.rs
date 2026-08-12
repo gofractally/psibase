@@ -101,11 +101,10 @@ mod service {
     struct RoutingPolicyView {
         creditor: String,
         debtor: String,
-        inAsset: u16,
-        outAsset: u16,
+        assetId: u16,
         hopFeeFixed: String,
+        hopFeePercentPpm: u32,
         maxAcceptRatePpm: u32,
-        fxRate: String,
         expiresAt: i64,
     }
 
@@ -114,11 +113,10 @@ mod service {
             Self {
                 creditor: acct(p.creditor),
                 debtor: acct(p.debtor),
-                inAsset: p.in_asset,
-                outAsset: p.out_asset,
+                assetId: p.asset_id,
                 hopFeeFixed: qty(p.hop_fee_fixed),
+                hopFeePercentPpm: p.hop_fee_percent,
                 maxAcceptRatePpm: p.max_accept_rate,
-                fxRate: p.fx_rate.to_string(),
                 expiresAt: time_sec(p.expires_at),
             }
         }

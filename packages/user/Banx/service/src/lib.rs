@@ -201,9 +201,28 @@ pub mod tables {
         out.into()
     }
 
+    /// Same-asset hop fee: `out = (in - fixed) * (PPM_SCALE - percent_ppm) / PPM_SCALE`.
+    fn apply_hop_fee(amount_in: Quantity, fee_fixed: Quantity, fee_percent_ppm: u32) -> Quantity {
+        assert!(
+            fee_percent_ppm <= PPM_SCALE,
+            "hop_fee_percent exceeds 100% (PPM_SCALE)"
+        );
+        assert!(fee_fixed < amount_in, "fixed hop fee consumes entire amount");
+        let after_fixed = amount_in - fee_fixed;
+        let keep_ppm = (PPM_SCALE - fee_percent_ppm) as u128;
+        let out = (after_fixed.value as u128)
+            .checked_mul(keep_ppm)
+            .expect("hop fee overflow")
+            / (PPM_SCALE as u128);
+        let out = u64::try_from(out).expect("hop fee out exceeds u64");
+        assert!(out > 0, "hop fee reduced amount to zero");
+        out.into()
+    }
+
     /// One hop in [`service::path_pay`]: draw on `account` in `asset_id`.
     ///
-    /// Example: `[(Gary, AUD), (Steve, USD)]`.
+    /// Example: `[(Gary, AUD), (Steve, USD)]` — currency change implies convert
+    /// on the previous edge via [`CurrencyPolicy`], then same-asset routing.
     #[derive(
         Default, Copy, Clone, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug,
     )]
@@ -212,19 +231,18 @@ pub mod tables {
         pub asset_id: u16,
     }
 
-    /// Path routing: **debtor-owned** opt-in to path-draw on `creditor` for
-    /// `in_asset` → `out_asset` (may be equal).
+    /// Path routing: **debtor-owned** opt-in to path-draw on `creditor` in a
+    /// **single asset** (no FX). Fees: fixed + percent.
+    ///
+    /// Currency changes on a path use the previous edge debtor's
+    /// [`CurrencyPolicy`], then this policy for the same-asset forward hop.
     ///
     /// # Alice → Gary (AUD) → Steve (USD)
     ///
     /// 1. Gary: credit line to Alice in AUD.
-    /// 2. Steve: credit line to Gary in USD.
-    /// 3. Gary: this policy (`creditor=Steve`, `in=AUD`, `out=USD`, fee/`fx_rate`).
-    ///
-    /// `path_pay([(Gary, AUD), (Steve, USD)], amount_aud, min_return_usd)`.
-    ///
-    /// Same-asset hops use `in_asset == out_asset`. For rebooking existing debt
-    /// without a path, use [`CurrencyPolicy`].
+    /// 2. Alice: currency policy AUD→USD (rebooks Alice→Gary claim).
+    /// 3. Steve: credit line to Gary in USD.
+    /// 4. Gary: routing policy toward Steve in **USD** (fees only).
     #[table(name = "RoutingPolicyTab", index = 1)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct RoutingPolicy {
@@ -232,91 +250,84 @@ pub mod tables {
         pub creditor: AccountNumber,
         /// Policy owner: intermediate path-drawing on `creditor`.
         pub debtor: AccountNumber,
-        /// Asset of the inbound path amount (prior leg).
-        pub in_asset: u16,
-        /// Asset of the credit line drawn on `creditor`.
-        pub out_asset: u16,
+        /// Asset of the credit line drawn on `creditor` (same as path asset).
+        pub asset_id: u16,
 
-        /// Flat fee in **in_asset** before rate (0 = none).
+        /// Flat fee in `asset_id` before percent (0 = none).
         pub hop_fee_fixed: Quantity,
-        /// Max interest rate (ppm APR) on the **out_asset** line.
+        /// Percent fee in ppm of amount after fixed (`10_000` = 1%).
+        pub hop_fee_percent: u32,
+        /// Max interest rate (ppm APR) on the line being drawn.
         pub max_accept_rate: u32,
-        /// `out = (in - fixed) * fx_rate / RATE_SCALE`.
-        pub fx_rate: u64,
-        /// Absolute expiry (`seconds == 0` → never). Prefer short TTL for FX.
+        /// Absolute expiry (`seconds == 0` → never).
         pub expires_at: TimePointSec,
     }
 
     impl RoutingPolicy {
         #[primary_key]
-        fn pk(&self) -> (AccountNumber, AccountNumber, u16, u16) {
-            (self.creditor, self.debtor, self.in_asset, self.out_asset)
+        fn pk(&self) -> (AccountNumber, AccountNumber, u16) {
+            (self.creditor, self.debtor, self.asset_id)
         }
 
         fn save(&self) {
             RoutingPolicyTab::read_write().put(self).unwrap();
         }
 
-        fn get(
-            creditor: AccountNumber,
-            debtor: AccountNumber,
-            in_asset: u16,
-            out_asset: u16,
-        ) -> Option<Self> {
+        fn get(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) -> Option<Self> {
             RoutingPolicyTab::read()
                 .get_index_pk()
-                .get(&(creditor, debtor, in_asset, out_asset))
+                .get(&(creditor, debtor, asset_id))
         }
 
         pub fn get_assert(
             creditor: AccountNumber,
             debtor: AccountNumber,
-            in_asset: u16,
-            out_asset: u16,
+            asset_id: u16,
         ) -> Self {
-            Self::get(creditor, debtor, in_asset, out_asset).expect("RoutingPolicy not found")
+            Self::get(creditor, debtor, asset_id).expect("RoutingPolicy not found")
         }
 
         pub fn upsert(
             creditor: AccountNumber,
             debtor: AccountNumber,
-            in_asset: u16,
-            out_asset: u16,
+            asset_id: u16,
             hop_fee_fixed: Quantity,
+            hop_fee_percent: u32,
             max_accept_rate: u32,
-            fx_rate: u64,
             expires_at: TimePointSec,
         ) {
             assert!(
                 max_accept_rate <= PPM_SCALE,
                 "max_accept_rate exceeds 100% (PPM_SCALE)"
             );
-            assert!(fx_rate > 0, "fx_rate must be positive");
-            let _ = CreditLine::get_assert(creditor, debtor, out_asset);
+            assert!(
+                hop_fee_percent <= PPM_SCALE,
+                "hop_fee_percent exceeds 100% (PPM_SCALE)"
+            );
+            let _ = CreditLine::get_assert(creditor, debtor, asset_id);
             Self {
                 creditor,
                 debtor,
-                in_asset,
-                out_asset,
+                asset_id,
                 hop_fee_fixed,
+                hop_fee_percent,
                 max_accept_rate,
-                fx_rate,
                 expires_at,
             }
             .save();
         }
 
-        /// Path draw: expiry + rate cap + fixed fee + FX/take → debit **out** line.
-        /// Returns principal drawn in **out_asset**.
+        /// Path draw: expiry + rate cap + fixed/percent fee → debit line.
+        /// Returns principal drawn in `asset_id`.
         pub fn path_draw(&self, amount_in: Quantity) -> Quantity {
             assert_policy_live(self.expires_at);
-            let line = CreditLine::get_assert(self.creditor, self.debtor, self.out_asset);
+            let line = CreditLine::get_assert(self.creditor, self.debtor, self.asset_id);
             assert!(
                 line.interest_rate <= self.max_accept_rate,
                 "next hop interest rate exceeds routing max_accept_rate"
             );
-            let draw = apply_rate(amount_in, self.hop_fee_fixed, self.fx_rate);
-            CreditLine::debit(self.creditor, self.debtor, self.out_asset, draw);
+            let draw = apply_hop_fee(amount_in, self.hop_fee_fixed, self.hop_fee_percent);
+            CreditLine::debit(self.creditor, self.debtor, self.asset_id, draw);
             draw
         }
     }
@@ -328,7 +339,8 @@ pub mod tables {
     /// obligations in `from_asset`. Convert names the **creditor** whose claim
     /// is rebooked.
     ///
-    /// Multi-currency flow: same-asset `path_pay` → `convert` → `path_pay`.
+    /// Also used **inside** `path_pay` when consecutive hops change asset:
+    /// the previous edge is rebooked before the next same-asset routing hop.
     /// Prefer short `expires_at` for FX-sensitive pairs.
     #[table(name = "CurrencyPolicyTab", index = 4)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
@@ -428,6 +440,15 @@ pub mod tables {
                 self.to_interest_rate,
                 to_qty,
             );
+            emit_pair_activity(
+                creditor,
+                self.debtor,
+                self.from_asset,
+                "convert",
+                Quantity::new(take),
+                to_qty,
+                self.to_asset,
+            );
             to_qty
         }
     }
@@ -441,10 +462,10 @@ pub mod tables {
     ///   ([`Self::credit`]), interest ([`Self::accrue`]), and pair exposure.
     /// - **CreditLine** gates *draws* (limit / deplete / line rate) then calls
     ///   into obligation credit — used by every `path_pay` leg.
-    /// - **RoutingPolicy** (debtor-owned) gates path hops after the first,
-    ///   including optional asset change (see [`RoutingPolicy`]).
-    /// - **CurrencyPolicy** (debtor-posted) re-denominates existing debt
-    ///   without a path (see [`CurrencyPolicy`]).
+    /// - **RoutingPolicy** (debtor-owned) gates **same-asset** path hops after
+    ///   the first (fixed + percent fee; no FX).
+    /// - **CurrencyPolicy** (debtor-posted) re-denominates existing debt and is
+    ///   applied automatically in `path_pay` on currency changes.
     /// - **deposit** credits an obligation with no line check (receiver books a
     ///   liability to the depositor).
     ///
@@ -1101,29 +1122,28 @@ pub mod service {
         );
     }
 
-    /// Sender (path intermediate) opts into path-drawing on `creditor` for
-    /// `in_asset` → `out_asset` (same ids = same-currency hop).
+    /// Sender (path intermediate) opts into same-asset path-drawing on `creditor`.
     ///
-    /// Requires a credit line in **out_asset** from `creditor` to sender.
-    /// Pricing: `out = (in - hop_fee_fixed) * fx_rate / RATE_SCALE`.
+    /// Requires a credit line in `asset_id` from `creditor` to sender.
+    /// Pricing: `out = (in - hop_fee_fixed) * (1 - hop_fee_percent)`.
+    /// FX lives only on [`CurrencyPolicy`] (and is applied in `path_pay` on
+    /// currency changes).
     #[action]
     fn st_rte_pol(
         creditor: AccountNumber,
-        in_asset: u16,
-        out_asset: u16,
+        asset_id: u16,
         hop_fee_fixed: Quantity,
+        hop_fee_percent: u32,
         max_accept_rate: u32,
-        fx_rate: u64,
         expires_at: TimePointSec,
     ) {
         RoutingPolicy::upsert(
             creditor,
             get_sender(),
-            in_asset,
-            out_asset,
+            asset_id,
             hop_fee_fixed,
+            hop_fee_percent,
             max_accept_rate,
-            fx_rate,
             expires_at,
         );
     }
@@ -1178,17 +1198,7 @@ pub mod service {
         };
 
         let policy = CurrencyPolicy::get_assert(debtor, from_asset, to_asset);
-        let to_qty = policy.convert(creditor, amount_from, min_to);
-        // History on from-asset view; `netted` holds output units, `other_asset_id` is to_asset.
-        emit_pair_activity(
-            creditor,
-            debtor,
-            from_asset,
-            "convert",
-            amount_from,
-            to_qty,
-            to_asset,
-        );
+        policy.convert(creditor, amount_from, min_to);
     }
 
     /// Book a **deposit**: sender receives value and credits `depositor`, then
@@ -1238,48 +1248,56 @@ pub mod service {
     ///
     /// `path_pay([(Gary, AUD), (Steve, USD)], amount_aud, min_return_usd)`:
     /// 1. **First hop** — sender draws `amount` on Gary in **AUD** (line only).
-    /// 2. **Later hops** — intermediate's [`RoutingPolicy`] for
-    ///    `(next, self, in=prior asset, out=hop.asset)`: fee, FX/take, rate
-    ///    cap, expiry; draw on next in **out** asset.
-    /// 3. **`min_return`** — final hop principal (in **last** asset) ≥ this.
+    /// 2. **Currency change** — rebook previous edge (sender owes Gary AUD) via
+    ///    sender's [`CurrencyPolicy`] AUD→USD.
+    /// 3. **Later hops** — intermediate's same-asset [`RoutingPolicy`] toward
+    ///    next (fixed + percent fee, max accept rate); draw on next line.
+    /// 4. **`min_return`** — final hop principal (in **last** asset) ≥ this.
     ///
-    /// Atomic: all legs succeed or none stick. Terminal payee holds a claim on
-    /// the previous hop (not necessarily on the sender).
+    /// Atomic: all legs succeed or none stick.
     ///
-    /// Each hop **auto-nets** that pair/asset after the draw (via
-    /// [`CreditLine::debit`]), so reverse exposure is settled in-line.
-    ///
-    /// Standalone rebook of existing debt (no path): [`convert`] /
-    /// [`CurrencyPolicy`].
+    /// Each draw **auto-nets** that pair/asset (via [`CreditLine::debit`]).
     #[action]
     fn path_pay(hops: Vec<PathHop>, amount: Quantity, min_return: Quantity) {
         assert!(!hops.is_empty(), "path_pay must include at least one hop");
         assert!(amount.value > 0, "path_pay amount must be positive");
 
-        let mut debtor = get_sender();
+        let mut path_debtor = get_sender();
         let mut forward = amount;
-        let mut in_asset = hops[0].asset_id;
+        let mut prev_edge_debtor = get_sender();
+        let mut prev_edge_creditor = get_sender(); // overwritten after hop 0
+        let mut prev_asset = hops[0].asset_id;
 
         for (i, hop) in hops.into_iter().enumerate() {
             let PathHop {
-                account: creditor,
-                asset_id: out_asset,
+                account: next_creditor,
+                asset_id,
             } = hop;
-            assert!(creditor != debtor, "path_pay cannot draw on self");
+            assert!(next_creditor != path_debtor, "path_pay cannot draw on self");
 
             if i == 0 {
-                assert!(
-                    out_asset == in_asset,
-                    "first hop asset must match path start asset"
-                );
-                CreditLine::debit(creditor, debtor, out_asset, forward);
-            } else {
-                let policy = RoutingPolicy::get_assert(creditor, debtor, in_asset, out_asset);
-                forward = policy.path_draw(forward);
-                in_asset = out_asset;
+                CreditLine::debit(next_creditor, path_debtor, asset_id, forward);
+                prev_edge_debtor = path_debtor;
+                prev_edge_creditor = next_creditor;
+                prev_asset = asset_id;
+                path_debtor = next_creditor;
+                continue;
             }
 
-            debtor = creditor;
+            // Currency change ⇒ convert previous edge (debtor-owned FX quote).
+            if asset_id != prev_asset {
+                let cpol =
+                    CurrencyPolicy::get_assert(prev_edge_debtor, prev_asset, asset_id);
+                forward = cpol.convert(prev_edge_creditor, forward, Quantity::new(0));
+            }
+
+            // Same-asset forward hop via routing policy.
+            let rpol = RoutingPolicy::get_assert(next_creditor, path_debtor, asset_id);
+            forward = rpol.path_draw(forward);
+            prev_edge_debtor = path_debtor;
+            prev_edge_creditor = next_creditor;
+            path_debtor = next_creditor;
+            prev_asset = asset_id;
         }
 
         assert!(
