@@ -30,10 +30,17 @@ The TCP port on which the server listens. The server must be restarted for a cha
 
 See [Logging](x-admin/http-endpoints.md#logging) for a list of the available logger types and their parameters.
 
-### Accept all incoming P2P connections
+### Incoming connection policy
 
-If enabled, the node accepts incoming P2P connections from any peer. If disabled, incoming connections are accepted only from accounts listed under [Allowed peers](#allowed-peers). With the option disabled and an empty allow list, no incoming P2P connections are accepted.
+The `p2p` config option (`--p2p`). Also editable on the Peers page under Settings. Chooses who may open a P2P connection to this node:
+
+- **Accept all incoming P2P connections** — any peer may connect (`p2p` enabled).
+- **Accept incoming P2P connections from whitelisted accounts only** — only accounts listed under [Allowed peers](#allowed-peers) may connect (`p2p` disabled). With an empty allow list, no incoming P2P connections are accepted.
+
+## Peering
+
+Peer connections and the incoming allow list are managed on the Peers page (and via [x-peers](x-peers.md)).
 
 ### Allowed peers
 
-A whitelist of on-chain accounts that may open an incoming P2P connection when [Accept all incoming P2P connections](#accept-all-incoming-p2p-connections) is disabled. The list has no effect while that option is enabled, because all incoming peers are already accepted.
+A whitelist of on-chain accounts that may open an incoming P2P connection when [Incoming connection policy](#incoming-connection-policy) is set to accept whitelisted accounts only. The list is unused while the policy accepts all incoming connections. It is stored by [x-peers](x-peers.md) and is not part of the server config file.
