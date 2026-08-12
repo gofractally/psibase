@@ -1,6 +1,5 @@
 import {
     Clipboard,
-    Info,
     MoreHorizontal,
     Plus,
     Trash,
@@ -26,7 +25,6 @@ import {
 import { EmptyBlock } from "@shared/components/empty-block";
 import { zAccount } from "@shared/lib/schemas/account";
 import { cn } from "@shared/lib/utils";
-import { Alert, AlertDescription, AlertTitle } from "@shared/shadcn/ui/alert";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Dialog,
@@ -46,7 +44,7 @@ import {
 } from "@shared/shadcn/ui/dropdown-menu";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
-import { Switch } from "@shared/shadcn/ui/switch";
+import { RadioGroup, RadioGroupItem } from "@shared/shadcn/ui/radio-group";
 import {
     Table,
     TableBody,
@@ -54,6 +52,12 @@ import {
     TableHeader,
     TableRow,
 } from "@shared/shadcn/ui/table";
+import {
+    Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
+} from "@shared/shadcn/ui/tabs";
 
 import { useConfig, useConfigUpdate } from "../hooks/use-config";
 import {
@@ -293,8 +297,8 @@ export const PeersPage = () => {
                         <DialogHeader>
                             <DialogTitle>Add allowed peer</DialogTitle>
                             <DialogDescription>
-                                Allow an on-chain account to peer with this
-                                node when "Accept all incoming P2P connections" is disabled.
+                                Allow an on-chain account to open an incoming
+                                P2P connection to this node.
                             </DialogDescription>
                         </DialogHeader>
                         <div className="grid gap-2 py-4">
@@ -326,198 +330,232 @@ export const PeersPage = () => {
                 </DialogContent>
             </Dialog>
 
-            <div className="my-6 flex items-center space-x-2">
-                <Switch
-                    checked={p2pEnabled}
-                    disabled={isUpdatingConfig || config === undefined}
-                    onCheckedChange={onP2pChange}
-                />
-                <Label>Accept all incoming P2P connections</Label>
-            </div>
-
-            <div className="flex items-center justify-between py-2">
-                <h3 className="text-lg font-semibold tracking-tight">
-                    Connections
-                </h3>
-                {combinedPeers.length !== 0 && (
-                    <Button
-                        variant="outline"
-                        onClick={() => setShowModalConnection(true)}
-                    >
-                        <Plus size={20} />
-                    </Button>
-                )}
-            </div>
-            {combinedPeers.length == 0 ? (
-                <EmptyBlock
-                    buttonLabel="Add Connection"
-                    onButtonClick={() => setShowModalConnection(true)}
-                    title="No connections"
-                    description="No existing connections to other nodes."
-                />
-            ) : (
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>URL</TableHead>
-                            <TableHead>Address</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Status</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {combinedPeers.map((peer) => (
-                            <TableRow key={peer.id}>
-                                <TableHead>
-                                    <span className={cn({ italic: !peer.url })}>
-                                        {peer.url ?? "Unknown"}
-                                    </span>
-                                </TableHead>
-                                <TableHead>{peer.endpoint}</TableHead>
-                                <TableHead>
-                                    <Status state={peer.state} />
-                                </TableHead>
-                                <TableHead>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button
-                                                variant="ghost"
-                                                className="my-auto h-full w-8 p-0"
-                                            >
-                                                <span className="sr-only">
-                                                    Open menu
-                                                </span>
-                                                <MoreHorizontal className="h-8 w-8" />
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end">
-                                            <DropdownMenuLabel>
-                                                Actions
-                                            </DropdownMenuLabel>
-                                            <DropdownMenuItem
-                                                onClick={() => {
-                                                    navigator.clipboard.writeText(
-                                                        peer.url ||
-                                                            peer.endpoint,
-                                                    );
-                                                }}
-                                            >
-                                                <Clipboard className="mr-2 h-4 w-4" />
-                                                <span>Copy URL</span>
-                                            </DropdownMenuItem>
-                                            <DropdownMenuSeparator />
-                                            {peer.state == "transient" && (
-                                                <DropdownMenuItem
-                                                    onClick={() =>
-                                                        disconnectPeer(peer.id)
-                                                    }
-                                                >
-                                                    <Unplug className="mr-2 h-4 w-4" />
-                                                    <span>Disconnect</span>
-                                                </DropdownMenuItem>
-                                            )}
-                                            {peer.state !== "transient" && (
-                                                <DropdownMenuItem
-                                                    onClick={() =>
-                                                        removePeer(peer.id)
-                                                    }
-                                                >
-                                                    <Trash className="mr-2 h-4 w-4" />
-                                                    <span>Remove</span>
-                                                </DropdownMenuItem>
-                                            )}
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </TableHead>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            )}
-            {configPeersError && <div>{configPeersError}</div>}
-
-            <div className="relative mt-10">
-                <div
-                    className={cn(
-                        "transition-all",
-                        p2pEnabled &&
-                            "pointer-events-none select-none opacity-40 blur-[1px]",
-                    )}
-                >
+            <Tabs defaultValue="connections" className="px-2">
+                <TabsList>
+                    <TabsTrigger value="connections">Connections</TabsTrigger>
+                    <TabsTrigger value="settings">Settings</TabsTrigger>
+                </TabsList>
+                <TabsContent value="connections">
                     <div className="flex items-center justify-between py-2">
-                        <div>
-                            <h3 className="text-lg font-semibold tracking-tight">
-                                Allowed peers
-                            </h3>
-                            <p className="text-muted-foreground text-sm">
-                                Accounts allowed to peer with this node when "Accept all
-                                incoming P2P connections" is disabled.
-                            </p>
-                        </div>
-                        {peerUsers.length !== 0 && (
+                        <div />
+                        {combinedPeers.length !== 0 && (
                             <Button
                                 variant="outline"
-                                onClick={() => setShowAddPeerUser(true)}
+                                onClick={() => setShowModalConnection(true)}
                             >
                                 <Plus size={20} />
                             </Button>
                         )}
                     </div>
-                    {peerUsers.length === 0 ? (
+                    {combinedPeers.length == 0 ? (
                         <EmptyBlock
-                            buttonLabel="Add allowed peer"
-                            onButtonClick={() => setShowAddPeerUser(true)}
-                            title="No allowed peers"
-                            description="Add an account to allow it to peer with this node."
+                            buttonLabel="Add Connection"
+                            onButtonClick={() => setShowModalConnection(true)}
+                            title="No connections"
+                            description="No existing connections to other nodes."
                         />
                     ) : (
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Account</TableHead>
-                                    <TableHead className="w-12" />
+                                    <TableHead>URL</TableHead>
+                                    <TableHead>Address</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Status</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {peerUsers.map((account) => (
-                                    <TableRow key={account}>
-                                        <TableHead>{account}</TableHead>
+                                {combinedPeers.map((peer) => (
+                                    <TableRow key={peer.id}>
                                         <TableHead>
-                                            <Button
-                                                variant="ghost"
-                                                className="h-8 w-8 p-0"
-                                                disabled={isUpdatingPeerUser}
-                                                onClick={() =>
-                                                    onRemovePeerUser(account)
-                                                }
+                                            <span
+                                                className={cn({
+                                                    italic: !peer.url,
+                                                })}
                                             >
-                                                <span className="sr-only">
-                                                    Remove {account}
-                                                </span>
-                                                <Trash className="h-4 w-4" />
-                                            </Button>
+                                                {peer.url ?? "Unknown"}
+                                            </span>
+                                        </TableHead>
+                                        <TableHead>{peer.endpoint}</TableHead>
+                                        <TableHead>
+                                            <Status state={peer.state} />
+                                        </TableHead>
+                                        <TableHead>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button
+                                                        variant="ghost"
+                                                        className="my-auto h-full w-8 p-0"
+                                                    >
+                                                        <span className="sr-only">
+                                                            Open menu
+                                                        </span>
+                                                        <MoreHorizontal className="h-8 w-8" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuLabel>
+                                                        Actions
+                                                    </DropdownMenuLabel>
+                                                    <DropdownMenuItem
+                                                        onClick={() => {
+                                                            navigator.clipboard.writeText(
+                                                                peer.url ||
+                                                                    peer.endpoint,
+                                                            );
+                                                        }}
+                                                    >
+                                                        <Clipboard className="mr-2 h-4 w-4" />
+                                                        <span>Copy URL</span>
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuSeparator />
+                                                    {peer.state ==
+                                                        "transient" && (
+                                                        <DropdownMenuItem
+                                                            onClick={() =>
+                                                                disconnectPeer(
+                                                                    peer.id,
+                                                                )
+                                                            }
+                                                        >
+                                                            <Unplug className="mr-2 h-4 w-4" />
+                                                            <span>
+                                                                Disconnect
+                                                            </span>
+                                                        </DropdownMenuItem>
+                                                    )}
+                                                    {peer.state !==
+                                                        "transient" && (
+                                                        <DropdownMenuItem
+                                                            onClick={() =>
+                                                                removePeer(
+                                                                    peer.id,
+                                                                )
+                                                            }
+                                                        >
+                                                            <Trash className="mr-2 h-4 w-4" />
+                                                            <span>Remove</span>
+                                                        </DropdownMenuItem>
+                                                    )}
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                         </TableHead>
                                     </TableRow>
                                 ))}
                             </TableBody>
                         </Table>
                     )}
-                </div>
-
-                {p2pEnabled && (
-                    <div className="absolute inset-0 flex items-center justify-center p-4">
-                        <Alert className="bg-background max-w-md shadow-sm">
-                            <Info />
-                            <AlertTitle>Whitelist disabled</AlertTitle>
-                            <AlertDescription>
-                                Open P2P is accepting all incoming peers. Turn
-                                off &quot;Accept all incoming P2P connections&quot;
-                                above to use the allowed-peers whitelist.
-                            </AlertDescription>
-                        </Alert>
+                    {configPeersError && <div>{configPeersError}</div>}
+                </TabsContent>
+                <TabsContent value="settings">
+                    <div className="py-2">
+                        <h3 className="text-lg font-semibold tracking-tight">
+                            Incoming connection policy
+                        </h3>
+                        <p className="text-muted-foreground text-sm">
+                            Choose who may open a P2P connection to this node.
+                        </p>
                     </div>
-                )}
-            </div>
+                    <RadioGroup
+                        className="mb-6 mt-3 gap-3"
+                        value={p2pEnabled ? "all" : "whitelist"}
+                        disabled={isUpdatingConfig || config === undefined}
+                        onValueChange={(value) =>
+                            onP2pChange(value === "all")
+                        }
+                    >
+                        <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="all" id="p2p-all" />
+                            <Label htmlFor="p2p-all">
+                                Accept all incoming P2P connections
+                            </Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <RadioGroupItem
+                                value="whitelist"
+                                id="p2p-whitelist"
+                            />
+                            <Label htmlFor="p2p-whitelist">
+                                Accept incoming P2P connections from
+                                whitelisted accounts only
+                            </Label>
+                        </div>
+                    </RadioGroup>
+
+                    {!p2pEnabled && (
+                        <div>
+                            <div className="flex items-center justify-between py-2">
+                                <div>
+                                    <h3 className="text-lg font-semibold tracking-tight">
+                                        Allowed peers whitelist
+                                    </h3>
+                                    <p className="text-muted-foreground text-sm">
+                                        On-chain accounts allowed to open an
+                                        incoming P2P connection to this node.
+                                    </p>
+                                </div>
+                                {peerUsers.length !== 0 && (
+                                    <Button
+                                        variant="outline"
+                                        onClick={() =>
+                                            setShowAddPeerUser(true)
+                                        }
+                                    >
+                                        <Plus size={20} />
+                                    </Button>
+                                )}
+                            </div>
+                            {peerUsers.length === 0 ? (
+                                <EmptyBlock
+                                    buttonLabel="Add allowed peer"
+                                    onButtonClick={() =>
+                                        setShowAddPeerUser(true)
+                                    }
+                                    title="No allowed peers"
+                                    description="Add an account to allow it to peer with this node."
+                                />
+                            ) : (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Account</TableHead>
+                                            <TableHead className="w-12" />
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {peerUsers.map((account) => (
+                                            <TableRow key={account}>
+                                                <TableHead>
+                                                    {account}
+                                                </TableHead>
+                                                <TableHead>
+                                                    <Button
+                                                        variant="ghost"
+                                                        className="h-8 w-8 p-0"
+                                                        disabled={
+                                                            isUpdatingPeerUser
+                                                        }
+                                                        onClick={() =>
+                                                            onRemovePeerUser(
+                                                                account,
+                                                            )
+                                                        }
+                                                    >
+                                                        <span className="sr-only">
+                                                            Remove {account}
+                                                        </span>
+                                                        <Trash className="h-4 w-4" />
+                                                    </Button>
+                                                </TableHead>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            )}
+                        </div>
+                    )}
+                </TabsContent>
+            </Tabs>
         </>
     );
 };
