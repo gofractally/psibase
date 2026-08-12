@@ -13,8 +13,8 @@ import {
     useSetGlobalRoutingPolicy,
     useSetRoutingPolicy,
 } from "@/hooks/use-banx-mutations";
-import { formatRawAmount } from "@/lib/amount";
-import { ppmToPercent, RATE_SCALE } from "@/lib/constants";
+import { formatFxToRate, formatRawAmount } from "@/lib/amount";
+import { ppmToPercent } from "@/lib/constants";
 
 import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
@@ -54,7 +54,8 @@ export function PoliciesPage() {
     const [cFrom, setCFrom] = useState<number | undefined>();
     const [cTo, setCTo] = useState<number | undefined>();
     const [cFee, setCFee] = useState("0");
-    const [cFx, setCFx] = useState(String(RATE_SCALE));
+    /** To-asset units per 1 from-asset unit (e.g. 0.45 → $1 → $0.45). */
+    const [cToRate, setCToRate] = useState("1");
     const [cApr, setCApr] = useState("0");
     const [cExp, setCExp] = useState("0");
 
@@ -69,7 +70,7 @@ export function PoliciesPage() {
         <div className="space-y-10">
             <PageHeader
                 title="Policies"
-                description="Global routing applies to every credit line in an asset (stored as creditor = 0). Optional per-creditor overrides. Currency policies handle FX. RATE_SCALE = 1e6 = 1:1."
+                description="Global routing applies to every credit line in an asset (stored as creditor = 0). Optional per-creditor overrides. Currency policies handle FX (enter how many to-units you get per 1 from-unit)."
             />
 
             <section className="grid gap-8 lg:grid-cols-2">
@@ -182,7 +183,7 @@ export function PoliciesPage() {
                             fromAsset: cFrom,
                             toAsset: cTo,
                             feeFixed: cFee.trim(),
-                            fxRate: Number(cFx),
+                            toRate: cToRate.trim(),
                             toInterestRatePpm: Math.round(
                                 Number(cApr) * 10_000,
                             ),
@@ -193,7 +194,8 @@ export function PoliciesPage() {
                     <h2 className="font-medium">Set currency policy</h2>
                     <p className="text-muted-foreground text-xs">
                         You are the debtor posting a convert quote for all
-                        holders of your from-asset obligations.
+                        holders of your from-asset obligations. Rate is to-units
+                        per 1 from-unit (e.g. 0.45 means $1 → $0.45).
                     </p>
                     <div className="grid gap-2 sm:grid-cols-2">
                         <div className="grid gap-2">
@@ -223,13 +225,19 @@ export function PoliciesPage() {
                             />
                         </div>
                         <div className="grid gap-2">
-                            <Label>FX rate (scale {RATE_SCALE})</Label>
+                            <Label>Rate (to per 1 from)</Label>
                             <Input
-                                type="number"
-                                min={1}
-                                value={cFx}
-                                onChange={(e) => setCFx(e.target.value)}
+                                inputMode="decimal"
+                                value={cToRate}
+                                onChange={(e) => setCToRate(e.target.value)}
+                                placeholder="0.45"
                             />
+                            {cFrom !== undefined && cTo !== undefined && (
+                                <p className="text-muted-foreground text-xs font-mono">
+                                    1 {symbolOf(cFrom)} → {cToRate || "?"}{" "}
+                                    {symbolOf(cTo)}
+                                </p>
+                            )}
                         </div>
                     </div>
                     <div className="grid gap-2 sm:grid-cols-2">
@@ -400,7 +408,7 @@ export function PoliciesPage() {
                                         Fee
                                     </TableHead>
                                     <TableHead className="text-right">
-                                        FX
+                                        Rate (to per 1 from)
                                     </TableHead>
                                     <TableHead className="text-right">
                                         To APR
@@ -423,7 +431,12 @@ export function PoliciesPage() {
                                             )}
                                         </TableCell>
                                         <TableCell className="text-right font-mono">
-                                            {p.fxRate}
+                                            1 →{" "}
+                                            {formatFxToRate(
+                                                p.fxRate,
+                                                precisionOf(p.fromAsset),
+                                                precisionOf(p.toAsset),
+                                            )}
                                         </TableCell>
                                         <TableCell className="text-right">
                                             {ppmToPercent(p.toInterestRatePpm)}

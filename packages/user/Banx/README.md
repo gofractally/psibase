@@ -20,7 +20,7 @@ Mutual-credit ledger: credit lines, deposits (auto-net), multi-hop path payments
 - `/policies` — routing + currency policies + convert
 - `/assets` — registered assets
 
-Amounts in the UI are **human decimals** (e.g. `"1.45"`). The Banx plugin looks up asset precision via GraphQL and converts with `Quantity::from_str`. Helpers: `helpers.decimalToQuantity` / `helpers.quantityToDecimal`. APR is entered as percent and stored as ppm (`10_000` ppm = 1%). FX/`fx_rate` uses `RATE_SCALE` (`1_000_000` = 1:1).
+Amounts in the UI are **human decimals** (e.g. `"1.45"`). The Banx plugin looks up asset precision via GraphQL and converts with `Quantity::from_str`. Helpers: `helpers.decimalToQuantity` / `helpers.quantityToDecimal`. APR is entered as percent and stored as ppm (`10_000` ppm = 1%). Currency policy **to-rate** is human to-units per 1 from-unit (e.g. `"0.45"` → 1 USD → 0.45 CAD); the plugin converts that to chain `fx_rate` (`RATE_SCALE` = `1_000_000` = 1:1 raw units after precision).
 
 ## Build
 

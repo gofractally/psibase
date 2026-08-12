@@ -1,3 +1,5 @@
+import { RATE_SCALE } from "@/lib/constants";
+
 /** Format raw ledger units as a fixed-point decimal using asset precision. */
 export function formatRawAmount(raw: string | number, precision: number): string {
     const value =
@@ -14,6 +16,22 @@ export function formatRawAmount(raw: string | number, precision: number): string
     const trimmed =
         precision > 0 ? body.replace(/(\.\d*?[1-9])0+$/, "$1").replace(/\.0+$/, "") : body;
     return neg ? `-${trimmed}` : trimmed;
+}
+
+/**
+ * Format chain `fx_rate` as human to-asset units per 1 from-asset unit.
+ * Inverse of the plugin's `human_to_fx_rate` (integer division may truncate tiny rates).
+ */
+export function formatFxToRate(
+    fxRate: string | number,
+    fromPrecision: number,
+    toPrecision: number,
+): string {
+    const rate =
+        typeof fxRate === "string" ? BigInt(fxRate || "0") : BigInt(Math.trunc(fxRate));
+    const oneFrom = 10n ** BigInt(fromPrecision);
+    const toRaw = (rate * oneFrom) / BigInt(RATE_SCALE);
+    return formatRawAmount(toRaw.toString(), toPrecision);
 }
 
 /** Placeholder hint for an amount field, e.g. `0.0000` for precision 4. */

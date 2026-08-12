@@ -59,11 +59,14 @@ interface api {
 
     /// Debtor posts a convert quote from `from-asset` → `to-asset`.
     /// Fee is a human decimal in **from-asset** units.
+    /// `to-rate` is how many **to-asset** units you get for 1 full **from-asset**
+    /// unit (e.g. `"0.45"` means 1 from → 0.45 to). The plugin converts this to
+    /// the chain `fx_rate` (RATE_SCALE fixed-point), including asset precisions.
     set-currency-policy: func(
         from-asset: u16,
         to-asset: u16,
         fee-fixed: string,
-        fx-rate: u64,
+        to-rate: string,
         to-interest-rate-ppm: u32,
         expires-at-seconds: u32,
     ) -> result<_, error>;

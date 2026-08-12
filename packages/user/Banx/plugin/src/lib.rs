@@ -78,6 +78,29 @@ fn parse_amount_nonzero(asset_id: u16, amount: &str) -> Result<Quantity, Error> 
     Ok(q)
 }
 
+/// Convert a human "to-asset per 1 from-asset" rate into chain `fx_rate`.
+///
+/// Example: `"0.45"` with USD→CAD means 1 USD → 0.45 CAD.
+/// Chain formula: `to_raw = from_raw * fx_rate / RATE_SCALE`, so
+/// `fx_rate = to_raw(to_rate) * RATE_SCALE / from_raw(1)`.
+fn human_to_fx_rate(from_asset: u16, to_asset: u16, to_rate: &str) -> Result<u64, Error> {
+    let to_for_one_from = parse_amount_nonzero(to_asset, to_rate)?;
+    let one_from = parse_amount_nonzero(from_asset, "1")?;
+    let fx = (to_for_one_from.value as u128)
+        .checked_mul(banx::tables::RATE_SCALE as u128)
+        .ok_or_else(|| ErrorType::ConversionError("fx_rate overflow".into()))?
+        / (one_from.value as u128);
+    let fx = u64::try_from(fx)
+        .map_err(|_| ErrorType::ConversionError("fx_rate exceeds u64".into()))?;
+    if fx == 0 {
+        return Err(ErrorType::ConversionError(
+            "to-rate too small for asset precisions (fx_rate rounds to 0)".into(),
+        )
+        .into());
+    }
+    Ok(fx)
+}
+
 impl Helpers for BanxPlugin {
     fn decimal_to_quantity(asset_id: u16, amount: String) -> Result<u64, Error> {
         Ok(parse_amount(asset_id, &amount)?.value)
@@ -157,12 +180,13 @@ impl Api for BanxPlugin {
         from_asset: u16,
         to_asset: u16,
         fee_fixed: String,
-        fx_rate: u64,
+        to_rate: String,
         to_interest_rate_ppm: u32,
         expires_at_seconds: u32,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::set_currency_policy)?;
         let fee_fixed = parse_amount(from_asset, &fee_fixed)?;
+        let fx_rate = human_to_fx_rate(from_asset, to_asset, &to_rate)?;
         let packed = banx::action_structs::st_cur_pol {
             from_asset,
             to_asset,

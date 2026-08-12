@@ -182,7 +182,8 @@ export function useSetCurrencyPolicy() {
             fromAsset: number;
             toAsset: number;
             feeFixed: string;
-            fxRate: number;
+            /** Human to-asset units per 1 from-asset unit, e.g. `"0.45"`. */
+            toRate: string;
             toInterestRatePpm: number;
             expiresAtSeconds: number;
         }) =>
@@ -190,7 +191,7 @@ export function useSetCurrencyPolicy() {
                 p.fromAsset,
                 p.toAsset,
                 p.feeFixed,
-                p.fxRate,
+                p.toRate,
                 p.toInterestRatePpm,
                 p.expiresAtSeconds,
             ]),
