@@ -54,11 +54,24 @@ const zCurrencyPolicy = z.object({
     expiresAt: z.number(),
 });
 
+const zActivity = z.object({
+    account: z.string(),
+    counterparty: z.string(),
+    assetId: z.number(),
+    kind: z.string(),
+    amount: z.string(),
+    netted: z.string(),
+    otherAssetId: z.number(),
+    actor: z.string(),
+    blockTime: z.string().optional(),
+});
+
 export type Asset = z.infer<typeof zAsset>;
 export type CreditLine = z.infer<typeof zCreditLine>;
 export type Obligation = z.infer<typeof zObligation>;
 export type RoutingPolicy = z.infer<typeof zRoutingPolicy>;
 export type CurrencyPolicy = z.infer<typeof zCurrencyPolicy>;
+export type ActivityEvent = z.infer<typeof zActivity>;
 
 const gql = <T>(query: string) =>
     graphql<T>(query, { service: BANX_SERVICE });
@@ -107,4 +120,60 @@ export async function fetchCurrencyPolicies(
         } }`,
     );
     return zCurrencyPolicy.array().parse(data.currencyPolicies);
+}
+
+export async function fetchActivity(
+    account: string,
+    counterparty: string,
+    assetId: number,
+): Promise<ActivityEvent[]> {
+    const data = await gql<{
+        activity: {
+            edges: {
+                node: {
+                    account: string;
+                    counterparty: string;
+                    assetId: number | string;
+                    kind: string;
+                    amount: string;
+                    netted: string;
+                    otherAssetId: number | string;
+                    actor: string;
+                    block?: { blockTime?: string | null } | null;
+                } | null;
+            }[];
+        };
+    }>(
+        `{ activity(account: "${account}", counterparty: "${counterparty}", assetId: ${assetId}, last: 50) {
+            edges {
+                node {
+                    account
+                    counterparty
+                    assetId
+                    kind
+                    amount
+                    netted
+                    otherAssetId
+                    actor
+                    block { blockTime }
+                }
+            }
+        } }`,
+    );
+    return (data.activity?.edges ?? [])
+        .map((e) => e.node)
+        .filter((n): n is NonNullable<typeof n> => n != null)
+        .map((n) =>
+            zActivity.parse({
+                account: n.account,
+                counterparty: n.counterparty,
+                assetId: Number(n.assetId),
+                kind: n.kind,
+                amount: n.amount,
+                netted: n.netted,
+                otherAssetId: Number(n.otherAssetId),
+                actor: n.actor,
+                blockTime: n.block?.blockTime ?? undefined,
+            }),
+        );
 }

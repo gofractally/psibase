@@ -8,4 +8,9 @@ export const QueryKey = {
         ["banx", "routingPolicies", account ?? ""] as const,
     currencyPolicies: (account: string | null | undefined) =>
         ["banx", "currencyPolicies", account ?? ""] as const,
+    activity: (
+        account: string | null | undefined,
+        counterparty: string,
+        assetId: number,
+    ) => ["banx", "activity", account ?? "", counterparty, assetId] as const,
 };

@@ -784,15 +784,17 @@ pub mod tables {
         /// 1. Credit the reverse obligation (depositor creditor, receiver debtor).
         /// 2. [`net_pair`] with unlimited `max_amount` (interest first, highest
         ///    rate first). Remainder stays one-way if exposures were unequal.
+        ///
+        /// Returns the amount netted away (may be less than `amount`).
         pub fn deposit(
             depositor: AccountNumber,
             receiver: AccountNumber,
             asset_id: u16,
             amount: Quantity,
             interest_rate: u32,
-        ) {
+        ) -> Quantity {
             Self::credit_pair(depositor, receiver, asset_id, interest_rate, amount);
-            Self::net_pair(depositor, receiver, asset_id, u64::MAX.into());
+            Self::net_pair(depositor, receiver, asset_id, u64::MAX.into())
         }
 
         fn save(&self) {
@@ -951,11 +953,48 @@ pub mod tables {
                 amount,
             );
             // Cancel mutual exposure for this pair/asset (no-op if reverse is 0).
-            Obligation::net_pair(
+            let netted = Obligation::net_pair(
                 line.creditor,
                 line.debtor,
                 line.asset_id,
                 u64::MAX.into(),
+            );
+            emit_pair_activity(
+                line.creditor,
+                line.debtor,
+                line.asset_id,
+                "path_draw",
+                amount,
+                netted,
+                line.asset_id,
+            );
+        }
+    }
+
+    /// Emit bilateral history (once per party as `account`) via service events.
+    pub fn emit_pair_activity(
+        party_a: AccountNumber,
+        party_b: AccountNumber,
+        asset_id: u16,
+        kind: &str,
+        amount: Quantity,
+        netted: Quantity,
+        other_asset_id: u16,
+    ) {
+        let actor = psibase::get_sender();
+        let amount_s = amount.value.to_string();
+        let netted_s = netted.value.to_string();
+        let kind_s = kind.to_string();
+        for (account, counterparty) in [(party_a, party_b), (party_b, party_a)] {
+            crate::Wrapper::emit().history().activity(
+                account,
+                counterparty,
+                asset_id,
+                kind_s.clone(),
+                amount_s.clone(),
+                netted_s.clone(),
+                other_asset_id,
+                actor,
             );
         }
     }
@@ -964,15 +1003,30 @@ pub mod tables {
 #[psibase::service(name = "banx", tables = "tables")]
 pub mod service {
     use crate::tables::{
-        Asset, CreditLine, CurrencyPolicy, InitRow, InitTable, Obligation, PathHop, RoutingPolicy,
+        emit_pair_activity, Asset, CreditLine, CurrencyPolicy, InitRow, InitTable, Obligation,
+        PathHop, RoutingPolicy,
     };
     use psibase::{
+        services::events,
         services::tokens::{Precision, Quantity},
-        AccountNumber, TimePointSec, *,
+        AccountNumber, EventDb, MethodNumber, TimePointSec, *,
     };
 
     #[action]
     fn init() {
+        // History indexes (safe to re-register on re-init).
+        let add_index = |method: &str, column: u8| {
+            events::Wrapper::call().addIndex(
+                EventDb::HistoryEvent,
+                Wrapper::SERVICE,
+                MethodNumber::from(method),
+                column,
+            );
+        };
+        add_index("activity", 0); // account
+        add_index("activity", 1); // counterparty
+        add_index("activity", 2); // asset_id
+
         let table = InitTable::new();
         if InitTable::read().get_index_pk().get(&()).is_none() {
             table
@@ -1027,13 +1081,23 @@ pub mod service {
         deplete_on_debit: bool,
         interest_rate: u32,
     ) {
+        let creditor = get_sender();
         CreditLine::upsert_credit_line(
-            get_sender(),
+            creditor,
             debitor,
             asset_id,
             amount,
             deplete_on_debit,
             interest_rate,
+        );
+        emit_pair_activity(
+            creditor,
+            debitor,
+            asset_id,
+            "credit_line",
+            amount,
+            Quantity::new(0),
+            asset_id,
         );
     }
 
@@ -1114,14 +1178,34 @@ pub mod service {
         };
 
         let policy = CurrencyPolicy::get_assert(debtor, from_asset, to_asset);
-        policy.convert(creditor, amount_from, min_to);
+        let to_qty = policy.convert(creditor, amount_from, min_to);
+        // History on from-asset view; `netted` holds output units, `other_asset_id` is to_asset.
+        emit_pair_activity(
+            creditor,
+            debtor,
+            from_asset,
+            "convert",
+            amount_from,
+            to_qty,
+            to_asset,
+        );
     }
 
     /// Book a **deposit**: sender receives value and credits `depositor`, then
     /// **auto-nets** mutual obligations for this asset.
     #[action]
     fn deposit(depositor: AccountNumber, asset_id: u16, amount: Quantity, interest_rate: u32) {
-        Obligation::deposit(depositor, get_sender(), asset_id, amount, interest_rate);
+        let receiver = get_sender();
+        let netted = Obligation::deposit(depositor, receiver, asset_id, amount, interest_rate);
+        emit_pair_activity(
+            depositor,
+            receiver,
+            asset_id,
+            "deposit",
+            amount,
+            netted,
+            asset_id,
+        );
     }
 
     /// Accrue interest on all obligations for a directed pair/asset.
@@ -1133,7 +1217,19 @@ pub mod service {
     /// Net mutual obligations between sender and `counterparty` for `asset_id`.
     #[action]
     fn net(counterparty: AccountNumber, asset_id: u16, max_amount: Quantity) {
-        Obligation::net_pair(get_sender(), counterparty, asset_id, max_amount);
+        let sender = get_sender();
+        let cancelled = Obligation::net_pair(sender, counterparty, asset_id, max_amount);
+        if cancelled.value > 0 {
+            emit_pair_activity(
+                sender,
+                counterparty,
+                asset_id,
+                "net",
+                cancelled,
+                Quantity::new(0),
+                asset_id,
+            );
+        }
     }
 
     /// Path payment along `hops`: each hop is `(account, asset_id)`.
@@ -1190,6 +1286,25 @@ pub mod service {
             forward.value >= min_return.value,
             "path_pay final amount below min_return"
         );
+    }
+
+    /// Bilateral activity history (emitted once per party as `account`).
+    ///
+    /// - `kind`: `path_draw` | `deposit` | `net` | `convert` | `credit_line`
+    /// - `amount`: primary quantity (raw units)
+    /// - `netted`: amount cancelled by auto-net (or convert output for `convert`)
+    /// - `other_asset_id`: convert destination asset; otherwise same as `asset_id`
+    #[event(history)]
+    pub fn activity(
+        account: AccountNumber,
+        counterparty: AccountNumber,
+        asset_id: u16,
+        kind: String,
+        amount: String,
+        netted: String,
+        other_asset_id: u16,
+        actor: AccountNumber,
+    ) {
     }
 
     #[pre_action(exclude(init))]

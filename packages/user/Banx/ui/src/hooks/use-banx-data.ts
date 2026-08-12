@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import {
+    fetchActivity,
     fetchCreditLines,
     fetchCurrencyPolicies,
     fetchObligations,
@@ -25,6 +26,19 @@ export function useObligations() {
         queryKey: QueryKey.obligations(user),
         queryFn: () => fetchObligations(user!),
         enabled: !!user,
+    });
+}
+
+export function useActivity(
+    counterparty: string | undefined,
+    assetId: number | undefined,
+    enabled: boolean,
+) {
+    const { data: user } = useCurrentUser();
+    return useQuery({
+        queryKey: QueryKey.activity(user, counterparty ?? "", assetId ?? 0),
+        queryFn: () => fetchActivity(user!, counterparty!, assetId!),
+        enabled: !!user && !!counterparty && assetId !== undefined && enabled,
     });
 }
 

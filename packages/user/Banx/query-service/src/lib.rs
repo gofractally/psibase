@@ -7,6 +7,8 @@ mod service {
         Obligation, ObligationTable, RoutingPolicy, RoutingPolicyTab, PPM_SCALE, RATE_SCALE,
     };
     use psibase::*;
+    use serde::Deserialize;
+    use serde_aux::field_attributes::deserialize_number_from_string;
 
     fn qty(q: psibase::services::tokens::Quantity) -> String {
         q.value.to_string()
@@ -153,6 +155,21 @@ mod service {
         rateScale: String,
     }
 
+    /// History row from `history.banx.activity`.
+    #[derive(Deserialize, SimpleObject)]
+    struct ActivityEvent {
+        account: AccountNumber,
+        counterparty: AccountNumber,
+        #[serde(deserialize_with = "deserialize_number_from_string")]
+        asset_id: u16,
+        kind: String,
+        amount: String,
+        netted: String,
+        #[serde(deserialize_with = "deserialize_number_from_string")]
+        other_asset_id: u16,
+        actor: AccountNumber,
+    }
+
     struct Query;
 
     #[Object]
@@ -250,6 +267,34 @@ mod service {
                 .filter(|p| p.debtor == debtor)
                 .map(CurrencyPolicyView::from)
                 .collect()
+        }
+
+        /// Activity history for `account` with a given `counterparty` and `assetId`.
+        /// Newest first (`last`).
+        async fn activity(
+            &self,
+            account: AccountNumber,
+            counterparty: AccountNumber,
+            assetId: u16,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<EventConnection<ActivityEvent>> {
+            EventQuery::new("history.banx.activity")
+                .condition_with_params(
+                    "account = ? AND counterparty = ? AND asset_id = ?".to_string(),
+                    vec![
+                        account.to_string(),
+                        counterparty.to_string(),
+                        assetId.to_string(),
+                    ],
+                )
+                .first(first)
+                .last(last.or(Some(50)))
+                .before(before)
+                .after(after)
+                .query()
         }
     }
 

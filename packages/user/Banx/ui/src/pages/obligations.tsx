@@ -4,11 +4,13 @@ import {
     Building2,
     ChevronDown,
     HandCoins,
+    History,
     Pencil,
     PiggyBank,
     Plus,
 } from "lucide-react";
 
+import { AccountHistoryDialog } from "@/components/account-history";
 import { AssetSelect } from "@/components/asset-select";
 import { PageHeader } from "@/components/page-header";
 import { useAssetMap } from "@/hooks/use-assets";
@@ -328,6 +330,9 @@ export function ObligationsPage() {
                                 key={g.key}
                                 tone="savings"
                                 title={g.counterparty}
+                                counterparty={g.counterparty}
+                                assetId={g.assetId}
+                                viewer={user ?? ""}
                                 symbol={symbolOf(g.assetId)}
                                 precision={precisionOf(g.assetId)}
                                 total={g.total}
@@ -419,6 +424,9 @@ export function ObligationsPage() {
                                 key={g.key}
                                 tone="loan"
                                 title={g.counterparty}
+                                counterparty={g.counterparty}
+                                assetId={g.assetId}
+                                viewer={user ?? ""}
                                 symbol={symbolOf(g.assetId)}
                                 precision={precisionOf(g.assetId)}
                                 total={g.total}
@@ -1052,6 +1060,9 @@ function NewAccountDialog({
 function AccountGroupRow({
     tone,
     title,
+    counterparty,
+    assetId,
+    viewer,
     symbol,
     precision,
     total,
@@ -1066,6 +1077,9 @@ function AccountGroupRow({
 }: {
     tone: "savings" | "loan";
     title: string;
+    counterparty: string;
+    assetId: number;
+    viewer: string;
     symbol: string;
     precision: number;
     total: bigint;
@@ -1079,6 +1093,7 @@ function AccountGroupRow({
     onEditCreditLine?: () => void;
 }) {
     const [open, setOpen] = useState(false);
+    const [historyOpen, setHistoryOpen] = useState(false);
     const amount = formatRawAmount(total.toString(), precision);
     const n = obligations.length;
     const hasPositions = n > 0;
@@ -1114,6 +1129,7 @@ function AccountGroupRow({
             : "Repay / net — clear outstanding claims with this lender";
     const editTip =
         "Edit credit line — change limit, interest rate, or revolving terms";
+    const historyTip = "History — path draws, deposits, nets, and line changes";
 
     return (
         <Collapsible open={open} onOpenChange={setOpen}>
@@ -1198,6 +1214,27 @@ function AccountGroupRow({
                     </div>
 
                     <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 shrink-0 gap-1 px-2 text-xs"
+                                    aria-label={historyTip}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setHistoryOpen(true);
+                                    }}
+                                >
+                                    <History className="size-3.5" />
+                                    History
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                                {historyTip}
+                            </TooltipContent>
+                        </Tooltip>
                         {canEditCreditLine && onEditCreditLine ? (
                             <Tooltip>
                                 <TooltipTrigger asChild>
@@ -1363,6 +1400,13 @@ function AccountGroupRow({
                     </CollapsibleContent>
                 ) : null}
             </div>
+            <AccountHistoryDialog
+                open={historyOpen}
+                onOpenChange={setHistoryOpen}
+                counterparty={counterparty}
+                assetId={assetId}
+                viewer={viewer}
+            />
         </Collapsible>
     );
 }
