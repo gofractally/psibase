@@ -1,6 +1,10 @@
 import { useState } from "react";
 
 import { AssetSelect } from "@/components/asset-select";
+import {
+    ExpiresAtPicker,
+    formatExpiresAt,
+} from "@/components/expires-at-picker";
 import { PageHeader } from "@/components/page-header";
 import { useAssetMap } from "@/hooks/use-assets";
 import {
@@ -33,14 +37,6 @@ import {
     TableRow,
 } from "@shared/shadcn/ui/table";
 
-/** Policy expiry: 0 = never; otherwise unix seconds. */
-function formatExpiresAt(expiresAt: number): string {
-    if (!expiresAt) return "Never";
-    const d = new Date(expiresAt * 1000);
-    if (Number.isNaN(d.getTime())) return String(expiresAt);
-    return d.toLocaleString();
-}
-
 export function PoliciesPage() {
     const { assets, symbolOf, precisionOf } = useAssetMap();
     const { data: routing = [] } = useRoutingPolicies();
@@ -58,7 +54,7 @@ export function PoliciesPage() {
     const [rFee, setRFee] = useState("0");
     const [rFeePct, setRFeePct] = useState("0");
     const [rMaxPct, setRMaxPct] = useState("100");
-    const [rExp, setRExp] = useState("0");
+    const [rExp, setRExp] = useState(0);
 
     // Optional per-creditor override
     const [rCreditor, setRCreditor] = useState("");
@@ -70,7 +66,7 @@ export function PoliciesPage() {
     /** To-asset units per 1 from-asset unit (e.g. 0.45 → $1 → $0.45). */
     const [cToRate, setCToRate] = useState("1");
     const [cApr, setCApr] = useState("0");
-    const [cExp, setCExp] = useState("0");
+    const [cExp, setCExp] = useState(0);
 
     // Convert form
     const [cvCp, setCvCp] = useState("");
@@ -101,7 +97,7 @@ export function PoliciesPage() {
                             maxAcceptRatePpm: Math.round(
                                 Number(rMaxPct) * 10_000,
                             ),
-                            expiresAtSeconds: Number(rExp),
+                            expiresAtSeconds: rExp,
                         };
                         if (rCreditor.trim()) {
                             setRouting.mutate({
@@ -155,26 +151,16 @@ export function PoliciesPage() {
                             />
                         </div>
                     </div>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                        <div className="grid gap-2">
-                            <Label>Max accept APR %</Label>
-                            <Input
-                                type="number"
-                                min={0}
-                                value={rMaxPct}
-                                onChange={(e) => setRMaxPct(e.target.value)}
-                            />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label>Expires at (unix sec, 0=never)</Label>
-                            <Input
-                                type="number"
-                                min={0}
-                                value={rExp}
-                                onChange={(e) => setRExp(e.target.value)}
-                            />
-                        </div>
+                    <div className="grid gap-2">
+                        <Label>Max accept APR %</Label>
+                        <Input
+                            type="number"
+                            min={0}
+                            value={rMaxPct}
+                            onChange={(e) => setRMaxPct(e.target.value)}
+                        />
                     </div>
+                    <ExpiresAtPicker value={rExp} onChange={setRExp} />
                     <Button
                         type="submit"
                         disabled={
@@ -200,7 +186,7 @@ export function PoliciesPage() {
                             toInterestRatePpm: Math.round(
                                 Number(cApr) * 10_000,
                             ),
-                            expiresAtSeconds: Number(cExp),
+                            expiresAtSeconds: cExp,
                         });
                     }}
                 >
@@ -279,26 +265,16 @@ export function PoliciesPage() {
                             )}
                         </div>
                     </div>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                        <div className="grid gap-2">
-                            <Label>To-asset APR %</Label>
-                            <Input
-                                type="number"
-                                min={0}
-                                value={cApr}
-                                onChange={(e) => setCApr(e.target.value)}
-                            />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label>Expires at (unix sec, 0=never)</Label>
-                            <Input
-                                type="number"
-                                min={0}
-                                value={cExp}
-                                onChange={(e) => setCExp(e.target.value)}
-                            />
-                        </div>
+                    <div className="grid gap-2">
+                        <Label>To-asset APR %</Label>
+                        <Input
+                            type="number"
+                            min={0}
+                            value={cApr}
+                            onChange={(e) => setCApr(e.target.value)}
+                        />
                     </div>
+                    <ExpiresAtPicker value={cExp} onChange={setCExp} />
                     <Button type="submit" disabled={setCurrency.isPending}>
                         Save currency policy
                     </Button>
@@ -392,6 +368,9 @@ export function PoliciesPage() {
                                     <TableHead className="text-right">
                                         Max APR
                                     </TableHead>
+                                    <TableHead className="text-right">
+                                        Expires
+                                    </TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -423,6 +402,9 @@ export function PoliciesPage() {
                                                 {ppmToPercent(
                                                     p.maxAcceptRatePpm,
                                                 )}
+                                            </TableCell>
+                                            <TableCell className="text-right text-sm">
+                                                {formatExpiresAt(p.expiresAt)}
                                             </TableCell>
                                         </TableRow>
                                     ),
