@@ -35,6 +35,6 @@ done
 for dir in "${dirs[@]}"; do
     cd "$dir"
     echo "Publishing $dir..."
-    cargo publish $1
+    cargo publish $1 || { [[ "$1" == "--dry-run" ]] || exit; }
     cd - > /dev/null
 done
