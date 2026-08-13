@@ -102,6 +102,21 @@ class Chain {
         return Peers.parse(res.data.peers.edges.map((e: any) => e.node));
     }
 
+    public async getPeerUsers(): Promise<string[]> {
+        const url = siblingUrl(null, "x-peers", "/graphql");
+        const query = "query { users { edges { node { name } } } }";
+        const res: any = await postGraphQLGetJson(url, query);
+        return z
+            .string()
+            .array()
+            .parse(res.data.users.edges.map((e: any) => e.node.name));
+    }
+
+    public async setPeerUser(account: string, accept: boolean): Promise<void> {
+        const url = siblingUrl(null, "x-peers", "/users");
+        await postJson(url, { account, accept });
+    }
+
     public async getStatus(): Promise<string[]> {
         return getJson("/native/admin/status");
     }
