@@ -22,8 +22,8 @@ const items: {
     end?: boolean;
 }[] = [
     { to: "/accounts", label: "Accounts", icon: ScrollText },
+    { to: "/path-pay", label: "Transfer", icon: GitBranch },
     { to: "/payees", label: "Payees", icon: Contact },
-    { to: "/path-pay", label: "Path pay", icon: GitBranch },
     { to: "/policies", label: "Policies", icon: ArrowLeftRight },
     { to: "/assets", label: "Assets", icon: Coins },
 ];

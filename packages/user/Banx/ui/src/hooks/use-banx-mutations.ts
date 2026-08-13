@@ -117,7 +117,7 @@ export function usePathPay() {
             ]),
         onSuccess: () => {
             invalidate();
-            toast.success("Path payment succeeded");
+            toast.success("Transfer succeeded");
         },
         onError: (e: Error) => toast.error(e.message),
     });

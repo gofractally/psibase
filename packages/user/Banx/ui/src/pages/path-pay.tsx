@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/page-header";
 import { useAssetMap } from "@/hooks/use-assets";
 import { usePathPay, useQuotePath } from "@/hooks/use-banx-mutations";
 import { amountPlaceholder } from "@/lib/amount";
-import { useAppForm } from "@/lib/form";
+import { amountFieldValidator, useAppForm } from "@/lib/form";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Button } from "@shared/shadcn/ui/button";
@@ -122,7 +122,7 @@ export function PathPayPage() {
     return (
         <div className="space-y-8">
             <PageHeader
-                title="Path pay"
+                title="Transfer"
                 description="Draw along a hop list. First hop uses a credit line only; later same-asset hops need routing (fixed + % fee). Asset changes auto-convert via the previous edge debtor's currency policy. Use Find path to discover a route from you to a payee (scoped graph search)."
             />
 
@@ -147,7 +147,7 @@ export function PathPayPage() {
                             name="payee"
                             children={(field) => (
                                 <field.TextField
-                                    label="Payee (final hop)"
+                                    label="Payee"
                                     placeholder="brandon"
                                 />
                             )}
@@ -188,21 +188,40 @@ export function PathPayPage() {
                     </div>
                     <findForm.Subscribe
                         selector={(s) => s.values.fromAsset}
-                        children={(fromAsset) => (
-                            <findForm.AppField
-                                name="amount"
-                                children={(field) => (
-                                    <field.TextField
-                                        label={
-                                            fromAsset !== undefined
-                                                ? `Amount (${amountPlaceholder(precisionOf(fromAsset))})`
-                                                : "Amount"
-                                        }
-                                        inputMode="decimal"
-                                    />
-                                )}
-                            />
-                        )}
+                        children={(fromAsset) => {
+                            const precision =
+                                fromAsset !== undefined
+                                    ? precisionOf(fromAsset)
+                                    : 0;
+                            return (
+                                <findForm.AppField
+                                    name="amount"
+                                    validators={{
+                                        onChange: amountFieldValidator(
+                                            precision,
+                                            { allowZero: false },
+                                        ),
+                                        onSubmit: amountFieldValidator(
+                                            precision,
+                                            { allowZero: false },
+                                        ),
+                                    }}
+                                    children={(field) => (
+                                        <field.TextField
+                                            label={
+                                                fromAsset !== undefined
+                                                    ? `Amount (${amountPlaceholder(precision)})`
+                                                    : "Amount"
+                                            }
+                                            inputMode="decimal"
+                                            placeholder={amountPlaceholder(
+                                                precision,
+                                            )}
+                                        />
+                                    )}
+                                />
+                            );
+                        }}
                     />
                     <div className="flex flex-wrap items-center gap-3">
                         <findForm.Subscribe
@@ -313,49 +332,87 @@ export function PathPayPage() {
                 <div className="grid gap-2 sm:grid-cols-2 sm:gap-4">
                     <execForm.Subscribe
                         selector={(s) => s.values.hops[0]?.assetId}
-                        children={(firstAsset) => (
-                            <execForm.AppField
-                                name="amount"
-                                children={(field) => (
-                                    <field.TextField
-                                        label={
-                                            firstAsset !== undefined
-                                                ? `Amount (${amountPlaceholder(precisionOf(firstAsset))})`
-                                                : "Amount"
-                                        }
-                                        inputMode="decimal"
-                                        required
-                                    />
-                                )}
-                            />
-                        )}
+                        children={(firstAsset) => {
+                            const precision =
+                                firstAsset !== undefined
+                                    ? precisionOf(firstAsset)
+                                    : 0;
+                            return (
+                                <execForm.AppField
+                                    name="amount"
+                                    validators={{
+                                        onChange: amountFieldValidator(
+                                            precision,
+                                            { allowZero: false },
+                                        ),
+                                        onSubmit: amountFieldValidator(
+                                            precision,
+                                            { allowZero: false },
+                                        ),
+                                    }}
+                                    children={(field) => (
+                                        <field.TextField
+                                            label={
+                                                firstAsset !== undefined
+                                                    ? `Amount (${amountPlaceholder(precision)})`
+                                                    : "Amount"
+                                            }
+                                            inputMode="decimal"
+                                            placeholder={amountPlaceholder(
+                                                precision,
+                                            )}
+                                            required
+                                        />
+                                    )}
+                                />
+                            );
+                        }}
                     />
                     <execForm.Subscribe
                         selector={(s) =>
                             s.values.hops[s.values.hops.length - 1]?.assetId
                         }
-                        children={(lastAsset) => (
-                            <execForm.AppField
-                                name="minReturn"
-                                children={(field) => (
-                                    <field.TextField
-                                        label={
-                                            lastAsset !== undefined
-                                                ? `Min return (${amountPlaceholder(precisionOf(lastAsset))})`
-                                                : "Min return (last asset)"
-                                        }
-                                        inputMode="decimal"
-                                        required
-                                    />
-                                )}
-                            />
-                        )}
+                        children={(lastAsset) => {
+                            const precision =
+                                lastAsset !== undefined
+                                    ? precisionOf(lastAsset)
+                                    : 0;
+                            return (
+                                <execForm.AppField
+                                    name="minReturn"
+                                    validators={{
+                                        onChange: amountFieldValidator(
+                                            precision,
+                                            { allowZero: true },
+                                        ),
+                                        onSubmit: amountFieldValidator(
+                                            precision,
+                                            { allowZero: true },
+                                        ),
+                                    }}
+                                    children={(field) => (
+                                        <field.TextField
+                                            label={
+                                                lastAsset !== undefined
+                                                    ? `Min return (${amountPlaceholder(precision)})`
+                                                    : "Min return (last asset)"
+                                            }
+                                            inputMode="decimal"
+                                            placeholder={amountPlaceholder(
+                                                precision,
+                                            )}
+                                            required
+                                        />
+                                    )}
+                                />
+                            );
+                        }}
                     />
                 </div>
 
                 <execForm.AppForm>
                     <execForm.SubmitButton
-                        labels={["Path pay", "Submitting…"]}
+                        labels={["Transfer", "Submitting…"]}
                         loading={pathPay.isPending}
                     />
                 </execForm.AppForm>
