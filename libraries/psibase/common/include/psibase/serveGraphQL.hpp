@@ -280,7 +280,7 @@ namespace psibase
    /// };
    /// PSIO_REFLECT(Query, method(rowsByPrimary), method(rowsBySecondary))
    ///
-   /// struct ExampleService : psibase::Service<ExampleService>
+   /// struct ExampleService : psibase::Service
    /// {
    ///    std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request)
    ///    {

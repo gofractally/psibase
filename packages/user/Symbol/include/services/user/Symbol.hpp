@@ -49,7 +49,6 @@ namespace UserService
          {
             void symEvent(SID symbol, Account actor, uint8_t action) {}
          };
-         struct Merkle{};
       };
       // clang-format on
    };
@@ -70,11 +69,9 @@ namespace UserService
       method(getMapBySym, symbol),
       method(delLength, length),
    );
-   PSIBASE_REFLECT_EVENTS(Symbol);
    PSIBASE_REFLECT_HISTORY_EVENTS(Symbol,
       method(symEvent, symbol, actor, action),
    );
-   PSIBASE_REFLECT_MERKLE_EVENTS(Symbol);
 
    PSIBASE_REFLECT_TABLES(Symbol, Symbol::Tables)
    // clang-format on

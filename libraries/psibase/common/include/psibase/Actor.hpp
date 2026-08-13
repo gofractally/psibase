@@ -380,7 +380,7 @@ namespace psibase
    /// For example, if `SomeService` has this set of methods:
    ///
    /// ```c++
-   /// struct SomeService : psibase::Service<SomeService>
+   /// struct SomeService : psibase::Service
    /// {
    ///    void        doSomething(std::string_view str);
    ///    std::string doAnother(uint32_t x, psibase::AccountNumber y);
