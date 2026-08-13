@@ -7,6 +7,11 @@ on:
         type: boolean
         required: false
         default: true
+      ref:
+        description: "Ref to build; defaults to the ref that triggered the run"
+        type: string
+        required: false
+        default: ""
     secrets:
       publish-package-login:
         required: false
@@ -34,6 +39,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
         with:
+          ref: ${{ inputs.ref }}
           submodules: false
           fetch-depth: 0
       - name: Preserve ccache
