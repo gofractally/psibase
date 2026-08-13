@@ -1,11 +1,11 @@
 import { useState } from "react";
 
-import { AssetSelect } from "@/components/asset-select";
+import { AssetField, ExpiresField } from "@/components/form-fields";
 import {
-    ExpiresAtPicker,
     formatExpiresAt,
 } from "@/components/expires-at-picker";
 import { PageHeader } from "@/components/page-header";
+import { RoutingPolicyDialog } from "@/components/routing-policy-dialog";
 import { useAssetMap } from "@/hooks/use-assets";
 import {
     useCurrencyPolicies,
@@ -14,8 +14,6 @@ import {
 import {
     useConvert,
     useSetCurrencyPolicy,
-    useSetGlobalRoutingPolicy,
-    useSetRoutingPolicy,
 } from "@/hooks/use-banx-mutations";
 import {
     amountPlaceholder,
@@ -24,10 +22,9 @@ import {
     formatToPrecision,
 } from "@/lib/amount";
 import { ppmToPercent } from "@/lib/constants";
+import { percentStringToPpm, useAppForm } from "@/lib/form";
 
 import { Button } from "@shared/shadcn/ui/button";
-import { Input } from "@shared/shadcn/ui/input";
-import { Label } from "@shared/shadcn/ui/label";
 import {
     Table,
     TableBody,
@@ -41,39 +38,77 @@ export function PoliciesPage() {
     const { assets, symbolOf, precisionOf } = useAssetMap();
     const { data: routing = [] } = useRoutingPolicies();
     const { data: currency = [] } = useCurrencyPolicies();
-    const setGlobalRouting = useSetGlobalRoutingPolicy();
-    const setRouting = useSetRoutingPolicy();
     const setCurrency = useSetCurrencyPolicy();
     const convert = useConvert();
 
     const globalRouting = routing.filter((p) => p.isGlobal);
     const specificRouting = routing.filter((p) => !p.isGlobal);
 
-    // Global routing form (same-asset, any next hop)
-    const [rAsset, setRAsset] = useState<number | undefined>();
-    const [rFee, setRFee] = useState("0");
-    const [rFeePct, setRFeePct] = useState("0");
-    const [rMaxPct, setRMaxPct] = useState("100");
-    const [rExp, setRExp] = useState(0);
+    const [routingDialogOpen, setRoutingDialogOpen] = useState(false);
 
-    // Optional per-creditor override
-    const [rCreditor, setRCreditor] = useState("");
+    const currencyForm = useAppForm({
+        defaultValues: {
+            fromAsset: undefined as number | undefined,
+            toAsset: undefined as number | undefined,
+            feeFixed: "0",
+            toRate: "1",
+            aprPct: "0",
+            expiresAtSeconds: 0,
+        },
+        onSubmit: async ({ value }) => {
+            if (value.fromAsset === undefined || value.toAsset === undefined)
+                return;
+            await new Promise<void>((resolve, reject) => {
+                setCurrency.mutate(
+                    {
+                        fromAsset: value.fromAsset!,
+                        toAsset: value.toAsset!,
+                        feeFixed: value.feeFixed.trim(),
+                        toRate: value.toRate.trim(),
+                        toInterestRatePpm: percentStringToPpm(value.aprPct),
+                        expiresAtSeconds: value.expiresAtSeconds,
+                    },
+                    {
+                        onSuccess: () => resolve(),
+                        onError: (e: Error) => reject(e),
+                    },
+                );
+            });
+        },
+    });
 
-    // Currency form
-    const [cFrom, setCFrom] = useState<number | undefined>();
-    const [cTo, setCTo] = useState<number | undefined>();
-    const [cFee, setCFee] = useState("0");
-    /** To-asset units per 1 from-asset unit (e.g. 0.45 → $1 → $0.45). */
-    const [cToRate, setCToRate] = useState("1");
-    const [cApr, setCApr] = useState("0");
-    const [cExp, setCExp] = useState(0);
-
-    // Convert form
-    const [cvCp, setCvCp] = useState("");
-    const [cvFrom, setCvFrom] = useState<number | undefined>();
-    const [cvTo, setCvTo] = useState<number | undefined>();
-    const [cvAmt, setCvAmt] = useState("1.00");
-    const [cvMin, setCvMin] = useState("0.01");
+    const convertForm = useAppForm({
+        defaultValues: {
+            counterparty: "",
+            fromAsset: undefined as number | undefined,
+            toAsset: undefined as number | undefined,
+            amountFrom: "1.00",
+            minTo: "0.01",
+        },
+        onSubmit: async ({ value }) => {
+            if (
+                value.fromAsset === undefined ||
+                value.toAsset === undefined ||
+                !value.counterparty.trim()
+            )
+                return;
+            await new Promise<void>((resolve, reject) => {
+                convert.mutate(
+                    {
+                        counterparty: value.counterparty.trim(),
+                        fromAsset: value.fromAsset!,
+                        toAsset: value.toAsset!,
+                        amountFrom: value.amountFrom.trim(),
+                        minTo: value.minTo.trim(),
+                    },
+                    {
+                        onSuccess: () => resolve(),
+                        onError: (e: Error) => reject(e),
+                    },
+                );
+            });
+        },
+    });
 
     return (
         <div className="space-y-10">
@@ -82,112 +117,35 @@ export function PoliciesPage() {
                 description="Global routing applies to every credit line in an asset (stored as creditor = 0). Optional per-creditor overrides. Currency policies handle FX (enter how many to-units you get per 1 from-unit)."
             />
 
+            <RoutingPolicyDialog
+                open={routingDialogOpen}
+                onOpenChange={setRoutingDialogOpen}
+                assets={assets}
+            />
+
             <section className="grid gap-8 lg:grid-cols-2">
-                <form
-                    className="grid gap-3 rounded-lg border p-4"
-                    onSubmit={(e) => {
-                        e.preventDefault();
-                        if (rAsset === undefined) return;
-                        const fees = {
-                            assetId: rAsset,
-                            hopFeeFixed: rFee.trim(),
-                            hopFeePercentPpm: Math.round(
-                                Number(rFeePct) * 10_000,
-                            ),
-                            maxAcceptRatePpm: Math.round(
-                                Number(rMaxPct) * 10_000,
-                            ),
-                            expiresAtSeconds: rExp,
-                        };
-                        if (rCreditor.trim()) {
-                            setRouting.mutate({
-                                creditor: rCreditor.trim(),
-                                ...fees,
-                            });
-                        } else {
-                            setGlobalRouting.mutate(fees);
-                        }
-                    }}
-                >
+                <div className="grid gap-3 rounded-lg border p-4">
                     <h2 className="font-medium">Set routing policy</h2>
                     <p className="text-muted-foreground text-xs">
-                        Leave next-hop blank for a <strong>global</strong>{" "}
-                        policy (all lines in this asset). Fill next-hop for a
-                        per-creditor override. Same asset only — no FX here.
+                        Same-asset path hop fees. Leave next-hop blank for a{" "}
+                        <strong>global</strong> policy, or set a per-creditor
+                        override. Also available from Accounts via the route
+                        icon.
                     </p>
-                    <div className="grid gap-2">
-                        <Label>Next-hop creditor (optional)</Label>
-                        <Input
-                            value={rCreditor}
-                            onChange={(e) => setRCreditor(e.target.value)}
-                            placeholder="empty = global"
-                        />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label>Asset</Label>
-                        <AssetSelect
-                            assets={assets}
-                            value={rAsset}
-                            onChange={setRAsset}
-                        />
-                    </div>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                        <div className="grid gap-2">
-                            <Label>Hop fee fixed (decimal)</Label>
-                            <Input
-                                inputMode="decimal"
-                                value={rFee}
-                                onChange={(e) => setRFee(e.target.value)}
-                            />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label>Hop fee %</Label>
-                            <Input
-                                type="number"
-                                min={0}
-                                step="0.01"
-                                value={rFeePct}
-                                onChange={(e) => setRFeePct(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                    <div className="grid gap-2">
-                        <Label>Max accept APR %</Label>
-                        <Input
-                            type="number"
-                            min={0}
-                            value={rMaxPct}
-                            onChange={(e) => setRMaxPct(e.target.value)}
-                        />
-                    </div>
-                    <ExpiresAtPicker value={rExp} onChange={setRExp} />
                     <Button
-                        type="submit"
-                        disabled={
-                            setGlobalRouting.isPending || setRouting.isPending
-                        }
+                        type="button"
+                        onClick={() => setRoutingDialogOpen(true)}
                     >
-                        {rCreditor.trim()
-                            ? "Save override"
-                            : "Save global routing"}
+                        Open routing form
                     </Button>
-                </form>
+                </div>
 
                 <form
                     className="grid gap-3 rounded-lg border p-4"
                     onSubmit={(e) => {
                         e.preventDefault();
-                        if (cFrom === undefined || cTo === undefined) return;
-                        setCurrency.mutate({
-                            fromAsset: cFrom,
-                            toAsset: cTo,
-                            feeFixed: cFee.trim(),
-                            toRate: cToRate.trim(),
-                            toInterestRatePpm: Math.round(
-                                Number(cApr) * 10_000,
-                            ),
-                            expiresAtSeconds: cExp,
-                        });
+                        e.stopPropagation();
+                        void currencyForm.handleSubmit();
                     }}
                 >
                     <h2 className="font-medium">Set currency policy</h2>
@@ -197,154 +155,214 @@ export function PoliciesPage() {
                         per 1 from-unit (e.g. 0.45 means $1 → $0.45).
                     </p>
                     <div className="grid gap-2 sm:grid-cols-2">
-                        <div className="grid gap-2">
-                            <Label>From asset</Label>
-                            <AssetSelect
-                                assets={assets}
-                                value={cFrom}
-                                onChange={setCFrom}
-                            />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label>To asset</Label>
-                            <AssetSelect
-                                assets={assets}
-                                value={cTo}
-                                onChange={setCTo}
-                            />
-                        </div>
-                    </div>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                        <div className="grid gap-2">
-                            <Label>
-                                Fee fixed
-                                {cFrom !== undefined
-                                    ? ` (${symbolOf(cFrom)})`
-                                    : ""}
-                            </Label>
-                            <Input
-                                inputMode="decimal"
-                                value={cFee}
-                                onChange={(e) => setCFee(e.target.value)}
-                                placeholder={
-                                    cFrom !== undefined
-                                        ? amountPlaceholder(
-                                              precisionOf(cFrom),
-                                          )
-                                        : "0"
-                                }
-                            />
-                            {cFrom !== undefined && (
-                                <p className="text-muted-foreground text-xs font-mono">
-                                    {formatToPrecision(
-                                        cFee,
-                                        precisionOf(cFrom),
-                                    ) ?? "?"}{" "}
-                                    {symbolOf(cFrom)}
-                                </p>
+                        <currencyForm.Field
+                            name="fromAsset"
+                            children={(field) => (
+                                <AssetField
+                                    label="From asset"
+                                    assets={assets}
+                                    value={field.state.value}
+                                    onChange={(id) => field.handleChange(id)}
+                                />
                             )}
-                        </div>
-                        <div className="grid gap-2">
-                            <Label>Rate (to per 1 from)</Label>
-                            <Input
-                                inputMode="decimal"
-                                value={cToRate}
-                                onChange={(e) => setCToRate(e.target.value)}
-                                placeholder="0.45"
-                            />
-                            {cFrom !== undefined && cTo !== undefined && (
-                                <p className="text-muted-foreground text-xs font-mono">
-                                    1 {symbolOf(cFrom)} →{" "}
-                                    {formatToPrecision(
-                                        cToRate,
-                                        precisionOf(cTo),
-                                    ) ??
-                                        (cToRate || "?")}{" "}
-                                    {symbolOf(cTo)}
-                                </p>
+                        />
+                        <currencyForm.Field
+                            name="toAsset"
+                            children={(field) => (
+                                <AssetField
+                                    label="To asset"
+                                    assets={assets}
+                                    value={field.state.value}
+                                    onChange={(id) => field.handleChange(id)}
+                                />
                             )}
-                        </div>
-                    </div>
-                    <div className="grid gap-2">
-                        <Label>To-asset APR %</Label>
-                        <Input
-                            type="number"
-                            min={0}
-                            value={cApr}
-                            onChange={(e) => setCApr(e.target.value)}
                         />
                     </div>
-                    <ExpiresAtPicker value={cExp} onChange={setCExp} />
-                    <Button type="submit" disabled={setCurrency.isPending}>
-                        Save currency policy
-                    </Button>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                        <currencyForm.Subscribe
+                            selector={(s) => s.values}
+                            children={(values) => (
+                                <div className="grid gap-2">
+                                    <currencyForm.AppField
+                                        name="feeFixed"
+                                        children={(field) => (
+                                            <field.TextField
+                                                label={
+                                                    values.fromAsset !==
+                                                    undefined
+                                                        ? `Fee fixed (${symbolOf(values.fromAsset)})`
+                                                        : "Fee fixed"
+                                                }
+                                                inputMode="decimal"
+                                                placeholder={
+                                                    values.fromAsset !==
+                                                    undefined
+                                                        ? amountPlaceholder(
+                                                              precisionOf(
+                                                                  values.fromAsset,
+                                                              ),
+                                                          )
+                                                        : "0"
+                                                }
+                                            />
+                                        )}
+                                    />
+                                    {values.fromAsset !== undefined ? (
+                                        <p className="text-muted-foreground text-xs font-mono">
+                                            {formatToPrecision(
+                                                values.feeFixed,
+                                                precisionOf(values.fromAsset),
+                                            ) ?? "?"}{" "}
+                                            {symbolOf(values.fromAsset)}
+                                        </p>
+                                    ) : null}
+                                </div>
+                            )}
+                        />
+                        <currencyForm.Subscribe
+                            selector={(s) => s.values}
+                            children={(values) => (
+                                <div className="grid gap-2">
+                                    <currencyForm.AppField
+                                        name="toRate"
+                                        children={(field) => (
+                                            <field.TextField
+                                                label="Rate (to per 1 from)"
+                                                inputMode="decimal"
+                                                placeholder="0.45"
+                                            />
+                                        )}
+                                    />
+                                    {values.fromAsset !== undefined &&
+                                    values.toAsset !== undefined ? (
+                                        <p className="text-muted-foreground text-xs font-mono">
+                                            1 {symbolOf(values.fromAsset)} →{" "}
+                                            {formatToPrecision(
+                                                values.toRate,
+                                                precisionOf(values.toAsset),
+                                            ) ??
+                                                (values.toRate || "?")}{" "}
+                                            {symbolOf(values.toAsset)}
+                                        </p>
+                                    ) : null}
+                                </div>
+                            )}
+                        />
+                    </div>
+                    <currencyForm.AppField
+                        name="aprPct"
+                        children={(field) => (
+                            <field.TextField
+                                label="To-asset APR %"
+                                inputMode="decimal"
+                            />
+                        )}
+                    />
+                    <currencyForm.Field
+                        name="expiresAtSeconds"
+                        children={(field) => (
+                            <ExpiresField
+                                value={field.state.value}
+                                onChange={(v) => field.handleChange(v)}
+                            />
+                        )}
+                    />
+                    <currencyForm.Subscribe
+                        selector={(s) => s.values}
+                        children={(values) => (
+                            <currencyForm.AppForm>
+                                <currencyForm.SubmitButton
+                                    labels={[
+                                        "Save currency policy",
+                                        "Saving…",
+                                    ]}
+                                    loading={setCurrency.isPending}
+                                    disabled={
+                                        values.fromAsset === undefined ||
+                                        values.toAsset === undefined
+                                    }
+                                />
+                            </currencyForm.AppForm>
+                        )}
+                    />
                 </form>
             </section>
 
-            <section className="grid gap-3 rounded-lg border p-4 max-w-xl">
+            <section className="grid max-w-xl gap-3 rounded-lg border p-4">
                 <h2 className="font-medium">Convert debt</h2>
                 <form
                     className="grid gap-3"
                     onSubmit={(e) => {
                         e.preventDefault();
-                        if (cvFrom === undefined || cvTo === undefined || !cvCp)
-                            return;
-                        convert.mutate({
-                            counterparty: cvCp.trim(),
-                            fromAsset: cvFrom,
-                            toAsset: cvTo,
-                            amountFrom: cvAmt.trim(),
-                            minTo: cvMin.trim(),
-                        });
+                        e.stopPropagation();
+                        void convertForm.handleSubmit();
                     }}
                 >
-                    <div className="grid gap-2">
-                        <Label>Counterparty</Label>
-                        <Input
-                            value={cvCp}
-                            onChange={(e) => setCvCp(e.target.value)}
-                            required
+                    <convertForm.AppField
+                        name="counterparty"
+                        children={(field) => (
+                            <field.TextField label="Counterparty" required />
+                        )}
+                    />
+                    <div className="grid gap-2 sm:grid-cols-2">
+                        <convertForm.Field
+                            name="fromAsset"
+                            children={(field) => (
+                                <AssetField
+                                    label="From"
+                                    assets={assets}
+                                    value={field.state.value}
+                                    onChange={(id) => field.handleChange(id)}
+                                />
+                            )}
+                        />
+                        <convertForm.Field
+                            name="toAsset"
+                            children={(field) => (
+                                <AssetField
+                                    label="To"
+                                    assets={assets}
+                                    value={field.state.value}
+                                    onChange={(id) => field.handleChange(id)}
+                                />
+                            )}
                         />
                     </div>
                     <div className="grid gap-2 sm:grid-cols-2">
-                        <div className="grid gap-2">
-                            <Label>From</Label>
-                            <AssetSelect
-                                assets={assets}
-                                value={cvFrom}
-                                onChange={setCvFrom}
-                            />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label>To</Label>
-                            <AssetSelect
-                                assets={assets}
-                                value={cvTo}
-                                onChange={setCvTo}
-                            />
-                        </div>
+                        <convertForm.AppField
+                            name="amountFrom"
+                            children={(field) => (
+                                <field.TextField
+                                    label="Amount from (decimal)"
+                                    inputMode="decimal"
+                                />
+                            )}
+                        />
+                        <convertForm.AppField
+                            name="minTo"
+                            children={(field) => (
+                                <field.TextField
+                                    label="Min to (decimal)"
+                                    inputMode="decimal"
+                                />
+                            )}
+                        />
                     </div>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                        <div className="grid gap-2">
-                            <Label>Amount from (decimal)</Label>
-                            <Input
-                                inputMode="decimal"
-                                value={cvAmt}
-                                onChange={(e) => setCvAmt(e.target.value)}
-                            />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label>Min to (decimal)</Label>
-                            <Input
-                                inputMode="decimal"
-                                value={cvMin}
-                                onChange={(e) => setCvMin(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                    <Button type="submit" disabled={convert.isPending}>
-                        Convert
-                    </Button>
+                    <convertForm.Subscribe
+                        selector={(s) => s.values}
+                        children={(values) => (
+                            <convertForm.AppForm>
+                                <convertForm.SubmitButton
+                                    labels={["Convert", "Converting…"]}
+                                    loading={convert.isPending}
+                                    disabled={
+                                        values.fromAsset === undefined ||
+                                        values.toAsset === undefined
+                                    }
+                                />
+                            </convertForm.AppForm>
+                        )}
+                    />
                 </form>
             </section>
 

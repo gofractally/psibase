@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 
-import { AssetSelect } from "@/components/asset-select";
+import { AssetField } from "@/components/form-fields";
 import { useDeposit, usePathPay } from "@/hooks/use-banx-mutations";
 import { amountPlaceholder } from "@/lib/amount";
+import { percentStringToPpm, useAppForm } from "@/lib/form";
 import type { Asset } from "@/lib/graphql";
 
 import { Button } from "@shared/shadcn/ui/button";
@@ -14,8 +15,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
-import { Input } from "@shared/shadcn/ui/input";
-import { Label } from "@shared/shadcn/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@shared/shadcn/ui/tabs";
 
 export type DepositLoanTab = "deposit" | "loan";
@@ -36,74 +35,95 @@ export function NewDepositLoanDialog({
     onOpenChange: (open: boolean) => void;
     assets: Asset[];
     precisionOf: (id: number) => number;
-    /** Prefill depositor (deposit tab) and lender (loan tab). */
     initialAccount?: string;
     defaultTab?: DepositLoanTab;
 }) {
     const deposit = useDeposit();
     const pathPay = usePathPay();
-
     const [tab, setTab] = useState<DepositLoanTab>(defaultTab);
 
-    const [depositor, setDepositor] = useState("");
-    const [depositAssetId, setDepositAssetId] = useState<number | undefined>();
-    const [depositAmount, setDepositAmount] = useState("1.00");
-    const [depositApr, setDepositApr] = useState("0");
+    const depositForm = useAppForm({
+        defaultValues: {
+            depositor: "",
+            assetId: undefined as number | undefined,
+            amount: "1.00",
+            aprPct: "0",
+        },
+        onSubmit: async ({ value }) => {
+            if (value.assetId === undefined || !value.depositor.trim()) return;
+            await new Promise<void>((resolve, reject) => {
+                deposit.mutate(
+                    {
+                        depositor: value.depositor.trim(),
+                        assetId: value.assetId!,
+                        amount: value.amount.trim(),
+                        interestRatePpm: percentStringToPpm(value.aprPct),
+                    },
+                    {
+                        onSuccess: () => {
+                            onOpenChange(false);
+                            resolve();
+                        },
+                        onError: (e: Error) => reject(e),
+                    },
+                );
+            });
+        },
+    });
 
-    const [lender, setLender] = useState("");
-    const [loanAssetId, setLoanAssetId] = useState<number | undefined>();
-    const [loanAmount, setLoanAmount] = useState("1.00");
+    const loanForm = useAppForm({
+        defaultValues: {
+            lender: "",
+            assetId: undefined as number | undefined,
+            amount: "1.00",
+        },
+        onSubmit: async ({ value }) => {
+            if (value.assetId === undefined || !value.lender.trim()) return;
+            const amount = value.amount.trim();
+            await new Promise<void>((resolve, reject) => {
+                pathPay.mutate(
+                    {
+                        hops: [
+                            {
+                                account: value.lender.trim(),
+                                assetId: value.assetId!,
+                            },
+                        ],
+                        amount,
+                        minReturn: amount,
+                    },
+                    {
+                        onSuccess: () => {
+                            onOpenChange(false);
+                            resolve();
+                        },
+                        onError: (e: Error) => reject(e),
+                    },
+                );
+            });
+        },
+    });
 
-    const pending = deposit.isPending || pathPay.isPending;
-
-    // When the dialog opens, seed counterparty fields from the payee (if any).
     useEffect(() => {
         if (!open) return;
         const account = initialAccount?.trim() ?? "";
         setTab(defaultTab);
-        setDepositor(account);
-        setLender(account);
-        setDepositAssetId(undefined);
-        setDepositAmount("1.00");
-        setDepositApr("0");
-        setLoanAssetId(undefined);
-        setLoanAmount("1.00");
+        depositForm.reset({
+            depositor: account,
+            assetId: undefined,
+            amount: "1.00",
+            aprPct: "0",
+        });
+        loanForm.reset({
+            lender: account,
+            assetId: undefined,
+            amount: "1.00",
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, initialAccount, defaultTab]);
 
-    const close = (next: boolean) => {
-        onOpenChange(next);
-    };
-
-    const onDeposit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!depositAssetId || !depositor.trim()) return;
-        deposit.mutate(
-            {
-                depositor: depositor.trim(),
-                assetId: depositAssetId,
-                amount: depositAmount.trim(),
-                interestRatePpm: Math.round(Number(depositApr) * 10_000),
-            },
-            { onSuccess: () => close(false) },
-        );
-    };
-
-    const onLoan = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!loanAssetId || !lender.trim()) return;
-        const amount = loanAmount.trim();
-        pathPay.mutate(
-            {
-                hops: [{ account: lender.trim(), assetId: loanAssetId }],
-                amount,
-                minReturn: amount,
-            },
-            { onSuccess: () => close(false) },
-        );
-    };
-
     return (
-        <Dialog open={open} onOpenChange={close}>
+        <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>New deposit or loan</DialogTitle>
@@ -129,148 +149,180 @@ export function NewDepositLoanDialog({
                     </TabsList>
 
                     <TabsContent value="deposit" className="mt-4">
-                        <form onSubmit={onDeposit} className="grid gap-4">
+                        <form
+                            className="grid gap-4"
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                void depositForm.handleSubmit();
+                            }}
+                        >
                             <p className="text-muted-foreground text-sm">
                                 You accept a deposit: you become the debtor; the
-                                depositor holds the claim (their savings). Mutual
-                                claims auto-net when possible.
+                                depositor holds the claim (their savings).
+                                Mutual claims auto-net when possible.
                             </p>
-                            <div className="grid gap-2">
-                                <Label htmlFor="new-depositor">
-                                    Depositor account
-                                </Label>
-                                <Input
-                                    id="new-depositor"
-                                    value={depositor}
-                                    onChange={(e) =>
-                                        setDepositor(e.target.value)
-                                    }
-                                    placeholder="alice"
-                                    required
-                                />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label>Asset</Label>
-                                <AssetSelect
-                                    assets={assets}
-                                    value={depositAssetId}
-                                    onChange={setDepositAssetId}
-                                />
-                            </div>
-                            <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="new-dep-amt">
-                                        Amount
-                                        {depositAssetId !== undefined
-                                            ? ` (${amountPlaceholder(precisionOf(depositAssetId))})`
-                                            : ""}
-                                    </Label>
-                                    <Input
-                                        id="new-dep-amt"
-                                        inputMode="decimal"
-                                        value={depositAmount}
-                                        onChange={(e) =>
-                                            setDepositAmount(e.target.value)
-                                        }
+                            <depositForm.AppField
+                                name="depositor"
+                                children={(field) => (
+                                    <field.TextField
+                                        label="Depositor account"
+                                        placeholder="alice"
                                         required
                                     />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="new-dep-apr">
-                                        Interest APR %
-                                    </Label>
-                                    <Input
-                                        id="new-dep-apr"
-                                        type="number"
-                                        step="0.01"
-                                        min={0}
-                                        value={depositApr}
-                                        onChange={(e) =>
-                                            setDepositApr(e.target.value)
+                                )}
+                            />
+                            <depositForm.Field
+                                name="assetId"
+                                children={(field) => (
+                                    <AssetField
+                                        assets={assets}
+                                        value={field.state.value}
+                                        onChange={(id) =>
+                                            field.handleChange(id)
                                         }
                                     />
-                                </div>
+                                )}
+                            />
+                            <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
+                                <depositForm.Subscribe
+                                    selector={(s) => s.values.assetId}
+                                    children={(assetId) => (
+                                        <depositForm.AppField
+                                            name="amount"
+                                            children={(field) => (
+                                                <field.TextField
+                                                    label={
+                                                        assetId !== undefined
+                                                            ? `Amount (${amountPlaceholder(precisionOf(assetId))})`
+                                                            : "Amount"
+                                                    }
+                                                    inputMode="decimal"
+                                                    required
+                                                />
+                                            )}
+                                        />
+                                    )}
+                                />
+                                <depositForm.AppField
+                                    name="aprPct"
+                                    children={(field) => (
+                                        <field.TextField
+                                            label="Interest APR %"
+                                            inputMode="decimal"
+                                        />
+                                    )}
+                                />
                             </div>
                             <DialogFooter>
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    onClick={() => close(false)}
+                                    onClick={() => onOpenChange(false)}
                                 >
                                     Cancel
                                 </Button>
-                                <Button
-                                    type="submit"
-                                    disabled={pending || !depositAssetId}
-                                >
-                                    {deposit.isPending
-                                        ? "Booking…"
-                                        : "Book deposit"}
-                                </Button>
+                                <depositForm.Subscribe
+                                    selector={(s) => s.values.assetId}
+                                    children={(assetId) => (
+                                        <depositForm.AppForm>
+                                            <depositForm.SubmitButton
+                                                labels={[
+                                                    "Book deposit",
+                                                    "Booking…",
+                                                ]}
+                                                loading={deposit.isPending}
+                                                disabled={
+                                                    assetId === undefined
+                                                }
+                                            />
+                                        </depositForm.AppForm>
+                                    )}
+                                />
                             </DialogFooter>
                         </form>
                     </TabsContent>
 
                     <TabsContent value="loan" className="mt-4">
-                        <form onSubmit={onLoan} className="grid gap-4">
+                        <form
+                            className="grid gap-4"
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                void loanForm.handleSubmit();
+                            }}
+                        >
                             <p className="text-muted-foreground text-sm">
                                 Draw on a credit line: enter the creditor who
                                 offered you the line. Creates a loan under that
                                 account and currency.
                             </p>
-                            <div className="grid gap-2">
-                                <Label htmlFor="new-lender">
-                                    Lender (creditor)
-                                </Label>
-                                <Input
-                                    id="new-lender"
-                                    value={lender}
-                                    onChange={(e) => setLender(e.target.value)}
-                                    placeholder="gary"
-                                    required
-                                />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label>Asset</Label>
-                                <AssetSelect
-                                    assets={assets}
-                                    value={loanAssetId}
-                                    onChange={setLoanAssetId}
-                                />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="new-loan-amt">
-                                    Draw amount
-                                    {loanAssetId !== undefined
-                                        ? ` (${amountPlaceholder(precisionOf(loanAssetId))})`
-                                        : ""}
-                                </Label>
-                                <Input
-                                    id="new-loan-amt"
-                                    inputMode="decimal"
-                                    value={loanAmount}
-                                    onChange={(e) =>
-                                        setLoanAmount(e.target.value)
-                                    }
-                                    required
-                                />
-                            </div>
+                            <loanForm.AppField
+                                name="lender"
+                                children={(field) => (
+                                    <field.TextField
+                                        label="Lender (creditor)"
+                                        placeholder="gary"
+                                        required
+                                    />
+                                )}
+                            />
+                            <loanForm.Field
+                                name="assetId"
+                                children={(field) => (
+                                    <AssetField
+                                        assets={assets}
+                                        value={field.state.value}
+                                        onChange={(id) =>
+                                            field.handleChange(id)
+                                        }
+                                    />
+                                )}
+                            />
+                            <loanForm.Subscribe
+                                selector={(s) => s.values.assetId}
+                                children={(assetId) => (
+                                    <loanForm.AppField
+                                        name="amount"
+                                        children={(field) => (
+                                            <field.TextField
+                                                label={
+                                                    assetId !== undefined
+                                                        ? `Draw amount (${amountPlaceholder(precisionOf(assetId))})`
+                                                        : "Draw amount"
+                                                }
+                                                inputMode="decimal"
+                                                required
+                                            />
+                                        )}
+                                    />
+                                )}
+                            />
                             <DialogFooter>
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    onClick={() => close(false)}
+                                    onClick={() => onOpenChange(false)}
                                 >
                                     Cancel
                                 </Button>
-                                <Button
-                                    type="submit"
-                                    disabled={pending || !loanAssetId}
-                                >
-                                    {pathPay.isPending
-                                        ? "Drawing…"
-                                        : "Draw loan"}
-                                </Button>
+                                <loanForm.Subscribe
+                                    selector={(s) => s.values.assetId}
+                                    children={(assetId) => (
+                                        <loanForm.AppForm>
+                                            <loanForm.SubmitButton
+                                                labels={[
+                                                    "Draw loan",
+                                                    "Drawing…",
+                                                ]}
+                                                loading={pathPay.isPending}
+                                                disabled={
+                                                    assetId === undefined
+                                                }
+                                            />
+                                        </loanForm.AppForm>
+                                    )}
+                                />
                             </DialogFooter>
                         </form>
                     </TabsContent>

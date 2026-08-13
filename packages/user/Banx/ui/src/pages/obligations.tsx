@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 
 import { AccountHistoryDialog } from "@/components/account-history";
-import { AssetSelect } from "@/components/asset-select";
+import { AssetField } from "@/components/form-fields";
 import { NewDepositLoanDialog } from "@/components/new-deposit-loan-dialog";
 import { PageHeader } from "@/components/page-header";
 import {
@@ -28,6 +28,7 @@ import {
 } from "@/hooks/use-banx-mutations";
 import { amountPlaceholder, formatRawAmount } from "@/lib/amount";
 import { ppmToPercent } from "@/lib/constants";
+import { percentStringToPpm, useAppForm } from "@/lib/form";
 import type { Asset, CreditLine, Obligation } from "@/lib/graphql";
 
 /** ppm → percent string for form inputs (e.g. 10000 → "1") */
@@ -39,7 +40,6 @@ import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { cn } from "@shared/lib/utils";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
-import { Checkbox } from "@shared/shadcn/ui/checkbox";
 import {
     Collapsible,
     CollapsibleContent,
@@ -53,7 +53,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
-import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 import { Separator } from "@shared/shadcn/ui/separator";
 import { Switch } from "@shared/shadcn/ui/switch";
@@ -189,9 +188,6 @@ export function ObligationsPage() {
     const accrue = useAccrue();
     const isLoading = obsLoading || linesLoading;
 
-    const [counterparty, setCounterparty] = useState("");
-    const [assetId, setAssetId] = useState<number | undefined>();
-    const [maxAmount, setMaxAmount] = useState("");
     const [createOpen, setCreateOpen] = useState(false);
     const [creditLineOpen, setCreditLineOpen] = useState(false);
     /** When set, credit-line dialog edits this facility instead of creating. */
@@ -206,6 +202,35 @@ export function ObligationsPage() {
         setRoutingPrefill(prefill ?? null);
         setRoutingOpen(true);
     };
+
+    const netForm = useAppForm({
+        defaultValues: {
+            counterparty: "",
+            assetId: undefined as number | undefined,
+            maxAmount: "",
+        },
+        onSubmit: async ({ value }) => {
+            if (
+                value.assetId === undefined ||
+                !value.counterparty.trim() ||
+                !value.maxAmount.trim()
+            )
+                return;
+            await new Promise<void>((resolve, reject) => {
+                net.mutate(
+                    {
+                        counterparty: value.counterparty.trim(),
+                        assetId: value.assetId!,
+                        maxAmount: value.maxAmount.trim(),
+                    },
+                    {
+                        onSuccess: () => resolve(),
+                        onError: (e: Error) => reject(e),
+                    },
+                );
+            });
+        },
+    });
 
     const savingsGroupsAll = useMemo(() => {
         if (!user) return [];
@@ -252,26 +277,17 @@ export function ObligationsPage() {
     );
 
     const prefillNet = (party: string, aid: number, maxRaw?: string) => {
-        setCounterparty(party);
-        setAssetId(aid);
+        netForm.setFieldValue("counterparty", party);
+        netForm.setFieldValue("assetId", aid);
         if (maxRaw !== undefined) {
-            setMaxAmount(
+            netForm.setFieldValue(
+                "maxAmount",
                 formatRawAmount(maxRaw, precisionOf(aid)).replace(/,/g, ""),
             );
         }
         document
             .getElementById("net-settlement")
             ?.scrollIntoView({ behavior: "smooth", block: "start" });
-    };
-
-    const onNet = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!assetId || !counterparty.trim() || !maxAmount.trim()) return;
-        net.mutate({
-            counterparty: counterparty.trim(),
-            assetId,
-            maxAmount: maxAmount.trim(),
-        });
     };
 
     return (
@@ -512,7 +528,11 @@ export function ObligationsPage() {
             {/* ── Settlement ──────────────────────────────────────────── */}
             <section id="net-settlement" className="scroll-mt-6">
                 <form
-                    onSubmit={onNet}
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        void netForm.handleSubmit();
+                    }}
                     className="bg-card grid max-w-xl gap-4 rounded-xl border p-5 shadow-sm"
                 >
                     <div className="flex items-center gap-3">
@@ -530,51 +550,64 @@ export function ObligationsPage() {
                             </p>
                         </div>
                     </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="cp">Counterparty</Label>
-                        <Input
-                            id="cp"
-                            value={counterparty}
-                            onChange={(e) => setCounterparty(e.target.value)}
-                            placeholder="account name"
-                            required
-                        />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label>Asset</Label>
-                        <AssetSelect
-                            assets={assets}
-                            value={assetId}
-                            onChange={setAssetId}
-                        />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="max">
-                            Max amount{" "}
-                            {assetId !== undefined
-                                ? `(e.g. ${amountPlaceholder(precisionOf(assetId))})`
-                                : ""}
-                        </Label>
-                        <Input
-                            id="max"
-                            inputMode="decimal"
-                            placeholder={
-                                assetId !== undefined
-                                    ? amountPlaceholder(precisionOf(assetId))
-                                    : "0.00"
-                            }
-                            value={maxAmount}
-                            onChange={(e) => setMaxAmount(e.target.value)}
-                            required
-                        />
-                    </div>
-                    <Button
-                        type="submit"
-                        disabled={net.isPending || !assetId}
-                        className="w-full sm:w-auto"
-                    >
-                        {net.isPending ? "Netting…" : "Net pair"}
-                    </Button>
+                    <netForm.AppField
+                        name="counterparty"
+                        children={(field) => (
+                            <field.TextField
+                                label="Counterparty"
+                                placeholder="account name"
+                                required
+                            />
+                        )}
+                    />
+                    <netForm.Field
+                        name="assetId"
+                        children={(field) => (
+                            <AssetField
+                                assets={assets}
+                                value={field.state.value}
+                                onChange={(id) => field.handleChange(id)}
+                            />
+                        )}
+                    />
+                    <netForm.Subscribe
+                        selector={(s) => s.values.assetId}
+                        children={(assetId) => (
+                            <netForm.AppField
+                                name="maxAmount"
+                                children={(field) => (
+                                    <field.TextField
+                                        label={
+                                            assetId !== undefined
+                                                ? `Max amount (e.g. ${amountPlaceholder(precisionOf(assetId))})`
+                                                : "Max amount"
+                                        }
+                                        inputMode="decimal"
+                                        placeholder={
+                                            assetId !== undefined
+                                                ? amountPlaceholder(
+                                                      precisionOf(assetId),
+                                                  )
+                                                : "0.00"
+                                        }
+                                        required
+                                    />
+                                )}
+                            />
+                        )}
+                    />
+                    <netForm.Subscribe
+                        selector={(s) => s.values.assetId}
+                        children={(assetId) => (
+                            <netForm.AppForm>
+                                <netForm.SubmitButton
+                                    labels={["Net pair", "Netting…"]}
+                                    loading={net.isPending}
+                                    disabled={assetId === undefined}
+                                />
+                            </netForm.AppForm>
+                        )}
+                    />
                 </form>
             </section>
         </div>
@@ -696,55 +729,64 @@ function CreditLineDialog({
     const setLine = useSetCreditLine();
     const isEdit = !!editing;
 
-    const [debtor, setDebtor] = useState("");
-    const [lineAssetId, setLineAssetId] = useState<number | undefined>();
-    const [limit, setLimit] = useState("100");
-    const [interestPct, setInterestPct] = useState("0");
-    const [deplete, setDeplete] = useState(false);
+    const form = useAppForm({
+        defaultValues: {
+            debtor: "",
+            assetId: undefined as number | undefined,
+            limit: "100",
+            interestPct: "0",
+            deplete: false,
+        },
+        onSubmit: async ({ value }) => {
+            if (value.assetId === undefined || !value.debtor.trim()) return;
+            await new Promise<void>((resolve, reject) => {
+                setLine.mutate(
+                    {
+                        debtor: value.debtor.trim(),
+                        assetId: value.assetId!,
+                        limit: value.limit.trim(),
+                        depleteOnDebit: value.deplete,
+                        interestRatePpm: percentStringToPpm(value.interestPct),
+                    },
+                    {
+                        onSuccess: () => {
+                            onOpenChange(false);
+                            resolve();
+                        },
+                        onError: (e: Error) => reject(e),
+                    },
+                );
+            });
+        },
+    });
 
     useEffect(() => {
         if (!open) return;
         if (editing) {
-            setDebtor(editing.debtor);
-            setLineAssetId(editing.assetId);
-            setLimit(
-                formatRawAmount(
+            form.reset({
+                debtor: editing.debtor,
+                assetId: editing.assetId,
+                limit: formatRawAmount(
                     editing.limit,
                     precisionOf(editing.assetId),
                 ).replace(/,/g, ""),
-            );
-            setInterestPct(ppmToPercentInput(editing.interestRatePpm));
-            setDeplete(editing.depleteOnDebit);
+                interestPct: ppmToPercentInput(editing.interestRatePpm),
+                deplete: editing.depleteOnDebit,
+            });
         } else {
-            setDebtor("");
-            setLineAssetId(undefined);
-            setLimit("100");
-            setInterestPct("0");
-            setDeplete(false);
+            form.reset({
+                debtor: "",
+                assetId: undefined,
+                limit: "100",
+                interestPct: "0",
+                deplete: false,
+            });
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, editing, precisionOf]);
 
-    const close = (next: boolean) => {
-        onOpenChange(next);
-    };
-
-    const onSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!lineAssetId || !debtor.trim()) return;
-        setLine.mutate(
-            {
-                debtor: debtor.trim(),
-                assetId: lineAssetId,
-                limit: limit.trim(),
-                depleteOnDebit: deplete,
-                interestRatePpm: Math.round(Number(interestPct) * 10_000),
-            },
-            { onSuccess: () => close(false) },
-        );
-    };
-
     return (
-        <Dialog open={open} onOpenChange={close}>
+        <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>
@@ -756,77 +798,73 @@ function CreditLineDialog({
                             : "You are the creditor. Set how much the debtor may draw (and hold outstanding) against you. Drawn amounts show up here as savings-style claims."}
                     </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={onSubmit} className="grid gap-4">
-                    <div className="grid gap-2">
-                        <Label htmlFor="line-debtor">Debtor account</Label>
-                        <Input
-                            id="line-debtor"
-                            value={debtor}
-                            onChange={(e) => setDebtor(e.target.value)}
-                            placeholder="alice"
-                            required
-                            disabled={isEdit}
-                            readOnly={isEdit}
-                        />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label>Asset</Label>
-                        {isEdit && lineAssetId !== undefined ? (
-                            <Input
-                                value={
-                                    assets.find((a) => a.id === lineAssetId)
-                                        ?.symbol.toUpperCase() ??
-                                    `Asset #${lineAssetId}`
-                                }
-                                disabled
-                                readOnly
-                            />
-                        ) : (
-                            <AssetSelect
-                                assets={assets}
-                                value={lineAssetId}
-                                onChange={setLineAssetId}
+                <form
+                    className="grid gap-4"
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        void form.handleSubmit();
+                    }}
+                >
+                    <form.AppField
+                        name="debtor"
+                        children={(field) => (
+                            <field.TextField
+                                label="Debtor account"
+                                placeholder="alice"
+                                required
+                                disabled={isEdit}
+                                readOnly={isEdit}
                             />
                         )}
-                    </div>
+                    />
+                    <form.Field
+                        name="assetId"
+                        children={(field) => (
+                            <AssetField
+                                assets={assets}
+                                value={field.state.value}
+                                onChange={(id) => field.handleChange(id)}
+                                disabled={isEdit}
+                            />
+                        )}
+                    />
                     <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
-                        <div className="grid gap-2">
-                            <Label htmlFor="line-limit">
-                                Limit
-                                {lineAssetId !== undefined
-                                    ? ` (${amountPlaceholder(precisionOf(lineAssetId))})`
-                                    : ""}
-                            </Label>
-                            <Input
-                                id="line-limit"
-                                inputMode="decimal"
-                                value={limit}
-                                onChange={(e) => setLimit(e.target.value)}
-                                required
-                            />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="line-apr">Interest APR %</Label>
-                            <Input
-                                id="line-apr"
-                                type="number"
-                                step="0.01"
-                                min={0}
-                                value={interestPct}
-                                onChange={(e) => setInterestPct(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Checkbox
-                            id="line-deplete"
-                            checked={deplete}
-                            onCheckedChange={(v) => setDeplete(v === true)}
+                        <form.Subscribe
+                            selector={(s) => s.values.assetId}
+                            children={(assetId) => (
+                                <form.AppField
+                                    name="limit"
+                                    children={(field) => (
+                                        <field.TextField
+                                            label={
+                                                assetId !== undefined
+                                                    ? `Limit (${amountPlaceholder(precisionOf(assetId))})`
+                                                    : "Limit"
+                                            }
+                                            inputMode="decimal"
+                                            required
+                                        />
+                                    )}
+                                />
+                            )}
                         />
-                        <Label htmlFor="line-deplete" className="font-normal">
-                            Deplete limit on each draw (non-revolving)
-                        </Label>
+                        <form.AppField
+                            name="interestPct"
+                            children={(field) => (
+                                <field.TextField
+                                    label="Interest APR %"
+                                    inputMode="decimal"
+                                />
+                            )}
+                        />
                     </div>
+                    <form.AppField
+                        name="deplete"
+                        children={(field) => (
+                            <field.CheckboxField label="Deplete limit on each draw (non-revolving)" />
+                        )}
+                    />
                     {isEdit && editing ? (
                         <p className="text-muted-foreground text-xs">
                             Current line exposure:{" "}
@@ -843,21 +881,32 @@ function CreditLineDialog({
                         <Button
                             type="button"
                             variant="outline"
-                            onClick={() => close(false)}
+                            onClick={() => onOpenChange(false)}
                         >
                             Cancel
                         </Button>
-                        <Button
-                            type="submit"
-                            disabled={setLine.isPending || !lineAssetId}
-                            className="bg-emerald-700 text-white hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500"
-                        >
-                            {setLine.isPending
-                                ? "Saving…"
-                                : isEdit
-                                  ? "Update credit line"
-                                  : "Save credit line"}
-                        </Button>
+                        <form.Subscribe
+                            selector={(s) => s.values.assetId}
+                            children={(assetId) => (
+                                <form.AppForm>
+                                    <form.SubmitButton
+                                        labels={
+                                            isEdit
+                                                ? [
+                                                      "Update credit line",
+                                                      "Saving…",
+                                                  ]
+                                                : [
+                                                      "Save credit line",
+                                                      "Saving…",
+                                                  ]
+                                        }
+                                        loading={setLine.isPending}
+                                        disabled={assetId === undefined}
+                                    />
+                                </form.AppForm>
+                            )}
+                        />
                     </DialogFooter>
                 </form>
             </DialogContent>

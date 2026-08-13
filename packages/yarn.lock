@@ -1836,6 +1836,7 @@ __metadata:
   resolution: "@psibase/banx-ui@workspace:user/Banx/ui"
   dependencies:
     "@psibase/common-lib": "workspace:*"
+    "@tanstack/react-form": "npm:^1.19.3"
     "@tanstack/react-query": "npm:^5.90.6"
     "@types/node": "npm:^22.15.0"
     "@types/react": "npm:^19.1.0"
