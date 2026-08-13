@@ -771,12 +771,18 @@ function CreditLineDialog({
             deplete: false,
         },
         onSubmit: async ({ value }) => {
-            if (value.assetId === undefined || !value.debtor.trim()) return;
+            const debtor = isEdit
+                ? editing!.debtor
+                : value.debtor.trim();
+            const assetId = isEdit
+                ? editing!.assetId
+                : value.assetId;
+            if (assetId === undefined || !debtor) return;
             await new Promise<void>((resolve, reject) => {
                 setLine.mutate(
                     {
-                        debtor: value.debtor.trim(),
-                        assetId: value.assetId!,
+                        debtor,
+                        assetId,
                         limit: value.limit.trim(),
                         depleteOnDebit: value.deplete,
                         interestRatePpm: percentStringToPpm(
@@ -821,16 +827,24 @@ function CreditLineDialog({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, editing, precisionOf]);
 
+    const editSymbol =
+        isEdit && editing
+            ? (assets.find((a) => a.id === editing.assetId)?.symbol.toUpperCase() ??
+              `#${editing.assetId}`)
+            : null;
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>
-                        {isEdit ? "Edit credit line" : "Offer a credit line"}
+                        {isEdit
+                            ? `Edit credit line · ${editing!.debtor} · ${editSymbol}`
+                            : "Offer a credit line"}
                     </DialogTitle>
                     <DialogDescription>
                         {isEdit
-                            ? "Update limit, interest, or revolving terms. Debtor and asset stay the same."
+                            ? `Update limit, interest, or revolving terms for ${editing!.debtor} in ${editSymbol}.`
                             : "You are the creditor. Set how much the debtor may draw (and hold outstanding) against you. Drawn amounts show up here as savings-style claims."}
                     </DialogDescription>
                 </DialogHeader>
@@ -842,48 +856,56 @@ function CreditLineDialog({
                         void form.handleSubmit();
                     }}
                 >
-                    <form.AppField
-                        name="debtor"
-                        children={(field) => (
-                            <field.TextField
-                                label="Debtor account"
-                                placeholder="alice"
-                                required
-                                disabled={isEdit}
-                                readOnly={isEdit}
+                    {!isEdit ? (
+                        <>
+                            <form.AppField
+                                name="debtor"
+                                children={(field) => (
+                                    <field.TextField
+                                        label="Debtor account"
+                                        placeholder="alice"
+                                        required
+                                    />
+                                )}
                             />
-                        )}
-                    />
-                    <form.Field
-                        name="assetId"
-                        children={(field) => (
-                            <AssetField
-                                assets={assets}
-                                value={field.state.value}
-                                onChange={(id) => field.handleChange(id)}
-                                disabled={isEdit}
+                            <form.Field
+                                name="assetId"
+                                children={(field) => (
+                                    <AssetField
+                                        assets={assets}
+                                        value={field.state.value}
+                                        onChange={(id) =>
+                                            field.handleChange(id)
+                                        }
+                                    />
+                                )}
                             />
-                        )}
-                    />
+                        </>
+                    ) : null}
                     <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
                         <form.Subscribe
                             selector={(s) => s.values.assetId}
-                            children={(assetId) => (
-                                <form.AppField
-                                    name="limit"
-                                    children={(field) => (
-                                        <field.TextField
-                                            label={
-                                                assetId !== undefined
-                                                    ? `Limit (${amountPlaceholder(precisionOf(assetId))})`
-                                                    : "Limit"
-                                            }
-                                            inputMode="decimal"
-                                            required
-                                        />
-                                    )}
-                                />
-                            )}
+                            children={(assetId) => {
+                                const aid = isEdit
+                                    ? editing!.assetId
+                                    : assetId;
+                                return (
+                                    <form.AppField
+                                        name="limit"
+                                        children={(field) => (
+                                            <field.TextField
+                                                label={
+                                                    aid !== undefined
+                                                        ? `Limit (${amountPlaceholder(precisionOf(aid))})`
+                                                        : "Limit"
+                                                }
+                                                inputMode="decimal"
+                                                required
+                                            />
+                                        )}
+                                    />
+                                );
+                            }}
                         />
                         <form.AppField
                             name="interestPct"
@@ -898,7 +920,6 @@ function CreditLineDialog({
                                     min={0}
                                     max={MAX_PERCENT}
                                     step={MIN_PERCENT_STEP}
-                                    description="0–100% (0.0001% = 1 ppm)"
                                 />
                             )}
                         />
@@ -930,26 +951,37 @@ function CreditLineDialog({
                             Cancel
                         </Button>
                         <form.Subscribe
-                            selector={(s) => s.values.assetId}
-                            children={(assetId) => (
-                                <form.AppForm>
-                                    <form.SubmitButton
-                                        labels={
-                                            isEdit
-                                                ? [
-                                                      "Update credit line",
-                                                      "Saving…",
-                                                  ]
-                                                : [
-                                                      "Save credit line",
-                                                      "Saving…",
-                                                  ]
-                                        }
-                                        loading={setLine.isPending}
-                                        disabled={assetId === undefined}
-                                    />
-                                </form.AppForm>
-                            )}
+                            selector={(s) => s.values}
+                            children={(values) => {
+                                const assetId = isEdit
+                                    ? editing!.assetId
+                                    : values.assetId;
+                                const debtorOk = isEdit
+                                    ? true
+                                    : !!values.debtor.trim();
+                                return (
+                                    <form.AppForm>
+                                        <form.SubmitButton
+                                            labels={
+                                                isEdit
+                                                    ? [
+                                                          "Update credit line",
+                                                          "Saving…",
+                                                      ]
+                                                    : [
+                                                          "Save credit line",
+                                                          "Saving…",
+                                                      ]
+                                            }
+                                            loading={setLine.isPending}
+                                            disabled={
+                                                assetId === undefined ||
+                                                !debtorOk
+                                            }
+                                        />
+                                    </form.AppForm>
+                                );
+                            }}
                         />
                     </DialogFooter>
                 </form>

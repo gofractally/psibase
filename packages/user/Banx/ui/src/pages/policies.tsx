@@ -1,20 +1,12 @@
-import { useState } from "react";
-
 import { AssetField, ExpiresField } from "@/components/form-fields";
-import {
-    formatExpiresAt,
-} from "@/components/expires-at-picker";
+import { formatExpiresAt } from "@/components/expires-at-picker";
 import { PageHeader } from "@/components/page-header";
-import { RoutingPolicyDialog } from "@/components/routing-policy-dialog";
 import { useAssetMap } from "@/hooks/use-assets";
 import {
     useCurrencyPolicies,
     useRoutingPolicies,
 } from "@/hooks/use-banx-data";
-import {
-    useConvert,
-    useSetCurrencyPolicy,
-} from "@/hooks/use-banx-mutations";
+import { useConvert, useSetCurrencyPolicy } from "@/hooks/use-banx-mutations";
 import {
     amountPlaceholder,
     formatFxToRate,
@@ -31,7 +23,6 @@ import {
     useAppForm,
 } from "@/lib/form";
 
-import { Button } from "@shared/shadcn/ui/button";
 import {
     Table,
     TableBody,
@@ -50,8 +41,6 @@ export function PoliciesPage() {
 
     const globalRouting = routing.filter((p) => p.isGlobal);
     const specificRouting = routing.filter((p) => !p.isGlobal);
-
-    const [routingDialogOpen, setRoutingDialogOpen] = useState(false);
 
     const currencyForm = useAppForm({
         defaultValues: {
@@ -124,32 +113,10 @@ export function PoliciesPage() {
         <div className="space-y-10">
             <PageHeader
                 title="Policies"
-                description="Global routing applies to every credit line in an asset (stored as creditor = 0). Optional per-creditor overrides. Currency policies handle FX (enter how many to-units you get per 1 from-unit)."
-            />
-
-            <RoutingPolicyDialog
-                open={routingDialogOpen}
-                onOpenChange={setRoutingDialogOpen}
-                assets={assets}
+                description="Currency policies handle FX (how many to-units you get per 1 from-unit). Routing hop fees are managed from Accounts."
             />
 
             <section className="grid gap-8 lg:grid-cols-2">
-                <div className="grid gap-3 rounded-lg border p-4">
-                    <h2 className="font-medium">Set routing policy</h2>
-                    <p className="text-muted-foreground text-xs">
-                        Same-asset path hop fees. Leave next-hop blank for a{" "}
-                        <strong>global</strong> policy, or set a per-creditor
-                        override. Also available from Accounts via the route
-                        icon.
-                    </p>
-                    <Button
-                        type="button"
-                        onClick={() => setRoutingDialogOpen(true)}
-                    >
-                        Open routing form
-                    </Button>
-                </div>
-
                 <form
                     className="grid gap-3 rounded-lg border p-4"
                     onSubmit={(e) => {
@@ -387,7 +354,9 @@ export function PoliciesPage() {
             <section className="space-y-4">
                 <h2 className="font-medium">Your routing policies</h2>
                 {routing.length === 0 ? (
-                    <p className="text-muted-foreground text-sm">None</p>
+                    <p className="text-muted-foreground text-sm">
+                        None — set hop fees from Accounts (route icon).
+                    </p>
                 ) : (
                     <div className="overflow-x-auto rounded-md border">
                         <Table>

@@ -80,18 +80,21 @@ pub fn apply_rate(amount_in: u64, fee_fixed: u64, rate: u64) -> Option<u64> {
     Some(out)
 }
 
-/// `out = (in - fixed) * (PPM_SCALE - percent) / PPM_SCALE`.
+/// Stripe-style: `out = in * (PPM_SCALE - percent) / PPM_SCALE - fixed`.
 pub fn apply_hop_fee(amount_in: u64, fee_fixed: u64, fee_percent_ppm: u32) -> Option<u64> {
     // Must be under 100% (same as on-chain: hop_fee_percent < PPM_SCALE).
-    if fee_percent_ppm >= PPM_SCALE || fee_fixed >= amount_in {
+    if fee_percent_ppm >= PPM_SCALE {
         return None;
     }
-    let after = amount_in - fee_fixed;
     let keep = (PPM_SCALE - fee_percent_ppm) as u128;
-    let out = (after as u128)
+    let after_pct = (amount_in as u128)
         .checked_mul(keep)?
         .checked_div(PPM_SCALE as u128)?;
-    let out = u64::try_from(out).ok()?;
+    let after_pct = u64::try_from(after_pct).ok()?;
+    if fee_fixed >= after_pct {
+        return None;
+    }
+    let out = after_pct - fee_fixed;
     if out == 0 {
         return None;
     }

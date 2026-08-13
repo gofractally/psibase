@@ -19,6 +19,7 @@ export {
     clampHopFeePercent,
     percentStringToPpm,
     percentToPpm,
+    ppmToPercentInput,
 } from "@/lib/constants";
 
 /** Non-empty trimmed account string, or undefined if invalid. */
@@ -47,6 +48,34 @@ export function percentFieldValidator(maxPercent: number) {
         const decimals = (t.split(".")[1] ?? "").replace(/0+$/, "").length;
         if (decimals > 4) {
             return "Max 4 decimal places (1 ppm = 0.0001%)";
+        }
+        return undefined;
+    };
+}
+
+/**
+ * Human decimal amount for an asset with the given `precision` (fraction digits).
+ * Empty allowed when `allowEmpty` (e.g. optional fixed fee of 0).
+ */
+export function amountFieldValidator(
+    precision: number,
+    opts?: { allowEmpty?: boolean; allowZero?: boolean },
+) {
+    const allowEmpty = opts?.allowEmpty ?? false;
+    const allowZero = opts?.allowZero ?? true;
+    return ({ value }: { value: string }) => {
+        const t = String(value).trim();
+        if (t === "") return allowEmpty ? undefined : "Required";
+        if (!/^\d+(\.\d*)?$|^\.\d+$/.test(t)) return "Enter a valid amount";
+        const n = Number(t);
+        if (!Number.isFinite(n)) return "Enter a valid amount";
+        if (n < 0) return "Cannot be negative";
+        if (!allowZero && n === 0) return "Must be greater than zero";
+        const frac = t.includes(".") ? (t.split(".")[1] ?? "") : "";
+        if (frac.length > precision) {
+            return precision <= 0
+                ? "Whole numbers only for this asset"
+                : `Max ${precision} decimal place${precision === 1 ? "" : "s"} for this asset`;
         }
         return undefined;
     };

@@ -204,20 +204,25 @@ pub mod tables {
         out.into()
     }
 
-    /// Same-asset hop fee: `out = (in - fixed) * (PPM_SCALE - percent_ppm) / PPM_SCALE`.
+    /// Same-asset hop fee (Stripe-style): percent of gross, then fixed.
+    ///
+    /// `out = in * (PPM_SCALE - percent_ppm) / PPM_SCALE - fee_fixed`
     fn apply_hop_fee(amount_in: Quantity, fee_fixed: Quantity, fee_percent_ppm: u32) -> Quantity {
         assert!(
             fee_percent_ppm < PPM_SCALE,
             "hop fee must be under 100%"
         );
-        assert!(fee_fixed < amount_in, "fixed hop fee consumes entire amount");
-        let after_fixed = amount_in - fee_fixed;
         let keep_ppm = (PPM_SCALE - fee_percent_ppm) as u128;
-        let out = (after_fixed.value as u128)
+        let after_pct = (amount_in.value as u128)
             .checked_mul(keep_ppm)
             .expect("hop fee overflow")
             / (PPM_SCALE as u128);
-        let out = u64::try_from(out).expect("hop fee out exceeds u64");
+        let after_pct = u64::try_from(after_pct).expect("hop fee out exceeds u64");
+        assert!(
+            fee_fixed.value < after_pct,
+            "fixed hop fee consumes entire amount after percent fee"
+        );
+        let out = after_pct - fee_fixed.value;
         assert!(out > 0, "hop fee reduced amount to zero");
         out.into()
     }
@@ -322,11 +327,13 @@ pub mod tables {
             .save();
         }
 
-        /// Remove a routing policy row if present (no-op if missing).
+        /// Remove a routing policy row. Panics if it does not exist.
         pub fn remove(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) {
-            if Self::get(creditor, debtor, asset_id).is_some() {
-                RoutingPolicyTab::read_write().erase(&(creditor, debtor, asset_id));
-            }
+            assert!(
+                Self::get(creditor, debtor, asset_id).is_some(),
+                "routing policy not found"
+            );
+            RoutingPolicyTab::read_write().erase(&(creditor, debtor, asset_id));
         }
 
         /// Path draw using this policy's fees against a concrete next-hop `creditor`.
@@ -1219,7 +1226,7 @@ pub mod service {
     /// Sender sets **global** routing for this asset (`creditor = 0` row).
     /// Applies to any next-hop that has extended them a credit line.
     ///
-    /// Pricing: `out = (in - hop_fee_fixed) * (1 - hop_fee_percent)`.
+    /// Pricing (Stripe-style): `out = in * (1 - hop_fee_percent) - hop_fee_fixed`.
     /// Specific [`st_rte_pol`] entries still win when present.
     #[action]
     fn st_glb_rte(

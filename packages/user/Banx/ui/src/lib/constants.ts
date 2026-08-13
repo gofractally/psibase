@@ -33,6 +33,15 @@ export function ppmToPercent(ppm: number): string {
     return `${fixed}%`;
 }
 
+/** Percent number string for form inputs (no `%` suffix). */
+export function ppmToPercentInput(ppm: number): string {
+    const pct = ppm / PPM_PER_PERCENT;
+    return pct
+        .toFixed(4)
+        .replace(/(\.\d*?[1-9])0+$/, "$1")
+        .replace(/\.0+$/, "");
+}
+
 /**
  * Convert a human percent to ppm, clamped to [0, maxPpm].
  * Rounds to nearest integer ppm (chain precision).
