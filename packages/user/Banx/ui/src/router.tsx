@@ -17,8 +17,8 @@ export const router = createBrowserRouter([
         path: "/",
         element: <Layout />,
         children: [
-            { index: true, element: <Navigate to="/obligations" replace /> },
-            { path: "obligations", element: withGate(<ObligationsPage />) },
+            { index: true, element: <Navigate to="/accounts" replace /> },
+            { path: "accounts", element: withGate(<ObligationsPage />) },
             { path: "payees", element: withGate(<PayeesPage />) },
             { path: "path-pay", element: withGate(<PathPayPage />) },
             { path: "policies", element: withGate(<PoliciesPage />) },

@@ -21,7 +21,7 @@ const items: {
     icon: React.ComponentType<{ className?: string }>;
     end?: boolean;
 }[] = [
-    { to: "/obligations", label: "Accounts", icon: ScrollText },
+    { to: "/accounts", label: "Accounts", icon: ScrollText },
     { to: "/payees", label: "Payees", icon: Contact },
     { to: "/path-pay", label: "Path pay", icon: GitBranch },
     { to: "/policies", label: "Policies", icon: ArrowLeftRight },

@@ -93,8 +93,8 @@ fn human_to_fx_rate(from_asset: u16, to_asset: u16, to_rate: &str) -> Result<u64
         .checked_mul(banx::tables::RATE_SCALE as u128)
         .ok_or_else(|| ErrorType::ConversionError("fx_rate overflow".into()))?
         / (one_from.value as u128);
-    let fx = u64::try_from(fx)
-        .map_err(|_| ErrorType::ConversionError("fx_rate exceeds u64".into()))?;
+    let fx =
+        u64::try_from(fx).map_err(|_| ErrorType::ConversionError("fx_rate exceeds u64".into()))?;
     if fx == 0 {
         return Err(ErrorType::ConversionError(
             "to-rate too small for asset precisions (fx_rate rounds to 0)".into(),
@@ -256,7 +256,9 @@ impl Api for BanxPlugin {
     fn path_pay(hops: Vec<WitPathHop>, amount: String, min_return: String) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::path_pay)?;
         if hops.is_empty() {
-            return Err(ErrorType::ConversionError("path must have at least one hop".into()).into());
+            return Err(
+                ErrorType::ConversionError("path must have at least one hop".into()).into(),
+            );
         }
         let first_asset = hops[0].asset_id;
         let last_asset = hops[hops.len() - 1].asset_id;
@@ -320,15 +322,10 @@ impl Api for BanxPlugin {
             ))
         })?;
 
-        let last_asset = quote
-            .hops
-            .last()
-            .map(|h| h.asset_id)
-            .unwrap_or(from_asset);
+        let last_asset = quote.hops.last().map(|h| h.asset_id).unwrap_or(from_asset);
         let asset = query::fetch_asset::fetch_asset(last_asset)?;
         let precision = asset.precision()?;
-        let amount_out =
-            Decimal::new(Quantity::new(quote.amount_out), precision).to_string();
+        let amount_out = Decimal::new(Quantity::new(quote.amount_out), precision).to_string();
 
         Ok(PathQuote {
             hops: quote
