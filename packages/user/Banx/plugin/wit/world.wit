@@ -9,9 +9,11 @@ interface types {
     /// Result of off-chain multi-hop path discovery for `path-pay`.
     record path-quote {
         hops: list<path-hop>,
+        /// Amount to draw on the first hop (human decimal in first hop asset).
+        amount-in: string,
         /// Estimated residual after fees (human decimal in last hop asset).
         amount-out: string,
-        /// Suggested min-return (same as amount-out for now).
+        /// Suggested min-return for `path-pay` (human decimal in last hop asset).
         min-return: string,
     }
 }
@@ -120,7 +122,14 @@ interface api {
     /// Discover a multi-hop path from `from-account` to `to-account` (TokenSwap-style
     /// max-residual search over credit lines / routing / FX). Uses a scoped GraphQL
     /// subgraph around the two endpoints — not a full-network dump.
-    /// `to-asset` empty/none → any final asset; otherwise require that asset on last hop.
+    ///
+    /// - `exact-out = false` (default): `amount` is what you send (`from-asset`);
+    ///   fees reduce what the payee receives.
+    /// - `exact-out = true`: `amount` is what the payee should receive (requires
+    ///   `to-asset`); quote finds the minimum send so you absorb hop/FX fees.
+    ///
+    /// `to-asset` empty/none → any final asset (exact-in only); otherwise require
+    /// that asset on the last hop.
     quote-path: func(
         from-account: string,
         to-account: string,
@@ -128,6 +137,7 @@ interface api {
         from-asset: u16,
         to-asset: option<u16>,
         max-hops: u8,
+        exact-out: bool,
     ) -> result<path-quote, error>;
 
     /// Accrue interest on a directed pair/asset.

@@ -52,6 +52,8 @@ pub struct PathHop {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PathQuote {
     pub hops: Vec<PathHop>,
+    /// Amount drawn on the first hop (raw units of `from_asset`).
+    pub amount_in: u64,
     /// Residual amount after all fees (raw units of last hop asset).
     pub amount_out: u64,
 }
@@ -335,7 +337,140 @@ pub fn find_banx_path(
         return None;
     }
 
-    Some(PathQuote { hops, amount_out })
+    Some(PathQuote {
+        hops,
+        amount_in,
+        amount_out,
+    })
+}
+
+/// Find a path that delivers at least `amount_out` to the payee, minimizing
+/// `amount_in` (sender absorbs hop/FX fees).
+///
+/// Important: we must **not** probe the full first-hop residual first. A large
+/// `amount_in` often exceeds intermediate residuals and makes the exact-in
+/// searcher return `None` even when a smaller send works (the exact-in UX
+/// case). Expand upward from a small probe, then binary-search the minimum
+/// send that still clears `amount_out`.
+pub fn find_banx_path_exact_out(
+    lines: &[LineEdge],
+    routing: &[RoutingEdge],
+    fx: &[FxEdge],
+    sender: &str,
+    payee: &str,
+    amount_out: u64,
+    from_asset: u16,
+    to_asset: Option<u16>,
+    max_hops: u8,
+    now: i64,
+) -> Option<PathQuote> {
+    if amount_out == 0 || max_hops == 0 || sender == payee {
+        return None;
+    }
+
+    let max_in = lines
+        .iter()
+        .filter(|l| l.debtor == sender && l.asset_id == from_asset && l.residual > 0)
+        .map(|l| l.residual)
+        .max()
+        .unwrap_or(0);
+    if max_in == 0 {
+        return None;
+    }
+
+    let try_in = |amount_in: u64| {
+        find_banx_path(
+            lines,
+            routing,
+            fx,
+            sender,
+            payee,
+            amount_in,
+            from_asset,
+            to_asset,
+            max_hops,
+            now,
+        )
+    };
+
+    // Phase 1: find some amount_in that clears `amount_out`.
+    //
+    // Do not probe max first-hop residual first — large notions often exceed
+    // intermediate residuals and look like "no path". Grow from small values.
+    //
+    // Feasibility is not fully monotonic (fixed hop fees reject tiny notions;
+    // residual caps reject huge ones), so when doubling jumps over residual
+    // capacity we binary-search the gap for the largest still-feasible send.
+    let mut probe = 1u64;
+    let mut upper: Option<PathQuote> = None;
+    let mut last_ok: Option<PathQuote> = None;
+
+    loop {
+        match try_in(probe) {
+            Some(q) if q.amount_out >= amount_out => {
+                upper = Some(q);
+                break;
+            }
+            Some(q) => {
+                last_ok = Some(q);
+            }
+            None => {
+                if let Some(ref ok) = last_ok {
+                    // Doubling jumped past residual capacity. Search (ok, probe)
+                    // for the largest feasible amount_in — may still be enough.
+                    let mut flo = ok.amount_in.saturating_add(1);
+                    let mut fhi = probe.saturating_sub(1);
+                    let mut max_feas = ok.clone();
+                    while flo <= fhi {
+                        let mid = flo + (fhi - flo) / 2;
+                        match try_in(mid) {
+                            Some(q) => {
+                                max_feas = q;
+                                flo = mid.saturating_add(1);
+                            }
+                            None => {
+                                if mid == 0 {
+                                    break;
+                                }
+                                fhi = mid - 1;
+                            }
+                        }
+                    }
+                    if max_feas.amount_out >= amount_out {
+                        upper = Some(max_feas);
+                    }
+                    break;
+                }
+                // Still no feasible path (e.g. fixed fees need a larger notional).
+            }
+        }
+        if probe >= max_in {
+            break;
+        }
+        let next = probe.saturating_mul(2).max(probe.saturating_add(1));
+        probe = next.min(max_in);
+    }
+
+    let upper = upper?;
+    let mut lo = 1u64;
+    let mut hi = upper.amount_in;
+    let mut best = upper;
+
+    // Phase 2: minimize amount_in while still clearing amount_out.
+    while lo <= hi {
+        let mid = lo + (hi - lo) / 2;
+        match try_in(mid) {
+            Some(q) if q.amount_out >= amount_out => {
+                best = q;
+                if mid == 0 {
+                    break;
+                }
+                hi = mid - 1;
+            }
+            _ => lo = mid.saturating_add(1),
+        }
+    }
+    Some(best)
 }
 
 fn expand_hops(
@@ -446,6 +581,7 @@ mod tests {
         .expect("path");
         assert_eq!(q.hops.len(), 1);
         assert_eq!(q.hops[0].account, "bob");
+        assert_eq!(q.amount_in, 100);
         assert_eq!(q.amount_out, 100);
     }
 
@@ -473,8 +609,133 @@ mod tests {
         assert_eq!(q.hops.len(), 2);
         assert_eq!(q.hops[0].account, "gary");
         assert_eq!(q.hops[1].account, "steve");
+        assert_eq!(q.amount_in, 10_000);
         // second hop: 10000 * 0.95 = 9500
         assert_eq!(q.amount_out, 9_500);
+    }
+
+    #[test]
+    fn exact_out_absorbs_hop_fee() {
+        // alice → gary → steve, 5% fee: to deliver 9500, need send 10000
+        let lines = vec![
+            line("gary", "alice", 1, 1_000_000),
+            line("steve", "gary", 1, 1_000_000),
+        ];
+        let routing = vec![global_rte("gary", 1, PPM_SCALE * 5 / 100)];
+        let q = find_banx_path_exact_out(
+            &lines,
+            &routing,
+            &[],
+            "alice",
+            "steve",
+            9_500,
+            1,
+            Some(1),
+            4,
+            0,
+        )
+        .expect("path");
+        assert_eq!(q.hops.len(), 2);
+        assert_eq!(q.amount_in, 10_000);
+        assert!(q.amount_out >= 9_500);
+    }
+
+    #[test]
+    fn exact_out_when_first_hop_residual_far_exceeds_mid_path() {
+        // Old bug: probing max first-hop residual (1e6) required a mid-hop draw
+        // larger than gary→steve residual, so exact-out returned None even though
+        // a modest send works (exact-in of 10_000 succeeds).
+        let lines = vec![
+            line("gary", "alice", 1, 1_000_000),
+            line("steve", "gary", 1, 20_000),
+        ];
+        let routing = vec![global_rte("gary", 1, PPM_SCALE * 5 / 100)];
+        let q = find_banx_path_exact_out(
+            &lines,
+            &routing,
+            &[],
+            "alice",
+            "steve",
+            9_500,
+            1,
+            Some(1),
+            4,
+            0,
+        )
+        .expect("path despite huge first-hop residual");
+        assert_eq!(q.amount_in, 10_000);
+        assert!(q.amount_out >= 9_500);
+    }
+
+    #[test]
+    fn exact_out_doubling_gap_near_residual_cap() {
+        // mid residual 20_000 @ 5% ⇒ max send ~21_052. Desired out 19_000 needs
+        // send ≈ 20_000. Doubling 16384 → 32768 jumps over the feasible window.
+        let lines = vec![
+            line("gary", "alice", 1, 1_000_000),
+            line("steve", "gary", 1, 20_000),
+        ];
+        let routing = vec![global_rte("gary", 1, PPM_SCALE * 5 / 100)];
+        let q = find_banx_path_exact_out(
+            &lines,
+            &routing,
+            &[],
+            "alice",
+            "steve",
+            19_000,
+            1,
+            Some(1),
+            4,
+            0,
+        )
+        .expect("gap search finds send inside residual window");
+        assert!(q.amount_out >= 19_000);
+        // 19000 / 0.95 = 20000 exactly
+        assert_eq!(q.amount_in, 20_000);
+    }
+
+    #[test]
+    fn exact_out_direct_line_no_fee() {
+        let lines = vec![line("bob", "alice", 1, 1_000_000)];
+        let q = find_banx_path_exact_out(
+            &lines, &[], &[], "alice", "bob", 100, 1, Some(1), 4, 0,
+        )
+        .expect("path");
+        assert_eq!(q.amount_in, 100);
+        assert_eq!(q.amount_out, 100);
+    }
+
+    #[test]
+    fn exact_out_fixed_fee_needs_larger_notional() {
+        // 10 fixed on second hop: tiny sends fail; desired 100 needs send 110.
+        let lines = vec![
+            line("gary", "alice", 1, 1_000_000),
+            line("steve", "gary", 1, 1_000_000),
+        ];
+        let routing = vec![RoutingEdge {
+            creditor: String::new(),
+            debtor: "gary".into(),
+            asset_id: 1,
+            hop_fee_fixed: 10,
+            hop_fee_percent_ppm: 0,
+            max_accept_rate_ppm: PPM_SCALE,
+            expires_at: 0,
+        }];
+        let q = find_banx_path_exact_out(
+            &lines,
+            &routing,
+            &[],
+            "alice",
+            "steve",
+            100,
+            1,
+            Some(1),
+            4,
+            0,
+        )
+        .expect("grows past fixed fee floor");
+        assert_eq!(q.amount_in, 110);
+        assert_eq!(q.amount_out, 100);
     }
 
     #[test]

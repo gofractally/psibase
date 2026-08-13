@@ -15,13 +15,19 @@ import { Button } from "@shared/shadcn/ui/button";
 
 type Hop = { account: string; assetId: number | undefined };
 
+type QuoteSummary = {
+    amountIn: string;
+    amountOut: string;
+    exactOut: boolean;
+};
+
 export function PathPayPage() {
     const { data: user } = useCurrentUser();
     const { assets, precisionOf, symbolOf } = useAssetMap();
     const pathPay = usePathPay();
     const quotePath = useQuotePath();
 
-    const [quoteOut, setQuoteOut] = useState<string | null>(null);
+    const [quote, setQuote] = useState<QuoteSummary | null>(null);
 
     const findForm = useAppForm({
         defaultValues: {
@@ -30,6 +36,8 @@ export function PathPayPage() {
             toAsset: undefined as number | undefined,
             maxHops: "6",
             amount: "1.00",
+            /** true = amount is what payee receives; you cover hop/FX fees */
+            coverFees: false,
         },
         onSubmit: async ({ value }) => {
             if (
@@ -40,6 +48,7 @@ export function PathPayPage() {
             )
                 return;
             const hopsN = Math.min(12, Math.max(1, Number(value.maxHops) || 6));
+            const exactOut = value.coverFees;
             await new Promise<void>((resolve, reject) => {
                 quotePath.mutate(
                     {
@@ -49,6 +58,7 @@ export function PathPayPage() {
                         fromAsset: value.fromAsset!,
                         toAsset: value.toAsset!,
                         maxHops: hopsN,
+                        exactOut,
                     },
                     {
                         onSuccess: (q) => {
@@ -59,9 +69,13 @@ export function PathPayPage() {
                                     assetId: h.assetId as number | undefined,
                                 })),
                             );
-                            execForm.setFieldValue("amount", value.amount.trim());
+                            execForm.setFieldValue("amount", q.amountIn);
                             execForm.setFieldValue("minReturn", q.minReturn);
-                            setQuoteOut(q.amountOut);
+                            setQuote({
+                                amountIn: q.amountIn,
+                                amountOut: q.amountOut,
+                                exactOut,
+                            });
                             resolve();
                         },
                         onError: (e: Error) => reject(e),
@@ -186,13 +200,38 @@ export function PathPayPage() {
                             )}
                         />
                     </div>
+                    <findForm.AppField
+                        name="coverFees"
+                        children={(field) => (
+                            <field.SwitchField
+                                label={
+                                    field.state.value
+                                        ? "I cover hop fees"
+                                        : "Payee covers hop fees"
+                                }
+                                description={
+                                    field.state.value
+                                        ? "Amount is what the payee gets; quote finds how much more you need to send."
+                                        : "Amount is what you send; payee receives less after fees."
+                                }
+                            />
+                        )}
+                    />
                     <findForm.Subscribe
-                        selector={(s) => s.values.fromAsset}
-                        children={(fromAsset) => {
+                        selector={(s) => ({
+                            fromAsset: s.values.fromAsset,
+                            toAsset: s.values.toAsset,
+                            coverFees: s.values.coverFees,
+                        })}
+                        children={({ fromAsset, toAsset, coverFees }) => {
+                            const amountAsset = coverFees ? toAsset : fromAsset;
                             const precision =
-                                fromAsset !== undefined
-                                    ? precisionOf(fromAsset)
+                                amountAsset !== undefined
+                                    ? precisionOf(amountAsset)
                                     : 0;
+                            const amountLabel = coverFees
+                                ? "Payee receives"
+                                : "You send";
                             return (
                                 <findForm.AppField
                                     name="amount"
@@ -209,9 +248,9 @@ export function PathPayPage() {
                                     children={(field) => (
                                         <field.TextField
                                             label={
-                                                fromAsset !== undefined
-                                                    ? `Amount (${amountPlaceholder(precision)})`
-                                                    : "Amount"
+                                                amountAsset !== undefined
+                                                    ? `${amountLabel} (${amountPlaceholder(precision)})`
+                                                    : amountLabel
                                             }
                                             inputMode="decimal"
                                             placeholder={amountPlaceholder(
@@ -241,18 +280,34 @@ export function PathPayPage() {
                                 </findForm.AppForm>
                             )}
                         />
-                        <execForm.Subscribe
-                            selector={(s) =>
-                                s.values.hops[s.values.hops.length - 1]
-                                    ?.assetId
-                            }
-                            children={(lastAsset) =>
-                                quoteOut ? (
+                        <findForm.Subscribe
+                            selector={(s) => ({
+                                fromAsset: s.values.fromAsset,
+                                toAsset: s.values.toAsset,
+                            })}
+                            children={({ fromAsset, toAsset }) =>
+                                quote ? (
                                     <p className="text-muted-foreground text-sm font-mono">
-                                        Est. out: {quoteOut}
-                                        {lastAsset !== undefined
-                                            ? ` ${symbolOf(lastAsset)}`
-                                            : ""}
+                                        {quote.exactOut ? (
+                                            <>
+                                                You send: {quote.amountIn}
+                                                {fromAsset !== undefined
+                                                    ? ` ${symbolOf(fromAsset)}`
+                                                    : ""}
+                                                {" · "}
+                                                Payee gets ≥ {quote.amountOut}
+                                                {toAsset !== undefined
+                                                    ? ` ${symbolOf(toAsset)}`
+                                                    : ""}
+                                            </>
+                                        ) : (
+                                            <>
+                                                Est. out: {quote.amountOut}
+                                                {toAsset !== undefined
+                                                    ? ` ${symbolOf(toAsset)}`
+                                                    : ""}
+                                            </>
+                                        )}
                                     </p>
                                 ) : null
                             }
@@ -354,8 +409,8 @@ export function PathPayPage() {
                                         <field.TextField
                                             label={
                                                 firstAsset !== undefined
-                                                    ? `Amount (${amountPlaceholder(precision)})`
-                                                    : "Amount"
+                                                    ? `You send (${amountPlaceholder(precision)})`
+                                                    : "You send"
                                             }
                                             inputMode="decimal"
                                             placeholder={amountPlaceholder(
@@ -394,8 +449,8 @@ export function PathPayPage() {
                                         <field.TextField
                                             label={
                                                 lastAsset !== undefined
-                                                    ? `Min return (${amountPlaceholder(precision)})`
-                                                    : "Min return (last asset)"
+                                                    ? `Payee min (${amountPlaceholder(precision)})`
+                                                    : "Payee min (last asset)"
                                             }
                                             inputMode="decimal"
                                             placeholder={amountPlaceholder(

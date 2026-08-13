@@ -125,7 +125,11 @@ export function usePathPay() {
 
 export type PathQuote = {
     hops: { account: string; assetId: number }[];
+    /** Amount to draw on first hop (from-asset). */
+    amountIn: string;
+    /** Residual after fees (last-hop asset). */
     amountOut: string;
+    /** Suggested path_pay min-return (last-hop asset). */
     minReturn: string;
 };
 
@@ -140,6 +144,11 @@ export function useQuotePath() {
             /** Final hop must be in this asset. */
             toAsset: number;
             maxHops: number;
+            /**
+             * false: `amount` is what you send (fees reduce receive).
+             * true: `amount` is what payee receives (you absorb hop/FX fees).
+             */
+            exactOut?: boolean;
         }): Promise<PathQuote> => {
             const res = (await supervisor.functionCall({
                 service: BANX_SERVICE,
@@ -152,9 +161,11 @@ export function useQuotePath() {
                     p.fromAsset,
                     p.toAsset,
                     p.maxHops,
+                    p.exactOut ?? false,
                 ],
             })) as {
                 hops: { account: string; assetId: number }[];
+                amountIn: string;
                 amountOut: string;
                 minReturn: string;
             };
@@ -163,6 +174,7 @@ export function useQuotePath() {
                     account: h.account,
                     assetId: Number(h.assetId),
                 })),
+                amountIn: res.amountIn,
                 amountOut: res.amountOut,
                 minReturn: res.minReturn,
             };

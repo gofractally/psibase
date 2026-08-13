@@ -6,7 +6,7 @@ use bindings::exports::banx::plugin::helpers::Guest as Helpers;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
-use banx::path_find::find_banx_path;
+use banx::path_find::{find_banx_path, find_banx_path_exact_out};
 use psibase::define_trust;
 use psibase::fracpack::Pack;
 use psibase::services::tokens::{Decimal, Quantity};
@@ -306,6 +306,7 @@ impl Api for BanxPlugin {
         from_asset: u16,
         to_asset: Option<u16>,
         max_hops: u8,
+        exact_out: bool,
     ) -> Result<PathQuote, Error> {
         trust::assert_authorized(trust::FunctionName::quote_path)?;
         let from = from_account.trim();
@@ -317,23 +318,51 @@ impl Api for BanxPlugin {
             return Err(ErrorType::NoPath("from and to are the same account".into()).into());
         }
         let max_hops = max_hops.clamp(1, 12);
-        let amount_raw = parse_amount_nonzero(from_asset, &amount)?;
+
+        // Exact-out: amount is desired receive (to-asset). Exact-in: amount is send (from-asset).
+        let amount_raw = if exact_out {
+            let Some(to_a) = to_asset else {
+                return Err(ErrorType::ConversionError(
+                    "exact-out quote requires to-asset".into(),
+                )
+                .into());
+            };
+            parse_amount_nonzero(to_a, &amount)?
+        } else {
+            parse_amount_nonzero(from_asset, &amount)?
+        };
+
         let snap = query::fetch_path_graph::fetch_path_graph(from, to, max_hops)?;
 
         // Expiry checks: pass now=0 so "never" and future policies both pass offline;
         // chain re-validates at execute time. (Wall clock in plugin is not authoritative.)
-        let quote = find_banx_path(
-            &snap.lines,
-            &snap.routing,
-            &snap.fx,
-            from,
-            to,
-            amount_raw.value,
-            from_asset,
-            to_asset,
-            max_hops,
-            0,
-        )
+        let quote = if exact_out {
+            find_banx_path_exact_out(
+                &snap.lines,
+                &snap.routing,
+                &snap.fx,
+                from,
+                to,
+                amount_raw.value,
+                from_asset,
+                to_asset,
+                max_hops,
+                0,
+            )
+        } else {
+            find_banx_path(
+                &snap.lines,
+                &snap.routing,
+                &snap.fx,
+                from,
+                to,
+                amount_raw.value,
+                from_asset,
+                to_asset,
+                max_hops,
+                0,
+            )
+        }
         .ok_or_else(|| {
             ErrorType::NoPath(format!(
                 "no route from {from} to {to} within {max_hops} hops (scoped graph)"
@@ -341,9 +370,18 @@ impl Api for BanxPlugin {
         })?;
 
         let last_asset = quote.hops.last().map(|h| h.asset_id).unwrap_or(from_asset);
-        let asset = query::fetch_asset::fetch_asset(last_asset)?;
-        let precision = asset.precision()?;
-        let amount_out = Decimal::new(Quantity::new(quote.amount_out), precision).to_string();
+        let from_prec = query::fetch_asset::fetch_asset(from_asset)?.precision()?;
+        let to_prec = query::fetch_asset::fetch_asset(last_asset)?.precision()?;
+        let amount_in =
+            Decimal::new(Quantity::new(quote.amount_in), from_prec).to_string();
+        let amount_out =
+            Decimal::new(Quantity::new(quote.amount_out), to_prec).to_string();
+        // Exact-out: min-return is the requested receive amount; exact-in: full residual.
+        let min_return = if exact_out {
+            Decimal::new(amount_raw, to_prec).to_string()
+        } else {
+            amount_out.clone()
+        };
 
         Ok(PathQuote {
             hops: quote
@@ -354,8 +392,9 @@ impl Api for BanxPlugin {
                     asset_id: h.asset_id,
                 })
                 .collect(),
-            amount_out: amount_out.clone(),
-            min_return: amount_out,
+            amount_in,
+            amount_out,
+            min_return,
         })
     }
 
