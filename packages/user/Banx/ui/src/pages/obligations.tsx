@@ -20,7 +20,11 @@ import {
     type RoutingPolicyPrefill,
 } from "@/components/routing-policy-dialog";
 import { useAssetMap } from "@/hooks/use-assets";
-import { useCreditLines, useObligations } from "@/hooks/use-banx-data";
+import {
+    useCreditLines,
+    useObligations,
+    useRoutingPolicies,
+} from "@/hooks/use-banx-data";
 import {
     useAccrue,
     useNet,
@@ -28,7 +32,14 @@ import {
 } from "@/hooks/use-banx-mutations";
 import { amountPlaceholder, formatRawAmount } from "@/lib/amount";
 import { ppmToPercent } from "@/lib/constants";
-import { percentStringToPpm, useAppForm } from "@/lib/form";
+import {
+    MAX_PERCENT,
+    MIN_PERCENT_STEP,
+    PPM_SCALE,
+    percentFieldValidator,
+    percentStringToPpm,
+    useAppForm,
+} from "@/lib/form";
 import type { Asset, CreditLine, Obligation } from "@/lib/graphql";
 
 /** ppm → percent string for form inputs (e.g. 10000 → "1") */
@@ -183,10 +194,21 @@ export function ObligationsPage() {
     const { data: user } = useCurrentUser();
     const { data: obs = [], isLoading: obsLoading } = useObligations();
     const { data: lines = [], isLoading: linesLoading } = useCreditLines();
+    const { data: routing = [] } = useRoutingPolicies();
     const { assets, symbolOf, precisionOf } = useAssetMap();
     const net = useNet();
     const accrue = useAccrue();
     const isLoading = obsLoading || linesLoading;
+
+    /** At least one live global routing policy → path hop fees are “on”. */
+    const globalRoutingOn = useMemo(() => {
+        const nowSec = Math.floor(Date.now() / 1000);
+        return routing.some(
+            (p) =>
+                p.isGlobal &&
+                (p.expiresAt === 0 || p.expiresAt >= nowSec),
+        );
+    }, [routing]);
 
     const [createOpen, setCreateOpen] = useState(false);
     const [creditLineOpen, setCreditLineOpen] = useState(false);
@@ -302,15 +324,26 @@ export function ObligationsPage() {
                                 type="button"
                                 size="icon"
                                 variant="outline"
-                                className="size-9 shrink-0"
-                                aria-label="Set routing policy"
+                                className={cn(
+                                    "size-9 shrink-0 transition-shadow",
+                                    globalRoutingOn
+                                        ? "border-emerald-500/60 text-emerald-700 shadow-[0_0_12px_rgba(16,185,129,0.55)] hover:bg-emerald-500/10 dark:text-emerald-400 dark:shadow-[0_0_14px_rgba(52,211,153,0.45)]"
+                                        : "border-red-500/70 text-red-700 shadow-[0_0_14px_rgba(239,68,68,0.65)] hover:bg-red-500/10 dark:text-red-400 dark:shadow-[0_0_16px_rgba(248,113,113,0.5)] animate-pulse",
+                                )}
+                                aria-label={
+                                    globalRoutingOn
+                                        ? "Global routing is on — edit routing policy"
+                                        : "Global routing is off — set routing policy for path pay"
+                                }
                                 onClick={() => openRouting(null)}
                             >
                                 <Route className="size-4" />
                             </Button>
                         </TooltipTrigger>
-                        <TooltipContent side="bottom">
-                            Set routing policy — hop fees for path payments
+                        <TooltipContent side="bottom" className="max-w-xs">
+                            {globalRoutingOn
+                                ? "Global routing on — path hop fees are configured. Click to edit."
+                                : "Global routing off — multi-hop path pay needs hop fees. Click to set a global policy."}
                         </TooltipContent>
                     </Tooltip>
                 }
@@ -746,7 +779,10 @@ function CreditLineDialog({
                         assetId: value.assetId!,
                         limit: value.limit.trim(),
                         depleteOnDebit: value.deplete,
-                        interestRatePpm: percentStringToPpm(value.interestPct),
+                        interestRatePpm: percentStringToPpm(
+                            value.interestPct,
+                            PPM_SCALE,
+                        ),
                     },
                     {
                         onSuccess: () => {
@@ -851,10 +887,18 @@ function CreditLineDialog({
                         />
                         <form.AppField
                             name="interestPct"
+                            validators={{
+                                onChange: percentFieldValidator(MAX_PERCENT),
+                                onSubmit: percentFieldValidator(MAX_PERCENT),
+                            }}
                             children={(field) => (
                                 <field.TextField
                                     label="Interest APR %"
                                     inputMode="decimal"
+                                    min={0}
+                                    max={MAX_PERCENT}
+                                    step={MIN_PERCENT_STEP}
+                                    description="0–100% (0.0001% = 1 ppm)"
                                 />
                             )}
                         />

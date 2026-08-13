@@ -207,8 +207,8 @@ pub mod tables {
     /// Same-asset hop fee: `out = (in - fixed) * (PPM_SCALE - percent_ppm) / PPM_SCALE`.
     fn apply_hop_fee(amount_in: Quantity, fee_fixed: Quantity, fee_percent_ppm: u32) -> Quantity {
         assert!(
-            fee_percent_ppm <= PPM_SCALE,
-            "hop_fee_percent exceeds 100% (PPM_SCALE)"
+            fee_percent_ppm < PPM_SCALE,
+            "hop fee must be under 100%"
         );
         assert!(fee_fixed < amount_in, "fixed hop fee consumes entire amount");
         let after_fixed = amount_in - fee_fixed;
@@ -303,8 +303,8 @@ pub mod tables {
                 "max_accept_rate exceeds 100% (PPM_SCALE)"
             );
             assert!(
-                hop_fee_percent <= PPM_SCALE,
-                "hop_fee_percent exceeds 100% (PPM_SCALE)"
+                hop_fee_percent < PPM_SCALE,
+                "hop fee must be under 100%"
             );
             // Global: no specific line required at set time. Specific: line must exist.
             if creditor != Self::GLOBAL_CREDITOR {
@@ -320,6 +320,13 @@ pub mod tables {
                 expires_at,
             }
             .save();
+        }
+
+        /// Remove a routing policy row if present (no-op if missing).
+        pub fn remove(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) {
+            if Self::get(creditor, debtor, asset_id).is_some() {
+                RoutingPolicyTab::read_write().erase(&(creditor, debtor, asset_id));
+            }
         }
 
         /// Path draw using this policy's fees against a concrete next-hop `creditor`.
@@ -1230,6 +1237,26 @@ pub mod service {
             hop_fee_percent,
             max_accept_rate,
             expires_at,
+        );
+    }
+
+    /// Remove a **specific** next-hop routing override (if present).
+    #[action]
+    fn rm_rte_pol(creditor: AccountNumber, asset_id: u16) {
+        assert!(
+            creditor != RoutingPolicy::GLOBAL_CREDITOR,
+            "use rm_glb_rte for global routing (creditor 0)"
+        );
+        RoutingPolicy::remove(creditor, get_sender(), asset_id);
+    }
+
+    /// Remove **global** routing for this asset (if present).
+    #[action]
+    fn rm_glb_rte(asset_id: u16) {
+        RoutingPolicy::remove(
+            RoutingPolicy::GLOBAL_CREDITOR,
+            get_sender(),
+            asset_id,
         );
     }
 

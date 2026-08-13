@@ -28,7 +28,7 @@ define_trust! {
             - Quote multi-hop paths (read-only GraphQL + search)
         ",
         Medium => "
-            - Post credit lines, routing policies, and currency policies
+            - Post or remove credit lines, routing policies, and currency policies
             - Deposit and net obligations
             - Convert debt between assets
         ",
@@ -43,6 +43,8 @@ define_trust! {
             set_credit_line,
             set_routing_policy,
             set_global_routing_policy,
+            remove_routing_policy,
+            remove_global_routing_policy,
             set_currency_policy,
             deposit,
             net,
@@ -177,6 +179,22 @@ impl Api for BanxPlugin {
         }
         .packed();
         add_action_to_transaction(banx::action_structs::st_glb_rte::ACTION_NAME, &packed)
+    }
+
+    fn remove_routing_policy(creditor: String, asset_id: u16) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::remove_routing_policy)?;
+        let packed = banx::action_structs::rm_rte_pol {
+            creditor: parse_account(&creditor)?,
+            asset_id,
+        }
+        .packed();
+        add_action_to_transaction(banx::action_structs::rm_rte_pol::ACTION_NAME, &packed)
+    }
+
+    fn remove_global_routing_policy(asset_id: u16) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::remove_global_routing_policy)?;
+        let packed = banx::action_structs::rm_glb_rte { asset_id }.packed();
+        add_action_to_transaction(banx::action_structs::rm_glb_rte::ACTION_NAME, &packed)
     }
 
     fn set_currency_policy(

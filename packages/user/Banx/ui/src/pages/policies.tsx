@@ -22,7 +22,14 @@ import {
     formatToPrecision,
 } from "@/lib/amount";
 import { ppmToPercent } from "@/lib/constants";
-import { percentStringToPpm, useAppForm } from "@/lib/form";
+import {
+    MAX_PERCENT,
+    MIN_PERCENT_STEP,
+    PPM_SCALE,
+    percentFieldValidator,
+    percentStringToPpm,
+    useAppForm,
+} from "@/lib/form";
 
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -65,7 +72,10 @@ export function PoliciesPage() {
                         toAsset: value.toAsset!,
                         feeFixed: value.feeFixed.trim(),
                         toRate: value.toRate.trim(),
-                        toInterestRatePpm: percentStringToPpm(value.aprPct),
+                        toInterestRatePpm: percentStringToPpm(
+                            value.aprPct,
+                            PPM_SCALE,
+                        ),
                         expiresAtSeconds: value.expiresAtSeconds,
                     },
                     {
@@ -251,10 +261,18 @@ export function PoliciesPage() {
                     </div>
                     <currencyForm.AppField
                         name="aprPct"
+                        validators={{
+                            onChange: percentFieldValidator(MAX_PERCENT),
+                            onSubmit: percentFieldValidator(MAX_PERCENT),
+                        }}
                         children={(field) => (
                             <field.TextField
                                 label="To-asset APR %"
                                 inputMode="decimal"
+                                min={0}
+                                max={MAX_PERCENT}
+                                step={MIN_PERCENT_STEP}
+                                description="0–100% (0.0001% = 1 ppm)"
                             />
                         )}
                     />

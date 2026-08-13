@@ -3,7 +3,14 @@ import { useEffect, useState } from "react";
 import { AssetField } from "@/components/form-fields";
 import { useDeposit, usePathPay } from "@/hooks/use-banx-mutations";
 import { amountPlaceholder } from "@/lib/amount";
-import { percentStringToPpm, useAppForm } from "@/lib/form";
+import {
+    MAX_PERCENT,
+    MIN_PERCENT_STEP,
+    PPM_SCALE,
+    percentFieldValidator,
+    percentStringToPpm,
+    useAppForm,
+} from "@/lib/form";
 import type { Asset } from "@/lib/graphql";
 
 import { Button } from "@shared/shadcn/ui/button";
@@ -57,7 +64,10 @@ export function NewDepositLoanDialog({
                         depositor: value.depositor.trim(),
                         assetId: value.assetId!,
                         amount: value.amount.trim(),
-                        interestRatePpm: percentStringToPpm(value.aprPct),
+                        interestRatePpm: percentStringToPpm(
+                            value.aprPct,
+                            PPM_SCALE,
+                        ),
                     },
                     {
                         onSuccess: () => {
@@ -206,10 +216,20 @@ export function NewDepositLoanDialog({
                                 />
                                 <depositForm.AppField
                                     name="aprPct"
+                                    validators={{
+                                        onChange:
+                                            percentFieldValidator(MAX_PERCENT),
+                                        onSubmit:
+                                            percentFieldValidator(MAX_PERCENT),
+                                    }}
                                     children={(field) => (
                                         <field.TextField
                                             label="Interest APR %"
                                             inputMode="decimal"
+                                            min={0}
+                                            max={MAX_PERCENT}
+                                            step={MIN_PERCENT_STEP}
+                                            description="0–100% (0.0001% = 1 ppm)"
                                         />
                                     )}
                                 />

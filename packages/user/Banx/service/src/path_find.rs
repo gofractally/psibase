@@ -82,7 +82,8 @@ pub fn apply_rate(amount_in: u64, fee_fixed: u64, rate: u64) -> Option<u64> {
 
 /// `out = (in - fixed) * (PPM_SCALE - percent) / PPM_SCALE`.
 pub fn apply_hop_fee(amount_in: u64, fee_fixed: u64, fee_percent_ppm: u32) -> Option<u64> {
-    if fee_percent_ppm > PPM_SCALE || fee_fixed >= amount_in {
+    // Must be under 100% (same as on-chain: hop_fee_percent < PPM_SCALE).
+    if fee_percent_ppm >= PPM_SCALE || fee_fixed >= amount_in {
         return None;
     }
     let after = amount_in - fee_fixed;

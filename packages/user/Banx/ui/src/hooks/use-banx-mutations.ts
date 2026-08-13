@@ -224,6 +224,32 @@ export function useSetGlobalRoutingPolicy() {
     });
 }
 
+export function useRemoveRoutingPolicy() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: { creditor: string; assetId: number }) =>
+            banxCall("removeRoutingPolicy", [p.creditor, p.assetId]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Routing override removed");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useRemoveGlobalRoutingPolicy() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: { assetId: number }) =>
+            banxCall("removeGlobalRoutingPolicy", [p.assetId]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Global routing policy removed");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
 export function useSetCurrencyPolicy() {
     const invalidate = useInvalidateBanx();
     return useMutation({

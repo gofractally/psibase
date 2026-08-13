@@ -66,6 +66,12 @@ interface api {
         expires-at-seconds: u32,
     ) -> result<_, error>;
 
+    /// Remove a per-creditor routing override (if present).
+    remove-routing-policy: func(creditor: string, asset-id: u16) -> result<_, error>;
+
+    /// Remove global routing for this asset (if present).
+    remove-global-routing-policy: func(asset-id: u16) -> result<_, error>;
+
     /// Debtor posts a convert quote from `from-asset` → `to-asset`.
     /// Fee is a human decimal in **from-asset** units.
     /// `to-rate` is how many **to-asset** units you get for 1 full **from-asset**
