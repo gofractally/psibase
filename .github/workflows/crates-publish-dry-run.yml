@@ -1,0 +1,45 @@
+name: Crates publish dry-run
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  dry_run:
+    name: Crates publish dry-run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@1.86.0
+
+      - name: Detect version bump
+        id: version
+        run: |
+          set +e
+          .github/scripts/psibase-version.sh changed \
+              "${{ github.event.pull_request.base.sha }}" \
+              "${{ github.event.pull_request.head.sha }}"
+          code=$?
+          set -e
+          if (( code == 0 )); then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          elif (( code == 1 )); then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            exit "$code"
+          fi
+
+      - name: Dry-run crate publish
+        if: steps.version.outputs.changed == 'true'
+        run: |
+          cd rust
+          ./scripts/publish.sh --dry-run 2>&1 | tee /tmp/crates-dry-run.log || true
+          ../.github/scripts/expect-crates-dry-run-errors.sh < /tmp/crates-dry-run.log
