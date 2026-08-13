@@ -364,9 +364,17 @@ impl Api for BanxPlugin {
             )
         }
         .ok_or_else(|| {
-            ErrorType::NoPath(format!(
-                "no route from {from} to {to} within {max_hops} hops (scoped graph)"
-            ))
+            ErrorType::NoPath(if exact_out {
+                format!(
+                    "cannot deliver {amount} to {to} from {from} within {max_hops} hops \
+                     (insufficient residual after fees, or no route)"
+                )
+            } else {
+                format!(
+                    "cannot send {amount} from {from} to {to} within {max_hops} hops \
+                     (amount exceeds capacity after fees, or no route)"
+                )
+            })
         })?;
 
         let last_asset = quote.hops.last().map(|h| h.asset_id).unwrap_or(from_asset);

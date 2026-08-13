@@ -615,6 +615,32 @@ mod tests {
     }
 
     #[test]
+    fn exact_in_still_works_with_tight_mid_residual() {
+        // Exact-in must keep working when first-hop residual is huge but mid is tight
+        // (the case that previously broke exact-out when it probed max_in).
+        let lines = vec![
+            line("gary", "alice", 1, 1_000_000),
+            line("steve", "gary", 1, 20_000),
+        ];
+        let routing = vec![global_rte("gary", 1, PPM_SCALE * 5 / 100)];
+        let q = find_banx_path(
+            &lines,
+            &routing,
+            &[],
+            "alice",
+            "steve",
+            10_000,
+            1,
+            Some(1),
+            4,
+            0,
+        )
+        .expect("exact-in path");
+        assert_eq!(q.amount_in, 10_000);
+        assert_eq!(q.amount_out, 9_500);
+    }
+
+    #[test]
     fn exact_out_absorbs_hop_fee() {
         // alice → gary → steve, 5% fee: to deliver 9500, need send 10000
         let lines = vec![

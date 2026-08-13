@@ -71,7 +71,9 @@ export function amountFieldValidator(
         if (!Number.isFinite(n)) return "Enter a valid amount";
         if (n < 0) return "Cannot be negative";
         if (!allowZero && n === 0) return "Must be greater than zero";
-        const frac = t.includes(".") ? (t.split(".")[1] ?? "") : "";
+        // Ignore trailing zeros so "1.00" is valid for precision 0 / 2, etc.
+        const fracRaw = t.includes(".") ? (t.split(".")[1] ?? "") : "";
+        const frac = fracRaw.replace(/0+$/, "");
         if (frac.length > precision) {
             return precision <= 0
                 ? "Whole numbers only for this asset"

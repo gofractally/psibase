@@ -35,9 +35,13 @@ export function PathPayPage() {
             fromAsset: undefined as number | undefined,
             toAsset: undefined as number | undefined,
             maxHops: "6",
-            amount: "1.00",
-            /** true = amount is what payee receives; you cover hop/FX fees */
-            coverFees: false,
+            amount: "1",
+            /**
+             * Fee mode:
+             * - `send`  = exact-in: amount is what you send (payee covers fees)
+             * - `receive` = exact-out: amount is what payee gets (you cover fees)
+             */
+            feeMode: "send" as "send" | "receive",
         },
         onSubmit: async ({ value }) => {
             if (
@@ -48,13 +52,15 @@ export function PathPayPage() {
             )
                 return;
             const hopsN = Math.min(12, Math.max(1, Number(value.maxHops) || 6));
-            const exactOut = value.coverFees;
+            // `receive` ⇒ you cover fees (exact-out). `send` ⇒ payee covers (exact-in).
+            const exactOut = value.feeMode === "receive";
+            const typedAmount = value.amount.trim();
             await new Promise<void>((resolve, reject) => {
                 quotePath.mutate(
                     {
                         fromAccount: user,
                         toAccount: value.payee.trim(),
-                        amount: value.amount.trim(),
+                        amount: typedAmount,
                         fromAsset: value.fromAsset!,
                         toAsset: value.toAsset!,
                         maxHops: hopsN,
@@ -69,10 +75,18 @@ export function PathPayPage() {
                                     assetId: h.assetId as number | undefined,
                                 })),
                             );
-                            execForm.setFieldValue("amount", q.amountIn);
-                            execForm.setFieldValue("minReturn", q.minReturn);
+                            // Exact-in: trust the typed send amount.
+                            // Exact-out: use quoted send (includes fee buffer).
+                            execForm.setFieldValue(
+                                "amount",
+                                exactOut ? q.amountIn : typedAmount,
+                            );
+                            execForm.setFieldValue(
+                                "minReturn",
+                                exactOut ? q.minReturn : q.amountOut,
+                            );
                             setQuote({
-                                amountIn: q.amountIn,
+                                amountIn: exactOut ? q.amountIn : typedAmount,
                                 amountOut: q.amountOut,
                                 exactOut,
                             });
@@ -200,38 +214,75 @@ export function PathPayPage() {
                             )}
                         />
                     </div>
-                    <findForm.AppField
-                        name="coverFees"
-                        children={(field) => (
-                            <field.SwitchField
-                                label={
-                                    field.state.value
-                                        ? "I cover hop fees"
-                                        : "Payee covers hop fees"
-                                }
-                                description={
-                                    field.state.value
-                                        ? "Amount is what the payee gets; quote finds how much more you need to send."
-                                        : "Amount is what you send; payee receives less after fees."
-                                }
-                            />
+                    <findForm.Subscribe
+                        selector={(s) => s.values.feeMode}
+                        children={(feeMode) => (
+                            <div className="grid gap-2">
+                                <p className="text-sm font-medium">Amount means</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant={
+                                            feeMode === "send"
+                                                ? "default"
+                                                : "outline"
+                                        }
+                                        onClick={() => {
+                                            findForm.setFieldValue(
+                                                "feeMode",
+                                                "send",
+                                            );
+                                            setQuote(null);
+                                        }}
+                                    >
+                                        You send
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant={
+                                            feeMode === "receive"
+                                                ? "default"
+                                                : "outline"
+                                        }
+                                        onClick={() => {
+                                            findForm.setFieldValue(
+                                                "feeMode",
+                                                "receive",
+                                            );
+                                            setQuote(null);
+                                        }}
+                                    >
+                                        Payee receives
+                                    </Button>
+                                </div>
+                                <p className="text-muted-foreground text-xs">
+                                    {feeMode === "receive"
+                                        ? "You cover hop fees — amount is what the payee gets; quote finds how much you send."
+                                        : "Payee covers hop fees — amount is what you send; they receive less after fees."}
+                                </p>
+                            </div>
                         )}
                     />
                     <findForm.Subscribe
                         selector={(s) => ({
                             fromAsset: s.values.fromAsset,
                             toAsset: s.values.toAsset,
-                            coverFees: s.values.coverFees,
+                            feeMode: s.values.feeMode,
                         })}
-                        children={({ fromAsset, toAsset, coverFees }) => {
-                            const amountAsset = coverFees ? toAsset : fromAsset;
+                        children={({ fromAsset, toAsset, feeMode }) => {
+                            // receive (you cover) ⇒ amount in to-asset; send ⇒ from-asset
+                            const amountAsset =
+                                feeMode === "receive" ? toAsset : fromAsset;
                             const precision =
                                 amountAsset !== undefined
                                     ? precisionOf(amountAsset)
                                     : 0;
-                            const amountLabel = coverFees
-                                ? "Payee receives"
-                                : "You send";
+                            const amountLabel =
+                                feeMode === "receive"
+                                    ? "Payee receives"
+                                    : "You send";
                             return (
                                 <findForm.AppField
                                     name="amount"

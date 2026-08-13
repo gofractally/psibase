@@ -150,6 +150,8 @@ export function useQuotePath() {
              */
             exactOut?: boolean;
         }): Promise<PathQuote> => {
+            // Always pass a real boolean (some bridges drop/omit `false`).
+            const exactOut = p.exactOut === true;
             const res = (await supervisor.functionCall({
                 service: BANX_SERVICE,
                 intf: "api",
@@ -161,22 +163,27 @@ export function useQuotePath() {
                     p.fromAsset,
                     p.toAsset,
                     p.maxHops,
-                    p.exactOut ?? false,
+                    exactOut,
                 ],
-            })) as {
+            })) as Record<string, unknown> & {
                 hops: { account: string; assetId: number }[];
-                amountIn: string;
-                amountOut: string;
-                minReturn: string;
             };
+            // Prefer camelCase (jco); fall back to snake_case if present.
+            const amountIn = String(
+                res.amountIn ?? res.amount_in ?? p.amount,
+            );
+            const amountOut = String(res.amountOut ?? res.amount_out ?? "");
+            const minReturn = String(
+                res.minReturn ?? res.min_return ?? amountOut,
+            );
             return {
-                hops: res.hops.map((h) => ({
+                hops: (res.hops ?? []).map((h) => ({
                     account: h.account,
                     assetId: Number(h.assetId),
                 })),
-                amountIn: res.amountIn,
-                amountOut: res.amountOut,
-                minReturn: res.minReturn,
+                amountIn,
+                amountOut,
+                minReturn,
             };
         },
         onError: (e: Error) => toast.error(e.message),
