@@ -298,11 +298,7 @@ export function PathPayPage() {
                                     }}
                                     children={(field) => (
                                         <field.TextField
-                                            label={
-                                                amountAsset !== undefined
-                                                    ? `${amountLabel} (${amountPlaceholder(precision)})`
-                                                    : amountLabel
-                                            }
+                                            label={amountLabel}
                                             inputMode="decimal"
                                             placeholder={amountPlaceholder(
                                                 precision,
@@ -458,11 +454,7 @@ export function PathPayPage() {
                                     }}
                                     children={(field) => (
                                         <field.TextField
-                                            label={
-                                                firstAsset !== undefined
-                                                    ? `You send (${amountPlaceholder(precision)})`
-                                                    : "You send"
-                                            }
+                                            label="You send"
                                             inputMode="decimal"
                                             placeholder={amountPlaceholder(
                                                 precision,
@@ -498,11 +490,7 @@ export function PathPayPage() {
                                     }}
                                     children={(field) => (
                                         <field.TextField
-                                            label={
-                                                lastAsset !== undefined
-                                                    ? `Payee min (${amountPlaceholder(precision)})`
-                                                    : "Payee min (last asset)"
-                                            }
+                                            label="Payee min"
                                             inputMode="decimal"
                                             placeholder={amountPlaceholder(
                                                 precision,
