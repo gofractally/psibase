@@ -28,6 +28,13 @@ export interface PluginPostDetails {
     body: BodyType;
 }
 
+export interface CallstackImports {
+    "supervisor:callstack/callstack": {
+        push: (service: string) => void;
+        pop: () => void;
+    };
+}
+
 /// Imports exposed to privileged plugins
 export interface BridgeImports {
     "supervisor:bridge/intf": {
@@ -55,6 +62,7 @@ export interface BridgeImports {
 // This is the interface linked to the host plugin
 export interface HostInterface {
     bridge: BridgeImports;
+    callstack: CallstackImports;
 
     // Proxy entry points used by buildInterfaceProxy. Not exposed to plugins
     //   directly; reachable only through closures the proxy installs.

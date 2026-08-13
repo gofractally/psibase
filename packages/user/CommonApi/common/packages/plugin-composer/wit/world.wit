@@ -1,0 +1,35 @@
+package plugin:composer;
+
+interface types {
+    record plugin-id {
+        service: string,
+        %plugin: string,
+    }
+
+    record wasm-plugin {
+        service: string,
+        %plugin: string,
+        wasm: list<u8>,
+    }
+
+    record compose-result {
+        wasm: list<u8>,
+        compose-set: list<plugin-id>,
+        contains-transact: bool,
+    }
+}
+
+world composer {
+    use types.{plugin-id, wasm-plugin, compose-result};
+
+    export compose: func(
+        entry: plugin-id,
+        plugins: list<wasm-plugin>,
+        wrap-inner-tracers: bool,
+    ) -> result<compose-result, string>;
+
+    export compose-host: func(
+        plugins: list<wasm-plugin>,
+        wrap-inner-tracers: bool,
+    ) -> result<compose-result, string>;
+}

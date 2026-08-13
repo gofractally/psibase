@@ -18,15 +18,18 @@ import {
 } from "@psibase/common-lib/messaging/function-call-request";
 import { pluginId } from "@psibase/common-lib/messaging/plugin-id";
 
+import { compilePlugin } from "./component-loading/loader";
 import { AppInterface } from "./app-interface";
 import { CallContext } from "./call-context";
 import { getRecoverableError } from "./plugin/errors";
+import { PluginHost } from "./plugin/plugin-host";
 import { PluginLoader } from "./plugin/plugin-loader";
 import { Plugins } from "./plugin/plugins";
 import {
     OriginationData,
     assert,
     chainIdPromise,
+    composer,
     isEmbedded,
     networkName,
     networkNamePromise,
@@ -76,6 +79,15 @@ export class Supervisor implements AppInterface {
     private embedder: string | undefined;
 
     private inPreload = false;
+
+    private compositeCache = new Map<
+        string,
+        {
+            wasm: Uint8Array;
+            composeSet: Array<{ service: string; plugin: string }>;
+            containsTransact: boolean;
+        }
+    >();
 
     parser: Promise<any>;
 
@@ -142,6 +154,13 @@ export class Supervisor implements AppInterface {
             await this.loader.processPlugins();
             await this.loader.awaitReady();
 
+            try {
+                await this.composeHostPlugins();
+            } catch (e) {
+                console.warn("Host composite skipped:", e);
+            }
+            await this.plugins.compileUncompiled();
+
             // Required to instantiate system plugins to execute the plugin calls below
             await this.plugins.instantiateAll();
 
@@ -163,8 +182,6 @@ export class Supervisor implements AppInterface {
 
             setQueryToken(this.getActiveQueryToken());
 
-            // Phase 1: Compile app plugins (NO instantiation yet — Memory deferred).
-            // The sync call to getAuthServices below only touches Phase 0 plugins.
             this.loader.trackPlugins([...plugins]);
             await this.loader.processPlugins();
             await this.loader.awaitReady();
@@ -269,13 +286,164 @@ export class Supervisor implements AppInterface {
         window.addEventListener("pagehide", () => this.shutdown());
     }
 
+    private unwrapComposerResult(raw: any): {
+        wasm: Uint8Array;
+        composeSet: Array<{ service: string; plugin: string }>;
+        containsTransact: boolean;
+    } {
+        if (raw && typeof raw === "object" && "tag" in raw) {
+            if (raw.tag === "err") {
+                throw new Error(String(raw.val));
+            }
+            raw = raw.val;
+        }
+        return {
+            wasm: raw.wasm as Uint8Array,
+            composeSet: (raw.composeSet ?? raw["compose-set"]) as Array<{
+                service: string;
+                plugin: string;
+            }>,
+            containsTransact: Boolean(
+                raw.containsTransact ?? raw["contains-transact"],
+            ),
+        };
+    }
+
+    private cacheKey(
+        kind: string,
+        plugins: Array<{ service: string; plugin: string; wasm: Uint8Array }>,
+    ): string {
+        const parts = plugins
+            .map((p) => `${p.service}:${p.plugin}:${p.wasm.byteLength}`)
+            .sort();
+        return `${kind}|${parts.join(",")}`;
+    }
+
+    private async attachComposite(
+        result: {
+            wasm: Uint8Array;
+            composeSet: Array<{ service: string; plugin: string }>;
+        },
+        entry: QualifiedPluginId | undefined,
+        privileged: boolean,
+        wrapInnerTracers: boolean,
+    ): Promise<void> {
+        if (result.composeSet.length === 0) return;
+        const p = await parser();
+        const api = p.parse("composite", result.wasm);
+        const services = await this.plugins.mergedServiceMap();
+        for (const intf of api.importedFuncs?.interfaces ?? []) {
+            if (intf.namespace === "wasi" || intf.namespace === "supervisor") {
+                continue;
+            }
+            if (!(intf.namespace in services)) {
+                services[intf.namespace] = intf.namespace;
+            }
+        }
+        const compiled = await compilePlugin(
+            entry?.service ?? "host",
+            privileged,
+            result.wasm,
+            new PluginHost(this),
+            api,
+            services,
+            { namespacedExports: true, allowCallstack: true },
+        );
+        let instance: Promise<{ exports: Record<string, unknown> }> | undefined;
+        const instantiate = () => {
+            if (!instance) instance = compiled.instantiate();
+            return instance;
+        };
+        const importNames =
+            (api.importedFuncs?.interfaces as
+                | Array<{ namespace: string; package: string; name: string }>
+                | undefined)?.map(
+                (i) => `${i.namespace}:${i.package}/${i.name}`,
+            ) ?? [];
+        const tracedIds: string[] = [];
+        for (const id of result.composeSet) {
+            const plugin = this.plugins.getPlugin(id).plugin;
+            await plugin.parsed;
+            const inner =
+                !entry ||
+                id.service !== entry.service ||
+                id.plugin !== entry.plugin;
+            // Only skip JS push when a tracer actually wraps this plugin.
+            // Host compose currently skips tracers; marking inner plugins
+            // traced anyway left get-sender with no host frame, so Max-trust
+            // checks (e.g. get-auth-services) saw homepage instead of supervisor.
+            const traced =
+                wrapInnerTracers && inner && !plugin.exportsResources();
+            if (traced) tracedIds.push(`${id.service}:${id.plugin}`);
+            plugin.attachShared(instantiate, true, traced);
+        }
+        const entryKey = entry ? `${entry.service}:${entry.plugin}` : "host";
+        console.info(
+            `[supervisor] ${privileged ? "host" : "app"} composite entry=${entryKey} ` +
+                `set=${result.composeSet.map((id) => `${id.service}:${id.plugin}`).join(",")} ` +
+                `traced=[${tracedIds.join(",")}] ` +
+                `imports=${importNames.filter((n) => n.startsWith("supervisor:") || n.startsWith("host:")).join(",")}`,
+        );
+    }
+
+    private async composeHostPlugins(): Promise<void> {
+        // Host composition is disabled until inner tracers are reentrant.
+        // host:db/clear-buffers calls host:common/get-sender. get-sender pops
+        // its own frame then looks back 2, which only works if db→common is a
+        // JS hop that pushes a second "host" frame. Composing them (with or
+        // without tracers) either drops that frame or traps on nested
+        // get-sender while post-graphql is already on the common tracer.
+        return;
+    }
+
+    private async composeAppPlugins(entry: QualifiedPluginId): Promise<void> {
+        const wasmPlugins = this.plugins.collectWasmPlugins();
+        if (wasmPlugins.length === 0) return;
+        if (!wasmPlugins.some((p) => p.service === entry.service && p.plugin === entry.plugin)) {
+            return;
+        }
+        const key = this.cacheKey(`app:${entry.service}:${entry.plugin}`, wasmPlugins);
+        let result = this.compositeCache.get(key);
+        if (!result) {
+            const c = await composer();
+            // Inner app tracers are not reentrant-safe yet. Without them,
+            // in-composite plugin-to-plugin calls do not push a JS frame.
+            // External calls into the composite (supervisor → transact
+            // start-tx, UI → branding) still push. Remaining imports
+            // (host, hook providers, perms) still JS-hop and still push.
+            result = this.unwrapComposerResult(
+                c.compose(entry, wasmPlugins, false),
+            );
+            this.compositeCache.set(key, result);
+        }
+        await this.attachComposite(result, entry, false, false);
+    }
+
     getRootDomain(): string {
         return rootDomain;
     }
 
+    pushTracerFrame(service: string): void {
+        const ctx = this.getCallContext();
+        ctx.stack.push(service, `tracer:${service}`);
+        console.info(
+            `[supervisor] tracer push ${service} → [${ctx.stack.export().join(" > ")}]`,
+        );
+    }
+
+    popTracerFrame(): void {
+        const ctx = this.getCallContext();
+        ctx.stack.pop();
+        console.info(
+            `[supervisor] tracer pop → [${ctx.stack.export().join(" > ")}]`,
+        );
+    }
+
     getServiceStack(): string[] {
         assertTruthy(this.context, "Uninitialized call context");
-        return this.context.stack.export();
+        const stack = this.context.stack.export();
+        console.info(`[supervisor] serviceStack → [${stack.join(" > ")}]`);
+        return stack;
     }
 
     importKey(privateKey: string): string {
@@ -317,13 +485,31 @@ export class Supervisor implements AppInterface {
 
         const { service, plugin, intf, method, params } = args;
         const p = this.plugins.getAssertPlugin({ service, plugin });
+        const label = `${service}:${plugin}/${intf ?? ""}->${method}`;
 
-        this.context.stack.push(args.service, toString(args));
+        const skipJsPush = p.stackManagedByTracer;
+        if (!skipJsPush) {
+            this.context.stack.push(args.service, toString(args));
+        }
+        const stackBefore = this.context.stack.export();
         let ret: any;
         try {
             ret = p.call(intf, method, params);
+        } catch (e) {
+            if (e instanceof PromptSignal) throw e;
+            const rec = getRecoverableError(e);
+            console.error(
+                `[supervisor] trap ${label} traced=${skipJsPush} ` +
+                    `stack=[${stackBefore.join(" > ")}]`,
+                rec ?? e,
+            );
+            if (rec) throw e;
+            const msg = e instanceof Error ? e.message : String(e);
+            throw new Error(`${label} failed: ${msg}`, { cause: e });
         } finally {
-            this.context.stack.pop();
+            if (!skipJsPush) {
+                this.context.stack.pop();
+            }
         }
 
         return ret;
@@ -373,13 +559,30 @@ export class Supervisor implements AppInterface {
         assertTruthy(this.context, "Uninitialized call context");
         const { service, plugin, intf, type, handle, method, params } = args;
         const p = this.plugins.getAssertPlugin({ service, plugin });
-
-        this.context.stack.push(service, toString(args));
+        const label = `${service}:${plugin}/${intf ?? ""}->${type}.${method}`;
+        const skipJsPush = p.stackManagedByTracer;
+        if (!skipJsPush) {
+            this.context.stack.push(service, toString(args));
+        }
+        const stackBefore = this.context.stack.export();
         let ret: any;
         try {
             ret = p.resourceCall(intf, type, handle, method, params);
+        } catch (e) {
+            if (e instanceof PromptSignal) throw e;
+            const rec = getRecoverableError(e);
+            console.error(
+                `[supervisor] trap ${label} traced=${skipJsPush} ` +
+                    `stack=[${stackBefore.join(" > ")}]`,
+                rec ?? e,
+            );
+            if (rec) throw e;
+            const msg = e instanceof Error ? e.message : String(e);
+            throw new Error(`${label} failed: ${msg}`, { cause: e });
         } finally {
-            this.context.stack.pop();
+            if (!skipJsPush) {
+                this.context.stack.pop();
+            }
         }
 
         return ret;
@@ -449,6 +652,11 @@ export class Supervisor implements AppInterface {
                 },
             ]);
 
+            await this.composeAppPlugins({
+                service: args.service,
+                plugin: args.plugin,
+            });
+            await this.plugins.compileUncompiled();
             await this.plugins.instantiateAll();
 
             this.context = this.getCallContext();

@@ -2,6 +2,7 @@ import { QualifiedPluginId } from "@psibase/common-lib";
 
 import { assert } from "@/utils";
 
+import { ServiceMap } from "../component-loading/loader";
 import { Supervisor } from "../supervisor";
 import { Plugin } from "./plugin";
 import { PluginHost } from "./plugin-host";
@@ -39,6 +40,53 @@ export class Plugins {
             `Tried to call plugin ${plugin.service}:${plugin.plugin} before initialization`,
         );
         return loaded.plugin;
+    }
+
+    public collectWasmPlugins(): {
+        service: string;
+        plugin: string;
+        wasm: Uint8Array;
+    }[] {
+        const out: { service: string; plugin: string; wasm: Uint8Array }[] = [];
+        for (const ctx of Object.values(this.serviceContexts)) {
+            for (const plugin of ctx.listPlugins()) {
+                const wasm = plugin.getBytes?.();
+                if (wasm) {
+                    out.push({
+                        service: plugin.id.service,
+                        plugin: plugin.id.plugin,
+                        wasm,
+                    });
+                }
+            }
+        }
+        return out;
+    }
+
+    public allPlugins(): Plugin[] {
+        return Object.values(this.serviceContexts).flatMap((c) => c.listPlugins());
+    }
+
+    public async mergedServiceMap(): Promise<ServiceMap> {
+        const merged: ServiceMap = {};
+        const maps = await Promise.all(
+            this.allPlugins().map((p) => p.services),
+        );
+        for (const map of maps) {
+            if (map) Object.assign(merged, map);
+        }
+        return merged;
+    }
+
+    async compileUncompiled(): Promise<void> {
+        await Promise.all(
+            this.allPlugins()
+                .filter(
+                    (p) =>
+                        typeof p.isCompiled === "function" && !p.isCompiled(),
+                )
+                .map((p) => p.compileIndividual()),
+        );
     }
 
     // Instantiates all plugins that have been loaded.

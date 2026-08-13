@@ -208,6 +208,11 @@ export interface InstantiateResult {
     exports: Record<string, unknown>;
 }
 
+export interface CompileOptions {
+    namespacedExports?: boolean;
+    allowCallstack?: boolean;
+}
+
 export interface CompiledPlugin {
     instantiate: () => Promise<InstantiateResult>;
 }
@@ -218,6 +223,7 @@ async function compileWasmComponent(
     wasmBytes: Uint8Array,
     imports: PluginImports,
     debugFileName: string,
+    namespacedExports = false,
 ): Promise<CompiledPlugin> {
     const name = "component";
     const opts: GenerateOptions = {
@@ -227,7 +233,7 @@ async function compileWasmComponent(
         noNodejsCompat: true,
         tlaCompat: false,
         validLiftingOptimization: false,
-        noNamespacedExports: true,
+        noNamespacedExports: !namespacedExports,
         tracing: false,
     };
 
@@ -303,7 +309,7 @@ function assertSupervisorImportsSatisfied(
 
         const key = `${intf.namespace}:${intf.package}/${intf.name}`;
 
-        if (!privileged) {
+        if (intf.package !== "callstack" && !privileged) {
             throw new Error(
                 `Plugin ${service} imports ${key} but is not privileged`,
             );
@@ -335,10 +341,16 @@ export async function compilePlugin(
     pluginHost: HostInterface,
     api: ComponentAPI,
     services: ServiceMap | null,
+    options: CompileOptions = {},
 ): Promise<CompiledPlugin> {
     const imports: PluginImports = {
         ...getWasiImports(),
         ...(privileged ? pluginHost.bridge : {}),
+        ...(options.allowCallstack || api.importedFuncs.interfaces.some(
+            (intf) => intf.namespace === "supervisor" && intf.package === "callstack",
+        )
+            ? pluginHost.callstack
+            : {}),
         ...buildProxiedImports(api.importedFuncs, pluginHost, services),
     };
     assertSupervisorImportsSatisfied(
@@ -347,7 +359,12 @@ export async function compilePlugin(
         api.importedFuncs,
         imports,
     );
-    return compileWasmComponent(wasmBytes, imports, `${service}.plugin.js`);
+    return compileWasmComponent(
+        wasmBytes,
+        imports,
+        `${service}.plugin.js`,
+        options.namespacedExports === true,
+    );
 }
 
 // Loads a utility WASM component (not a plugin) with only WASI imports.

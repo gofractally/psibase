@@ -272,7 +272,9 @@ file(GLOB plugin-wit LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/packages
 # Build each component
 include(libraries/psibase/sdk/rs-components.cmake)
 add_rs_component(packages/user/CommonApi/common/packages/component-parser:ComponentParser component_parser.wasm wasm32-unknown-unknown)
+add_rs_component(packages/user/CommonApi/common/packages/plugin-composer:PluginComposer plugin_composer.wasm wasm32-unknown-unknown)
 add_dependencies(CommonApiCommonLib_js ComponentParser)
+add_dependencies(CommonApiCommonLib_js PluginComposer)
 
 add_rs_component_workspace(packages/:Plugins 
     accounts
@@ -666,9 +668,11 @@ psibase_package(
         DATA GLOB ${COMMON_API}/common/resources/*.mjs                        common/
         DATA GLOB ${THIRD_FILES}                                              common
         DATA      ${COMPONENT_BIN_DIR}/${ComponentParser_OUTPUT_FILE}         /common/${ComponentParser_OUTPUT_FILE}
+        DATA      ${COMPONENT_BIN_DIR}/${PluginComposer_OUTPUT_FILE}          /common/${PluginComposer_OUTPUT_FILE}
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/plugin-tester/ui/dist/* /common/plugin-tester/
     DEPENDS CommonApiCommonLib_js
     DEPENDS ${ComponentParser_DEP}
+    DEPENDS ${PluginComposer_DEP}
     DEPENDS ${PluginTester_js_DEP}
     DEPENDS wasm
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
