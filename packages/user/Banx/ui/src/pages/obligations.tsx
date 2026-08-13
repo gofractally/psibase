@@ -8,12 +8,17 @@ import {
     Pencil,
     PiggyBank,
     Plus,
+    Route,
 } from "lucide-react";
 
 import { AccountHistoryDialog } from "@/components/account-history";
 import { AssetSelect } from "@/components/asset-select";
 import { NewDepositLoanDialog } from "@/components/new-deposit-loan-dialog";
 import { PageHeader } from "@/components/page-header";
+import {
+    RoutingPolicyDialog,
+    type RoutingPolicyPrefill,
+} from "@/components/routing-policy-dialog";
 import { useAssetMap } from "@/hooks/use-assets";
 import { useCreditLines, useObligations } from "@/hooks/use-banx-data";
 import {
@@ -191,8 +196,16 @@ export function ObligationsPage() {
     const [creditLineOpen, setCreditLineOpen] = useState(false);
     /** When set, credit-line dialog edits this facility instead of creating. */
     const [editingLine, setEditingLine] = useState<CreditLine | null>(null);
+    const [routingOpen, setRoutingOpen] = useState(false);
+    const [routingPrefill, setRoutingPrefill] =
+        useState<RoutingPolicyPrefill | null>(null);
     const [hideEmptySavings, setHideEmptySavings] = useState(false);
     const [hideEmptyLoans, setHideEmptyLoans] = useState(false);
+
+    const openRouting = (prefill?: RoutingPolicyPrefill | null) => {
+        setRoutingPrefill(prefill ?? null);
+        setRoutingOpen(true);
+    };
 
     const savingsGroupsAll = useMemo(() => {
         if (!user) return [];
@@ -266,6 +279,35 @@ export function ObligationsPage() {
             <PageHeader
                 title="Accounts"
                 description="Open obligations as banking products: claims you hold act like savings; amounts you owe act like loans. Grouped by counterparty and currency."
+                action={
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                type="button"
+                                size="icon"
+                                variant="outline"
+                                className="size-9 shrink-0"
+                                aria-label="Set routing policy"
+                                onClick={() => openRouting(null)}
+                            >
+                                <Route className="size-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                            Set routing policy — hop fees for path payments
+                        </TooltipContent>
+                    </Tooltip>
+                }
+            />
+
+            <RoutingPolicyDialog
+                open={routingOpen}
+                onOpenChange={(open) => {
+                    setRoutingOpen(open);
+                    if (!open) setRoutingPrefill(null);
+                }}
+                assets={assets}
+                prefill={routingPrefill}
             />
 
             {/* ── Savings / deposits (you are creditor) ───────────────── */}
@@ -361,6 +403,12 @@ export function ObligationsPage() {
                                           }
                                         : undefined
                                 }
+                                onSetRouting={() =>
+                                    openRouting({
+                                        creditor: g.counterparty,
+                                        assetId: g.assetId,
+                                    })
+                                }
                             />
                         ))}
                     </div>
@@ -446,6 +494,12 @@ export function ObligationsPage() {
                                         g.assetId,
                                         g.total.toString(),
                                     )
+                                }
+                                onSetRouting={() =>
+                                    openRouting({
+                                        creditor: g.counterparty,
+                                        assetId: g.assetId,
+                                    })
                                 }
                             />
                         ))}
@@ -828,6 +882,7 @@ function AccountGroupRow({
     onAccrue,
     onSettle,
     onEditCreditLine,
+    onSetRouting,
 }: {
     tone: "savings" | "loan";
     title: string;
@@ -845,6 +900,8 @@ function AccountGroupRow({
     onAccrue: (o: Obligation) => void;
     onSettle: () => void;
     onEditCreditLine?: () => void;
+    /** Open routing policy with this counterparty as next-hop creditor. */
+    onSetRouting?: () => void;
 }) {
     const [open, setOpen] = useState(false);
     const [historyOpen, setHistoryOpen] = useState(false);
@@ -884,6 +941,8 @@ function AccountGroupRow({
     const editTip =
         "Edit credit line — change limit, interest rate, or revolving terms";
     const historyTip = "History — path draws, deposits, nets, and line changes";
+    const routingTip =
+        "Routing policy — set path hop fees toward this next-hop creditor";
 
     return (
         <Collapsible open={open} onOpenChange={setOpen}>
@@ -1008,6 +1067,28 @@ function AccountGroupRow({
                                 </TooltipTrigger>
                                 <TooltipContent side="top">
                                     {editTip}
+                                </TooltipContent>
+                            </Tooltip>
+                        ) : null}
+                        {onSetRouting ? (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        type="button"
+                                        size="icon"
+                                        variant="outline"
+                                        className="size-8 shrink-0"
+                                        aria-label={routingTip}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onSetRouting();
+                                        }}
+                                    >
+                                        <Route className="size-3.5" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">
+                                    {routingTip}
                                 </TooltipContent>
                             </Tooltip>
                         ) : null}
