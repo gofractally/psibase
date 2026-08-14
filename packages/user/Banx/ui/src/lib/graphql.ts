@@ -18,6 +18,9 @@ const zCreditLine = z.object({
     limit: z.string(),
     depleteOnDebit: z.boolean(),
     interestRatePpm: z.number(),
+    graceSeconds: z.number(),
+    cycleStartedAt: z.number(),
+    cycleGraceSeconds: z.number(),
     exposure: z.string(),
 });
 
@@ -90,7 +93,8 @@ export async function fetchAssets(): Promise<Asset[]> {
 export async function fetchCreditLines(account: string): Promise<CreditLine[]> {
     const data = await gql<{ creditLines: CreditLine[] }>(
         `{ creditLines(account: "${account}") {
-            creditor debtor assetId limit depleteOnDebit interestRatePpm exposure
+            creditor debtor assetId limit depleteOnDebit interestRatePpm
+            graceSeconds cycleStartedAt cycleGraceSeconds exposure
         } }`,
     );
     return zCreditLine.array().parse(data.creditLines);

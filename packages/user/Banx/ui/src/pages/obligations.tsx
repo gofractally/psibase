@@ -40,7 +40,7 @@ import {
     formatRawAmount,
     humanToRaw,
 } from "@/lib/amount";
-import { ppmToPercent } from "@/lib/constants";
+import { DEFAULT_GRACE_SECONDS, ppmToPercent } from "@/lib/constants";
 import {
     MAX_PERCENT,
     MIN_PERCENT_STEP,
@@ -819,6 +819,7 @@ function CreditLineDialog({
             limit: "100",
             interestPct: "0",
             deplete: false,
+            graceSeconds: String(DEFAULT_GRACE_SECONDS),
         },
         onSubmit: async ({ value }) => {
             const debtor = isEdit
@@ -838,6 +839,10 @@ function CreditLineDialog({
                         interestRatePpm: percentStringToPpm(
                             value.interestPct,
                             PPM_SCALE,
+                        ),
+                        graceSeconds: Math.max(
+                            0,
+                            Math.floor(Number(value.graceSeconds.trim()) || 0),
                         ),
                     },
                     {
@@ -864,6 +869,7 @@ function CreditLineDialog({
                 ).replace(/,/g, ""),
                 interestPct: ppmToPercentInput(editing.interestRatePpm),
                 deplete: editing.depleteOnDebit,
+                graceSeconds: String(editing.graceSeconds ?? DEFAULT_GRACE_SECONDS),
             });
         } else {
             form.reset({
@@ -872,6 +878,7 @@ function CreditLineDialog({
                 limit: "100",
                 interestPct: "0",
                 deplete: false,
+                graceSeconds: String(DEFAULT_GRACE_SECONDS),
             });
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -974,6 +981,41 @@ function CreditLineDialog({
                             )}
                         />
                     </div>
+                    <form.AppField
+                        name="graceSeconds"
+                        validators={{
+                            onChange: ({ value }: { value: string }) => {
+                                const t = String(value).trim();
+                                if (t === "") return "Required";
+                                if (!/^\d+$/.test(t)) {
+                                    return "Whole seconds only";
+                                }
+                                return undefined;
+                            },
+                            onSubmit: ({ value }: { value: string }) => {
+                                const t = String(value).trim();
+                                if (t === "") return "Required";
+                                if (!/^\d+$/.test(t)) {
+                                    return "Whole seconds only";
+                                }
+                                return undefined;
+                            },
+                        }}
+                        children={(field) => (
+                            <field.TextField
+                                label="Interest-free period (seconds)"
+                                inputMode="numeric"
+                                placeholder={String(DEFAULT_GRACE_SECONDS)}
+                            />
+                        )}
+                    />
+                    <p className="text-muted-foreground -mt-2 text-xs">
+                        If they repay this pair to zero within this window, no
+                        interest. Default {DEFAULT_GRACE_SECONDS} = 7 days.{" "}
+                        {isEdit && editing && editing.cycleStartedAt
+                            ? "An open cycle keeps its snapshotted window; this value applies to the next cycle."
+                            : "0 = interest from the first second."}
+                    </p>
                     <form.AppField
                         name="deplete"
                         children={(field) => (
@@ -1380,6 +1422,20 @@ function AccountGroupRow({
                                             {symbol}
                                         </span>
                                     </div>
+                                    {creditLine.graceSeconds > 0 ? (
+                                        <div className="sm:col-span-3">
+                                            Interest-free{" "}
+                                            <span className="text-foreground font-mono tabular-nums">
+                                                {creditLine.cycleStartedAt
+                                                    ? creditLine.cycleGraceSeconds
+                                                    : creditLine.graceSeconds}
+                                            </span>{" "}
+                                            seconds
+                                            {creditLine.cycleStartedAt
+                                                ? " (this cycle)"
+                                                : ""}
+                                        </div>
+                                    ) : null}
                                 </div>
                             ) : null}
                             <p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">

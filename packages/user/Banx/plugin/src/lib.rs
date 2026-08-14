@@ -128,6 +128,7 @@ impl Api for BanxPlugin {
         limit: String,
         deplete_on_debit: bool,
         interest_rate_ppm: u32,
+        grace_seconds: u32,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::set_credit_line)?;
         let amount = parse_amount(asset_id, &limit)?;
@@ -137,6 +138,7 @@ impl Api for BanxPlugin {
             amount,
             deplete_on_debit,
             interest_rate: interest_rate_ppm,
+            grace_seconds,
         }
         .packed();
         add_action_to_transaction(banx::action_structs::st_crd_lne::ACTION_NAME, &packed)

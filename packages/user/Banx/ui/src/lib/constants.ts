@@ -1,5 +1,8 @@
 export const BANX_SERVICE = "banx" as const;
 
+/** Default interest-free window on a new credit line (7 days). */
+export const DEFAULT_GRACE_SECONDS = 7 * 86_400;
+
 /**
  * Chain rate scale: `PPM_SCALE` = 100%.
  * 1% = 10_000 ppm; smallest unit is **1 ppm** = **0.0001%**.

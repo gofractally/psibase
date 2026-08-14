@@ -44,6 +44,8 @@ export function useSetCreditLine() {
             limit: string;
             depleteOnDebit: boolean;
             interestRatePpm: number;
+            /** Interest-free window in seconds after 0→positive. */
+            graceSeconds: number;
         }) =>
             banxCall("setCreditLine", [
                 p.debtor,
@@ -51,6 +53,7 @@ export function useSetCreditLine() {
                 p.limit,
                 p.depleteOnDebit,
                 p.interestRatePpm,
+                p.graceSeconds,
             ]),
         onSuccess: () => {
             invalidate();

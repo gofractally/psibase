@@ -53,12 +53,15 @@ interface api {
     /// Creditor posts/updates a credit line to `debtor` in `asset-id`.
     /// `limit` is a human decimal string (e.g. `"100.00"`).
     /// `interest-rate-ppm` is APR in ppm (10000 = 1%).
+    /// `grace-seconds` is the interest-free window after a 0→positive cycle
+    /// (`604800` = 7 days). `0` = interest from the first second.
     set-credit-line: func(
         debtor: string,
         asset-id: u16,
         limit: string,
         deplete-on-debit: bool,
         interest-rate-ppm: u32,
+        grace-seconds: u32,
     ) -> result<_, error>;
 
     /// Post a clearing offer toward a **specific** `counterparty` (next hop for

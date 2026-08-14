@@ -58,6 +58,12 @@ mod service {
         limit: Decimal,
         depleteOnDebit: bool,
         interestRatePpm: u32,
+        /// Posted interest-free window (seconds) for the next cycle.
+        graceSeconds: u32,
+        /// When the open cycle started (`0` = none).
+        cycleStartedAt: i64,
+        /// Grace snapshotted at cycle open.
+        cycleGraceSeconds: u32,
         /// Outstanding principal + interest for this directed pair/asset.
         exposure: Decimal,
         /// Unused grant when depleting; 0 on revolving lines.
@@ -76,6 +82,9 @@ mod service {
                 limit: dec(line.limit, line.asset_id),
                 depleteOnDebit: line.deplete_on_debit,
                 interestRatePpm: line.interest_rate,
+                graceSeconds: line.grace_seconds,
+                cycleStartedAt: time_sec(line.cycle_started_at),
+                cycleGraceSeconds: line.cycle_grace_seconds,
                 exposure: dec(exposure, line.asset_id),
                 remaining: dec(line.remaining, line.asset_id),
                 residual: dec(Quantity::new(line.draw_headroom()), line.asset_id),

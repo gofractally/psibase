@@ -547,7 +547,7 @@ pub mod tables {
                 .unwrap_or_else(|| Self::new(creditor, debtor, asset_id, interest_rate))
         }
 
-        fn now() -> TimePointSec {
+        pub fn now() -> TimePointSec {
             psibase::services::transact::Wrapper::call()
                 .currentBlock()
                 .time
@@ -605,6 +605,9 @@ pub mod tables {
         }
 
         pub fn live_accrued_at(&self, now: TimePointSec) -> Quantity {
+            if CreditLine::pair_in_grace(self.creditor, self.debtor, self.asset_id, now) {
+                return Quantity::new(0);
+            }
             let base = self
                 .remaining_principal
                 .value
@@ -623,8 +626,17 @@ pub mod tables {
 
         /// Write live interest and start a new epoch. Only for principal/rate
         /// changes — not for a lone accrue, so 5s vs 5y stays identical.
+        /// During a grace window, interest stays 0 and the cycle start is kept
+        /// so post-grace compound still runs from origination.
         pub fn lock_interest(&mut self) {
             let now = Self::now();
+            if CreditLine::pair_in_grace(self.creditor, self.debtor, self.asset_id, now) {
+                if self.accrued_interest.value != 0 {
+                    self.accrued_interest = Quantity::new(0);
+                    self.save();
+                }
+                return;
+            }
             let live = self.live_accrued_at(now);
             if live == self.accrued_interest && now.seconds <= self.last_interest_accrual.seconds {
                 return;
@@ -634,6 +646,17 @@ pub mod tables {
             if !self.is_clear() {
                 self.save();
             }
+        }
+
+        pub fn directed_principal(
+            creditor: AccountNumber,
+            debtor: AccountNumber,
+            asset_id: u16,
+        ) -> u64 {
+            Self::obligations(creditor, debtor, asset_id)
+                .into_iter()
+                .map(|o| o.remaining_principal.value)
+                .sum()
         }
 
         /// Lock interest before a principal change on this row.
@@ -671,6 +694,7 @@ pub mod tables {
             if amount == 0 {
                 return;
             }
+            let before = Self::directed_principal(creditor, debtor, asset_id);
             let mut obs = Self::obligations(creditor, debtor, asset_id);
             if obs.is_empty() {
                 return;
@@ -682,6 +706,8 @@ pub mod tables {
             for o in &obs {
                 o.persist_or_delete();
             }
+            let after = Self::directed_principal(creditor, debtor, asset_id);
+            CreditLine::sync_cycle(creditor, debtor, asset_id, before, after);
         }
 
         /// Interest first (globally, highest-rate order), then principal.
@@ -718,6 +744,7 @@ pub mod tables {
             assert!(from_creditor != to_creditor, "cannot transfer claims to self");
             assert!(amount > 0, "transfer amount must be positive");
             Self::accrue_pair(from_creditor, debtor, asset_id);
+            let before_from = Self::directed_principal(from_creditor, debtor, asset_id);
             let available = Self::exposure(from_creditor, debtor, asset_id).value;
             assert!(
                 available >= amount,
@@ -769,6 +796,8 @@ pub mod tables {
             for o in &obs {
                 o.persist_or_delete();
             }
+            let after_from = Self::directed_principal(from_creditor, debtor, asset_id);
+            CreditLine::sync_cycle(from_creditor, debtor, asset_id, before_from, after_from);
         }
 
         /// Net mutual obligations between `a` and `b` for `asset_id`.
@@ -806,6 +835,8 @@ pub mod tables {
         /// Grow principal on this claim (shared by deposit and line draws).
         /// Accrues first so interest is finalized on the prior principal balance.
         fn credit(&mut self, amount: Quantity) {
+            let before =
+                Self::directed_principal(self.creditor, self.debtor, self.asset_id);
             self.accrue();
             self.remaining_principal = self
                 .remaining_principal
@@ -814,6 +845,14 @@ pub mod tables {
                 .expect("obligation principal overflow")
                 .into();
             self.save();
+            let after = Self::directed_principal(self.creditor, self.debtor, self.asset_id);
+            CreditLine::sync_cycle(
+                self.creditor,
+                self.debtor,
+                self.asset_id,
+                before,
+                after,
+            );
         }
 
         /// Credit the (creditor, debtor, rate) bucket, creating it if needed.
@@ -858,6 +897,10 @@ pub mod tables {
     /// A draw of `amount` requires `exposure + amount <= limit`.
     /// When `deplete_on_debit`, `remaining` is unused grant (shrinks on draw /
     /// takeout; not restored by repayment). Revolving lines ignore `remaining`.
+    ///
+    /// `grace_seconds` is the posted interest-free window. When this pair goes
+    /// 0→positive, that value is snapshotted on the open cycle. Live interest
+    /// is 0 until the window ends or principal returns to 0.
     #[table(name = "CreditLineTable", index = 3)]
     #[derive(
         Default, Clone, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug,
@@ -875,6 +918,12 @@ pub mod tables {
         pub interest_rate: u32,
         /// Unused grant when `deplete_on_debit`. Ignored for revolving lines.
         pub remaining: Quantity,
+        /// Posted interest-free window for the *next* 0→positive cycle.
+        pub grace_seconds: u32,
+        /// When the current cycle opened (`0` = none).
+        pub cycle_started_at: TimePointSec,
+        /// Grace snapshotted at cycle open. Later `grace_seconds` edits do not change it.
+        pub cycle_grace_seconds: u32,
     }
 
     impl CreditLine {
@@ -894,6 +943,7 @@ pub mod tables {
             limit: Quantity,
             deplete_on_debit: bool,
             interest_rate: u32,
+            grace_seconds: u32,
         ) -> Self {
             Self {
                 creditor,
@@ -907,6 +957,56 @@ pub mod tables {
                 } else {
                     Quantity::new(0)
                 },
+                grace_seconds,
+                cycle_started_at: TimePointSec { seconds: 0 },
+                cycle_grace_seconds: 0,
+            }
+        }
+
+        pub fn in_grace_at(&self, now: TimePointSec) -> bool {
+            if self.cycle_started_at.seconds == 0 || self.cycle_grace_seconds == 0 {
+                return false;
+            }
+            let end = self
+                .cycle_started_at
+                .seconds
+                .saturating_add(i64::from(self.cycle_grace_seconds));
+            now.seconds < end
+        }
+
+        pub fn pair_in_grace(
+            creditor: AccountNumber,
+            debtor: AccountNumber,
+            asset_id: u16,
+            now: TimePointSec,
+        ) -> bool {
+            Self::get(creditor, debtor, asset_id)
+                .map(|l| l.in_grace_at(now))
+                .unwrap_or(false)
+        }
+
+        /// Open a cycle on 0→positive; close when principal returns to 0.
+        pub fn sync_cycle(
+            creditor: AccountNumber,
+            debtor: AccountNumber,
+            asset_id: u16,
+            before_principal: u64,
+            after_principal: u64,
+        ) {
+            let Some(mut line) = Self::get(creditor, debtor, asset_id) else {
+                return;
+            };
+            if before_principal == 0
+                && after_principal > 0
+                && line.cycle_started_at.seconds == 0
+            {
+                line.cycle_started_at = Obligation::now();
+                line.cycle_grace_seconds = line.grace_seconds;
+                line.save();
+            } else if after_principal == 0 && line.cycle_started_at.seconds != 0 {
+                line.cycle_started_at = TimePointSec { seconds: 0 };
+                line.cycle_grace_seconds = 0;
+                line.save();
             }
         }
 
@@ -956,6 +1056,7 @@ pub mod tables {
             amount: Quantity,
             deplete_on_debit: bool,
             interest_rate: u32,
+            grace_seconds: u32,
         ) {
             assert!(creditor != debtor, "cannot set credit line to self");
             let _ = Asset::get_assert(asset_id);
@@ -963,15 +1064,29 @@ pub mod tables {
                 interest_rate <= PPM_SCALE,
                 "interest_rate exceeds 100% (PPM_SCALE)"
             );
-            CreditLine::new(
-                creditor,
-                debtor,
-                asset_id,
-                amount,
-                deplete_on_debit,
-                interest_rate,
-            )
-            .save();
+            if let Some(mut line) = Self::get(creditor, debtor, asset_id) {
+                line.limit = amount;
+                line.deplete_on_debit = deplete_on_debit;
+                line.interest_rate = interest_rate;
+                line.grace_seconds = grace_seconds;
+                line.remaining = if deplete_on_debit {
+                    amount
+                } else {
+                    Quantity::new(0)
+                };
+                line.save();
+            } else {
+                CreditLine::new(
+                    creditor,
+                    debtor,
+                    asset_id,
+                    amount,
+                    deplete_on_debit,
+                    interest_rate,
+                    grace_seconds,
+                )
+                .save();
+            }
         }
 
         /// Draw `amount` of new principal: check `exposure + amount <= limit`,
@@ -1149,6 +1264,7 @@ pub mod service {
         amount: Quantity,
         deplete_on_debit: bool,
         interest_rate: u32,
+        grace_seconds: u32,
     ) {
         let creditor = get_sender();
         CreditLine::upsert_credit_line(
@@ -1158,6 +1274,7 @@ pub mod service {
             amount,
             deplete_on_debit,
             interest_rate,
+            grace_seconds,
         );
         emit_pair_activity(
             creditor,
