@@ -9,6 +9,7 @@ import {
     useCancelRequest,
     useCreateRequest,
     useDeposit,
+    useFulfillSettle,
 } from "@/hooks/use-banx-mutations";
 import { amountPlaceholder, displayAmount } from "@/lib/amount";
 import { formatExpiresAt } from "@/components/expires-at-picker";
@@ -16,6 +17,7 @@ import { amountFieldValidator, useAppForm } from "@/lib/form";
 import {
     REQUEST_INVOICE,
     REQUEST_PLEASE_BOOK,
+    REQUEST_SETTLE_AUTH,
     type PayRequest,
 } from "@/lib/graphql";
 
@@ -33,6 +35,7 @@ import {
 function kindLabel(kind: number): string {
     if (kind === REQUEST_INVOICE) return "Invoice";
     if (kind === REQUEST_PLEASE_BOOK) return "Please book";
+    if (kind === REQUEST_SETTLE_AUTH) return "Settle auth";
     return `Kind ${kind}`;
 }
 
@@ -51,6 +54,7 @@ export function RequestsPage() {
     const create = useCreateRequest();
     const cancel = useCancelRequest();
     const deposit = useDeposit();
+    const settle = useFulfillSettle();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const nowSec = Math.floor(Date.now() / 1000);
@@ -104,7 +108,11 @@ export function RequestsPage() {
         const counterparty = searchParams.get("counterparty");
         const assetId = Number(searchParams.get("assetId") || "");
         const amount = searchParams.get("amount");
-        if (kind === REQUEST_INVOICE || kind === REQUEST_PLEASE_BOOK) {
+        if (
+            kind === REQUEST_INVOICE ||
+            kind === REQUEST_PLEASE_BOOK ||
+            kind === REQUEST_SETTLE_AUTH
+        ) {
             createForm.setFieldValue("kind", kind);
         }
         if (counterparty) createForm.setFieldValue("counterparty", counterparty);
@@ -123,6 +131,27 @@ export function RequestsPage() {
             amount: displayAmount(r.remaining),
         });
         navigate(`/path-pay?${q.toString()}`);
+    };
+
+    const fulfillSettle = async (r: PayRequest) => {
+        setBookingId(r.id);
+        try {
+            await new Promise<void>((resolve, reject) => {
+                settle.mutate(
+                    {
+                        requestId: r.id,
+                        assetId: r.assetId,
+                        amount: displayAmount(r.remaining),
+                    },
+                    {
+                        onSuccess: () => resolve(),
+                        onError: (e: Error) => reject(e),
+                    },
+                );
+            });
+        } finally {
+            setBookingId(null);
+        }
     };
 
     const fulfillBook = async (r: PayRequest) => {
@@ -206,6 +235,21 @@ export function RequestsPage() {
                                         </Button>
                                     ) : null}
                                     {role === "in" &&
+                                    r.kind === REQUEST_SETTLE_AUTH ? (
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            disabled={bookingId === r.id}
+                                            onClick={() =>
+                                                void fulfillSettle(r)
+                                            }
+                                        >
+                                            {bookingId === r.id
+                                                ? "Settling…"
+                                                : "Settle"}
+                                        </Button>
+                                    ) : null}
+                                    {role === "in" &&
                                     r.kind === REQUEST_PLEASE_BOOK ? (
                                         <Button
                                             type="button"
@@ -240,7 +284,7 @@ export function RequestsPage() {
         <div className="space-y-10">
             <PageHeader
                 title="Requests"
-                description="Invoices ask someone to path-pay you (they do not clear an existing loan). Please-book asks a creditor to record off-graph value they received — only they can book it."
+                description="Invoices ask someone to path-pay you (they do not clear an existing loan). Please-book asks a creditor to record off-graph value they received — only they can book it. Settle-auth lets a debtor pay down a tab you already authorized, capped by what they owe you."
             />
 
             <section className="grid max-w-xl gap-3 rounded-lg border p-4">
@@ -260,7 +304,7 @@ export function RequestsPage() {
                                 <span className="text-sm font-medium">
                                     Kind
                                 </span>
-                                <div className="flex gap-2">
+                                <div className="flex flex-wrap gap-2">
                                     <Button
                                         type="button"
                                         size="sm"
@@ -293,11 +337,31 @@ export function RequestsPage() {
                                     >
                                         Invoice
                                     </Button>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant={
+                                            field.state.value ===
+                                            REQUEST_SETTLE_AUTH
+                                                ? "default"
+                                                : "outline"
+                                        }
+                                        onClick={() =>
+                                            field.handleChange(
+                                                REQUEST_SETTLE_AUTH,
+                                            )
+                                        }
+                                    >
+                                        Settle auth
+                                    </Button>
                                 </div>
                                 <p className="text-muted-foreground text-xs">
                                     {field.state.value === REQUEST_PLEASE_BOOK
                                         ? "Ask a creditor to deposit you (they received value off-graph)."
-                                        : "Ask someone to path-pay you. Last hop must be you."}
+                                        : field.state.value ===
+                                            REQUEST_SETTLE_AUTH
+                                          ? "You are the creditor. The named debtor may pay down what they owe you, up to this amount."
+                                          : "Ask someone to path-pay you. Last hop must be you."}
                                 </p>
                             </div>
                         )}
@@ -310,7 +374,10 @@ export function RequestsPage() {
                                     createForm.state.values.kind ===
                                     REQUEST_PLEASE_BOOK
                                         ? "Creditor"
-                                        : "Payer"
+                                        : createForm.state.values.kind ===
+                                            REQUEST_SETTLE_AUTH
+                                          ? "Debtor"
+                                          : "Payer"
                                 }
                                 placeholder="account"
                                 required

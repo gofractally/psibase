@@ -389,11 +389,15 @@ pub mod tables {
     /// Please-book (`PLEASE_BOOK`): poster asked the counterparty (creditor)
     /// to `deposit` them — off-graph value received. Only the creditor can
     /// fulfill; the poster cannot clear their own debt.
+    ///
+    /// Settle-auth (`SETTLE_AUTH`): poster is the creditor; counterparty
+    /// (debtor) may pull a deposit-equivalent up to remaining, capped by live
+    /// exposure. Does not create a claim on the creditor.
     #[table(name = "RequestTab", index = 8)]
     #[derive(Default, Clone, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct PayRequest {
         pub id: u32,
-        /// [`Self::INVOICE`] or [`Self::PLEASE_BOOK`].
+        /// [`Self::INVOICE`], [`Self::PLEASE_BOOK`], or [`Self::SETTLE_AUTH`].
         pub kind: u8,
         pub poster: AccountNumber,
         pub counterparty: AccountNumber,
@@ -408,6 +412,7 @@ pub mod tables {
     impl PayRequest {
         pub const INVOICE: u8 = 1;
         pub const PLEASE_BOOK: u8 = 2;
+        pub const SETTLE_AUTH: u8 = 3;
 
         #[primary_key]
         fn pk(&self) -> u32 {
@@ -441,8 +446,10 @@ pub mod tables {
             expires_at: TimePointSec,
         ) -> u32 {
             assert!(
-                kind == Self::INVOICE || kind == Self::PLEASE_BOOK,
-                "request kind must be invoice (1) or please-book (2)"
+                kind == Self::INVOICE
+                    || kind == Self::PLEASE_BOOK
+                    || kind == Self::SETTLE_AUTH,
+                "request kind must be invoice (1), please-book (2), or settle-auth (3)"
             );
             assert!(poster != counterparty, "cannot request to self");
             assert!(
@@ -465,10 +472,10 @@ pub mod tables {
                 created_at: Obligation::now(),
             };
             row.save();
-            let kind_s = if kind == Self::INVOICE {
-                "invoice"
-            } else {
-                "please_book"
+            let kind_s = match kind {
+                Self::INVOICE => "invoice",
+                Self::PLEASE_BOOK => "please_book",
+                _ => "settle_auth",
             };
             emit_pair_activity(
                 poster,
@@ -572,6 +579,41 @@ pub mod tables {
             row.remaining = (row.remaining.value - amount.value).into();
             row.save();
             row.memo.to_string()
+        }
+
+        /// Debtor pulls a deposit-equivalent the creditor already authorized.
+        /// `take` = min(amount, remaining, live exposure). Never flips the book.
+        pub fn fulfill_settle(
+            id: u32,
+            debtor: AccountNumber,
+            amount: Quantity,
+        ) -> (Quantity, String, AccountNumber, u16) {
+            let mut row = Self::get_assert(id);
+            assert!(
+                row.kind == Self::SETTLE_AUTH,
+                "request is not a settle-auth"
+            );
+            row.assert_live();
+            assert!(
+                debtor == row.counterparty,
+                "only the named debtor can fulfill this settle-auth"
+            );
+            assert!(amount.value > 0, "settle amount must be positive");
+            let exposure =
+                Obligation::exposure(row.poster, row.counterparty, row.asset_id).value;
+            let take = amount
+                .value
+                .min(row.remaining.value)
+                .min(exposure);
+            assert!(take > 0, "nothing to settle (no exposure on this pair)");
+            row.remaining = (row.remaining.value - take).into();
+            row.save();
+            (
+                Quantity::new(take),
+                row.memo.to_string(),
+                row.poster,
+                row.asset_id,
+            )
         }
     }
 
@@ -2067,10 +2109,11 @@ pub mod service {
         }
     }
 
-    /// Post an invoice (`kind` = 1) or please-book (`kind` = 2).
+    /// Post an invoice (`1`), please-book (`2`), or settle-auth (`3`).
     ///
     /// Invoice: poster is payee; `counterparty` should path-pay ending at poster.
     /// Please-book: poster asks `counterparty` (creditor) to deposit them.
+    /// Settle-auth: poster is creditor; named debtor may pull a deposit-equivalent.
     #[action]
     fn st_req(
         kind: u8,
@@ -2097,10 +2140,32 @@ pub mod service {
         PayRequest::cancel(id, get_sender());
     }
 
+    /// Debtor fulfills a settle-auth: same book as the creditor depositing
+    /// them, capped by request remaining and live exposure (no flip).
+    #[action]
+    fn fl_stl(request_id: u32, amount: Quantity) {
+        let debtor = get_sender();
+        let (take, memo, creditor, asset_id) =
+            PayRequest::fulfill_settle(request_id, debtor, amount);
+        let netted = Obligation::deposit(debtor, creditor, asset_id, take, 0);
+        emit_pair_activity(
+            debtor,
+            creditor,
+            asset_id,
+            "deposit",
+            take,
+            netted,
+            asset_id,
+            request_id,
+            &memo,
+        );
+    }
+
     /// Bilateral activity history (emitted once per party as `account`).
     ///
     /// - `kind`: `path_draw` | `deposit` | `net` | `convert` | `credit_line` |
-    ///   `sell_claim` | `invoice` | `please_book` | `fulfill` | `req_cancel`
+    ///   `sell_claim` | `invoice` | `please_book` | `settle_auth` | `fulfill` |
+    ///   `req_cancel`
     /// - `amount`: primary quantity (raw units)
     /// - `netted`: amount cancelled by auto-net (or convert output for `convert`)
     /// - `other_asset_id`: convert destination asset; otherwise same as `asset_id`

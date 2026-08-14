@@ -51,12 +51,13 @@ A **deposit** is how off-graph value enters: the receiver books a liability to t
 
 ## Requests
 
-Two kinds (`st_req` / `createRequest`). Named counterparty, amount, memo (80 bytes), optional expiry.
+Three kinds (`st_req` / `createRequest`). Named counterparty, amount, memo (80 bytes), optional expiry.
 
 | Kind | Poster | Fulfiller | Effect |
 |------|--------|-----------|--------|
 | **Invoice** (`1`) | Payee | Named payer, via `path_pay` ending at the payee | Payee holds a **new** claim. Does **not** shrink an existing loan to that payee. |
 | **Please-book** (`2`) | Debtor (or whoever sent value off-graph) | **Only** the named creditor, via `deposit` with `request_id` | Opposite claim + auto-net. The poster cannot book this themselves. |
+| **Settle-auth** (`3`) | **Creditor** | **Only** the named debtor, via `fl_stl` | Same book as the creditor depositing them. Capped by `min(amount, remaining, live exposure)` — cannot flip the book or mint a claim on the creditor. |
 
 Fulfillment is partial (`remaining` declines). Poster can `rm_req` while still open. Activity records `request_id` and memo on create / cancel / fulfill (and on the deposit that books a please-book).
 
@@ -147,7 +148,8 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 | `path_pay` | Multi-hop draw (`request_id` 0 or invoice) |
 | `sell_claim` | Sell a claim to a buyer’s offer |
 | `deposit` | Book a deposit and auto-net (`request_id` 0 or please-book) |
-| `st_req` / `rm_req` | Create / cancel invoice or please-book |
+| `st_req` / `rm_req` | Create / cancel invoice, please-book, or settle-auth |
+| `fl_stl` | Debtor fulfills a settle-auth |
 | `net` | Explicit bilateral net (no UI; writers already auto-net) |
 | `st_cur_pol` | Post convert quote |
 | `convert` | Rebook a claim and auto-net `to_asset` |

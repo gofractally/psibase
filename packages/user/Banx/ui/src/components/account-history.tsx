@@ -27,6 +27,8 @@ function kindLabel(kind: string): string {
             return "Invoice";
         case "please_book":
             return "Please-book";
+        case "settle_auth":
+            return "Settle auth";
         case "fulfill":
             return "Fulfill request";
         case "req_cancel":
@@ -85,6 +87,7 @@ function describeEvent(
             };
         case "invoice":
         case "please_book":
+        case "settle_auth":
         case "fulfill":
         case "req_cancel": {
             const req =

@@ -8,6 +8,7 @@ import {
     History,
     Pencil,
     PiggyBank,
+    BadgeCheck,
     Handshake,
     Inbox,
     Plus,
@@ -60,7 +61,11 @@ import {
     useAppForm,
 } from "@/lib/form";
 import type { Asset, CreditLine, Obligation } from "@/lib/graphql";
-import { REQUEST_INVOICE, REQUEST_PLEASE_BOOK } from "@/lib/graphql";
+import {
+    REQUEST_INVOICE,
+    REQUEST_PLEASE_BOOK,
+    REQUEST_SETTLE_AUTH,
+} from "@/lib/graphql";
 
 /** ppm → percent string for form inputs (e.g. 10000 → "1") */
 function ppmToPercentInput(ppm: number): string {
@@ -522,6 +527,17 @@ export function ObligationsPage() {
                                             ? g.total.toString()
                                             : undefined,
                                     )
+                                }
+                                onAskSettle={
+                                    g.total > 0n
+                                        ? () =>
+                                              openRequest(
+                                                  REQUEST_SETTLE_AUTH,
+                                                  g.counterparty,
+                                                  g.assetId,
+                                                  g.total.toString(),
+                                              )
+                                        : undefined
                                 }
                                 onSellClaim={
                                     g.total > 0n
@@ -1052,6 +1068,7 @@ function AccountGroupRow({
     onSetRouting,
     onSetTakeout,
     onAskRequest,
+    onAskSettle,
     onSellClaim,
 }: {
     tone: "savings" | "loan";
@@ -1073,6 +1090,8 @@ function AccountGroupRow({
     onSetTakeout?: () => void;
     /** Open a request (invoice from savings, please-book from a loan). */
     onAskRequest?: () => void;
+    /** Authorize the debtor to settle this tab (settle-auth). */
+    onAskSettle?: () => void;
     /** Sell claim on this counterparty (savings / you are creditor). */
     onSellClaim?: () => void;
 }) {
@@ -1120,6 +1139,8 @@ function AccountGroupRow({
         tone === "savings"
             ? "Invoice — ask them to path-pay you"
             : "Please book — ask this creditor to record value they received";
+    const settleAuthTip =
+        "Settle auth — let them pay down this tab without you booking it";
     const sellTip =
         "Sell claim — transfer this debt to a buyer under their takeout offer";
 
@@ -1312,6 +1333,28 @@ function AccountGroupRow({
                                 </TooltipTrigger>
                                 <TooltipContent side="top">
                                     {requestTip}
+                                </TooltipContent>
+                            </Tooltip>
+                        ) : null}
+                        {onAskSettle ? (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        type="button"
+                                        size="icon"
+                                        variant="outline"
+                                        className="size-8 shrink-0"
+                                        aria-label={settleAuthTip}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onAskSettle();
+                                        }}
+                                    >
+                                        <BadgeCheck className="size-3.5" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">
+                                    {settleAuthTip}
                                 </TooltipContent>
                             </Tooltip>
                         ) : null}

@@ -82,6 +82,7 @@ const zPayRequest = z.object({
 
 export const REQUEST_INVOICE = 1;
 export const REQUEST_PLEASE_BOOK = 2;
+export const REQUEST_SETTLE_AUTH = 3;
 
 const zActivity = z.object({
     account: z.string(),
