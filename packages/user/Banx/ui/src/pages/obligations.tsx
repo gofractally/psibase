@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import {
+    ArrowLeftRight,
     Building2,
     ChevronDown,
     HandCoins,
@@ -19,6 +20,10 @@ import {
     RoutingPolicyDialog,
     type RoutingPolicyPrefill,
 } from "@/components/routing-policy-dialog";
+import {
+    SellClaimDialog,
+    type SellClaimTarget,
+} from "@/components/sell-claim-dialog";
 import { useAssetMap } from "@/hooks/use-assets";
 import {
     useCreditLines,
@@ -200,8 +205,8 @@ export function ObligationsPage() {
     const accrue = useAccrue();
     const isLoading = obsLoading || linesLoading;
 
-    /** At least one live global routing policy → path hop fees are “on”. */
-    const globalRoutingOn = useMemo(() => {
+    /** At least one live global clearing offer. */
+    const globalClearingOn = useMemo(() => {
         const nowSec = Math.floor(Date.now() / 1000);
         return routing.some(
             (p) =>
@@ -217,6 +222,8 @@ export function ObligationsPage() {
     const [routingOpen, setRoutingOpen] = useState(false);
     const [routingPrefill, setRoutingPrefill] =
         useState<RoutingPolicyPrefill | null>(null);
+    const [sellOpen, setSellOpen] = useState(false);
+    const [sellTarget, setSellTarget] = useState<SellClaimTarget | null>(null);
     const [hideEmptySavings, setHideEmptySavings] = useState(false);
     const [hideEmptyLoans, setHideEmptyLoans] = useState(false);
 
@@ -326,14 +333,14 @@ export function ObligationsPage() {
                                 variant="outline"
                                 className={cn(
                                     "size-9 shrink-0 transition-shadow",
-                                    globalRoutingOn
+                                    globalClearingOn
                                         ? "border-emerald-500/60 text-emerald-700 shadow-[0_0_12px_rgba(16,185,129,0.55)] hover:bg-emerald-500/10 dark:text-emerald-400 dark:shadow-[0_0_14px_rgba(52,211,153,0.45)]"
                                         : "border-red-500/70 text-red-700 shadow-[0_0_14px_rgba(239,68,68,0.65)] hover:bg-red-500/10 dark:text-red-400 dark:shadow-[0_0_16px_rgba(248,113,113,0.5)] animate-pulse",
                                 )}
                                 aria-label={
-                                    globalRoutingOn
-                                        ? "Global routing is on — edit routing policy"
-                                        : "Global routing is off — set routing policy for path pay"
+                                    globalClearingOn
+                                        ? "Global clearing offer is on — click to edit"
+                                        : "Global clearing offer is off — click to post one"
                                 }
                                 onClick={() => openRouting(null)}
                             >
@@ -341,9 +348,9 @@ export function ObligationsPage() {
                             </Button>
                         </TooltipTrigger>
                         <TooltipContent side="bottom" className="max-w-xs">
-                            {globalRoutingOn
-                                ? "Global routing on — path hop fees are configured. Click to edit."
-                                : "Global routing off — multi-hop path pay needs hop fees. Click to set a global policy."}
+                            {globalClearingOn
+                                ? "Global clearing offer on — path forward & claim takeout. Click to edit."
+                                : "No global clearing offer — post one for path forward and claim takeout."}
                         </TooltipContent>
                     </Tooltip>
                 }
@@ -458,11 +465,36 @@ export function ObligationsPage() {
                                         assetId: g.assetId,
                                     })
                                 }
+                                onSellClaim={
+                                    g.total > 0n
+                                        ? () => {
+                                              setSellTarget({
+                                                  debtor: g.counterparty,
+                                                  assetId: g.assetId,
+                                                  maxRaw: g.total.toString(),
+                                                  symbol: symbolOf(g.assetId),
+                                                  precision: precisionOf(
+                                                      g.assetId,
+                                                  ),
+                                              });
+                                              setSellOpen(true);
+                                          }
+                                        : undefined
+                                }
                             />
                         ))}
                     </div>
                 )}
             </section>
+
+            <SellClaimDialog
+                open={sellOpen}
+                onOpenChange={(open) => {
+                    setSellOpen(open);
+                    if (!open) setSellTarget(null);
+                }}
+                target={sellTarget}
+            />
 
             <Separator />
 
@@ -1008,6 +1040,7 @@ function AccountGroupRow({
     onSettle,
     onEditCreditLine,
     onSetRouting,
+    onSellClaim,
 }: {
     tone: "savings" | "loan";
     title: string;
@@ -1027,6 +1060,8 @@ function AccountGroupRow({
     onEditCreditLine?: () => void;
     /** Open routing policy with this counterparty as next-hop creditor. */
     onSetRouting?: () => void;
+    /** Sell claim on this counterparty (savings / you are creditor). */
+    onSellClaim?: () => void;
 }) {
     const [open, setOpen] = useState(false);
     const [historyOpen, setHistoryOpen] = useState(false);
@@ -1067,7 +1102,9 @@ function AccountGroupRow({
         "Edit credit line — change limit, interest rate, or revolving terms";
     const historyTip = "History — path draws, deposits, nets, and line changes";
     const routingTip =
-        "Routing policy — set path hop fees toward this next-hop creditor";
+        "Clearing offer — path forward / claim takeout terms toward this party";
+    const sellTip =
+        "Sell claim — transfer this debt to a buyer under their clearing offer";
 
     return (
         <Collapsible open={open} onOpenChange={setOpen}>
@@ -1214,6 +1251,28 @@ function AccountGroupRow({
                                 </TooltipTrigger>
                                 <TooltipContent side="top">
                                     {routingTip}
+                                </TooltipContent>
+                            </Tooltip>
+                        ) : null}
+                        {onSellClaim ? (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        type="button"
+                                        size="icon"
+                                        variant="outline"
+                                        className="size-8 shrink-0"
+                                        aria-label={sellTip}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onSellClaim();
+                                        }}
+                                    >
+                                        <ArrowLeftRight className="size-3.5" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">
+                                    {sellTip}
                                 </TooltipContent>
                             </Tooltip>
                         ) : null}

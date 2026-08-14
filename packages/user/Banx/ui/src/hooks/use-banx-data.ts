@@ -6,7 +6,6 @@ import {
     fetchCurrencyPolicies,
     fetchObligations,
     fetchClearingOffers,
-    fetchRoutingPolicies,
 } from "@/lib/graphql";
 import { QueryKey } from "@/lib/query-keys";
 

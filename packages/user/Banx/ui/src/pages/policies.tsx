@@ -113,7 +113,7 @@ export function PoliciesPage() {
         <div className="space-y-10">
             <PageHeader
                 title="Policies"
-                description="Currency policies handle FX (how many to-units you get per 1 from-unit). Routing hop fees are managed from Accounts."
+                description="Currency policies handle FX (how many to-units you get per 1 from-unit). Clearing offers are managed from Accounts."
             />
 
             <section className="grid gap-8 lg:grid-cols-2">

@@ -14,12 +14,15 @@ export function AssetField({
     value,
     onChange,
     disabled,
+    itemActive,
 }: {
     label?: string;
     assets: Asset[];
     value: number | undefined;
     onChange: (id: number) => void;
     disabled?: boolean;
+    /** Green/red status dots + sort actives first (see AssetSelect). */
+    itemActive?: (asset: Asset) => boolean;
 }) {
     return (
         <div className="grid gap-2">
@@ -34,6 +37,7 @@ export function AssetField({
                     assets={assets}
                     value={value}
                     onChange={onChange}
+                    itemActive={itemActive}
                 />
             )}
         </div>

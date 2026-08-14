@@ -49,6 +49,7 @@ type FeeFields = {
     hopFeeFixed: string;
     hopFeePct: string;
     maxAcceptPct: string;
+    forwardEnabled: boolean;
     expiresAtSeconds: number;
 };
 
@@ -57,6 +58,7 @@ const defaultFees = (assetId?: number): FeeFields => ({
     hopFeeFixed: "0",
     hopFeePct: "0",
     maxAcceptPct: "100",
+    forwardEnabled: true,
     expiresAtSeconds: 0,
 });
 
@@ -73,6 +75,7 @@ function feesFromPolicy(
         hopFeeFixed: formatRawAmount(p.feeFixed, precision).replace(/,/g, ""),
         hopFeePct: ppmToPercentInput(p.feePercentPpm),
         maxAcceptPct: ppmToPercentInput(p.maxLineAprPpm),
+        forwardEnabled: p.forwardEnabled,
         expiresAtSeconds: p.expiresAt,
     };
 }
@@ -83,6 +86,7 @@ function feePayload(value: FeeFields) {
         hopFeeFixed: value.hopFeeFixed.trim(),
         hopFeePercentPpm: percentStringToPpm(value.hopFeePct, MAX_HOP_FEE_PPM),
         maxAcceptRatePpm: percentStringToPpm(value.maxAcceptPct, PPM_SCALE),
+        forwardEnabled: value.forwardEnabled,
         expiresAtSeconds: value.expiresAtSeconds,
     };
 }
@@ -97,11 +101,11 @@ const aprValidators = {
     onSubmit: percentFieldValidator(MAX_PERCENT),
 };
 
-/** Sample path amount used in the hop-fee illustration. */
+/** Sample amount used in the fee illustration. */
 const SAMPLE_HOP_IN = 15;
 
 /**
- * on-chain Stripe-style: `out = in * (1 - fee_pct/100) - fee_fixed`.
+ * Stripe-style: `out = in * (1 - fee_pct/100) - fee_fixed`.
  * Returns null if inputs are invalid (fee ≥ 100%, fixed consumes all, etc.).
  */
 function previewHopOut(
@@ -162,8 +166,8 @@ function HopFeeExample({
 }
 
 /**
- * Global routing (header) — fee form only, no account.
- * Override (row) — switch reflects whether an override exists; off + Save removes.
+ * Global clearing offer (header) — fee form only, no account.
+ * Specific offer (row) — switch reflects whether an offer exists; off + Save removes.
  */
 export function RoutingPolicyDialog({
     open,
@@ -358,10 +362,9 @@ export function RoutingPolicyDialog({
             <Dialog open={open} onOpenChange={onOpenChange}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Routing override</DialogTitle>
+                        <DialogTitle>Clearing offer</DialogTitle>
                         <DialogDescription>
-                            Hop fees when you path-pay via next-hop{" "}
-                            <strong>{creditor}</strong>
+                            Terms toward <strong>{creditor}</strong>
                             {prefill?.assetId !== undefined ? (
                                 <>
                                     {" "}
@@ -377,7 +380,9 @@ export function RoutingPolicyDialog({
                                     </strong>
                                 </>
                             ) : null}
-                            .
+                            . While posted, others can sell you claims on this
+                            counterparty (if you lined them). Path forward is
+                            optional.
                         </DialogDescription>
                     </DialogHeader>
                     <form
@@ -406,7 +411,7 @@ export function RoutingPolicyDialog({
                                         ? precisionOf(assetId)
                                         : 0;
                                 return enabled ? (
-                                    <>
+                                    <div className="grid gap-5">
                                         <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
                                             <overrideForm.AppField
                                                 name="hopFeeFixed"
@@ -427,8 +432,8 @@ export function RoutingPolicyDialog({
                                                         label={
                                                             assetId !==
                                                             undefined
-                                                                ? `Hop fee fixed (${amountPlaceholder(precision)})`
-                                                                : "Hop fee fixed"
+                                                                ? `Fee fixed (${amountPlaceholder(precision)})`
+                                                                : "Fee fixed"
                                                         }
                                                         inputMode="decimal"
                                                         placeholder={amountPlaceholder(
@@ -442,7 +447,7 @@ export function RoutingPolicyDialog({
                                                 validators={hopFeeValidators}
                                                 children={(field) => (
                                                     <field.TextField
-                                                        label="Hop fee %"
+                                                        label="Fee %"
                                                         inputMode="decimal"
                                                         min={0}
                                                         max={
@@ -477,7 +482,7 @@ export function RoutingPolicyDialog({
                                             validators={aprValidators}
                                             children={(field) => (
                                                 <field.TextField
-                                                    label="Max accept APR %"
+                                                    label="Max line APR %"
                                                     inputMode="decimal"
                                                     min={0}
                                                     max={MAX_PERCENT}
@@ -496,7 +501,18 @@ export function RoutingPolicyDialog({
                                                 />
                                             )}
                                         />
-                                    </>
+                                        <div className="border-border/60 space-y-1 border-t pt-4">
+                                            <overrideForm.AppField
+                                                name="forwardEnabled"
+                                                children={(field) => (
+                                                    <field.SwitchField
+                                                        label="Allow path forward"
+                                                        description="Allow new obligation swapping using credit lines extended to me."
+                                                    />
+                                                )}
+                                            />
+                                        </div>
+                                    </div>
                                 ) : null;
                             }}
                         />
@@ -523,12 +539,12 @@ export function RoutingPolicyDialog({
                                                     values.enabled
                                                         ? [
                                                               existingOverride
-                                                                  ? "Update override"
-                                                                  : "Save override",
+                                                                  ? "Update offer"
+                                                                  : "Save offer",
                                                               "Saving…",
                                                           ]
                                                         : [
-                                                              "Remove override",
+                                                              "Remove offer",
                                                               "Removing…",
                                                           ]
                                                 }
@@ -549,20 +565,43 @@ export function RoutingPolicyDialog({
         );
     }
 
-    // ── Global (header) — same toggle pattern as override, no account ─
+    // ── Global (header) — pick asset first; enable is per-currency ─
     const globalPending =
         setGlobalRouting.isPending || removeGlobal.isPending;
+
+    const loadGlobalForAsset = (assetId: number) => {
+        const existing = liveGlobalByAsset.get(assetId);
+        if (existing) {
+            const fees = feesFromPolicy(
+                existing,
+                precisionOf(existing.assetId),
+            );
+            globalForm.setFieldValue("enabled", true);
+            globalForm.setFieldValue("hopFeeFixed", fees.hopFeeFixed);
+            globalForm.setFieldValue("hopFeePct", fees.hopFeePct);
+            globalForm.setFieldValue("maxAcceptPct", fees.maxAcceptPct);
+            globalForm.setFieldValue("forwardEnabled", fees.forwardEnabled);
+            globalForm.setFieldValue(
+                "expiresAtSeconds",
+                fees.expiresAtSeconds,
+            );
+        } else {
+            globalForm.setFieldValue("enabled", false);
+            globalForm.setFieldValue("hopFeeFixed", "0");
+            globalForm.setFieldValue("hopFeePct", "0");
+            globalForm.setFieldValue("maxAcceptPct", "100");
+            globalForm.setFieldValue("forwardEnabled", true);
+            globalForm.setFieldValue("expiresAtSeconds", 0);
+        }
+    };
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Global routing policy</DialogTitle>
+                    <DialogTitle>Share credit lines</DialogTitle>
                     <DialogDescription>
-                        Default hop fees for any next hop in this asset.
-                        Per-creditor overrides are set from an account row.
-                        Turn off and Save to remove global routing for the
-                        selected asset.
+                        While enabled, others can sell you claims on credit lines you&apos;ve extended (you buy their debt for a fee).
                     </DialogDescription>
                 </DialogHeader>
                 <form
@@ -573,170 +612,100 @@ export function RoutingPolicyDialog({
                         void globalForm.handleSubmit();
                     }}
                 >
+                    <globalForm.Field
+                        name="assetId"
+                        listeners={{
+                            onChange: ({ value }) => {
+                                if (value === undefined) return;
+                                loadGlobalForAsset(value);
+                            },
+                        }}
+                        children={(field) => (
+                            <AssetField
+                                label="Asset"
+                                assets={assets}
+                                value={field.state.value}
+                                onChange={(id) => field.handleChange(id)}
+                                itemActive={(a) => liveGlobalByAsset.has(a.id)}
+                            />
+                        )}
+                    />
+
                     <globalForm.AppField
                         name="enabled"
                         children={(field) => (
-                            <field.SwitchField label="Global routing" />
+                            <globalForm.Subscribe
+                                selector={(s) => s.values.assetId}
+                                children={(assetId) => (
+                                    <field.SwitchField
+                                        label="Enabled"
+                                        disabled={assetId === undefined}
+                                    />
+                                )}
+                            />
                         )}
                     />
 
                     <globalForm.Subscribe
-                        selector={(s) => s.values.enabled}
-                        children={(enabled) =>
-                            enabled ? (
-                                <>
-                                    <globalForm.Field
-                                        name="assetId"
-                                        listeners={{
-                                            onChange: ({ value }) => {
-                                                if (value === undefined)
-                                                    return;
-                                                const existing =
-                                                    liveGlobalByAsset.get(
-                                                        value,
-                                                    );
-                                                if (existing) {
-                                                    const fees =
-                                                        feesFromPolicy(
-                                                            existing,
-                                                            precisionOf(
-                                                                existing.assetId,
-                                                            ),
-                                                        );
-                                                    globalForm.setFieldValue(
-                                                        "hopFeeFixed",
-                                                        fees.hopFeeFixed,
-                                                    );
-                                                    globalForm.setFieldValue(
-                                                        "hopFeePct",
-                                                        fees.hopFeePct,
-                                                    );
-                                                    globalForm.setFieldValue(
-                                                        "maxAcceptPct",
-                                                        fees.maxAcceptPct,
-                                                    );
-                                                    globalForm.setFieldValue(
-                                                        "expiresAtSeconds",
-                                                        fees.expiresAtSeconds,
-                                                    );
-                                                } else {
-                                                    globalForm.setFieldValue(
-                                                        "hopFeeFixed",
-                                                        "0",
-                                                    );
-                                                    globalForm.setFieldValue(
-                                                        "hopFeePct",
-                                                        "0",
-                                                    );
-                                                    globalForm.setFieldValue(
-                                                        "maxAcceptPct",
-                                                        "100",
-                                                    );
-                                                    globalForm.setFieldValue(
-                                                        "expiresAtSeconds",
-                                                        0,
-                                                    );
-                                                }
-                                            },
-                                        }}
-                                        children={(field) => (
-                                            <AssetField
-                                                assets={assets}
-                                                value={field.state.value}
-                                                onChange={(id) =>
-                                                    field.handleChange(id)
-                                                }
-                                            />
-                                        )}
-                                    />
-                                    <globalForm.Subscribe
-                                        selector={(s) => s.values.assetId}
-                                        children={(assetId) => {
-                                            const precision =
-                                                assetId !== undefined
-                                                    ? precisionOf(assetId)
-                                                    : 0;
-                                            return (
-                                                <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
-                                                    <globalForm.AppField
-                                                        name="hopFeeFixed"
-                                                        validators={{
-                                                            onChange:
-                                                                amountFieldValidator(
-                                                                    precision,
-                                                                    {
-                                                                        allowZero: true,
-                                                                    },
-                                                                ),
-                                                            onSubmit:
-                                                                amountFieldValidator(
-                                                                    precision,
-                                                                    {
-                                                                        allowZero: true,
-                                                                    },
-                                                                ),
-                                                        }}
-                                                        children={(field) => (
-                                                            <field.TextField
-                                                                label={
-                                                                    assetId !==
-                                                                    undefined
-                                                                        ? `Hop fee fixed (${amountPlaceholder(precision)})`
-                                                                        : "Hop fee fixed"
-                                                                }
-                                                                inputMode="decimal"
-                                                                placeholder={amountPlaceholder(
-                                                                    precision,
-                                                                )}
-                                                                disabled={
-                                                                    assetId ===
-                                                                    undefined
-                                                                }
-                                                            />
-                                                        )}
-                                                    />
-                                                    <globalForm.AppField
-                                                        name="hopFeePct"
-                                                        validators={
-                                                            hopFeeValidators
-                                                        }
-                                                        children={(field) => (
-                                                            <field.TextField
-                                                                label="Hop fee %"
-                                                                inputMode="decimal"
-                                                                min={0}
-                                                                max={
-                                                                    MAX_HOP_FEE_PERCENT
-                                                                }
-                                                                step={
-                                                                    MIN_PERCENT_STEP
-                                                                }
-                                                            />
-                                                        )}
-                                                    />
-                                                </div>
-                                            );
-                                        }}
-                                    />
+                        selector={(s) => ({
+                            enabled: s.values.enabled,
+                            assetId: s.values.assetId,
+                        })}
+                        children={({ enabled, assetId }) => {
+                            if (!enabled || assetId === undefined) return null;
+                            const precision = precisionOf(assetId);
+                            return (
+                                <div className="grid gap-5">
+                                    <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
+                                        <globalForm.AppField
+                                            name="hopFeeFixed"
+                                            validators={{
+                                                onChange: amountFieldValidator(
+                                                    precision,
+                                                    { allowZero: true },
+                                                ),
+                                                onSubmit: amountFieldValidator(
+                                                    precision,
+                                                    { allowZero: true },
+                                                ),
+                                            }}
+                                            children={(field) => (
+                                                <field.TextField
+                                                    label={`Fee fixed (${amountPlaceholder(precision)})`}
+                                                    inputMode="decimal"
+                                                    placeholder={amountPlaceholder(
+                                                        precision,
+                                                    )}
+                                                />
+                                            )}
+                                        />
+                                        <globalForm.AppField
+                                            name="hopFeePct"
+                                            validators={hopFeeValidators}
+                                            children={(field) => (
+                                                <field.TextField
+                                                    label="Fee %"
+                                                    inputMode="decimal"
+                                                    min={0}
+                                                    max={MAX_HOP_FEE_PERCENT}
+                                                    step={MIN_PERCENT_STEP}
+                                                />
+                                            )}
+                                        />
+                                    </div>
                                     <globalForm.Subscribe
                                         selector={(s) => ({
                                             hopFeeFixed: s.values.hopFeeFixed,
                                             hopFeePct: s.values.hopFeePct,
-                                            assetId: s.values.assetId,
                                         })}
                                         children={({
                                             hopFeeFixed,
                                             hopFeePct,
-                                            assetId,
                                         }) => (
                                             <HopFeeExample
                                                 hopFeeFixed={hopFeeFixed}
                                                 hopFeePct={hopFeePct}
-                                                precision={
-                                                    assetId !== undefined
-                                                        ? precisionOf(assetId)
-                                                        : 0
-                                                }
+                                                precision={precision}
                                                 intermediate={intermediate}
                                                 nextHop="bob"
                                             />
@@ -747,7 +716,7 @@ export function RoutingPolicyDialog({
                                         validators={aprValidators}
                                         children={(field) => (
                                             <field.TextField
-                                                label="Max accept APR %"
+                                                label="Max line APR %"
                                                 inputMode="decimal"
                                                 min={0}
                                                 max={MAX_PERCENT}
@@ -766,9 +735,20 @@ export function RoutingPolicyDialog({
                                             />
                                         )}
                                     />
-                                </>
-                            ) : null
-                        }
+                                    <div className="border-border/60 space-y-1 border-t pt-4">
+                                        <globalForm.AppField
+                                            name="forwardEnabled"
+                                            children={(field) => (
+                                                <field.SwitchField
+                                                    label="Allow path forward"
+                                                    description="Buy new obligations using credit lines extended to me."
+                                                />
+                                            )}
+                                        />
+                                    </div>
+                                </div>
+                            );
+                        }}
                     />
 
                     <DialogFooter>
@@ -782,12 +762,10 @@ export function RoutingPolicyDialog({
                         <globalForm.Subscribe
                             selector={(s) => s.values}
                             children={(values) => {
-                                const assetId =
-                                    values.assetId ?? prefill?.assetId;
+                                const assetId = values.assetId;
                                 const hasLive =
                                     assetId !== undefined &&
                                     liveGlobalByAsset.has(assetId);
-                                // Off with no policy: nothing to remove
                                 const nothingToDo =
                                     !values.enabled && !hasLive;
                                 return (
@@ -797,19 +775,18 @@ export function RoutingPolicyDialog({
                                                 values.enabled
                                                     ? [
                                                           hasLive
-                                                              ? "Update global routing"
-                                                              : "Save global routing",
+                                                              ? "Update offer"
+                                                              : "Save offer",
                                                           "Saving…",
                                                       ]
                                                     : [
-                                                          "Remove global",
+                                                          "Remove offer",
                                                           "Removing…",
                                                       ]
                                             }
                                             loading={globalPending}
                                             disabled={
-                                                (values.enabled &&
-                                                    assetId === undefined) ||
+                                                assetId === undefined ||
                                                 nothingToDo
                                             }
                                         />
