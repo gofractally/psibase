@@ -487,6 +487,44 @@ mod tests {
         Ok(())
     }
 
+    /// Reverse claim in the destination asset is cancelled by convert.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_convert_autonets_reverse_to_asset(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let gary = account!("gary");
+        chain.new_account(alice).unwrap();
+        chain.new_account(gary).unwrap();
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, gary)
+            .st_crd_lne(alice, aud, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .path_pay(vec![hop(gary, aud)], Quantity::new(100), Quantity::new(100))
+            .get()?;
+        // Gary already owes Alice 80 USD.
+        Wrapper::push_from(&chain, gary)
+            .deposit(alice, usd, Quantity::new(80), 0)
+            .get()?;
+        assert_eq!(exp(&chain, alice, gary, usd), 80);
+
+        Wrapper::push_from(&chain, alice)
+            .st_cur_pol(aud, usd, Quantity::new(0), RATE_SCALE, 0, never())
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .convert(alice, aud, usd, Quantity::new(100), Quantity::new(100))
+            .get()?;
+
+        assert_eq!(exp(&chain, gary, alice, aud), 0);
+        assert_eq!(exp(&chain, gary, alice, usd), 20);
+        assert_eq!(exp(&chain, alice, gary, usd), 0);
+        Ok(())
+    }
+
     #[psibase::test_case(packages("Banx"))]
     fn test_path_pay_requires_routing(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;

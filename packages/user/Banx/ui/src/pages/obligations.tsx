@@ -4,7 +4,6 @@ import {
     ArrowLeftRight,
     Building2,
     ChevronDown,
-    HandCoins,
     History,
     Pencil,
     PiggyBank,
@@ -36,7 +35,7 @@ import {
     useObligations,
     useTakeoutOffers,
 } from "@/hooks/use-banx-data";
-import { useNet, useSetCreditLine } from "@/hooks/use-banx-mutations";
+import { useSetCreditLine } from "@/hooks/use-banx-mutations";
 import {
     amountPlaceholder,
     formatRawAmount,
@@ -227,7 +226,6 @@ export function ObligationsPage() {
     const { data: forwardOffers = [] } = useForwardOffers();
     const { data: takeoutOffers = [] } = useTakeoutOffers();
     const { assets, symbolOf, precisionOf } = useAssetMap();
-    const net = useNet();
     const isLoading = obsLoading || linesLoading;
 
     const nowSec = Math.floor(Date.now() / 1000);
@@ -270,35 +268,6 @@ export function ObligationsPage() {
         setTakeoutPrefill(prefill ?? null);
         setTakeoutOpen(true);
     };
-
-    const netForm = useAppForm({
-        defaultValues: {
-            counterparty: "",
-            assetId: undefined as number | undefined,
-            maxAmount: "",
-        },
-        onSubmit: async ({ value }) => {
-            if (
-                value.assetId === undefined ||
-                !value.counterparty.trim() ||
-                !value.maxAmount.trim()
-            )
-                return;
-            await new Promise<void>((resolve, reject) => {
-                net.mutate(
-                    {
-                        counterparty: value.counterparty.trim(),
-                        assetId: value.assetId!,
-                        maxAmount: value.maxAmount.trim(),
-                    },
-                    {
-                        onSuccess: () => resolve(),
-                        onError: (e: Error) => reject(e),
-                    },
-                );
-            });
-        },
-    });
 
     const savingsGroupsAll = useMemo(() => {
         if (!user) return [];
@@ -345,20 +314,6 @@ export function ObligationsPage() {
         () => loanGroupsAll.filter(isFacilityOnly).length,
         [loanGroupsAll],
     );
-
-    const prefillNet = (party: string, aid: number, maxRaw?: string) => {
-        netForm.setFieldValue("counterparty", party);
-        netForm.setFieldValue("assetId", aid);
-        if (maxRaw !== undefined) {
-            netForm.setFieldValue(
-                "maxAmount",
-                formatRawAmount(maxRaw, precisionOf(aid)).replace(/,/g, ""),
-            );
-        }
-        document
-            .getElementById("net-settlement")
-            ?.scrollIntoView({ behavior: "smooth", block: "start" });
-    };
 
     return (
         <div className="space-y-10">
@@ -517,13 +472,6 @@ export function ObligationsPage() {
                                 creditLine={g.creditLine}
                                 canEditCreditLine={!!g.creditLine}
                                 balanceLabel="Balance"
-                                onSettle={() =>
-                                    prefillNet(
-                                        g.counterparty,
-                                        g.assetId,
-                                        g.total.toString(),
-                                    )
-                                }
                                 onEditCreditLine={
                                     g.creditLine
                                         ? () => {
@@ -640,13 +588,6 @@ export function ObligationsPage() {
                                 creditLine={g.creditLine}
                                 canEditCreditLine={false}
                                 balanceLabel="Outstanding"
-                                onSettle={() =>
-                                    prefillNet(
-                                        g.counterparty,
-                                        g.assetId,
-                                        g.total.toString(),
-                                    )
-                                }
                                 onSetRouting={() =>
                                     openRouting({
                                         creditor: g.counterparty,
@@ -657,94 +598,6 @@ export function ObligationsPage() {
                         ))}
                     </div>
                 )}
-            </section>
-
-            <Separator />
-
-            {/* ── Settlement ──────────────────────────────────────────── */}
-            <section id="net-settlement" className="scroll-mt-6">
-                <form
-                    onSubmit={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        void netForm.handleSubmit();
-                    }}
-                    className="bg-card grid max-w-xl gap-4 rounded-xl border p-5 shadow-sm"
-                >
-                    <div className="flex items-center gap-3">
-                        <div className="bg-muted flex size-10 items-center justify-center rounded-xl">
-                            <HandCoins className="text-muted-foreground size-5" />
-                        </div>
-                        <div>
-                            <h2 className="font-semibold tracking-tight">
-                                Net settlement
-                            </h2>
-                            <p className="text-muted-foreground text-sm">
-                                Clear mutual claims with a counterparty up to a
-                                max amount. No Banx cash balance — deposit + net
-                                is how you settle.
-                            </p>
-                        </div>
-                    </div>
-                    <netForm.AppField
-                        name="counterparty"
-                        children={(field) => (
-                            <field.TextField
-                                label="Counterparty"
-                                placeholder="account name"
-                                required
-                            />
-                        )}
-                    />
-                    <netForm.Field
-                        name="assetId"
-                        children={(field) => (
-                            <AssetField
-                                assets={assets}
-                                value={field.state.value}
-                                onChange={(id) => field.handleChange(id)}
-                            />
-                        )}
-                    />
-                    <netForm.Subscribe
-                        selector={(s) => s.values.assetId}
-                        children={(assetId) => (
-                            <netForm.AppField
-                                name="maxAmount"
-                                children={(field) => (
-                                    <field.TextField
-                                        label={
-                                            assetId !== undefined
-                                                ? `Max amount (e.g. ${amountPlaceholder(precisionOf(assetId))})`
-                                                : "Max amount"
-                                        }
-                                        inputMode="decimal"
-                                        placeholder={
-                                            assetId !== undefined
-                                                ? amountPlaceholder(
-                                                      precisionOf(assetId),
-                                                  )
-                                                : "0.00"
-                                        }
-                                        required
-                                    />
-                                )}
-                            />
-                        )}
-                    />
-                    <netForm.Subscribe
-                        selector={(s) => s.values.assetId}
-                        children={(assetId) => (
-                            <netForm.AppForm>
-                                <netForm.SubmitButton
-                                    labels={["Net pair", "Netting…"]}
-                                    loading={net.isPending}
-                                    disabled={assetId === undefined}
-                                />
-                            </netForm.AppForm>
-                        )}
-                    />
-                </form>
             </section>
         </div>
     );
@@ -1154,7 +1007,6 @@ function AccountGroupRow({
     creditLine,
     canEditCreditLine,
     balanceLabel,
-    onSettle,
     onEditCreditLine,
     onSetRouting,
     onSetTakeout,
@@ -1172,7 +1024,6 @@ function AccountGroupRow({
     creditLine?: CreditLine;
     canEditCreditLine?: boolean;
     balanceLabel: string;
-    onSettle: () => void;
     onEditCreditLine?: () => void;
     /** Path-forward offer with this counterparty as next hop. */
     onSetRouting?: () => void;
@@ -1214,10 +1065,6 @@ function AccountGroupRow({
         tone === "savings"
             ? "bg-emerald-500/[0.03] border-emerald-500/10"
             : "bg-amber-500/[0.04] border-amber-500/15";
-    const settleTip =
-        tone === "savings"
-            ? "Settle — net mutual claims with this counterparty"
-            : "Repay / net — clear outstanding claims with this lender";
     const editTip =
         "Edit credit line — change limit, interest rate, or revolving terms";
     const historyTip = "History — path draws, deposits, nets, and line changes";
@@ -1417,28 +1264,6 @@ function AccountGroupRow({
                                 </TooltipTrigger>
                                 <TooltipContent side="top">
                                     {sellTip}
-                                </TooltipContent>
-                            </Tooltip>
-                        ) : null}
-                        {hasPositions ? (
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        type="button"
-                                        size="icon"
-                                        variant="outline"
-                                        className="size-8 shrink-0"
-                                        aria-label={settleTip}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onSettle();
-                                        }}
-                                    >
-                                        <HandCoins className="size-3.5" />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="top">
-                                    {settleTip}
                                 </TooltipContent>
                             </Tooltip>
                         ) : null}

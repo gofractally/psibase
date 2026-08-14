@@ -490,7 +490,8 @@ pub mod tables {
         }
 
         /// Rebook up to `amount_from` of what `self.debtor` owes `creditor` in
-        /// `from_asset` into `to_asset`. Returns units created in `to_asset`.
+        /// `from_asset` into `to_asset`. Auto-nets the pair in `to_asset`.
+        /// Returns units created in `to_asset` (before that net).
         pub fn convert(
             &self,
             creditor: AccountNumber,
@@ -518,6 +519,7 @@ pub mod tables {
                 self.to_interest_rate,
                 to_qty,
             );
+            Obligation::net_pair(creditor, self.debtor, self.to_asset, u64::MAX.into());
             emit_pair_activity(
                 creditor,
                 self.debtor,
@@ -1644,7 +1646,8 @@ pub mod service {
     ///
     /// `counterparty` is the other party on the obligation. Sender must be
     /// creditor or debtor. Rebooks up to `amount_from` of `from_asset` into
-    /// `to_asset` for that pair; requires output ≥ `min_to`.
+    /// `to_asset` for that pair; requires output ≥ `min_to`. Auto-nets
+    /// `to_asset` after the rebook.
     #[action]
     fn convert(
         counterparty: AccountNumber,

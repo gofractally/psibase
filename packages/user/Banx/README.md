@@ -38,7 +38,7 @@ Path capacity is larger than line headroom: **headroom + reverse claim** (what t
 
 ## Obligations and netting
 
-Every draw, deposit, and takeout **auto-nets** that pair/asset: equal value both ways is cancelled.
+Every draw, deposit, takeout, and convert **auto-nets** that pair/asset: equal value both ways is cancelled.
 
 Reduction order is fixed:
 
@@ -47,7 +47,7 @@ Reduction order is fixed:
 
 A **deposit** is how off-graph value enters: the receiver books a liability to the depositor, then nets. That is also how you *repay* (the creditor deposits the debtor, which books the opposite claim and nets).
 
-`net` is the explicit bilateral cancel. Either party may call.
+`net` remains as an action (either party, optional `max_amount`) for scripts or cleanup. The UI does not expose it; writers already full-net.
 
 ## Path pay
 
@@ -107,7 +107,7 @@ Default in the UI is **7 days**. `0` means interest from the first second.
 
 The **debtor** posts `st_cur_pol`: from-asset → to-asset, fixed fee in from-asset, rate (human “to per 1 from” in the plugin), optional new APR, expiry.
 
-`convert` rebooks an existing claim. The debtor is who **actually owes** `from_asset` on that pair, not whoever posted a policy. Path pay calls convert internally on asset-changing hops (previous edge debtor’s policy).
+`convert` rebooks an existing claim, then **auto-nets** the destination asset. The debtor is who **actually owes** `from_asset` on that pair, not whoever posted a policy. Path pay calls convert internally on asset-changing hops (previous edge debtor’s policy).
 
 ## Amounts and units
 
@@ -134,9 +134,9 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 | `path_pay` | Multi-hop draw |
 | `sell_claim` | Sell a claim to a buyer’s offer |
 | `deposit` | Book a deposit and auto-net |
-| `net` | Explicit bilateral net |
+| `net` | Explicit bilateral net (no UI; writers already auto-net) |
 | `st_cur_pol` | Post convert quote |
-| `convert` | Rebook a claim |
+| `convert` | Rebook a claim and auto-net `to_asset` |
 | `get_exposure` | Live pair exposure |
 | `add_asset` | Register an asset (service only) |
 
