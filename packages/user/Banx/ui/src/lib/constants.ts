@@ -1,7 +1,55 @@
 export const BANX_SERVICE = "banx" as const;
 
+export const SECONDS_PER_DAY = 86_400;
+
 /** Default interest-free window on a new credit line (7 days). */
-export const DEFAULT_GRACE_SECONDS = 7 * 86_400;
+export const DEFAULT_GRACE_SECONDS = 7 * SECONDS_PER_DAY;
+
+/** Preset interest-free periods offered in the UI (days). */
+export const GRACE_PRESET_DAYS = [1, 7, 30] as const;
+
+export type GracePreset =
+    | "none"
+    | `${(typeof GRACE_PRESET_DAYS)[number]}`
+    | "custom";
+
+export function daysToGraceSeconds(days: number): number {
+    if (!Number.isFinite(days) || days <= 0) return 0;
+    return Math.floor(days) * SECONDS_PER_DAY;
+}
+
+export function graceSecondsToDays(seconds: number): number {
+    if (!Number.isFinite(seconds) || seconds <= 0) return 0;
+    return seconds / SECONDS_PER_DAY;
+}
+
+/** Map stored seconds to a select preset + custom days field. */
+export function graceSecondsToPreset(seconds: number): {
+    preset: GracePreset;
+    days: string;
+} {
+    if (!Number.isFinite(seconds) || seconds <= 0) {
+        return { preset: "none", days: "0" };
+    }
+    const whole = seconds / SECONDS_PER_DAY;
+    const days = Number.isInteger(whole) ? whole : Math.round(whole);
+    if (
+        Number.isInteger(whole) &&
+        (GRACE_PRESET_DAYS as readonly number[]).includes(days)
+    ) {
+        return { preset: String(days) as GracePreset, days: String(days) };
+    }
+    return { preset: "custom", days: String(Math.max(0, days)) };
+}
+
+export function formatGracePeriod(seconds: number): string {
+    if (seconds <= 0) return "none";
+    const days = seconds / SECONDS_PER_DAY;
+    if (Number.isInteger(days)) {
+        return days === 1 ? "1 day" : `${days} days`;
+    }
+    return `${seconds} seconds`;
+}
 
 /**
  * Chain rate scale: `PPM_SCALE` = 100%.

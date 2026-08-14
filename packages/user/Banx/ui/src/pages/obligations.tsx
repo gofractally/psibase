@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 
 import { AccountHistoryDialog } from "@/components/account-history";
-import { AssetField } from "@/components/form-fields";
+import { AssetField, GracePeriodField } from "@/components/form-fields";
 import { NewDepositLoanDialog } from "@/components/new-deposit-loan-dialog";
 import { PageHeader } from "@/components/page-header";
 import {
@@ -40,7 +40,14 @@ import {
     formatRawAmount,
     humanToRaw,
 } from "@/lib/amount";
-import { DEFAULT_GRACE_SECONDS, ppmToPercent } from "@/lib/constants";
+import {
+    DEFAULT_GRACE_SECONDS,
+    daysToGraceSeconds,
+    formatGracePeriod,
+    graceSecondsToPreset,
+    ppmToPercent,
+    type GracePreset,
+} from "@/lib/constants";
 import {
     MAX_PERCENT,
     MIN_PERCENT_STEP,
@@ -819,7 +826,8 @@ function CreditLineDialog({
             limit: "100",
             interestPct: "0",
             deplete: false,
-            graceSeconds: String(DEFAULT_GRACE_SECONDS),
+            gracePreset: "7" as GracePreset,
+            graceDays: "7",
         },
         onSubmit: async ({ value }) => {
             const debtor = isEdit
@@ -840,10 +848,14 @@ function CreditLineDialog({
                             value.interestPct,
                             PPM_SCALE,
                         ),
-                        graceSeconds: Math.max(
-                            0,
-                            Math.floor(Number(value.graceSeconds.trim()) || 0),
-                        ),
+                        graceSeconds:
+                            value.gracePreset === "none"
+                                ? 0
+                                : daysToGraceSeconds(
+                                      value.gracePreset === "custom"
+                                          ? Number(value.graceDays.trim())
+                                          : Number(value.gracePreset),
+                                  ),
                     },
                     {
                         onSuccess: () => {
@@ -860,6 +872,9 @@ function CreditLineDialog({
     useEffect(() => {
         if (!open) return;
         if (editing) {
+            const grace = graceSecondsToPreset(
+                editing.graceSeconds ?? DEFAULT_GRACE_SECONDS,
+            );
             form.reset({
                 debtor: editing.debtor,
                 assetId: editing.assetId,
@@ -869,7 +884,8 @@ function CreditLineDialog({
                 ).replace(/,/g, ""),
                 interestPct: ppmToPercentInput(editing.interestRatePpm),
                 deplete: editing.depleteOnDebit,
-                graceSeconds: String(editing.graceSeconds ?? DEFAULT_GRACE_SECONDS),
+                gracePreset: grace.preset,
+                graceDays: grace.days,
             });
         } else {
             form.reset({
@@ -878,7 +894,8 @@ function CreditLineDialog({
                 limit: "100",
                 interestPct: "0",
                 deplete: false,
-                graceSeconds: String(DEFAULT_GRACE_SECONDS),
+                gracePreset: "7",
+                graceDays: "7",
             });
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -981,40 +998,36 @@ function CreditLineDialog({
                             )}
                         />
                     </div>
-                    <form.AppField
-                        name="graceSeconds"
-                        validators={{
-                            onChange: ({ value }: { value: string }) => {
-                                const t = String(value).trim();
-                                if (t === "") return "Required";
-                                if (!/^\d+$/.test(t)) {
-                                    return "Whole seconds only";
+                    <form.Subscribe
+                        selector={(s) => ({
+                            preset: s.values.gracePreset,
+                            days: s.values.graceDays,
+                        })}
+                        children={({ preset, days }) => (
+                            <GracePeriodField
+                                preset={preset}
+                                days={days}
+                                onPresetChange={(p) => {
+                                    form.setFieldValue("gracePreset", p);
+                                    if (p === "none") {
+                                        form.setFieldValue("graceDays", "0");
+                                    } else if (p !== "custom") {
+                                        form.setFieldValue("graceDays", p);
+                                    }
+                                }}
+                                onDaysChange={(d) =>
+                                    form.setFieldValue("graceDays", d)
                                 }
-                                return undefined;
-                            },
-                            onSubmit: ({ value }: { value: string }) => {
-                                const t = String(value).trim();
-                                if (t === "") return "Required";
-                                if (!/^\d+$/.test(t)) {
-                                    return "Whole seconds only";
-                                }
-                                return undefined;
-                            },
-                        }}
-                        children={(field) => (
-                            <field.TextField
-                                label="Interest-free period (seconds)"
-                                inputMode="numeric"
-                                placeholder={String(DEFAULT_GRACE_SECONDS)}
                             />
                         )}
                     />
                     <p className="text-muted-foreground -mt-2 text-xs">
                         If they repay this pair to zero within this window, no
-                        interest. Default {DEFAULT_GRACE_SECONDS} = 7 days.{" "}
+                        interest. Default is 7 days. Custom is whole days (0 =
+                        interest from the first second).{" "}
                         {isEdit && editing && editing.cycleStartedAt
                             ? "An open cycle keeps its snapshotted window; this value applies to the next cycle."
-                            : "0 = interest from the first second."}
+                            : null}
                     </p>
                     <form.AppField
                         name="deplete"
@@ -1422,15 +1435,15 @@ function AccountGroupRow({
                                             {symbol}
                                         </span>
                                     </div>
-                                    {creditLine.graceSeconds > 0 ? (
+                                    {creditLine.graceSeconds > 0 ||
+                                    creditLine.cycleStartedAt ? (
                                         <div className="sm:col-span-3">
                                             Interest-free{" "}
-                                            <span className="text-foreground font-mono tabular-nums">
-                                                {creditLine.cycleStartedAt
+                                            {formatGracePeriod(
+                                                creditLine.cycleStartedAt
                                                     ? creditLine.cycleGraceSeconds
-                                                    : creditLine.graceSeconds}
-                                            </span>{" "}
-                                            seconds
+                                                    : creditLine.graceSeconds,
+                                            )}
                                             {creditLine.cycleStartedAt
                                                 ? " (this cycle)"
                                                 : ""}
