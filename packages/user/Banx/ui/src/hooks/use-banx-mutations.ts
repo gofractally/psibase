@@ -16,7 +16,7 @@ function useInvalidateBanx() {
             void qc.invalidateQueries({ queryKey: QueryKey.creditLines(user) });
             void qc.invalidateQueries({ queryKey: QueryKey.obligations(user) });
             void qc.invalidateQueries({
-                queryKey: QueryKey.routingPolicies(user),
+                queryKey: QueryKey.clearingOffers(user),
             });
             void qc.invalidateQueries({
                 queryKey: QueryKey.currencyPolicies(user),
@@ -191,79 +191,177 @@ export function useQuotePath() {
     });
 }
 
-export function useSetRoutingPolicy() {
+export function useSetClearingOffer() {
     const invalidate = useInvalidateBanx();
     return useMutation({
         mutationFn: async (p: {
-            creditor: string;
+            counterparty: string;
             assetId: number;
-            hopFeeFixed: string;
-            hopFeePercentPpm: number;
-            maxAcceptRatePpm: number;
+            feeFixed: string;
+            feePercentPpm: number;
+            maxLineAprPpm: number;
+            forwardEnabled: boolean;
             expiresAtSeconds: number;
         }) =>
-            banxCall("setRoutingPolicy", [
-                p.creditor,
+            banxCall("setClearingOffer", [
+                p.counterparty,
                 p.assetId,
-                p.hopFeeFixed,
-                p.hopFeePercentPpm,
-                p.maxAcceptRatePpm,
+                p.feeFixed,
+                p.feePercentPpm,
+                p.maxLineAprPpm,
+                p.forwardEnabled,
                 p.expiresAtSeconds,
             ]),
         onSuccess: () => {
             invalidate();
-            toast.success("Routing override saved");
+            toast.success("Clearing offer saved");
         },
         onError: (e: Error) => toast.error(e.message),
     });
 }
 
-export function useSetGlobalRoutingPolicy() {
+/** @deprecated */
+export const useSetRoutingPolicy = () => {
+    const m = useSetClearingOffer();
+    return {
+        ...m,
+        mutate: (
+            p: {
+                creditor: string;
+                assetId: number;
+                hopFeeFixed: string;
+                hopFeePercentPpm: number;
+                maxAcceptRatePpm: number;
+                expiresAtSeconds: number;
+                forwardEnabled?: boolean;
+            },
+            opts?: Parameters<typeof m.mutate>[1],
+        ) =>
+            m.mutate(
+                {
+                    counterparty: p.creditor,
+                    assetId: p.assetId,
+                    feeFixed: p.hopFeeFixed,
+                    feePercentPpm: p.hopFeePercentPpm,
+                    maxLineAprPpm: p.maxAcceptRatePpm,
+                    forwardEnabled: p.forwardEnabled ?? true,
+                    expiresAtSeconds: p.expiresAtSeconds,
+                },
+                opts,
+            ),
+    };
+};
+
+export function useSetGlobalClearingOffer() {
     const invalidate = useInvalidateBanx();
     return useMutation({
         mutationFn: async (p: {
             assetId: number;
-            hopFeeFixed: string;
-            hopFeePercentPpm: number;
-            maxAcceptRatePpm: number;
+            feeFixed: string;
+            feePercentPpm: number;
+            maxLineAprPpm: number;
+            forwardEnabled: boolean;
             expiresAtSeconds: number;
         }) =>
-            banxCall("setGlobalRoutingPolicy", [
+            banxCall("setGlobalClearingOffer", [
                 p.assetId,
-                p.hopFeeFixed,
-                p.hopFeePercentPpm,
-                p.maxAcceptRatePpm,
+                p.feeFixed,
+                p.feePercentPpm,
+                p.maxLineAprPpm,
+                p.forwardEnabled,
                 p.expiresAtSeconds,
             ]),
         onSuccess: () => {
             invalidate();
-            toast.success("Global routing policy saved");
+            toast.success("Global clearing offer saved");
         },
         onError: (e: Error) => toast.error(e.message),
     });
 }
 
+/** @deprecated */
+export const useSetGlobalRoutingPolicy = () => {
+    const m = useSetGlobalClearingOffer();
+    return {
+        ...m,
+        mutate: (
+            p: {
+                assetId: number;
+                hopFeeFixed: string;
+                hopFeePercentPpm: number;
+                maxAcceptRatePpm: number;
+                expiresAtSeconds: number;
+                forwardEnabled?: boolean;
+            },
+            opts?: Parameters<typeof m.mutate>[1],
+        ) =>
+            m.mutate(
+                {
+                    assetId: p.assetId,
+                    feeFixed: p.hopFeeFixed,
+                    feePercentPpm: p.hopFeePercentPpm,
+                    maxLineAprPpm: p.maxAcceptRatePpm,
+                    forwardEnabled: p.forwardEnabled ?? true,
+                    expiresAtSeconds: p.expiresAtSeconds,
+                },
+                opts,
+            ),
+    };
+};
+
+export function useRemoveClearingOffer() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: { counterparty: string; assetId: number }) =>
+            banxCall("removeClearingOffer", [p.counterparty, p.assetId]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Clearing offer removed");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+/** @deprecated */
 export function useRemoveRoutingPolicy() {
-    const invalidate = useInvalidateBanx();
-    return useMutation({
-        mutationFn: async (p: { creditor: string; assetId: number }) =>
-            banxCall("removeRoutingPolicy", [p.creditor, p.assetId]),
-        onSuccess: () => {
-            invalidate();
-            toast.success("Routing override removed");
-        },
-        onError: (e: Error) => toast.error(e.message),
-    });
+    const m = useRemoveClearingOffer();
+    return {
+        ...m,
+        mutate: (
+            p: { creditor: string; assetId: number },
+            opts?: Parameters<typeof m.mutate>[1],
+        ) => m.mutate({ counterparty: p.creditor, assetId: p.assetId }, opts),
+    };
 }
 
-export function useRemoveGlobalRoutingPolicy() {
+export function useRemoveGlobalClearingOffer() {
     const invalidate = useInvalidateBanx();
     return useMutation({
         mutationFn: async (p: { assetId: number }) =>
-            banxCall("removeGlobalRoutingPolicy", [p.assetId]),
+            banxCall("removeGlobalClearingOffer", [p.assetId]),
         onSuccess: () => {
             invalidate();
-            toast.success("Global routing policy removed");
+            toast.success("Global clearing offer removed");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+/** @deprecated */
+export const useRemoveGlobalRoutingPolicy = useRemoveGlobalClearingOffer;
+
+export function useSellClaim() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            buyer: string;
+            debtor: string;
+            assetId: number;
+            amount: string;
+        }) => banxCall("sellClaim", [p.buyer, p.debtor, p.assetId, p.amount]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Claim sold");
         },
         onError: (e: Error) => toast.error(e.message),
     });

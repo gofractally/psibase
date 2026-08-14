@@ -352,10 +352,11 @@ export function PoliciesPage() {
             </section>
 
             <section className="space-y-4">
-                <h2 className="font-medium">Your routing policies</h2>
+                <h2 className="font-medium">Your clearing offers</h2>
                 {routing.length === 0 ? (
                     <p className="text-muted-foreground text-sm">
-                        None — set hop fees from Accounts (route icon).
+                        None — set fees from Accounts (route icon). Enables path
+                        forward and claim takeout.
                     </p>
                 ) : (
                     <div className="overflow-x-auto rounded-md border">
@@ -371,8 +372,9 @@ export function PoliciesPage() {
                                         Fee %
                                     </TableHead>
                                     <TableHead className="text-right">
-                                        Max APR
+                                        Max line APR
                                     </TableHead>
+                                    <TableHead>Forward</TableHead>
                                     <TableHead className="text-right">
                                         Expires
                                     </TableHead>
@@ -382,31 +384,30 @@ export function PoliciesPage() {
                                 {[...globalRouting, ...specificRouting].map(
                                     (p) => (
                                         <TableRow
-                                            key={`${p.isGlobal ? "g" : p.creditor}-${p.assetId}`}
+                                            key={`${p.isGlobal ? "g" : p.counterparty}-${p.assetId}`}
                                         >
                                             <TableCell>
                                                 {p.isGlobal
-                                                    ? "Global (any line)"
-                                                    : p.creditor}
+                                                    ? "Global"
+                                                    : p.counterparty}
                                             </TableCell>
                                             <TableCell>
                                                 {symbolOf(p.assetId)}
                                             </TableCell>
                                             <TableCell className="text-right font-mono">
                                                 {formatRawAmount(
-                                                    p.hopFeeFixed,
+                                                    p.feeFixed,
                                                     precisionOf(p.assetId),
                                                 )}
                                             </TableCell>
                                             <TableCell className="text-right">
-                                                {ppmToPercent(
-                                                    p.hopFeePercentPpm,
-                                                )}
+                                                {ppmToPercent(p.feePercentPpm)}
                                             </TableCell>
                                             <TableCell className="text-right">
-                                                {ppmToPercent(
-                                                    p.maxAcceptRatePpm,
-                                                )}
+                                                {ppmToPercent(p.maxLineAprPpm)}
+                                            </TableCell>
+                                            <TableCell>
+                                                {p.forwardEnabled ? "Yes" : "No"}
                                             </TableCell>
                                             <TableCell className="text-right text-sm">
                                                 {formatExpiresAt(p.expiresAt)}

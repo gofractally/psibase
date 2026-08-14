@@ -150,11 +150,12 @@ mod tests {
             .get()?;
 
         Wrapper::push_from(&chain, gary)
-            .st_glb_rte(
+            .st_glb_clr(
                 usd,
                 Quantity::new(0),
                 (PPM_SCALE * 2 / 100),
                 PPM_SCALE,
+                true,
                 never(),
             )
             .get()?;
@@ -207,11 +208,12 @@ mod tests {
             .get()?;
         // Gary routes same-asset USD to Steve (no fee).
         Wrapper::push_from(&chain, gary)
-            .st_glb_rte(
+            .st_glb_clr(
                 usd,
                 Quantity::new(0),
                 0,
                 PPM_SCALE,
+                true,
                 never(),
             )
             .get()?;
@@ -279,31 +281,34 @@ mod tests {
         // --- Routing (same-asset fees) ---
         // Mitchell → John, AUD, 5% hop fee
         Wrapper::push_from(&chain, mitchell)
-            .st_glb_rte(
+            .st_glb_clr(
                 aud,
                 Quantity::new(0),
                 PPM_SCALE * 5 / 100,
                 PPM_SCALE,
+                true,
                 never(),
             )
             .get()?;
         // John → Mike, USD (after convert), no fee
         Wrapper::push_from(&chain, john)
-            .st_glb_rte(
+            .st_glb_clr(
                 usd,
                 Quantity::new(0),
                 0,
                 PPM_SCALE,
+                true,
                 never(),
             )
             .get()?;
         // Mike → Brandon, USD, 1% hop fee
         Wrapper::push_from(&chain, mike)
-            .st_glb_rte(
+            .st_glb_clr(
                 usd,
                 Quantity::new(0),
                 PPM_SCALE * 1 / 100,
                 PPM_SCALE,
+                true,
                 never(),
             )
             .get()?;
@@ -408,29 +413,32 @@ mod tests {
             .get()?;
 
         Wrapper::push_from(&chain, mitchell)
-            .st_glb_rte(
+            .st_glb_clr(
                 aud,
                 Quantity::new(0),
                 PPM_SCALE * 5 / 100,
                 PPM_SCALE,
+                true,
                 never(),
             )
             .get()?;
         Wrapper::push_from(&chain, john)
-            .st_glb_rte(
+            .st_glb_clr(
                 usd,
                 Quantity::new(0),
                 0,
                 PPM_SCALE,
+                true,
                 never(),
             )
             .get()?;
         Wrapper::push_from(&chain, mike)
-            .st_glb_rte(
+            .st_glb_clr(
                 usd,
                 Quantity::new(0),
                 PPM_SCALE * 1 / 100,
                 PPM_SCALE,
+                true,
                 never(),
             )
             .get()?;
@@ -558,11 +566,12 @@ mod tests {
             .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0)
             .get()?;
         Wrapper::push_from(&chain, gary)
-            .st_glb_rte(
+            .st_glb_clr(
                 usd,
                 Quantity::new(50),
                 0,
                 PPM_SCALE,
+                true,
                 never(),
             )
             .get()?;
@@ -676,6 +685,57 @@ mod tests {
             .get()?;
         assert_eq!(Obligation::exposure(bob, alice, usd).value, 60);
         assert_eq!(Obligation::exposure(alice, bob, usd).value, 0);
+
+        Ok(())
+    }
+
+    /// Alice holds Bob debt, sells to Peter under Peter's clearing offer.
+    /// Peter takes Bob face; Alice gets face after fees as claim on Peter.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_sell_claim_takeout(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+
+        let alice = account!("alice");
+        let bob = account!("bob");
+        let peter = account!("peter");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        chain.new_account(peter).unwrap();
+
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        // Alice holds Bob debt via deposit (Bob books liability to Alice... 
+        // deposit: sender=receiver owes depositor. Alice deposit depositor=bob → Alice owes Bob.
+        // We need Bob owes Alice: Bob deposit depositor=alice.
+        Wrapper::push_from(&chain, bob)
+            .deposit(alice, usd, Quantity::new(10_000), 0)
+            .get()?;
+        assert_eq!(Obligation::exposure(alice, bob, usd).value, 10_000);
+
+        // Peter willing to be owed by Bob up to 10k.
+        Wrapper::push_from(&chain, peter)
+            .st_crd_lne(bob, usd, Quantity::new(10_000), false, 0)
+            .get()?;
+        // Global clearing: 5% take fee, forward off ok (take still works).
+        Wrapper::push_from(&chain, peter)
+            .st_glb_clr(
+                usd,
+                Quantity::new(0),
+                PPM_SCALE * 5 / 100,
+                PPM_SCALE,
+                false,
+                never(),
+            )
+            .get()?;
+
+        Wrapper::push_from(&chain, alice)
+            .sell_claim(peter, bob, usd, Quantity::new(10_000))
+            .get()?;
+
+        // Bob now owes Peter full face; Alice holds 9500 on Peter.
+        assert_eq!(Obligation::exposure(alice, bob, usd).value, 0);
+        assert_eq!(Obligation::exposure(peter, bob, usd).value, 10_000);
+        assert_eq!(Obligation::exposure(alice, peter, usd).value, 9_500);
 
         Ok(())
     }

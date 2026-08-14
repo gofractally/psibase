@@ -18,7 +18,7 @@ struct Data {
 #[serde(rename_all = "camelCase")]
 struct PathGraph {
     credit_lines: Vec<GqlCreditLine>,
-    routing_policies: Vec<GqlRouting>,
+    clearing_offers: Vec<GqlClearing>,
     currency_policies: Vec<GqlCurrency>,
 }
 
@@ -35,13 +35,14 @@ struct GqlCreditLine {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct GqlRouting {
-    creditor: String,
-    debtor: String,
+struct GqlClearing {
+    poster: String,
+    counterparty: String,
     asset_id: u16,
-    hop_fee_fixed: String,
-    hop_fee_percent_ppm: u32,
-    max_accept_rate_ppm: u32,
+    fee_fixed: String,
+    fee_percent_ppm: u32,
+    max_line_apr_ppm: u32,
+    forward_enabled: bool,
     expires_at: i64,
 }
 
@@ -79,8 +80,8 @@ pub fn fetch_path_graph(
                 creditLines {{
                     creditor debtor assetId limit exposure interestRatePpm
                 }}
-                routingPolicies {{
-                    creditor debtor assetId hopFeeFixed hopFeePercentPpm maxAcceptRatePpm expiresAt
+                clearingOffers {{
+                    poster counterparty assetId feeFixed feePercentPpm maxLineAprPpm forwardEnabled expiresAt
                 }}
                 currencyPolicies {{
                     debtor fromAsset toAsset feeFixed fxRate expiresAt
@@ -111,15 +112,24 @@ pub fn fetch_path_graph(
         });
     }
 
-    let mut routing = Vec::with_capacity(g.routing_policies.len());
-    for r in g.routing_policies {
+    let mut routing = Vec::with_capacity(g.clearing_offers.len());
+    for r in g.clearing_offers {
+        if !r.forward_enabled {
+            continue;
+        }
+        // path_find RoutingEdge: creditor = next hop (empty = global), debtor = poster
+        let creditor = if r.counterparty.is_empty() || r.counterparty == "0" {
+            String::new()
+        } else {
+            r.counterparty
+        };
         routing.push(RoutingEdge {
-            creditor: r.creditor,
-            debtor: r.debtor,
+            creditor,
+            debtor: r.poster,
             asset_id: r.asset_id,
-            hop_fee_fixed: parse_u64(&r.hop_fee_fixed)?,
-            hop_fee_percent_ppm: r.hop_fee_percent_ppm,
-            max_accept_rate_ppm: r.max_accept_rate_ppm,
+            hop_fee_fixed: parse_u64(&r.fee_fixed)?,
+            hop_fee_percent_ppm: r.fee_percent_ppm,
+            max_accept_rate_ppm: r.max_line_apr_ppm,
             expires_at: r.expires_at,
         });
     }

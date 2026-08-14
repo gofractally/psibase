@@ -45,34 +45,45 @@ interface api {
         interest-rate-ppm: u32,
     ) -> result<_, error>;
 
-    /// Intermediate posts a same-asset path-routing policy toward a **specific**
-    /// `creditor` (optional override). Prefer `set-global-routing-policy`.
-    /// `hop-fee-fixed` is a human decimal in `asset-id` units.
-    /// `hop-fee-percent-ppm` is a percent fee in ppm (`10_000` = 1%).
-    set-routing-policy: func(
-        creditor: string,
+    /// Post a clearing offer toward a **specific** `counterparty` (next hop for
+    /// path forward and/or debtor for claim takeout). Prefer global when possible.
+    /// `fee-fixed` is a human decimal in `asset-id` units.
+    /// `fee-percent-ppm` is ppm (`10_000` = 1%).
+    set-clearing-offer: func(
+        counterparty: string,
         asset-id: u16,
-        hop-fee-fixed: string,
-        hop-fee-percent-ppm: u32,
-        max-accept-rate-ppm: u32,
+        fee-fixed: string,
+        fee-percent-ppm: u32,
+        max-line-apr-ppm: u32,
+        forward-enabled: bool,
         expires-at-seconds: u32,
     ) -> result<_, error>;
 
-    /// Intermediate posts **default** routing for this asset toward any next-hop
-    /// that has extended them a credit line.
-    set-global-routing-policy: func(
+    /// Global clearing offer for this asset (any next hop / any lined debtor).
+    set-global-clearing-offer: func(
         asset-id: u16,
-        hop-fee-fixed: string,
-        hop-fee-percent-ppm: u32,
-        max-accept-rate-ppm: u32,
+        fee-fixed: string,
+        fee-percent-ppm: u32,
+        max-line-apr-ppm: u32,
+        forward-enabled: bool,
         expires-at-seconds: u32,
     ) -> result<_, error>;
 
-    /// Remove a per-creditor routing override (if present).
-    remove-routing-policy: func(creditor: string, asset-id: u16) -> result<_, error>;
+    /// Remove a specific clearing offer.
+    remove-clearing-offer: func(counterparty: string, asset-id: u16) -> result<_, error>;
 
-    /// Remove global routing for this asset (if present).
-    remove-global-routing-policy: func(asset-id: u16) -> result<_, error>;
+    /// Remove global clearing offer for this asset.
+    remove-global-clearing-offer: func(asset-id: u16) -> result<_, error>;
+
+    /// Sell claims on `debtor` to `buyer` under buyer's clearing offer.
+    /// `amount` is face (human decimal); seller receives face after fees as a
+    /// claim on the buyer.
+    sell-claim: func(
+        buyer: string,
+        debtor: string,
+        asset-id: u16,
+        amount: string,
+    ) -> result<_, error>;
 
     /// Debtor posts a convert quote from `from-asset` → `to-asset`.
     /// Fee is a human decimal in **from-asset** units.

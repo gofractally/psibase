@@ -70,12 +70,9 @@ function feesFromPolicy(
 ): FeeFields {
     return {
         assetId: p.assetId,
-        hopFeeFixed: formatRawAmount(p.hopFeeFixed, precision).replace(
-            /,/g,
-            "",
-        ),
-        hopFeePct: ppmToPercentInput(p.hopFeePercentPpm),
-        maxAcceptPct: ppmToPercentInput(p.maxAcceptRatePpm),
+        hopFeeFixed: formatRawAmount(p.feeFixed, precision).replace(/,/g, ""),
+        hopFeePct: ppmToPercentInput(p.feePercentPpm),
+        maxAcceptPct: ppmToPercentInput(p.maxLineAprPpm),
         expiresAtSeconds: p.expiresAt,
     };
 }
@@ -202,7 +199,7 @@ export function RoutingPolicyDialog({
         const matches = routing.filter(
             (p) =>
                 !p.isGlobal &&
-                p.creditor === creditor &&
+                p.counterparty === creditor &&
                 policyLive(p, nowSec) &&
                 (prefill?.assetId === undefined ||
                     p.assetId === prefill.assetId),
@@ -221,6 +218,7 @@ export function RoutingPolicyDialog({
                 map.set(p.assetId, p);
             }
         }
+        // note: RoutingPolicy === ClearingOffer
         return map;
     }, [routing, nowSec]);
 

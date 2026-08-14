@@ -28,9 +28,10 @@ define_trust! {
             - Quote multi-hop paths (read-only GraphQL + search)
         ",
         Medium => "
-            - Post or remove credit lines, routing policies, and currency policies
+            - Post or remove credit lines, clearing offers, and currency policies
             - Deposit and net obligations
             - Convert debt between assets
+            - Sell claims under a buyer's clearing offer
         ",
         High => "
             - Path-pay (draw on others' credit along a path)
@@ -41,14 +42,15 @@ define_trust! {
         Low => [accrue, quote_path],
         Medium => [
             set_credit_line,
-            set_routing_policy,
-            set_global_routing_policy,
-            remove_routing_policy,
-            remove_global_routing_policy,
+            set_clearing_offer,
+            set_global_clearing_offer,
+            remove_clearing_offer,
+            remove_global_clearing_offer,
             set_currency_policy,
             deposit,
             net,
             convert,
+            sell_claim,
         ],
         High => [path_pay],
     }
@@ -139,62 +141,84 @@ impl Api for BanxPlugin {
         add_action_to_transaction(banx::action_structs::st_crd_lne::ACTION_NAME, &packed)
     }
 
-    fn set_routing_policy(
-        creditor: String,
+    fn set_clearing_offer(
+        counterparty: String,
         asset_id: u16,
-        hop_fee_fixed: String,
-        hop_fee_percent_ppm: u32,
-        max_accept_rate_ppm: u32,
+        fee_fixed: String,
+        fee_percent_ppm: u32,
+        max_line_apr_ppm: u32,
+        forward_enabled: bool,
         expires_at_seconds: u32,
     ) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::set_routing_policy)?;
-        let hop_fee_fixed = parse_amount(asset_id, &hop_fee_fixed)?;
-        let packed = banx::action_structs::st_rte_pol {
-            creditor: parse_account(&creditor)?,
+        trust::assert_authorized(trust::FunctionName::set_clearing_offer)?;
+        let fee_fixed = parse_amount(asset_id, &fee_fixed)?;
+        let packed = banx::action_structs::st_clr_ofr {
+            counterparty: parse_account(&counterparty)?,
             asset_id,
-            hop_fee_fixed,
-            hop_fee_percent: hop_fee_percent_ppm,
-            max_accept_rate: max_accept_rate_ppm,
+            fee_fixed,
+            fee_percent: fee_percent_ppm,
+            max_line_apr: max_line_apr_ppm,
+            forward_enabled,
             expires_at: time_point(expires_at_seconds),
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::st_rte_pol::ACTION_NAME, &packed)
+        add_action_to_transaction(banx::action_structs::st_clr_ofr::ACTION_NAME, &packed)
     }
 
-    fn set_global_routing_policy(
+    fn set_global_clearing_offer(
         asset_id: u16,
-        hop_fee_fixed: String,
-        hop_fee_percent_ppm: u32,
-        max_accept_rate_ppm: u32,
+        fee_fixed: String,
+        fee_percent_ppm: u32,
+        max_line_apr_ppm: u32,
+        forward_enabled: bool,
         expires_at_seconds: u32,
     ) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::set_global_routing_policy)?;
-        let hop_fee_fixed = parse_amount(asset_id, &hop_fee_fixed)?;
-        let packed = banx::action_structs::st_glb_rte {
+        trust::assert_authorized(trust::FunctionName::set_global_clearing_offer)?;
+        let fee_fixed = parse_amount(asset_id, &fee_fixed)?;
+        let packed = banx::action_structs::st_glb_clr {
             asset_id,
-            hop_fee_fixed,
-            hop_fee_percent: hop_fee_percent_ppm,
-            max_accept_rate: max_accept_rate_ppm,
+            fee_fixed,
+            fee_percent: fee_percent_ppm,
+            max_line_apr: max_line_apr_ppm,
+            forward_enabled,
             expires_at: time_point(expires_at_seconds),
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::st_glb_rte::ACTION_NAME, &packed)
+        add_action_to_transaction(banx::action_structs::st_glb_clr::ACTION_NAME, &packed)
     }
 
-    fn remove_routing_policy(creditor: String, asset_id: u16) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::remove_routing_policy)?;
-        let packed = banx::action_structs::rm_rte_pol {
-            creditor: parse_account(&creditor)?,
+    fn remove_clearing_offer(counterparty: String, asset_id: u16) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::remove_clearing_offer)?;
+        let packed = banx::action_structs::rm_clr_ofr {
+            counterparty: parse_account(&counterparty)?,
             asset_id,
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::rm_rte_pol::ACTION_NAME, &packed)
+        add_action_to_transaction(banx::action_structs::rm_clr_ofr::ACTION_NAME, &packed)
     }
 
-    fn remove_global_routing_policy(asset_id: u16) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::remove_global_routing_policy)?;
-        let packed = banx::action_structs::rm_glb_rte { asset_id }.packed();
-        add_action_to_transaction(banx::action_structs::rm_glb_rte::ACTION_NAME, &packed)
+    fn remove_global_clearing_offer(asset_id: u16) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::remove_global_clearing_offer)?;
+        let packed = banx::action_structs::rm_glb_clr { asset_id }.packed();
+        add_action_to_transaction(banx::action_structs::rm_glb_clr::ACTION_NAME, &packed)
+    }
+
+    fn sell_claim(
+        buyer: String,
+        debtor: String,
+        asset_id: u16,
+        amount: String,
+    ) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::sell_claim)?;
+        let amount = parse_amount_nonzero(asset_id, &amount)?;
+        let packed = banx::action_structs::sell_claim {
+            buyer: parse_account(&buyer)?,
+            debtor: parse_account(&debtor)?,
+            asset_id,
+            amount,
+        }
+        .packed();
+        add_action_to_transaction(banx::action_structs::sell_claim::ACTION_NAME, &packed)
     }
 
     fn set_currency_policy(

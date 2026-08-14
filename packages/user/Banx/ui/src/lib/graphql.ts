@@ -33,13 +33,14 @@ const zObligation = z.object({
     lastInterestAccrual: z.number(),
 });
 
-const zRoutingPolicy = z.object({
-    creditor: z.string(),
-    debtor: z.string(),
+const zClearingOffer = z.object({
+    poster: z.string(),
+    counterparty: z.string(),
     assetId: z.number(),
-    hopFeeFixed: z.string(),
-    hopFeePercentPpm: z.number(),
-    maxAcceptRatePpm: z.number(),
+    feeFixed: z.string(),
+    feePercentPpm: z.number(),
+    maxLineAprPpm: z.number(),
+    forwardEnabled: z.boolean(),
     expiresAt: z.number(),
     isGlobal: z.boolean(),
 });
@@ -69,7 +70,9 @@ const zActivity = z.object({
 export type Asset = z.infer<typeof zAsset>;
 export type CreditLine = z.infer<typeof zCreditLine>;
 export type Obligation = z.infer<typeof zObligation>;
-export type RoutingPolicy = z.infer<typeof zRoutingPolicy>;
+export type ClearingOffer = z.infer<typeof zClearingOffer>;
+/** @deprecated use ClearingOffer */
+export type RoutingPolicy = ClearingOffer;
 export type CurrencyPolicy = z.infer<typeof zCurrencyPolicy>;
 export type ActivityEvent = z.infer<typeof zActivity>;
 
@@ -103,16 +106,20 @@ export async function fetchObligations(account: string): Promise<Obligation[]> {
     return zObligation.array().parse(data.obligations);
 }
 
-export async function fetchRoutingPolicies(
+export async function fetchClearingOffers(
     account: string,
-): Promise<RoutingPolicy[]> {
-    const data = await gql<{ routingPolicies: RoutingPolicy[] }>(
-        `{ routingPolicies(debtor: "${account}") {
-            creditor debtor assetId hopFeeFixed hopFeePercentPpm maxAcceptRatePpm expiresAt isGlobal
+): Promise<ClearingOffer[]> {
+    const data = await gql<{ clearingOffers: ClearingOffer[] }>(
+        `{ clearingOffers(poster: "${account}") {
+            poster counterparty assetId feeFixed feePercentPpm maxLineAprPpm
+            forwardEnabled expiresAt isGlobal
         } }`,
     );
-    return zRoutingPolicy.array().parse(data.routingPolicies);
+    return zClearingOffer.array().parse(data.clearingOffers);
 }
+
+/** @deprecated use fetchClearingOffers */
+export const fetchRoutingPolicies = fetchClearingOffers;
 
 export async function fetchCurrencyPolicies(
     account: string,

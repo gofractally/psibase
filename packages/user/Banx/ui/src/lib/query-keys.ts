@@ -4,8 +4,10 @@ export const QueryKey = {
         ["banx", "creditLines", account ?? ""] as const,
     obligations: (account: string | null | undefined) =>
         ["banx", "obligations", account ?? ""] as const,
+    clearingOffers: (account: string | null | undefined) =>
+        ["banx", "clearingOffers", account ?? ""] as const,
     routingPolicies: (account: string | null | undefined) =>
-        ["banx", "routingPolicies", account ?? ""] as const,
+        ["banx", "clearingOffers", account ?? ""] as const,
     currencyPolicies: (account: string | null | undefined) =>
         ["banx", "currencyPolicies", account ?? ""] as const,
     activity: (

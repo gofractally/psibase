@@ -180,7 +180,7 @@ pub mod tables {
 
     pub const FX_RATE_SCALE: u64 = RATE_SCALE;
 
-    fn assert_policy_live(expires_at: TimePointSec) {
+    pub fn assert_policy_live(expires_at: TimePointSec) {
         if expires_at.seconds == 0 {
             return;
         }
@@ -247,132 +247,155 @@ pub mod tables {
     ///
     /// # Alice → Gary (AUD) → Steve (USD)
     ///
-    /// 1. Gary: credit line to Alice in AUD.
-    /// 2. Alice: currency policy AUD→USD (rebooks Alice→Gary claim).
-    /// 3. Steve: credit line to Gary in USD.
-    /// 4. Gary: global routing in **USD** (`creditor = 0`) or override for Steve.
-    #[table(name = "RoutingPolicyTab", index = 1)]
+    /// Standing clearing offer: path forward (optional) and claim takeout (always
+    /// while the row exists). Posted by `poster`.
+    ///
+    /// - **Path** (`forward_enabled`): poster is path-debtor; `counterparty` is
+    ///   next hop or [`Self::GLOBAL`] for any next hop that lined them.
+    /// - **Take claim**: seller moves obligations (debtor → seller) onto poster
+    ///   as new creditor, for face minus fees; `counterparty` is that debtor or
+    ///   [`Self::GLOBAL`] for any debtor poster has a line on.
+    #[table(name = "ClearingOfferTab", index = 1)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
-    pub struct RoutingPolicy {
-        /// Next hop, or [`Self::GLOBAL_CREDITOR`] (`0`) for all next hops.
-        pub creditor: AccountNumber,
-        /// Policy owner: intermediate path-drawing on the next hop.
-        pub debtor: AccountNumber,
-        /// Asset of the credit line drawn (same as path asset).
+    pub struct ClearingOffer {
+        pub poster: AccountNumber,
+        /// Next hop (path) / underlying debtor (take), or [`Self::GLOBAL`].
+        pub counterparty: AccountNumber,
         pub asset_id: u16,
 
-        /// Flat fee in `asset_id` before percent (0 = none).
-        pub hop_fee_fixed: Quantity,
-        /// Percent fee in ppm of amount after fixed (`10_000` = 1%).
-        pub hop_fee_percent: u32,
-        /// Max interest rate (ppm APR) on the line being drawn.
-        pub max_accept_rate: u32,
+        pub fee_fixed: Quantity,
+        /// ppm (`10_000` = 1%); must be `< PPM_SCALE`.
+        pub fee_percent: u32,
+        /// Max APR ppm on a line poster **draws** when forwarding.
+        pub max_line_apr: u32,
+        /// When true, usable as a path hop; takeout is always on if row exists.
+        pub forward_enabled: bool,
         /// Absolute expiry (`seconds == 0` → never).
         pub expires_at: TimePointSec,
     }
 
-    impl RoutingPolicy {
-        /// Sentinel `creditor` for a global (any next-hop) policy.
-        pub const GLOBAL_CREDITOR: AccountNumber = AccountNumber::new(0);
+    impl ClearingOffer {
+        pub const GLOBAL: AccountNumber = AccountNumber::new(0);
 
         #[primary_key]
         fn pk(&self) -> (AccountNumber, AccountNumber, u16) {
-            (self.creditor, self.debtor, self.asset_id)
+            (self.poster, self.counterparty, self.asset_id)
         }
 
         fn save(&self) {
-            RoutingPolicyTab::read_write().put(self).unwrap();
+            ClearingOfferTab::read_write().put(self).unwrap();
         }
 
-        fn get(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) -> Option<Self> {
-            RoutingPolicyTab::read()
+        fn get(poster: AccountNumber, counterparty: AccountNumber, asset_id: u16) -> Option<Self> {
+            ClearingOfferTab::read()
                 .get_index_pk()
-                .get(&(creditor, debtor, asset_id))
+                .get(&(poster, counterparty, asset_id))
         }
 
         pub fn is_global(&self) -> bool {
-            self.creditor == Self::GLOBAL_CREDITOR
+            self.counterparty == Self::GLOBAL
         }
 
         pub fn upsert(
-            creditor: AccountNumber,
-            debtor: AccountNumber,
+            poster: AccountNumber,
+            counterparty: AccountNumber,
             asset_id: u16,
-            hop_fee_fixed: Quantity,
-            hop_fee_percent: u32,
-            max_accept_rate: u32,
+            fee_fixed: Quantity,
+            fee_percent: u32,
+            max_line_apr: u32,
+            forward_enabled: bool,
             expires_at: TimePointSec,
         ) {
             assert!(
-                max_accept_rate <= PPM_SCALE,
-                "max_accept_rate exceeds 100% (PPM_SCALE)"
+                max_line_apr <= PPM_SCALE,
+                "max_line_apr exceeds 100% (PPM_SCALE)"
             );
-            assert!(
-                hop_fee_percent < PPM_SCALE,
-                "hop fee must be under 100%"
-            );
-            // Global: no specific line required at set time. Specific: line must exist.
-            if creditor != Self::GLOBAL_CREDITOR {
-                let _ = CreditLine::get_assert(creditor, debtor, asset_id);
+            assert!(fee_percent < PPM_SCALE, "fee must be under 100%");
+            // Path specific: next hop must have lined the poster.
+            // Take residual is checked at sell_claim time (poster must line debtor).
+            if counterparty != Self::GLOBAL && forward_enabled {
+                let _ = CreditLine::get_assert(counterparty, poster, asset_id);
             }
             Self {
-                creditor,
-                debtor,
+                poster,
+                counterparty,
                 asset_id,
-                hop_fee_fixed,
-                hop_fee_percent,
-                max_accept_rate,
+                fee_fixed,
+                fee_percent,
+                max_line_apr,
+                forward_enabled,
                 expires_at,
             }
             .save();
         }
 
-        /// Remove a routing policy row. Panics if it does not exist.
-        pub fn remove(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) {
+        pub fn remove(poster: AccountNumber, counterparty: AccountNumber, asset_id: u16) {
             assert!(
-                Self::get(creditor, debtor, asset_id).is_some(),
-                "routing policy not found"
+                Self::get(poster, counterparty, asset_id).is_some(),
+                "clearing offer not found"
             );
-            RoutingPolicyTab::read_write().erase(&(creditor, debtor, asset_id));
+            ClearingOfferTab::read_write().erase(&(poster, counterparty, asset_id));
         }
 
-        /// Path draw using this policy's fees against a concrete next-hop `creditor`.
-        /// For global rows, pass the hop account (not `GLOBAL_CREDITOR`).
+        pub fn apply_fees(&self, amount_in: Quantity) -> Quantity {
+            apply_hop_fee(amount_in, self.fee_fixed, self.fee_percent)
+        }
+
+        /// Path draw: fee then debit next hop's line to poster. Requires
+        /// `forward_enabled`.
         pub fn path_draw(&self, next_creditor: AccountNumber, amount_in: Quantity) -> Quantity {
+            assert!(self.forward_enabled, "clearing offer does not allow path forward");
             assert_policy_live(self.expires_at);
             let creditor = if self.is_global() {
                 next_creditor
             } else {
                 assert!(
-                    next_creditor == self.creditor,
-                    "routing policy creditor mismatch"
+                    next_creditor == self.counterparty,
+                    "clearing offer counterparty mismatch"
                 );
-                self.creditor
+                self.counterparty
             };
-            let line = CreditLine::get_assert(creditor, self.debtor, self.asset_id);
+            let line = CreditLine::get_assert(creditor, self.poster, self.asset_id);
             assert!(
-                line.interest_rate <= self.max_accept_rate,
-                "next hop interest rate exceeds routing max_accept_rate"
+                line.interest_rate <= self.max_line_apr,
+                "next hop interest rate exceeds max_line_apr"
             );
-            let draw = apply_hop_fee(amount_in, self.hop_fee_fixed, self.hop_fee_percent);
-            CreditLine::debit(creditor, self.debtor, self.asset_id, draw);
+            let draw = self.apply_fees(amount_in);
+            CreditLine::debit(creditor, self.poster, self.asset_id, draw);
             draw
         }
     }
 
-    /// Specific `(creditor, debtor, asset)` policy, else global `(0, debtor, asset)`.
-    pub fn resolve_routing(
+    /// Specific next-hop offer, else global, for path forward.
+    pub fn resolve_clearing_forward(
         next_creditor: AccountNumber,
-        debtor: AccountNumber,
+        poster: AccountNumber,
         asset_id: u16,
-    ) -> RoutingPolicy {
-        if let Some(p) = RoutingPolicy::get(next_creditor, debtor, asset_id) {
+    ) -> ClearingOffer {
+        if let Some(p) = ClearingOffer::get(poster, next_creditor, asset_id) {
+            assert!(p.forward_enabled, "clearing offer does not allow path forward");
             return p;
         }
-        if let Some(g) = RoutingPolicy::get(RoutingPolicy::GLOBAL_CREDITOR, debtor, asset_id) {
+        if let Some(g) = ClearingOffer::get(poster, ClearingOffer::GLOBAL, asset_id) {
+            assert!(g.forward_enabled, "clearing offer does not allow path forward");
             return g;
         }
-        panic!("RoutingPolicy not found (no specific or global for this asset)");
+        panic!("ClearingOffer not found (no specific or global forward for this asset)");
+    }
+
+    /// Specific debtor takeout offer, else global (must exist — take is always on).
+    pub fn resolve_clearing_take(
+        buyer: AccountNumber,
+        debtor: AccountNumber,
+        asset_id: u16,
+    ) -> ClearingOffer {
+        if let Some(p) = ClearingOffer::get(buyer, debtor, asset_id) {
+            return p;
+        }
+        if let Some(g) = ClearingOffer::get(buyer, ClearingOffer::GLOBAL, asset_id) {
+            return g;
+        }
+        panic!("ClearingOffer not found (buyer has no takeout offer for this asset)");
     }
 
     /// Debtor-posted quote: re-denominate **any** claim against this debtor
@@ -505,8 +528,9 @@ pub mod tables {
     ///   ([`Self::credit`]), interest ([`Self::accrue`]), and pair exposure.
     /// - **CreditLine** gates *draws* (limit / deplete / line rate) then calls
     ///   into obligation credit — used by every `path_pay` leg.
-    /// - **RoutingPolicy** (debtor-owned) gates **same-asset** path hops after
-    ///   the first (fixed + percent fee; no FX).
+    /// - **ClearingOffer** (poster-owned) gates same-asset path hops after the
+    ///   first when `forward_enabled`, and enables claim takeout while the row
+    ///   exists (fixed + percent fee; no FX).
     /// - **CurrencyPolicy** (debtor-posted) re-denominates existing debt and is
     ///   applied automatically in `path_pay` on currency changes.
     /// - **deposit** credits an obligation with no line check (receiver books a
@@ -783,6 +807,75 @@ pub mod tables {
                     o.interest_remainder = 0;
                 }
                 left -= take;
+            }
+        }
+
+        /// Move `amount` of claims (interest then principal, highest rate first)
+        /// from `from_creditor` to `to_creditor` on the same `debtor` / asset,
+        /// preserving each obligation's interest rate.
+        pub fn transfer_claims(
+            from_creditor: AccountNumber,
+            to_creditor: AccountNumber,
+            debtor: AccountNumber,
+            asset_id: u16,
+            amount: u64,
+        ) {
+            assert!(from_creditor != to_creditor, "cannot transfer claims to self");
+            assert!(amount > 0, "transfer amount must be positive");
+            Self::accrue_pair(from_creditor, debtor, asset_id);
+            let available = Self::exposure(from_creditor, debtor, asset_id).value;
+            assert!(
+                available >= amount,
+                "insufficient claim exposure to transfer"
+            );
+
+            let mut obs = Self::obligations(from_creditor, debtor, asset_id);
+            Self::sort_for_net(&mut obs);
+            let mut left = amount;
+
+            for o in obs.iter_mut() {
+                if left == 0 {
+                    break;
+                }
+                let take_i = left.min(o.accrued_interest.value);
+                if take_i > 0 {
+                    o.accrued_interest = (o.accrued_interest.value - take_i).into();
+                    let mut dest =
+                        Self::get_existing_or_new(to_creditor, debtor, asset_id, o.interest_rate);
+                    dest.accrue();
+                    dest.accrued_interest = dest
+                        .accrued_interest
+                        .value
+                        .checked_add(take_i)
+                        .expect("accrued overflow")
+                        .into();
+                    dest.save();
+                    left -= take_i;
+                }
+            }
+            for o in obs.iter_mut() {
+                if left == 0 {
+                    break;
+                }
+                let take_p = left.min(o.remaining_principal.value);
+                if take_p > 0 {
+                    o.remaining_principal = (o.remaining_principal.value - take_p).into();
+                    if o.remaining_principal.value == 0 {
+                        o.interest_remainder = 0;
+                    }
+                    Self::credit_pair(
+                        to_creditor,
+                        debtor,
+                        asset_id,
+                        o.interest_rate,
+                        Quantity::new(take_p),
+                    );
+                    left -= take_p;
+                }
+            }
+            assert!(left == 0, "transfer claims underflow");
+            for o in &obs {
+                o.persist_or_delete();
             }
         }
 
@@ -1074,8 +1167,8 @@ pub mod tables {
 #[psibase::service(name = "banx", tables = "tables")]
 pub mod service {
     use crate::tables::{
-        emit_pair_activity, resolve_routing, Asset, CreditLine, CurrencyPolicy, InitRow, InitTable,
-        Obligation, PathHop, RoutingPolicy,
+        emit_pair_activity, resolve_clearing_forward, resolve_clearing_take, Asset, ClearingOffer,
+        CreditLine, CurrencyPolicy, InitRow, InitTable, Obligation, PathHop,
     };
     use psibase::{
         services::events,
@@ -1194,75 +1287,117 @@ pub mod service {
         );
     }
 
-    /// Sender (path intermediate) opts into same-asset path-drawing on a
-    /// **specific** `creditor` (overrides global for that pair).
+    /// Post/update a **specific** clearing offer (`counterparty` ≠ 0).
     ///
-    /// Requires a credit line in `asset_id` from `creditor` to sender.
-    /// Prefer [`st_glb_rte`] unless you need per-creditor fees.
+    /// Path: next hop = `counterparty` when `forward_enabled`.
+    /// Takeout: buy claims on that debtor while the row exists.
+    /// Fees: Stripe-style `out = in * (1 - fee_percent) - fee_fixed`.
     #[action]
-    fn st_rte_pol(
-        creditor: AccountNumber,
+    fn st_clr_ofr(
+        counterparty: AccountNumber,
         asset_id: u16,
-        hop_fee_fixed: Quantity,
-        hop_fee_percent: u32,
-        max_accept_rate: u32,
+        fee_fixed: Quantity,
+        fee_percent: u32,
+        max_line_apr: u32,
+        forward_enabled: bool,
         expires_at: TimePointSec,
     ) {
         assert!(
-            creditor != RoutingPolicy::GLOBAL_CREDITOR,
-            "use st_glb_rte for global routing (creditor 0)"
+            counterparty != ClearingOffer::GLOBAL,
+            "use st_glb_clr for global clearing offer (counterparty 0)"
         );
-        RoutingPolicy::upsert(
-            creditor,
+        ClearingOffer::upsert(
             get_sender(),
+            counterparty,
             asset_id,
-            hop_fee_fixed,
-            hop_fee_percent,
-            max_accept_rate,
+            fee_fixed,
+            fee_percent,
+            max_line_apr,
+            forward_enabled,
             expires_at,
         );
     }
 
-    /// Sender sets **global** routing for this asset (`creditor = 0` row).
-    /// Applies to any next-hop that has extended them a credit line.
-    ///
-    /// Pricing (Stripe-style): `out = in * (1 - hop_fee_percent) - hop_fee_fixed`.
-    /// Specific [`st_rte_pol`] entries still win when present.
+    /// Post/update a **global** clearing offer (`counterparty = 0`).
     #[action]
-    fn st_glb_rte(
+    fn st_glb_clr(
         asset_id: u16,
-        hop_fee_fixed: Quantity,
-        hop_fee_percent: u32,
-        max_accept_rate: u32,
+        fee_fixed: Quantity,
+        fee_percent: u32,
+        max_line_apr: u32,
+        forward_enabled: bool,
         expires_at: TimePointSec,
     ) {
-        RoutingPolicy::upsert(
-            RoutingPolicy::GLOBAL_CREDITOR,
+        ClearingOffer::upsert(
             get_sender(),
+            ClearingOffer::GLOBAL,
             asset_id,
-            hop_fee_fixed,
-            hop_fee_percent,
-            max_accept_rate,
+            fee_fixed,
+            fee_percent,
+            max_line_apr,
+            forward_enabled,
             expires_at,
         );
     }
 
-    /// Remove a **specific** next-hop routing override (if present).
+    /// Remove a **specific** clearing offer.
     #[action]
-    fn rm_rte_pol(creditor: AccountNumber, asset_id: u16) {
+    fn rm_clr_ofr(counterparty: AccountNumber, asset_id: u16) {
         assert!(
-            creditor != RoutingPolicy::GLOBAL_CREDITOR,
-            "use rm_glb_rte for global routing (creditor 0)"
+            counterparty != ClearingOffer::GLOBAL,
+            "use rm_glb_clr for global clearing offer"
         );
-        RoutingPolicy::remove(creditor, get_sender(), asset_id);
+        ClearingOffer::remove(get_sender(), counterparty, asset_id);
     }
 
-    /// Remove **global** routing for this asset (if present).
+    /// Remove a **global** clearing offer.
     #[action]
-    fn rm_glb_rte(asset_id: u16) {
-        RoutingPolicy::remove(
-            RoutingPolicy::GLOBAL_CREDITOR,
-            get_sender(),
+    fn rm_glb_clr(asset_id: u16) {
+        ClearingOffer::remove(get_sender(), ClearingOffer::GLOBAL, asset_id);
+    }
+
+    /// Seller (sender) sells claims on `debtor` to `buyer` under buyer's clearing
+    /// offer. Buyer becomes creditor of `debtor` for `amount`; seller receives
+    /// a claim on buyer for face after fees. Requires buyer's line residual to
+    /// `debtor` and a live clearing offer (specific or global).
+    #[action]
+    fn sell_claim(
+        buyer: AccountNumber,
+        debtor: AccountNumber,
+        asset_id: u16,
+        amount: Quantity,
+    ) {
+        let seller = get_sender();
+        assert!(seller != buyer, "cannot sell claim to self");
+        assert!(seller != debtor, "cannot sell claim on self as debtor");
+        assert!(buyer != debtor, "buyer cannot be the debtor");
+        assert!(amount.value > 0, "sell_claim amount must be positive");
+
+        let offer = resolve_clearing_take(buyer, debtor, asset_id);
+        crate::tables::assert_policy_live(offer.expires_at);
+
+        let line = CreditLine::get_assert(buyer, debtor, asset_id);
+        Obligation::accrue_pair(buyer, debtor, asset_id);
+        let buyer_exp = Obligation::exposure(buyer, debtor, asset_id).value;
+        assert!(
+            buyer_exp.saturating_add(amount.value) <= line.limit.value,
+            "buyer credit line residual insufficient for claim takeout"
+        );
+
+        let proceeds = offer.apply_fees(amount);
+        Obligation::transfer_claims(seller, buyer, debtor, asset_id, amount.value);
+        // Proceeds: buyer owes seller (0% obligation).
+        Obligation::credit_pair(seller, buyer, asset_id, 0, proceeds);
+        Obligation::net_pair(seller, buyer, asset_id, u64::MAX.into());
+        Obligation::net_pair(buyer, debtor, asset_id, u64::MAX.into());
+
+        emit_pair_activity(
+            seller,
+            buyer,
+            asset_id,
+            "sell_claim",
+            amount,
+            proceeds,
             asset_id,
         );
     }
@@ -1369,8 +1504,8 @@ pub mod service {
     /// 1. **First hop** — sender draws `amount` on Gary in **AUD** (line only).
     /// 2. **Currency change** — rebook previous edge (sender owes Gary AUD) via
     ///    sender's [`CurrencyPolicy`] AUD→USD.
-    /// 3. **Later hops** — intermediate's same-asset [`RoutingPolicy`] toward
-    ///    next (fixed + percent fee, max accept rate); draw on next line.
+    /// 3. **Later hops** — intermediate's [`ClearingOffer`] with
+    ///    `forward_enabled` (fee + max line APR); draw on next line.
     /// 4. **`min_return`** — final hop principal (in **last** asset) ≥ this.
     ///
     /// Atomic: all legs succeed or none stick.
@@ -1410,9 +1545,9 @@ pub mod service {
                 forward = cpol.convert(prev_edge_creditor, forward, Quantity::new(0));
             }
 
-            // Same-asset forward hop: specific routing, else global (creditor 0).
-            let rpol = resolve_routing(next_creditor, path_debtor, asset_id);
-            forward = rpol.path_draw(next_creditor, forward);
+            // Same-asset forward hop: specific clearing offer, else global.
+            let offer = resolve_clearing_forward(next_creditor, path_debtor, asset_id);
+            forward = offer.path_draw(next_creditor, forward);
             prev_edge_debtor = path_debtor;
             prev_edge_creditor = next_creditor;
             path_debtor = next_creditor;

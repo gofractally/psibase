@@ -4,7 +4,7 @@ mod service {
     use async_graphql::*;
     use banx::tables::{
         Asset, AssetTable, CreditLine, CreditLineTable, CurrencyPolicy, CurrencyPolicyTab,
-        Obligation, ObligationTable, RoutingPolicy, RoutingPolicyTab, PPM_SCALE, RATE_SCALE,
+        ClearingOffer, ClearingOfferTab, Obligation, ObligationTable, PPM_SCALE, RATE_SCALE,
     };
     use psibase::*;
     use serde::Deserialize;
@@ -98,32 +98,34 @@ mod service {
     }
 
     #[derive(SimpleObject, Clone)]
-    struct RoutingPolicyView {
-        /// Empty string when global (`creditor == 0`).
-        creditor: String,
-        debtor: String,
+    struct ClearingOfferView {
+        poster: String,
+        /// Empty string when global (`counterparty == 0`).
+        counterparty: String,
         assetId: u16,
-        hopFeeFixed: String,
-        hopFeePercentPpm: u32,
-        maxAcceptRatePpm: u32,
+        feeFixed: String,
+        feePercentPpm: u32,
+        maxLineAprPpm: u32,
+        forwardEnabled: bool,
         expiresAt: i64,
         isGlobal: bool,
     }
 
-    impl From<RoutingPolicy> for RoutingPolicyView {
-        fn from(p: RoutingPolicy) -> Self {
+    impl From<ClearingOffer> for ClearingOfferView {
+        fn from(p: ClearingOffer) -> Self {
             let is_global = p.is_global();
             Self {
-                creditor: if is_global {
+                poster: acct(p.poster),
+                counterparty: if is_global {
                     String::new()
                 } else {
-                    acct(p.creditor)
+                    acct(p.counterparty)
                 },
-                debtor: acct(p.debtor),
                 assetId: p.asset_id,
-                hopFeeFixed: qty(p.hop_fee_fixed),
-                hopFeePercentPpm: p.hop_fee_percent,
-                maxAcceptRatePpm: p.max_accept_rate,
+                feeFixed: qty(p.fee_fixed),
+                feePercentPpm: p.fee_percent,
+                maxLineAprPpm: p.max_line_apr,
+                forwardEnabled: p.forward_enabled,
                 expiresAt: time_sec(p.expires_at),
                 isGlobal: is_global,
             }
@@ -167,7 +169,7 @@ mod service {
         /// Accounts discovered while expanding from `from` (includes `from` / `to`).
         accounts: Vec<String>,
         creditLines: Vec<CreditLineView>,
-        routingPolicies: Vec<RoutingPolicyView>,
+        clearingOffers: Vec<ClearingOfferView>,
         currencyPolicies: Vec<CurrencyPolicyView>,
     }
 
@@ -265,14 +267,13 @@ mod service {
             qty(Obligation::exposure(creditor, debtor, assetId))
         }
 
-        /// Routing policies owned by `debtor`. Includes global rows (`isGlobal`)
-        /// and per-creditor overrides.
-        async fn routingPolicies(&self, debtor: AccountNumber) -> Vec<RoutingPolicyView> {
-            RoutingPolicyTab::with_service(banx::SERVICE)
+        /// Clearing offers posted by `poster` (global + specific counterparties).
+        async fn clearingOffers(&self, poster: AccountNumber) -> Vec<ClearingOfferView> {
+            ClearingOfferTab::with_service(banx::SERVICE)
                 .get_index_pk()
                 .iter()
-                .filter(|p| p.debtor == debtor)
-                .map(RoutingPolicyView::from)
+                .filter(|p| p.poster == poster)
+                .map(ClearingOfferView::from)
                 .collect()
         }
 
@@ -339,12 +340,12 @@ mod service {
                 .map(CreditLineView::from_line)
                 .collect();
 
-            let routing_policies: Vec<RoutingPolicyView> =
-                RoutingPolicyTab::with_service(banx::SERVICE)
+            let clearing_offers: Vec<ClearingOfferView> =
+                ClearingOfferTab::with_service(banx::SERVICE)
                     .get_index_pk()
                     .iter()
-                    .filter(|p| debtors.contains(&acct(p.debtor)))
-                    .map(RoutingPolicyView::from)
+                    .filter(|p| debtors.contains(&acct(p.poster)))
+                    .map(ClearingOfferView::from)
                     .collect();
 
             let currency_policies: Vec<CurrencyPolicyView> =
@@ -360,7 +361,7 @@ mod service {
             PathGraphView {
                 accounts,
                 creditLines: credit_lines,
-                routingPolicies: routing_policies,
+                clearingOffers: clearing_offers,
                 currencyPolicies: currency_policies,
             }
         }
