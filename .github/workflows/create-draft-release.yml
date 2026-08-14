@@ -42,11 +42,6 @@ jobs:
                   >>release-notes.md
           fi
           printf '%s\n' "$CHANGELOG" >>release-notes.md
-          if [[ $TAG == *-* ]]; then
-              echo prerelease=true >>"$GITHUB_OUTPUT"
-          else
-              echo prerelease=false >>"$GITHUB_OUTPUT"
-          fi
 
       - name: Create new Github Release
         id: create_release
@@ -58,7 +53,7 @@ jobs:
             psidk-book/psidk-book.tar.gz
           fail_on_unmatched_files: true
           draft: true
-          prerelease: ${{ steps.notes.outputs.prerelease }}
+          prerelease: ${{ contains(inputs.tag, '-') }}
           name: ${{ inputs.tag }}
           tag_name: ${{ inputs.tag }}
           body_path: release-notes.md
