@@ -40,6 +40,26 @@ fn load_from_psi(psi: &str, inner: &str, service: &str, plugin: &str) -> WasmPlu
 }
 
 #[test]
+fn tracer_can_still_encode_host_db() {
+    if !components_dir().join("host_db.wasm").exists() {
+        return;
+    }
+    let wasm = std::fs::read(components_dir().join("host_db.wasm")).unwrap();
+    // Encoding works; constructor result is resource-new'd so the inner
+    // own<bucket> is the export-table rep.
+    match plugin_composer::make_tracer(&wasm, "host") {
+        Ok(t) => {
+            let imports = remaining_imports(&t).unwrap();
+            assert!(
+                imports.iter().any(|i| i.starts_with("supervisor:callstack")),
+                "db tracer should import callstack, got {imports:?}"
+            );
+        }
+        Err(e) => panic!("host:db tracer encode failed: {e:#}"),
+    }
+}
+
+#[test]
 fn compose_real_host_with_tracers() {
     if !components_dir().join("host_common.wasm").exists() {
         eprintln!("skip: no build/components");
@@ -55,10 +75,39 @@ fn compose_real_host_with_tracers() {
     ];
     match compose_host(&plugins, true) {
         Ok(r) => {
+            // TEMP: dump the composite for the JS-side repro of the
+            // prompt.html second-get-active-prompt zeroed-bucket bug.
+            if let Ok(path) = std::env::var("DUMP_HOST_COMPOSITE") {
+                std::fs::write(&path, &r.wasm).unwrap();
+                eprintln!("dumped host composite to {path}");
+            }
+            let imports = remaining_imports(&r.wasm).unwrap();
             println!(
-                "host compose ok, compose_set={:?}, wasm={} bytes",
+                "host compose ok, compose_set={:?}, wasm={} bytes, imports={:?}",
                 r.compose_set.iter().map(|id| id.key()).collect::<Vec<_>>(),
-                r.wasm.len()
+                r.wasm.len(),
+                imports
+                    .iter()
+                    .filter(|i| i.starts_with("host:") || i.starts_with("supervisor:"))
+                    .collect::<Vec<_>>()
+            );
+            assert!(
+                r.compose_set.iter().any(|id| id.plugin == "common"),
+                "common should be in the host blob, got {:?}",
+                r.compose_set.iter().map(|id| id.key()).collect::<Vec<_>>()
+            );
+            assert!(
+                r.compose_set.iter().any(|id| id.plugin == "db"),
+                "db should be in the host blob, got {:?}",
+                r.compose_set.iter().map(|id| id.key()).collect::<Vec<_>>()
+            );
+            assert!(
+                !imports.iter().any(|i| i.starts_with("host:common/")),
+                "prompt→common should be plugged, got {imports:?}"
+            );
+            assert!(
+                !imports.iter().any(|i| i.starts_with("host:db/")),
+                "prompt→db should be plugged, got {imports:?}"
             );
         }
         Err(e) => panic!("host compose failed: {e:#}"),
@@ -82,19 +131,27 @@ fn compose_real_host_without_tracers() {
 }
 
 #[test]
-fn tracer_host_db() {
+fn compose_host_plugs_db_when_present() {
     if !components_dir().join("host_db.wasm").exists() {
         return;
     }
-    let wasm = std::fs::read(components_dir().join("host_db.wasm")).unwrap();
-    match plugin_composer::compose_host(
-        &[WasmPlugin {
-            id: PluginId::new("host", "db"),
-            wasm,
-        }],
-        true,
-    ) {
-        Ok(_) => println!("single-plugin db with tracers ok (entry has no tracer)"),
+    let plugins = vec![
+        load("host", "db", "host_db.wasm"),
+        load("host", "prompt", "host_prompt.wasm"),
+    ];
+    match compose_host(&plugins, true) {
+        Ok(r) => {
+            assert!(
+                r.compose_set.iter().any(|id| id.plugin == "db"),
+                "db should be in the host blob, got {:?}",
+                r.compose_set.iter().map(|id| id.key()).collect::<Vec<_>>()
+            );
+            let imports = remaining_imports(&r.wasm).unwrap();
+            assert!(
+                !imports.iter().any(|i| i.starts_with("host:db/")),
+                "prompt→db should be plugged, got {imports:?}"
+            );
+        }
         Err(e) => panic!("{e:#}"),
     }
 }
@@ -183,9 +240,13 @@ fn compose_branding_from_psi_packages() {
     assert!(set.contains(&"vserver:plugin".to_string()), "{set:?}");
     assert!(set.contains(&"tokens:plugin".to_string()), "{set:?}");
     assert!(set.contains(&"perms:plugin".to_string()), "{set:?}");
+    assert!(
+        set.contains(&"accounts:query".to_string()),
+        "accounts:query should be composed: {set:?}"
+    );
 
-    let result = compose(&PluginId::new("branding", "plugin"), &plugins, false)
-        .unwrap_or_else(|e| panic!("branding compose failed: {e:#}"));
+    let result = compose(&PluginId::new("branding", "plugin"), &plugins, true)
+        .unwrap_or_else(|e| panic!("branding compose with tracers failed: {e:#}"));
     println!(
         "branding compose ok set={:?} bytes={}",
         result.compose_set.iter().map(|id| id.key()).collect::<Vec<_>>(),
@@ -203,5 +264,9 @@ fn compose_branding_from_psi_packages() {
     assert!(
         !imports.iter().any(|i| i == "sites:plugin/api"),
         "forward branding→sites api should be plugged, got {imports:?}"
+    );
+    assert!(
+        !imports.iter().any(|i| i.starts_with("accounts:query/")),
+        "accounts:query should be plugged, got {imports:?}"
     );
 }

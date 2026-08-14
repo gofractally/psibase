@@ -5,7 +5,7 @@ use wac_graph::types::Package;
 use wac_graph::CompositionGraph;
 
 use crate::ids::{
-    is_host_compose_plugin, is_unplugged_namespace, plugin_id_from_extern, Partition, PluginId,
+    is_host_compose_plugin, is_unplugged, plugin_id_from_extern, Partition, PluginId,
     WasmPlugin,
 };
 
@@ -101,7 +101,7 @@ pub fn partition(entry: &PluginId, plugins: &[WasmPlugin]) -> Result<Partition> 
         if !seen.insert(id.clone()) {
             continue;
         }
-        if is_unplugged_namespace(&id.service) {
+        if is_unplugged(&id) {
             continue;
         }
         let Some(meta) = metas.get(&id) else {
@@ -112,7 +112,7 @@ pub fn partition(entry: &PluginId, plugins: &[WasmPlugin]) -> Result<Partition> 
             let Some(dep) = resolve_wit_dep(import, &by_wit) else {
                 continue;
             };
-            if is_unplugged_namespace(&dep.service) {
+            if is_unplugged(&dep) {
                 continue;
             }
             queue.push_back(dep);
@@ -132,9 +132,9 @@ pub fn partition(entry: &PluginId, plugins: &[WasmPlugin]) -> Result<Partition> 
     })
 }
 
-/// Host subset that 1g showed is composable: `common`, `db`, `prompt`.
-/// `types` / `auth` / `crypto` stay dynamic. Unlike [`partition`], host
-/// plugins are not treated as unplugged — they are the compose set.
+/// Host subset: `common`, `db`, `prompt`. `types` / `auth` / `crypto` stay
+/// dynamic. Unlike [`partition`], these host plugins are not treated as
+/// unplugged — they are the compose set.
 pub fn partition_host(plugins: &[WasmPlugin]) -> Result<Partition> {
     let host: Vec<_> = plugins
         .iter()
@@ -265,7 +265,6 @@ pub fn dag_order(
             visit_back_edges(id, &deps, &mut color, &mut back);
         }
     }
-
     let mut incoming: HashMap<PluginId, usize> =
         compose_set.iter().cloned().map(|id| (id, 0)).collect();
     let mut outgoing: HashMap<PluginId, Vec<PluginId>> =

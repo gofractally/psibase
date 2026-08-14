@@ -4,9 +4,10 @@ mod partition;
 mod tracer;
 
 pub use compose::{compose, compose_host, remaining_exports, remaining_imports, ComposeResult};
+pub use tracer::make_tracer;
 pub use ids::{
-    is_hook_provider, is_unplugged_namespace, parse_extern_name, Partition, PluginId, WasmPlugin,
-    HOOK_PROVIDERS, HOST_COMPOSE_PLUGINS,
+    is_hook_provider, is_unplugged, is_unplugged_namespace, parse_extern_name,
+    Partition, PluginId, WasmPlugin, HOOK_PROVIDERS, HOST_COMPOSE_PLUGINS,
 };
 pub use partition::{
     dag_order, inspect_plugin, inspect_wasm, partition, partition_host, topo_sort,
@@ -24,7 +25,7 @@ impl bindings::Guest for Component {
     fn compose(
         entry: bindings::PluginId,
         plugins: Vec<bindings::WasmPlugin>,
-        wrap_inner_tracers: bool,
+        wrap_tracers: bool,
     ) -> Result<bindings::ComposeResult, String> {
         let entry = PluginId::new(entry.service, entry.plugin);
         let plugins = plugins
@@ -34,14 +35,14 @@ impl bindings::Guest for Component {
                 wasm: p.wasm,
             })
             .collect::<Vec<_>>();
-        compose(&entry, &plugins, wrap_inner_tracers)
+        compose(&entry, &plugins, wrap_tracers)
             .map(into_wit_result)
             .map_err(|e| format!("{e:#}"))
     }
 
     fn compose_host(
         plugins: Vec<bindings::WasmPlugin>,
-        wrap_inner_tracers: bool,
+        wrap_tracers: bool,
     ) -> Result<bindings::ComposeResult, String> {
         let plugins = plugins
             .into_iter()
@@ -50,7 +51,7 @@ impl bindings::Guest for Component {
                 wasm: p.wasm,
             })
             .collect::<Vec<_>>();
-        compose_host(&plugins, wrap_inner_tracers)
+        compose_host(&plugins, wrap_tracers)
             .map(into_wit_result)
             .map_err(|e| format!("{e:#}"))
     }

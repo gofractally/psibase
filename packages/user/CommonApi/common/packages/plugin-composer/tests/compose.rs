@@ -108,7 +108,10 @@ world impl {
     let part = partition(&permissions.id.clone(), &[query, permissions]).unwrap();
     let keys: Vec<_> = part.compose_set.iter().map(|id| id.key()).collect();
     assert!(keys.contains(&"permissions:plugin".to_string()));
-    assert!(keys.contains(&"accounts:query".to_string()));
+    assert!(
+        keys.contains(&"accounts:query".to_string()),
+        "accounts:query should be composed: {keys:?}"
+    );
     assert!(!keys.iter().any(|k| k.starts_with("host:")));
 }
 
@@ -279,12 +282,15 @@ world impl { export api; }
     let part = partition(&transact.id.clone(), &[transact, query, auth]).unwrap();
     let keys: Vec<_> = part.compose_set.iter().map(|id| id.key()).collect();
     assert!(keys.contains(&"transact:plugin".to_string()));
-    assert!(keys.contains(&"accounts:query".to_string()));
+    assert!(
+        keys.contains(&"accounts:query".to_string()),
+        "accounts:query should be composed: {keys:?}"
+    );
     assert!(!keys.contains(&"auth-sig:plugin".to_string()));
 }
 
 #[test]
-fn plug_permissions_into_query_closes_query_import() {
+fn plug_permissions_closes_query_import() {
     let query = plugin(
         "accounts",
         "query",
@@ -315,14 +321,14 @@ world impl {
     let imports = remaining_imports(&result.wasm).unwrap();
     assert!(
         !has_import(&imports, "accounts:query/api"),
-        "accounts:query/api should be closed, got {imports:?}"
+        "accounts:query should be plugged, got {imports:?}"
     );
     assert!(
         has_import(&imports, "host:common"),
         "host import should remain, got {imports:?}"
     );
     assert!(result.compose_set.iter().any(|id| id.service == "permissions"));
-    assert!(result.compose_set.iter().any(|id| id.service == "accounts"));
+    assert!(result.compose_set.iter().any(|id| id.plugin == "query"));
 }
 
 #[test]
@@ -384,7 +390,7 @@ world impl {
     let imports = remaining_imports(&result.wasm).unwrap();
     assert!(
         !has_import(&imports, "accounts:query/api"),
-        "query should be closed: {imports:?}"
+        "accounts:query should be plugged: {imports:?}"
     );
     assert!(
         !has_import(&imports, "permissions:plugin/api"),
@@ -439,6 +445,25 @@ world impl {
 }
 
 #[test]
+fn tracers_wrap_the_entry_plugin() {
+    let entry = plugin(
+        "branding",
+        "plugin",
+        r#"
+package branding:plugin;
+interface queries { get-network-name: func() -> string; }
+world impl { export queries; }
+"#,
+    );
+    let result = compose(&entry.id.clone(), &[entry], true).unwrap();
+    let imports = remaining_imports(&result.wasm).unwrap();
+    assert!(
+        has_import(&imports, "supervisor:callstack"),
+        "entry plugin must be tracer-wrapped, got {imports:?}"
+    );
+}
+
+#[test]
 fn tracers_add_callstack_import() {
     let query = plugin(
         "accounts",
@@ -470,7 +495,7 @@ world impl {
     );
     assert!(
         !has_import(&imports, "accounts:query/api"),
-        "query should still be closed: {imports:?}"
+        "accounts:query should be plugged: {imports:?}"
     );
 }
 
@@ -530,7 +555,7 @@ interface api {
 }
 
 #[test]
-fn tracers_skip_plugins_that_export_resources() {
+fn tracers_wrap_plugins_that_export_resources() {
     let inner = plugin_with_deps(
         "kv",
         "plugin",
@@ -573,7 +598,11 @@ interface store {
     let imports = remaining_imports(&result.wasm).unwrap();
     assert!(
         !has_import(&imports, "kv:plugin/store"),
-        "resource plugin should still be closed without a tracer: {imports:?}"
+        "resource plugin should still be closed: {imports:?}"
+    );
+    assert!(
+        has_import(&imports, "supervisor:callstack"),
+        "resource plugin should be tracer-wrapped: {imports:?}"
     );
 }
 
@@ -630,18 +659,24 @@ world impl { export api; }
     );
     let result = plugin_composer::compose_host(&[common, db, prompt, types], false).unwrap();
     let keys: Vec<_> = result.compose_set.iter().map(|id| id.plugin.clone()).collect();
-    assert!(keys.contains(&"common".to_string()));
-    assert!(keys.contains(&"db".to_string()));
+    assert!(
+        keys.contains(&"common".to_string()),
+        "common should be in the host blob: {keys:?}"
+    );
+    assert!(
+        keys.contains(&"db".to_string()),
+        "db should be in the host blob: {keys:?}"
+    );
     assert!(keys.contains(&"prompt".to_string()));
     assert!(!keys.contains(&"types".to_string()));
     let imports = remaining_imports(&result.wasm).unwrap();
     assert!(
         !has_import(&imports, "host:common/client"),
-        "common should be closed: {imports:?}"
+        "prompt → common should be plugged: {imports:?}"
     );
     assert!(
         !has_import(&imports, "host:db/store"),
-        "db should be closed: {imports:?}"
+        "prompt → db should be plugged: {imports:?}"
     );
 }
 

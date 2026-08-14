@@ -49,6 +49,8 @@ pub const HOOK_PROVIDERS: &[&str] = &[
     "invite",
 ];
 
+// Supervisor's JCO instantiate patch stacks borrow / instanceFlags so
+// get-sender and bucket.set can re-enter this blob.
 pub const HOST_COMPOSE_PLUGINS: &[&str] = &["common", "db", "prompt"];
 
 pub fn is_unplugged_namespace(namespace: &str) -> bool {
@@ -57,6 +59,10 @@ pub fn is_unplugged_namespace(namespace: &str) -> bool {
 
 pub fn is_hook_provider(service: &str) -> bool {
     HOOK_PROVIDERS.contains(&service)
+}
+
+pub fn is_unplugged(id: &PluginId) -> bool {
+    is_unplugged_namespace(&id.service)
 }
 
 pub fn is_host_compose_plugin(id: &PluginId) -> bool {

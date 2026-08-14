@@ -25,11 +25,11 @@ world composer {
     export compose: func(
         entry: plugin-id,
         plugins: list<wasm-plugin>,
-        wrap-inner-tracers: bool,
+        wrap-tracers: bool,
     ) -> result<compose-result, string>;
 
     export compose-host: func(
         plugins: list<wasm-plugin>,
-        wrap-inner-tracers: bool,
+        wrap-tracers: bool,
     ) -> result<compose-result, string>;
 }

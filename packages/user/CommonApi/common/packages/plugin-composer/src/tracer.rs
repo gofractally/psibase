@@ -1,12 +1,14 @@
 use anyhow::{Context, Result, bail};
 use indexmap::IndexMap;
+use std::collections::HashMap;
 use wit_component::{
     ComponentEncoder, StringEncoding, decode, embed_component_metadata,
 };
 use wit_parser::abi::WasmType;
 use wit_parser::{
-    Function, InterfaceId, LiftLowerAbi, ManglingAndAbi, Resolve, ResourceIntrinsic, Stability,
-    TypeDefKind, WasmExport, WasmExportKind, WasmImport, World, WorldId, WorldItem, WorldKey,
+    Function, FunctionKind, Handle, InterfaceId, LiftLowerAbi, ManglingAndAbi, Resolve,
+    ResourceIntrinsic, Stability, Type, TypeDefKind, TypeId, WasmExport, WasmExportKind,
+    WasmImport, World, WorldId, WorldItem, WorldKey,
 };
 
 const CALLSTACK_WIT: &str = r#"
@@ -35,9 +37,6 @@ pub fn make_tracer(plugin_wasm: &[u8], service: &str) -> Result<Vec<u8>> {
 
     if !world_has_exported_funcs(&resolve, world_id) {
         bail!("plugin exports no functions; cannot wrap with a tracer");
-    }
-    if world_exports_resources(&resolve, world_id) {
-        bail!("plugin exports WIT resources; tracer wrapping is not supported");
     }
 
     let callstack_pkg = resolve
@@ -105,7 +104,7 @@ pub(crate) fn can_wrap_with_tracer(plugin_wasm: &[u8]) -> bool {
         wit_component::DecodedWasm::Component(resolve, world) => (resolve, world),
         wit_component::DecodedWasm::WitPackage(_, _) => return false,
     };
-    world_has_exported_funcs(&resolve, world_id) && !world_exports_resources(&resolve, world_id)
+    world_has_exported_funcs(&resolve, world_id)
 }
 
 fn world_has_exported_funcs(resolve: &Resolve, world_id: WorldId) -> bool {
@@ -117,18 +116,9 @@ fn world_has_exported_funcs(resolve: &Resolve, world_id: WorldId) -> bool {
     })
 }
 
-fn world_exports_resources(resolve: &Resolve, world_id: WorldId) -> bool {
-    let world = &resolve.worlds[world_id];
-    world.exports.iter().any(|(_, item)| match item {
-        WorldItem::Interface { id, .. } => resolve.interfaces[*id]
-            .types
-            .values()
-            .any(|ty| matches!(resolve.types[*ty].kind, TypeDefKind::Resource)),
-        WorldItem::Type { id, .. } => {
-            matches!(resolve.types[*id].kind, TypeDefKind::Resource)
-        }
-        WorldItem::Function(_) => false,
-    })
+struct ResourceFns {
+    imported_drop: String,
+    exported_new: String,
 }
 
 fn insert_type_deps(
@@ -155,6 +145,7 @@ fn trampoline_module(resolve: &Resolve, world_id: WorldId, service: &str) -> Res
 
     let mut import_funcs: IndexMap<(String, String), String> = IndexMap::new();
     let mut next_imp = 0usize;
+    let mut resources: HashMap<TypeId, ResourceFns> = HashMap::new();
 
     for (name, import) in world.imports.iter() {
         match import {
@@ -179,19 +170,41 @@ fn trampoline_module(resolve: &Resolve, world_id: WorldId, service: &str) -> Res
                         &mut next_imp,
                     );
                 }
+                let also_exported = world.exports.contains_key(name);
                 for (_, ty) in resolve.interfaces[*id].types.iter() {
-                    push_imported_type_intrinsics(&mut wat, resolve, Some(name), *ty);
+                    push_imported_type_intrinsics(
+                        &mut wat,
+                        resolve,
+                        Some(name),
+                        *ty,
+                        also_exported,
+                        &mut next_imp,
+                        &mut resources,
+                    );
                 }
             }
             WorldItem::Type { id, .. } => {
-                push_imported_type_intrinsics(&mut wat, resolve, None, *id);
+                push_imported_type_intrinsics(
+                    &mut wat,
+                    resolve,
+                    None,
+                    *id,
+                    false,
+                    &mut next_imp,
+                    &mut resources,
+                );
             }
         }
     }
 
     let service_bytes = service.as_bytes();
-    let data_off = 16u32;
-    let heap_start = align_up(data_off + service_bytes.len() as u32, 16).max(256);
+    // Low memory: watermark stack for re-entrant bump-alloc frames, then the
+    // service name. Heap starts after both. Nested JS hops (post-graphql →
+    // accounts → host get-sender) share one tracer instance; post_return must
+    // restore the caller's heap watermark, not reset to a constant.
+    let wm_stack_bytes = 1024u32; // 256 nested frames
+    let data_off = wm_stack_bytes;
+    let heap_start = align_up(data_off + service_bytes.len() as u32, 16);
 
     let push_key = callstack_func_key(resolve, world, "push");
     let pop_key = callstack_func_key(resolve, world, "pop");
@@ -211,6 +224,7 @@ fn trampoline_module(resolve: &Resolve, world_id: WorldId, service: &str) -> Res
                     None,
                     func,
                     &import_funcs,
+                    &resources,
                     push_local,
                     pop_local,
                     data_off,
@@ -225,11 +239,15 @@ fn trampoline_module(resolve: &Resolve, world_id: WorldId, service: &str) -> Res
                         Some(name),
                         func,
                         &import_funcs,
+                        &resources,
                         push_local,
                         pop_local,
                         data_off,
                         service_bytes.len() as u32,
                     )?;
+                }
+                for (_, ty) in resolve.interfaces[*id].types.iter() {
+                    push_resource_dtor_export(&mut wat, resolve, name, *ty, &resources)?;
                 }
             }
             WorldItem::Type { .. } => {}
@@ -239,10 +257,12 @@ fn trampoline_module(resolve: &Resolve, world_id: WorldId, service: &str) -> Res
     let memory = resolve.wasm_export_name(MANGLING, WasmExport::Memory);
     wat.push_str(&format!("(memory (export {memory:?}) 1)\n"));
     wat.push_str(&format!("(global $heap (mut i32) (i32.const {heap_start}))\n"));
+    wat.push_str("(global $wm_sp (mut i32) (i32.const 0))\n");
     wat.push_str(&format!(
         "(data (i32.const {data_off}) \"{}\")\n",
         escape_wat_data(service)
     ));
+    wat.push_str(&heap_frame_wat(wm_stack_bytes));
 
     let realloc = resolve.wasm_export_name(MANGLING, WasmExport::Realloc);
     wat.push_str(&realloc_wat(&realloc));
@@ -295,13 +315,16 @@ fn push_imported_type_intrinsics(
     wat: &mut String,
     resolve: &Resolve,
     interface: Option<&WorldKey>,
-    resource: wit_parser::TypeId,
+    resource: TypeId,
+    also_exported: bool,
+    next_imp: &mut usize,
+    resources: &mut HashMap<TypeId, ResourceFns>,
 ) {
     let ty = &resolve.types[resource];
     if !matches!(ty.kind, TypeDefKind::Resource) {
         return;
     }
-    let (module, name) = resolve.wasm_import_name(
+    let drop = resolve.wasm_import_name(
         MANGLING.sync(),
         WasmImport::ResourceIntrinsic {
             interface,
@@ -309,9 +332,146 @@ fn push_imported_type_intrinsics(
             intrinsic: ResourceIntrinsic::ImportedDrop,
         },
     );
+    let imported_drop = format!("imp{next_imp}");
+    *next_imp += 1;
     wat.push_str(&format!(
-        "(import {module:?} {name:?} (func (param i32)))\n"
+        "(import {:?} {:?} (func ${imported_drop} (param i32)))\n",
+        drop.0, drop.1
     ));
+    if !also_exported {
+        return;
+    }
+    let mut exported_new = String::new();
+    for (intrinsic, body) in [
+        (ResourceIntrinsic::ExportedDrop, "(param i32)"),
+        (
+            ResourceIntrinsic::ExportedNew,
+            "(param i32) (result i32)",
+        ),
+        (
+            ResourceIntrinsic::ExportedRep,
+            "(param i32) (result i32)",
+        ),
+    ] {
+        let is_new = matches!(intrinsic, ResourceIntrinsic::ExportedNew);
+        let (module, name) = resolve.wasm_import_name(
+            MANGLING.sync(),
+            WasmImport::ResourceIntrinsic {
+                interface,
+                resource,
+                intrinsic,
+            },
+        );
+        let local = format!("imp{next_imp}");
+        *next_imp += 1;
+        wat.push_str(&format!(
+            "(import {module:?} {name:?} (func ${local} {body}))\n"
+        ));
+        if is_new {
+            exported_new = local;
+        }
+    }
+    resources.insert(
+        resource,
+        ResourceFns {
+            imported_drop,
+            exported_new,
+        },
+    );
+}
+
+fn push_resource_dtor_export(
+    wat: &mut String,
+    resolve: &Resolve,
+    interface: &WorldKey,
+    resource: TypeId,
+    resources: &HashMap<TypeId, ResourceFns>,
+) -> Result<()> {
+    let ty = &resolve.types[resource];
+    if !matches!(ty.kind, TypeDefKind::Resource) {
+        return Ok(());
+    }
+    let name = resolve.wasm_export_name(
+        MANGLING,
+        WasmExport::ResourceDtor {
+            interface,
+            resource,
+        },
+    );
+    // Dtor receives the export-table *rep*, which we stored as the inner
+    // plugin's own<T> handle. Drop that imported handle.
+    if let Some(fns) = resources.get(&resource) {
+        wat.push_str(&format!(
+            "(func (export {name:?}) (param i32) (call ${} (local.get 0)))\n",
+            fns.imported_drop
+        ));
+    } else {
+        wat.push_str(&format!("(func (export {name:?}) (param i32))\n"));
+    }
+    Ok(())
+}
+
+fn as_handle(resolve: &Resolve, ty: Type) -> Option<(TypeId, bool)> {
+    let Type::Id(id) = ty else {
+        return None;
+    };
+    match &resolve.types[id].kind {
+        TypeDefKind::Handle(Handle::Own(r)) => Some((*r, true)),
+        TypeDefKind::Handle(Handle::Borrow(r)) => Some((*r, false)),
+        TypeDefKind::Resource => Some((id, true)),
+        TypeDefKind::Type(inner) => as_handle(resolve, *inner),
+        _ => None,
+    }
+}
+
+fn constructor_new_local(
+    resolve: &Resolve,
+    func: &Function,
+    resources: &HashMap<TypeId, ResourceFns>,
+) -> Result<Option<String>> {
+    if let FunctionKind::Constructor(id) = func.kind {
+        return Ok(resources.get(&id).map(|f| f.exported_new.clone()));
+    }
+    if let Some(ty) = func.result {
+        if let Some((id, true)) = as_handle(resolve, ty) {
+            if resources.contains_key(&id) {
+                bail!(
+                    "tracer cannot wrap {}: result is own<resource> on a non-constructor",
+                    func.name
+                );
+            }
+        }
+    }
+    Ok(None)
+}
+
+fn check_passthrough_params(
+    resolve: &Resolve,
+    func: &Function,
+    resources: &HashMap<TypeId, ResourceFns>,
+) -> Result<()> {
+    for (i, param) in func.params.iter().enumerate() {
+        let Some((id, _)) = as_handle(resolve, param.ty) else {
+            continue;
+        };
+        if !resources.contains_key(&id) {
+            continue;
+        }
+        let method_self = i == 0
+            && matches!(
+                func.kind,
+                FunctionKind::Method(_) | FunctionKind::AsyncMethod(_)
+            );
+        if !method_self {
+            bail!(
+                "tracer cannot wrap {}: resource handle param `{}` is not method-self \
+                 (export methods already receive the rep = inner handle)",
+                func.name,
+                param.name
+            );
+        }
+    }
+    Ok(())
 }
 
 fn push_forwarding_export(
@@ -320,6 +480,7 @@ fn push_forwarding_export(
     interface: Option<&WorldKey>,
     func: &Function,
     import_funcs: &IndexMap<(String, String), String>,
+    resources: &HashMap<TypeId, ResourceFns>,
     push_local: &str,
     pop_local: &str,
     data_off: u32,
@@ -341,6 +502,8 @@ fn push_forwarding_export(
     let imp = import_funcs
         .get(&(iface_name.clone(), func.name.clone()))
         .with_context(|| format!("no import for exported {iface_name}/{}", func.name))?;
+    check_passthrough_params(resolve, func, resources)?;
+    let result_new = constructor_new_local(resolve, func, resources)?;
 
     wat.push_str(&format!("(func (export {name:?})"));
     push_tys(wat, "param", &export_sig.params);
@@ -349,8 +512,9 @@ fn push_forwarding_export(
         wat.push_str(&format!(" (local $r{i} {})", wasm_ty(export_sig.results[i])));
     }
     wat.push_str(" (local $retptr i32)");
+    wat.push_str("\n  (call $heap_push)\n");
     wat.push_str(&format!(
-        "\n  (call ${push_local} (i32.const {data_off}) (i32.const {data_len}))\n"
+        "  (call ${push_local} (i32.const {data_off}) (i32.const {data_len}))\n"
     ));
 
     let retptr_bridge = import_sig.retptr
@@ -362,6 +526,12 @@ fn push_forwarding_export(
         && import_sig.results.len() == export_sig.results.len();
 
     if retptr_bridge {
+        if result_new.is_some() {
+            bail!(
+                "tracer cannot wrap {}: constructor result used a return pointer",
+                func.name
+            );
+        }
         wat.push_str(
             "  (local.set $retptr (call $realloc (i32.const 0) (i32.const 0) (i32.const 4) (i32.const 256)))\n",
         );
@@ -380,6 +550,18 @@ fn push_forwarding_export(
         wat.push_str(")\n");
         for i in (0..export_sig.results.len()).rev() {
             wat.push_str(&format!("  (local.set $r{i})\n"));
+        }
+        if let Some(new) = &result_new {
+            if export_sig.results.len() != 1 {
+                bail!(
+                    "tracer cannot wrap {}: constructor must return one i32 handle",
+                    func.name
+                );
+            }
+            // Inner own<T> handle becomes the export-table rep.
+            wat.push_str(&format!(
+                "  (local.set $r0 (call ${new} (local.get $r0)))\n"
+            ));
         }
         wat.push_str(&format!("  (call ${pop_local})\n"));
         for i in 0..export_sig.results.len() {
@@ -407,8 +589,35 @@ fn push_forwarding_export(
     );
     wat.push_str(&format!("(func (export {post:?})"));
     push_tys(wat, "param", &export_sig.results);
-    wat.push_str(" (global.set $heap (i32.const 256)))\n");
+    // JCO lifts from the retptr before calling post_return; pop the bump
+    // frame only after lift so nested re-entry cannot clobber this frame's
+    // Result buffer by resetting $heap too early.
+    wat.push_str(" (call $heap_pop))\n");
     Ok(())
+}
+
+fn heap_frame_wat(wm_stack_bytes: u32) -> String {
+    format!(
+        r#"
+(func $heap_push
+  (local $s i32)
+  (local.set $s (global.get $wm_sp))
+  (if (i32.ge_u (local.get $s) (i32.const {wm_stack_bytes}))
+    (then (unreachable)))
+  (i32.store (local.get $s) (global.get $heap))
+  (global.set $wm_sp (i32.add (local.get $s) (i32.const 4)))
+)
+(func $heap_pop
+  (local $s i32)
+  (local.set $s (global.get $wm_sp))
+  (if (i32.eqz (local.get $s))
+    (then (unreachable)))
+  (local.set $s (i32.sub (local.get $s) (i32.const 4)))
+  (global.set $wm_sp (local.get $s))
+  (global.set $heap (i32.load (local.get $s)))
+)
+"#
+    )
 }
 
 fn realloc_wat(export_name: &str) -> String {

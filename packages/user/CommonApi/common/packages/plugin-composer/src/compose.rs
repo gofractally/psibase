@@ -18,16 +18,16 @@ pub struct ComposeResult {
 pub fn compose(
     entry: &PluginId,
     plugins: &[WasmPlugin],
-    wrap_inner_tracers: bool,
+    wrap_tracers: bool,
 ) -> Result<ComposeResult> {
     let part = partition(entry, plugins)?;
-    encode_set(entry, &part.compose_set, plugins, wrap_inner_tracers)
+    encode_set(entry, &part.compose_set, plugins, wrap_tracers)
 }
 
-pub fn compose_host(plugins: &[WasmPlugin], wrap_inner_tracers: bool) -> Result<ComposeResult> {
+pub fn compose_host(plugins: &[WasmPlugin], wrap_tracers: bool) -> Result<ComposeResult> {
     let part = partition_host(plugins)?;
     if part.compose_set.is_empty() {
-        bail!("no host plugins to compose (expected common/db/prompt)");
+        bail!("no host plugins to compose (expected prompt)");
     }
     let entry = part
         .compose_set
@@ -37,14 +37,14 @@ pub fn compose_host(plugins: &[WasmPlugin], wrap_inner_tracers: bool) -> Result<
         .or_else(|| part.compose_set.iter().find(|id| id.plugin == "common"))
         .cloned()
         .unwrap();
-    encode_set(&entry, &part.compose_set, plugins, wrap_inner_tracers)
+    encode_set(&entry, &part.compose_set, plugins, wrap_tracers)
 }
 
 fn encode_set(
     entry: &PluginId,
     compose_set: &[PluginId],
     plugins: &[WasmPlugin],
-    wrap_inner_tracers: bool,
+    wrap_tracers: bool,
 ) -> Result<ComposeResult> {
     if compose_set.is_empty() {
         bail!("compose set is empty");
@@ -57,10 +57,10 @@ fn encode_set(
     }
 
     let contains_transact = compose_set.iter().any(|id| id.is_transact());
-    let wasm = if compose_set.len() == 1 && !wrap_inner_tracers {
+    let wasm = if compose_set.len() == 1 && !wrap_tracers {
         by_id[entry].wasm.clone()
     } else {
-        compose_graph(entry, compose_set, plugins, wrap_inner_tracers)?
+        compose_graph(compose_set, plugins, wrap_tracers)?
     };
 
     Ok(ComposeResult {
@@ -71,10 +71,9 @@ fn encode_set(
 }
 
 fn compose_graph(
-    entry: &PluginId,
     compose_set: &[PluginId],
     plugins: &[WasmPlugin],
-    wrap_inner_tracers: bool,
+    wrap_tracers: bool,
 ) -> Result<Vec<u8>> {
     let by_id: HashMap<_, _> = plugins.iter().map(|p| (p.id.clone(), p)).collect();
     let (order, back_edges) = dag_order(compose_set, plugins)?;
@@ -90,7 +89,7 @@ fn compose_graph(
         let inst = graph.instantiate(pkg_id);
         plugin_nodes.insert(id.clone(), (pkg_id, inst));
 
-        let provider = if wrap_inner_tracers && id != entry && can_wrap_with_tracer(wasm) {
+        let provider = if wrap_tracers && can_wrap_with_tracer(wasm) {
             let tracer_bytes = make_tracer(wasm, &id.service)
                 .with_context(|| format!("generate tracer for {id}"))?;
             let tpkg = Package::from_bytes(

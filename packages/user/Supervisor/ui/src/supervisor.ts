@@ -326,7 +326,7 @@ export class Supervisor implements AppInterface {
         },
         entry: QualifiedPluginId | undefined,
         privileged: boolean,
-        wrapInnerTracers: boolean,
+        wrapTracers: boolean,
     ): Promise<void> {
         if (result.composeSet.length === 0) return;
         const p = await parser();
@@ -354,49 +354,40 @@ export class Supervisor implements AppInterface {
             if (!instance) instance = compiled.instantiate();
             return instance;
         };
-        const importNames =
-            (api.importedFuncs?.interfaces as
-                | Array<{ namespace: string; package: string; name: string }>
-                | undefined)?.map(
-                (i) => `${i.namespace}:${i.package}/${i.name}`,
-            ) ?? [];
-        const tracedIds: string[] = [];
         for (const id of result.composeSet) {
             const plugin = this.plugins.getPlugin(id).plugin;
             await plugin.parsed;
-            const inner =
-                !entry ||
-                id.service !== entry.service ||
-                id.plugin !== entry.plugin;
-            // Only skip JS push when a tracer actually wraps this plugin.
-            // Host compose currently skips tracers; marking inner plugins
-            // traced anyway left get-sender with no host frame, so Max-trust
-            // checks (e.g. get-auth-services) saw homepage instead of supervisor.
-            const traced =
-                wrapInnerTracers && inner && !plugin.exportsResources();
-            if (traced) tracedIds.push(`${id.service}:${id.plugin}`);
-            plugin.attachShared(instantiate, true, traced);
+            // Every compose-set plugin is tracer-wrapped. Supervisor skips
+            // the JS push so the tracer is the only frame (no double push).
+            plugin.attachShared(instantiate, true, wrapTracers);
         }
-        const entryKey = entry ? `${entry.service}:${entry.plugin}` : "host";
-        console.info(
-            `[supervisor] ${privileged ? "host" : "app"} composite entry=${entryKey} ` +
-                `set=${result.composeSet.map((id) => `${id.service}:${id.plugin}`).join(",")} ` +
-                `traced=[${tracedIds.join(",")}] ` +
-                `imports=${importNames.filter((n) => n.startsWith("supervisor:") || n.startsWith("host:")).join(",")}`,
-        );
     }
 
     private async composeHostPlugins(): Promise<void> {
-        // Host composition is disabled until inner tracers are reentrant.
-        // host:db/clear-buffers calls host:common/get-sender. get-sender pops
-        // its own frame then looks back 2, which only works if db→common is a
-        // JS hop that pushes a second "host" frame. Composing them (with or
-        // without tracers) either drops that frame or traps on nested
-        // get-sender while post-graphql is already on the common tracer.
-        return;
+        const wasmPlugins = this.plugins.collectWasmPlugins();
+        if (
+            !wasmPlugins.some((p) => p.service === "host" && p.plugin === "common")
+        ) {
+            return;
+        }
+        const key = this.cacheKey("host", wasmPlugins);
+        let result = this.compositeCache.get(key);
+        if (!result) {
+            const c = await composer();
+            result = this.unwrapComposerResult(
+                c.composeHost(wasmPlugins, true),
+            );
+            this.compositeCache.set(key, result);
+        }
+        await this.attachComposite(result, undefined, true, true);
     }
 
     private async composeAppPlugins(entry: QualifiedPluginId): Promise<void> {
+        // host:* is attached by composeHostPlugins. partition() skips the
+        // host namespace, so compose(host:prompt) yields an empty set.
+        if (entry.service === "host") {
+            return;
+        }
         const wasmPlugins = this.plugins.collectWasmPlugins();
         if (wasmPlugins.length === 0) return;
         if (!wasmPlugins.some((p) => p.service === entry.service && p.plugin === entry.plugin)) {
@@ -406,17 +397,12 @@ export class Supervisor implements AppInterface {
         let result = this.compositeCache.get(key);
         if (!result) {
             const c = await composer();
-            // Inner app tracers are not reentrant-safe yet. Without them,
-            // in-composite plugin-to-plugin calls do not push a JS frame.
-            // External calls into the composite (supervisor → transact
-            // start-tx, UI → branding) still push. Remaining imports
-            // (host, hook providers, perms) still JS-hop and still push.
             result = this.unwrapComposerResult(
-                c.compose(entry, wasmPlugins, false),
+                c.compose(entry, wasmPlugins, true),
             );
             this.compositeCache.set(key, result);
         }
-        await this.attachComposite(result, entry, false, false);
+        await this.attachComposite(result, entry, false, true);
     }
 
     getRootDomain(): string {
@@ -426,24 +412,16 @@ export class Supervisor implements AppInterface {
     pushTracerFrame(service: string): void {
         const ctx = this.getCallContext();
         ctx.stack.push(service, `tracer:${service}`);
-        console.info(
-            `[supervisor] tracer push ${service} → [${ctx.stack.export().join(" > ")}]`,
-        );
     }
 
     popTracerFrame(): void {
         const ctx = this.getCallContext();
         ctx.stack.pop();
-        console.info(
-            `[supervisor] tracer pop → [${ctx.stack.export().join(" > ")}]`,
-        );
     }
 
     getServiceStack(): string[] {
         assertTruthy(this.context, "Uninitialized call context");
-        const stack = this.context.stack.export();
-        console.info(`[supervisor] serviceStack → [${stack.join(" > ")}]`);
-        return stack;
+        return this.context.stack.export();
     }
 
     importKey(privateKey: string): string {

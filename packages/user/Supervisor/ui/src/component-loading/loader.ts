@@ -9,6 +9,7 @@ import { kebabToCamel, kebabToPascal } from "../case.js";
 import { HostInterface } from "../host-interface.js";
 import { assert } from "../utils.js";
 import { ComponentAPI, Functions, Interface } from "../wit-extraction.js";
+import { fixJcoResourceTables, makeJcoReenterable } from "./jco-reenter.js";
 
 type PluginImports = Record<string, Record<string, unknown>>;
 
@@ -251,6 +252,8 @@ async function compileWasmComponent(
     }
 
     assert(jsSource !== null, "jco generate produced no JS file");
+    jsSource = fixJcoResourceTables(jsSource);
+    jsSource = makeJcoReenterable(jsSource);
 
     // If a future jco version (or some adversarial input) ever caused it to emit a
     //   static `import`/`export ... from`, the browser would silently fetch it.
