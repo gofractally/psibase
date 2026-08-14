@@ -38,7 +38,7 @@ Documentation is hosted on the [docs app](https://docs.psibase.io/) of our demo 
 
 ## Build from source 🛠️
 
-We only officially support developing natively on Ubuntu 22.04 and Ubuntu 24.04, although any Linux distribution may work. If you use a distribution other than Ubuntu 22.04 or 24.04, ensure the versions of the dependencies you install are at least as high as they are in Ubuntu.
+We only officially support developing natively on Ubuntu 22.04, Ubuntu 24.04, and Ubuntu 26.04, although any Linux distribution may work. If you use a distribution other than Ubuntu 22.04, 24.04, or 26.04, ensure the versions of the dependencies you install are at least as high as they are in Ubuntu.
 
 Some of our developers have very strong success with Ubuntu on WSL2, and also with Docker.
 
@@ -72,7 +72,7 @@ Other notes:
 - Set the `WASI_SDK_PREFIX` environment variable before building to the root of your llvm installation (e.g. `/usr/lib/llvm-16`). Alternatively, set this variable during the build using the CMake flag `-DWASI_SDK_PREFIX=....`.
 - Add the following targets to rust: `wasm32-wasip1`, `wasm32-unknown-unknown`
 
-> 🔍 You can reference either the [Ubuntu 22.04 dockerfile](https://github.com/gofractally/image-builders/blob/main/docker/ubuntu-2204-builder.Dockerfile) or the [Ubuntu 24.04 dockerfile](https://github.com/gofractally/image-builders/blob/main/docker/ubuntu-2404-builder.Dockerfile) for an example on how an environment could be set up.
+> 🔍 You can reference the [Ubuntu 22.04 dockerfile](https://github.com/gofractally/image-builders/blob/main/docker/ubuntu-2204-builder.Dockerfile), [Ubuntu 24.04 dockerfile](https://github.com/gofractally/image-builders/blob/main/docker/ubuntu-2404-builder.Dockerfile), or [Ubuntu 26.04 dockerfile](https://github.com/gofractally/image-builders/blob/main/docker/ubuntu-2604-builder.Dockerfile) for an example on how an environment could be set up.
 
 ### Build
 
@@ -106,7 +106,7 @@ The following are some of the common/useful build flags you can use to configure
 
 To run psinode, you can either build from source as described above, or you can install prebuilt binaries through one of the following two methods:
 
-1. Installing a binary release, the latest of which can be found on our [Releases](https://github.com/gofractally/psibase/releases) page. We provide binary packages for both Ubuntu 22.04 and Ubuntu 24.04.
+1. Installing a binary release, the latest of which can be found on our [Releases](https://github.com/gofractally/psibase/releases) page. We provide binary packages for Ubuntu 22.04, Ubuntu 24.04, and Ubuntu 26.04.
 2. Installing our psinode [Docker Image](https://github.com/orgs/gofractally/packages/container/package/psinode).
 
 To execute psinode from the docker image, you can use the following docker command (make sure to specify the `VERSION` you want to run):
