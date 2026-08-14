@@ -126,7 +126,12 @@ class Chain {
 
     public async setPeerUser(account: string, accept: boolean): Promise<void> {
         const url = siblingUrl(null, "x-peers", "/users");
-        await postJson(url, { account, accept });
+        await postJson(url, { account, accept }, {
+            headers: {
+                "Content-Type": "application/json",
+                ...(await adminBearerAuthHeaders()),
+            },
+        });
     }
 
     public async getStatus(): Promise<string[]> {
