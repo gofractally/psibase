@@ -7,7 +7,7 @@ on:
   pull_request:
     types: [closed]
     branches:
-      - release/v0
+      - release/v*
 
 permissions:
   contents: write
@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   open-release-pr:
-    name: Open release/v0 PR
+    name: Open release PR
     if: github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000'
     runs-on: ubuntu-latest
     steps:
@@ -40,34 +40,52 @@ jobs:
             exit "$code"
           fi
 
-      - name: Create release/v0 at pre-bump main
+      - name: Resolve release branch
+        id: release
         if: steps.version.outputs.changed == 'true'
         run: |
-          if ! git ls-remote --exit-code origin refs/heads/release/v0 >/dev/null; then
-            git push origin "${{ github.event.before }}:refs/heads/release/v0"
+          ver=$(.github/scripts/psibase-version.sh at "${{ github.sha }}")
+          branch=$(.github/scripts/psibase-version.sh release-branch "$ver")
+          echo "branch=$branch" >>"$GITHUB_OUTPUT"
+
+      - name: Create release branch at pre-bump main
+        if: steps.version.outputs.changed == 'true'
+        run: |
+          branch="${{ steps.release.outputs.branch }}"
+          if ! git ls-remote --exit-code origin "refs/heads/$branch" >/dev/null; then
+            git push origin "${{ github.event.before }}:refs/heads/$branch"
           fi
 
-      - name: Open PR into release/v0
+      - name: Open PR into release branch
         if: steps.version.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          open_pr=$(gh pr list --base release/v0 --head main --state open --json number --jq '.[].number')
+          branch="${{ steps.release.outputs.branch }}"
+          open_pr=$(gh pr list --base "$branch" --head main --state open --json number --jq '.[].number')
           if [[ -n "$open_pr" ]]; then
-            echo "PR #${open_pr} is already open from main into release/v0"
+            echo "PR #${open_pr} is already open from main into $branch"
             exit 0
           fi
-          gh pr create --base release/v0 --head main \
+          gh pr create --base "$branch" --head main \
               --title "Cut release from main" \
               --body 'Merge/conflict gate for the release cut. Merging this tags the release and drafts a GitHub Release.'
 
   tag-release:
-    name: Tag release/v0
+    name: Tag release
     if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
     steps:
+      - name: Validate release branch
+        run: |
+          base="${{ github.event.pull_request.base.ref }}"
+          if [[ ! "$base" =~ ^release/v[0-9]+$ ]]; then
+            echo "Base branch $base is not a release branch" >&2
+            exit 1
+          fi
+
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.merge_commit_sha }}
@@ -88,6 +106,18 @@ jobs:
             echo "changed=false" >>"$GITHUB_OUTPUT"
           else
             exit "$code"
+          fi
+
+      - name: Enforce major matches release branch
+        if: steps.version.outputs.changed == 'true'
+        run: |
+          ver=$(.github/scripts/psibase-version.sh at HEAD)
+          major="${ver%%.*}"
+          expected="${{ github.event.pull_request.base.ref }}"
+          expected="${expected#release/v}"
+          if [[ "$major" != "$expected" ]]; then
+            echo "HEAD major $major does not match release branch major $expected" >&2
+            exit 1
           fi
 
       - name: Create and push tag

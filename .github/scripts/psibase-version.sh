@@ -60,6 +60,18 @@ cmd_tag_name() {
     fi
 }
 
+cmd_release_branch() {
+    local ver="$1"
+    local major="${ver%%.*}"
+
+    if [[ $# -ne 1 || -z "$ver" || "$ver" != *.*.* ]]; then
+        echo "usage: $0 release-branch <major.minor.patch>" >&2
+        exit 2
+    fi
+
+    echo "release/v${major}"
+}
+
 main() {
     local cmd="${1:-}"
 
@@ -67,8 +79,9 @@ main() {
         at) shift; cmd_at "$@" ;;
         changed) shift; cmd_changed "$@" ;;
         tag-name) shift; cmd_tag_name "$@" ;;
+        release-branch) shift; cmd_release_branch "$@" ;;
         *)
-            echo "usage: $0 at|changed|tag-name ..." >&2
+            echo "usage: $0 at|changed|tag-name|release-branch ..." >&2
             exit 2
             ;;
     esac
