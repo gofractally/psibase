@@ -1,3 +1,5 @@
+/// Annual compound interest (path-independent closed form).
+pub mod interest;
 /// Off-chain path discovery for multi-hop `path_pay` (TokenSwap-style search).
 pub mod path_find;
 
@@ -15,63 +17,6 @@ pub mod tables {
     /// Used for interest APR, FX/`fx_rate`, and max accept rates so one unit
     /// system covers “percent-like” quantities (`10_000` = 1%, full scale = 100%).
     pub const PPM_SCALE: u32 = 1_000_000;
-
-    /// Interest math: simple APR on principal, path-independent under subdivision.
-    ///
-    /// # Rate
-    ///
-    /// `interest_rate` is **ppm per year** (parts per million): `10_000` = 1% APR,
-    /// [`PPM_SCALE`] = 100% APR. Year length is fixed at [`SECONDS_PER_YEAR`] (365
-    /// days) so results do not depend on leap years or wall-clock calendars.
-    ///
-    /// # Accrual (simple, not compounded into principal)
-    ///
-    /// Interest accrues on `remaining_principal` only; `accrued_interest` is a
-    /// separate bucket. Between principal changes:
-    ///
-    /// ```text
-    /// product   = principal * rate_ppm * dt_seconds + remainder
-    /// interest  = product / (PPM_SCALE * SECONDS_PER_YEAR)
-    /// remainder = product % (PPM_SCALE * SECONDS_PER_YEAR)
-    /// ```
-    ///
-    /// Carrying `remainder` makes accrual **path-independent**: any sequence of
-    /// accruals over an interval with fixed principal and rate yields the same
-    /// total interest and final remainder as one accrual over the whole
-    /// interval. Calling accrue twice in the same second is a no-op.
-    pub mod interest {
-        use super::PPM_SCALE;
-
-        /// 365 * 24 * 60 * 60 — fixed, no leap seconds / leap years.
-        pub const SECONDS_PER_YEAR: u128 = 31_536_000;
-        pub const RATE_PPM_DENOM: u128 = PPM_SCALE as u128;
-        pub const ACCRUAL_DENOM: u128 = RATE_PPM_DENOM * SECONDS_PER_YEAR;
-
-        /// Returns `(interest_units, new_remainder)`.
-        pub fn accrue_delta(
-            principal: u64,
-            rate_ppm: u32,
-            dt_seconds: u64,
-            remainder: u64,
-        ) -> (u64, u64) {
-            if principal == 0 || rate_ppm == 0 || dt_seconds == 0 {
-                return (0, remainder);
-            }
-            let product = (principal as u128)
-                .checked_mul(rate_ppm as u128)
-                .expect("interest: principal * rate overflow")
-                .checked_mul(dt_seconds as u128)
-                .expect("interest: * dt overflow")
-                .checked_add(remainder as u128)
-                .expect("interest: + remainder overflow");
-            let interest = product / ACCRUAL_DENOM;
-            let new_remainder = product % ACCRUAL_DENOM;
-            (
-                u64::try_from(interest).expect("interest: accrued amount exceeds u64"),
-                u64::try_from(new_remainder).expect("interest: remainder exceeds u64"),
-            )
-        }
-    }
 
     #[table(name = "InitTable", index = 0)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
@@ -540,13 +485,13 @@ pub mod tables {
         pub asset_id: u16,
 
         pub remaining_principal: Quantity,
+        /// Interest finalized at the last principal/rate change. Compounds
+        /// with principal (see [`crate::interest`]).
         pub accrued_interest: Quantity,
-        /// Simple APR in ppm per year (`10_000` = 1%). See [`interest`].
+        /// Compound APR in ppm per year (`10_000` = 1%). See [`crate::interest`].
         pub interest_rate: u32,
 
-        /// Fractional interest not yet large enough for one unit; see [`interest`].
-        pub interest_remainder: u64,
-
+        /// Start of the current principal/rate epoch.
         pub last_interest_accrual: TimePointSec,
         pub created_at: TimePointSec,
     }
@@ -572,13 +517,12 @@ pub mod tables {
                 .collect()
         }
 
-        /// Total exposure creditor←debtor for asset: Σ(principal + accrued interest).
-        /// Does **not** accrue; call [`accrue_pair`] first when freshness matters.
+        /// Total exposure: Σ(principal + live accrued interest).
         pub fn exposure(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) -> Quantity {
             Self::obligations(creditor, debtor, asset_id)
                 .into_iter()
                 .fold(Quantity::new(0), |acc, o| {
-                    acc + o.remaining_principal + o.accrued_interest
+                    acc + o.remaining_principal + o.live_accrued()
                 })
         }
 
@@ -625,7 +569,6 @@ pub mod tables {
                 remaining_principal: 0.into(),
                 interest_rate,
                 accrued_interest: 0.into(),
-                interest_remainder: 0,
                 last_interest_accrual: now,
                 created_at: now,
             }
@@ -647,51 +590,61 @@ pub mod tables {
             }
         }
 
-        /// Accrue simple interest from `last_interest_accrual` to now.
-        ///
-        /// Path-independent for fixed principal/rate (see [`interest`]). No-op
-        /// if `now <= last_interest_accrual`. Persists when anything changes
-        /// (including advancing the timestamp with zero interest).
-        pub fn accrue(&mut self) {
-            let now = Self::now();
+        fn dt_since_epoch(&self, now: TimePointSec) -> u64 {
             let last = self.last_interest_accrual.seconds;
             if now.seconds <= last {
-                return;
+                0
+            } else {
+                (now.seconds - last) as u64
             }
-            let dt = (now.seconds - last) as u64;
-
-            if self.remaining_principal.value == 0 || self.interest_rate == 0 {
-                // No charge while principal or rate is zero; do not "owe" for
-                // idle time after principal returns — just move the watermark.
-                self.last_interest_accrual = now;
-                self.save();
-                return;
-            }
-
-            let (delta, new_rem) = interest::accrue_delta(
-                self.remaining_principal.value,
-                self.interest_rate,
-                dt,
-                self.interest_remainder,
-            );
-
-            if delta > 0 {
-                self.accrued_interest = self
-                    .accrued_interest
-                    .value
-                    .checked_add(delta)
-                    .expect("accrued interest overflow")
-                    .into();
-            }
-            self.interest_remainder = new_rem;
-            self.last_interest_accrual = now;
-            self.save();
         }
 
-        /// Accrue every obligation on this directed pair/asset.
+        /// Accrued interest including this epoch (does not persist).
+        pub fn live_accrued(&self) -> Quantity {
+            self.live_accrued_at(Self::now())
+        }
+
+        pub fn live_accrued_at(&self, now: TimePointSec) -> Quantity {
+            let base = self
+                .remaining_principal
+                .value
+                .checked_add(self.accrued_interest.value)
+                .expect("interest base overflow");
+            let total = crate::interest::compound_amount(
+                base,
+                self.interest_rate,
+                self.dt_since_epoch(now),
+            );
+            total
+                .checked_sub(self.remaining_principal.value)
+                .expect("compound total below principal")
+                .into()
+        }
+
+        /// Write live interest and start a new epoch. Only for principal/rate
+        /// changes — not for a lone accrue, so 5s vs 5y stays identical.
+        pub fn lock_interest(&mut self) {
+            let now = Self::now();
+            let live = self.live_accrued_at(now);
+            if live == self.accrued_interest && now.seconds <= self.last_interest_accrual.seconds {
+                return;
+            }
+            self.accrued_interest = live;
+            self.last_interest_accrual = now;
+            if !self.is_clear() {
+                self.save();
+            }
+        }
+
+        /// Lock interest before a principal change on this row.
+        pub fn accrue(&mut self) {
+            self.lock_interest();
+        }
+
+        /// Lock every obligation on this directed pair/asset.
         pub fn accrue_pair(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) {
             for mut pair in Self::obligations(creditor, debtor, asset_id) {
-                pair.accrue();
+                pair.lock_interest();
             }
         }
 
@@ -748,9 +701,6 @@ pub mod tables {
                 }
                 let take = left.min(o.remaining_principal.value);
                 o.remaining_principal = (o.remaining_principal.value - take).into();
-                if o.remaining_principal.value == 0 {
-                    o.interest_remainder = 0;
-                }
                 left -= take;
             }
         }
@@ -805,9 +755,6 @@ pub mod tables {
                 let take_p = left.min(o.remaining_principal.value);
                 if take_p > 0 {
                     o.remaining_principal = (o.remaining_principal.value - take_p).into();
-                    if o.remaining_principal.value == 0 {
-                        o.interest_remainder = 0;
-                    }
                     Self::credit_pair(
                         to_creditor,
                         debtor,
@@ -924,7 +871,7 @@ pub mod tables {
         pub limit: Quantity,
         /// If true, draws/takeout also consume [`Self::remaining`].
         pub deplete_on_debit: bool,
-        /// Rate applied to new draws on this line (ppm APR); see [`interest`].
+        /// Rate applied to new draws on this line (ppm APR); see [`crate::interest`].
         pub interest_rate: u32,
         /// Unused grant when `deplete_on_debit`. Ignored for revolving lines.
         pub remaining: Quantity,
@@ -1416,10 +1363,21 @@ pub mod service {
         );
     }
 
-    /// Accrue interest on all obligations for a directed pair/asset.
+    /// No-op: interest is computed from the last principal/rate change.
+    /// Calling this does not cut the epoch (5s vs 5y stays the same).
     #[action]
     fn accrue(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) {
-        Obligation::accrue_pair(creditor, debtor, asset_id);
+        let _ = (creditor, debtor, asset_id);
+    }
+
+    /// Live pair exposure (principal + interest since last principal/rate change).
+    #[action]
+    fn get_exposure(
+        creditor: AccountNumber,
+        debtor: AccountNumber,
+        asset_id: u16,
+    ) -> Quantity {
+        Obligation::exposure(creditor, debtor, asset_id)
     }
 
     /// Net mutual obligations between sender and `counterparty` for `asset_id`.

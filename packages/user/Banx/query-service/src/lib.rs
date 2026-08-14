@@ -104,7 +104,7 @@ mod service {
                 debtor: o.debtor,
                 assetId: o.asset_id,
                 remainingPrincipal: dec(o.remaining_principal, o.asset_id),
-                accruedInterest: dec(o.accrued_interest, o.asset_id),
+                accruedInterest: dec(o.live_accrued(), o.asset_id),
                 interestRatePpm: o.interest_rate,
                 createdAt: time_sec(o.created_at),
                 lastInterestAccrual: time_sec(o.last_interest_accrual),
@@ -288,8 +288,8 @@ mod service {
                 .collect()
         }
 
-        /// Pair exposure: what `debtor` owes `creditor` in `assetId` (no accrue).
-        /// Human decimal for that asset.
+        /// Pair exposure: what `debtor` owes `creditor` in `assetId`
+        /// (principal + live interest). Human decimal for that asset.
         async fn exposure(
             &self,
             creditor: AccountNumber,

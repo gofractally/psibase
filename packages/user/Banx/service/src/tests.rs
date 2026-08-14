@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::tables::interest::{accrue_delta, ACCRUAL_DENOM, SECONDS_PER_YEAR};
+    use crate::interest::{compound_amount, interest_for, SECONDS_PER_YEAR};
     use crate::tables::{Asset, CreditLine, Obligation, PathHop, PPM_SCALE, RATE_SCALE};
     use crate::Wrapper;
     use psibase::services::tokens::{Precision, Quantity};
@@ -14,6 +14,19 @@ mod tests {
 
     fn never() -> TimePointSec {
         TimePointSec { seconds: 0 }
+    }
+
+    fn exp(
+        chain: &psibase::Chain,
+        creditor: AccountNumber,
+        debtor: AccountNumber,
+        asset_id: u16,
+    ) -> u64 {
+        Wrapper::push(chain)
+            .get_exposure(creditor, debtor, asset_id)
+            .get()
+            .unwrap()
+            .value
     }
 
     #[psibase::test_case(packages("Banx"))]
@@ -104,26 +117,16 @@ mod tests {
 
     #[psibase::test_case(packages("Banx"))]
     fn test_interest_path_independence(_chain: psibase::Chain) -> Result<(), psibase::Error> {
-        let principal = 1_000_000_000u64;
-        let rate_ppm = 50_000u32;
-        let steps = [1u64, 7, 60, 3_600, 86_400, PPM_SCALE as u64];
-
-        let mut rem_split = 0u64;
-        let mut interest_split = 0u64;
-        let mut total_dt = 0u64;
-        for dt in steps {
-            let (d, r) = accrue_delta(principal, rate_ppm, dt, rem_split);
-            interest_split = interest_split.checked_add(d).unwrap();
-            rem_split = r;
-            total_dt = total_dt.checked_add(dt).unwrap();
-        }
-
-        let (interest_once, rem_once) = accrue_delta(principal, rate_ppm, total_dt, 0);
-        assert_eq!(interest_split, interest_once);
-        assert_eq!(rem_split, rem_once);
-
-        let expect = (principal as u128) * (rate_ppm as u128) * (total_dt as u128) / ACCRUAL_DENOM;
-        assert_eq!(interest_once as u128, expect);
+        let year = SECONDS_PER_YEAR as u64;
+        // 10% annual compound: 1y → 110, 2y → 121 (not simple 120).
+        assert_eq!(compound_amount(100, 100_000, year), 110);
+        assert_eq!(compound_amount(100, 100_000, year * 2), 121);
+        assert_eq!(interest_for(100, 100_000, year * 2), 21);
+        assert_eq!(compound_amount(100, 100_000, 0), 100);
+        assert_eq!(compound_amount(0, 100_000, year), 0);
+        assert_eq!(interest_for(100, 0, year), 0);
+        // Half year: pro-rata on principal (100 * 1.05 = 105).
+        assert_eq!(compound_amount(100, 100_000, year / 2), 105);
 
         Ok(())
     }
@@ -168,8 +171,8 @@ mod tests {
             )
             .get()?;
 
-        assert_eq!(Obligation::exposure(gary, alice, usd).value, 500);
-        assert_eq!(Obligation::exposure(steve, gary, usd).value, 490);
+        assert_eq!(exp(&chain, gary, alice, usd), 500);
+        assert_eq!(exp(&chain, steve, gary, usd), 490);
 
         Ok(())
     }
@@ -227,9 +230,9 @@ mod tests {
             .get()?;
 
         // After implied convert, Alice owes Gary USD (not AUD).
-        assert_eq!(Obligation::exposure(gary, alice, aud).value, 0);
-        assert_eq!(Obligation::exposure(gary, alice, usd).value, 700);
-        assert_eq!(Obligation::exposure(steve, gary, usd).value, 700);
+        assert_eq!(exp(&chain, gary, alice, aud), 0);
+        assert_eq!(exp(&chain, gary, alice, usd), 700);
+        assert_eq!(exp(&chain, steve, gary, usd), 700);
 
         Ok(())
     }
@@ -346,35 +349,35 @@ mod tests {
 
         // AUD book
         assert_eq!(
-            Obligation::exposure(mitchell, zac, aud).value,
+            exp(&chain, mitchell, zac, aud),
             10_000,
             "Zac owes Mitchell 10000 AUD"
         );
         // Mitchell→John claim converted to USD
         assert_eq!(
-            Obligation::exposure(john, mitchell, aud).value,
+            exp(&chain, john, mitchell, aud),
             0,
             "Mitchell→John AUD cleared by convert"
         );
         assert_eq!(
-            Obligation::exposure(john, mitchell, usd).value,
+            exp(&chain, john, mitchell, usd),
             6_175,
             "Mitchell owes John 6175 USD after convert"
         );
         // USD path
         assert_eq!(
-            Obligation::exposure(mike, john, usd).value,
+            exp(&chain, mike, john, usd),
             6_175,
             "John owes Mike 6175 USD"
         );
         assert_eq!(
-            Obligation::exposure(brandon, mike, usd).value,
+            exp(&chain, brandon, mike, usd),
             6_113,
             "Mike owes Brandon 6113 USD after 1% fee"
         );
 
-        assert_eq!(Obligation::exposure(mike, john, aud).value, 0);
-        assert_eq!(Obligation::exposure(brandon, mike, aud).value, 0);
+        assert_eq!(exp(&chain, mike, john, aud), 0);
+        assert_eq!(exp(&chain, brandon, mike, aud), 0);
 
         Ok(())
     }
@@ -468,10 +471,10 @@ mod tests {
             .get();
         assert!(result.is_err());
 
-        assert_eq!(Obligation::exposure(mitchell, zac, aud).value, 0);
-        assert_eq!(Obligation::exposure(john, mitchell, aud).value, 0);
-        assert_eq!(Obligation::exposure(mike, john, usd).value, 0);
-        assert_eq!(Obligation::exposure(brandon, mike, usd).value, 0);
+        assert_eq!(exp(&chain, mitchell, zac, aud), 0);
+        assert_eq!(exp(&chain, john, mitchell, aud), 0);
+        assert_eq!(exp(&chain, mike, john, usd), 0);
+        assert_eq!(exp(&chain, brandon, mike, usd), 0);
 
         Ok(())
     }
@@ -510,8 +513,8 @@ mod tests {
             .convert(alice, aud, usd, Quantity::new(100), Quantity::new(50))
             .get()?;
 
-        assert_eq!(Obligation::exposure(gary, alice, aud).value, 0);
-        assert_eq!(Obligation::exposure(gary, alice, usd).value, 50);
+        assert_eq!(exp(&chain, gary, alice, aud), 0);
+        assert_eq!(exp(&chain, gary, alice, usd), 50);
 
         Ok(())
     }
@@ -592,7 +595,7 @@ mod tests {
                 Quantity::new(50),
             )
             .get()?;
-        assert_eq!(Obligation::exposure(steve, gary, usd).value, 50);
+        assert_eq!(exp(&chain, steve, gary, usd), 50);
 
         Ok(())
     }
@@ -620,8 +623,8 @@ mod tests {
             .deposit(alice, usd, amount, 0)
             .get()?;
 
-        assert_eq!(Obligation::exposure(bob, alice, usd).value, 0);
-        assert_eq!(Obligation::exposure(alice, bob, usd).value, 0);
+        assert_eq!(exp(&chain, bob, alice, usd), 0);
+        assert_eq!(exp(&chain, alice, bob, usd), 0);
 
         Ok(())
     }
@@ -654,8 +657,8 @@ mod tests {
                 Quantity::new(100),
             )
             .get()?;
-        assert_eq!(Obligation::exposure(bob, alice, usd).value, 100);
-        assert_eq!(Obligation::exposure(alice, bob, usd).value, 0);
+        assert_eq!(exp(&chain, bob, alice, usd), 100);
+        assert_eq!(exp(&chain, alice, bob, usd), 0);
 
         // Bob draws 100 on Alice → reverse claim auto-nets to zero.
         Wrapper::push_from(&chain, bob)
@@ -665,8 +668,8 @@ mod tests {
                 Quantity::new(100),
             )
             .get()?;
-        assert_eq!(Obligation::exposure(bob, alice, usd).value, 0);
-        assert_eq!(Obligation::exposure(alice, bob, usd).value, 0);
+        assert_eq!(exp(&chain, bob, alice, usd), 0);
+        assert_eq!(exp(&chain, alice, bob, usd), 0);
 
         // Partial reverse: Alice draws 100, Bob draws 40 → Alice still owes 60.
         Wrapper::push_from(&chain, alice)
@@ -683,8 +686,8 @@ mod tests {
                 Quantity::new(40),
             )
             .get()?;
-        assert_eq!(Obligation::exposure(bob, alice, usd).value, 60);
-        assert_eq!(Obligation::exposure(alice, bob, usd).value, 0);
+        assert_eq!(exp(&chain, bob, alice, usd), 60);
+        assert_eq!(exp(&chain, alice, bob, usd), 0);
 
         Ok(())
     }
@@ -710,7 +713,7 @@ mod tests {
         Wrapper::push_from(&chain, bob)
             .deposit(alice, usd, Quantity::new(10_000), 0)
             .get()?;
-        assert_eq!(Obligation::exposure(alice, bob, usd).value, 10_000);
+        assert_eq!(exp(&chain, alice, bob, usd), 10_000);
 
         // Peter willing to be owed by Bob up to 10k.
         Wrapper::push_from(&chain, peter)
@@ -733,9 +736,9 @@ mod tests {
             .get()?;
 
         // Bob now owes Peter full face; Alice holds 9500 on Peter.
-        assert_eq!(Obligation::exposure(alice, bob, usd).value, 0);
-        assert_eq!(Obligation::exposure(peter, bob, usd).value, 10_000);
-        assert_eq!(Obligation::exposure(alice, peter, usd).value, 9_500);
+        assert_eq!(exp(&chain, alice, bob, usd), 0);
+        assert_eq!(exp(&chain, peter, bob, usd), 10_000);
+        assert_eq!(exp(&chain, alice, peter, usd), 9_500);
 
         Ok(())
     }
@@ -788,7 +791,7 @@ mod tests {
                 Quantity::new(490),
             )
             .get()?;
-        assert_eq!(Obligation::exposure(steve, gary, usd).value, 490);
+        assert_eq!(exp(&chain, steve, gary, usd), 490);
         Ok(())
     }
 
@@ -839,7 +842,7 @@ mod tests {
                 Quantity::new(90),
             )
             .get()?;
-        assert_eq!(Obligation::exposure(steve, gary, usd).value, 90);
+        assert_eq!(exp(&chain, steve, gary, usd), 90);
         Ok(())
     }
 
@@ -896,21 +899,21 @@ mod tests {
         let line = CreditLine::get_assert(bob, alice, usd);
         assert_eq!(line.limit.value, 100);
         assert_eq!(line.remaining.value, 40);
-        assert_eq!(Obligation::exposure(bob, alice, usd).value, 60);
-        assert!(Obligation::exposure(bob, alice, usd).value <= line.limit.value);
+        assert_eq!(exp(&chain, bob, alice, usd), 60);
+        assert!(exp(&chain, bob, alice, usd) <= line.limit.value);
 
         // Leftover grant is 40, not 40-after-shrunk-cap.
         Wrapper::push_from(&chain, alice)
             .path_pay(vec![hop(bob, usd)], Quantity::new(40), Quantity::new(40))
             .get()?;
-        assert_eq!(Obligation::exposure(bob, alice, usd).value, 100);
+        assert_eq!(exp(&chain, bob, alice, usd), 100);
         assert_eq!(CreditLine::get_assert(bob, alice, usd).remaining.value, 0);
 
         // Repay does not restore grant.
         Wrapper::push_from(&chain, bob)
             .deposit(alice, usd, Quantity::new(100), 0)
             .get()?;
-        assert_eq!(Obligation::exposure(bob, alice, usd).value, 0);
+        assert_eq!(exp(&chain, bob, alice, usd), 0);
         let over = Wrapper::push_from(&chain, alice)
             .path_pay(vec![hop(bob, usd)], Quantity::new(1), Quantity::new(1))
             .get();
@@ -945,7 +948,7 @@ mod tests {
         let line = CreditLine::get_assert(peter, bob, usd);
         assert_eq!(line.limit.value, 100);
         assert_eq!(line.remaining.value, 50);
-        assert_eq!(Obligation::exposure(peter, bob, usd).value, 50);
+        assert_eq!(exp(&chain, peter, bob, usd), 50);
         Ok(())
     }
 
@@ -979,8 +982,8 @@ mod tests {
         Wrapper::push_from(&chain, gary)
             .convert(alice, aud, usd, Quantity::new(100), Quantity::new(50))
             .get()?;
-        assert_eq!(Obligation::exposure(gary, alice, aud).value, 0);
-        assert_eq!(Obligation::exposure(gary, alice, usd).value, 50);
+        assert_eq!(exp(&chain, gary, alice, aud), 0);
+        assert_eq!(exp(&chain, gary, alice, usd), 50);
         Ok(())
     }
 
@@ -1023,9 +1026,9 @@ mod tests {
             .get();
         assert!(result.is_err());
         // Reverted: reverse deposit remains; no new path legs.
-        assert_eq!(Obligation::exposure(alice, gary, aud).value, 1_000);
-        assert_eq!(Obligation::exposure(gary, alice, aud).value, 0);
-        assert_eq!(Obligation::exposure(steve, gary, usd).value, 0);
+        assert_eq!(exp(&chain, alice, gary, aud), 1_000);
+        assert_eq!(exp(&chain, gary, alice, aud), 0);
+        assert_eq!(exp(&chain, steve, gary, usd), 0);
         Ok(())
     }
 
@@ -1066,9 +1069,9 @@ mod tests {
             )
             .get()?;
         // 1000 draw nets 400 reverse → 600 AUD converts at 0.70 → 420 USD.
-        assert_eq!(Obligation::exposure(gary, alice, aud).value, 0);
-        assert_eq!(Obligation::exposure(gary, alice, usd).value, 420);
-        assert_eq!(Obligation::exposure(steve, gary, usd).value, 420);
+        assert_eq!(exp(&chain, gary, alice, aud), 0);
+        assert_eq!(exp(&chain, gary, alice, usd), 420);
+        assert_eq!(exp(&chain, steve, gary, usd), 420);
         Ok(())
     }
 
@@ -1121,23 +1124,50 @@ mod tests {
             .get()?;
 
         chain.start_block_after(Seconds::new(SECONDS_PER_YEAR as i64).into());
-        Wrapper::push_from(&chain, alice)
-            .accrue(alice, bob, usd)
-            .get()?;
-
+        // Live interest — no accrue action needed.
         // 10% of 100 + 1% of 100 over one year.
-        assert_eq!(Obligation::exposure(alice, bob, usd).value, 211);
+        assert_eq!(exp(&chain, alice, bob, usd), 211);
 
         // Net 10: interest-first, highest rate first → 10% bucket interest gone.
         Wrapper::push_from(&chain, alice)
             .deposit(bob, usd, Quantity::new(10), 0)
             .get()?;
-        assert_eq!(Obligation::exposure(alice, bob, usd).value, 201);
+        assert_eq!(exp(&chain, alice, bob, usd), 201);
         let hi = Obligation::get_by_interest_rate(alice, bob, usd, 100_000).unwrap();
         assert_eq!(hi.accrued_interest.value, 0);
         assert_eq!(hi.remaining_principal.value, 100);
         let lo = Obligation::get_by_interest_rate(alice, bob, usd, 10_000).unwrap();
         assert_eq!(lo.accrued_interest.value, 1);
+        Ok(())
+    }
+
+    /// 10% on 100: 1y → 110, 2y compounds to 121. Accrue action does not cut the epoch.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_interest_one_floor_over_epoch(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, bob)
+            .deposit(alice, usd, Quantity::new(100), 100_000)
+            .get()?;
+
+        chain.start_block_after(Seconds::new(SECONDS_PER_YEAR as i64).into());
+        assert_eq!(exp(&chain, alice, bob, usd), 110);
+        Wrapper::push_from(&chain, alice)
+            .accrue(alice, bob, usd)
+            .get()?;
+        assert_eq!(exp(&chain, alice, bob, usd), 110);
+
+        chain.start_block_after(Seconds::new(SECONDS_PER_YEAR as i64).into());
+        assert_eq!(
+            exp(&chain, alice, bob, usd),
+            121,
+            "10% compounds: 100→110→121, not simple 120"
+        );
         Ok(())
     }
 
@@ -1176,7 +1206,7 @@ mod tests {
         Wrapper::push_from(&chain, alice)
             .sell_claim(peter, bob, usd, Quantity::new(1_000))
             .get()?;
-        assert_eq!(Obligation::exposure(alice, peter, usd).value, 1_000);
+        assert_eq!(exp(&chain, alice, peter, usd), 1_000);
         Ok(())
     }
 }
