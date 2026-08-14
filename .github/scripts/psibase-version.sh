@@ -72,6 +72,17 @@ cmd_release_branch() {
     echo "release/v${major}"
 }
 
+cmd_cut_branch() {
+    local ver="$1"
+
+    if [[ $# -ne 1 || -z "$ver" || "$ver" != *.*.* ]]; then
+        echo "usage: $0 cut-branch <major.minor.patch>" >&2
+        exit 2
+    fi
+
+    echo "cut/v${ver}"
+}
+
 main() {
     local cmd="${1:-}"
 
@@ -80,8 +91,9 @@ main() {
         changed) shift; cmd_changed "$@" ;;
         tag-name) shift; cmd_tag_name "$@" ;;
         release-branch) shift; cmd_release_branch "$@" ;;
+        cut-branch) shift; cmd_cut_branch "$@" ;;
         *)
-            echo "usage: $0 at|changed|tag-name|release-branch ..." >&2
+            echo "usage: $0 at|changed|tag-name|release-branch|cut-branch ..." >&2
             exit 2
             ;;
     esac

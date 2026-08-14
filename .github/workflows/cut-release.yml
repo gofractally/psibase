@@ -16,7 +16,7 @@ permissions:
 jobs:
   open-release-pr:
     name: Open release PR
-    if: github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000'
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,7 +35,10 @@ jobs:
         run: |
           ver=$(.github/scripts/psibase-version.sh at "${{ github.sha }}")
           branch=$(.github/scripts/psibase-version.sh release-branch "$ver")
+          cut_branch=$(.github/scripts/psibase-version.sh cut-branch "$ver")
+          echo "version=$ver" >>"$GITHUB_OUTPUT"
           echo "branch=$branch" >>"$GITHUB_OUTPUT"
+          echo "cut-branch=$cut_branch" >>"$GITHUB_OUTPUT"
 
       - name: Create release branch at pre-bump main
         if: steps.version.outputs.changed == 'true'
@@ -51,14 +54,23 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           branch="${{ steps.release.outputs.branch }}"
-          open_pr=$(gh pr list --base "$branch" --head main --state open --json number --jq '.[].number')
-          if [[ -n "$open_pr" ]]; then
-            echo "PR #${open_pr} is already open from main into $branch"
-            exit 0
+          cut_branch="${{ steps.release.outputs.cut-branch }}"
+          ver="${{ steps.release.outputs.version }}"
+          open_cut=$(gh pr list --base "$branch" --state open --json number,headRefName \
+              --jq '.[] | select(.headRefName | startswith("cut/v")) | "#\(.number) \(.headRefName)"')
+          if [[ -n "$open_cut" ]]; then
+            echo "A prior release bump has not landed yet. Open cut PR(s) into $branch:" >&2
+            echo "$open_cut" >&2
+            exit 1
           fi
-          gh pr create --base "$branch" --head main \
-              --title "Cut release from main" \
-              --body 'Merge/conflict gate for the release cut. Merging this tags the release and drafts a GitHub Release.'
+          if git ls-remote --exit-code origin "refs/heads/$cut_branch" >/dev/null; then
+            echo "Branch $cut_branch already exists on origin and there is no open cut PR into $branch. Not force-updating or reusing a leftover cut branch." >&2
+            exit 1
+          fi
+          git push origin "${{ github.sha }}:refs/heads/$cut_branch"
+          gh pr create --base "$branch" --head "$cut_branch" \
+              --title "Cut release v$ver" \
+              --body 'Merge/conflict gate for the release cut. Merging this tags the release and drafts a GitHub Release. Conflict fixes go on this cut branch (merge the release branch into it).'
 
   tag-release:
     name: Tag release
@@ -112,6 +124,8 @@ jobs:
           else
             message="psibase version v$ver"
           fi
+          # 41898282+github-actions[bot]@users.noreply.github.com is
+          # GitHub's noreply identity for github-actions[bot] (user id 41898282).
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag -a "$tag" -m "$message"
