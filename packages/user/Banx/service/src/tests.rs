@@ -2,7 +2,9 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::interest::{compound_amount, interest_for, SECONDS_PER_YEAR};
+    use crate::interest::{
+        compound_amount, interest_for, SECONDS_PER_DAY, SECONDS_PER_YEAR,
+    };
     use crate::tables::{Asset, CreditLine, Obligation, PathHop, PPM_SCALE, RATE_SCALE};
     use crate::Wrapper;
     use psibase::services::tokens::{Precision, Quantity};
@@ -118,15 +120,21 @@ mod tests {
     #[psibase::test_case(packages("Banx"))]
     fn test_interest_path_independence(_chain: psibase::Chain) -> Result<(), psibase::Error> {
         let year = SECONDS_PER_YEAR as u64;
-        // 10% annual compound: 1y → 110, 2y → 121 (not simple 120).
-        assert_eq!(compound_amount(100, 100_000, year), 110);
-        assert_eq!(compound_amount(100, 100_000, year * 2), 121);
-        assert_eq!(interest_for(100, 100_000, year * 2), 21);
-        assert_eq!(compound_amount(100, 100_000, 0), 100);
+        let p = 1_000_000u64; // $100.0000 at 4 dp
+        // Daily 10%: ~10.52% effective over 365 days (not exact +10%).
+        assert_eq!(compound_amount(p, 100_000, year), 1_104_964);
+        assert_eq!(compound_amount(p, 100_000, year * 2), 1_220_966);
+        assert_eq!(interest_for(p, 100_000, year * 2), 220_966);
+        assert_eq!(compound_amount(p, 100_000, 0), p);
         assert_eq!(compound_amount(0, 100_000, year), 0);
-        assert_eq!(interest_for(100, 0, year), 0);
-        // Half year: pro-rata on principal (100 * 1.05 = 105).
-        assert_eq!(compound_amount(100, 100_000, year / 2), 105);
+        assert_eq!(interest_for(p, 0, year), 0);
+        assert_eq!(compound_amount(p, 100_000, year / 2), 1_051_170);
+        assert_eq!(compound_amount(p, 100_000, SECONDS_PER_DAY as u64), 1_000_273);
+        // $5.0000 at 20% for 12h: half a daily tick, floor to 0.0013.
+        assert_eq!(
+            interest_for(50_000, 200_000, 12 * 3600),
+            13
+        );
 
         Ok(())
     }
@@ -1117,31 +1125,30 @@ mod tests {
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
 
         Wrapper::push_from(&chain, bob)
-            .deposit(alice, usd, Quantity::new(100), 100_000)
+            .deposit(alice, usd, Quantity::new(1_000_000), 100_000)
             .get()?;
         Wrapper::push_from(&chain, bob)
-            .deposit(alice, usd, Quantity::new(100), 10_000)
+            .deposit(alice, usd, Quantity::new(1_000_000), 10_000)
             .get()?;
 
         chain.start_block_after(Seconds::new(SECONDS_PER_YEAR as i64).into());
         // Live interest — no accrue action needed.
-        // 10% of 100 + 1% of 100 over one year.
-        assert_eq!(exp(&chain, alice, bob, usd), 211);
+        assert_eq!(exp(&chain, alice, bob, usd), 2_114_819);
 
-        // Net 10: interest-first, highest rate first → 10% bucket interest gone.
+        // Net the 10% bucket's interest first (highest rate).
         Wrapper::push_from(&chain, alice)
-            .deposit(bob, usd, Quantity::new(10), 0)
+            .deposit(bob, usd, Quantity::new(104_964), 0)
             .get()?;
-        assert_eq!(exp(&chain, alice, bob, usd), 201);
+        assert_eq!(exp(&chain, alice, bob, usd), 2_009_855);
         let hi = Obligation::get_by_interest_rate(alice, bob, usd, 100_000).unwrap();
         assert_eq!(hi.accrued_interest.value, 0);
-        assert_eq!(hi.remaining_principal.value, 100);
+        assert_eq!(hi.remaining_principal.value, 1_000_000);
         let lo = Obligation::get_by_interest_rate(alice, bob, usd, 10_000).unwrap();
-        assert_eq!(lo.accrued_interest.value, 1);
+        assert_eq!(lo.accrued_interest.value, 9_855);
         Ok(())
     }
 
-    /// 10% on 100: 1y → 110, 2y compounds to 121. Accrue action does not cut the epoch.
+    /// Daily 10% on $100.0000; accrue action does not cut the epoch.
     #[psibase::test_case(packages("Banx"))]
     fn test_interest_one_floor_over_epoch(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
@@ -1152,21 +1159,21 @@ mod tests {
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
 
         Wrapper::push_from(&chain, bob)
-            .deposit(alice, usd, Quantity::new(100), 100_000)
+            .deposit(alice, usd, Quantity::new(1_000_000), 100_000)
             .get()?;
 
         chain.start_block_after(Seconds::new(SECONDS_PER_YEAR as i64).into());
-        assert_eq!(exp(&chain, alice, bob, usd), 110);
+        assert_eq!(exp(&chain, alice, bob, usd), 1_104_964);
         Wrapper::push_from(&chain, alice)
             .accrue(alice, bob, usd)
             .get()?;
-        assert_eq!(exp(&chain, alice, bob, usd), 110);
+        assert_eq!(exp(&chain, alice, bob, usd), 1_104_964);
 
         chain.start_block_after(Seconds::new(SECONDS_PER_YEAR as i64).into());
         assert_eq!(
             exp(&chain, alice, bob, usd),
-            121,
-            "10% compounds: 100→110→121, not simple 120"
+            1_220_966,
+            "daily 10% over 2y from original principal, not two 1y locks"
         );
         Ok(())
     }

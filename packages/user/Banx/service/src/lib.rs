@@ -1,4 +1,4 @@
-/// Annual compound interest (path-independent closed form).
+/// Daily compound interest (path-independent closed form).
 pub mod interest;
 /// Off-chain path discovery for multi-hop `path_pay` (TokenSwap-style search).
 pub mod path_find;
