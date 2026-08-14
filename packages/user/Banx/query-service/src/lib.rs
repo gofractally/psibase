@@ -68,11 +68,33 @@ mod service {
         exposure: Decimal,
         /// Unused grant when depleting; 0 on revolving lines.
         remaining: Decimal,
-        /// Drawable now: `limit - exposure`, also capped by `remaining` if depleting.
+        /// Path residual: line headroom plus reverse claim (they already owe you).
         residual: Decimal,
     }
 
     impl CreditLineView {
+        fn from_reverse_claim(
+            creditor: AccountNumber,
+            debtor: AccountNumber,
+            asset_id: u16,
+            residual: u64,
+        ) -> Self {
+            Self {
+                creditor,
+                debtor,
+                assetId: asset_id,
+                limit: dec(0.into(), asset_id),
+                depleteOnDebit: false,
+                interestRatePpm: 0,
+                graceSeconds: 0,
+                cycleStartedAt: 0,
+                cycleGraceSeconds: 0,
+                exposure: dec(0.into(), asset_id),
+                remaining: dec(0.into(), asset_id),
+                residual: dec(residual.into(), asset_id),
+            }
+        }
+
         fn from_line(line: CreditLine) -> Self {
             let exposure = Obligation::exposure(line.creditor, line.debtor, line.asset_id);
             Self {
@@ -87,7 +109,11 @@ mod service {
                 cycleGraceSeconds: line.cycle_grace_seconds,
                 exposure: dec(exposure, line.asset_id),
                 remaining: dec(line.remaining, line.asset_id),
-                residual: dec(Quantity::new(line.draw_headroom()), line.asset_id),
+                residual: dec(
+                    CreditLine::path_capacity_live(line.creditor, line.debtor, line.asset_id)
+                        .into(),
+                    line.asset_id,
+                ),
             }
         }
     }
@@ -269,8 +295,7 @@ mod service {
                 .get_index_pk()
                 .iter()
                 .filter(|l| {
-                    (want_creditor && l.creditor == account)
-                        || (want_debtor && l.debtor == account)
+                    (want_creditor && l.creditor == account) || (want_debtor && l.debtor == account)
                 })
                 .map(CreditLineView::from_line)
                 .collect()
@@ -290,8 +315,7 @@ mod service {
                 .get_index_pk()
                 .iter()
                 .filter(|o| {
-                    (want_creditor && o.creditor == account)
-                        || (want_debtor && o.debtor == account)
+                    (want_creditor && o.creditor == account) || (want_debtor && o.debtor == account)
                 })
                 .map(ObligationView::from)
                 .collect()
@@ -346,6 +370,10 @@ mod service {
                 .get_index_pk()
                 .iter()
                 .collect();
+            let all_obs: Vec<Obligation> = ObligationTable::with_service(banx::SERVICE)
+                .get_index_pk()
+                .iter()
+                .collect();
 
             let mut debtors: HashSet<AccountNumber> = HashSet::new();
             debtors.insert(from);
@@ -353,6 +381,7 @@ mod service {
 
             let mut selected_lines: Vec<CreditLine> = Vec::new();
             let mut seen_line: HashSet<(AccountNumber, AccountNumber, u16)> = HashSet::new();
+            let mut reverse_only: Vec<CreditLineView> = Vec::new();
 
             for _ in 0..max_hops {
                 let frontier: HashSet<AccountNumber> = debtors.clone();
@@ -370,15 +399,38 @@ mod service {
                         grew = true;
                     }
                 }
+                // Claims: if frontier account is owed by X, they can path-draw on X
+                // (create reverse debt and auto-net) without X having lined them.
+                for o in &all_obs {
+                    if !frontier.contains(&o.creditor) {
+                        continue;
+                    }
+                    let key = (o.debtor, o.creditor, o.asset_id);
+                    if seen_line.contains(&key) {
+                        continue;
+                    }
+                    let residual = Obligation::exposure(o.creditor, o.debtor, o.asset_id).value;
+                    if residual == 0 {
+                        continue;
+                    }
+                    seen_line.insert(key);
+                    reverse_only.push(CreditLineView::from_reverse_claim(
+                        o.debtor, o.creditor, o.asset_id, residual,
+                    ));
+                    if debtors.insert(o.debtor) {
+                        grew = true;
+                    }
+                }
                 if !grew {
                     break;
                 }
             }
 
-            let credit_lines: Vec<CreditLineView> = selected_lines
+            let mut credit_lines: Vec<CreditLineView> = selected_lines
                 .into_iter()
                 .map(CreditLineView::from_line)
                 .collect();
+            credit_lines.extend(reverse_only);
 
             let clearing_offers: Vec<ClearingOfferView> =
                 ClearingOfferTab::with_service(banx::SERVICE)

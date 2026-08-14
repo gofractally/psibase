@@ -15,7 +15,7 @@ pub struct LineEdge {
     pub creditor: String,
     pub debtor: String,
     pub asset_id: u16,
-    /// `limit - exposure` (raw units). 0 = closed.
+    /// Line headroom plus reverse claim (raw units). 0 = closed.
     pub residual: u64,
     pub interest_rate_ppm: u32,
 }
@@ -902,5 +902,23 @@ mod tests {
     fn no_path_without_capacity() {
         let lines = vec![line("bob", "alice", 1, 50)];
         assert!(find_banx_path(&lines, &[], &[], "alice", "bob", 100, 1, None, 2, 0).is_none());
+    }
+
+    #[test]
+    fn reverse_claim_edges_unwind_path() {
+        // After A→B→C, reverse residuals let C→B→A unwind without opposite lines.
+        let lines = vec![
+            line("b", "c", 1, 100),
+            line("a", "b", 1, 100),
+        ];
+        let routing = vec![global_rte("b", 1, 0)];
+        let q = find_banx_path(
+            &lines, &routing, &[], "c", "a", 100, 1, Some(1), 4, 0,
+        )
+        .expect("reverse path");
+        assert_eq!(q.hops.len(), 2);
+        assert_eq!(q.hops[0].account, "b");
+        assert_eq!(q.hops[1].account, "a");
+        assert_eq!(q.amount_out, 100);
     }
 }

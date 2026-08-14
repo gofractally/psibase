@@ -295,13 +295,14 @@ pub mod tables {
                 );
                 self.counterparty
             };
-            let line = CreditLine::get_assert(creditor, self.poster, self.asset_id);
-            assert!(
-                line.interest_rate <= self.max_line_apr,
-                "next hop interest rate exceeds max_line_apr"
-            );
+            if let Some(line) = CreditLine::get(creditor, self.poster, self.asset_id) {
+                assert!(
+                    line.interest_rate <= self.max_line_apr,
+                    "next hop interest rate exceeds max_line_apr"
+                );
+            }
             let draw = self.apply_fees(amount_in);
-            CreditLine::debit(creditor, self.poster, self.asset_id, draw);
+            CreditLine::path_debit(creditor, self.poster, self.asset_id, draw);
             draw
         }
     }
@@ -1089,6 +1090,71 @@ pub mod tables {
             }
         }
 
+        /// Line headroom plus reverse claim (`creditor` already owes `debtor`).
+        /// That reverse book can be unwound by a path draw + auto-net without
+        /// the opposite credit line existing. Live (no persist).
+        pub fn path_capacity_live(
+            creditor: AccountNumber,
+            debtor: AccountNumber,
+            asset_id: u16,
+        ) -> u64 {
+            let reverse = Obligation::exposure(debtor, creditor, asset_id).value;
+            let line_cap = Self::get(creditor, debtor, asset_id)
+                .map(|l| l.draw_headroom())
+                .unwrap_or(0);
+            reverse.saturating_add(line_cap)
+        }
+
+        pub fn path_capacity(
+            creditor: AccountNumber,
+            debtor: AccountNumber,
+            asset_id: u16,
+        ) -> u64 {
+            Obligation::accrue_pair(creditor, debtor, asset_id);
+            Obligation::accrue_pair(debtor, creditor, asset_id);
+            Self::path_capacity_live(creditor, debtor, asset_id)
+        }
+
+        /// Draw for `path_pay`: uses a credit line and/or an existing reverse
+        /// claim (auto-net). Grant is consumed only for the portion that is
+        /// new line capacity.
+        pub fn path_debit(
+            creditor: AccountNumber,
+            debtor: AccountNumber,
+            asset_id: u16,
+            amount: Quantity,
+        ) {
+            assert!(amount.value > 0, "path debit amount must be positive");
+            let cap = Self::path_capacity(creditor, debtor, asset_id);
+            assert!(
+                amount.value <= cap,
+                "insufficient path capacity (line + reverse claim)"
+            );
+
+            let reverse = Obligation::exposure(debtor, creditor, asset_id).value;
+            let new_draw = amount.value.saturating_sub(reverse);
+            let line = Self::get(creditor, debtor, asset_id);
+            let rate = if new_draw > 0 {
+                let mut line = line.expect("credit line required for new path draw");
+                line.consume_grant(Quantity::new(new_draw));
+                line.interest_rate
+            } else {
+                line.map(|l| l.interest_rate).unwrap_or(0)
+            };
+
+            Obligation::credit_pair(creditor, debtor, asset_id, rate, amount);
+            let netted = Obligation::net_pair(creditor, debtor, asset_id, u64::MAX.into());
+            emit_pair_activity(
+                creditor,
+                debtor,
+                asset_id,
+                "path_draw",
+                amount,
+                netted,
+                asset_id,
+            );
+        }
+
         /// Draw `amount` of new principal: check `exposure + amount <= limit`,
         /// consume `remaining` if depleting, credit the line-rate bucket, auto-net.
         pub fn debit(
@@ -1097,39 +1163,7 @@ pub mod tables {
             asset_id: u16,
             amount: Quantity,
         ) {
-            let mut line = Self::get_assert(creditor, debtor, asset_id);
-
-            // Fresh interest against the revolving cap before measuring exposure.
-            Obligation::accrue_pair(line.creditor, line.debtor, line.asset_id);
-            let exposure = Obligation::exposure(line.creditor, line.debtor, line.asset_id);
-            if exposure + amount > line.limit {
-                panic!("total outstanding exceeds max limit");
-            }
-            line.consume_grant(amount);
-
-            Obligation::credit_pair(
-                line.creditor,
-                line.debtor,
-                line.asset_id,
-                line.interest_rate,
-                amount,
-            );
-            // Cancel mutual exposure for this pair/asset (no-op if reverse is 0).
-            let netted = Obligation::net_pair(
-                line.creditor,
-                line.debtor,
-                line.asset_id,
-                u64::MAX.into(),
-            );
-            emit_pair_activity(
-                line.creditor,
-                line.debtor,
-                line.asset_id,
-                "path_draw",
-                amount,
-                netted,
-                line.asset_id,
-            );
+            Self::path_debit(creditor, debtor, asset_id, amount);
         }
     }
 
@@ -1520,7 +1554,8 @@ pub mod service {
     /// # Example
     ///
     /// `path_pay([(Gary, AUD), (Steve, USD)], amount_aud, min_return_usd)`:
-    /// 1. **First hop** — sender draws `amount` on Gary in **AUD** (line only).
+    /// 1. **First hop** — sender draws `amount` on Gary in **AUD** (line and/or
+    ///    reverse claim that auto-nets).
     /// 2. **Currency change** — rebook previous edge (sender owes Gary AUD) via
     ///    sender's [`CurrencyPolicy`] AUD→USD.
     /// 3. **Later hops** — intermediate's [`ClearingOffer`] with
@@ -1549,7 +1584,7 @@ pub mod service {
             assert!(next_creditor != path_debtor, "path_pay cannot draw on self");
 
             if i == 0 {
-                CreditLine::debit(next_creditor, path_debtor, asset_id, forward);
+                CreditLine::path_debit(next_creditor, path_debtor, asset_id, forward);
                 prev_edge_debtor = path_debtor;
                 prev_edge_creditor = next_creditor;
                 prev_asset = asset_id;

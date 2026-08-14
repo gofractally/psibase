@@ -1314,4 +1314,53 @@ mod tests {
         assert_eq!(exp(&chain, bob, alice, usd), 1_000_000);
         Ok(())
     }
+
+    /// C lined B, B lined A. A pays C via B. C can pay A back by unwinding
+    /// those claims — no opposite credit lines required.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_path_pay_unwinds_reverse_claims(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let a = account!("alice");
+        let b = account!("bobby");
+        let c = account!("carol");
+        for acct in [a, b, c] {
+            chain.new_account(acct).unwrap();
+        }
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, b)
+            .st_crd_lne(a, usd, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, c)
+            .st_crd_lne(b, usd, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, b)
+            .st_glb_clr(usd, Quantity::new(0), 0, PPM_SCALE, true, never())
+            .get()?;
+
+        Wrapper::push_from(&chain, a)
+            .path_pay(
+                vec![hop(b, usd), hop(c, usd)],
+                Quantity::new(1_000),
+                Quantity::new(1_000),
+            )
+            .get()?;
+        assert_eq!(exp(&chain, b, a, usd), 1_000);
+        assert_eq!(exp(&chain, c, b, usd), 1_000);
+
+        Wrapper::push_from(&chain, c)
+            .path_pay(
+                vec![hop(b, usd), hop(a, usd)],
+                Quantity::new(1_000),
+                Quantity::new(1_000),
+            )
+            .get()?;
+        assert_eq!(exp(&chain, b, a, usd), 0);
+        assert_eq!(exp(&chain, c, b, usd), 0);
+        assert_eq!(exp(&chain, a, b, usd), 0);
+        assert_eq!(exp(&chain, b, c, usd), 0);
+        Ok(())
+    }
 }
