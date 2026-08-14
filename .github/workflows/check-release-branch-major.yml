@@ -1,4 +1,4 @@
-name: Release branch major
+name: Check release-branch major
 
 on:
   pull_request:
