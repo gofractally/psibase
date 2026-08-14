@@ -3,6 +3,7 @@ import { util } from "wasm-transpiled";
 import { z } from "zod";
 
 import {
+    get,
     getArrayBuffer,
     getJson,
     postArrayBufferGetJson,
@@ -12,6 +13,8 @@ import {
     siblingUrl,
     throwIfError,
 } from "@psibase/common-lib";
+
+import { getAdminLoginAccessToken } from "./admin-login-jwt";
 
 import {
     type KeyDevice,
@@ -281,7 +284,14 @@ class Chain {
 
     public async getTransactStats(): Promise<TransactStatsType> {
         const url = siblingUrl(null, "transact", "/stats");
-        return TransactStats.parse(await getJson(url));
+        const accessToken = await getAdminLoginAccessToken();
+        const res = await get(url, {
+            headers: {
+                Accept: "application/json",
+                Authorization: `Bearer ${accessToken}`,
+            },
+        });
+        return TransactStats.parse(await res.json());
     }
 
     public async installNodeLocalPackage(file: File): Promise<{
