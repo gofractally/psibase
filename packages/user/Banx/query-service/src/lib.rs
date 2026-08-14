@@ -4,8 +4,8 @@ mod service {
     use async_graphql::*;
     use banx::tables::{
         Asset, AssetTable, CreditLine, CreditLineTable, CurrencyPolicy, CurrencyPolicyTab,
-        ForwardOffer, ForwardOfferTab, Obligation, ObligationTable, PairCycle, PPM_SCALE,
-        RATE_SCALE, TakeoutOffer, TakeoutOfferTab,
+        ForwardOffer, ForwardOfferTab, Obligation, ObligationTable, PairCycle, PayRequest,
+        PPM_SCALE, RATE_SCALE, RequestTab, TakeoutOffer, TakeoutOfferTab,
     };
     use psibase::services::tokens::{Decimal, Precision, Quantity};
     use psibase::*;
@@ -265,6 +265,41 @@ mod service {
         #[serde(deserialize_with = "deserialize_number_from_string")]
         other_asset_id: u16,
         actor: AccountNumber,
+        #[serde(default, deserialize_with = "deserialize_number_from_string")]
+        request_id: u32,
+        #[serde(default)]
+        memo: String,
+    }
+
+    #[derive(SimpleObject)]
+    struct PayRequestView {
+        id: u32,
+        kind: u8,
+        poster: AccountNumber,
+        counterparty: AccountNumber,
+        assetId: u16,
+        amount: Decimal,
+        remaining: Decimal,
+        memo: String,
+        expiresAt: i64,
+        createdAt: i64,
+    }
+
+    impl From<PayRequest> for PayRequestView {
+        fn from(r: PayRequest) -> Self {
+            Self {
+                id: r.id,
+                kind: r.kind,
+                poster: r.poster,
+                counterparty: r.counterparty,
+                assetId: r.asset_id,
+                amount: dec(r.amount, r.asset_id),
+                remaining: dec(r.remaining, r.asset_id),
+                memo: r.memo.to_string(),
+                expiresAt: time_sec(r.expires_at),
+                createdAt: time_sec(r.created_at),
+            }
+        }
     }
 
     #[ComplexObject]
@@ -378,6 +413,34 @@ mod service {
                 .filter(|p| p.poster == poster)
                 .map(TakeoutOfferView::from)
                 .collect()
+        }
+
+        /// Invoices and please-book requests where `account` is poster and/or
+        /// counterparty.
+        async fn requests(
+            &self,
+            account: AccountNumber,
+            asPoster: Option<bool>,
+            asCounterparty: Option<bool>,
+            openOnly: Option<bool>,
+        ) -> Vec<PayRequestView> {
+            let want_poster = asPoster.unwrap_or(true);
+            let want_counter = asCounterparty.unwrap_or(true);
+            let open_only = openOnly.unwrap_or(false);
+            RequestTab::with_service(banx::SERVICE)
+                .get_index_pk()
+                .iter()
+                .filter(|r| {
+                    (want_poster && r.poster == account)
+                        || (want_counter && r.counterparty == account)
+                })
+                .filter(|r| !open_only || r.remaining.value > 0)
+                .map(PayRequestView::from)
+                .collect()
+        }
+
+        async fn request(&self, id: u32) -> Option<PayRequestView> {
+            PayRequest::get(id).map(PayRequestView::from)
         }
 
         /// Currency convert quotes posted by `debtor`.

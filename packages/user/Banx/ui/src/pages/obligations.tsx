@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import {
     ArrowLeftRight,
@@ -8,6 +9,7 @@ import {
     Pencil,
     PiggyBank,
     Handshake,
+    Inbox,
     Plus,
     Route,
 } from "lucide-react";
@@ -58,6 +60,7 @@ import {
     useAppForm,
 } from "@/lib/form";
 import type { Asset, CreditLine, Obligation } from "@/lib/graphql";
+import { REQUEST_INVOICE, REQUEST_PLEASE_BOOK } from "@/lib/graphql";
 
 /** ppm → percent string for form inputs (e.g. 10000 → "1") */
 function ppmToPercentInput(ppm: number): string {
@@ -220,6 +223,7 @@ function mergeCreditLines(
 }
 
 export function ObligationsPage() {
+    const navigate = useNavigate();
     const { data: user } = useCurrentUser();
     const { data: obs = [], isLoading: obsLoading } = useObligations();
     const { data: lines = [], isLoading: linesLoading } = useCreditLines();
@@ -267,6 +271,23 @@ export function ObligationsPage() {
     const openTakeout = (prefill?: TakeoutOfferPrefill | null) => {
         setTakeoutPrefill(prefill ?? null);
         setTakeoutOpen(true);
+    };
+
+    const openRequest = (
+        kind: number,
+        counterparty: string,
+        assetId: number,
+        amountRaw?: string,
+    ) => {
+        const q = new URLSearchParams({
+            kind: String(kind),
+            counterparty,
+            assetId: String(assetId),
+        });
+        if (amountRaw) {
+            q.set("amount", formatRawAmount(amountRaw, precisionOf(assetId)));
+        }
+        navigate(`/requests?${q.toString()}`);
     };
 
     const savingsGroupsAll = useMemo(() => {
@@ -492,6 +513,16 @@ export function ObligationsPage() {
                                         assetId: g.assetId,
                                     })
                                 }
+                                onAskRequest={() =>
+                                    openRequest(
+                                        REQUEST_INVOICE,
+                                        g.counterparty,
+                                        g.assetId,
+                                        g.total > 0n
+                                            ? g.total.toString()
+                                            : undefined,
+                                    )
+                                }
                                 onSellClaim={
                                     g.total > 0n
                                         ? () => {
@@ -593,6 +624,16 @@ export function ObligationsPage() {
                                         creditor: g.counterparty,
                                         assetId: g.assetId,
                                     })
+                                }
+                                onAskRequest={() =>
+                                    openRequest(
+                                        REQUEST_PLEASE_BOOK,
+                                        g.counterparty,
+                                        g.assetId,
+                                        g.total > 0n
+                                            ? g.total.toString()
+                                            : undefined,
+                                    )
                                 }
                             />
                         ))}
@@ -1010,6 +1051,7 @@ function AccountGroupRow({
     onEditCreditLine,
     onSetRouting,
     onSetTakeout,
+    onAskRequest,
     onSellClaim,
 }: {
     tone: "savings" | "loan";
@@ -1029,6 +1071,8 @@ function AccountGroupRow({
     onSetRouting?: () => void;
     /** Takeout offer to buy claims on this counterparty. */
     onSetTakeout?: () => void;
+    /** Open a request (invoice from savings, please-book from a loan). */
+    onAskRequest?: () => void;
     /** Sell claim on this counterparty (savings / you are creditor). */
     onSellClaim?: () => void;
 }) {
@@ -1072,6 +1116,10 @@ function AccountGroupRow({
         "Path-forward offer — let others hop through you to this party";
     const takeoutTip =
         "Takeout offer — buy others' claims on this party";
+    const requestTip =
+        tone === "savings"
+            ? "Invoice — ask them to path-pay you"
+            : "Please book — ask this creditor to record value they received";
     const sellTip =
         "Sell claim — transfer this debt to a buyer under their takeout offer";
 
@@ -1242,6 +1290,28 @@ function AccountGroupRow({
                                 </TooltipTrigger>
                                 <TooltipContent side="top">
                                     {takeoutTip}
+                                </TooltipContent>
+                            </Tooltip>
+                        ) : null}
+                        {onAskRequest ? (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        type="button"
+                                        size="icon"
+                                        variant="outline"
+                                        className="size-8 shrink-0"
+                                        aria-label={requestTip}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onAskRequest();
+                                        }}
+                                    >
+                                        <Inbox className="size-3.5" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">
+                                    {requestTip}
                                 </TooltipContent>
                             </Tooltip>
                         ) : null}

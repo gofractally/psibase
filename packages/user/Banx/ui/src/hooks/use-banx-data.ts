@@ -6,6 +6,7 @@ import {
     fetchCurrencyPolicies,
     fetchObligations,
     fetchForwardOffers,
+    fetchRequests,
     fetchTakeoutOffers,
 } from "@/lib/graphql";
 import { QueryKey } from "@/lib/query-keys";
@@ -57,6 +58,15 @@ export function useTakeoutOffers() {
     return useQuery({
         queryKey: QueryKey.takeoutOffers(user),
         queryFn: () => fetchTakeoutOffers(user!),
+        enabled: !!user,
+    });
+}
+
+export function useRequests() {
+    const { data: user } = useCurrentUser();
+    return useQuery({
+        queryKey: QueryKey.requests(user),
+        queryFn: () => fetchRequests(user!),
         enabled: !!user,
     });
 }

@@ -10,6 +10,8 @@ export const QueryKey = {
         ["banx", "takeoutOffers", account ?? ""] as const,
     currencyPolicies: (account: string | null | undefined) =>
         ["banx", "currencyPolicies", account ?? ""] as const,
+    requests: (account: string | null | undefined) =>
+        ["banx", "requests", account ?? ""] as const,
     activity: (
         account: string | null | undefined,
         counterparty: string,

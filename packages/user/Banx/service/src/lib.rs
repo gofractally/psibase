@@ -25,6 +25,8 @@ pub mod tables {
         pub next_obligation_id: u32,
         /// Next primary key for [`Asset`] rows (u16 space).
         pub next_asset_id: u16,
+        /// Next primary key for [`PayRequest`] rows.
+        pub next_request_id: u32,
     }
     impl InitRow {
         #[primary_key]
@@ -58,6 +60,18 @@ pub mod tables {
             let mut row = Self::get_assert();
             let id = row.next_asset_id;
             row.next_asset_id = row.next_asset_id.checked_add(1).expect("asset id overflow");
+            row.save();
+            id
+        }
+
+        /// Allocate a unique request primary key.
+        pub fn alloc_request_id() -> u32 {
+            let mut row = Self::get_assert();
+            let id = row.next_request_id;
+            row.next_request_id = row
+                .next_request_id
+                .checked_add(1)
+                .expect("request id overflow");
             row.save();
             id
         }
@@ -368,6 +382,199 @@ pub mod tables {
         }
     }
 
+    /// Invoice (`INVOICE`): poster is the payee; counterparty should `path_pay`
+    /// so the last hop is the poster. Does **not** shrink an existing debt to
+    /// the poster.
+    ///
+    /// Please-book (`PLEASE_BOOK`): poster asked the counterparty (creditor)
+    /// to `deposit` them — off-graph value received. Only the creditor can
+    /// fulfill; the poster cannot clear their own debt.
+    #[table(name = "RequestTab", index = 8)]
+    #[derive(Default, Clone, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    pub struct PayRequest {
+        pub id: u32,
+        /// [`Self::INVOICE`] or [`Self::PLEASE_BOOK`].
+        pub kind: u8,
+        pub poster: AccountNumber,
+        pub counterparty: AccountNumber,
+        pub asset_id: u16,
+        pub amount: Quantity,
+        pub remaining: Quantity,
+        pub memo: Memo,
+        pub expires_at: TimePointSec,
+        pub created_at: TimePointSec,
+    }
+
+    impl PayRequest {
+        pub const INVOICE: u8 = 1;
+        pub const PLEASE_BOOK: u8 = 2;
+
+        #[primary_key]
+        fn pk(&self) -> u32 {
+            self.id
+        }
+
+        fn save(&self) {
+            RequestTab::read_write().put(self).unwrap();
+        }
+
+        pub fn get(id: u32) -> Option<Self> {
+            RequestTab::read().get_index_pk().get(&id)
+        }
+
+        pub fn get_assert(id: u32) -> Self {
+            Self::get(id).unwrap_or_else(|| panic!("request {id} not found"))
+        }
+
+        fn assert_live(&self) {
+            assert!(self.remaining.value > 0, "request already fulfilled");
+            assert_policy_live(self.expires_at);
+        }
+
+        pub fn create(
+            kind: u8,
+            poster: AccountNumber,
+            counterparty: AccountNumber,
+            asset_id: u16,
+            amount: Quantity,
+            memo: Memo,
+            expires_at: TimePointSec,
+        ) -> u32 {
+            assert!(
+                kind == Self::INVOICE || kind == Self::PLEASE_BOOK,
+                "request kind must be invoice (1) or please-book (2)"
+            );
+            assert!(poster != counterparty, "cannot request to self");
+            assert!(
+                counterparty != AccountNumber::new(0),
+                "request counterparty required"
+            );
+            assert!(amount.value > 0, "request amount must be positive");
+            let _ = Asset::get_assert(asset_id);
+            let id = InitRow::alloc_request_id();
+            let row = Self {
+                id,
+                kind,
+                poster,
+                counterparty,
+                asset_id,
+                amount,
+                remaining: amount,
+                memo,
+                expires_at,
+                created_at: Obligation::now(),
+            };
+            row.save();
+            let kind_s = if kind == Self::INVOICE {
+                "invoice"
+            } else {
+                "please_book"
+            };
+            emit_pair_activity(
+                poster,
+                counterparty,
+                asset_id,
+                kind_s,
+                amount,
+                Quantity::new(0),
+                asset_id,
+                id,
+                &row.memo.to_string(),
+            );
+            id
+        }
+
+        pub fn cancel(id: u32, sender: AccountNumber) {
+            let row = Self::get_assert(id);
+            assert!(row.poster == sender, "only the poster can cancel a request");
+            assert!(row.remaining.value > 0, "request already fulfilled");
+            emit_pair_activity(
+                row.poster,
+                row.counterparty,
+                row.asset_id,
+                "req_cancel",
+                row.remaining,
+                Quantity::new(0),
+                row.asset_id,
+                row.id,
+                &row.memo.to_string(),
+            );
+            RequestTab::read_write().erase(&id);
+        }
+
+        /// After a successful path_pay: last hop must be the payee (poster).
+        pub fn fulfill_invoice(
+            id: u32,
+            payer: AccountNumber,
+            last_hop: AccountNumber,
+            last_asset: u16,
+            residual: Quantity,
+        ) {
+            let mut row = Self::get_assert(id);
+            assert!(row.kind == Self::INVOICE, "request is not an invoice");
+            row.assert_live();
+            assert!(
+                payer == row.counterparty,
+                "only the named payer can fulfill this invoice"
+            );
+            assert!(
+                last_hop == row.poster,
+                "invoice path must end at the payee (poster)"
+            );
+            assert!(
+                last_asset == row.asset_id,
+                "invoice last hop asset mismatch"
+            );
+            assert!(residual.value > 0, "invoice fulfill residual is zero");
+            let take = Quantity::new(row.remaining.value.min(residual.value));
+            row.remaining = (row.remaining.value - take.value).into();
+            row.save();
+            emit_pair_activity(
+                row.poster,
+                payer,
+                row.asset_id,
+                "fulfill",
+                take,
+                Quantity::new(0),
+                row.asset_id,
+                row.id,
+                &row.memo.to_string(),
+            );
+        }
+
+        /// Before deposit: creditor (sender) books the poster as depositor.
+        pub fn fulfill_please_book(
+            id: u32,
+            creditor: AccountNumber,
+            depositor: AccountNumber,
+            asset_id: u16,
+            amount: Quantity,
+        ) -> String {
+            let mut row = Self::get_assert(id);
+            assert!(
+                row.kind == Self::PLEASE_BOOK,
+                "request is not a please-book"
+            );
+            row.assert_live();
+            assert!(
+                creditor == row.counterparty,
+                "only the named creditor can book this request"
+            );
+            assert!(
+                depositor == row.poster,
+                "depositor must be the please-book poster"
+            );
+            assert!(asset_id == row.asset_id, "please-book asset mismatch");
+            assert!(
+                amount.value > 0 && amount.value <= row.remaining.value,
+                "please-book amount exceeds remaining"
+            );
+            row.remaining = (row.remaining.value - amount.value).into();
+            row.save();
+            row.memo.to_string()
+        }
+    }
+
     fn offer_live(expires_at: TimePointSec) -> bool {
         policy_is_live(expires_at)
     }
@@ -528,6 +735,8 @@ pub mod tables {
                 Quantity::new(take),
                 to_qty,
                 self.to_asset,
+                0,
+                "",
             );
             to_qty
         }
@@ -1281,6 +1490,8 @@ pub mod tables {
                 amount,
                 netted,
                 asset_id,
+                0,
+                "",
             );
         }
 
@@ -1305,11 +1516,14 @@ pub mod tables {
         amount: Quantity,
         netted: Quantity,
         other_asset_id: u16,
+        request_id: u32,
+        memo: &str,
     ) {
         let actor = psibase::get_sender();
         let amount_s = amount.value.to_string();
         let netted_s = netted.value.to_string();
         let kind_s = kind.to_string();
+        let memo_s = memo.to_string();
         for (account, counterparty) in [(party_a, party_b), (party_b, party_a)] {
             crate::Wrapper::emit().history().activity(
                 account,
@@ -1320,6 +1534,8 @@ pub mod tables {
                 netted_s.clone(),
                 other_asset_id,
                 actor,
+                request_id,
+                memo_s.clone(),
             );
         }
     }
@@ -1329,7 +1545,7 @@ pub mod tables {
 pub mod service {
     use crate::tables::{
         emit_pair_activity, resolve_forward, resolve_take, Asset, CreditLine, CurrencyPolicy,
-        ForwardOffer, InitRow, InitTable, Obligation, PathHop, TakeoutOffer,
+        ForwardOffer, InitRow, InitTable, Obligation, PathHop, PayRequest, TakeoutOffer,
     };
     use psibase::{
         services::events,
@@ -1358,6 +1574,7 @@ pub mod service {
                 .put(&InitRow {
                     next_obligation_id: 1,
                     next_asset_id: 1,
+                    next_request_id: 1,
                 })
                 .unwrap();
 
@@ -1447,6 +1664,8 @@ pub mod service {
             amount,
             Quantity::new(0),
             asset_id,
+            0,
+            "",
         );
     }
 
@@ -1617,6 +1836,8 @@ pub mod service {
             amount,
             proceeds,
             asset_id,
+            0,
+            "",
         );
     }
 
@@ -1676,8 +1897,17 @@ pub mod service {
 
     /// Book a **deposit**: sender receives value and credits `depositor`, then
     /// **auto-nets** mutual obligations for this asset.
+    ///
+    /// `request_id` 0 = none. Non-zero must be a live please-book posted by
+    /// `depositor` naming the sender as creditor.
     #[action]
-    fn deposit(depositor: AccountNumber, asset_id: u16, amount: Quantity, interest_rate: u32) {
+    fn deposit(
+        depositor: AccountNumber,
+        asset_id: u16,
+        amount: Quantity,
+        interest_rate: u32,
+        request_id: u32,
+    ) {
         let receiver = get_sender();
         assert!(depositor != receiver, "cannot deposit from self");
         assert!(amount.value > 0, "deposit amount must be positive");
@@ -1686,6 +1916,17 @@ pub mod service {
             interest_rate <= crate::tables::PPM_SCALE,
             "interest_rate exceeds 100% (PPM_SCALE)"
         );
+        let req_memo = if request_id != 0 {
+            PayRequest::fulfill_please_book(
+                request_id,
+                receiver,
+                depositor,
+                asset_id,
+                amount,
+            )
+        } else {
+            String::new()
+        };
         let netted = Obligation::deposit(depositor, receiver, asset_id, amount, interest_rate);
         emit_pair_activity(
             depositor,
@@ -1695,6 +1936,8 @@ pub mod service {
             amount,
             netted,
             asset_id,
+            request_id,
+            &req_memo,
         );
     }
 
@@ -1722,6 +1965,8 @@ pub mod service {
                 cancelled,
                 Quantity::new(0),
                 asset_id,
+                0,
+                "",
             );
         }
     }
@@ -1742,10 +1987,19 @@ pub mod service {
     /// Atomic: all legs succeed or none stick.
     ///
     /// Each draw **auto-nets** that pair/asset (via [`CreditLine::debit`]).
+    ///
+    /// `request_id` 0 = none. Non-zero must be a live invoice naming the
+    /// sender as payer; last hop must be the invoice poster in that asset.
     #[action]
-    fn path_pay(hops: Vec<PathHop>, amount: Quantity, min_return: Quantity) {
+    fn path_pay(
+        hops: Vec<PathHop>,
+        amount: Quantity,
+        min_return: Quantity,
+        request_id: u32,
+    ) {
         assert!(!hops.is_empty(), "path_pay must include at least one hop");
         assert!(amount.value > 0, "path_pay amount must be positive");
+        let last_hop = hops[hops.len() - 1];
 
         let mut path_debtor = get_sender();
         let mut forward = amount;
@@ -1801,14 +2055,57 @@ pub mod service {
             forward.value >= min_return.value,
             "path_pay final amount below min_return"
         );
+
+        if request_id != 0 {
+            PayRequest::fulfill_invoice(
+                request_id,
+                get_sender(),
+                last_hop.account,
+                last_hop.asset_id,
+                forward,
+            );
+        }
+    }
+
+    /// Post an invoice (`kind` = 1) or please-book (`kind` = 2).
+    ///
+    /// Invoice: poster is payee; `counterparty` should path-pay ending at poster.
+    /// Please-book: poster asks `counterparty` (creditor) to deposit them.
+    #[action]
+    fn st_req(
+        kind: u8,
+        counterparty: AccountNumber,
+        asset_id: u16,
+        amount: Quantity,
+        memo: Memo,
+        expires_at: TimePointSec,
+    ) -> u32 {
+        PayRequest::create(
+            kind,
+            get_sender(),
+            counterparty,
+            asset_id,
+            amount,
+            memo,
+            expires_at,
+        )
+    }
+
+    /// Cancel an open request. Poster only.
+    #[action]
+    fn rm_req(id: u32) {
+        PayRequest::cancel(id, get_sender());
     }
 
     /// Bilateral activity history (emitted once per party as `account`).
     ///
-    /// - `kind`: `path_draw` | `deposit` | `net` | `convert` | `credit_line` | `sell_claim`
+    /// - `kind`: `path_draw` | `deposit` | `net` | `convert` | `credit_line` |
+    ///   `sell_claim` | `invoice` | `please_book` | `fulfill` | `req_cancel`
     /// - `amount`: primary quantity (raw units)
     /// - `netted`: amount cancelled by auto-net (or convert output for `convert`)
     /// - `other_asset_id`: convert destination asset; otherwise same as `asset_id`
+    /// - `request_id`: linked request (`0` = none)
+    /// - `memo`: request memo when linked
     #[event(history)]
     pub fn activity(
         account: AccountNumber,
@@ -1819,6 +2116,8 @@ pub mod service {
         netted: String,
         other_asset_id: u16,
         actor: AccountNumber,
+        request_id: u32,
+        memo: String,
     ) {
     }
 

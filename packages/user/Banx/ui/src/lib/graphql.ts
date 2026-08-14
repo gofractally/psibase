@@ -67,6 +67,22 @@ const zCurrencyPolicy = z.object({
     expiresAt: z.number(),
 });
 
+const zPayRequest = z.object({
+    id: z.number(),
+    kind: z.number(),
+    poster: z.string(),
+    counterparty: z.string(),
+    assetId: z.number(),
+    amount: z.string(),
+    remaining: z.string(),
+    memo: z.string(),
+    expiresAt: z.number(),
+    createdAt: z.number(),
+});
+
+export const REQUEST_INVOICE = 1;
+export const REQUEST_PLEASE_BOOK = 2;
+
 const zActivity = z.object({
     account: z.string(),
     counterparty: z.string(),
@@ -76,6 +92,8 @@ const zActivity = z.object({
     netted: z.string(),
     otherAssetId: z.number(),
     actor: z.string(),
+    requestId: z.number().optional(),
+    memo: z.string().optional(),
     blockTime: z.string().optional(),
 });
 
@@ -85,6 +103,7 @@ export type Obligation = z.infer<typeof zObligation>;
 export type ForwardOffer = z.infer<typeof zForwardOffer>;
 export type TakeoutOffer = z.infer<typeof zTakeoutOffer>;
 export type CurrencyPolicy = z.infer<typeof zCurrencyPolicy>;
+export type PayRequest = z.infer<typeof zPayRequest>;
 export type ActivityEvent = z.infer<typeof zActivity>;
 
 const gql = <T>(query: string) =>
@@ -141,6 +160,16 @@ export async function fetchTakeoutOffers(
     return zTakeoutOffer.array().parse(data.takeoutOffers);
 }
 
+export async function fetchRequests(account: string): Promise<PayRequest[]> {
+    const data = await gql<{ requests: PayRequest[] }>(
+        `{ requests(account: "${account}") {
+            id kind poster counterparty assetId amount remaining memo
+            expiresAt createdAt
+        } }`,
+    );
+    return zPayRequest.array().parse(data.requests);
+}
+
 export async function fetchCurrencyPolicies(
     account: string,
 ): Promise<CurrencyPolicy[]> {
@@ -169,6 +198,8 @@ export async function fetchActivity(
                     netted: string;
                     otherAssetId: number | string;
                     actor: string;
+                    requestId?: number | string;
+                    memo?: string;
                     block?: { blockTime?: string | null } | null;
                 } | null;
             }[];
@@ -185,6 +216,8 @@ export async function fetchActivity(
                     netted
                     otherAssetId
                     actor
+                    requestId
+                    memo
                     block { blockTime }
                 }
             }
@@ -203,6 +236,8 @@ export async function fetchActivity(
                 netted: n.netted,
                 otherAssetId: Number(n.otherAssetId),
                 actor: n.actor,
+                requestId: n.requestId === undefined ? 0 : Number(n.requestId),
+                memo: n.memo ?? "",
                 blockTime: n.block?.blockTime ?? undefined,
             }),
         );

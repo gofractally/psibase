@@ -30,6 +30,7 @@ define_trust! {
         Medium => "
             - Post or remove credit lines, forward offers, takeout offers, and currency policies
             - Deposit and net obligations
+            - Create or cancel invoices and please-book requests
             - Convert debt between assets
             - Sell claims under a buyer's takeout offer
         ",
@@ -51,6 +52,8 @@ define_trust! {
             remove_takeout_offer,
             remove_global_takeout_offer,
             set_currency_policy,
+            create_request,
+            cancel_request,
             deposit,
             net,
             convert,
@@ -300,11 +303,42 @@ impl Api for BanxPlugin {
         add_action_to_transaction(banx::action_structs::st_cur_pol::ACTION_NAME, &packed)
     }
 
+    fn create_request(
+        kind: u8,
+        counterparty: String,
+        asset_id: u16,
+        amount: String,
+        memo: String,
+        expires_at_seconds: u32,
+    ) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::create_request)?;
+        let amount = parse_amount_nonzero(asset_id, &amount)?;
+        let packed = banx::action_structs::st_req {
+            kind,
+            counterparty: parse_account(&counterparty)?,
+            asset_id,
+            amount,
+            memo: memo.parse().map_err(|_| {
+                ErrorType::ConversionError("memo too long (max 80 bytes)".into())
+            })?,
+            expires_at: time_point(expires_at_seconds),
+        }
+        .packed();
+        add_action_to_transaction(banx::action_structs::st_req::ACTION_NAME, &packed)
+    }
+
+    fn cancel_request(id: u32) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::cancel_request)?;
+        let packed = banx::action_structs::rm_req { id }.packed();
+        add_action_to_transaction(banx::action_structs::rm_req::ACTION_NAME, &packed)
+    }
+
     fn deposit(
         depositor: String,
         asset_id: u16,
         amount: String,
         interest_rate_ppm: u32,
+        request_id: u32,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::deposit)?;
         let amount = parse_amount_nonzero(asset_id, &amount)?;
@@ -313,6 +347,7 @@ impl Api for BanxPlugin {
             asset_id,
             amount,
             interest_rate: interest_rate_ppm,
+            request_id,
         }
         .packed();
         add_action_to_transaction(banx::action_structs::deposit::ACTION_NAME, &packed)
@@ -351,7 +386,12 @@ impl Api for BanxPlugin {
         add_action_to_transaction(banx::action_structs::convert::ACTION_NAME, &packed)
     }
 
-    fn path_pay(hops: Vec<WitPathHop>, amount: String, min_return: String) -> Result<(), Error> {
+    fn path_pay(
+        hops: Vec<WitPathHop>,
+        amount: String,
+        min_return: String,
+        request_id: u32,
+    ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::path_pay)?;
         if hops.is_empty() {
             return Err(
@@ -374,6 +414,7 @@ impl Api for BanxPlugin {
             hops: path,
             amount,
             min_return,
+            request_id,
         }
         .packed();
         add_action_to_transaction(banx::action_structs::path_pay::ACTION_NAME, &packed)

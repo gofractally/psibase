@@ -138,13 +138,30 @@ interface api {
         expires-at-seconds: u32,
     ) -> result<_, error>;
 
+    /// Invoice (`kind` = 1): you are the payee; `counterparty` should path-pay
+    /// you. Please-book (`kind` = 2): you ask `counterparty` (creditor) to
+    /// deposit you. `amount` is a human decimal. `memo` max 80 bytes.
+    create-request: func(
+        kind: u8,
+        counterparty: string,
+        asset-id: u16,
+        amount: string,
+        memo: string,
+        expires-at-seconds: u32,
+    ) -> result<_, error>;
+
+    /// Cancel an open request. Poster only.
+    cancel-request: func(id: u32) -> result<_, error>;
+
     /// Book a deposit: sender receives value and credits `depositor`, then auto-nets.
     /// `amount` is a human decimal string.
+    /// `request-id` 0 = none; otherwise a please-book you are fulfilling.
     deposit: func(
         depositor: string,
         asset-id: u16,
         amount: string,
         interest-rate-ppm: u32,
+        request-id: u32,
     ) -> result<_, error>;
 
     /// Net mutual obligations with `counterparty` for `asset-id`.
@@ -163,10 +180,13 @@ interface api {
 
     /// Multi-hop path payment. Each hop is (account, asset-id).
     /// Amounts are human decimal strings in the first/last hop assets respectively.
+    /// `request-id` 0 = none; otherwise an invoice you are fulfilling (last hop
+    /// must be the payee).
     path-pay: func(
         hops: list<path-hop>,
         amount: string,
         min-return: string,
+        request-id: u32,
     ) -> result<_, error>;
 
     /// Discover a multi-hop path from `from-account` to `to-account` (TokenSwap-style

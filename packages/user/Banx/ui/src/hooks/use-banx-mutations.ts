@@ -24,6 +24,9 @@ function useInvalidateBanx() {
             void qc.invalidateQueries({
                 queryKey: QueryKey.currencyPolicies(user),
             });
+            void qc.invalidateQueries({
+                queryKey: QueryKey.requests(user),
+            });
         }
     };
 }
@@ -74,16 +77,57 @@ export function useDeposit() {
             assetId: number;
             amount: string;
             interestRatePpm: number;
+            requestId?: number;
         }) =>
             banxCall("deposit", [
                 p.depositor,
                 p.assetId,
                 p.amount,
                 p.interestRatePpm,
+                p.requestId ?? 0,
             ]),
         onSuccess: () => {
             invalidate();
             toast.success("Deposit booked (and netted if possible)");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useCreateRequest() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            kind: number;
+            counterparty: string;
+            assetId: number;
+            amount: string;
+            memo: string;
+            expiresAtSeconds: number;
+        }) =>
+            banxCall("createRequest", [
+                p.kind,
+                p.counterparty,
+                p.assetId,
+                p.amount,
+                p.memo,
+                p.expiresAtSeconds,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Request posted");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useCancelRequest() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (id: number) => banxCall("cancelRequest", [id]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Request cancelled");
         },
         onError: (e: Error) => toast.error(e.message),
     });
@@ -112,6 +156,7 @@ export function usePathPay() {
             hops: { account: string; assetId: number }[];
             amount: string;
             minReturn: string;
+            requestId?: number;
         }) =>
             banxCall("pathPay", [
                 p.hops.map((h) => ({
@@ -120,6 +165,7 @@ export function usePathPay() {
                 })),
                 p.amount,
                 p.minReturn,
+                p.requestId ?? 0,
             ]),
         onSuccess: () => {
             invalidate();

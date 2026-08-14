@@ -23,6 +23,14 @@ function kindLabel(kind: string): string {
             return "Convert";
         case "credit_line":
             return "Credit line";
+        case "invoice":
+            return "Invoice";
+        case "please_book":
+            return "Please-book";
+        case "fulfill":
+            return "Fulfill request";
+        case "req_cancel":
+            return "Cancel request";
         default:
             return kind;
     }
@@ -75,6 +83,18 @@ function describeEvent(
                 title: `Converted ${amt} ${sym} → ${toAmt} ${otherSym}`,
                 detail: `Rebook via currency policy · actor ${e.actor}`,
             };
+        case "invoice":
+        case "please_book":
+        case "fulfill":
+        case "req_cancel": {
+            const req =
+                e.requestId && e.requestId > 0 ? ` · request #${e.requestId}` : "";
+            const memo = e.memo?.trim() ? ` · ${e.memo}` : "";
+            return {
+                title: `${kindLabel(e.kind)} ${amt} ${sym}`,
+                detail: `${e.counterparty}${req}${memo} · actor ${e.actor}`,
+            };
+        }
         case "credit_line":
             return {
                 title:

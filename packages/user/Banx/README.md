@@ -49,6 +49,19 @@ A **deposit** is how off-graph value enters: the receiver books a liability to t
 
 `net` remains as an action (either party, optional `max_amount`) for scripts or cleanup. The UI does not expose it; writers already full-net.
 
+## Requests
+
+Two kinds (`st_req` / `createRequest`). Named counterparty, amount, memo (80 bytes), optional expiry.
+
+| Kind | Poster | Fulfiller | Effect |
+|------|--------|-----------|--------|
+| **Invoice** (`1`) | Payee | Named payer, via `path_pay` ending at the payee | Payee holds a **new** claim. Does **not** shrink an existing loan to that payee. |
+| **Please-book** (`2`) | Debtor (or whoever sent value off-graph) | **Only** the named creditor, via `deposit` with `request_id` | Opposite claim + auto-net. The poster cannot book this themselves. |
+
+Fulfillment is partial (`remaining` declines). Poster can `rm_req` while still open. Activity records `request_id` and memo on create / cancel / fulfill (and on the deposit that books a please-book).
+
+UI: `/requests`. Accounts inbox icon prefills an invoice (savings) or please-book (loan). Incoming invoices open Transfer with the invoice id.
+
 ## Path pay
 
 `path_pay(hops, amount, min_return)` is atomic.
@@ -131,9 +144,10 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 | `rm_fwd_ofr` / `rm_glb_fwd` | Remove path-forward offer |
 | `st_tko_ofr` / `st_glb_tko` | Specific / global takeout offer |
 | `rm_tko_ofr` / `rm_glb_tko` | Remove takeout offer |
-| `path_pay` | Multi-hop draw |
+| `path_pay` | Multi-hop draw (`request_id` 0 or invoice) |
 | `sell_claim` | Sell a claim to a buyer’s offer |
-| `deposit` | Book a deposit and auto-net |
+| `deposit` | Book a deposit and auto-net (`request_id` 0 or please-book) |
+| `st_req` / `rm_req` | Create / cancel invoice or please-book |
 | `net` | Explicit bilateral net (no UI; writers already auto-net) |
 | `st_cur_pol` | Post convert quote |
 | `convert` | Rebook a claim and auto-net `to_asset` |
@@ -145,6 +159,7 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 - `/accounts` — claims you hold and liabilities you owe; offer/edit lines
 - `/payees` — contacts; deposit or draw
 - `/path-pay` — Transfer: find a path and execute
+- `/requests` — invoices and please-book
 - `/policies` — path-forward offers, takeout offers, and currency policies
 - `/assets` — registered assets
 

@@ -3,6 +3,7 @@ import {
     Coins,
     Contact,
     GitBranch,
+    Inbox,
     ScrollText,
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
@@ -23,6 +24,7 @@ const items: {
 }[] = [
     { to: "/accounts", label: "Accounts", icon: ScrollText },
     { to: "/path-pay", label: "Transfer", icon: GitBranch },
+    { to: "/requests", label: "Requests", icon: Inbox },
     { to: "/payees", label: "Payees", icon: Contact },
     { to: "/policies", label: "Policies", icon: ArrowLeftRight },
     { to: "/assets", label: "Assets", icon: Coins },

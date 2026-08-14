@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import {
     defaultAssetId,
@@ -37,12 +38,14 @@ export function PathPayPage() {
     const { assets, precisionOf, symbolOf } = useAssetMap();
     const pathPay = usePathPay();
     const quotePath = useQuotePath();
+    const [searchParams] = useSearchParams();
+    const requestId = Number(searchParams.get("request") || "0") || 0;
 
     const [quote, setQuote] = useState<QuoteSummary | null>(null);
 
     const findForm = useAppForm({
         defaultValues: {
-            payee: "",
+            payee: searchParams.get("payee") ?? "",
             fromAsset: undefined as number | undefined,
             toAsset: undefined as number | undefined,
             maxHops: "6",
@@ -52,7 +55,9 @@ export function PathPayPage() {
              * - `send`  = exact-in: amount is what you send (payee covers fees)
              * - `receive` = exact-out: amount is what payee gets (you cover fees)
              */
-            feeMode: "send" as "send" | "receive",
+            feeMode: (searchParams.get("request")
+                ? "receive"
+                : "send") as "send" | "receive",
         },
         onSubmit: async ({ value }) => {
             if (
@@ -131,6 +136,7 @@ export function PathPayPage() {
                         hops: cleaned,
                         amount: value.amount.trim(),
                         minReturn: value.minReturn.trim(),
+                        requestId: requestId || undefined,
                     },
                     {
                         onSuccess: () => resolve(),
@@ -140,6 +146,25 @@ export function PathPayPage() {
             });
         },
     });
+
+    useEffect(() => {
+        const payee = searchParams.get("payee");
+        const amount = searchParams.get("amount");
+        const toAsset = Number(searchParams.get("toAsset") || "");
+        if (payee) findForm.setFieldValue("payee", payee);
+        if (amount) {
+            findForm.setFieldValue("amount", amount);
+            execForm.setFieldValue("minReturn", amount);
+        }
+        if (Number.isFinite(toAsset) && toAsset > 0) {
+            findForm.setFieldValue("toAsset", toAsset);
+            findForm.setFieldValue("fromAsset", toAsset);
+        }
+        if (searchParams.get("request")) {
+            findForm.setFieldValue("feeMode", "receive");
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams]);
 
     const addHop = () => {
         const hops = execForm.state.values.hops;
@@ -166,11 +191,16 @@ export function PathPayPage() {
         <div className="space-y-8">
             <PageHeader
                 title="Transfer"
-                description="Draw along a hop list. First hop uses a credit line only; later same-asset hops need a live path-forward offer (fixed + % fee). Asset changes auto-convert via the previous edge debtor's currency policy. Use Find path to discover a route from you to a payee."
+                description="Draw along a hop list. First hop uses a credit line only; later same-asset hops need a live path-forward offer (fixed + % fee). Asset changes auto-convert via the previous edge debtor's currency policy. Use Find path to discover a route from you to a payee. Fulfilling an invoice requires the last hop to be the payee."
             />
 
             <section className="grid max-w-2xl gap-4 rounded-lg border p-4">
-                <h2 className="font-medium">Find path</h2>
+                <h2 className="font-medium">
+                    Find path
+                    {requestId
+                        ? ` · invoice #${requestId}`
+                        : null}
+                </h2>
                 <p className="text-muted-foreground text-xs">
                     Off-chain quote using credit lines, path-forward offers, and FX
                     policies expanded from your account toward the payee (not a
