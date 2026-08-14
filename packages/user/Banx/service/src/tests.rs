@@ -2,8 +2,8 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::tables::interest::{accrue_delta, ACCRUAL_DENOM};
-    use crate::tables::{Asset, Obligation, PathHop, PPM_SCALE, RATE_SCALE};
+    use crate::tables::interest::{accrue_delta, ACCRUAL_DENOM, SECONDS_PER_YEAR};
+    use crate::tables::{Asset, CreditLine, Obligation, PathHop, PPM_SCALE, RATE_SCALE};
     use crate::Wrapper;
     use psibase::services::tokens::{Precision, Quantity};
     use psibase::*;
@@ -153,7 +153,7 @@ mod tests {
             .st_glb_clr(
                 usd,
                 Quantity::new(0),
-                (PPM_SCALE * 2 / 100),
+                PPM_SCALE * 2 / 100,
                 PPM_SCALE,
                 true,
                 never(),
@@ -737,6 +737,446 @@ mod tests {
         assert_eq!(Obligation::exposure(peter, bob, usd).value, 10_000);
         assert_eq!(Obligation::exposure(alice, peter, usd).value, 9_500);
 
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_take_only_specific_falls_back_to_global_forward(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let gary = account!("gary");
+        let steve = account!("steve");
+        for a in [alice, gary, steve] {
+            chain.new_account(a).unwrap();
+        }
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        Wrapper::push_from(&chain, gary)
+            .st_crd_lne(alice, usd, Quantity::new(10_000), false, 0)
+            .get()?;
+        Wrapper::push_from(&chain, steve)
+            .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0)
+            .get()?;
+        // Take-only specific to Steve would previously shadow the global forward.
+        Wrapper::push_from(&chain, gary)
+            .st_clr_ofr(
+                steve,
+                usd,
+                Quantity::new(0),
+                0,
+                PPM_SCALE,
+                false,
+                never(),
+            )
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .st_glb_clr(
+                usd,
+                Quantity::new(0),
+                PPM_SCALE * 2 / 100,
+                PPM_SCALE,
+                true,
+                never(),
+            )
+            .get()?;
+
+        Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(gary, usd), hop(steve, usd)],
+                Quantity::new(500),
+                Quantity::new(490),
+            )
+            .get()?;
+        assert_eq!(Obligation::exposure(steve, gary, usd).value, 490);
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_expired_specific_falls_back_to_global(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let gary = account!("gary");
+        let steve = account!("steve");
+        for a in [alice, gary, steve] {
+            chain.new_account(a).unwrap();
+        }
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        Wrapper::push_from(&chain, gary)
+            .st_crd_lne(alice, usd, Quantity::new(10_000), false, 0)
+            .get()?;
+        Wrapper::push_from(&chain, steve)
+            .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0)
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .st_clr_ofr(
+                steve,
+                usd,
+                Quantity::new(0),
+                0,
+                PPM_SCALE,
+                true,
+                TimePointSec { seconds: 1 },
+            )
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .st_glb_clr(
+                usd,
+                Quantity::new(10),
+                0,
+                PPM_SCALE,
+                true,
+                never(),
+            )
+            .get()?;
+
+        Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(gary, usd), hop(steve, usd)],
+                Quantity::new(100),
+                Quantity::new(90),
+            )
+            .get()?;
+        assert_eq!(Obligation::exposure(steve, gary, usd).value, 90);
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_max_line_apr_rejects_forward(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let gary = account!("gary");
+        let steve = account!("steve");
+        for a in [alice, gary, steve] {
+            chain.new_account(a).unwrap();
+        }
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        Wrapper::push_from(&chain, gary)
+            .st_crd_lne(alice, usd, Quantity::new(10_000), false, 0)
+            .get()?;
+        Wrapper::push_from(&chain, steve)
+            .st_crd_lne(gary, usd, Quantity::new(10_000), false, 20_000)
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .st_glb_clr(usd, Quantity::new(0), 0, 10_000, true, never())
+            .get()?;
+
+        let result = Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(gary, usd), hop(steve, usd)],
+                Quantity::new(100),
+                Quantity::new(0),
+            )
+            .get();
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_deplete_on_debit_keeps_limit_cap(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, usd, Quantity::new(100), true, 0)
+            .get()?;
+        let line = CreditLine::get_assert(bob, alice, usd);
+        assert_eq!(line.limit.value, 100);
+        assert_eq!(line.remaining.value, 100);
+
+        Wrapper::push_from(&chain, alice)
+            .path_pay(vec![hop(bob, usd)], Quantity::new(60), Quantity::new(60))
+            .get()?;
+        let line = CreditLine::get_assert(bob, alice, usd);
+        assert_eq!(line.limit.value, 100);
+        assert_eq!(line.remaining.value, 40);
+        assert_eq!(Obligation::exposure(bob, alice, usd).value, 60);
+        assert!(Obligation::exposure(bob, alice, usd).value <= line.limit.value);
+
+        // Leftover grant is 40, not 40-after-shrunk-cap.
+        Wrapper::push_from(&chain, alice)
+            .path_pay(vec![hop(bob, usd)], Quantity::new(40), Quantity::new(40))
+            .get()?;
+        assert_eq!(Obligation::exposure(bob, alice, usd).value, 100);
+        assert_eq!(CreditLine::get_assert(bob, alice, usd).remaining.value, 0);
+
+        // Repay does not restore grant.
+        Wrapper::push_from(&chain, bob)
+            .deposit(alice, usd, Quantity::new(100), 0)
+            .get()?;
+        assert_eq!(Obligation::exposure(bob, alice, usd).value, 0);
+        let over = Wrapper::push_from(&chain, alice)
+            .path_pay(vec![hop(bob, usd)], Quantity::new(1), Quantity::new(1))
+            .get();
+        assert!(over.is_err());
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_sell_claim_consumes_depleting_grant(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        let peter = account!("peter");
+        for a in [alice, bob, peter] {
+            chain.new_account(a).unwrap();
+        }
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        Wrapper::push_from(&chain, bob)
+            .deposit(alice, usd, Quantity::new(50), 0)
+            .get()?;
+        Wrapper::push_from(&chain, peter)
+            .st_crd_lne(bob, usd, Quantity::new(100), true, 0)
+            .get()?;
+        Wrapper::push_from(&chain, peter)
+            .st_glb_clr(usd, Quantity::new(0), 0, PPM_SCALE, false, never())
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .sell_claim(peter, bob, usd, Quantity::new(50))
+            .get()?;
+        let line = CreditLine::get_assert(peter, bob, usd);
+        assert_eq!(line.limit.value, 100);
+        assert_eq!(line.remaining.value, 50);
+        assert_eq!(Obligation::exposure(peter, bob, usd).value, 50);
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_convert_uses_claim_debtor_when_both_quote(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let gary = account!("gary");
+        chain.new_account(alice).unwrap();
+        chain.new_account(gary).unwrap();
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, gary)
+            .st_crd_lne(alice, aud, Quantity::new(10_000), false, 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .path_pay(vec![hop(gary, aud)], Quantity::new(100), Quantity::new(100))
+            .get()?;
+
+        Wrapper::push_from(&chain, alice)
+            .st_cur_pol(aud, usd, Quantity::new(0), RATE_SCALE * 50 / 100, 0, never())
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .st_cur_pol(aud, usd, Quantity::new(0), RATE_SCALE * 80 / 100, 0, never())
+            .get()?;
+
+        // Gary holds the claim; Alice is the debtor. Use Alice's 0.50 quote.
+        Wrapper::push_from(&chain, gary)
+            .convert(alice, aud, usd, Quantity::new(100), Quantity::new(50))
+            .get()?;
+        assert_eq!(Obligation::exposure(gary, alice, aud).value, 0);
+        assert_eq!(Obligation::exposure(gary, alice, usd).value, 50);
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_path_pay_fx_after_full_reverse_net_fails_min_return(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let gary = account!("gary");
+        let steve = account!("steve");
+        for a in [alice, gary, steve] {
+            chain.new_account(a).unwrap();
+        }
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        Wrapper::push_from(&chain, gary)
+            .st_crd_lne(alice, aud, Quantity::new(10_000), false, 0)
+            .get()?;
+        Wrapper::push_from(&chain, steve)
+            .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .st_cur_pol(aud, usd, Quantity::new(0), RATE_SCALE * 70 / 100, 0, never())
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .st_glb_clr(usd, Quantity::new(0), 0, PPM_SCALE, true, never())
+            .get()?;
+        // Reverse AUD book: Gary owes Alice 1000. Hop-0 debit nets it away.
+        Wrapper::push_from(&chain, gary)
+            .deposit(alice, aud, Quantity::new(1_000), 0)
+            .get()?;
+
+        let result = Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(gary, aud), hop(steve, usd)],
+                Quantity::new(1_000),
+                Quantity::new(700),
+            )
+            .get();
+        assert!(result.is_err());
+        // Reverted: reverse deposit remains; no new path legs.
+        assert_eq!(Obligation::exposure(alice, gary, aud).value, 1_000);
+        assert_eq!(Obligation::exposure(gary, alice, aud).value, 0);
+        assert_eq!(Obligation::exposure(steve, gary, usd).value, 0);
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_path_pay_fx_after_partial_reverse_net(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let gary = account!("gary");
+        let steve = account!("steve");
+        for a in [alice, gary, steve] {
+            chain.new_account(a).unwrap();
+        }
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        Wrapper::push_from(&chain, gary)
+            .st_crd_lne(alice, aud, Quantity::new(10_000), false, 0)
+            .get()?;
+        Wrapper::push_from(&chain, steve)
+            .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .st_cur_pol(aud, usd, Quantity::new(0), RATE_SCALE * 70 / 100, 0, never())
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .st_glb_clr(usd, Quantity::new(0), 0, PPM_SCALE, true, never())
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .deposit(alice, aud, Quantity::new(400), 0)
+            .get()?;
+
+        Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(gary, aud), hop(steve, usd)],
+                Quantity::new(1_000),
+                Quantity::new(420),
+            )
+            .get()?;
+        // 1000 draw nets 400 reverse → 600 AUD converts at 0.70 → 420 USD.
+        assert_eq!(Obligation::exposure(gary, alice, aud).value, 0);
+        assert_eq!(Obligation::exposure(gary, alice, usd).value, 420);
+        assert_eq!(Obligation::exposure(steve, gary, usd).value, 420);
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_credit_line_and_deposit_reject_bad_args(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        chain.new_account(alice).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        assert!(Wrapper::push_from(&chain, alice)
+            .st_crd_lne(alice, usd, Quantity::new(100), false, 0)
+            .get()
+            .is_err());
+        assert!(Wrapper::push_from(&chain, alice)
+            .st_crd_lne(account!("bob"), 99, Quantity::new(100), false, 0)
+            .get()
+            .is_err());
+        assert!(Wrapper::push_from(&chain, alice)
+            .st_crd_lne(account!("bob"), usd, Quantity::new(100), false, PPM_SCALE + 1)
+            .get()
+            .is_err());
+        assert!(Wrapper::push_from(&chain, alice)
+            .deposit(alice, usd, Quantity::new(1), 0)
+            .get()
+            .is_err());
+        assert!(Wrapper::push_from(&chain, alice)
+            .deposit(account!("bob"), usd, Quantity::new(0), 0)
+            .get()
+            .is_err());
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_accrue_and_interest_first_net(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, bob)
+            .deposit(alice, usd, Quantity::new(100), 100_000)
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .deposit(alice, usd, Quantity::new(100), 10_000)
+            .get()?;
+
+        chain.start_block_after(Seconds::new(SECONDS_PER_YEAR as i64).into());
+        Wrapper::push_from(&chain, alice)
+            .accrue(alice, bob, usd)
+            .get()?;
+
+        // 10% of 100 + 1% of 100 over one year.
+        assert_eq!(Obligation::exposure(alice, bob, usd).value, 211);
+
+        // Net 10: interest-first, highest rate first → 10% bucket interest gone.
+        Wrapper::push_from(&chain, alice)
+            .deposit(bob, usd, Quantity::new(10), 0)
+            .get()?;
+        assert_eq!(Obligation::exposure(alice, bob, usd).value, 201);
+        let hi = Obligation::get_by_interest_rate(alice, bob, usd, 100_000).unwrap();
+        assert_eq!(hi.accrued_interest.value, 0);
+        assert_eq!(hi.remaining_principal.value, 100);
+        let lo = Obligation::get_by_interest_rate(alice, bob, usd, 10_000).unwrap();
+        assert_eq!(lo.accrued_interest.value, 1);
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_sell_claim_specific_take_overrides_global(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        let peter = account!("peter");
+        for a in [alice, bob, peter] {
+            chain.new_account(a).unwrap();
+        }
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        Wrapper::push_from(&chain, bob)
+            .deposit(alice, usd, Quantity::new(1_000), 0)
+            .get()?;
+        Wrapper::push_from(&chain, peter)
+            .st_crd_lne(bob, usd, Quantity::new(10_000), false, 0)
+            .get()?;
+        Wrapper::push_from(&chain, peter)
+            .st_glb_clr(
+                usd,
+                Quantity::new(0),
+                PPM_SCALE * 5 / 100,
+                PPM_SCALE,
+                false,
+                never(),
+            )
+            .get()?;
+        Wrapper::push_from(&chain, peter)
+            .st_clr_ofr(bob, usd, Quantity::new(0), 0, PPM_SCALE, false, never())
+            .get()?;
+
+        Wrapper::push_from(&chain, alice)
+            .sell_claim(peter, bob, usd, Quantity::new(1_000))
+            .get()?;
+        assert_eq!(Obligation::exposure(alice, peter, usd).value, 1_000);
         Ok(())
     }
 }

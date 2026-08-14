@@ -705,8 +705,6 @@ mod tests {
 
     #[test]
     fn exact_in_still_works_with_tight_mid_residual() {
-        // Exact-in must keep working when first-hop residual is huge but mid is tight
-        // (the case that previously broke exact-out when it probed max_in).
         let lines = vec![
             line("gary", "alice", 1, 1_000_000),
             line("steve", "gary", 1, 20_000),
@@ -757,9 +755,6 @@ mod tests {
 
     #[test]
     fn exact_out_when_first_hop_residual_far_exceeds_mid_path() {
-        // Old bug: probing max first-hop residual (1e6) required a mid-hop draw
-        // larger than gary→steve residual, so exact-out returned None even though
-        // a modest send works (exact-in of 10_000 succeeds).
         let lines = vec![
             line("gary", "alice", 1, 1_000_000),
             line("steve", "gary", 1, 20_000),
@@ -777,15 +772,13 @@ mod tests {
             4,
             0,
         )
-        .expect("path despite huge first-hop residual");
+        .expect("path");
         assert_eq!(q.amount_in, 10_000);
         assert!(q.amount_out >= 9_500);
     }
 
     #[test]
     fn exact_out_doubling_gap_near_residual_cap() {
-        // mid residual 20_000 @ 5% ⇒ max send ~21_052. Desired out 19_000 needs
-        // send ≈ 20_000. Doubling 16384 → 32768 jumps over the feasible window.
         let lines = vec![
             line("gary", "alice", 1, 1_000_000),
             line("steve", "gary", 1, 20_000),
@@ -803,7 +796,7 @@ mod tests {
             4,
             0,
         )
-        .expect("gap search finds send inside residual window");
+        .expect("path");
         assert!(q.amount_out >= 19_000);
         // 19000 / 0.95 = 20000 exactly
         assert_eq!(q.amount_in, 20_000);
@@ -855,8 +848,6 @@ mod tests {
 
     #[test]
     fn mid_path_fx() {
-        // Mirror service test shape (simplified):
-        // zac → mitchell (AUD) → john (AUD, 5% fee) → mike (USD after mitchell FX) → brandon
         let aud = 1u16;
         let usd = 2u16;
         let lines = vec![
@@ -870,19 +861,6 @@ mod tests {
             global_rte("john", usd, 0),
             global_rte("mike", usd, PPM_SCALE * 1 / 100),
         ];
-        // mitchell converts AUD→USD at 0.65 when path switches to USD at john→mike
-        // Actually convert is on prev_edge_debtor when asset changes.
-        // Hop sequence: mitchell(AUD), john(AUD), mike(USD), brandon(USD)
-        // Asset change at mike hop: prev_edge_debtor=john, so john needs FX?
-        // Looking at service again: convert uses prev_edge_debtor.
-        // After john hop: prev_edge_debtor=mitchell, prev_asset=AUD
-        // Wait after hop john: path_debtor=john, prev_edge_debtor=mitchell
-        // Hop mike USD: convert mitchell AUD→USD, then john routes to mike.
-        // So FX is on mitchell not john!
-        //
-        // After hop0 mitchell: prev_edge_debtor=zac
-        // After hop john: prev_edge_debtor=mitchell
-        // Hop mike USD: convert mitchell's policy AUD→USD
         let fx = vec![FxEdge {
             debtor: "mitchell".into(),
             from_asset: aud,

@@ -180,15 +180,19 @@ pub mod tables {
 
     pub const FX_RATE_SCALE: u64 = RATE_SCALE;
 
-    pub fn assert_policy_live(expires_at: TimePointSec) {
+    pub fn policy_is_live(expires_at: TimePointSec) -> bool {
         if expires_at.seconds == 0 {
-            return;
+            return true;
         }
         let now = psibase::services::transact::Wrapper::call()
             .currentBlock()
             .time
             .seconds();
-        assert!(now.seconds <= expires_at.seconds, "policy expired");
+        now.seconds <= expires_at.seconds
+    }
+
+    pub fn assert_policy_live(expires_at: TimePointSec) {
+        assert!(policy_is_live(expires_at), "policy expired");
     }
 
     /// `out = (in - fee_fixed) * rate / RATE_SCALE`.
@@ -239,22 +243,13 @@ pub mod tables {
         pub asset_id: u16,
     }
 
-    /// Path routing fees: fixed + percent, same-asset only (no FX).
+    /// Clearing offer posted by `poster`: path forward (optional) and claim
+    /// takeout (while a live row exists). `counterparty = 0` is global; otherwise
+    /// a specific next hop (path) or underlying debtor (take).
     ///
-    /// Stored in one table. **`creditor = AccountNumber::new(0)`** means
-    /// **global** for this `(debtor, asset_id)` — applies to any next-hop line.
-    /// A non-zero `creditor` is a per-line override (takes precedence).
-    ///
-    /// # Alice → Gary (AUD) → Steve (USD)
-    ///
-    /// Standing clearing offer: path forward (optional) and claim takeout (always
-    /// while the row exists). Posted by `poster`.
-    ///
-    /// - **Path** (`forward_enabled`): poster is path-debtor; `counterparty` is
-    ///   next hop or [`Self::GLOBAL`] for any next hop that lined them.
-    /// - **Take claim**: seller moves obligations (debtor → seller) onto poster
-    ///   as new creditor, for face minus fees; `counterparty` is that debtor or
-    ///   [`Self::GLOBAL`] for any debtor poster has a line on.
+    /// Resolution prefers a **usable** specific row, else a usable global.
+    /// Unusable specific (expired, or `forward_enabled = false` for path) does
+    /// not shadow a live global.
     #[table(name = "ClearingOfferTab", index = 1)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct ClearingOffer {
@@ -366,34 +361,46 @@ pub mod tables {
         }
     }
 
-    /// Specific next-hop offer, else global, for path forward.
+    fn offer_live(o: &ClearingOffer) -> bool {
+        policy_is_live(o.expires_at)
+    }
+
+    /// Usable specific forward, else usable global. Take-only / expired specific
+    /// does not block a live global.
     pub fn resolve_clearing_forward(
         next_creditor: AccountNumber,
         poster: AccountNumber,
         asset_id: u16,
     ) -> ClearingOffer {
         if let Some(p) = ClearingOffer::get(poster, next_creditor, asset_id) {
-            assert!(p.forward_enabled, "clearing offer does not allow path forward");
-            return p;
+            if p.forward_enabled && offer_live(&p) {
+                return p;
+            }
         }
         if let Some(g) = ClearingOffer::get(poster, ClearingOffer::GLOBAL, asset_id) {
-            assert!(g.forward_enabled, "clearing offer does not allow path forward");
-            return g;
+            if g.forward_enabled && offer_live(&g) {
+                return g;
+            }
         }
         panic!("ClearingOffer not found (no specific or global forward for this asset)");
     }
 
-    /// Specific debtor takeout offer, else global (must exist — take is always on).
+    /// Usable specific takeout, else usable global. Expired specific does not
+    /// block a live global.
     pub fn resolve_clearing_take(
         buyer: AccountNumber,
         debtor: AccountNumber,
         asset_id: u16,
     ) -> ClearingOffer {
         if let Some(p) = ClearingOffer::get(buyer, debtor, asset_id) {
-            return p;
+            if offer_live(&p) {
+                return p;
+            }
         }
         if let Some(g) = ClearingOffer::get(buyer, ClearingOffer::GLOBAL, asset_id) {
-            return g;
+            if offer_live(&g) {
+                return g;
+            }
         }
         panic!("ClearingOffer not found (buyer has no takeout offer for this asset)");
     }
@@ -519,71 +526,9 @@ pub mod tables {
         }
     }
 
-    /// A directed claim: `debtor` owes `creditor` principal + accrued interest
-    /// of `asset_id`. Total owed = `remaining_principal + accrued_interest`.
-    ///
-    /// # Layering
-    ///
-    /// - **Obligation** owns claim state: create/merge by rate, grow principal
-    ///   ([`Self::credit`]), interest ([`Self::accrue`]), and pair exposure.
-    /// - **CreditLine** gates *draws* (limit / deplete / line rate) then calls
-    ///   into obligation credit — used by every `path_pay` leg.
-    /// - **ClearingOffer** (poster-owned) gates same-asset path hops after the
-    ///   first when `forward_enabled`, and enables claim takeout while the row
-    ///   exists (fixed + percent fee; no FX).
-    /// - **CurrencyPolicy** (debtor-posted) re-denominates existing debt and is
-    ///   applied automatically in `path_pay` on currency changes.
-    /// - **deposit** credits an obligation with no line check (receiver books a
-    ///   liability to the depositor).
-    ///
-    /// # Interest
-    ///
-    /// See [`interest`]: simple APR in ppm/year on principal only, with a
-    /// carried `interest_remainder` so frequent accruals match a single long
-    /// accrual. Accrue **before** any principal change and before exposure
-    /// checks that must include up-to-date interest.
-    ///
-    /// # Deposit
-    ///
-    /// A **deposit** is how external value (cash, goods, off-chain transfer)
-    /// enters the graph: the **receiver** books a liability to the
-    /// **depositor**, same as a bank taking $5 and crediting your account.
-    /// On-chain that is an obligation with `creditor = depositor` and
-    /// `debtor = receiver` (the account that called `deposit`). There is still
-    /// no local balance row — the depositor's "credit" *is* this obligation.
-    ///
-    /// # Repayment (deposit, which auto-nets)
-    ///
-    /// There is no Banx cash balance and no separate "repay with money" ledger
-    /// entry. **Repayment is a deposit** that books a counter-obligation and
-    /// immediately **nets** against existing claims for the pair/asset.
-    ///
-    /// ## Physical / off-chain cash (or any external transfer)
-    ///
-    /// Example: Alice already owes Bob 100 (obligation O1: Bob creditor, Alice
-    /// debtor). Alice hands Bob $100 cash off-chain.
-    ///
-    /// Bob calls `deposit(depositor = Alice, …)`: books O2 (Alice creditor, Bob
-    /// debtor) then **auto-nets** against O1. Equal amounts cancel; a remainder
-    /// stays as a single direction of net debt.
-    ///
-    /// Cash never becomes a local balance: it becomes a deposit claim that is
-    /// immediately netted against opposite exposure when possible.
-    ///
-    /// ## On-graph repayment
-    ///
-    /// If the payer already has (or draws) a claim the other way — or obtains
-    /// one via routing — that obligation is likewise **netted**, not "spent as
-    /// balance." Every [`CreditLine::debit`] (including each `path_pay` hop)
-    /// auto-calls [`Obligation::net_pair`] after crediting. Netting is the only
-    /// settlement primitive inside Banx.
-    ///
-    /// # Netting
-    ///
-    /// [`Obligation::net_pair`] cancels equal value both ways after accruing.
-    /// Reduction is fixed protocol policy: **accrued interest first, then
-    /// principal**; across obligations, **highest `interest_rate` first**
-    /// (then older `created_at`, then lower `id` for ties).
+    /// Directed claim: `debtor` owes `creditor` principal + accrued interest of
+    /// `asset_id`. Accrue before any principal change. [`net_pair`] cancels both
+    /// directions: interest first, then principal; highest rate first.
     #[table(name = "ObligationTable", index = 2)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct Obligation {
@@ -959,35 +904,13 @@ pub mod tables {
         }
     }
 
-    /// Bilateral credit facility: `creditor` is willing to be owed by `debtor`
-    /// up to `limit` of `asset_id`, at `interest_rate` on new draws.
+    /// Bilateral credit facility: `creditor` will be owed by `debtor` up to
+    /// `limit` of `asset_id`, at `interest_rate` on new draws.
     ///
-    /// # Limit semantics (revolving exposure cap)
-    ///
-    /// `limit` is a cap on **total outstanding exposure**, not a lifetime draw
-    /// budget and not a spendable balance. Same idea as a revolving credit card:
-    /// the debtor may draw, repay, and draw again so long as exposure stays
-    /// at or under `limit`.
-    ///
-    /// **Exposure** for this (creditor, debtor, asset_id) is
-    /// [`Obligation::exposure`] (principal + accrued interest on all related
-    /// obligations). Accrued interest **counts against the limit**. A draw of
-    /// `amount` is allowed only when:
-    /// `exposure + amount <= limit`.
-    ///
-    /// When `deplete_on_debit` is false (normal revolving facility), settlement
-    /// frees capacity under the same `limit` without the creditor resetting it.
-    /// Settlement is **deposit + net** (see [`Obligation`]): after mutual
-    /// claims cancel, exposure drops and revolving room reopens.
-    /// When `deplete_on_debit` is true, each draw also reduces `limit` itself
-    /// (one-shot / grant-style capacity); that is an additional constraint on
-    /// top of the exposure cap.
-    ///
-    /// # Draw path
-    ///
-    /// [`CreditLine::debit`] enforces capacity and line terms, then
-    /// [`Obligation::credit_pair`] grows the claim (merge by same interest rate).
-    /// Used by every `path_pay` leg (first leg direct; later legs after routing).
+    /// `limit` is a stable cap on outstanding exposure (principal + interest).
+    /// A draw of `amount` requires `exposure + amount <= limit`.
+    /// When `deplete_on_debit`, `remaining` is unused grant (shrinks on draw /
+    /// takeout; not restored by repayment). Revolving lines ignore `remaining`.
     #[table(name = "CreditLineTable", index = 3)]
     #[derive(
         Default, Clone, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug,
@@ -997,14 +920,14 @@ pub mod tables {
         pub debtor: AccountNumber,
         pub asset_id: u16,
 
-        /// Max total outstanding exposure (principal + accrued interest across
-        /// all obligations for this pair and asset). See struct docs.
+        /// Stable cap on outstanding exposure (principal + accrued interest).
         pub limit: Quantity,
-        /// If true, also shrink `limit` by each draw (non-revolving grant).
-        /// If false, `limit` stays fixed and only outstanding exposure binds.
+        /// If true, draws/takeout also consume [`Self::remaining`].
         pub deplete_on_debit: bool,
         /// Rate applied to new draws on this line (ppm APR); see [`interest`].
         pub interest_rate: u32,
+        /// Unused grant when `deplete_on_debit`. Ignored for revolving lines.
+        pub remaining: Quantity,
     }
 
     impl CreditLine {
@@ -1032,7 +955,36 @@ pub mod tables {
                 limit,
                 deplete_on_debit,
                 interest_rate,
+                remaining: if deplete_on_debit {
+                    limit
+                } else {
+                    Quantity::new(0)
+                },
             }
+        }
+
+        /// Drawable headroom: `limit - exposure`, also capped by `remaining`
+        /// when depleting.
+        pub fn draw_headroom(&self) -> u64 {
+            let exposure = Obligation::exposure(self.creditor, self.debtor, self.asset_id).value;
+            let vs_limit = self.limit.value.saturating_sub(exposure);
+            if self.deplete_on_debit {
+                vs_limit.min(self.remaining.value)
+            } else {
+                vs_limit
+            }
+        }
+
+        pub fn consume_grant(&mut self, amount: Quantity) {
+            if !self.deplete_on_debit {
+                return;
+            }
+            assert!(
+                amount.value <= self.remaining.value,
+                "insufficient remaining grant"
+            );
+            self.remaining = (self.remaining.value - amount.value).into();
+            self.save();
         }
 
         pub fn get(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) -> Option<Self> {
@@ -1058,6 +1010,12 @@ pub mod tables {
             deplete_on_debit: bool,
             interest_rate: u32,
         ) {
+            assert!(creditor != debtor, "cannot set credit line to self");
+            let _ = Asset::get_assert(asset_id);
+            assert!(
+                interest_rate <= PPM_SCALE,
+                "interest_rate exceeds 100% (PPM_SCALE)"
+            );
             CreditLine::new(
                 creditor,
                 debtor,
@@ -1069,21 +1027,8 @@ pub mod tables {
             .save();
         }
 
-        /// Draw `amount` of new principal on this line (debtor owes creditor more).
-        ///
-        /// Loads the line, applies the draw, and persists any limit change.
-        /// Callers should use this associated function rather than mutating a
-        /// temporary from [`get_assert`].
-        ///
-        /// 1. Enforce revolving exposure cap (interest included).
-        /// 2. Optionally deplete `limit` and save.
-        /// 3. Credit the obligation bucket at this line's `interest_rate`.
-        /// 4. **Auto-net** the pair for this asset
-        ///    ([`Obligation::net_pair`] with unlimited max) so mutual claims
-        ///    cancel immediately — high-frequency path corridors stay bilaterally
-        ///    compressed without a separate `net` action.
-        ///
-        /// Used by `path_pay` legs (after any routing checks on multi-hop).
+        /// Draw `amount` of new principal: check `exposure + amount <= limit`,
+        /// consume `remaining` if depleting, credit the line-rate bucket, auto-net.
         pub fn debit(
             creditor: AccountNumber,
             debtor: AccountNumber,
@@ -1098,16 +1043,7 @@ pub mod tables {
             if exposure + amount > line.limit {
                 panic!("total outstanding exceeds max limit");
             }
-
-            if line.deplete_on_debit {
-                line.limit = line
-                    .limit
-                    .value
-                    .checked_sub(amount.value)
-                    .expect("insufficient credit line limit")
-                    .into();
-                line.save();
-            }
+            line.consume_grant(amount);
 
             Obligation::credit_pair(
                 line.creditor,
@@ -1376,13 +1312,14 @@ pub mod service {
         let offer = resolve_clearing_take(buyer, debtor, asset_id);
         crate::tables::assert_policy_live(offer.expires_at);
 
-        let line = CreditLine::get_assert(buyer, debtor, asset_id);
+        let mut line = CreditLine::get_assert(buyer, debtor, asset_id);
         Obligation::accrue_pair(buyer, debtor, asset_id);
         let buyer_exp = Obligation::exposure(buyer, debtor, asset_id).value;
         assert!(
             buyer_exp.saturating_add(amount.value) <= line.limit.value,
             "buyer credit line residual insufficient for claim takeout"
         );
+        line.consume_grant(amount);
 
         let proceeds = offer.apply_fees(amount);
         Obligation::transfer_claims(seller, buyer, debtor, asset_id, amount.value);
@@ -1440,15 +1377,15 @@ pub mod service {
         let sender = get_sender();
         assert!(sender != counterparty, "cannot convert with self");
 
-        // Debtor owns the policy; resolve who is debtor vs creditor on this claim.
-        let (creditor, debtor) = if CurrencyPolicy::get(sender, from_asset, to_asset).is_some() {
-            // Sender posted the policy → sender is debtor; counterparty is creditor.
-            (counterparty, sender)
-        } else if CurrencyPolicy::get(counterparty, from_asset, to_asset).is_some() {
-            // Counterparty is debtor; sender is creditor holding the claim.
-            (sender, counterparty)
-        } else {
-            panic!("CurrencyPolicy not found for debtor/assets");
+        Obligation::accrue_pair(sender, counterparty, from_asset);
+        Obligation::accrue_pair(counterparty, sender, from_asset);
+        let sender_owes = Obligation::exposure(counterparty, sender, from_asset).value;
+        let counterparty_owes = Obligation::exposure(sender, counterparty, from_asset).value;
+        let (creditor, debtor) = match (sender_owes > 0, counterparty_owes > 0) {
+            (true, false) => (counterparty, sender),
+            (false, true) => (sender, counterparty),
+            (true, true) => panic!("both directions have from_asset claims; net first"),
+            (false, false) => panic!("nothing to convert in from_asset"),
         };
 
         let policy = CurrencyPolicy::get_assert(debtor, from_asset, to_asset);
@@ -1460,6 +1397,13 @@ pub mod service {
     #[action]
     fn deposit(depositor: AccountNumber, asset_id: u16, amount: Quantity, interest_rate: u32) {
         let receiver = get_sender();
+        assert!(depositor != receiver, "cannot deposit from self");
+        assert!(amount.value > 0, "deposit amount must be positive");
+        let _ = Asset::get_assert(asset_id);
+        assert!(
+            interest_rate <= crate::tables::PPM_SCALE,
+            "interest_rate exceeds 100% (PPM_SCALE)"
+        );
         let netted = Obligation::deposit(depositor, receiver, asset_id, amount, interest_rate);
         emit_pair_activity(
             depositor,
@@ -1538,14 +1482,26 @@ pub mod service {
                 continue;
             }
 
-            // Currency change ⇒ convert previous edge (debtor-owned FX quote).
+            // Currency change ⇒ convert remaining previous-edge claim (post-net).
             if asset_id != prev_asset {
-                let cpol =
-                    CurrencyPolicy::get_assert(prev_edge_debtor, prev_asset, asset_id);
-                forward = cpol.convert(prev_edge_creditor, forward, Quantity::new(0));
+                Obligation::accrue_pair(prev_edge_creditor, prev_edge_debtor, prev_asset);
+                let available =
+                    Obligation::exposure(prev_edge_creditor, prev_edge_debtor, prev_asset);
+                let take = Quantity::new(forward.value.min(available.value));
+                if take.value == 0 {
+                    forward = Quantity::new(0);
+                } else {
+                    let cpol =
+                        CurrencyPolicy::get_assert(prev_edge_debtor, prev_asset, asset_id);
+                    forward = cpol.convert(prev_edge_creditor, take, Quantity::new(0));
+                }
             }
 
-            // Same-asset forward hop: specific clearing offer, else global.
+            if forward.value == 0 {
+                break;
+            }
+
+            // Same-asset forward hop: usable specific, else usable global.
             let offer = resolve_clearing_forward(next_creditor, path_debtor, asset_id);
             forward = offer.path_draw(next_creditor, forward);
             prev_edge_debtor = path_debtor;
@@ -1562,7 +1518,7 @@ pub mod service {
 
     /// Bilateral activity history (emitted once per party as `account`).
     ///
-    /// - `kind`: `path_draw` | `deposit` | `net` | `convert` | `credit_line`
+    /// - `kind`: `path_draw` | `deposit` | `net` | `convert` | `credit_line` | `sell_claim`
     /// - `amount`: primary quantity (raw units)
     /// - `netted`: amount cancelled by auto-net (or convert output for `convert`)
     /// - `other_asset_id`: convert destination asset; otherwise same as `asset_id`

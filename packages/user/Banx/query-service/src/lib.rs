@@ -60,6 +60,10 @@ mod service {
         interestRatePpm: u32,
         /// Outstanding principal + interest for this directed pair/asset.
         exposure: Decimal,
+        /// Unused grant when depleting; 0 on revolving lines.
+        remaining: Decimal,
+        /// Drawable now: `limit - exposure`, also capped by `remaining` if depleting.
+        residual: Decimal,
     }
 
     impl CreditLineView {
@@ -73,6 +77,8 @@ mod service {
                 depleteOnDebit: line.deplete_on_debit,
                 interestRatePpm: line.interest_rate,
                 exposure: dec(exposure, line.asset_id),
+                remaining: dec(line.remaining, line.asset_id),
+                residual: dec(Quantity::new(line.draw_headroom()), line.asset_id),
             }
         }
     }

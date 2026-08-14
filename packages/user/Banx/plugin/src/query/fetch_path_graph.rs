@@ -30,8 +30,7 @@ struct GqlCreditLine {
     creditor: AccountNumber,
     debtor: AccountNumber,
     asset_id: u16,
-    limit: Decimal,
-    exposure: Decimal,
+    residual: Decimal,
     interest_rate_ppm: u32,
 }
 
@@ -81,7 +80,7 @@ pub fn fetch_path_graph(
         r#"query {{
             pathGraph(from: "{from}", to: "{to}", maxHops: {max_hops}) {{
                 creditLines {{
-                    creditor debtor assetId limit exposure interestRatePpm
+                    creditor debtor assetId residual interestRatePpm
                 }}
                 clearingOffers {{
                     poster counterparty assetId feeFixed feePercentPpm maxLineAprPpm forwardEnabled expiresAt
@@ -103,9 +102,7 @@ pub fn fetch_path_graph(
 
     let mut lines = Vec::with_capacity(g.credit_lines.len());
     for l in g.credit_lines {
-        let limit = l.limit.quantity.value;
-        let exposure = l.exposure.quantity.value;
-        let residual = limit.saturating_sub(exposure);
+        let residual = l.residual.quantity.value;
         lines.push(LineEdge {
             creditor: l.creditor.to_string(),
             debtor: l.debtor.to_string(),
