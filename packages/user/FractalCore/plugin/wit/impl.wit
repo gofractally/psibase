@@ -7,7 +7,6 @@ world impl {
     include fractals:plugin/imports;
     include guilds:plugin/imports;
 
-    include staged-tx:plugin/imports;
     include host:db/imports;
 
 
