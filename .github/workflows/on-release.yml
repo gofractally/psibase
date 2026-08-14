@@ -28,6 +28,11 @@ jobs:
           message: |
             🎉 New Psibase release 🎉
             [${{ github.ref_name }}](https://github.com/${{ github.repository }}/releases/tag/${{ github.event.release.name }})
+
+  publish-crates:
+    name: Publish crates to crates.io
+    runs-on: ubuntu-latest
+    steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.release.tag_name }}
