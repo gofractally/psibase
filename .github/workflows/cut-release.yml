@@ -23,22 +23,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Detect version bump
+      - uses: ./.github/actions/detect-version-bump
         id: version
-        run: |
-          set +e
-          .github/scripts/psibase-version.sh changed \
-              "${{ github.event.before }}" \
-              "${{ github.sha }}"
-          code=$?
-          set -e
-          if (( code == 0 )); then
-            echo "changed=true" >>"$GITHUB_OUTPUT"
-          elif (( code == 1 )); then
-            echo "changed=false" >>"$GITHUB_OUTPUT"
-          else
-            exit "$code"
-          fi
+        with:
+          ref-a: ${{ github.event.before }}
+          ref-b: ${{ github.sha }}
 
       - name: Resolve release branch
         id: release
@@ -91,34 +80,22 @@ jobs:
           ref: ${{ github.event.pull_request.merge_commit_sha }}
           fetch-depth: 0
 
-      - name: Detect version bump
+      - uses: ./.github/actions/detect-version-bump
         id: version
-        run: |
-          set +e
-          .github/scripts/psibase-version.sh changed \
-              "${{ github.event.pull_request.base.sha }}" \
-              HEAD
-          code=$?
-          set -e
-          if (( code == 0 )); then
-            echo "changed=true" >>"$GITHUB_OUTPUT"
-          elif (( code == 1 )); then
-            echo "changed=false" >>"$GITHUB_OUTPUT"
-          else
-            exit "$code"
-          fi
+        with:
+          ref-a: ${{ github.event.pull_request.base.sha }}
+          ref-b: HEAD
 
-      - name: Enforce major matches release branch
+      - name: Read version at HEAD
         if: steps.version.outputs.changed == 'true'
-        run: |
-          ver=$(.github/scripts/psibase-version.sh at HEAD)
-          major="${ver%%.*}"
-          expected="${{ github.event.pull_request.base.ref }}"
-          expected="${expected#release/v}"
-          if [[ "$major" != "$expected" ]]; then
-            echo "HEAD major $major does not match release branch major $expected" >&2
-            exit 1
-          fi
+        id: head_version
+        run: echo "version=$(.github/scripts/psibase-version.sh at HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: ./.github/actions/major-matches-release-branch
+        if: steps.version.outputs.changed == 'true'
+        with:
+          version: ${{ steps.head_version.outputs.version }}
+          release-branch: ${{ github.event.pull_request.base.ref }}
 
       - name: Create and push tag
         id: tag
