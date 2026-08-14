@@ -17,3 +17,4 @@ jobs:
     uses: ./.github/workflows/create-draft-release.yml
     with:
       tag: ${{ github.ref_name }}
+      ubuntu-versions: ${{ needs.build-psibase.outputs.ubuntu-versions }}

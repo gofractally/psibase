@@ -9,6 +9,10 @@ on:
         description: 'Tag to draft a release for (e.g. "vX.Y.Z")'
         required: true
         type: string
+      ubuntu-versions:
+        description: JSON array of Ubuntu version suffixes (e.g. ["2204","2404","2604"])
+        required: true
+        type: string
 
 jobs:
   generate-changelog:
@@ -43,14 +47,23 @@ jobs:
           fi
           printf '%s\n' "$CHANGELOG" >>release-notes.md
 
+      - name: Build release files list
+        id: release-files
+        env:
+          VERSIONS: ${{ inputs.ubuntu-versions }}
+        run: |
+          {
+            echo 'files<<EOF'
+            echo "$VERSIONS" | jq -r '.[] | "psidk-ubuntu-\(.)/psidk-ubuntu-\(.).tar.gz"'
+            echo 'psidk-book/psidk-book.tar.gz'
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
       - name: Create new Github Release
         id: create_release
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            psidk-ubuntu-2204/psidk-ubuntu-2204.tar.gz
-            psidk-ubuntu-2404/psidk-ubuntu-2404.tar.gz
-            psidk-book/psidk-book.tar.gz
+          files: ${{ steps.release-files.outputs.files }}
           fail_on_unmatched_files: true
           draft: true
           prerelease: ${{ contains(inputs.tag, '-') }}

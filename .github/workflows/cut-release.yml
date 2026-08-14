@@ -148,3 +148,4 @@ jobs:
     uses: ./.github/workflows/create-draft-release.yml
     with:
       tag: ${{ needs.tag-release.outputs.tag }}
+      ubuntu-versions: ${{ needs.build-psibase.outputs.ubuntu-versions }}

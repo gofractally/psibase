@@ -12,20 +12,32 @@ on:
         type: string
         required: false
         default: ""
+    outputs:
+      ubuntu-versions:
+        description: Full list of Ubuntu versions for all-platforms builds
+        value: ${{ jobs.ubuntu-versions.outputs.ubuntu-versions }}
     secrets:
       publish-package-login:
         required: false
 
 jobs:
+  ubuntu-versions:
+    runs-on: ubuntu-latest
+    outputs:
+      ubuntu-versions: '["2204","2404","2604"]'
+    steps:
+      - run: true
+
   build:
     name: Ubuntu ${{ matrix.ubuntu-version }} - Build
+    needs: ubuntu-versions
     runs-on: ubuntu-latest
     env:
       can-publish: ${{ !! secrets.publish-package-login }}
     strategy:
       fail-fast: false
       matrix:
-        ubuntu-version: ${{ fromJSON(inputs.all-platforms && '["2204","2404","2604"]' || '["2204"]') }}
+        ubuntu-version: ${{ fromJSON(inputs.all-platforms && needs.ubuntu-versions.outputs.ubuntu-versions || '["2204"]') }}
     steps:
       - name: Timestamp
         id: ccache_cache_timestamp
