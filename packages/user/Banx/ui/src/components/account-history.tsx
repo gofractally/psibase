@@ -1,6 +1,6 @@
 import { useAssetMap } from "@/hooks/use-assets";
 import { useActivity } from "@/hooks/use-banx-data";
-import { formatRawAmount } from "@/lib/amount";
+import { displayAmount,  humanToRaw } from "@/lib/amount";
 import type { ActivityEvent } from "@/lib/graphql";
 
 import {
@@ -36,11 +36,11 @@ function describeEvent(
 ): { title: string; detail: string } {
     const sym = symbolOf(e.assetId);
     const prec = precisionOf(e.assetId);
-    const amt = formatRawAmount(e.amount, prec);
-    const netted = formatRawAmount(e.netted, prec);
+    const amt = displayAmount(e.amount);
+    const netted = displayAmount(e.netted);
     const otherSym = symbolOf(e.otherAssetId);
-    const otherPrec = precisionOf(e.otherAssetId);
-    const toAmt = formatRawAmount(e.netted, otherPrec);
+    const toAmt = displayAmount(e.netted);
+    const nettedRaw = humanToRaw(e.netted || "0", prec);
 
     switch (e.kind) {
         case "path_draw": {
@@ -49,7 +49,7 @@ function describeEvent(
                     ? `You drew ${amt} ${sym}`
                     : `${e.actor} drew ${amt} ${sym}`;
             const detail =
-                BigInt(e.netted || "0") > 0n
+                nettedRaw > 0n
                     ? `Auto-netted ${netted} ${sym} against reverse claims`
                     : `Draw on credit line · counterparty ${e.counterparty}`;
             return { title, detail };
@@ -60,7 +60,7 @@ function describeEvent(
                     ? `You booked deposit of ${amt} ${sym}`
                     : `Deposit of ${amt} ${sym} booked by ${e.actor}`;
             const detail =
-                BigInt(e.netted || "0") > 0n
+                nettedRaw > 0n
                     ? `Auto-netted ${netted} ${sym}`
                     : `Booked liability · counterparty ${e.counterparty}`;
             return { title, detail };

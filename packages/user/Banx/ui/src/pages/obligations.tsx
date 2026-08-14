@@ -35,7 +35,11 @@ import {
     useNet,
     useSetCreditLine,
 } from "@/hooks/use-banx-mutations";
-import { amountPlaceholder, formatRawAmount } from "@/lib/amount";
+import {
+    amountPlaceholder,
+    formatRawAmount,
+    humanToRaw,
+} from "@/lib/amount";
 import { ppmToPercent } from "@/lib/constants";
 import {
     MAX_PERCENT,
@@ -78,8 +82,15 @@ import {
     TooltipTrigger,
 } from "@shared/shadcn/ui/tooltip";
 
-function totalRaw(principal: string, interest: string): bigint {
-    return BigInt(principal || "0") + BigInt(interest || "0");
+function totalRaw(
+    principal: string,
+    interest: string,
+    precision: number,
+): bigint {
+    return (
+        humanToRaw(principal || "0", precision) +
+        humanToRaw(interest || "0", precision)
+    );
 }
 
 type GroupedAccount = {
@@ -100,6 +111,7 @@ function lineKey(creditor: string, debtor: string, assetId: number): string {
 function groupByCounterpartyAndAsset(
     items: Obligation[],
     counterpartyOf: (o: Obligation) => string,
+    precisionOf: (assetId: number) => number,
 ): Map<string, GroupedAccount> {
     const map = new Map<string, GroupedAccount>();
     for (const o of items) {
@@ -117,7 +129,11 @@ function groupByCounterpartyAndAsset(
             map.set(key, g);
         }
         g.obligations.push(o);
-        g.total += totalRaw(o.remainingPrincipal, o.accruedInterest);
+        g.total += totalRaw(
+            o.remainingPrincipal,
+            o.accruedInterest,
+            precisionOf(o.assetId),
+        );
     }
     return map;
 }
@@ -267,12 +283,13 @@ export function ObligationsPage() {
             groupByCounterpartyAndAsset(
                 obs.filter((o) => o.creditor === user),
                 (o) => o.debtor,
+                precisionOf,
             ),
             lines,
             "savings",
             user,
         );
-    }, [obs, lines, user]);
+    }, [obs, lines, user, precisionOf]);
 
     const loanGroupsAll = useMemo(() => {
         if (!user) return [];
@@ -280,12 +297,13 @@ export function ObligationsPage() {
             groupByCounterpartyAndAsset(
                 obs.filter((o) => o.debtor === user),
                 (o) => o.creditor,
+                precisionOf,
             ),
             lines,
             "loan",
             user,
         );
-    }, [obs, lines, user]);
+    }, [obs, lines, user, precisionOf]);
 
     const savingsGroups = useMemo(
         () => filterGroups(savingsGroupsAll, hideEmptySavings),
@@ -1069,9 +1087,11 @@ function AccountGroupRow({
     const n = obligations.length;
     const hasPositions = n > 0;
 
-    const limitRaw = creditLine ? BigInt(creditLine.limit || "0") : null;
+    const limitRaw = creditLine
+        ? humanToRaw(creditLine.limit || "0", precision)
+        : null;
     const exposureRaw = creditLine
-        ? BigInt(creditLine.exposure || "0")
+        ? humanToRaw(creditLine.exposure || "0", precision)
         : null;
     const availableRaw =
         limitRaw !== null && exposureRaw !== null
@@ -1379,6 +1399,7 @@ function AccountGroupRow({
                                         totalRaw(
                                             o.remainingPrincipal,
                                             o.accruedInterest,
+                                            precision,
                                         ).toString(),
                                         precision,
                                     );

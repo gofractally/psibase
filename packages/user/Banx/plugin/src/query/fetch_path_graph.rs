@@ -1,6 +1,8 @@
 use crate::bindings::host::common::server;
 use crate::errors::ErrorType;
 use banx::path_find::{FxEdge, LineEdge, RoutingEdge};
+use psibase::services::tokens::Decimal;
+use psibase::AccountNumber;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -25,21 +27,21 @@ struct PathGraph {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct GqlCreditLine {
-    creditor: String,
-    debtor: String,
+    creditor: AccountNumber,
+    debtor: AccountNumber,
     asset_id: u16,
-    limit: String,
-    exposure: String,
+    limit: Decimal,
+    exposure: Decimal,
     interest_rate_ppm: u32,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct GqlClearing {
-    poster: String,
-    counterparty: String,
+    poster: AccountNumber,
+    counterparty: AccountNumber,
     asset_id: u16,
-    fee_fixed: String,
+    fee_fixed: Decimal,
     fee_percent_ppm: u32,
     max_line_apr_ppm: u32,
     forward_enabled: bool,
@@ -49,10 +51,11 @@ struct GqlClearing {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct GqlCurrency {
-    debtor: String,
+    debtor: AccountNumber,
     from_asset: u16,
     to_asset: u16,
-    fee_fixed: String,
+    fee_fixed: Decimal,
+    /// Chain RATE_SCALE fixed-point (not an asset amount).
     fx_rate: String,
     expires_at: i64,
 }
@@ -100,12 +103,12 @@ pub fn fetch_path_graph(
 
     let mut lines = Vec::with_capacity(g.credit_lines.len());
     for l in g.credit_lines {
-        let limit = parse_u64(&l.limit)?;
-        let exposure = parse_u64(&l.exposure)?;
+        let limit = l.limit.quantity.value;
+        let exposure = l.exposure.quantity.value;
         let residual = limit.saturating_sub(exposure);
         lines.push(LineEdge {
-            creditor: l.creditor,
-            debtor: l.debtor,
+            creditor: l.creditor.to_string(),
+            debtor: l.debtor.to_string(),
             asset_id: l.asset_id,
             residual,
             interest_rate_ppm: l.interest_rate_ppm,
@@ -117,17 +120,17 @@ pub fn fetch_path_graph(
         if !r.forward_enabled {
             continue;
         }
-        // path_find RoutingEdge: creditor = next hop (empty = global), debtor = poster
-        let creditor = if r.counterparty.is_empty() || r.counterparty == "0" {
+        // path_find: empty creditor = global next hop
+        let creditor = if r.counterparty.value == 0 {
             String::new()
         } else {
-            r.counterparty
+            r.counterparty.to_string()
         };
         routing.push(RoutingEdge {
             creditor,
-            debtor: r.poster,
+            debtor: r.poster.to_string(),
             asset_id: r.asset_id,
-            hop_fee_fixed: parse_u64(&r.fee_fixed)?,
+            hop_fee_fixed: r.fee_fixed.quantity.value,
             hop_fee_percent_ppm: r.fee_percent_ppm,
             max_accept_rate_ppm: r.max_line_apr_ppm,
             expires_at: r.expires_at,
@@ -137,18 +140,14 @@ pub fn fetch_path_graph(
     let mut fx = Vec::with_capacity(g.currency_policies.len());
     for c in g.currency_policies {
         fx.push(FxEdge {
-            debtor: c.debtor,
+            debtor: c.debtor.to_string(),
             from_asset: c.from_asset,
             to_asset: c.to_asset,
-            fee_fixed: parse_u64(&c.fee_fixed)?,
+            fee_fixed: c.fee_fixed.quantity.value,
             fx_rate: parse_u64(&c.fx_rate)?,
             expires_at: c.expires_at,
         });
     }
 
-    Ok(PathGraphSnapshot {
-        lines,
-        routing,
-        fx,
-    })
+    Ok(PathGraphSnapshot { lines, routing, fx })
 }

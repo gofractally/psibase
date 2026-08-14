@@ -9,8 +9,8 @@ import {
 import { useConvert, useSetCurrencyPolicy } from "@/hooks/use-banx-mutations";
 import {
     amountPlaceholder,
+    displayAmount,
     formatFxToRate,
-    formatRawAmount,
     formatToPrecision,
 } from "@/lib/amount";
 import { ppmToPercent } from "@/lib/constants";
@@ -395,10 +395,7 @@ export function PoliciesPage() {
                                                 {symbolOf(p.assetId)}
                                             </TableCell>
                                             <TableCell className="text-right font-mono">
-                                                {formatRawAmount(
-                                                    p.feeFixed,
-                                                    precisionOf(p.assetId),
-                                                )}
+                                                {displayAmount(p.feeFixed)}
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 {ppmToPercent(p.feePercentPpm)}
@@ -455,10 +452,7 @@ export function PoliciesPage() {
                                             {symbolOf(p.toAsset)}
                                         </TableCell>
                                         <TableCell className="text-right font-mono">
-                                            {formatRawAmount(
-                                                p.feeFixed,
-                                                precisionOf(p.fromAsset),
-                                            )}
+                                            {displayAmount(p.feeFixed)}
                                         </TableCell>
                                         <TableCell className="text-right font-mono">
                                             1 →{" "}

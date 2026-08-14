@@ -1,9 +1,50 @@
 import { RATE_SCALE } from "@/lib/constants";
 
+/**
+ * Parse a human decimal string (GraphQL `Decimal`) to raw ledger units.
+ * Returns 0n on empty/invalid input.
+ */
+export function humanToRaw(amount: string, precision: number): bigint {
+    const s = amount.trim();
+    if (!s || !/^-?\d+(\.\d*)?$|^-?\.\d+$/.test(s)) return 0n;
+    const neg = s.startsWith("-");
+    const body = neg ? s.slice(1) : s;
+    const [wholePart, fracPart = ""] = body.includes(".")
+        ? body.split(".", 2)
+        : [body, ""];
+    const whole = wholePart === "" ? "0" : wholePart.replace(/^0+(?=\d)/, "") || "0";
+    const frac =
+        precision <= 0
+            ? ""
+            : fracPart.slice(0, precision).padEnd(precision, "0");
+    try {
+        const raw = BigInt(whole + frac);
+        return neg ? -raw : raw;
+    } catch {
+        return 0n;
+    }
+}
+
+/**
+ * Display a GraphQL `Decimal` string (already human). Trims trailing zeros.
+ * Prefer this over {@link formatRawAmount} for Banx query fields.
+ */
+export function displayAmount(amount: string): string {
+    const s = amount.trim();
+    if (!s) return "0";
+    if (!s.includes(".")) return s;
+    return s.replace(/(\.\d*?[1-9])0+$/, "$1").replace(/\.0+$/, "");
+}
+
 /** Format raw ledger units as a fixed-point decimal using asset precision. */
 export function formatRawAmount(raw: string | number, precision: number): string {
     const value =
-        typeof raw === "string" ? BigInt(raw || "0") : BigInt(Math.trunc(raw));
+        typeof raw === "string"
+            ? // Accept accidental human decimals from GraphQL without double-scaling.
+              raw.includes(".")
+                ? humanToRaw(raw, precision)
+                : BigInt(raw || "0")
+            : BigInt(Math.trunc(raw));
     const neg = value < 0n;
     const abs = neg ? -value : value;
     const scale = 10n ** BigInt(precision);

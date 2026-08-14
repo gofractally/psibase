@@ -3,29 +3,38 @@
 mod service {
     use async_graphql::*;
     use banx::tables::{
-        Asset, AssetTable, CreditLine, CreditLineTable, CurrencyPolicy, CurrencyPolicyTab,
-        ClearingOffer, ClearingOfferTab, Obligation, ObligationTable, PPM_SCALE, RATE_SCALE,
+        Asset, AssetTable, ClearingOffer, ClearingOfferTab, CreditLine, CreditLineTable,
+        CurrencyPolicy, CurrencyPolicyTab, Obligation, ObligationTable, PPM_SCALE, RATE_SCALE,
     };
+    use psibase::services::tokens::{Decimal, Precision, Quantity};
     use psibase::*;
     use serde::Deserialize;
     use serde_aux::field_attributes::deserialize_number_from_string;
-
-    fn qty(q: psibase::services::tokens::Quantity) -> String {
-        q.value.to_string()
-    }
-
-    fn acct(a: AccountNumber) -> String {
-        a.to_string()
-    }
 
     fn time_sec(t: TimePointSec) -> i64 {
         t.seconds as i64
     }
 
+    fn asset_precision(id: u16) -> Precision {
+        Asset::get(id)
+            .map(|a| a.precision)
+            .unwrap_or_else(|| Precision::new(0).expect("precision 0"))
+    }
+
+    /// Human decimal for an asset quantity (GraphQL `Decimal` scalar).
+    fn dec(q: Quantity, asset_id: u16) -> Decimal {
+        Decimal::new(q, asset_precision(asset_id))
+    }
+
+    fn dec_raw(raw: u64, asset_id: u16) -> Decimal {
+        dec(Quantity::new(raw), asset_id)
+    }
+
     #[derive(SimpleObject, Clone)]
     struct AssetView {
         id: u16,
-        symbol: String,
+        /// GraphQL `AccountNumber` scalar (string on the wire).
+        symbol: AccountNumber,
         precision: u8,
         description: String,
     }
@@ -34,48 +43,48 @@ mod service {
         fn from(a: Asset) -> Self {
             Self {
                 id: a.id,
-                symbol: acct(a.symbol),
+                symbol: a.symbol,
                 precision: a.precision.value(),
                 description: a.description.to_string(),
             }
         }
     }
 
-    #[derive(SimpleObject, Clone)]
+    #[derive(SimpleObject)]
     struct CreditLineView {
-        creditor: String,
-        debtor: String,
+        creditor: AccountNumber,
+        debtor: AccountNumber,
         assetId: u16,
-        limit: String,
+        limit: Decimal,
         depleteOnDebit: bool,
         interestRatePpm: u32,
         /// Outstanding principal + interest for this directed pair/asset.
-        exposure: String,
+        exposure: Decimal,
     }
 
     impl CreditLineView {
         fn from_line(line: CreditLine) -> Self {
             let exposure = Obligation::exposure(line.creditor, line.debtor, line.asset_id);
             Self {
-                creditor: acct(line.creditor),
-                debtor: acct(line.debtor),
+                creditor: line.creditor,
+                debtor: line.debtor,
                 assetId: line.asset_id,
-                limit: qty(line.limit),
+                limit: dec(line.limit, line.asset_id),
                 depleteOnDebit: line.deplete_on_debit,
                 interestRatePpm: line.interest_rate,
-                exposure: qty(exposure),
+                exposure: dec(exposure, line.asset_id),
             }
         }
     }
 
-    #[derive(SimpleObject, Clone)]
+    #[derive(SimpleObject)]
     struct ObligationView {
         id: u32,
-        creditor: String,
-        debtor: String,
+        creditor: AccountNumber,
+        debtor: AccountNumber,
         assetId: u16,
-        remainingPrincipal: String,
-        accruedInterest: String,
+        remainingPrincipal: Decimal,
+        accruedInterest: Decimal,
         interestRatePpm: u32,
         createdAt: i64,
         lastInterestAccrual: i64,
@@ -85,11 +94,11 @@ mod service {
         fn from(o: Obligation) -> Self {
             Self {
                 id: o.id,
-                creditor: acct(o.creditor),
-                debtor: acct(o.debtor),
+                creditor: o.creditor,
+                debtor: o.debtor,
                 assetId: o.asset_id,
-                remainingPrincipal: qty(o.remaining_principal),
-                accruedInterest: qty(o.accrued_interest),
+                remainingPrincipal: dec(o.remaining_principal, o.asset_id),
+                accruedInterest: dec(o.accrued_interest, o.asset_id),
                 interestRatePpm: o.interest_rate,
                 createdAt: time_sec(o.created_at),
                 lastInterestAccrual: time_sec(o.last_interest_accrual),
@@ -97,13 +106,13 @@ mod service {
         }
     }
 
-    #[derive(SimpleObject, Clone)]
+    #[derive(SimpleObject)]
     struct ClearingOfferView {
-        poster: String,
-        /// Empty string when global (`counterparty == 0`).
-        counterparty: String,
+        poster: AccountNumber,
+        /// `0` / empty when global.
+        counterparty: AccountNumber,
         assetId: u16,
-        feeFixed: String,
+        feeFixed: Decimal,
         feePercentPpm: u32,
         maxLineAprPpm: u32,
         forwardEnabled: bool,
@@ -115,14 +124,10 @@ mod service {
         fn from(p: ClearingOffer) -> Self {
             let is_global = p.is_global();
             Self {
-                poster: acct(p.poster),
-                counterparty: if is_global {
-                    String::new()
-                } else {
-                    acct(p.counterparty)
-                },
+                poster: p.poster,
+                counterparty: p.counterparty,
                 assetId: p.asset_id,
-                feeFixed: qty(p.fee_fixed),
+                feeFixed: dec(p.fee_fixed, p.asset_id),
                 feePercentPpm: p.fee_percent,
                 maxLineAprPpm: p.max_line_apr,
                 forwardEnabled: p.forward_enabled,
@@ -132,12 +137,14 @@ mod service {
         }
     }
 
-    #[derive(SimpleObject, Clone)]
+    #[derive(SimpleObject)]
     struct CurrencyPolicyView {
-        debtor: String,
+        debtor: AccountNumber,
         fromAsset: u16,
         toAsset: u16,
-        feeFixed: String,
+        /// Fixed fee in **from** asset units (human decimal).
+        feeFixed: Decimal,
+        /// Chain `fx_rate` (RATE_SCALE fixed-point), not an asset amount.
         fxRate: String,
         toInterestRatePpm: u32,
         expiresAt: i64,
@@ -146,10 +153,10 @@ mod service {
     impl From<CurrencyPolicy> for CurrencyPolicyView {
         fn from(p: CurrencyPolicy) -> Self {
             Self {
-                debtor: acct(p.debtor),
+                debtor: p.debtor,
                 fromAsset: p.from_asset,
                 toAsset: p.to_asset,
-                feeFixed: qty(p.fee_fixed),
+                feeFixed: dec(p.fee_fixed, p.from_asset),
                 fxRate: p.fx_rate.to_string(),
                 toInterestRatePpm: p.to_interest_rate,
                 expiresAt: time_sec(p.expires_at),
@@ -164,28 +171,44 @@ mod service {
     }
 
     /// Scoped subgraph for path discovery between two accounts.
-    #[derive(SimpleObject, Clone)]
+    #[derive(SimpleObject)]
     struct PathGraphView {
         /// Accounts discovered while expanding from `from` (includes `from` / `to`).
-        accounts: Vec<String>,
+        accounts: Vec<AccountNumber>,
         creditLines: Vec<CreditLineView>,
         clearingOffers: Vec<ClearingOfferView>,
         currencyPolicies: Vec<CurrencyPolicyView>,
     }
 
-    /// History row from `history.banx.activity`.
+    /// History row from `history.banx.activity` (amounts stored raw on-chain).
     #[derive(Deserialize, SimpleObject)]
+    #[graphql(complex)]
     struct ActivityEvent {
         account: AccountNumber,
         counterparty: AccountNumber,
         #[serde(deserialize_with = "deserialize_number_from_string")]
         asset_id: u16,
         kind: String,
+        #[graphql(skip)]
         amount: String,
+        #[graphql(skip)]
         netted: String,
         #[serde(deserialize_with = "deserialize_number_from_string")]
         other_asset_id: u16,
         actor: AccountNumber,
+    }
+
+    #[ComplexObject]
+    impl ActivityEvent {
+        async fn amount(&self) -> Decimal {
+            let raw = self.amount.parse::<u64>().unwrap_or(0);
+            dec_raw(raw, self.asset_id)
+        }
+
+        async fn netted(&self) -> Decimal {
+            let raw = self.netted.parse::<u64>().unwrap_or(0);
+            dec_raw(raw, self.asset_id)
+        }
     }
 
     struct Query;
@@ -218,6 +241,7 @@ mod service {
         }
 
         /// Credit lines where `account` is creditor and/or debtor.
+        /// `limit` / `exposure` are human decimals for the line's asset.
         async fn creditLines(
             &self,
             account: AccountNumber,
@@ -238,6 +262,7 @@ mod service {
         }
 
         /// Obligations where `account` is creditor and/or debtor.
+        /// Principal / interest are human decimals for the obligation's asset.
         async fn obligations(
             &self,
             account: AccountNumber,
@@ -258,13 +283,14 @@ mod service {
         }
 
         /// Pair exposure: what `debtor` owes `creditor` in `assetId` (no accrue).
+        /// Human decimal for that asset.
         async fn exposure(
             &self,
             creditor: AccountNumber,
             debtor: AccountNumber,
             assetId: u16,
-        ) -> String {
-            qty(Obligation::exposure(creditor, debtor, assetId))
+        ) -> Decimal {
+            dec(Obligation::exposure(creditor, debtor, assetId), assetId)
         }
 
         /// Clearing offers posted by `poster` (global + specific counterparties).
@@ -287,10 +313,11 @@ mod service {
                 .collect()
         }
 
-        /// Scoped credit/routing/FX snapshot for path finding between `from` and `to`.
+        /// Scoped credit/routing/FX snapshot for path discovery between `from` and `to`.
         ///
         /// Expands along credit lines up to `maxHops` from `from` (debtors → creditors),
         /// always including `to`. Does **not** dump the full network graph.
+        /// Amount fields are human decimals for their asset.
         async fn pathGraph(
             &self,
             from: AccountNumber,
@@ -305,28 +332,26 @@ mod service {
                 .iter()
                 .collect();
 
-            let mut debtors: HashSet<String> = HashSet::new();
-            debtors.insert(acct(from));
-            debtors.insert(acct(to));
+            let mut debtors: HashSet<AccountNumber> = HashSet::new();
+            debtors.insert(from);
+            debtors.insert(to);
 
             let mut selected_lines: Vec<CreditLine> = Vec::new();
-            let mut seen_line: HashSet<(String, String, u16)> = HashSet::new();
+            let mut seen_line: HashSet<(AccountNumber, AccountNumber, u16)> = HashSet::new();
 
             for _ in 0..max_hops {
-                let frontier: HashSet<String> = debtors.clone();
+                let frontier: HashSet<AccountNumber> = debtors.clone();
                 let mut grew = false;
                 for line in &all_lines {
-                    let d = acct(line.debtor);
-                    if !frontier.contains(&d) {
+                    if !frontier.contains(&line.debtor) {
                         continue;
                     }
-                    let c = acct(line.creditor);
-                    let key = (c.clone(), d, line.asset_id);
+                    let key = (line.creditor, line.debtor, line.asset_id);
                     if !seen_line.insert(key) {
                         continue;
                     }
                     selected_lines.push(line.clone());
-                    if debtors.insert(c) {
+                    if debtors.insert(line.creditor) {
                         grew = true;
                     }
                 }
@@ -344,7 +369,7 @@ mod service {
                 ClearingOfferTab::with_service(banx::SERVICE)
                     .get_index_pk()
                     .iter()
-                    .filter(|p| debtors.contains(&acct(p.poster)))
+                    .filter(|p| debtors.contains(&p.poster))
                     .map(ClearingOfferView::from)
                     .collect();
 
@@ -352,7 +377,7 @@ mod service {
                 CurrencyPolicyTab::with_service(banx::SERVICE)
                     .get_index_pk()
                     .iter()
-                    .filter(|p| debtors.contains(&acct(p.debtor)))
+                    .filter(|p| debtors.contains(&p.debtor))
                     .map(CurrencyPolicyView::from)
                     .collect();
 
@@ -367,7 +392,7 @@ mod service {
         }
 
         /// Activity history for `account` with a given `counterparty` and `assetId`.
-        /// Newest first (`last`).
+        /// Newest first (`last`). Amounts are human decimals.
         async fn activity(
             &self,
             account: AccountNumber,

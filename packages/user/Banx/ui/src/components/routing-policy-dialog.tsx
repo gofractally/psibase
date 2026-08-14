@@ -10,7 +10,7 @@ import {
 } from "@/hooks/use-banx-mutations";
 import {
     amountPlaceholder,
-    formatRawAmount,
+    displayAmount,
     formatToPrecision,
 } from "@/lib/amount";
 import {
@@ -68,11 +68,10 @@ function policyLive(p: RoutingPolicy, nowSec: number): boolean {
 
 function feesFromPolicy(
     p: RoutingPolicy,
-    precision: number,
 ): FeeFields {
     return {
         assetId: p.assetId,
-        hopFeeFixed: formatRawAmount(p.feeFixed, precision).replace(/,/g, ""),
+        hopFeeFixed: displayAmount(p.feeFixed),
         hopFeePct: ppmToPercentInput(p.feePercentPpm),
         maxAcceptPct: ppmToPercentInput(p.maxLineAprPpm),
         forwardEnabled: p.forwardEnabled,
@@ -320,10 +319,7 @@ export function RoutingPolicyDialog({
             if (existingOverride) {
                 overrideForm.reset({
                     enabled: true,
-                    ...feesFromPolicy(
-                        existingOverride,
-                        precisionOf(existingOverride.assetId),
-                    ),
+                    ...feesFromPolicy(existingOverride),
                 });
             } else {
                 overrideForm.reset({
@@ -334,10 +330,7 @@ export function RoutingPolicyDialog({
         } else if (existingGlobal) {
             globalForm.reset({
                 enabled: true,
-                ...feesFromPolicy(
-                    existingGlobal,
-                    precisionOf(existingGlobal.assetId),
-                ),
+                ...feesFromPolicy(existingGlobal),
             });
         } else {
             globalForm.reset({
@@ -362,9 +355,10 @@ export function RoutingPolicyDialog({
             <Dialog open={open} onOpenChange={onOpenChange}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Clearing offer</DialogTitle>
+                        <DialogTitle>Share credit lines</DialogTitle>
                         <DialogDescription>
-                            Terms toward <strong>{creditor}</strong>
+                            While enabled, others can sell you claims against{" "}
+                            <strong>{creditor}</strong>
                             {prefill?.assetId !== undefined ? (
                                 <>
                                     {" "}
@@ -380,9 +374,9 @@ export function RoutingPolicyDialog({
                                     </strong>
                                 </>
                             ) : null}
-                            . While posted, others can sell you claims on this
-                            counterparty (if you lined them). Path forward is
-                            optional.
+                            — people you&apos;ve extended credit to (you buy
+                            their debt for a fee). Path forward is optional
+                            below.
                         </DialogDescription>
                     </DialogHeader>
                     <form
@@ -477,19 +471,6 @@ export function RoutingPolicyDialog({
                                                 />
                                             )}
                                         />
-                                        <overrideForm.AppField
-                                            name="maxAcceptPct"
-                                            validators={aprValidators}
-                                            children={(field) => (
-                                                <field.TextField
-                                                    label="Max line APR %"
-                                                    inputMode="decimal"
-                                                    min={0}
-                                                    max={MAX_PERCENT}
-                                                    step={MIN_PERCENT_STEP}
-                                                />
-                                            )}
-                                        />
                                         <overrideForm.Field
                                             name="expiresAtSeconds"
                                             children={(field) => (
@@ -501,13 +482,42 @@ export function RoutingPolicyDialog({
                                                 />
                                             )}
                                         />
-                                        <div className="border-border/60 space-y-1 border-t pt-4">
+                                        <div className="border-border/60 space-y-4 border-t pt-4">
                                             <overrideForm.AppField
                                                 name="forwardEnabled"
                                                 children={(field) => (
                                                     <field.SwitchField
                                                         label="Allow path forward"
                                                         description="Allow new obligation swapping using credit lines extended to me."
+                                                    />
+                                                )}
+                                            />
+                                            <overrideForm.Subscribe
+                                                selector={(s) =>
+                                                    s.values.forwardEnabled
+                                                }
+                                                children={(forwardEnabled) => (
+                                                    <overrideForm.AppField
+                                                        name="maxAcceptPct"
+                                                        validators={
+                                                            aprValidators
+                                                        }
+                                                        children={(field) => (
+                                                            <field.TextField
+                                                                label="Max line APR %"
+                                                                inputMode="decimal"
+                                                                min={0}
+                                                                max={
+                                                                    MAX_PERCENT
+                                                                }
+                                                                step={
+                                                                    MIN_PERCENT_STEP
+                                                                }
+                                                                disabled={
+                                                                    !forwardEnabled
+                                                                }
+                                                            />
+                                                        )}
                                                     />
                                                 )}
                                             />
@@ -572,10 +582,7 @@ export function RoutingPolicyDialog({
     const loadGlobalForAsset = (assetId: number) => {
         const existing = liveGlobalByAsset.get(assetId);
         if (existing) {
-            const fees = feesFromPolicy(
-                existing,
-                precisionOf(existing.assetId),
-            );
+            const fees = feesFromPolicy(existing);
             globalForm.setFieldValue("enabled", true);
             globalForm.setFieldValue("hopFeeFixed", fees.hopFeeFixed);
             globalForm.setFieldValue("hopFeePct", fees.hopFeePct);
@@ -601,7 +608,9 @@ export function RoutingPolicyDialog({
                 <DialogHeader>
                     <DialogTitle>Share credit lines</DialogTitle>
                     <DialogDescription>
-                        While enabled, others can sell you claims on credit lines you&apos;ve extended (you buy their debt for a fee).
+                        While enabled, others can sell you claims against people
+                        you&apos;ve extended credit to (you buy their debt for a
+                        fee). Path forward is optional below.
                     </DialogDescription>
                 </DialogHeader>
                 <form
@@ -711,19 +720,6 @@ export function RoutingPolicyDialog({
                                             />
                                         )}
                                     />
-                                    <globalForm.AppField
-                                        name="maxAcceptPct"
-                                        validators={aprValidators}
-                                        children={(field) => (
-                                            <field.TextField
-                                                label="Max line APR %"
-                                                inputMode="decimal"
-                                                min={0}
-                                                max={MAX_PERCENT}
-                                                step={MIN_PERCENT_STEP}
-                                            />
-                                        )}
-                                    />
                                     <globalForm.Field
                                         name="expiresAtSeconds"
                                         children={(field) => (
@@ -735,13 +731,38 @@ export function RoutingPolicyDialog({
                                             />
                                         )}
                                     />
-                                    <div className="border-border/60 space-y-1 border-t pt-4">
+                                    <div className="border-border/60 space-y-4 border-t pt-4">
                                         <globalForm.AppField
                                             name="forwardEnabled"
                                             children={(field) => (
                                                 <field.SwitchField
                                                     label="Allow path forward"
-                                                    description="Buy new obligations using credit lines extended to me."
+                                                    description="Allow new obligation swapping using credit lines extended to me."
+                                                />
+                                            )}
+                                        />
+                                        <globalForm.Subscribe
+                                            selector={(s) =>
+                                                s.values.forwardEnabled
+                                            }
+                                            children={(forwardEnabled) => (
+                                                <globalForm.AppField
+                                                    name="maxAcceptPct"
+                                                    validators={aprValidators}
+                                                    children={(field) => (
+                                                        <field.TextField
+                                                            label="Max line APR %"
+                                                            inputMode="decimal"
+                                                            min={0}
+                                                            max={MAX_PERCENT}
+                                                            step={
+                                                                MIN_PERCENT_STEP
+                                                            }
+                                                            disabled={
+                                                                !forwardEnabled
+                                                            }
+                                                        />
+                                                    )}
                                                 />
                                             )}
                                         />
