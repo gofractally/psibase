@@ -123,14 +123,40 @@ export function usePathPay() {
     });
 }
 
+export type PathHopQuote = {
+    account: string;
+    assetId: number;
+    /** Notional drawn on this hop after fees (hop asset). */
+    amount: string;
+    /** Routing fee on this hop (hop asset). `"0"` for hop 0. */
+    hopFee: string;
+    /** FX fixed fee into this hop (prior asset). `"0"` if no convert. */
+    fxFee: string;
+    /** Prior asset when FX convert happened. */
+    fxFromAsset?: number;
+};
+
 export type PathQuote = {
-    hops: { account: string; assetId: number }[];
+    hops: PathHopQuote[];
     /** Amount to draw on first hop (from-asset). */
     amountIn: string;
     /** Residual after fees (last-hop asset). */
     amountOut: string;
     /** Suggested path_pay min-return (last-hop asset). */
     minReturn: string;
+};
+
+type RawHop = {
+    account: string;
+    assetId?: number;
+    asset_id?: number;
+    amount?: string;
+    hopFee?: string;
+    hop_fee?: string;
+    fxFee?: string;
+    fx_fee?: string;
+    fxFromAsset?: number | null;
+    fx_from_asset?: number | null;
 };
 
 /** Off-chain path discovery (scoped graph + TokenSwap-style search). */
@@ -166,7 +192,7 @@ export function useQuotePath() {
                     exactOut,
                 ],
             })) as Record<string, unknown> & {
-                hops: { account: string; assetId: number }[];
+                hops: RawHop[];
             };
             // Prefer camelCase (jco); fall back to snake_case if present.
             const amountIn = String(
@@ -177,10 +203,21 @@ export function useQuotePath() {
                 res.minReturn ?? res.min_return ?? amountOut,
             );
             return {
-                hops: (res.hops ?? []).map((h) => ({
-                    account: h.account,
-                    assetId: Number(h.assetId),
-                })),
+                hops: (res.hops ?? []).map((h) => {
+                    const fxFrom =
+                        h.fxFromAsset ?? h.fx_from_asset ?? undefined;
+                    return {
+                        account: h.account,
+                        assetId: Number(h.assetId ?? h.asset_id),
+                        amount: String(h.amount ?? ""),
+                        hopFee: String(h.hopFee ?? h.hop_fee ?? "0"),
+                        fxFee: String(h.fxFee ?? h.fx_fee ?? "0"),
+                        fxFromAsset:
+                            fxFrom === null || fxFrom === undefined
+                                ? undefined
+                                : Number(fxFrom),
+                    };
+                }),
                 amountIn,
                 amountOut,
                 minReturn,

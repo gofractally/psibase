@@ -6,8 +6,12 @@ import {
 import { AssetField } from "@/components/form-fields";
 import { PageHeader } from "@/components/page-header";
 import { useAssetMap } from "@/hooks/use-assets";
-import { usePathPay, useQuotePath } from "@/hooks/use-banx-mutations";
-import { amountPlaceholder } from "@/lib/amount";
+import {
+    type PathHopQuote,
+    usePathPay,
+    useQuotePath,
+} from "@/hooks/use-banx-mutations";
+import { amountPlaceholder, displayAmount } from "@/lib/amount";
 import { amountFieldValidator, useAppForm } from "@/lib/form";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
@@ -19,7 +23,14 @@ type QuoteSummary = {
     amountIn: string;
     amountOut: string;
     exactOut: boolean;
+    hops: PathHopQuote[];
 };
+
+function feeIsPositive(fee: string | undefined): boolean {
+    if (!fee) return false;
+    const n = Number(fee);
+    return Number.isFinite(n) ? n > 0 : displayAmount(fee) !== "0";
+}
 
 export function PathPayPage() {
     const { data: user } = useCurrentUser();
@@ -89,6 +100,7 @@ export function PathPayPage() {
                                 amountIn: exactOut ? q.amountIn : typedAmount,
                                 amountOut: q.amountOut,
                                 exactOut,
+                                hops: q.hops,
                             });
                             resolve();
                         },
@@ -139,12 +151,15 @@ export function PathPayPage() {
                 assetId: prevAsset ?? defaultAssetId(assets),
             },
         ]);
+        // Hop list no longer matches the last quote fee breakdown.
+        setQuote(null);
     };
 
     const removeLastHop = () => {
         const hops = execForm.state.values.hops;
         if (hops.length <= 1) return;
         execForm.setFieldValue("hops", hops.slice(0, -1));
+        setQuote(null);
     };
 
     return (
@@ -332,32 +347,79 @@ export function PathPayPage() {
                                 fromAsset: s.values.fromAsset,
                                 toAsset: s.values.toAsset,
                             })}
-                            children={({ fromAsset, toAsset }) =>
-                                quote ? (
-                                    <p className="text-muted-foreground text-sm font-mono">
-                                        {quote.exactOut ? (
-                                            <>
-                                                You send: {quote.amountIn}
-                                                {fromAsset !== undefined
-                                                    ? ` ${symbolOf(fromAsset)}`
-                                                    : ""}
-                                                {" · "}
-                                                Payee gets ≥ {quote.amountOut}
-                                                {toAsset !== undefined
-                                                    ? ` ${symbolOf(toAsset)}`
-                                                    : ""}
-                                            </>
+                            children={({ fromAsset, toAsset }) => {
+                                if (!quote) return null;
+                                const feeParts = quote.hops.flatMap((h, i) => {
+                                    const parts: string[] = [];
+                                    if (feeIsPositive(h.hopFee)) {
+                                        parts.push(
+                                            `hop ${i + 1}: ${displayAmount(h.hopFee)} ${symbolOf(h.assetId)}`,
+                                        );
+                                    }
+                                    if (
+                                        feeIsPositive(h.fxFee) &&
+                                        h.fxFromAsset !== undefined
+                                    ) {
+                                        parts.push(
+                                            `FX→hop ${i + 1}: ${displayAmount(h.fxFee)} ${symbolOf(h.fxFromAsset)}`,
+                                        );
+                                    }
+                                    return parts;
+                                });
+                                return (
+                                    <div className="text-muted-foreground space-y-0.5 text-sm font-mono">
+                                        <p>
+                                            {quote.exactOut ? (
+                                                <>
+                                                    You send:{" "}
+                                                    {displayAmount(
+                                                        quote.amountIn,
+                                                    )}
+                                                    {fromAsset !== undefined
+                                                        ? ` ${symbolOf(fromAsset)}`
+                                                        : ""}
+                                                    {" · "}
+                                                    Payee gets ≥{" "}
+                                                    {displayAmount(
+                                                        quote.amountOut,
+                                                    )}
+                                                    {toAsset !== undefined
+                                                        ? ` ${symbolOf(toAsset)}`
+                                                        : ""}
+                                                </>
+                                            ) : (
+                                                <>
+                                                    You send:{" "}
+                                                    {displayAmount(
+                                                        quote.amountIn,
+                                                    )}
+                                                    {fromAsset !== undefined
+                                                        ? ` ${symbolOf(fromAsset)}`
+                                                        : ""}
+                                                    {" · "}
+                                                    Est. out:{" "}
+                                                    {displayAmount(
+                                                        quote.amountOut,
+                                                    )}
+                                                    {toAsset !== undefined
+                                                        ? ` ${symbolOf(toAsset)}`
+                                                        : ""}
+                                                </>
+                                            )}
+                                        </p>
+                                        {feeParts.length > 0 ? (
+                                            <p className="text-xs">
+                                                Expected fees:{" "}
+                                                {feeParts.join(" · ")}
+                                            </p>
                                         ) : (
-                                            <>
-                                                Est. out: {quote.amountOut}
-                                                {toAsset !== undefined
-                                                    ? ` ${symbolOf(toAsset)}`
-                                                    : ""}
-                                            </>
+                                            <p className="text-xs">
+                                                Expected fees: none
+                                            </p>
                                         )}
-                                    </p>
-                                ) : null
-                            }
+                                    </div>
+                                );
+                            }}
                         />
                     </div>
                 </form>
@@ -376,37 +438,109 @@ export function PathPayPage() {
                     selector={(s) => s.values.hops}
                     children={(hops) => (
                         <div className="space-y-4">
-                            {hops.map((hop, i) => (
-                                <div
-                                    key={i}
-                                    className="grid gap-2 rounded-md border p-3 sm:grid-cols-2"
-                                >
-                                    <execForm.AppField
-                                        name={`hops[${i}].account`}
-                                        children={(field) => (
-                                            <field.TextField
-                                                label={`Hop ${i + 1} account`}
-                                                placeholder={
-                                                    i === 0 ? "gary" : "steve"
-                                                }
-                                                required
+                            {hops.map((hop, i) => {
+                                // Fee annotations come from the last successful quote
+                                // for this hop list (index-aligned while unedited).
+                                const quoted = quote?.hops[i];
+                                const sameHop =
+                                    quoted &&
+                                    quoted.account === hop.account.trim() &&
+                                    quoted.assetId === hop.assetId;
+                                const showFees = Boolean(sameHop);
+                                const hopFee = quoted?.hopFee;
+                                const fxFee = quoted?.fxFee;
+                                const hasHopFee =
+                                    showFees && feeIsPositive(hopFee);
+                                const hasFxFee =
+                                    showFees && feeIsPositive(fxFee);
+                                const hopSym =
+                                    hop.assetId !== undefined
+                                        ? symbolOf(hop.assetId)
+                                        : "";
+                                const fxSym =
+                                    quoted?.fxFromAsset !== undefined
+                                        ? symbolOf(quoted.fxFromAsset)
+                                        : "";
+                                return (
+                                    <div
+                                        key={i}
+                                        className="grid gap-2 rounded-md border p-3"
+                                    >
+                                        <div className="grid gap-2 sm:grid-cols-2">
+                                            <execForm.AppField
+                                                name={`hops[${i}].account`}
+                                                children={(field) => (
+                                                    <field.TextField
+                                                        label={`Hop ${i + 1} account`}
+                                                        placeholder={
+                                                            i === 0
+                                                                ? "gary"
+                                                                : "steve"
+                                                        }
+                                                        required
+                                                    />
+                                                )}
                                             />
-                                        )}
-                                    />
-                                    <execForm.Field
-                                        name={`hops[${i}].assetId`}
-                                        children={(field) => (
-                                            <AssetField
-                                                assets={assets}
-                                                value={field.state.value}
-                                                onChange={(id) =>
-                                                    field.handleChange(id)
-                                                }
+                                            <execForm.Field
+                                                name={`hops[${i}].assetId`}
+                                                children={(field) => (
+                                                    <AssetField
+                                                        assets={assets}
+                                                        value={field.state.value}
+                                                        onChange={(id) =>
+                                                            field.handleChange(
+                                                                id,
+                                                            )
+                                                        }
+                                                    />
+                                                )}
                                             />
-                                        )}
-                                    />
-                                </div>
-                            ))}
+                                        </div>
+                                        {showFees ? (
+                                            <div className="text-muted-foreground space-y-0.5 text-xs font-mono">
+                                                {quoted?.amount ? (
+                                                    <p>
+                                                        After fees:{" "}
+                                                        {displayAmount(
+                                                            quoted.amount,
+                                                        )}
+                                                        {hopSym
+                                                            ? ` ${hopSym}`
+                                                            : ""}
+                                                    </p>
+                                                ) : null}
+                                                {i === 0 &&
+                                                !hasHopFee &&
+                                                !hasFxFee ? (
+                                                    <p>No hop fee (first hop)</p>
+                                                ) : null}
+                                                {hasHopFee ? (
+                                                    <p>
+                                                        Hop fee:{" "}
+                                                        {displayAmount(
+                                                            hopFee!,
+                                                        )}
+                                                        {hopSym
+                                                            ? ` ${hopSym}`
+                                                            : ""}
+                                                    </p>
+                                                ) : i > 0 && showFees ? (
+                                                    <p>Hop fee: 0</p>
+                                                ) : null}
+                                                {hasFxFee ? (
+                                                    <p>
+                                                        FX fee:{" "}
+                                                        {displayAmount(fxFee!)}
+                                                        {fxSym
+                                                            ? ` ${fxSym}`
+                                                            : ""}
+                                                    </p>
+                                                ) : null}
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
                 />

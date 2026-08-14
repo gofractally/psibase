@@ -1,6 +1,7 @@
 #[allow(warnings)]
 mod bindings;
 
+use bindings::banx::plugin::types::PathHopQuote as WitPathHopQuote;
 use bindings::exports::banx::plugin::api::{Guest as Api, PathHop as WitPathHop, PathQuote};
 use bindings::exports::banx::plugin::helpers::Guest as Helpers;
 use bindings::host::types::types::Error;
@@ -415,15 +416,31 @@ impl Api for BanxPlugin {
             amount_out.clone()
         };
 
+        let mut wit_hops = Vec::with_capacity(quote.hops.len());
+        for h in quote.hops {
+            let hop_prec = query::fetch_asset::fetch_asset(h.asset_id)?.precision()?;
+            let amount =
+                Decimal::new(Quantity::new(h.amount), hop_prec).to_string();
+            let hop_fee =
+                Decimal::new(Quantity::new(h.hop_fee), hop_prec).to_string();
+            let fx_fee = if let Some(from_a) = h.fx_from_asset {
+                let fx_prec = query::fetch_asset::fetch_asset(from_a)?.precision()?;
+                Decimal::new(Quantity::new(h.fx_fee), fx_prec).to_string()
+            } else {
+                Decimal::new(Quantity::new(0), hop_prec).to_string()
+            };
+            wit_hops.push(WitPathHopQuote {
+                account: h.account,
+                asset_id: h.asset_id,
+                amount,
+                hop_fee,
+                fx_fee,
+                fx_from_asset: h.fx_from_asset,
+            });
+        }
+
         Ok(PathQuote {
-            hops: quote
-                .hops
-                .into_iter()
-                .map(|h| WitPathHop {
-                    account: h.account,
-                    asset_id: h.asset_id,
-                })
-                .collect(),
+            hops: wit_hops,
             amount_in,
             amount_out,
             min_return,

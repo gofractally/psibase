@@ -1,14 +1,30 @@
 package banx:plugin;
 
 interface types {
+    /// Hop used for `path-pay` execution (account + asset only).
     record path-hop {
         account: string,
         asset-id: u16,
     }
 
+    /// Quoted hop with expected fee breakdown (from `quote-path`).
+    record path-hop-quote {
+        account: string,
+        asset-id: u16,
+        /// Notional drawn on this hop after fees (human decimal, hop asset).
+        amount: string,
+        /// Routing fee on this hop (human decimal, hop asset). `"0"` for hop 0.
+        hop-fee: string,
+        /// FX fixed fee when converting into this hop (human decimal, prior asset).
+        /// `"0"` if no asset change.
+        fx-fee: string,
+        /// Prior asset id when FX convert happened; none otherwise.
+        fx-from-asset: option<u16>,
+    }
+
     /// Result of off-chain multi-hop path discovery for `path-pay`.
     record path-quote {
-        hops: list<path-hop>,
+        hops: list<path-hop-quote>,
         /// Amount to draw on the first hop (human decimal in first hop asset).
         amount-in: string,
         /// Estimated residual after fees (human decimal in last hop asset).
@@ -32,7 +48,7 @@ interface helpers {
 
 interface api {
     use host:types/types.{error};
-    use types.{path-hop, path-quote};
+    use types.{path-hop, path-hop-quote, path-quote};
 
     /// Creditor posts/updates a credit line to `debtor` in `asset-id`.
     /// `limit` is a human decimal string (e.g. `"100.00"`).

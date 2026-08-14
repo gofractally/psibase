@@ -47,6 +47,14 @@ pub struct FxEdge {
 pub struct PathHop {
     pub account: String,
     pub asset_id: u16,
+    /// Notional drawn on this hop after fees (raw units of hop asset).
+    pub amount: u64,
+    /// Routing fee taken on this hop (raw units of hop asset). Always 0 for hop 0.
+    pub hop_fee: u64,
+    /// FX fixed fee when converting into this hop (raw units of prior asset). 0 if no FX.
+    pub fx_fee: u64,
+    /// Prior asset when an FX convert happened into this hop.
+    pub fx_from_asset: Option<u16>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -315,33 +323,107 @@ pub fn find_banx_path(
         return None;
     }
 
-    let mut hops = Vec::new();
+    // Reconstruct hop accounts/assets (fees filled by simulate_path_fees).
+    let mut hop_keys = Vec::new();
     loop {
         let p = pred.get(&(cur_acct.clone(), cur_asset))?;
-        hops.push(PathHop {
-            account: p.hop_account.clone(),
-            asset_id: p.hop_asset,
-        });
+        hop_keys.push((p.hop_account.clone(), p.hop_asset));
         if p.prev_account.is_empty() {
             break;
         }
         cur_acct = p.prev_account.clone();
         cur_asset = p.prev_asset;
     }
-    hops.reverse();
-    if hops.is_empty() || hops.len() > max_hops as usize {
+    hop_keys.reverse();
+    if hop_keys.is_empty() || hop_keys.len() > max_hops as usize {
         return None;
     }
     // Last hop must be payee.
-    if hops.last()?.account != payee {
+    if hop_keys.last()?.0 != payee {
         return None;
     }
+
+    let hops = simulate_path_fees(&hop_keys, amount_in, sender, routing, fx, now)?;
+    let sim_out = hops.last().map(|h| h.amount).unwrap_or(0);
 
     Some(PathQuote {
         hops,
         amount_in,
-        amount_out,
+        // Prefer search residual when both agree; simulation is the fee source of truth.
+        amount_out: if sim_out > 0 { sim_out } else { amount_out },
     })
+}
+
+/// Walk a hop list the same way `path_pay` / search do, recording per-hop fees.
+fn simulate_path_fees(
+    hop_keys: &[(String, u16)],
+    amount_in: u64,
+    sender: &str,
+    routing: &[RoutingEdge],
+    fx: &[FxEdge],
+    now: i64,
+) -> Option<Vec<PathHop>> {
+    if hop_keys.is_empty() || amount_in == 0 {
+        return None;
+    }
+
+    let mut hops = Vec::with_capacity(hop_keys.len());
+    let mut forward = amount_in;
+    let mut path_debtor = sender.to_string();
+    let mut prev_edge_debtor = sender.to_string();
+    let mut prev_asset = hop_keys[0].1;
+
+    for (i, (next_creditor, asset_id)) in hop_keys.iter().enumerate() {
+        let asset_id = *asset_id;
+        if i == 0 {
+            hops.push(PathHop {
+                account: next_creditor.clone(),
+                asset_id,
+                amount: forward,
+                hop_fee: 0,
+                fx_fee: 0,
+                fx_from_asset: None,
+            });
+            prev_edge_debtor = path_debtor;
+            path_debtor = next_creditor.clone();
+            prev_asset = asset_id;
+            continue;
+        }
+
+        let mut fx_fee = 0u64;
+        let mut fx_from_asset = None;
+        if asset_id != prev_asset {
+            let e = fx.iter().find(|e| {
+                e.debtor == prev_edge_debtor
+                    && e.from_asset == prev_asset
+                    && e.to_asset == asset_id
+                    && policy_live(e.expires_at, now)
+                    && e.fx_rate > 0
+            })?;
+            fx_fee = e.fee_fixed;
+            fx_from_asset = Some(prev_asset);
+            forward = apply_rate(forward, e.fee_fixed, e.fx_rate)?;
+        }
+
+        let rpol = resolve_routing(routing, next_creditor, &path_debtor, asset_id, now)?;
+        let before_fee = forward;
+        forward = apply_hop_fee(forward, rpol.hop_fee_fixed, rpol.hop_fee_percent_ppm)?;
+        let hop_fee = before_fee.saturating_sub(forward);
+
+        hops.push(PathHop {
+            account: next_creditor.clone(),
+            asset_id,
+            amount: forward,
+            hop_fee,
+            fx_fee,
+            fx_from_asset,
+        });
+        prev_edge_debtor = path_debtor;
+        path_debtor = next_creditor.clone();
+        prev_asset = asset_id;
+    }
+
+    Some(hops)
 }
 
 /// Find a path that delivers at least `amount_out` to the payee, minimizing
@@ -612,6 +694,13 @@ mod tests {
         assert_eq!(q.amount_in, 10_000);
         // second hop: 10000 * 0.95 = 9500
         assert_eq!(q.amount_out, 9_500);
+        // Fee breakdown on hops
+        assert_eq!(q.hops[0].hop_fee, 0);
+        assert_eq!(q.hops[0].amount, 10_000);
+        assert_eq!(q.hops[1].hop_fee, 500);
+        assert_eq!(q.hops[1].amount, 9_500);
+        assert_eq!(q.hops[1].fx_fee, 0);
+        assert!(q.hops[1].fx_from_asset.is_none());
     }
 
     #[test]
