@@ -169,9 +169,6 @@ interface api {
         max-hops: u8,
         exact-out: bool,
     ) -> result<path-quote, error>;
-
-    /// Accrue interest on a directed pair/asset.
-    accrue: func(creditor: string, debtor: string, asset-id: u16) -> result<_, error>;
 }
 
 world imports {

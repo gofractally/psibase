@@ -81,7 +81,7 @@ Interest is **daily compound** on principal + already finalized interest.
 - Full days: `bal × (1 + APR / 365)` (365-day year, no leap).
 - Leftover hours in the current day: pro-rata on that daily rate.
 
-It is computed from the last **principal/rate change**, not from “last time someone clicked Accrue.” The `accrue` action is a no-op. Reads (GraphQL, exposure) include **live** interest. Any action that changes principal **locks** live interest first, then mutates.
+It is computed from the last **principal/rate change**. Reads (GraphQL, exposure) include **live** interest. Any action that changes principal **locks** live interest first, then mutates.
 
 So 25 days of a loan already carry 25 days of interest. Interest-on-interest starts after each full day.
 
@@ -133,7 +133,6 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 | `net` | Explicit bilateral net |
 | `st_cur_pol` | Post convert quote |
 | `convert` | Rebook a claim |
-| `accrue` | No-op (interest is live) |
 | `get_exposure` | Live pair exposure |
 | `add_asset` | Register an asset (service only) |
 

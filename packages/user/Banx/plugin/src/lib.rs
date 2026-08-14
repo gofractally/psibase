@@ -24,7 +24,6 @@ mod query {
 define_trust! {
     descriptions {
         Low => "
-            - Accrue interest on Banx obligations
             - Convert amounts using asset precision
             - Quote multi-hop paths (read-only GraphQL + search)
         ",
@@ -40,7 +39,7 @@ define_trust! {
     }
     functions {
         None => [decimal_to_quantity, quantity_to_decimal],
-        Low => [accrue, quote_path],
+        Low => [quote_path],
         Medium => [
             set_credit_line,
             set_clearing_offer,
@@ -447,17 +446,6 @@ impl Api for BanxPlugin {
             amount_out,
             min_return,
         })
-    }
-
-    fn accrue(creditor: String, debtor: String, asset_id: u16) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::accrue)?;
-        let packed = banx::action_structs::accrue {
-            creditor: parse_account(&creditor)?,
-            debtor: parse_account(&debtor)?,
-            asset_id,
-        }
-        .packed();
-        add_action_to_transaction(banx::action_structs::accrue::ACTION_NAME, &packed)
     }
 }
 

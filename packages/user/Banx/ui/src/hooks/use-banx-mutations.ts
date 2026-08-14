@@ -460,18 +460,3 @@ export function useConvert() {
     });
 }
 
-export function useAccrue() {
-    const invalidate = useInvalidateBanx();
-    return useMutation({
-        mutationFn: async (p: {
-            creditor: string;
-            debtor: string;
-            assetId: number;
-        }) => banxCall("accrue", [p.creditor, p.debtor, p.assetId]),
-        onSuccess: () => {
-            invalidate();
-            toast.success("Interest accrued");
-        },
-        onError: (e: Error) => toast.error(e.message),
-    });
-}

@@ -1514,13 +1514,6 @@ pub mod service {
         );
     }
 
-    /// No-op: interest is computed from the last principal/rate change.
-    /// Calling this does not cut the epoch (5s vs 5y stays the same).
-    #[action]
-    fn accrue(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) {
-        let _ = (creditor, debtor, asset_id);
-    }
-
     /// Live pair exposure (principal + interest since last principal/rate change).
     #[action]
     fn get_exposure(

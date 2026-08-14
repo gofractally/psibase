@@ -30,11 +30,7 @@ import {
     useObligations,
     useRoutingPolicies,
 } from "@/hooks/use-banx-data";
-import {
-    useAccrue,
-    useNet,
-    useSetCreditLine,
-} from "@/hooks/use-banx-mutations";
+import { useNet, useSetCreditLine } from "@/hooks/use-banx-mutations";
 import {
     amountPlaceholder,
     formatRawAmount,
@@ -225,7 +221,6 @@ export function ObligationsPage() {
     const { data: routing = [] } = useRoutingPolicies();
     const { assets, symbolOf, precisionOf } = useAssetMap();
     const net = useNet();
-    const accrue = useAccrue();
     const isLoading = obsLoading || linesLoading;
 
     /** At least one live global clearing offer. */
@@ -461,14 +456,6 @@ export function ObligationsPage() {
                                 creditLine={g.creditLine}
                                 canEditCreditLine={!!g.creditLine}
                                 balanceLabel="Balance"
-                                accruePending={accrue.isPending}
-                                onAccrue={(o) =>
-                                    accrue.mutate({
-                                        creditor: o.creditor,
-                                        debtor: o.debtor,
-                                        assetId: o.assetId,
-                                    })
-                                }
                                 onSettle={() =>
                                     prefillNet(
                                         g.counterparty,
@@ -586,14 +573,6 @@ export function ObligationsPage() {
                                 creditLine={g.creditLine}
                                 canEditCreditLine={false}
                                 balanceLabel="Outstanding"
-                                accruePending={accrue.isPending}
-                                onAccrue={(o) =>
-                                    accrue.mutate({
-                                        creditor: o.creditor,
-                                        debtor: o.debtor,
-                                        assetId: o.assetId,
-                                    })
-                                }
                                 onSettle={() =>
                                     prefillNet(
                                         g.counterparty,
@@ -1108,8 +1087,6 @@ function AccountGroupRow({
     creditLine,
     canEditCreditLine,
     balanceLabel,
-    accruePending,
-    onAccrue,
     onSettle,
     onEditCreditLine,
     onSetRouting,
@@ -1127,8 +1104,6 @@ function AccountGroupRow({
     creditLine?: CreditLine;
     canEditCreditLine?: boolean;
     balanceLabel: string;
-    accruePending: boolean;
-    onAccrue: (o: Obligation) => void;
     onSettle: () => void;
     onEditCreditLine?: () => void;
     /** Open routing policy with this counterparty as next-hop creditor. */
@@ -1493,14 +1468,6 @@ function AccountGroupRow({
                                                     APR
                                                 </p>
                                             </div>
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                disabled={accruePending}
-                                                onClick={() => onAccrue(o)}
-                                            >
-                                                Accrue
-                                            </Button>
                                         </li>
                                     );
                                 })}

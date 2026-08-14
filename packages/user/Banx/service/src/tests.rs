@@ -1148,7 +1148,7 @@ mod tests {
         Ok(())
     }
 
-    /// Daily 10% on $100.0000; accrue action does not cut the epoch.
+    /// Daily 10% on $100.0000 over two years without locking the epoch.
     #[psibase::test_case(packages("Banx"))]
     fn test_interest_one_floor_over_epoch(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
@@ -1163,10 +1163,6 @@ mod tests {
             .get()?;
 
         chain.start_block_after(Seconds::new(SECONDS_PER_YEAR as i64).into());
-        assert_eq!(exp(&chain, alice, bob, usd), 1_104_964);
-        Wrapper::push_from(&chain, alice)
-            .accrue(alice, bob, usd)
-            .get()?;
         assert_eq!(exp(&chain, alice, bob, usd), 1_104_964);
 
         chain.start_block_after(Seconds::new(SECONDS_PER_YEAR as i64).into());
