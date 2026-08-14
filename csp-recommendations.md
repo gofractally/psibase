@@ -241,14 +241,14 @@ default they need a `setCsp` override = **default + enumerated hosts in
 
 | App | Extra `connect-src` hosts | Verified direct fetches |
 | --- | --- | --- |
-| `homepage` (Homepage, incl. Chainmail/Contacts/Tokens/Token-swap sub-apps) | `invite.{root}` `tokens.{root}` `token-swap.{root}` `vserver.{root}` `producers.{root}` `profiles.{root}` | invite GraphQL (`pages/invite.tsx`); tokens GraphQL (`apps/tokens/lib/graphql/ui.ts`, shared `use-system-token`); token-swap GraphQL (`apps/token-swap/hooks/use-pools.ts`); shared `use-billing-config` (vserver); shared `get-producers`; shared `use-profile` (nav/contacts) |
+| `homepage` (Homepage, incl. Chainmail/Contacts/Tokens/Token-swap/Accounts-marketplace sub-apps) | `invite.{root}` `tokens.{root}` `token-swap.{root}` `vserver.{root}` `producers.{root}` `profiles.{root}` `namemarket.{root}` | invite GraphQL (`pages/invite.tsx`); tokens GraphQL (`apps/tokens/lib/graphql/ui.ts`, shared `use-system-token`); token-swap GraphQL (`apps/token-swap/hooks/use-pools.ts`); shared `use-billing-config` (vserver); shared `get-producers`; shared `use-profile` (nav/contacts); shared `use-account-markets` → `lib/graphql/namemarket.ts` (accounts marketplace; note the service name is passed as a variable, so literal-string audits miss it) |
 | `config` (Config) | `producers.{root}` `sites.{root}` `staged-tx.{root}` `transact.{root}` `vserver.{root}` `tokens.{root}` `profiles.{root}` `x-admin.{root}` `packages.{root}` **`http:` `https:`** | candidates/tx-history/staged-tx hooks; sites GraphQL (logo check); vserver pricing hooks; shared `use-system-token`; sidebar profile; package-index fetches. The `http:`/`https:` scheme sources exist because Config's custom package sources are user-configured URLs at arbitrary hosts — a supported feature that cannot be host-allowlisted. They subsume the enumerated hosts (kept to document first-party needs, and so the list survives if the scheme grant is ever replaced by a package-source proxy). Trade-off: Config alone retains a fetch-anywhere channel; acceptable because it is an operator-facing app, but see Watch list. |
 | `fractal-cr` (FractalCore) | `guilds.{root}` `invite.{root}` `staged-tx.{root}` `profiles.{root}` | guild/invite GraphQL (`lib/graphql/fractals/*`); staged-tx via shared `checkLastTx`; sidebar profile |
 | `workshop` (Workshop) | `registry.{root}` `setcode.{root}` `sites.{root}` `profiles.{root}` | app-metadata (registry), code-hash (setcode), site-config (sites) hooks; sidebar profile |
 | `evaluation` (Evaluations) | `profiles.{root}` | own-service GraphQL is same-origin; sidebar profile only |
 | `fractals` (Fractals) | `profiles.{root}` | plugin calls via supervisor; sidebar profile only |
 | `tok-stream` (TokenStream) | `token-stream.{root}` `nft.{root}` `tokens.{root}` `profiles.{root}` | stream/nft/token GraphQL (`lib/get-*.ts`); sidebar profile. NB: the UI queries `token-stream.{root}` although the service account is `tok-stream` — the host is allowlisted as the code requests it; if that is a bug, fixing it makes the fetch same-origin |
-| `accounts` (Accounts) | `tokens.{root}` | system-token lookup in `create-prompt.tsx` (shared `use-system-token`) |
+| `accounts` (Accounts) | `tokens.{root}` `namemarket.{root}` | system-token lookup and account-market overview in `create-prompt.tsx` (shared `use-system-token`, `use-account-markets`) |
 
 These lists change as apps grow — do not hand-maintain them long-term; see
 the Watch-list item on generated allowlists.
@@ -326,9 +326,10 @@ prompt routes — the exception must be applied **site-wide** (`setCsp` with pat
 
 Recommended (site-wide) policy = default, with `frame-ancestors` widened.
 Accounts' account and key operations go through the supervisor, but its
-create-account prompt looks up the system token directly (shared
-`use-system-token` in `create-prompt.tsx`), so `connect-src` also needs
-`tokens.{root}`:
+create-account prompt fetches directly from the page: the system-token
+lookup (shared `use-system-token`) and the account-market overview (shared
+`use-account-markets`), so `connect-src` also needs `tokens.{root}` and
+`namemarket.{root}`:
 
 ```
 default-src 'self';
@@ -336,7 +337,7 @@ script-src 'self';
 style-src 'self' 'unsafe-inline';
 img-src 'self' data: profiles.{root}/avatar/ branding.{root};
 font-src 'self';
-connect-src 'self' tokens.{root};
+connect-src 'self' tokens.{root} namemarket.{root};
 frame-src supervisor.{root};
 frame-ancestors 'self' supervisor.{root};
 base-uri 'none';
@@ -511,6 +512,14 @@ object-src 'none';
   lands (interim: `{root} *.{root}`). Truly external images (arbitrary
   user-supplied URLs, off-domain token icons/NFT art) remain blocked by default
   and need per-app opt-in via `setCsp`; re-audit if such a feature ships.
+- **500 responses lack CORS headers.** psibase error replies (e.g. HTTP 500
+  from service dispatch) omit `Access-Control-Allow-Origin`, while success,
+  404, and preflight replies include it. A browser therefore reports any
+  cross-origin 500 as "blocked by CORS policy: No 'Access-Control-Allow-Origin'
+  header" — masking the real server error and making it look like a
+  policy problem. Fix server-side by attaching the CORS headers to error
+  replies too; until then, check psinode logs for the real status code when
+  diagnosing "CORS" reports.
 - **Config's `http:`/`https:` scheme grant.** Config's custom package
   sources are user-configured URLs at arbitrary hosts, so its `connect-src`
   carries `http: https:` — the one first-party fetch-anywhere channel left
