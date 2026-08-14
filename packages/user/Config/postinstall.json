@@ -4,5 +4,14 @@
     "service": "sites",
     "method": "enablespa",
     "data": { "enable": true }
+  },
+  {
+    "sender": "config",
+    "service": "sites",
+    "method": "setcsp",
+    "data": {
+      "path": "*",
+      "csp": "default-src 'self';script-src 'self';style-src 'self' 'unsafe-inline';img-src 'self' data: profiles.{{root}}/avatar/ branding.{{root}};font-src 'self';connect-src 'self' producers.{{root}} sites.{{root}} staged-tx.{{root}} transact.{{root}} vserver.{{root}} tokens.{{root}} profiles.{{root}} x-admin.{{root}} packages.{{root}};frame-src supervisor.{{root}};frame-ancestors 'self';base-uri 'none';form-action 'self';object-src 'none';"
+    }
   }
 ]

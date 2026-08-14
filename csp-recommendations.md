@@ -223,12 +223,6 @@ These apps were verified to fetch only same-origin endpoints (their own
 `/graphql` and `/common/*`) from the page, so the strict default works as-is:
 
 - `identity` (Identity)
-- `evaluations` (Evaluations — its `graphql()` calls name its own service,
-  which resolves to its own origin)
-- `fractals` (Fractals)
-- `token-stream` (TokenStream)
-- `prem-accounts` (PremAccounts)
-- `workshop` (Workshop)
 - `common-api` (CommonApi; also serves the plugin-tester dev tool under
   `/common/plugin-tester/` — it is part of this site, not its own subdomain,
   and calls plugins via the supervisor, not direct fetch)
@@ -242,20 +236,26 @@ content they serve also falls under the default.
 
 These apps `fetch` other services directly from the page, so under the strict
 default they need a `setCsp` override = **default + enumerated hosts in
-`connect-src`** (complete policy, per Assumption 2). Hosts verified in-tree:
+`connect-src`** (complete policy, per Assumption 2). Hosts verified in-tree
+(and implemented as postinstall `setcsp` overrides):
 
 | App | Extra `connect-src` hosts | Verified direct fetches |
 | --- | --- | --- |
-| `homepage` (Homepage, incl. Chainmail/Contacts/Tokens/Token-swap sub-apps) | `invite.{root}` `tokens.{root}` `token-swap.{root}` | invite GraphQL (`pages/invite.tsx`); tokens GraphQL (`apps/tokens/lib/graphql/ui.ts`); token-swap GraphQL (`apps/token-swap/hooks/use-pools.ts`) |
-| `config` (Config) | `vserver.{root}` `prem-accounts.{root}` `<namemarket>.{root}` | resource pricing/virtual-server hooks; premium/name-market hooks |
-| `fractal-cr` (FractalCore) | `guilds.{root}` `invite.{root}` | guild/evaluation GraphQL (`lib/graphql/fractals/*`); invite GraphQL |
+| `homepage` (Homepage, incl. Chainmail/Contacts/Tokens/Token-swap sub-apps) | `invite.{root}` `tokens.{root}` `token-swap.{root}` `vserver.{root}` `producers.{root}` `profiles.{root}` | invite GraphQL (`pages/invite.tsx`); tokens GraphQL (`apps/tokens/lib/graphql/ui.ts`, shared `use-system-token`); token-swap GraphQL (`apps/token-swap/hooks/use-pools.ts`); shared `use-billing-config` (vserver); shared `get-producers`; shared `use-profile` (nav/contacts) |
+| `config` (Config) | `producers.{root}` `sites.{root}` `staged-tx.{root}` `transact.{root}` `vserver.{root}` `tokens.{root}` `profiles.{root}` `x-admin.{root}` `packages.{root}` | candidates/tx-history/staged-tx hooks; sites GraphQL (logo check); vserver pricing hooks; shared `use-system-token`; sidebar profile; package-index fetches (`x-admin`/`packages` default sources — user-configured custom source URLs are *not* allowlisted and will be blocked) |
+| `fractal-cr` (FractalCore) | `guilds.{root}` `invite.{root}` `staged-tx.{root}` `profiles.{root}` | guild/invite GraphQL (`lib/graphql/fractals/*`); staged-tx via shared `checkLastTx`; sidebar profile |
+| `workshop` (Workshop) | `registry.{root}` `setcode.{root}` `sites.{root}` `profiles.{root}` | app-metadata (registry), code-hash (setcode), site-config (sites) hooks; sidebar profile |
+| `evaluation` (Evaluations) | `profiles.{root}` | own-service GraphQL is same-origin; sidebar profile only |
+| `fractals` (Fractals) | `profiles.{root}` | plugin calls via supervisor; sidebar profile only |
+| `tok-stream` (TokenStream) | `token-stream.{root}` `nft.{root}` `tokens.{root}` `profiles.{root}` | stream/nft/token GraphQL (`lib/get-*.ts`); sidebar profile. NB: the UI queries `token-stream.{root}` although the service account is `tok-stream` — the host is allowlisted as the code requests it; if that is a bug, fixing it makes the fetch same-origin |
+| `accounts` (Accounts) | `tokens.{root}` | system-token lookup in `create-prompt.tsx` (shared `use-system-token`) |
 
 These lists change as apps grow — do not hand-maintain them long-term; see
 the Watch-list item on generated allowlists.
 
 Explorer and Docs also exist on this branch but need exceptions (see below)
 because their build tooling emits inline scripts; Explorer additionally
-fetches `tokens.{root}` directly.
+fetches `tokens.{root}` directly (allowlisted in its exception policy).
 
 ---
 
@@ -324,9 +324,11 @@ the same `index.html` content row, so a path-scoped CSP cannot single out the
 prompt routes — the exception must be applied **site-wide** (`setCsp` with path
 `*`).
 
-Recommended (site-wide) policy = default, with `frame-ancestors` widened
-(Accounts' UI makes no direct cross-subdomain fetches — its account and key
-operations go through the supervisor — so `connect-src` stays `'self'`):
+Recommended (site-wide) policy = default, with `frame-ancestors` widened.
+Accounts' account and key operations go through the supervisor, but its
+create-account prompt looks up the system token directly (shared
+`use-system-token` in `create-prompt.tsx`), so `connect-src` also needs
+`tokens.{root}`:
 
 ```
 default-src 'self';
@@ -334,7 +336,7 @@ script-src 'self';
 style-src 'self' 'unsafe-inline';
 img-src 'self' data: profiles.{root}/avatar/ branding.{root};
 font-src 'self';
-connect-src 'self';
+connect-src 'self' tokens.{root};
 frame-src supervisor.{root};
 frame-ancestors 'self' supervisor.{root};
 base-uri 'none';
@@ -586,10 +588,13 @@ object-src 'none';
 
 | Site | Service account | Policy | Scope | Reason |
 | --- | --- | --- | --- | --- |
-| Identity, Evaluations, Fractals, TokenStream, PremAccounts, Workshop, CommonApi (incl. plugin-tester) | various | **Default** | site-wide | Verified same-origin-only fetches |
-| Homepage | `homepage` | Default + `connect-src` allowlist | site-wide (SPA) | Direct GraphQL to `invite`, `tokens`, `token-swap` |
-| Config | `config` | Default + `connect-src` allowlist | site-wide (SPA) | Direct GraphQL to `vserver`, `prem-accounts`, name-market services |
-| FractalCore | `fractal-cr` | Default + `connect-src` allowlist | site-wide (SPA) | Direct GraphQL to `guilds`, `invite` |
+| Identity, CommonApi (incl. plugin-tester) | `identity`, `common-api` | **Default** | site-wide | Verified same-origin-only fetches |
+| Homepage | `homepage` | Default + `connect-src` allowlist | site-wide (SPA) | Direct GraphQL to `invite`, `tokens`, `token-swap`, `vserver`, `producers`, `profiles` |
+| Config | `config` | Default + `connect-src` allowlist | site-wide (SPA) | Direct GraphQL/fetches to `producers`, `sites`, `staged-tx`, `transact`, `vserver`, `tokens`, `profiles`, `x-admin`, `packages` |
+| FractalCore | `fractal-cr` | Default + `connect-src` allowlist | site-wide (SPA) | Direct GraphQL to `guilds`, `invite`, `staged-tx`, `profiles` |
+| Workshop | `workshop` | Default + `connect-src` allowlist | site-wide (SPA) | Direct GraphQL to `registry`, `setcode`, `sites`, `profiles` |
+| Evaluations, Fractals | `evaluation`, `fractals` | Default + `connect-src` allowlist | site-wide (SPA) | Sidebar profile lookup (`profiles`) |
+| TokenStream | `tok-stream` | Default + `connect-src` allowlist | site-wide (SPA) | Direct GraphQL to `token-stream`, `nft`, `tokens`, `profiles` |
 | Supervisor | `supervisor` | Exception 1 | site-wide | Wasm/blob, embeds prompts, embedded by all apps; sole holder of the `connect-src` wildcard |
 | Accounts | `accounts` | Exception 2 | site-wide (SPA) | Serves prompt pages embedded by supervisor |
 | Permissions | `perms` | Exception 3 | path (`/plugin/web/prompt/permissions/index.html`) | Serves a prompt page embedded by supervisor |
