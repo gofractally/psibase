@@ -46,14 +46,26 @@ this document can be enforced as written.
 
 ### Prerequisite A — dynamic host injection (already documented)
 
+> **Status: landed** ([#1936](https://github.com/gofractally/psibase/issues/1936)).
+> CSP strings (the default and user-defined `setCsp` values) may contain the
+> keyword `{{root}}`, which `Sites::getCspHeader` expands per request to the
+> root domain plus port suffix (`expandCspKeywords` in `Sites.cpp`). Where
+> this document writes `{root}`, the implemented syntax is `{{root}}`.
+
 The per-request `{root}` injection described under Assumptions. The
 primitives exist (`HttpServer::rootHost`, and the scheme/port derivation in
-`HttpServer::getSiblingUrl`); the current branch hard-codes
-`psibase.localhost:8080` in `Sites.cpp` as a placeholder until this lands.
-This prerequisite unblocks shipping *any* of the policies below with real
-hosts.
+`HttpServer::getSiblingUrl`). This prerequisite unblocks shipping *any* of
+the policies below with real hosts.
 
 ### Prerequisite B — avatar proxying
+
+> **Status: landed** ([#1939](https://github.com/gofractally/psibase/issues/1939)).
+> The `profiles` service now stores avatars under its own subdomain
+> (`/avatar/<account>`), and the shared `Avatar` component
+> (`shared-ui/hooks/use-avatar.ts`) fetches
+> `profiles.{root}/avatar/<account>`. The tightened
+> `img-src 'self' data: profiles.{root}/avatar/ branding.{root}` is enforced
+> in the default policy and all first-party overrides.
 
 Today avatars are uploaded to each account's own subdomain (`sites` path
 `<account>.{root}/profile/avatar`, via the `Profiles` plugin) and fetched
@@ -97,12 +109,9 @@ first-party system service, not an arbitrary account).
    `img-src` can be enforced; land the proxy and the `img-src` change
    together (tightening `img-src` before the proxy exists breaks avatars).
 
-If the CSP rollout ships before Prerequisite B, use
-`img-src 'self' data: {root} *.{root}` as an **interim** value everywhere
-this document says `img-src 'self' data: profiles.{root}/avatar/ branding.{root}`,
-and treat the tightened value as the target state. (This interim wildcard also
-temporarily preserves an image-based exfiltration channel that undercuts part
-of the `connect-src` tightening's value — one more reason to prioritize B.)
+Both prerequisites have landed, so the tightened
+`img-src 'self' data: profiles.{root}/avatar/ branding.{root}` value is used
+as written; no interim wildcard is needed.
 
 ### Rollout: enforce directly, skip Report-Only
 

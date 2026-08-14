@@ -83,8 +83,9 @@ namespace SystemService
             (e.g. the shared chart component)
         img-src:
           * `data:` for generated identicons and inline app icons
-          * root + subdomains for cross-subdomain avatars
-            (<account>.<root>/profile/avatar)
+          * `profiles.<root>/avatar/` (prefix match) for user avatars,
+            served by the profiles service
+          * `branding.<root>` for the network logo
         connect-src:
           * root + subdomains for fetching GraphQL/RPC from sibling services;
             `'self'` also covers same-origin websockets
@@ -98,7 +99,7 @@ namespace SystemService
           "default-src 'self';"                             //
           "script-src 'self';"                              //
           "style-src 'self' 'unsafe-inline';"               //
-          "img-src 'self' data: {{root}} *.{{root}};"       //
+          "img-src 'self' data: profiles.{{root}}/avatar/ branding.{{root}};"  //
           "font-src 'self';"                                //
           "connect-src 'self' {{root}} *.{{root}};"         //
           "frame-src supervisor.{{root}};"                  //

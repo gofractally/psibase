@@ -12,17 +12,17 @@ The `sites` service is used to host content for an account and serve it over HTT
 
 The `Content-Security-Policy` header aids security efforts, as modern browsers restrict the capabilities of the document on the client-side according to the policy expressed in this header. The sites server uses a strict baseline CSP header; apps with additional requirements (e.g. the supervisor, prompt pages, or sites built with tooling that emits inline scripts) override it with the `setCsp` action.
 
-Host sources are written scheme-relative (no `http://`/`https://` prefix), so the same policy works over `http` in local development and `https` in production. The root host is currently hardcoded to `psibase.localhost:8080`; deriving it per request is planned as separate work.
+Host sources are written scheme-relative (no `http://`/`https://` prefix), so the same policy works over `http` in local development and `https` in production. The `{{root}}` keyword (see below) is replaced at serve time with the root domain of the request.
 
 | Default policy    | Values                                                       |
 | ----------------- | ------------------------------------------------------------ |
 | `default-src`     | `'self'`                                                     |
 | `script-src`      | `'self'`                                                     |
 | `style-src`       | `'self' 'unsafe-inline'`                                     |
-| `img-src`         | `'self' data: psibase.localhost:8080 *.psibase.localhost:8080` |
+| `img-src`         | `'self' data: profiles.{{root}}/avatar/ branding.{{root}}`   |
 | `font-src`        | `'self'`                                                     |
-| `connect-src`     | `'self' psibase.localhost:8080 *.psibase.localhost:8080`     |
-| `frame-src`       | `supervisor.psibase.localhost:8080`                          |
+| `connect-src`     | `'self' {{root}} *.{{root}}`                                 |
+| `frame-src`       | `supervisor.{{root}}`                                        |
 | `frame-ancestors` | `'self'`                                                     |
 | `base-uri`        | `'none'`                                                     |
 | `form-action`     | `'self'`                                                     |
@@ -33,7 +33,8 @@ Notable consequences of the strict baseline:
 - Inline `<script>` tags, `eval`, and CDN-hosted scripts are blocked by default. Apps that need them must opt in via `setCsp`.
 - Pages may only be embedded same-origin by default (`frame-ancestors 'self'`). Pages designed to be embedded by the supervisor (e.g. plugin prompt pages) must widen `frame-ancestors` to include the supervisor's origin.
 - The only frameable origin is the supervisor (every app embeds the hidden supervisor iframe).
-- Cross-subdomain `fetch`/WebSocket and image loads within the deployment's domain are allowed; arbitrary external origins are not.
+- Cross-subdomain `fetch`/WebSocket within the deployment's domain is allowed; arbitrary external origins are not.
+- Cross-subdomain image loads are limited to user avatars (served by the `profiles` service at `profiles.{{root}}/avatar/<account>`) and the network logo (served from `branding.{{root}}`). Apps that display images from other origins must opt in via `setCsp`.
 
 ### Dynamic CSP
 
