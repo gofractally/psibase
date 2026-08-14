@@ -19,10 +19,9 @@ jobs:
   ubuntu-versions:
     runs-on: ubuntu-latest
     outputs:
-      ubuntu-versions: ${{ steps.set-ubuntu-versions.outputs.ubuntu-versions }}
+      ubuntu-versions: '["2204","2404","2604"]'
     steps:
-      - id: set-ubuntu-versions
-        run: echo 'ubuntu-versions=["2204","2404","2604"]' >> "$GITHUB_OUTPUT"
+      - run: true
 
   build:
     name: Ubuntu ${{ matrix.ubuntu-version }} - Build
