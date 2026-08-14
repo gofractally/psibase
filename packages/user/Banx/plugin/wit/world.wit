@@ -64,37 +64,57 @@ interface api {
         grace-seconds: u32,
     ) -> result<_, error>;
 
-    /// Post a clearing offer toward a **specific** `counterparty` (next hop for
-    /// path forward and/or debtor for claim takeout). Prefer global when possible.
-    /// `fee-fixed` is a human decimal in `asset-id` units.
+    /// Post a path-forward offer toward a **specific** next hop. Prefer global
+    /// when possible. `fee-fixed` is a human decimal in `asset-id` units.
     /// `fee-percent-ppm` is ppm (`10_000` = 1%).
-    set-clearing-offer: func(
-        counterparty: string,
+    set-forward-offer: func(
+        next-hop: string,
         asset-id: u16,
         fee-fixed: string,
         fee-percent-ppm: u32,
         max-line-apr-ppm: u32,
-        forward-enabled: bool,
         expires-at-seconds: u32,
     ) -> result<_, error>;
 
-    /// Global clearing offer for this asset (any next hop / any lined debtor).
-    set-global-clearing-offer: func(
+    /// Global path-forward offer for this asset (any next hop).
+    set-global-forward-offer: func(
         asset-id: u16,
         fee-fixed: string,
         fee-percent-ppm: u32,
         max-line-apr-ppm: u32,
-        forward-enabled: bool,
         expires-at-seconds: u32,
     ) -> result<_, error>;
 
-    /// Remove a specific clearing offer.
-    remove-clearing-offer: func(counterparty: string, asset-id: u16) -> result<_, error>;
+    /// Remove a specific path-forward offer.
+    remove-forward-offer: func(next-hop: string, asset-id: u16) -> result<_, error>;
 
-    /// Remove global clearing offer for this asset.
-    remove-global-clearing-offer: func(asset-id: u16) -> result<_, error>;
+    /// Remove global path-forward offer for this asset.
+    remove-global-forward-offer: func(asset-id: u16) -> result<_, error>;
 
-    /// Sell claims on `debtor` to `buyer` under buyer's clearing offer.
+    /// Post a takeout offer for claims on a **specific** debtor.
+    set-takeout-offer: func(
+        debtor: string,
+        asset-id: u16,
+        fee-fixed: string,
+        fee-percent-ppm: u32,
+        expires-at-seconds: u32,
+    ) -> result<_, error>;
+
+    /// Global takeout offer for this asset (any lined debtor).
+    set-global-takeout-offer: func(
+        asset-id: u16,
+        fee-fixed: string,
+        fee-percent-ppm: u32,
+        expires-at-seconds: u32,
+    ) -> result<_, error>;
+
+    /// Remove a specific takeout offer.
+    remove-takeout-offer: func(debtor: string, asset-id: u16) -> result<_, error>;
+
+    /// Remove global takeout offer for this asset.
+    remove-global-takeout-offer: func(asset-id: u16) -> result<_, error>;
+
+    /// Sell claims on `debtor` to `buyer` under buyer's takeout offer.
     /// `amount` is face (human decimal); seller receives face after fees as a
     /// claim on the buyer.
     sell-claim: func(

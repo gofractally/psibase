@@ -28,10 +28,10 @@ define_trust! {
             - Quote multi-hop paths (read-only GraphQL + search)
         ",
         Medium => "
-            - Post or remove credit lines, clearing offers, and currency policies
+            - Post or remove credit lines, forward offers, takeout offers, and currency policies
             - Deposit and net obligations
             - Convert debt between assets
-            - Sell claims under a buyer's clearing offer
+            - Sell claims under a buyer's takeout offer
         ",
         High => "
             - Path-pay (draw on others' credit along a path)
@@ -42,10 +42,14 @@ define_trust! {
         Low => [quote_path],
         Medium => [
             set_credit_line,
-            set_clearing_offer,
-            set_global_clearing_offer,
-            remove_clearing_offer,
-            remove_global_clearing_offer,
+            set_forward_offer,
+            set_global_forward_offer,
+            remove_forward_offer,
+            remove_global_forward_offer,
+            set_takeout_offer,
+            set_global_takeout_offer,
+            remove_takeout_offer,
+            remove_global_takeout_offer,
             set_currency_policy,
             deposit,
             net,
@@ -143,66 +147,116 @@ impl Api for BanxPlugin {
         add_action_to_transaction(banx::action_structs::st_crd_lne::ACTION_NAME, &packed)
     }
 
-    fn set_clearing_offer(
-        counterparty: String,
+    fn set_forward_offer(
+        next_hop: String,
         asset_id: u16,
         fee_fixed: String,
         fee_percent_ppm: u32,
         max_line_apr_ppm: u32,
-        forward_enabled: bool,
         expires_at_seconds: u32,
     ) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::set_clearing_offer)?;
+        trust::assert_authorized(trust::FunctionName::set_forward_offer)?;
         let fee_fixed = parse_amount(asset_id, &fee_fixed)?;
-        let packed = banx::action_structs::st_clr_ofr {
-            counterparty: parse_account(&counterparty)?,
+        let packed = banx::action_structs::st_fwd_ofr {
+            next_hop: parse_account(&next_hop)?,
             asset_id,
             fee_fixed,
             fee_percent: fee_percent_ppm,
             max_line_apr: max_line_apr_ppm,
-            forward_enabled,
             expires_at: time_point(expires_at_seconds),
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::st_clr_ofr::ACTION_NAME, &packed)
+        add_action_to_transaction(banx::action_structs::st_fwd_ofr::ACTION_NAME, &packed)
     }
 
-    fn set_global_clearing_offer(
+    fn set_global_forward_offer(
         asset_id: u16,
         fee_fixed: String,
         fee_percent_ppm: u32,
         max_line_apr_ppm: u32,
-        forward_enabled: bool,
         expires_at_seconds: u32,
     ) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::set_global_clearing_offer)?;
+        trust::assert_authorized(trust::FunctionName::set_global_forward_offer)?;
         let fee_fixed = parse_amount(asset_id, &fee_fixed)?;
-        let packed = banx::action_structs::st_glb_clr {
+        let packed = banx::action_structs::st_glb_fwd {
             asset_id,
             fee_fixed,
             fee_percent: fee_percent_ppm,
             max_line_apr: max_line_apr_ppm,
-            forward_enabled,
             expires_at: time_point(expires_at_seconds),
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::st_glb_clr::ACTION_NAME, &packed)
+        add_action_to_transaction(banx::action_structs::st_glb_fwd::ACTION_NAME, &packed)
     }
 
-    fn remove_clearing_offer(counterparty: String, asset_id: u16) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::remove_clearing_offer)?;
-        let packed = banx::action_structs::rm_clr_ofr {
-            counterparty: parse_account(&counterparty)?,
+    fn remove_forward_offer(next_hop: String, asset_id: u16) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::remove_forward_offer)?;
+        let packed = banx::action_structs::rm_fwd_ofr {
+            next_hop: parse_account(&next_hop)?,
             asset_id,
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::rm_clr_ofr::ACTION_NAME, &packed)
+        add_action_to_transaction(banx::action_structs::rm_fwd_ofr::ACTION_NAME, &packed)
     }
 
-    fn remove_global_clearing_offer(asset_id: u16) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::remove_global_clearing_offer)?;
-        let packed = banx::action_structs::rm_glb_clr { asset_id }.packed();
-        add_action_to_transaction(banx::action_structs::rm_glb_clr::ACTION_NAME, &packed)
+    fn remove_global_forward_offer(asset_id: u16) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::remove_global_forward_offer)?;
+        let packed = banx::action_structs::rm_glb_fwd { asset_id }.packed();
+        add_action_to_transaction(banx::action_structs::rm_glb_fwd::ACTION_NAME, &packed)
+    }
+
+    fn set_takeout_offer(
+        debtor: String,
+        asset_id: u16,
+        fee_fixed: String,
+        fee_percent_ppm: u32,
+        expires_at_seconds: u32,
+    ) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::set_takeout_offer)?;
+        let fee_fixed = parse_amount(asset_id, &fee_fixed)?;
+        let packed = banx::action_structs::st_tko_ofr {
+            debtor: parse_account(&debtor)?,
+            asset_id,
+            fee_fixed,
+            fee_percent: fee_percent_ppm,
+            expires_at: time_point(expires_at_seconds),
+        }
+        .packed();
+        add_action_to_transaction(banx::action_structs::st_tko_ofr::ACTION_NAME, &packed)
+    }
+
+    fn set_global_takeout_offer(
+        asset_id: u16,
+        fee_fixed: String,
+        fee_percent_ppm: u32,
+        expires_at_seconds: u32,
+    ) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::set_global_takeout_offer)?;
+        let fee_fixed = parse_amount(asset_id, &fee_fixed)?;
+        let packed = banx::action_structs::st_glb_tko {
+            asset_id,
+            fee_fixed,
+            fee_percent: fee_percent_ppm,
+            expires_at: time_point(expires_at_seconds),
+        }
+        .packed();
+        add_action_to_transaction(banx::action_structs::st_glb_tko::ACTION_NAME, &packed)
+    }
+
+    fn remove_takeout_offer(debtor: String, asset_id: u16) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::remove_takeout_offer)?;
+        let packed = banx::action_structs::rm_tko_ofr {
+            debtor: parse_account(&debtor)?,
+            asset_id,
+        }
+        .packed();
+        add_action_to_transaction(banx::action_structs::rm_tko_ofr::ACTION_NAME, &packed)
+    }
+
+    fn remove_global_takeout_offer(asset_id: u16) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::remove_global_takeout_offer)?;
+        let packed = banx::action_structs::rm_glb_tko { asset_id }.packed();
+        add_action_to_transaction(banx::action_structs::rm_glb_tko::ACTION_NAME, &packed)
     }
 
     fn sell_claim(

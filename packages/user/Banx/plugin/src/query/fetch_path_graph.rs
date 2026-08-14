@@ -20,7 +20,7 @@ struct Data {
 #[serde(rename_all = "camelCase")]
 struct PathGraph {
     credit_lines: Vec<GqlCreditLine>,
-    clearing_offers: Vec<GqlClearing>,
+    forward_offers: Vec<GqlForward>,
     currency_policies: Vec<GqlCurrency>,
 }
 
@@ -36,14 +36,13 @@ struct GqlCreditLine {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct GqlClearing {
+struct GqlForward {
     poster: AccountNumber,
-    counterparty: AccountNumber,
+    next_hop: AccountNumber,
     asset_id: u16,
     fee_fixed: Decimal,
     fee_percent_ppm: u32,
     max_line_apr_ppm: u32,
-    forward_enabled: bool,
     expires_at: i64,
 }
 
@@ -82,8 +81,8 @@ pub fn fetch_path_graph(
                 creditLines {{
                     creditor debtor assetId residual interestRatePpm
                 }}
-                clearingOffers {{
-                    poster counterparty assetId feeFixed feePercentPpm maxLineAprPpm forwardEnabled expiresAt
+                forwardOffers {{
+                    poster nextHop assetId feeFixed feePercentPpm maxLineAprPpm expiresAt
                 }}
                 currencyPolicies {{
                     debtor fromAsset toAsset feeFixed fxRate expiresAt
@@ -112,16 +111,13 @@ pub fn fetch_path_graph(
         });
     }
 
-    let mut routing = Vec::with_capacity(g.clearing_offers.len());
-    for r in g.clearing_offers {
-        if !r.forward_enabled {
-            continue;
-        }
+    let mut routing = Vec::with_capacity(g.forward_offers.len());
+    for r in g.forward_offers {
         // path_find: empty creditor = global next hop
-        let creditor = if r.counterparty.value == 0 {
+        let creditor = if r.next_hop.value == 0 {
             String::new()
         } else {
-            r.counterparty.to_string()
+            r.next_hop.to_string()
         };
         routing.push(RoutingEdge {
             creditor,

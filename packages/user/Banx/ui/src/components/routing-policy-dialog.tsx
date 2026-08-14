@@ -1,12 +1,12 @@
 import { useEffect, useMemo } from "react";
 
 import { AssetField, ExpiresField } from "@/components/form-fields";
-import { useRoutingPolicies } from "@/hooks/use-banx-data";
+import { useForwardOffers } from "@/hooks/use-banx-data";
 import {
-    useRemoveGlobalRoutingPolicy,
-    useRemoveRoutingPolicy,
-    useSetGlobalRoutingPolicy,
-    useSetRoutingPolicy,
+    useRemoveForwardOffer,
+    useRemoveGlobalForwardOffer,
+    useSetForwardOffer,
+    useSetGlobalForwardOffer,
 } from "@/hooks/use-banx-mutations";
 import {
     amountPlaceholder,
@@ -25,7 +25,7 @@ import {
     ppmToPercentInput,
     useAppForm,
 } from "@/lib/form";
-import type { Asset, RoutingPolicy } from "@/lib/graphql";
+import type { Asset, ForwardOffer } from "@/lib/graphql";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Button } from "@shared/shadcn/ui/button";
@@ -39,7 +39,7 @@ import {
 } from "@shared/shadcn/ui/dialog";
 
 export type RoutingPolicyPrefill = {
-    /** Next-hop creditor → open **override** dialog. Omit for **global**. */
+    /** Next-hop creditor → open **specific** dialog. Omit for **global**. */
     creditor?: string;
     assetId?: number;
 };
@@ -49,7 +49,6 @@ type FeeFields = {
     hopFeeFixed: string;
     hopFeePct: string;
     maxAcceptPct: string;
-    forwardEnabled: boolean;
     expiresAtSeconds: number;
 };
 
@@ -58,23 +57,19 @@ const defaultFees = (assetId?: number): FeeFields => ({
     hopFeeFixed: "0",
     hopFeePct: "0",
     maxAcceptPct: "100",
-    forwardEnabled: true,
     expiresAtSeconds: 0,
 });
 
-function policyLive(p: RoutingPolicy, nowSec: number): boolean {
+function offerLive(p: ForwardOffer, nowSec: number): boolean {
     return p.expiresAt === 0 || p.expiresAt >= nowSec;
 }
 
-function feesFromPolicy(
-    p: RoutingPolicy,
-): FeeFields {
+function feesFromOffer(p: ForwardOffer): FeeFields {
     return {
         assetId: p.assetId,
         hopFeeFixed: displayAmount(p.feeFixed),
         hopFeePct: ppmToPercentInput(p.feePercentPpm),
         maxAcceptPct: ppmToPercentInput(p.maxLineAprPpm),
-        forwardEnabled: p.forwardEnabled,
         expiresAtSeconds: p.expiresAt,
     };
 }
@@ -82,10 +77,9 @@ function feesFromPolicy(
 function feePayload(value: FeeFields) {
     return {
         assetId: value.assetId!,
-        hopFeeFixed: value.hopFeeFixed.trim(),
-        hopFeePercentPpm: percentStringToPpm(value.hopFeePct, MAX_HOP_FEE_PPM),
-        maxAcceptRatePpm: percentStringToPpm(value.maxAcceptPct, PPM_SCALE),
-        forwardEnabled: value.forwardEnabled,
+        feeFixed: value.hopFeeFixed.trim(),
+        feePercentPpm: percentStringToPpm(value.hopFeePct, MAX_HOP_FEE_PPM),
+        maxLineAprPpm: percentStringToPpm(value.maxAcceptPct, PPM_SCALE),
         expiresAtSeconds: value.expiresAtSeconds,
     };
 }
@@ -100,13 +94,8 @@ const aprValidators = {
     onSubmit: percentFieldValidator(MAX_PERCENT),
 };
 
-/** Sample amount used in the fee illustration. */
 const SAMPLE_HOP_IN = 15;
 
-/**
- * Stripe-style: `out = in * (1 - fee_pct/100) - fee_fixed`.
- * Returns null if inputs are invalid (fee ≥ 100%, fixed consumes all, etc.).
- */
 function previewHopOut(
     amountIn: number,
     feeFixed: string,
@@ -121,7 +110,6 @@ function previewHopOut(
     return afterPct - fixed;
 }
 
-/** Centered sample path: `10 Alice ← you → out Bob` */
 function HopFeeExample({
     hopFeeFixed,
     hopFeePct,
@@ -165,8 +153,7 @@ function HopFeeExample({
 }
 
 /**
- * Global clearing offer (header) — fee form only, no account.
- * Specific offer (row) — switch reflects whether an offer exists; off + Save removes.
+ * Path-forward offer. Global (header) or specific next hop (account row).
  */
 export function RoutingPolicyDialog({
     open,
@@ -179,31 +166,30 @@ export function RoutingPolicyDialog({
     assets: Asset[];
     prefill?: RoutingPolicyPrefill | null;
 }) {
-    const creditor = prefill?.creditor?.trim() ?? "";
-    const isOverride = !!creditor;
+    const nextHop = prefill?.creditor?.trim() ?? "";
+    const isSpecific = !!nextHop;
 
     const { data: user } = useCurrentUser();
     const intermediate = user?.trim() || "you";
 
-    const { data: routing = [] } = useRoutingPolicies();
-    const setGlobalRouting = useSetGlobalRoutingPolicy();
-    const setRouting = useSetRoutingPolicy();
-    const removeGlobal = useRemoveGlobalRoutingPolicy();
-    const removeOverride = useRemoveRoutingPolicy();
+    const { data: offers = [] } = useForwardOffers();
+    const setGlobal = useSetGlobalForwardOffer();
+    const setSpecific = useSetForwardOffer();
+    const removeGlobal = useRemoveGlobalForwardOffer();
+    const removeSpecific = useRemoveForwardOffer();
 
     const precisionOf = (id: number) =>
         assets.find((a) => a.id === id)?.precision ?? 0;
 
     const nowSec = Math.floor(Date.now() / 1000);
 
-    /** Live per-creditor override for this next-hop (+ asset when known). */
-    const existingOverride = useMemo(() => {
-        if (!creditor) return undefined;
-        const matches = routing.filter(
+    const existingSpecific = useMemo(() => {
+        if (!nextHop) return undefined;
+        const matches = offers.filter(
             (p) =>
                 !p.isGlobal &&
-                p.counterparty === creditor &&
-                policyLive(p, nowSec) &&
+                p.nextHop === nextHop &&
+                offerLive(p, nowSec) &&
                 (prefill?.assetId === undefined ||
                     p.assetId === prefill.assetId),
         );
@@ -211,28 +197,25 @@ export function RoutingPolicyDialog({
             return matches.find((p) => p.assetId === prefill.assetId);
         }
         return matches[0];
-    }, [routing, creditor, prefill?.assetId, nowSec]);
+    }, [offers, nextHop, prefill?.assetId, nowSec]);
 
-    /** Live global policies by asset id. */
     const liveGlobalByAsset = useMemo(() => {
-        const map = new Map<number, RoutingPolicy>();
-        for (const p of routing) {
-            if (p.isGlobal && policyLive(p, nowSec)) {
+        const map = new Map<number, ForwardOffer>();
+        for (const p of offers) {
+            if (p.isGlobal && offerLive(p, nowSec)) {
                 map.set(p.assetId, p);
             }
         }
-        // note: RoutingPolicy === ClearingOffer
         return map;
-    }, [routing, nowSec]);
+    }, [offers, nowSec]);
 
-    /** Live global for prefilled asset (if any), else first live global. */
     const existingGlobal = useMemo(() => {
-        if (isOverride) return undefined;
+        if (isSpecific) return undefined;
         if (prefill?.assetId !== undefined) {
             return liveGlobalByAsset.get(prefill.assetId);
         }
         return liveGlobalByAsset.values().next().value;
-    }, [isOverride, prefill?.assetId, liveGlobalByAsset]);
+    }, [isSpecific, prefill?.assetId, liveGlobalByAsset]);
 
     const globalForm = useAppForm({
         defaultValues: {
@@ -260,7 +243,7 @@ export function RoutingPolicyDialog({
             }
 
             await new Promise<void>((resolve, reject) => {
-                setGlobalRouting.mutate(feePayload({ ...value, assetId }), {
+                setGlobal.mutate(feePayload({ ...value, assetId }), {
                     onSuccess: () => {
                         onOpenChange(false);
                         resolve();
@@ -271,20 +254,19 @@ export function RoutingPolicyDialog({
         },
     });
 
-    const overrideForm = useAppForm({
+    const specificForm = useAppForm({
         defaultValues: {
             enabled: false,
             ...defaultFees(prefill?.assetId),
         },
         onSubmit: async ({ value }) => {
-            // Asset is fixed by the account row that opened this dialog.
             const assetId = prefill?.assetId;
             if (assetId === undefined) return;
 
             if (!value.enabled) {
                 await new Promise<void>((resolve, reject) => {
-                    removeOverride.mutate(
-                        { creditor, assetId },
+                    removeSpecific.mutate(
+                        { nextHop, assetId },
                         {
                             onSuccess: () => {
                                 onOpenChange(false);
@@ -298,8 +280,8 @@ export function RoutingPolicyDialog({
             }
 
             await new Promise<void>((resolve, reject) => {
-                setRouting.mutate(
-                    { creditor, ...feePayload({ ...value, assetId }) },
+                setSpecific.mutate(
+                    { nextHop, ...feePayload({ ...value, assetId }) },
                     {
                         onSuccess: () => {
                             onOpenChange(false);
@@ -312,17 +294,16 @@ export function RoutingPolicyDialog({
         },
     });
 
-    // Reset when opening; toggle follows whether a live override exists.
     useEffect(() => {
         if (!open) return;
-        if (isOverride) {
-            if (existingOverride) {
-                overrideForm.reset({
+        if (isSpecific) {
+            if (existingSpecific) {
+                specificForm.reset({
                     enabled: true,
-                    ...feesFromPolicy(existingOverride),
+                    ...feesFromOffer(existingSpecific),
                 });
             } else {
-                overrideForm.reset({
+                specificForm.reset({
                     enabled: false,
                     ...defaultFees(prefill?.assetId),
                 });
@@ -330,7 +311,7 @@ export function RoutingPolicyDialog({
         } else if (existingGlobal) {
             globalForm.reset({
                 enabled: true,
-                ...feesFromPolicy(existingGlobal),
+                ...feesFromOffer(existingGlobal),
             });
         } else {
             globalForm.reset({
@@ -341,24 +322,23 @@ export function RoutingPolicyDialog({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
         open,
-        isOverride,
+        isSpecific,
         prefill?.assetId,
-        creditor,
-        existingOverride,
+        nextHop,
+        existingSpecific,
         existingGlobal,
     ]);
 
-    // ── Override (opened from an account row) ─────────────────────────
-    if (isOverride) {
-        const pending = setRouting.isPending || removeOverride.isPending;
+    if (isSpecific) {
+        const pending = setSpecific.isPending || removeSpecific.isPending;
         return (
             <Dialog open={open} onOpenChange={onOpenChange}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Share credit lines</DialogTitle>
+                        <DialogTitle>Path-forward offer</DialogTitle>
                         <DialogDescription>
-                            While enabled, others can sell you claims against{" "}
-                            <strong>{creditor}</strong>
+                            Let others path-pay through you to{" "}
+                            <strong>{nextHop}</strong>
                             {prefill?.assetId !== undefined ? (
                                 <>
                                     {" "}
@@ -374,9 +354,8 @@ export function RoutingPolicyDialog({
                                     </strong>
                                 </>
                             ) : null}
-                            — people you&apos;ve extended credit to (you buy
-                            their debt for a fee). Path forward is optional
-                            below.
+                            . Hop fees apply; max line APR rejects a next hop
+                            whose line is more expensive than you accept.
                         </DialogDescription>
                     </DialogHeader>
                     <form
@@ -384,19 +363,19 @@ export function RoutingPolicyDialog({
                         onSubmit={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            void overrideForm.handleSubmit();
+                            void specificForm.handleSubmit();
                         }}
                     >
-                        <overrideForm.AppField
+                        <specificForm.AppField
                             name="enabled"
                             children={(field) => (
                                 <field.SwitchField
-                                    label={`Override for ${creditor}`}
+                                    label={`Offer for ${nextHop}`}
                                 />
                             )}
                         />
 
-                        <overrideForm.Subscribe
+                        <specificForm.Subscribe
                             selector={(s) => s.values.enabled}
                             children={(enabled) => {
                                 const assetId = prefill?.assetId;
@@ -407,7 +386,7 @@ export function RoutingPolicyDialog({
                                 return enabled ? (
                                     <div className="grid gap-5">
                                         <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
-                                            <overrideForm.AppField
+                                            <specificForm.AppField
                                                 name="hopFeeFixed"
                                                 validators={{
                                                     onChange:
@@ -436,7 +415,7 @@ export function RoutingPolicyDialog({
                                                     />
                                                 )}
                                             />
-                                            <overrideForm.AppField
+                                            <specificForm.AppField
                                                 name="hopFeePct"
                                                 validators={hopFeeValidators}
                                                 children={(field) => (
@@ -452,7 +431,7 @@ export function RoutingPolicyDialog({
                                                 )}
                                             />
                                         </div>
-                                        <overrideForm.Subscribe
+                                        <specificForm.Subscribe
                                             selector={(s) => ({
                                                 hopFeeFixed:
                                                     s.values.hopFeeFixed,
@@ -467,11 +446,11 @@ export function RoutingPolicyDialog({
                                                     hopFeePct={hopFeePct}
                                                     precision={precision}
                                                     intermediate={intermediate}
-                                                    nextHop={creditor}
+                                                    nextHop={nextHop}
                                                 />
                                             )}
                                         />
-                                        <overrideForm.Field
+                                        <specificForm.Field
                                             name="expiresAtSeconds"
                                             children={(field) => (
                                                 <ExpiresField
@@ -482,46 +461,19 @@ export function RoutingPolicyDialog({
                                                 />
                                             )}
                                         />
-                                        <div className="border-border/60 space-y-4 border-t pt-4">
-                                            <overrideForm.AppField
-                                                name="forwardEnabled"
-                                                children={(field) => (
-                                                    <field.SwitchField
-                                                        label="Allow path forward"
-                                                        description="Allow new obligation swapping using credit lines extended to me."
-                                                    />
-                                                )}
-                                            />
-                                            <overrideForm.Subscribe
-                                                selector={(s) =>
-                                                    s.values.forwardEnabled
-                                                }
-                                                children={(forwardEnabled) => (
-                                                    <overrideForm.AppField
-                                                        name="maxAcceptPct"
-                                                        validators={
-                                                            aprValidators
-                                                        }
-                                                        children={(field) => (
-                                                            <field.TextField
-                                                                label="Max line APR %"
-                                                                inputMode="decimal"
-                                                                min={0}
-                                                                max={
-                                                                    MAX_PERCENT
-                                                                }
-                                                                step={
-                                                                    MIN_PERCENT_STEP
-                                                                }
-                                                                disabled={
-                                                                    !forwardEnabled
-                                                                }
-                                                            />
-                                                        )}
-                                                    />
-                                                )}
-                                            />
-                                        </div>
+                                        <specificForm.AppField
+                                            name="maxAcceptPct"
+                                            validators={aprValidators}
+                                            children={(field) => (
+                                                <field.TextField
+                                                    label="Max line APR %"
+                                                    inputMode="decimal"
+                                                    min={0}
+                                                    max={MAX_PERCENT}
+                                                    step={MIN_PERCENT_STEP}
+                                                />
+                                            )}
+                                        />
                                     </div>
                                 ) : null;
                             }}
@@ -535,20 +487,19 @@ export function RoutingPolicyDialog({
                             >
                                 Cancel
                             </Button>
-                            <overrideForm.Subscribe
+                            <specificForm.Subscribe
                                 selector={(s) => s.values}
                                 children={(values) => {
                                     const assetId = prefill?.assetId;
-                                    // Off + no existing override: nothing to remove
                                     const nothingToDo =
-                                        !values.enabled && !existingOverride;
+                                        !values.enabled && !existingSpecific;
                                     return (
-                                        <overrideForm.AppForm>
-                                            <overrideForm.SubmitButton
+                                        <specificForm.AppForm>
+                                            <specificForm.SubmitButton
                                                 labels={
                                                     values.enabled
                                                         ? [
-                                                              existingOverride
+                                                              existingSpecific
                                                                   ? "Update offer"
                                                                   : "Save offer",
                                                               "Saving…",
@@ -564,7 +515,7 @@ export function RoutingPolicyDialog({
                                                     nothingToDo
                                                 }
                                             />
-                                        </overrideForm.AppForm>
+                                        </specificForm.AppForm>
                                     );
                                 }}
                             />
@@ -575,19 +526,16 @@ export function RoutingPolicyDialog({
         );
     }
 
-    // ── Global (header) — pick asset first; enable is per-currency ─
-    const globalPending =
-        setGlobalRouting.isPending || removeGlobal.isPending;
+    const globalPending = setGlobal.isPending || removeGlobal.isPending;
 
     const loadGlobalForAsset = (assetId: number) => {
         const existing = liveGlobalByAsset.get(assetId);
         if (existing) {
-            const fees = feesFromPolicy(existing);
+            const fees = feesFromOffer(existing);
             globalForm.setFieldValue("enabled", true);
             globalForm.setFieldValue("hopFeeFixed", fees.hopFeeFixed);
             globalForm.setFieldValue("hopFeePct", fees.hopFeePct);
             globalForm.setFieldValue("maxAcceptPct", fees.maxAcceptPct);
-            globalForm.setFieldValue("forwardEnabled", fees.forwardEnabled);
             globalForm.setFieldValue(
                 "expiresAtSeconds",
                 fees.expiresAtSeconds,
@@ -597,7 +545,6 @@ export function RoutingPolicyDialog({
             globalForm.setFieldValue("hopFeeFixed", "0");
             globalForm.setFieldValue("hopFeePct", "0");
             globalForm.setFieldValue("maxAcceptPct", "100");
-            globalForm.setFieldValue("forwardEnabled", true);
             globalForm.setFieldValue("expiresAtSeconds", 0);
         }
     };
@@ -606,11 +553,12 @@ export function RoutingPolicyDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Share credit lines</DialogTitle>
+                    <DialogTitle>Path-forward offer</DialogTitle>
                     <DialogDescription>
-                        While enabled, others can sell you claims against people
-                        you&apos;ve extended credit to (you buy their debt for a
-                        fee). Path forward is optional below.
+                        Sit in the middle of a path pay for this asset. Anyone
+                        can hop through you to a next creditor who has lined
+                        you (or whom you already owe). This does not buy
+                        claims — post a takeout offer for that.
                     </DialogDescription>
                 </DialogHeader>
                 <form
@@ -731,42 +679,19 @@ export function RoutingPolicyDialog({
                                             />
                                         )}
                                     />
-                                    <div className="border-border/60 space-y-4 border-t pt-4">
-                                        <globalForm.AppField
-                                            name="forwardEnabled"
-                                            children={(field) => (
-                                                <field.SwitchField
-                                                    label="Allow path forward"
-                                                    description="Allow new obligation swapping using credit lines extended to me."
-                                                />
-                                            )}
-                                        />
-                                        <globalForm.Subscribe
-                                            selector={(s) =>
-                                                s.values.forwardEnabled
-                                            }
-                                            children={(forwardEnabled) => (
-                                                <globalForm.AppField
-                                                    name="maxAcceptPct"
-                                                    validators={aprValidators}
-                                                    children={(field) => (
-                                                        <field.TextField
-                                                            label="Max line APR %"
-                                                            inputMode="decimal"
-                                                            min={0}
-                                                            max={MAX_PERCENT}
-                                                            step={
-                                                                MIN_PERCENT_STEP
-                                                            }
-                                                            disabled={
-                                                                !forwardEnabled
-                                                            }
-                                                        />
-                                                    )}
-                                                />
-                                            )}
-                                        />
-                                    </div>
+                                    <globalForm.AppField
+                                        name="maxAcceptPct"
+                                        validators={aprValidators}
+                                        children={(field) => (
+                                            <field.TextField
+                                                label="Max line APR %"
+                                                inputMode="decimal"
+                                                min={0}
+                                                max={MAX_PERCENT}
+                                                step={MIN_PERCENT_STEP}
+                                            />
+                                        )}
+                                    />
                                 </div>
                             );
                         }}

@@ -12,10 +12,10 @@ import {
 } from "@/lib/amount";
 import { amountFieldValidator, useAppForm } from "@/lib/form";
 import {
-    type ClearingOffer,
     type CreditLine,
-    fetchClearingOffers,
+    type TakeoutOffer,
     fetchCreditLines,
+    fetchTakeoutOffers,
 } from "@/lib/graphql";
 import { QueryKey } from "@/lib/query-keys";
 import { PPM_SCALE } from "@/lib/constants";
@@ -39,7 +39,7 @@ import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 import { cn } from "@shared/lib/utils";
 
-function offerLive(p: ClearingOffer, nowSec: number): boolean {
+function offerLive(p: TakeoutOffer, nowSec: number): boolean {
     return p.expiresAt === 0 || p.expiresAt >= nowSec;
 }
 
@@ -78,24 +78,24 @@ function residualOnLine(
 
 /** Prefer specific counterparty offer over global; lower fee wins ties. */
 function pickOffer(
-    offers: ClearingOffer[],
+    offers: TakeoutOffer[],
     debtor: string,
     assetId: number,
     nowSec: number,
-): ClearingOffer | null {
+): TakeoutOffer | null {
     const live = offers.filter(
         (o) =>
             o.assetId === assetId &&
             offerLive(o, nowSec) &&
             (o.isGlobal ||
-                !o.counterparty ||
-                o.counterparty === debtor ||
-                o.counterparty === "0"),
+                !o.debtor ||
+                o.debtor === debtor ||
+                o.debtor === "0"),
     );
     if (live.length === 0) return null;
     live.sort((a, b) => {
-        const aSpec = !a.isGlobal && a.counterparty === debtor ? 0 : 1;
-        const bSpec = !b.isGlobal && b.counterparty === debtor ? 0 : 1;
+        const aSpec = !a.isGlobal && a.debtor === debtor ? 0 : 1;
+        const bSpec = !b.isGlobal && b.debtor === debtor ? 0 : 1;
         if (aSpec !== bSpec) return aSpec - bSpec;
         if (a.feePercentPpm !== b.feePercentPpm) {
             return a.feePercentPpm - b.feePercentPpm;
@@ -121,7 +121,7 @@ export type SellClaimTarget = {
 type BuyerOption = {
     buyer: string;
     label: string;
-    offer: ClearingOffer;
+    offer: TakeoutOffer;
     residualRaw: bigint;
     maxFaceRaw: bigint;
 };
@@ -169,8 +169,8 @@ export function SellClaimDialog({
 
     const offerQueries = useQueries({
         queries: loadAccounts.map((account) => ({
-            queryKey: QueryKey.clearingOffers(account),
-            queryFn: () => fetchClearingOffers(account),
+            queryKey: QueryKey.takeoutOffers(account),
+            queryFn: () => fetchTakeoutOffers(account),
             enabled: open && !!target && !!account,
         })),
     });
@@ -300,7 +300,7 @@ export function SellClaimDialog({
                                     {target.debtor}
                                 </span>{" "}
                                 ({target.symbol}) to a buyer who posted a
-                                clearing offer. You receive a smaller claim on
+                                takeout offer. You receive a smaller claim on
                                 the buyer after their fee.
                             </>
                         ) : (
@@ -346,7 +346,7 @@ export function SellClaimDialog({
                             ) : options.length === 0 ? (
                                 <p className="text-muted-foreground text-sm">
                                     No contacts (or typed account) currently
-                                    have both a live clearing offer and credit
+                                    have both a live takeout offer and credit
                                     residual toward {target.debtor} in{" "}
                                     {target.symbol}.
                                 </p>

@@ -16,7 +16,10 @@ function useInvalidateBanx() {
             void qc.invalidateQueries({ queryKey: QueryKey.creditLines(user) });
             void qc.invalidateQueries({ queryKey: QueryKey.obligations(user) });
             void qc.invalidateQueries({
-                queryKey: QueryKey.clearingOffers(user),
+                queryKey: QueryKey.forwardOffers(user),
+            });
+            void qc.invalidateQueries({
+                queryKey: QueryKey.takeoutOffers(user),
             });
             void qc.invalidateQueries({
                 queryKey: QueryKey.currencyPolicies(user),
@@ -231,68 +234,34 @@ export function useQuotePath() {
     });
 }
 
-export function useSetClearingOffer() {
+export function useSetForwardOffer() {
     const invalidate = useInvalidateBanx();
     return useMutation({
         mutationFn: async (p: {
-            counterparty: string;
+            nextHop: string;
             assetId: number;
             feeFixed: string;
             feePercentPpm: number;
             maxLineAprPpm: number;
-            forwardEnabled: boolean;
             expiresAtSeconds: number;
         }) =>
-            banxCall("setClearingOffer", [
-                p.counterparty,
+            banxCall("setForwardOffer", [
+                p.nextHop,
                 p.assetId,
                 p.feeFixed,
                 p.feePercentPpm,
                 p.maxLineAprPpm,
-                p.forwardEnabled,
                 p.expiresAtSeconds,
             ]),
         onSuccess: () => {
             invalidate();
-            toast.success("Clearing offer saved");
+            toast.success("Path-forward offer saved");
         },
         onError: (e: Error) => toast.error(e.message),
     });
 }
 
-/** @deprecated */
-export const useSetRoutingPolicy = () => {
-    const m = useSetClearingOffer();
-    return {
-        ...m,
-        mutate: (
-            p: {
-                creditor: string;
-                assetId: number;
-                hopFeeFixed: string;
-                hopFeePercentPpm: number;
-                maxAcceptRatePpm: number;
-                expiresAtSeconds: number;
-                forwardEnabled?: boolean;
-            },
-            opts?: Parameters<typeof m.mutate>[1],
-        ) =>
-            m.mutate(
-                {
-                    counterparty: p.creditor,
-                    assetId: p.assetId,
-                    feeFixed: p.hopFeeFixed,
-                    feePercentPpm: p.hopFeePercentPpm,
-                    maxLineAprPpm: p.maxAcceptRatePpm,
-                    forwardEnabled: p.forwardEnabled ?? true,
-                    expiresAtSeconds: p.expiresAtSeconds,
-                },
-                opts,
-            ),
-    };
-};
-
-export function useSetGlobalClearingOffer() {
+export function useSetGlobalForwardOffer() {
     const invalidate = useInvalidateBanx();
     return useMutation({
         mutationFn: async (p: {
@@ -300,95 +269,122 @@ export function useSetGlobalClearingOffer() {
             feeFixed: string;
             feePercentPpm: number;
             maxLineAprPpm: number;
-            forwardEnabled: boolean;
             expiresAtSeconds: number;
         }) =>
-            banxCall("setGlobalClearingOffer", [
+            banxCall("setGlobalForwardOffer", [
                 p.assetId,
                 p.feeFixed,
                 p.feePercentPpm,
                 p.maxLineAprPpm,
-                p.forwardEnabled,
                 p.expiresAtSeconds,
             ]),
         onSuccess: () => {
             invalidate();
-            toast.success("Global clearing offer saved");
+            toast.success("Global path-forward offer saved");
         },
         onError: (e: Error) => toast.error(e.message),
     });
 }
 
-/** @deprecated */
-export const useSetGlobalRoutingPolicy = () => {
-    const m = useSetGlobalClearingOffer();
-    return {
-        ...m,
-        mutate: (
-            p: {
-                assetId: number;
-                hopFeeFixed: string;
-                hopFeePercentPpm: number;
-                maxAcceptRatePpm: number;
-                expiresAtSeconds: number;
-                forwardEnabled?: boolean;
-            },
-            opts?: Parameters<typeof m.mutate>[1],
-        ) =>
-            m.mutate(
-                {
-                    assetId: p.assetId,
-                    feeFixed: p.hopFeeFixed,
-                    feePercentPpm: p.hopFeePercentPpm,
-                    maxLineAprPpm: p.maxAcceptRatePpm,
-                    forwardEnabled: p.forwardEnabled ?? true,
-                    expiresAtSeconds: p.expiresAtSeconds,
-                },
-                opts,
-            ),
-    };
-};
-
-export function useRemoveClearingOffer() {
+export function useRemoveForwardOffer() {
     const invalidate = useInvalidateBanx();
     return useMutation({
-        mutationFn: async (p: { counterparty: string; assetId: number }) =>
-            banxCall("removeClearingOffer", [p.counterparty, p.assetId]),
+        mutationFn: async (p: { nextHop: string; assetId: number }) =>
+            banxCall("removeForwardOffer", [p.nextHop, p.assetId]),
         onSuccess: () => {
             invalidate();
-            toast.success("Clearing offer removed");
+            toast.success("Path-forward offer removed");
         },
         onError: (e: Error) => toast.error(e.message),
     });
 }
 
-/** @deprecated */
-export function useRemoveRoutingPolicy() {
-    const m = useRemoveClearingOffer();
-    return {
-        ...m,
-        mutate: (
-            p: { creditor: string; assetId: number },
-            opts?: Parameters<typeof m.mutate>[1],
-        ) => m.mutate({ counterparty: p.creditor, assetId: p.assetId }, opts),
-    };
-}
-
-export function useRemoveGlobalClearingOffer() {
+export function useRemoveGlobalForwardOffer() {
     const invalidate = useInvalidateBanx();
     return useMutation({
         mutationFn: async (p: { assetId: number }) =>
-            banxCall("removeGlobalClearingOffer", [p.assetId]),
+            banxCall("removeGlobalForwardOffer", [p.assetId]),
         onSuccess: () => {
             invalidate();
-            toast.success("Global clearing offer removed");
+            toast.success("Global path-forward offer removed");
         },
         onError: (e: Error) => toast.error(e.message),
     });
 }
 
-/** @deprecated */
-export const useRemoveGlobalRoutingPolicy = useRemoveGlobalClearingOffer;
+export function useSetTakeoutOffer() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            debtor: string;
+            assetId: number;
+            feeFixed: string;
+            feePercentPpm: number;
+            expiresAtSeconds: number;
+        }) =>
+            banxCall("setTakeoutOffer", [
+                p.debtor,
+                p.assetId,
+                p.feeFixed,
+                p.feePercentPpm,
+                p.expiresAtSeconds,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Takeout offer saved");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useSetGlobalTakeoutOffer() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            assetId: number;
+            feeFixed: string;
+            feePercentPpm: number;
+            expiresAtSeconds: number;
+        }) =>
+            banxCall("setGlobalTakeoutOffer", [
+                p.assetId,
+                p.feeFixed,
+                p.feePercentPpm,
+                p.expiresAtSeconds,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Global takeout offer saved");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useRemoveTakeoutOffer() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: { debtor: string; assetId: number }) =>
+            banxCall("removeTakeoutOffer", [p.debtor, p.assetId]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Takeout offer removed");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useRemoveGlobalTakeoutOffer() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: { assetId: number }) =>
+            banxCall("removeGlobalTakeoutOffer", [p.assetId]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Global takeout offer removed");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
 
 export function useSellClaim() {
     const invalidate = useInvalidateBanx();

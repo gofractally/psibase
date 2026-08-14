@@ -8,6 +8,7 @@ import {
     History,
     Pencil,
     PiggyBank,
+    Handshake,
     Plus,
     Route,
 } from "lucide-react";
@@ -24,11 +25,16 @@ import {
     SellClaimDialog,
     type SellClaimTarget,
 } from "@/components/sell-claim-dialog";
+import {
+    TakeoutOfferDialog,
+    type TakeoutOfferPrefill,
+} from "@/components/takeout-offer-dialog";
 import { useAssetMap } from "@/hooks/use-assets";
 import {
     useCreditLines,
+    useForwardOffers,
     useObligations,
-    useRoutingPolicies,
+    useTakeoutOffers,
 } from "@/hooks/use-banx-data";
 import { useNet, useSetCreditLine } from "@/hooks/use-banx-mutations";
 import {
@@ -218,20 +224,27 @@ export function ObligationsPage() {
     const { data: user } = useCurrentUser();
     const { data: obs = [], isLoading: obsLoading } = useObligations();
     const { data: lines = [], isLoading: linesLoading } = useCreditLines();
-    const { data: routing = [] } = useRoutingPolicies();
+    const { data: forwardOffers = [] } = useForwardOffers();
+    const { data: takeoutOffers = [] } = useTakeoutOffers();
     const { assets, symbolOf, precisionOf } = useAssetMap();
     const net = useNet();
     const isLoading = obsLoading || linesLoading;
 
-    /** At least one live global clearing offer. */
-    const globalClearingOn = useMemo(() => {
-        const nowSec = Math.floor(Date.now() / 1000);
-        return routing.some(
-            (p) =>
-                p.isGlobal &&
-                (p.expiresAt === 0 || p.expiresAt >= nowSec),
-        );
-    }, [routing]);
+    const nowSec = Math.floor(Date.now() / 1000);
+    const globalForwardOn = useMemo(
+        () =>
+            forwardOffers.some(
+                (p) => p.isGlobal && (p.expiresAt === 0 || p.expiresAt >= nowSec),
+            ),
+        [forwardOffers, nowSec],
+    );
+    const globalTakeoutOn = useMemo(
+        () =>
+            takeoutOffers.some(
+                (p) => p.isGlobal && (p.expiresAt === 0 || p.expiresAt >= nowSec),
+            ),
+        [takeoutOffers, nowSec],
+    );
 
     const [createOpen, setCreateOpen] = useState(false);
     const [creditLineOpen, setCreditLineOpen] = useState(false);
@@ -242,12 +255,20 @@ export function ObligationsPage() {
         useState<RoutingPolicyPrefill | null>(null);
     const [sellOpen, setSellOpen] = useState(false);
     const [sellTarget, setSellTarget] = useState<SellClaimTarget | null>(null);
+    const [takeoutOpen, setTakeoutOpen] = useState(false);
+    const [takeoutPrefill, setTakeoutPrefill] =
+        useState<TakeoutOfferPrefill | null>(null);
     const [hideEmptySavings, setHideEmptySavings] = useState(false);
     const [hideEmptyLoans, setHideEmptyLoans] = useState(false);
 
     const openRouting = (prefill?: RoutingPolicyPrefill | null) => {
         setRoutingPrefill(prefill ?? null);
         setRoutingOpen(true);
+    };
+
+    const openTakeout = (prefill?: TakeoutOfferPrefill | null) => {
+        setTakeoutPrefill(prefill ?? null);
+        setTakeoutOpen(true);
     };
 
     const netForm = useAppForm({
@@ -345,34 +366,64 @@ export function ObligationsPage() {
                 title="Accounts"
                 description="Open obligations as banking products: claims you hold act like savings; amounts you owe act like loans. Grouped by counterparty and currency."
                 action={
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button
-                                type="button"
-                                size="icon"
-                                variant="outline"
-                                className={cn(
-                                    "size-9 shrink-0 transition-shadow",
-                                    globalClearingOn
-                                        ? "border-emerald-500/60 text-emerald-700 shadow-[0_0_12px_rgba(16,185,129,0.55)] hover:bg-emerald-500/10 dark:text-emerald-400 dark:shadow-[0_0_14px_rgba(52,211,153,0.45)]"
-                                        : "border-red-500/70 text-red-700 shadow-[0_0_14px_rgba(239,68,68,0.65)] hover:bg-red-500/10 dark:text-red-400 dark:shadow-[0_0_16px_rgba(248,113,113,0.5)] animate-pulse",
-                                )}
-                                aria-label={
-                                    globalClearingOn
-                                        ? "Global clearing offer is on — click to edit"
-                                        : "Global clearing offer is off — click to post one"
-                                }
-                                onClick={() => openRouting(null)}
-                            >
-                                <Route className="size-4" />
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom" className="max-w-xs">
-                            {globalClearingOn
-                                ? "Global clearing offer on — path forward & claim takeout. Click to edit."
-                                : "No global clearing offer — post one for path forward and claim takeout."}
-                        </TooltipContent>
-                    </Tooltip>
+                    <div className="flex gap-2">
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="outline"
+                                    className={cn(
+                                        "size-9 shrink-0 transition-shadow",
+                                        globalForwardOn
+                                            ? "border-emerald-500/60 text-emerald-700 shadow-[0_0_12px_rgba(16,185,129,0.55)] hover:bg-emerald-500/10 dark:text-emerald-400 dark:shadow-[0_0_14px_rgba(52,211,153,0.45)]"
+                                            : "border-red-500/70 text-red-700 shadow-[0_0_14px_rgba(239,68,68,0.65)] hover:bg-red-500/10 dark:text-red-400 dark:shadow-[0_0_16px_rgba(248,113,113,0.5)] animate-pulse",
+                                    )}
+                                    aria-label={
+                                        globalForwardOn
+                                            ? "Global path-forward offer is on — click to edit"
+                                            : "Global path-forward offer is off — click to post one"
+                                    }
+                                    onClick={() => openRouting(null)}
+                                >
+                                    <Route className="size-4" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="max-w-xs">
+                                {globalForwardOn
+                                    ? "Global path-forward on — others can hop through you. Click to edit."
+                                    : "No global path-forward — post one so others can hop through you."}
+                            </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="outline"
+                                    className={cn(
+                                        "size-9 shrink-0 transition-shadow",
+                                        globalTakeoutOn
+                                            ? "border-emerald-500/60 text-emerald-700 shadow-[0_0_12px_rgba(16,185,129,0.55)] hover:bg-emerald-500/10 dark:text-emerald-400 dark:shadow-[0_0_14px_rgba(52,211,153,0.45)]"
+                                            : "border-red-500/70 text-red-700 shadow-[0_0_14px_rgba(239,68,68,0.65)] hover:bg-red-500/10 dark:text-red-400 dark:shadow-[0_0_16px_rgba(248,113,113,0.5)] animate-pulse",
+                                    )}
+                                    aria-label={
+                                        globalTakeoutOn
+                                            ? "Global takeout offer is on — click to edit"
+                                            : "Global takeout offer is off — click to post one"
+                                    }
+                                    onClick={() => openTakeout(null)}
+                                >
+                                    <Handshake className="size-4" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="max-w-xs">
+                                {globalTakeoutOn
+                                    ? "Global takeout on — others can sell you claims. Click to edit."
+                                    : "No global takeout — post one to buy others' claims."}
+                            </TooltipContent>
+                        </Tooltip>
+                    </div>
                 }
             />
 
@@ -384,6 +435,16 @@ export function ObligationsPage() {
                 }}
                 assets={assets}
                 prefill={routingPrefill}
+            />
+
+            <TakeoutOfferDialog
+                open={takeoutOpen}
+                onOpenChange={(open) => {
+                    setTakeoutOpen(open);
+                    if (!open) setTakeoutPrefill(null);
+                }}
+                assets={assets}
+                prefill={takeoutPrefill}
             />
 
             {/* ── Savings / deposits (you are creditor) ───────────────── */}
@@ -474,6 +535,12 @@ export function ObligationsPage() {
                                 onSetRouting={() =>
                                     openRouting({
                                         creditor: g.counterparty,
+                                        assetId: g.assetId,
+                                    })
+                                }
+                                onSetTakeout={() =>
+                                    openTakeout({
+                                        debtor: g.counterparty,
                                         assetId: g.assetId,
                                     })
                                 }
@@ -1090,6 +1157,7 @@ function AccountGroupRow({
     onSettle,
     onEditCreditLine,
     onSetRouting,
+    onSetTakeout,
     onSellClaim,
 }: {
     tone: "savings" | "loan";
@@ -1106,8 +1174,10 @@ function AccountGroupRow({
     balanceLabel: string;
     onSettle: () => void;
     onEditCreditLine?: () => void;
-    /** Open routing policy with this counterparty as next-hop creditor. */
+    /** Path-forward offer with this counterparty as next hop. */
     onSetRouting?: () => void;
+    /** Takeout offer to buy claims on this counterparty. */
+    onSetTakeout?: () => void;
     /** Sell claim on this counterparty (savings / you are creditor). */
     onSellClaim?: () => void;
 }) {
@@ -1152,9 +1222,11 @@ function AccountGroupRow({
         "Edit credit line — change limit, interest rate, or revolving terms";
     const historyTip = "History — path draws, deposits, nets, and line changes";
     const routingTip =
-        "Clearing offer — path forward / claim takeout terms toward this party";
+        "Path-forward offer — let others hop through you to this party";
+    const takeoutTip =
+        "Takeout offer — buy others' claims on this party";
     const sellTip =
-        "Sell claim — transfer this debt to a buyer under their clearing offer";
+        "Sell claim — transfer this debt to a buyer under their takeout offer";
 
     return (
         <Collapsible open={open} onOpenChange={setOpen}>
@@ -1301,6 +1373,28 @@ function AccountGroupRow({
                                 </TooltipTrigger>
                                 <TooltipContent side="top">
                                     {routingTip}
+                                </TooltipContent>
+                            </Tooltip>
+                        ) : null}
+                        {onSetTakeout ? (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        type="button"
+                                        size="icon"
+                                        variant="outline"
+                                        className="size-8 shrink-0"
+                                        aria-label={takeoutTip}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onSetTakeout();
+                                        }}
+                                    >
+                                        <Handshake className="size-3.5" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">
+                                    {takeoutTip}
                                 </TooltipContent>
                             </Tooltip>
                         ) : null}

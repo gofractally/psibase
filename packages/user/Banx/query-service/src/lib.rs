@@ -3,8 +3,9 @@
 mod service {
     use async_graphql::*;
     use banx::tables::{
-        Asset, AssetTable, ClearingOffer, ClearingOfferTab, CreditLine, CreditLineTable,
-        CurrencyPolicy, CurrencyPolicyTab, Obligation, ObligationTable, PPM_SCALE, RATE_SCALE,
+        Asset, AssetTable, CreditLine, CreditLineTable, CurrencyPolicy, CurrencyPolicyTab,
+        ForwardOffer, ForwardOfferTab, Obligation, ObligationTable, PairCycle, PPM_SCALE,
+        RATE_SCALE, TakeoutOffer, TakeoutOfferTab,
     };
     use psibase::services::tokens::{Decimal, Precision, Quantity};
     use psibase::*;
@@ -97,6 +98,7 @@ mod service {
 
         fn from_line(line: CreditLine) -> Self {
             let exposure = Obligation::exposure(line.creditor, line.debtor, line.asset_id);
+            let cycle = PairCycle::get(line.creditor, line.debtor, line.asset_id);
             Self {
                 creditor: line.creditor,
                 debtor: line.debtor,
@@ -104,9 +106,12 @@ mod service {
                 limit: dec(line.limit, line.asset_id),
                 depleteOnDebit: line.deplete_on_debit,
                 interestRatePpm: line.interest_rate,
-                graceSeconds: line.grace_seconds,
-                cycleStartedAt: time_sec(line.cycle_started_at),
-                cycleGraceSeconds: line.cycle_grace_seconds,
+                graceSeconds: cycle.as_ref().map(|c| c.grace_seconds).unwrap_or(0),
+                cycleStartedAt: cycle
+                    .as_ref()
+                    .map(|c| time_sec(c.cycle_started_at))
+                    .unwrap_or(0),
+                cycleGraceSeconds: cycle.as_ref().map(|c| c.cycle_grace_seconds).unwrap_or(0),
                 exposure: dec(exposure, line.asset_id),
                 remaining: dec(line.remaining, line.asset_id),
                 residual: dec(
@@ -148,32 +153,55 @@ mod service {
     }
 
     #[derive(SimpleObject)]
-    struct ClearingOfferView {
+    struct ForwardOfferView {
         poster: AccountNumber,
         /// `0` / empty when global.
-        counterparty: AccountNumber,
+        nextHop: AccountNumber,
         assetId: u16,
         feeFixed: Decimal,
         feePercentPpm: u32,
         maxLineAprPpm: u32,
-        forwardEnabled: bool,
         expiresAt: i64,
         isGlobal: bool,
     }
 
-    impl From<ClearingOffer> for ClearingOfferView {
-        fn from(p: ClearingOffer) -> Self {
-            let is_global = p.is_global();
+    impl From<ForwardOffer> for ForwardOfferView {
+        fn from(p: ForwardOffer) -> Self {
             Self {
                 poster: p.poster,
-                counterparty: p.counterparty,
+                nextHop: p.next_hop,
                 assetId: p.asset_id,
                 feeFixed: dec(p.fee_fixed, p.asset_id),
                 feePercentPpm: p.fee_percent,
                 maxLineAprPpm: p.max_line_apr,
-                forwardEnabled: p.forward_enabled,
                 expiresAt: time_sec(p.expires_at),
-                isGlobal: is_global,
+                isGlobal: p.is_global(),
+            }
+        }
+    }
+
+    #[derive(SimpleObject)]
+    struct TakeoutOfferView {
+        poster: AccountNumber,
+        /// `0` / empty when global.
+        debtor: AccountNumber,
+        assetId: u16,
+        feeFixed: Decimal,
+        feePercentPpm: u32,
+        expiresAt: i64,
+        isGlobal: bool,
+    }
+
+    impl From<TakeoutOffer> for TakeoutOfferView {
+        fn from(p: TakeoutOffer) -> Self {
+            Self {
+                poster: p.poster,
+                debtor: p.debtor,
+                assetId: p.asset_id,
+                feeFixed: dec(p.fee_fixed, p.asset_id),
+                feePercentPpm: p.fee_percent,
+                expiresAt: time_sec(p.expires_at),
+                isGlobal: p.is_global(),
             }
         }
     }
@@ -217,7 +245,7 @@ mod service {
         /// Accounts discovered while expanding from `from` (includes `from` / `to`).
         accounts: Vec<AccountNumber>,
         creditLines: Vec<CreditLineView>,
-        clearingOffers: Vec<ClearingOfferView>,
+        forwardOffers: Vec<ForwardOfferView>,
         currencyPolicies: Vec<CurrencyPolicyView>,
     }
 
@@ -332,13 +360,23 @@ mod service {
             dec(Obligation::exposure(creditor, debtor, assetId), assetId)
         }
 
-        /// Clearing offers posted by `poster` (global + specific counterparties).
-        async fn clearingOffers(&self, poster: AccountNumber) -> Vec<ClearingOfferView> {
-            ClearingOfferTab::with_service(banx::SERVICE)
+        /// Path-forward offers posted by `poster` (global + specific next hops).
+        async fn forwardOffers(&self, poster: AccountNumber) -> Vec<ForwardOfferView> {
+            ForwardOfferTab::with_service(banx::SERVICE)
                 .get_index_pk()
                 .iter()
                 .filter(|p| p.poster == poster)
-                .map(ClearingOfferView::from)
+                .map(ForwardOfferView::from)
+                .collect()
+        }
+
+        /// Claim-takeout offers posted by `poster` (global + specific debtors).
+        async fn takeoutOffers(&self, poster: AccountNumber) -> Vec<TakeoutOfferView> {
+            TakeoutOfferTab::with_service(banx::SERVICE)
+                .get_index_pk()
+                .iter()
+                .filter(|p| p.poster == poster)
+                .map(TakeoutOfferView::from)
                 .collect()
         }
 
@@ -432,12 +470,12 @@ mod service {
                 .collect();
             credit_lines.extend(reverse_only);
 
-            let clearing_offers: Vec<ClearingOfferView> =
-                ClearingOfferTab::with_service(banx::SERVICE)
+            let forward_offers: Vec<ForwardOfferView> =
+                ForwardOfferTab::with_service(banx::SERVICE)
                     .get_index_pk()
                     .iter()
                     .filter(|p| debtors.contains(&p.poster))
-                    .map(ClearingOfferView::from)
+                    .map(ForwardOfferView::from)
                     .collect();
 
             let currency_policies: Vec<CurrencyPolicyView> =
@@ -453,7 +491,7 @@ mod service {
             PathGraphView {
                 accounts,
                 creditLines: credit_lines,
-                clearingOffers: clearing_offers,
+                forwardOffers: forward_offers,
                 currencyPolicies: currency_policies,
             }
         }

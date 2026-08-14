@@ -166,13 +166,13 @@ export function PathPayPage() {
         <div className="space-y-8">
             <PageHeader
                 title="Transfer"
-                description="Draw along a hop list. First hop uses a credit line only; later same-asset hops need a clearing offer with forward enabled (fixed + % fee). Asset changes auto-convert via the previous edge debtor's currency policy. Use Find path to discover a route from you to a payee."
+                description="Draw along a hop list. First hop uses a credit line only; later same-asset hops need a live path-forward offer (fixed + % fee). Asset changes auto-convert via the previous edge debtor's currency policy. Use Find path to discover a route from you to a payee."
             />
 
             <section className="grid max-w-2xl gap-4 rounded-lg border p-4">
                 <h2 className="font-medium">Find path</h2>
                 <p className="text-muted-foreground text-xs">
-                    Off-chain quote using credit lines, clearing offers, and FX
+                    Off-chain quote using credit lines, path-forward offers, and FX
                     policies expanded from your account toward the payee (not a
                     full network dump). Fills the hop list below; you can still
                     edit hops before paying.

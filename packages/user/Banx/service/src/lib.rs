@@ -188,19 +188,15 @@ pub mod tables {
         pub asset_id: u16,
     }
 
-    /// Clearing offer posted by `poster`: path forward (optional) and claim
-    /// takeout (while a live row exists). `counterparty = 0` is global; otherwise
-    /// a specific next hop (path) or underlying debtor (take).
-    ///
-    /// Resolution prefers a **usable** specific row, else a usable global.
-    /// Unusable specific (expired, or `forward_enabled = false` for path) does
-    /// not shadow a live global.
-    #[table(name = "ClearingOfferTab", index = 1)]
+    /// Path-forward offer: `poster` will sit in the middle of `path_pay`.
+    /// `next_hop = 0` is global (any next hop). Specific requires that hop
+    /// has lined the poster.
+    #[table(name = "ForwardOfferTab", index = 1)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
-    pub struct ClearingOffer {
+    pub struct ForwardOffer {
         pub poster: AccountNumber,
-        /// Next hop (path) / underlying debtor (take), or [`Self::GLOBAL`].
-        pub counterparty: AccountNumber,
+        /// Next hop creditor, or [`Self::GLOBAL`].
+        pub next_hop: AccountNumber,
         pub asset_id: u16,
 
         pub fee_fixed: Quantity,
@@ -208,42 +204,39 @@ pub mod tables {
         pub fee_percent: u32,
         /// Max APR ppm on a line poster **draws** when forwarding.
         pub max_line_apr: u32,
-        /// When true, usable as a path hop; takeout is always on if row exists.
-        pub forward_enabled: bool,
         /// Absolute expiry (`seconds == 0` → never).
         pub expires_at: TimePointSec,
     }
 
-    impl ClearingOffer {
+    impl ForwardOffer {
         pub const GLOBAL: AccountNumber = AccountNumber::new(0);
 
         #[primary_key]
         fn pk(&self) -> (AccountNumber, AccountNumber, u16) {
-            (self.poster, self.counterparty, self.asset_id)
+            (self.poster, self.next_hop, self.asset_id)
         }
 
         fn save(&self) {
-            ClearingOfferTab::read_write().put(self).unwrap();
+            ForwardOfferTab::read_write().put(self).unwrap();
         }
 
-        fn get(poster: AccountNumber, counterparty: AccountNumber, asset_id: u16) -> Option<Self> {
-            ClearingOfferTab::read()
+        fn get(poster: AccountNumber, next_hop: AccountNumber, asset_id: u16) -> Option<Self> {
+            ForwardOfferTab::read()
                 .get_index_pk()
-                .get(&(poster, counterparty, asset_id))
+                .get(&(poster, next_hop, asset_id))
         }
 
         pub fn is_global(&self) -> bool {
-            self.counterparty == Self::GLOBAL
+            self.next_hop == Self::GLOBAL
         }
 
         pub fn upsert(
             poster: AccountNumber,
-            counterparty: AccountNumber,
+            next_hop: AccountNumber,
             asset_id: u16,
             fee_fixed: Quantity,
             fee_percent: u32,
             max_line_apr: u32,
-            forward_enabled: bool,
             expires_at: TimePointSec,
         ) {
             assert!(
@@ -251,49 +244,44 @@ pub mod tables {
                 "max_line_apr exceeds 100% (PPM_SCALE)"
             );
             assert!(fee_percent < PPM_SCALE, "fee must be under 100%");
-            // Path specific: next hop must have lined the poster.
-            // Take residual is checked at sell_claim time (poster must line debtor).
-            if counterparty != Self::GLOBAL && forward_enabled {
-                let _ = CreditLine::get_assert(counterparty, poster, asset_id);
+            if next_hop != Self::GLOBAL {
+                let _ = CreditLine::get_assert(next_hop, poster, asset_id);
             }
             Self {
                 poster,
-                counterparty,
+                next_hop,
                 asset_id,
                 fee_fixed,
                 fee_percent,
                 max_line_apr,
-                forward_enabled,
                 expires_at,
             }
             .save();
         }
 
-        pub fn remove(poster: AccountNumber, counterparty: AccountNumber, asset_id: u16) {
+        pub fn remove(poster: AccountNumber, next_hop: AccountNumber, asset_id: u16) {
             assert!(
-                Self::get(poster, counterparty, asset_id).is_some(),
-                "clearing offer not found"
+                Self::get(poster, next_hop, asset_id).is_some(),
+                "forward offer not found"
             );
-            ClearingOfferTab::read_write().erase(&(poster, counterparty, asset_id));
+            ForwardOfferTab::read_write().erase(&(poster, next_hop, asset_id));
         }
 
         pub fn apply_fees(&self, amount_in: Quantity) -> Quantity {
             apply_hop_fee(amount_in, self.fee_fixed, self.fee_percent)
         }
 
-        /// Path draw: fee then debit next hop's line to poster. Requires
-        /// `forward_enabled`.
+        /// Fee then debit next hop's line to poster.
         pub fn path_draw(&self, next_creditor: AccountNumber, amount_in: Quantity) -> Quantity {
-            assert!(self.forward_enabled, "clearing offer does not allow path forward");
             assert_policy_live(self.expires_at);
             let creditor = if self.is_global() {
                 next_creditor
             } else {
                 assert!(
-                    next_creditor == self.counterparty,
-                    "clearing offer counterparty mismatch"
+                    next_creditor == self.next_hop,
+                    "forward offer next hop mismatch"
                 );
-                self.counterparty
+                self.next_hop
             };
             if let Some(line) = CreditLine::get(creditor, self.poster, self.asset_id) {
                 assert!(
@@ -307,48 +295,119 @@ pub mod tables {
         }
     }
 
-    fn offer_live(o: &ClearingOffer) -> bool {
-        policy_is_live(o.expires_at)
+    /// Claim-takeout offer: `poster` will buy claims via `sell_claim`.
+    /// `debtor = 0` is global (any debtor the poster has lined). Residual
+    /// is checked at `sell_claim` time, not at post.
+    #[table(name = "TakeoutOfferTab", index = 6)]
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    pub struct TakeoutOffer {
+        pub poster: AccountNumber,
+        /// Underlying debtor, or [`Self::GLOBAL`].
+        pub debtor: AccountNumber,
+        pub asset_id: u16,
+
+        pub fee_fixed: Quantity,
+        /// ppm (`10_000` = 1%); must be `< PPM_SCALE`.
+        pub fee_percent: u32,
+        /// Absolute expiry (`seconds == 0` → never).
+        pub expires_at: TimePointSec,
     }
 
-    /// Usable specific forward, else usable global. Take-only / expired specific
-    /// does not block a live global.
-    pub fn resolve_clearing_forward(
+    impl TakeoutOffer {
+        pub const GLOBAL: AccountNumber = AccountNumber::new(0);
+
+        #[primary_key]
+        fn pk(&self) -> (AccountNumber, AccountNumber, u16) {
+            (self.poster, self.debtor, self.asset_id)
+        }
+
+        fn save(&self) {
+            TakeoutOfferTab::read_write().put(self).unwrap();
+        }
+
+        fn get(poster: AccountNumber, debtor: AccountNumber, asset_id: u16) -> Option<Self> {
+            TakeoutOfferTab::read()
+                .get_index_pk()
+                .get(&(poster, debtor, asset_id))
+        }
+
+        pub fn is_global(&self) -> bool {
+            self.debtor == Self::GLOBAL
+        }
+
+        pub fn upsert(
+            poster: AccountNumber,
+            debtor: AccountNumber,
+            asset_id: u16,
+            fee_fixed: Quantity,
+            fee_percent: u32,
+            expires_at: TimePointSec,
+        ) {
+            assert!(fee_percent < PPM_SCALE, "fee must be under 100%");
+            Self {
+                poster,
+                debtor,
+                asset_id,
+                fee_fixed,
+                fee_percent,
+                expires_at,
+            }
+            .save();
+        }
+
+        pub fn remove(poster: AccountNumber, debtor: AccountNumber, asset_id: u16) {
+            assert!(
+                Self::get(poster, debtor, asset_id).is_some(),
+                "takeout offer not found"
+            );
+            TakeoutOfferTab::read_write().erase(&(poster, debtor, asset_id));
+        }
+
+        pub fn apply_fees(&self, amount_in: Quantity) -> Quantity {
+            apply_hop_fee(amount_in, self.fee_fixed, self.fee_percent)
+        }
+    }
+
+    fn offer_live(expires_at: TimePointSec) -> bool {
+        policy_is_live(expires_at)
+    }
+
+    /// Live specific forward, else live global.
+    pub fn resolve_forward(
         next_creditor: AccountNumber,
         poster: AccountNumber,
         asset_id: u16,
-    ) -> ClearingOffer {
-        if let Some(p) = ClearingOffer::get(poster, next_creditor, asset_id) {
-            if p.forward_enabled && offer_live(&p) {
+    ) -> ForwardOffer {
+        if let Some(p) = ForwardOffer::get(poster, next_creditor, asset_id) {
+            if offer_live(p.expires_at) {
                 return p;
             }
         }
-        if let Some(g) = ClearingOffer::get(poster, ClearingOffer::GLOBAL, asset_id) {
-            if g.forward_enabled && offer_live(&g) {
+        if let Some(g) = ForwardOffer::get(poster, ForwardOffer::GLOBAL, asset_id) {
+            if offer_live(g.expires_at) {
                 return g;
             }
         }
-        panic!("ClearingOffer not found (no specific or global forward for this asset)");
+        panic!("ForwardOffer not found (no specific or global forward for this asset)");
     }
 
-    /// Usable specific takeout, else usable global. Expired specific does not
-    /// block a live global.
-    pub fn resolve_clearing_take(
+    /// Live specific takeout, else live global.
+    pub fn resolve_take(
         buyer: AccountNumber,
         debtor: AccountNumber,
         asset_id: u16,
-    ) -> ClearingOffer {
-        if let Some(p) = ClearingOffer::get(buyer, debtor, asset_id) {
-            if offer_live(&p) {
+    ) -> TakeoutOffer {
+        if let Some(p) = TakeoutOffer::get(buyer, debtor, asset_id) {
+            if offer_live(p.expires_at) {
                 return p;
             }
         }
-        if let Some(g) = ClearingOffer::get(buyer, ClearingOffer::GLOBAL, asset_id) {
-            if offer_live(&g) {
+        if let Some(g) = TakeoutOffer::get(buyer, TakeoutOffer::GLOBAL, asset_id) {
+            if offer_live(g.expires_at) {
                 return g;
             }
         }
-        panic!("ClearingOffer not found (buyer has no takeout offer for this asset)");
+        panic!("TakeoutOffer not found (buyer has no takeout offer for this asset)");
     }
 
     /// Debtor-posted quote: re-denominate **any** claim against this debtor
@@ -606,7 +665,7 @@ pub mod tables {
         }
 
         pub fn live_accrued_at(&self, now: TimePointSec) -> Quantity {
-            if CreditLine::pair_in_grace(self.creditor, self.debtor, self.asset_id, now) {
+            if PairCycle::pair_in_grace(self.creditor, self.debtor, self.asset_id, now) {
                 return Quantity::new(0);
             }
             let base = self
@@ -631,7 +690,7 @@ pub mod tables {
         /// so post-grace compound still runs from origination.
         pub fn lock_interest(&mut self) {
             let now = Self::now();
-            if CreditLine::pair_in_grace(self.creditor, self.debtor, self.asset_id, now) {
+            if PairCycle::pair_in_grace(self.creditor, self.debtor, self.asset_id, now) {
                 if self.accrued_interest.value != 0 {
                     self.accrued_interest = Quantity::new(0);
                     self.save();
@@ -708,7 +767,7 @@ pub mod tables {
                 o.persist_or_delete();
             }
             let after = Self::directed_principal(creditor, debtor, asset_id);
-            CreditLine::sync_cycle(creditor, debtor, asset_id, before, after);
+            PairCycle::sync_cycle(creditor, debtor, asset_id, before, after);
         }
 
         /// Interest first (globally, highest-rate order), then principal.
@@ -798,7 +857,7 @@ pub mod tables {
                 o.persist_or_delete();
             }
             let after_from = Self::directed_principal(from_creditor, debtor, asset_id);
-            CreditLine::sync_cycle(from_creditor, debtor, asset_id, before_from, after_from);
+            PairCycle::sync_cycle(from_creditor, debtor, asset_id, before_from, after_from);
         }
 
         /// Net mutual obligations between `a` and `b` for `asset_id`.
@@ -847,7 +906,7 @@ pub mod tables {
                 .into();
             self.save();
             let after = Self::directed_principal(self.creditor, self.debtor, self.asset_id);
-            CreditLine::sync_cycle(
+            PairCycle::sync_cycle(
                 self.creditor,
                 self.debtor,
                 self.asset_id,
@@ -891,76 +950,75 @@ pub mod tables {
         }
     }
 
-    /// Bilateral credit facility: `creditor` will be owed by `debtor` up to
-    /// `limit` of `asset_id`, at `interest_rate` on new draws.
+    /// Posted grace + open-cycle snapshot for a directed pair/asset.
     ///
-    /// `limit` is a stable cap on outstanding exposure (principal + interest).
-    /// A draw of `amount` requires `exposure + amount <= limit`.
-    /// When `deplete_on_debit`, `remaining` is unused grant (shrinks on draw /
-    /// takeout; not restored by repayment). Revolving lines ignore `remaining`.
-    ///
-    /// `grace_seconds` is the posted interest-free window. When this pair goes
-    /// 0→positive, that value is snapshotted on the open cycle. Live interest
-    /// is 0 until the window ends or principal returns to 0.
-    #[table(name = "CreditLineTable", index = 3)]
+    /// Creditor writes `grace_seconds` via `st_crd_lne`. Principal-changing
+    /// actions write the cycle clock via [`Self::sync_cycle`]. Same key as
+    /// [`CreditLine`]; separate row so a line upsert cannot clobber the clock.
+    #[table(name = "PairCycleTab", index = 7)]
     #[derive(
         Default, Clone, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug,
     )]
-    pub struct CreditLine {
+    pub struct PairCycle {
         pub creditor: AccountNumber,
         pub debtor: AccountNumber,
         pub asset_id: u16,
-
-        /// Stable cap on outstanding exposure (principal + accrued interest).
-        pub limit: Quantity,
-        /// If true, draws/takeout also consume [`Self::remaining`].
-        pub deplete_on_debit: bool,
-        /// Rate applied to new draws on this line (ppm APR); see [`crate::interest`].
-        pub interest_rate: u32,
-        /// Unused grant when `deplete_on_debit`. Ignored for revolving lines.
-        pub remaining: Quantity,
         /// Posted interest-free window for the *next* 0→positive cycle.
         pub grace_seconds: u32,
         /// When the current cycle opened (`0` = none).
         pub cycle_started_at: TimePointSec,
-        /// Grace snapshotted at cycle open. Later `grace_seconds` edits do not change it.
+        /// Grace snapshotted at cycle open. Later posted-grace edits do not change it.
         pub cycle_grace_seconds: u32,
     }
 
-    impl CreditLine {
+    impl PairCycle {
         #[primary_key]
         fn pk(&self) -> (AccountNumber, AccountNumber, u16) {
             (self.creditor, self.debtor, self.asset_id)
         }
 
         fn save(&self) {
-            CreditLineTable::read_write().put(&self).unwrap();
+            PairCycleTab::read_write().put(self).unwrap();
         }
 
-        fn new(
+        fn erase(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) {
+            PairCycleTab::read_write().erase(&(creditor, debtor, asset_id));
+        }
+
+        pub fn get(
             creditor: AccountNumber,
             debtor: AccountNumber,
             asset_id: u16,
-            limit: Quantity,
-            deplete_on_debit: bool,
-            interest_rate: u32,
+        ) -> Option<Self> {
+            PairCycleTab::read()
+                .get_index_pk()
+                .get(&(creditor, debtor, asset_id))
+        }
+
+        /// Update posted grace only. Never touches an open cycle snapshot.
+        pub fn set_posted_grace(
+            creditor: AccountNumber,
+            debtor: AccountNumber,
+            asset_id: u16,
             grace_seconds: u32,
-        ) -> Self {
-            Self {
-                creditor,
-                debtor,
-                asset_id,
-                limit,
-                deplete_on_debit,
-                interest_rate,
-                remaining: if deplete_on_debit {
-                    limit
+        ) {
+            if let Some(mut c) = Self::get(creditor, debtor, asset_id) {
+                c.grace_seconds = grace_seconds;
+                if grace_seconds == 0 && c.cycle_started_at.seconds == 0 {
+                    Self::erase(creditor, debtor, asset_id);
                 } else {
-                    Quantity::new(0)
-                },
-                grace_seconds,
-                cycle_started_at: TimePointSec { seconds: 0 },
-                cycle_grace_seconds: 0,
+                    c.save();
+                }
+            } else if grace_seconds > 0 {
+                Self {
+                    creditor,
+                    debtor,
+                    asset_id,
+                    grace_seconds,
+                    cycle_started_at: TimePointSec { seconds: 0 },
+                    cycle_grace_seconds: 0,
+                }
+                .save();
             }
         }
 
@@ -982,11 +1040,12 @@ pub mod tables {
             now: TimePointSec,
         ) -> bool {
             Self::get(creditor, debtor, asset_id)
-                .map(|l| l.in_grace_at(now))
+                .map(|c| c.in_grace_at(now))
                 .unwrap_or(false)
         }
 
-        /// Open a cycle on 0→positive; close when principal returns to 0.
+        /// Open a cycle on 0→positive (if posted grace > 0); close when
+        /// principal returns to 0. No-op when there is no row.
         pub fn sync_cycle(
             creditor: AccountNumber,
             debtor: AccountNumber,
@@ -994,20 +1053,89 @@ pub mod tables {
             before_principal: u64,
             after_principal: u64,
         ) {
-            let Some(mut line) = Self::get(creditor, debtor, asset_id) else {
+            let Some(mut c) = Self::get(creditor, debtor, asset_id) else {
                 return;
             };
             if before_principal == 0
                 && after_principal > 0
-                && line.cycle_started_at.seconds == 0
+                && c.cycle_started_at.seconds == 0
             {
-                line.cycle_started_at = Obligation::now();
-                line.cycle_grace_seconds = line.grace_seconds;
-                line.save();
-            } else if after_principal == 0 && line.cycle_started_at.seconds != 0 {
-                line.cycle_started_at = TimePointSec { seconds: 0 };
-                line.cycle_grace_seconds = 0;
-                line.save();
+                if c.grace_seconds == 0 {
+                    return;
+                }
+                c.cycle_started_at = Obligation::now();
+                c.cycle_grace_seconds = c.grace_seconds;
+                c.save();
+            } else if after_principal == 0 && c.cycle_started_at.seconds != 0 {
+                c.cycle_started_at = TimePointSec { seconds: 0 };
+                c.cycle_grace_seconds = 0;
+                if c.grace_seconds == 0 {
+                    Self::erase(creditor, debtor, asset_id);
+                } else {
+                    c.save();
+                }
+            }
+        }
+    }
+
+    /// Bilateral credit facility: `creditor` will be owed by `debtor` up to
+    /// `limit` of `asset_id`, at `interest_rate` on new draws.
+    ///
+    /// `limit` is a stable cap on outstanding exposure (principal + interest).
+    /// A draw of `amount` requires `exposure + amount <= limit`.
+    /// When `deplete_on_debit`, `remaining` is unused grant (shrinks on draw /
+    /// takeout; not restored by repayment). Revolving lines ignore `remaining`.
+    ///
+    /// Interest-free grace lives on [`PairCycle`], not this row.
+    #[table(name = "CreditLineTable", index = 3)]
+    #[derive(
+        Default, Clone, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug,
+    )]
+    pub struct CreditLine {
+        pub creditor: AccountNumber,
+        pub debtor: AccountNumber,
+        pub asset_id: u16,
+
+        /// Stable cap on outstanding exposure (principal + accrued interest).
+        pub limit: Quantity,
+        /// If true, draws/takeout also consume [`Self::remaining`].
+        pub deplete_on_debit: bool,
+        /// Rate applied to new draws on this line (ppm APR); see [`crate::interest`].
+        pub interest_rate: u32,
+        /// Unused grant when `deplete_on_debit`. Ignored for revolving lines.
+        pub remaining: Quantity,
+    }
+
+    impl CreditLine {
+        #[primary_key]
+        fn pk(&self) -> (AccountNumber, AccountNumber, u16) {
+            (self.creditor, self.debtor, self.asset_id)
+        }
+
+        fn save(&self) {
+            CreditLineTable::read_write().put(&self).unwrap();
+        }
+
+        fn new(
+            creditor: AccountNumber,
+            debtor: AccountNumber,
+            asset_id: u16,
+            limit: Quantity,
+            deplete_on_debit: bool,
+            interest_rate: u32,
+        ) -> Self {
+            Self {
+                creditor,
+                debtor,
+                asset_id,
+                limit,
+                deplete_on_debit,
+                interest_rate,
+                remaining: if deplete_on_debit {
+                    limit
+                } else {
+                    Quantity::new(0)
+                },
             }
         }
 
@@ -1069,7 +1197,6 @@ pub mod tables {
                 line.limit = amount;
                 line.deplete_on_debit = deplete_on_debit;
                 line.interest_rate = interest_rate;
-                line.grace_seconds = grace_seconds;
                 line.remaining = if deplete_on_debit {
                     amount
                 } else {
@@ -1084,10 +1211,10 @@ pub mod tables {
                     amount,
                     deplete_on_debit,
                     interest_rate,
-                    grace_seconds,
                 )
                 .save();
             }
+            PairCycle::set_posted_grace(creditor, debtor, asset_id, grace_seconds);
         }
 
         /// Line headroom plus reverse claim (`creditor` already owes `debtor`).
@@ -1199,8 +1326,8 @@ pub mod tables {
 #[psibase::service(name = "banx", tables = "tables")]
 pub mod service {
     use crate::tables::{
-        emit_pair_activity, resolve_clearing_forward, resolve_clearing_take, Asset, ClearingOffer,
-        CreditLine, CurrencyPolicy, InitRow, InitTable, Obligation, PathHop,
+        emit_pair_activity, resolve_forward, resolve_take, Asset, CreditLine, CurrencyPolicy,
+        ForwardOffer, InitRow, InitTable, Obligation, PathHop, TakeoutOffer,
     };
     use psibase::{
         services::events,
@@ -1321,79 +1448,133 @@ pub mod service {
         );
     }
 
-    /// Post/update a **specific** clearing offer (`counterparty` ≠ 0).
+    /// Post/update a **specific** path-forward offer (`next_hop` ≠ 0).
     ///
-    /// Path: next hop = `counterparty` when `forward_enabled`.
-    /// Takeout: buy claims on that debtor while the row exists.
+    /// Poster sits in the middle of `path_pay`; next hop is `next_hop`.
     /// Fees: Stripe-style `out = in * (1 - fee_percent) - fee_fixed`.
     #[action]
-    fn st_clr_ofr(
-        counterparty: AccountNumber,
+    fn st_fwd_ofr(
+        next_hop: AccountNumber,
         asset_id: u16,
         fee_fixed: Quantity,
         fee_percent: u32,
         max_line_apr: u32,
-        forward_enabled: bool,
         expires_at: TimePointSec,
     ) {
         assert!(
-            counterparty != ClearingOffer::GLOBAL,
-            "use st_glb_clr for global clearing offer (counterparty 0)"
+            next_hop != ForwardOffer::GLOBAL,
+            "use st_glb_fwd for global forward offer (next hop 0)"
         );
-        ClearingOffer::upsert(
+        ForwardOffer::upsert(
             get_sender(),
-            counterparty,
+            next_hop,
             asset_id,
             fee_fixed,
             fee_percent,
             max_line_apr,
-            forward_enabled,
             expires_at,
         );
     }
 
-    /// Post/update a **global** clearing offer (`counterparty = 0`).
+    /// Post/update a **global** path-forward offer (`next_hop = 0`).
     #[action]
-    fn st_glb_clr(
+    fn st_glb_fwd(
         asset_id: u16,
         fee_fixed: Quantity,
         fee_percent: u32,
         max_line_apr: u32,
-        forward_enabled: bool,
         expires_at: TimePointSec,
     ) {
-        ClearingOffer::upsert(
+        ForwardOffer::upsert(
             get_sender(),
-            ClearingOffer::GLOBAL,
+            ForwardOffer::GLOBAL,
             asset_id,
             fee_fixed,
             fee_percent,
             max_line_apr,
-            forward_enabled,
             expires_at,
         );
     }
 
-    /// Remove a **specific** clearing offer.
+    /// Remove a **specific** path-forward offer.
     #[action]
-    fn rm_clr_ofr(counterparty: AccountNumber, asset_id: u16) {
+    fn rm_fwd_ofr(next_hop: AccountNumber, asset_id: u16) {
         assert!(
-            counterparty != ClearingOffer::GLOBAL,
-            "use rm_glb_clr for global clearing offer"
+            next_hop != ForwardOffer::GLOBAL,
+            "use rm_glb_fwd for global forward offer"
         );
-        ClearingOffer::remove(get_sender(), counterparty, asset_id);
+        ForwardOffer::remove(get_sender(), next_hop, asset_id);
     }
 
-    /// Remove a **global** clearing offer.
+    /// Remove a **global** path-forward offer.
     #[action]
-    fn rm_glb_clr(asset_id: u16) {
-        ClearingOffer::remove(get_sender(), ClearingOffer::GLOBAL, asset_id);
+    fn rm_glb_fwd(asset_id: u16) {
+        ForwardOffer::remove(get_sender(), ForwardOffer::GLOBAL, asset_id);
     }
 
-    /// Seller (sender) sells claims on `debtor` to `buyer` under buyer's clearing
+    /// Post/update a **specific** takeout offer (`debtor` ≠ 0).
+    ///
+    /// Poster will buy claims on that debtor via `sell_claim`.
+    #[action]
+    fn st_tko_ofr(
+        debtor: AccountNumber,
+        asset_id: u16,
+        fee_fixed: Quantity,
+        fee_percent: u32,
+        expires_at: TimePointSec,
+    ) {
+        assert!(
+            debtor != TakeoutOffer::GLOBAL,
+            "use st_glb_tko for global takeout offer (debtor 0)"
+        );
+        TakeoutOffer::upsert(
+            get_sender(),
+            debtor,
+            asset_id,
+            fee_fixed,
+            fee_percent,
+            expires_at,
+        );
+    }
+
+    /// Post/update a **global** takeout offer (`debtor = 0`).
+    #[action]
+    fn st_glb_tko(
+        asset_id: u16,
+        fee_fixed: Quantity,
+        fee_percent: u32,
+        expires_at: TimePointSec,
+    ) {
+        TakeoutOffer::upsert(
+            get_sender(),
+            TakeoutOffer::GLOBAL,
+            asset_id,
+            fee_fixed,
+            fee_percent,
+            expires_at,
+        );
+    }
+
+    /// Remove a **specific** takeout offer.
+    #[action]
+    fn rm_tko_ofr(debtor: AccountNumber, asset_id: u16) {
+        assert!(
+            debtor != TakeoutOffer::GLOBAL,
+            "use rm_glb_tko for global takeout offer"
+        );
+        TakeoutOffer::remove(get_sender(), debtor, asset_id);
+    }
+
+    /// Remove a **global** takeout offer.
+    #[action]
+    fn rm_glb_tko(asset_id: u16) {
+        TakeoutOffer::remove(get_sender(), TakeoutOffer::GLOBAL, asset_id);
+    }
+
+    /// Seller (sender) sells claims on `debtor` to `buyer` under buyer's takeout
     /// offer. Buyer becomes creditor of `debtor` for `amount`; seller receives
     /// a claim on buyer for face after fees. Requires buyer's line residual to
-    /// `debtor` and a live clearing offer (specific or global).
+    /// `debtor` and a live takeout offer (specific or global).
     #[action]
     fn sell_claim(
         buyer: AccountNumber,
@@ -1407,7 +1588,7 @@ pub mod service {
         assert!(buyer != debtor, "buyer cannot be the debtor");
         assert!(amount.value > 0, "sell_claim amount must be positive");
 
-        let offer = resolve_clearing_take(buyer, debtor, asset_id);
+        let offer = resolve_take(buyer, debtor, asset_id);
         crate::tables::assert_policy_live(offer.expires_at);
 
         let mut line = CreditLine::get_assert(buyer, debtor, asset_id);
@@ -1551,8 +1732,8 @@ pub mod service {
     ///    reverse claim that auto-nets).
     /// 2. **Currency change** — rebook previous edge (sender owes Gary AUD) via
     ///    sender's [`CurrencyPolicy`] AUD→USD.
-    /// 3. **Later hops** — intermediate's [`ClearingOffer`] with
-    ///    `forward_enabled` (fee + max line APR); draw on next line.
+    /// 3. **Later hops** — intermediate's live [`ForwardOffer`] (fee + max
+    ///    line APR); draw on next line.
     /// 4. **`min_return`** — final hop principal (in **last** asset) ≥ this.
     ///
     /// Atomic: all legs succeed or none stick.
@@ -1604,8 +1785,8 @@ pub mod service {
                 break;
             }
 
-            // Same-asset forward hop: usable specific, else usable global.
-            let offer = resolve_clearing_forward(next_creditor, path_debtor, asset_id);
+            // Same-asset forward hop: live specific, else live global.
+            let offer = resolve_forward(next_creditor, path_debtor, asset_id);
             forward = offer.path_draw(next_creditor, forward);
             prev_edge_debtor = path_debtor;
             prev_edge_creditor = next_creditor;

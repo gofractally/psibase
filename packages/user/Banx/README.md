@@ -8,13 +8,14 @@ A payment does not move coins. It **creates or shrinks obligations** along a pat
 
 - **Credit line** — B is willing to be owed by A, up to a limit, at an APR. A can *draw* on B: A becomes debtor, B creditor.
 - **Obligation** — the actual debt. One pair/asset can have several rows (different rates). **Exposure** is principal + live interest.
-- **Clearing offer** — B’s standing terms for *forwarding* a path through them (and for *buying* someone else’s claim). Specific next hop, or **global** (any next hop).
+- **Path-forward offer** — B’s standing terms for *sitting in the middle* of a `path_pay`. Specific next hop, or **global** (any next hop).
+- **Takeout offer** — B’s standing terms for *buying* someone else’s claim via `sell_claim`. Specific debtor, or **global** (any lined debtor).
 - **Currency policy** — a debtor’s quote to rebook their debt from one asset to another (FX + optional fixed fee).
 
 Alice paying Carol $1 via Bob:
 
 1. Alice draws on Bob’s line → Alice owes Bob $1.
-2. Bob forwards to Carol (Bob must have a live clearing offer with forward on; Carol must have lined Bob, **or** Bob must already owe Carol) → Bob owes Carol $1.
+2. Bob forwards to Carol (Bob must have a live path-forward offer; Carol must have lined Bob, **or** Bob must already owe Carol) → Bob owes Carol $1.
 
 Carol is paid in the sense that she holds a claim. Bob is the middle book.
 
@@ -53,7 +54,7 @@ A **deposit** is how off-graph value enters: the receiver books a liability to t
 `path_pay(hops, amount, min_return)` is atomic.
 
 - **Hop 0** — sender draws on the first account (line and/or reverse claim). No hop fee.
-- **Later hops** — the current path debtor must have a **usable** clearing offer (`forward_enabled`, not expired). Specific offer if live; otherwise a live global. Take-only or expired specific does **not** block the global.
+- **Later hops** — the current path debtor must have a **live** path-forward offer. Specific next hop if live; otherwise a live global. Expired specific does **not** block the global. Takeout offers are not used here.
 - **Asset change** — convert the previous edge using the previous edge **debtor’s** currency policy, then continue. If debit auto-net ate that edge, convert uses whatever is left (or fails `min_return`).
 - **min_return** — final residual in the last hop’s asset must be at least this.
 
@@ -61,16 +62,17 @@ Off-chain **Find path** (`quotePath`) searches a scoped subgraph (lines + revers
 
 You can still edit hops before execute.
 
-## Clearing offers
+## Path-forward offers
 
-Posted by the **poster** (`st_clr_ofr` / `st_glb_clr`):
+Posted by the **poster** (`st_fwd_ofr` / `st_glb_fwd`): poster is an intermediate; `next_hop` is the next creditor or global. Fees are Stripe-style: `out = in × (1 − percent) − fixed`. `max_line_apr` rejects the next hop’s line if that line’s APR is higher.
 
-- **Path forward** (optional) — poster is an intermediate; `counterparty` is the next hop or global. Fees are Stripe-style: `out = in × (1 − percent) − fixed`. `max_line_apr` rejects the next hop’s line if that line’s APR is higher.
-- **Claim takeout** — while a live row exists, anyone can `sell_claim` to the poster: seller’s claim on a debtor moves to the poster; seller receives face after fees as a claim on the poster. Poster must have line residual on that debtor. Takeout does not require `forward_enabled`.
+## Takeout offers
+
+Posted by the **poster** (`st_tko_ofr` / `st_glb_tko`): anyone can `sell_claim` to the poster while a live row exists. Seller’s claim on a debtor moves to the poster; seller receives face after fees as a claim on the poster. Poster must have line residual on that debtor. Fees and expiry are independent of any path-forward offer.
 
 ## Selling a claim
 
-`sell_claim(buyer, debtor, asset, amount)`: you hold a claim on `debtor`, the buyer has a clearing offer and a line to that debtor. Face moves to the buyer; you hold a claim on the buyer for proceeds after fees.
+`sell_claim(buyer, debtor, asset, amount)`: you hold a claim on `debtor`, the buyer has a takeout offer and a line to that debtor. Face moves to the buyer; you hold a claim on the buyer for proceeds after fees.
 
 This is not a path payment and does **not** count as “paid in full” for grace.
 
@@ -89,9 +91,9 @@ Tiny principals can floor to zero daily increment (integer units). Use realistic
 
 ## Interest-free grace
 
-A term on the **credit line**, in seconds (UI: None, 1 / 7 / 30 days, or custom days → seconds).
+Posted with the credit line (`st_crd_lne`), stored on a **pair cycle** row keyed by `(creditor, debtor, asset)` — not on the facility terms. UI: None, 1 / 7 / 30 days, or custom days → seconds.
 
-When that pair goes **0 → positive**, the line’s `grace_seconds` is **snapshotted**. Until that window ends, live interest on that pair is **0**. If they **deposit/net the pair to zero** inside the window, the cycle closes with nothing to charge.
+When that pair goes **0 → positive**, the posted `grace_seconds` is **snapshotted** on the cycle. Until that window ends, live interest on that pair is **0**. If they **deposit/net the pair to zero** inside the window, the cycle closes with nothing to charge. Later line edits change posted grace only; they do not rewrite an open snapshot.
 
 After the window, daily compound runs from origination (the “lost grace” case).
 
@@ -116,7 +118,7 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 | Layer | Role |
 |-------|------|
 | **service** | Tables and actions |
-| **r-banx** | GraphQL (assets, lines, obligations, clearing, FX, scoped `pathGraph`) |
+| **r-banx** | GraphQL (assets, lines, obligations, forward/takeout, FX, scoped `pathGraph`) |
 | **plugin** | WIT `api` for the Supervisor (`setCreditLine`, `pathPay`, `quotePath`, …) |
 | **ui** | React app on the `banx` subdomain |
 
@@ -125,8 +127,10 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 | Action | Purpose |
 |--------|---------|
 | `st_crd_lne` | Set credit line (limit, deplete, APR, grace seconds) |
-| `st_clr_ofr` / `st_glb_clr` | Specific / global clearing offer |
-| `rm_clr_ofr` / `rm_glb_clr` | Remove offer |
+| `st_fwd_ofr` / `st_glb_fwd` | Specific / global path-forward offer |
+| `rm_fwd_ofr` / `rm_glb_fwd` | Remove path-forward offer |
+| `st_tko_ofr` / `st_glb_tko` | Specific / global takeout offer |
+| `rm_tko_ofr` / `rm_glb_tko` | Remove takeout offer |
 | `path_pay` | Multi-hop draw |
 | `sell_claim` | Sell a claim to a buyer’s offer |
 | `deposit` | Book a deposit and auto-net |
@@ -141,7 +145,7 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 - `/accounts` — claims you hold and liabilities you owe; offer/edit lines
 - `/payees` — contacts; deposit or draw
 - `/path-pay` — Transfer: find a path and execute
-- `/policies` — clearing offers and currency policies
+- `/policies` — path-forward offers, takeout offers, and currency policies
 - `/assets` — registered assets
 
 `/obligations` redirects to `/accounts`.

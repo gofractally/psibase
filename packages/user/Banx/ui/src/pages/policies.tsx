@@ -4,7 +4,8 @@ import { PageHeader } from "@/components/page-header";
 import { useAssetMap } from "@/hooks/use-assets";
 import {
     useCurrencyPolicies,
-    useRoutingPolicies,
+    useForwardOffers,
+    useTakeoutOffers,
 } from "@/hooks/use-banx-data";
 import { useConvert, useSetCurrencyPolicy } from "@/hooks/use-banx-mutations";
 import {
@@ -34,13 +35,11 @@ import {
 
 export function PoliciesPage() {
     const { assets, symbolOf, precisionOf } = useAssetMap();
-    const { data: routing = [] } = useRoutingPolicies();
+    const { data: forwardOffers = [] } = useForwardOffers();
+    const { data: takeoutOffers = [] } = useTakeoutOffers();
     const { data: currency = [] } = useCurrencyPolicies();
     const setCurrency = useSetCurrencyPolicy();
     const convert = useConvert();
-
-    const globalRouting = routing.filter((p) => p.isGlobal);
-    const specificRouting = routing.filter((p) => !p.isGlobal);
 
     const currencyForm = useAppForm({
         defaultValues: {
@@ -113,7 +112,7 @@ export function PoliciesPage() {
         <div className="space-y-10">
             <PageHeader
                 title="Policies"
-                description="Currency policies handle FX (how many to-units you get per 1 from-unit). Clearing offers are managed from Accounts."
+                description="Currency policies handle FX (how many to-units you get per 1 from-unit). Path-forward and takeout offers are posted from Accounts."
             />
 
             <section className="grid gap-8 lg:grid-cols-2">
@@ -352,18 +351,18 @@ export function PoliciesPage() {
             </section>
 
             <section className="space-y-4">
-                <h2 className="font-medium">Your clearing offers</h2>
-                {routing.length === 0 ? (
+                <h2 className="font-medium">Path-forward offers</h2>
+                {forwardOffers.length === 0 ? (
                     <p className="text-muted-foreground text-sm">
-                        None — set fees from Accounts (route icon). Enables path
-                        forward and claim takeout.
+                        None — post from Accounts (route icon). Lets others hop
+                        through you on a path pay.
                     </p>
                 ) : (
                     <div className="overflow-x-auto rounded-md border">
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Scope</TableHead>
+                                    <TableHead>Next hop</TableHead>
                                     <TableHead>Asset</TableHead>
                                     <TableHead className="text-right">
                                         Fixed fee
@@ -374,44 +373,89 @@ export function PoliciesPage() {
                                     <TableHead className="text-right">
                                         Max line APR
                                     </TableHead>
-                                    <TableHead>Forward</TableHead>
                                     <TableHead className="text-right">
                                         Expires
                                     </TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {[...globalRouting, ...specificRouting].map(
-                                    (p) => (
-                                        <TableRow
-                                            key={`${p.isGlobal ? "g" : p.counterparty}-${p.assetId}`}
-                                        >
-                                            <TableCell>
-                                                {p.isGlobal
-                                                    ? "Global"
-                                                    : p.counterparty}
-                                            </TableCell>
-                                            <TableCell>
-                                                {symbolOf(p.assetId)}
-                                            </TableCell>
-                                            <TableCell className="text-right font-mono">
-                                                {displayAmount(p.feeFixed)}
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                {ppmToPercent(p.feePercentPpm)}
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                {ppmToPercent(p.maxLineAprPpm)}
-                                            </TableCell>
-                                            <TableCell>
-                                                {p.forwardEnabled ? "Yes" : "No"}
-                                            </TableCell>
-                                            <TableCell className="text-right text-sm">
-                                                {formatExpiresAt(p.expiresAt)}
-                                            </TableCell>
-                                        </TableRow>
-                                    ),
-                                )}
+                                {forwardOffers.map((p) => (
+                                    <TableRow
+                                        key={`${p.isGlobal ? "g" : p.nextHop}-${p.assetId}`}
+                                    >
+                                        <TableCell>
+                                            {p.isGlobal ? "Global" : p.nextHop}
+                                        </TableCell>
+                                        <TableCell>
+                                            {symbolOf(p.assetId)}
+                                        </TableCell>
+                                        <TableCell className="text-right font-mono">
+                                            {displayAmount(p.feeFixed)}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            {ppmToPercent(p.feePercentPpm)}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            {ppmToPercent(p.maxLineAprPpm)}
+                                        </TableCell>
+                                        <TableCell className="text-right text-sm">
+                                            {formatExpiresAt(p.expiresAt)}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                )}
+            </section>
+
+            <section className="space-y-4">
+                <h2 className="font-medium">Claim takeout offers</h2>
+                {takeoutOffers.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">
+                        None — post from Accounts (handshake icon). Lets others
+                        sell you claims on debtors you have lined.
+                    </p>
+                ) : (
+                    <div className="overflow-x-auto rounded-md border">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Debtor</TableHead>
+                                    <TableHead>Asset</TableHead>
+                                    <TableHead className="text-right">
+                                        Fixed fee
+                                    </TableHead>
+                                    <TableHead className="text-right">
+                                        Fee %
+                                    </TableHead>
+                                    <TableHead className="text-right">
+                                        Expires
+                                    </TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {takeoutOffers.map((p) => (
+                                    <TableRow
+                                        key={`${p.isGlobal ? "g" : p.debtor}-${p.assetId}`}
+                                    >
+                                        <TableCell>
+                                            {p.isGlobal ? "Global" : p.debtor}
+                                        </TableCell>
+                                        <TableCell>
+                                            {symbolOf(p.assetId)}
+                                        </TableCell>
+                                        <TableCell className="text-right font-mono">
+                                            {displayAmount(p.feeFixed)}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            {ppmToPercent(p.feePercentPpm)}
+                                        </TableCell>
+                                        <TableCell className="text-right text-sm">
+                                            {formatExpiresAt(p.expiresAt)}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
                             </TableBody>
                         </Table>
                     </div>

@@ -5,7 +5,7 @@ mod tests {
     use crate::interest::{
         compound_amount, interest_for, SECONDS_PER_DAY, SECONDS_PER_YEAR,
     };
-    use crate::tables::{Asset, CreditLine, Obligation, PathHop, PPM_SCALE, RATE_SCALE};
+    use crate::tables::{Asset, CreditLine, Obligation, PairCycle, PathHop, PPM_SCALE, RATE_SCALE};
     use crate::Wrapper;
     use psibase::services::tokens::{Precision, Quantity};
     use psibase::*;
@@ -161,13 +161,8 @@ mod tests {
             .get()?;
 
         Wrapper::push_from(&chain, gary)
-            .st_glb_clr(
-                usd,
-                Quantity::new(0),
-                PPM_SCALE * 2 / 100,
-                PPM_SCALE,
-                true,
-                never(),
+            .st_glb_fwd(
+                usd, Quantity::new(0), PPM_SCALE * 2 / 100, PPM_SCALE, never(),
             )
             .get()?;
 
@@ -219,13 +214,8 @@ mod tests {
             .get()?;
         // Gary routes same-asset USD to Steve (no fee).
         Wrapper::push_from(&chain, gary)
-            .st_glb_clr(
-                usd,
-                Quantity::new(0),
-                0,
-                PPM_SCALE,
-                true,
-                never(),
+            .st_glb_fwd(
+                usd, Quantity::new(0), 0, PPM_SCALE, never(),
             )
             .get()?;
 
@@ -292,35 +282,20 @@ mod tests {
         // --- Routing (same-asset fees) ---
         // Mitchell → John, AUD, 5% hop fee
         Wrapper::push_from(&chain, mitchell)
-            .st_glb_clr(
-                aud,
-                Quantity::new(0),
-                PPM_SCALE * 5 / 100,
-                PPM_SCALE,
-                true,
-                never(),
+            .st_glb_fwd(
+                aud, Quantity::new(0), PPM_SCALE * 5 / 100, PPM_SCALE, never(),
             )
             .get()?;
         // John → Mike, USD (after convert), no fee
         Wrapper::push_from(&chain, john)
-            .st_glb_clr(
-                usd,
-                Quantity::new(0),
-                0,
-                PPM_SCALE,
-                true,
-                never(),
+            .st_glb_fwd(
+                usd, Quantity::new(0), 0, PPM_SCALE, never(),
             )
             .get()?;
         // Mike → Brandon, USD, 1% hop fee
         Wrapper::push_from(&chain, mike)
-            .st_glb_clr(
-                usd,
-                Quantity::new(0),
-                PPM_SCALE * 1 / 100,
-                PPM_SCALE,
-                true,
-                never(),
+            .st_glb_fwd(
+                usd, Quantity::new(0), PPM_SCALE * 1 / 100, PPM_SCALE, never(),
             )
             .get()?;
         // Mitchell posts convert AUD→USD at 0.65 (applied when path hits USD hop)
@@ -424,33 +399,18 @@ mod tests {
             .get()?;
 
         Wrapper::push_from(&chain, mitchell)
-            .st_glb_clr(
-                aud,
-                Quantity::new(0),
-                PPM_SCALE * 5 / 100,
-                PPM_SCALE,
-                true,
-                never(),
+            .st_glb_fwd(
+                aud, Quantity::new(0), PPM_SCALE * 5 / 100, PPM_SCALE, never(),
             )
             .get()?;
         Wrapper::push_from(&chain, john)
-            .st_glb_clr(
-                usd,
-                Quantity::new(0),
-                0,
-                PPM_SCALE,
-                true,
-                never(),
+            .st_glb_fwd(
+                usd, Quantity::new(0), 0, PPM_SCALE, never(),
             )
             .get()?;
         Wrapper::push_from(&chain, mike)
-            .st_glb_clr(
-                usd,
-                Quantity::new(0),
-                PPM_SCALE * 1 / 100,
-                PPM_SCALE,
-                true,
-                never(),
+            .st_glb_fwd(
+                usd, Quantity::new(0), PPM_SCALE * 1 / 100, PPM_SCALE, never(),
             )
             .get()?;
         Wrapper::push_from(&chain, mitchell)
@@ -577,13 +537,8 @@ mod tests {
             .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, gary)
-            .st_glb_clr(
-                usd,
-                Quantity::new(50),
-                0,
-                PPM_SCALE,
-                true,
-                never(),
+            .st_glb_fwd(
+                usd, Quantity::new(50), 0, PPM_SCALE, never(),
             )
             .get()?;
 
@@ -700,7 +655,7 @@ mod tests {
         Ok(())
     }
 
-    /// Alice holds Bob debt, sells to Peter under Peter's clearing offer.
+    /// Alice holds Bob debt, sells to Peter under Peter's takeout offer.
     /// Peter takes Bob face; Alice gets face after fees as claim on Peter.
     #[psibase::test_case(packages("Banx"))]
     fn test_sell_claim_takeout(chain: psibase::Chain) -> Result<(), psibase::Error> {
@@ -727,15 +682,10 @@ mod tests {
         Wrapper::push_from(&chain, peter)
             .st_crd_lne(bob, usd, Quantity::new(10_000), false, 0, 0)
             .get()?;
-        // Global clearing: 5% take fee, forward off ok (take still works).
+        // Global takeout: 5% take fee (no forward offer needed).
         Wrapper::push_from(&chain, peter)
-            .st_glb_clr(
-                usd,
-                Quantity::new(0),
-                PPM_SCALE * 5 / 100,
-                PPM_SCALE,
-                false,
-                never(),
+            .st_glb_tko(
+                usd, Quantity::new(0), PPM_SCALE * 5 / 100, never(),
             )
             .get()?;
 
@@ -752,7 +702,7 @@ mod tests {
     }
 
     #[psibase::test_case(packages("Banx"))]
-    fn test_take_only_specific_falls_back_to_global_forward(
+    fn test_specific_takeout_does_not_block_global_forward(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
@@ -769,26 +719,15 @@ mod tests {
         Wrapper::push_from(&chain, steve)
             .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0, 0)
             .get()?;
-        // Take-only specific to Steve would previously shadow the global forward.
+        // Specific takeout must not affect path forward.
         Wrapper::push_from(&chain, gary)
-            .st_clr_ofr(
-                steve,
-                usd,
-                Quantity::new(0),
-                0,
-                PPM_SCALE,
-                false,
-                never(),
+            .st_tko_ofr(
+                steve, usd, Quantity::new(0), 0, never(),
             )
             .get()?;
         Wrapper::push_from(&chain, gary)
-            .st_glb_clr(
-                usd,
-                Quantity::new(0),
-                PPM_SCALE * 2 / 100,
-                PPM_SCALE,
-                true,
-                never(),
+            .st_glb_fwd(
+                usd, Quantity::new(0), PPM_SCALE * 2 / 100, PPM_SCALE, never(),
             )
             .get()?;
 
@@ -822,24 +761,13 @@ mod tests {
             .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, gary)
-            .st_clr_ofr(
-                steve,
-                usd,
-                Quantity::new(0),
-                0,
-                PPM_SCALE,
-                true,
-                TimePointSec { seconds: 1 },
+            .st_fwd_ofr(
+                steve, usd, Quantity::new(0), 0, PPM_SCALE, TimePointSec { seconds: 1 },
             )
             .get()?;
         Wrapper::push_from(&chain, gary)
-            .st_glb_clr(
-                usd,
-                Quantity::new(10),
-                0,
-                PPM_SCALE,
-                true,
-                never(),
+            .st_glb_fwd(
+                usd, Quantity::new(10), 0, PPM_SCALE, never(),
             )
             .get()?;
 
@@ -871,7 +799,7 @@ mod tests {
             .st_crd_lne(gary, usd, Quantity::new(10_000), false, 20_000, 0)
             .get()?;
         Wrapper::push_from(&chain, gary)
-            .st_glb_clr(usd, Quantity::new(0), 0, 10_000, true, never())
+            .st_glb_fwd(usd, Quantity::new(0), 0, 10_000, never())
             .get()?;
 
         let result = Wrapper::push_from(&chain, alice)
@@ -948,7 +876,7 @@ mod tests {
             .st_crd_lne(bob, usd, Quantity::new(100), true, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, peter)
-            .st_glb_clr(usd, Quantity::new(0), 0, PPM_SCALE, false, never())
+            .st_glb_tko(usd, Quantity::new(0), 0, never())
             .get()?;
         Wrapper::push_from(&chain, alice)
             .sell_claim(peter, bob, usd, Quantity::new(50))
@@ -1018,7 +946,7 @@ mod tests {
             .st_cur_pol(aud, usd, Quantity::new(0), RATE_SCALE * 70 / 100, 0, never())
             .get()?;
         Wrapper::push_from(&chain, gary)
-            .st_glb_clr(usd, Quantity::new(0), 0, PPM_SCALE, true, never())
+            .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never())
             .get()?;
         // Reverse AUD book: Gary owes Alice 1000. Hop-0 debit nets it away.
         Wrapper::push_from(&chain, gary)
@@ -1063,7 +991,7 @@ mod tests {
             .st_cur_pol(aud, usd, Quantity::new(0), RATE_SCALE * 70 / 100, 0, never())
             .get()?;
         Wrapper::push_from(&chain, gary)
-            .st_glb_clr(usd, Quantity::new(0), 0, PPM_SCALE, true, never())
+            .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never())
             .get()?;
         Wrapper::push_from(&chain, gary)
             .deposit(alice, aud, Quantity::new(400), 0)
@@ -1193,17 +1121,12 @@ mod tests {
             .st_crd_lne(bob, usd, Quantity::new(10_000), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, peter)
-            .st_glb_clr(
-                usd,
-                Quantity::new(0),
-                PPM_SCALE * 5 / 100,
-                PPM_SCALE,
-                false,
-                never(),
+            .st_glb_tko(
+                usd, Quantity::new(0), PPM_SCALE * 5 / 100, never(),
             )
             .get()?;
         Wrapper::push_from(&chain, peter)
-            .st_clr_ofr(bob, usd, Quantity::new(0), 0, PPM_SCALE, false, never())
+            .st_tko_ofr(bob, usd, Quantity::new(0), 0, never())
             .get()?;
 
         Wrapper::push_from(&chain, alice)
@@ -1308,6 +1231,68 @@ mod tests {
 
         chain.start_block_after(Seconds::new(12 * 3600).into());
         assert_eq!(exp(&chain, bob, alice, usd), 1_000_000);
+        let cycle = PairCycle::get(bob, alice, usd).expect("open cycle");
+        assert_eq!(cycle.grace_seconds, 0);
+        assert_eq!(cycle.cycle_grace_seconds, WEEK_SECS);
+        assert!(cycle.cycle_started_at.seconds != 0);
+        Ok(())
+    }
+
+    /// Same poster/asset: 5% path hop, 0% takeout. Each action uses its own row.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_forward_and_takeout_fees_independent(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        let carol = account!("carol");
+        let gary = account!("gary");
+        let steve = account!("steve");
+        for a in [alice, bob, carol, gary, steve] {
+            chain.new_account(a).unwrap();
+        }
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, gary)
+            .st_crd_lne(alice, usd, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, steve)
+            .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .st_crd_lne(bob, usd, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .st_glb_fwd(
+                usd,
+                Quantity::new(0),
+                PPM_SCALE * 5 / 100,
+                PPM_SCALE,
+                never(),
+            )
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .st_glb_tko(usd, Quantity::new(0), 0, never())
+            .get()?;
+
+        Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(gary, usd), hop(steve, usd)],
+                Quantity::new(1_000),
+                Quantity::new(950),
+            )
+            .get()?;
+        assert_eq!(exp(&chain, steve, gary, usd), 950);
+
+        Wrapper::push_from(&chain, bob)
+            .deposit(carol, usd, Quantity::new(1_000), 0)
+            .get()?;
+        Wrapper::push_from(&chain, carol)
+            .sell_claim(gary, bob, usd, Quantity::new(1_000))
+            .get()?;
+        assert_eq!(exp(&chain, carol, gary, usd), 1_000);
+        assert_eq!(exp(&chain, gary, bob, usd), 1_000);
         Ok(())
     }
 
@@ -1333,7 +1318,7 @@ mod tests {
             .st_crd_lne(b, usd, Quantity::new(10_000), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, b)
-            .st_glb_clr(usd, Quantity::new(0), 0, PPM_SCALE, true, never())
+            .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never())
             .get()?;
 
         Wrapper::push_from(&chain, a)

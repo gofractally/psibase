@@ -36,14 +36,23 @@ const zObligation = z.object({
     lastInterestAccrual: z.number(),
 });
 
-const zClearingOffer = z.object({
+const zForwardOffer = z.object({
     poster: z.string(),
-    counterparty: z.string(),
+    nextHop: z.string(),
     assetId: z.number(),
     feeFixed: z.string(),
     feePercentPpm: z.number(),
     maxLineAprPpm: z.number(),
-    forwardEnabled: z.boolean(),
+    expiresAt: z.number(),
+    isGlobal: z.boolean(),
+});
+
+const zTakeoutOffer = z.object({
+    poster: z.string(),
+    debtor: z.string(),
+    assetId: z.number(),
+    feeFixed: z.string(),
+    feePercentPpm: z.number(),
     expiresAt: z.number(),
     isGlobal: z.boolean(),
 });
@@ -73,9 +82,8 @@ const zActivity = z.object({
 export type Asset = z.infer<typeof zAsset>;
 export type CreditLine = z.infer<typeof zCreditLine>;
 export type Obligation = z.infer<typeof zObligation>;
-export type ClearingOffer = z.infer<typeof zClearingOffer>;
-/** @deprecated use ClearingOffer */
-export type RoutingPolicy = ClearingOffer;
+export type ForwardOffer = z.infer<typeof zForwardOffer>;
+export type TakeoutOffer = z.infer<typeof zTakeoutOffer>;
 export type CurrencyPolicy = z.infer<typeof zCurrencyPolicy>;
 export type ActivityEvent = z.infer<typeof zActivity>;
 
@@ -110,20 +118,28 @@ export async function fetchObligations(account: string): Promise<Obligation[]> {
     return zObligation.array().parse(data.obligations);
 }
 
-export async function fetchClearingOffers(
+export async function fetchForwardOffers(
     account: string,
-): Promise<ClearingOffer[]> {
-    const data = await gql<{ clearingOffers: ClearingOffer[] }>(
-        `{ clearingOffers(poster: "${account}") {
-            poster counterparty assetId feeFixed feePercentPpm maxLineAprPpm
-            forwardEnabled expiresAt isGlobal
+): Promise<ForwardOffer[]> {
+    const data = await gql<{ forwardOffers: ForwardOffer[] }>(
+        `{ forwardOffers(poster: "${account}") {
+            poster nextHop assetId feeFixed feePercentPpm maxLineAprPpm
+            expiresAt isGlobal
         } }`,
     );
-    return zClearingOffer.array().parse(data.clearingOffers);
+    return zForwardOffer.array().parse(data.forwardOffers);
 }
 
-/** @deprecated use fetchClearingOffers */
-export const fetchRoutingPolicies = fetchClearingOffers;
+export async function fetchTakeoutOffers(
+    account: string,
+): Promise<TakeoutOffer[]> {
+    const data = await gql<{ takeoutOffers: TakeoutOffer[] }>(
+        `{ takeoutOffers(poster: "${account}") {
+            poster debtor assetId feeFixed feePercentPpm expiresAt isGlobal
+        } }`,
+    );
+    return zTakeoutOffer.array().parse(data.takeoutOffers);
+}
 
 export async function fetchCurrencyPolicies(
     account: string,

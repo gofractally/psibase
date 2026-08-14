@@ -5,7 +5,8 @@ import {
     fetchCreditLines,
     fetchCurrencyPolicies,
     fetchObligations,
-    fetchClearingOffers,
+    fetchForwardOffers,
+    fetchTakeoutOffers,
 } from "@/lib/graphql";
 import { QueryKey } from "@/lib/query-keys";
 
@@ -42,17 +43,23 @@ export function useActivity(
     });
 }
 
-export function useClearingOffers() {
+export function useForwardOffers() {
     const { data: user } = useCurrentUser();
     return useQuery({
-        queryKey: QueryKey.clearingOffers(user),
-        queryFn: () => fetchClearingOffers(user!),
+        queryKey: QueryKey.forwardOffers(user),
+        queryFn: () => fetchForwardOffers(user!),
         enabled: !!user,
     });
 }
 
-/** @deprecated use useClearingOffers */
-export const useRoutingPolicies = useClearingOffers;
+export function useTakeoutOffers() {
+    const { data: user } = useCurrentUser();
+    return useQuery({
+        queryKey: QueryKey.takeoutOffers(user),
+        queryFn: () => fetchTakeoutOffers(user!),
+        enabled: !!user,
+    });
+}
 
 export function useCurrencyPolicies() {
     const { data: user } = useCurrentUser();
