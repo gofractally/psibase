@@ -24,3 +24,9 @@ export async function getAdminLoginAccessToken(): Promise<string> {
     }
     return fetchPromise;
 }
+
+export async function adminBearerAuthHeaders(): Promise<{
+    Authorization: string;
+}> {
+    return { Authorization: `Bearer ${await getAdminLoginAccessToken()}` };
+}

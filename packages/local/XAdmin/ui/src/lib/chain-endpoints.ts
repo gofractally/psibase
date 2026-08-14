@@ -14,7 +14,7 @@ import {
     throwIfError,
 } from "@psibase/common-lib";
 
-import { getAdminLoginAccessToken } from "./admin-login-jwt";
+import { adminBearerAuthHeaders } from "./admin-login-jwt";
 
 import {
     type KeyDevice,
@@ -101,6 +101,10 @@ class Chain {
         const query = "query { peers { edges { node { id urls endpoint } } } }";
         const res: any = await postGraphQLGetJson(url, query, {
             credentials: "include",
+            headers: {
+                "Content-Type": "application/graphql",
+                ...(await adminBearerAuthHeaders()),
+            },
         });
         return Peers.parse(res.data.peers.edges.map((e: any) => e.node));
     }
@@ -108,7 +112,12 @@ class Chain {
     public async getPeerUsers(): Promise<string[]> {
         const url = siblingUrl(null, "x-peers", "/graphql");
         const query = "query { users { edges { node { name } } } }";
-        const res: any = await postGraphQLGetJson(url, query);
+        const res: any = await postGraphQLGetJson(url, query, {
+            headers: {
+                "Content-Type": "application/graphql",
+                ...(await adminBearerAuthHeaders()),
+            },
+        });
         return z
             .string()
             .array()
@@ -199,7 +208,17 @@ class Chain {
                 `Failed to find peer with ID ${id} in existing peers`,
             );
         const url = siblingUrl(null, "x-peers", "/disconnect");
-        await postJson(url, { id }, { credentials: "include" });
+        await postJson(
+            url,
+            { id },
+            {
+                credentials: "include",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(await adminBearerAuthHeaders()),
+                },
+            },
+        );
     }
 
     public pushArrayBufferBoot(buffer: ArrayBufferLike) {
@@ -218,6 +237,7 @@ class Chain {
                 headers: {
                     "Content-Type": "application/octet-stream",
                     Accept: "application/octet-stream",
+                    ...(await adminBearerAuthHeaders()),
                 },
                 body: buffer as any,
             }),
@@ -243,6 +263,10 @@ class Chain {
         const url = siblingUrl(null, "x-peers", "/connect");
         const result = await postJsonGetJson(url, config, {
             credentials: "include",
+            headers: {
+                "Content-Type": "application/json",
+                ...(await adminBearerAuthHeaders()),
+            },
         });
         result.urls = [url];
         return Peer.parse(result);
@@ -284,11 +308,10 @@ class Chain {
 
     public async getTransactStats(): Promise<TransactStatsType> {
         const url = siblingUrl(null, "transact", "/stats");
-        const accessToken = await getAdminLoginAccessToken();
         const res = await get(url, {
             headers: {
                 Accept: "application/json",
-                Authorization: `Bearer ${accessToken}`,
+                ...(await adminBearerAuthHeaders()),
             },
         });
         return TransactStats.parse(await res.json());
