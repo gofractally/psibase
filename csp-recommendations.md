@@ -242,7 +242,7 @@ default they need a `setCsp` override = **default + enumerated hosts in
 | App | Extra `connect-src` hosts | Verified direct fetches |
 | --- | --- | --- |
 | `homepage` (Homepage, incl. Chainmail/Contacts/Tokens/Token-swap sub-apps) | `invite.{root}` `tokens.{root}` `token-swap.{root}` `vserver.{root}` `producers.{root}` `profiles.{root}` | invite GraphQL (`pages/invite.tsx`); tokens GraphQL (`apps/tokens/lib/graphql/ui.ts`, shared `use-system-token`); token-swap GraphQL (`apps/token-swap/hooks/use-pools.ts`); shared `use-billing-config` (vserver); shared `get-producers`; shared `use-profile` (nav/contacts) |
-| `config` (Config) | `producers.{root}` `sites.{root}` `staged-tx.{root}` `transact.{root}` `vserver.{root}` `tokens.{root}` `profiles.{root}` `x-admin.{root}` `packages.{root}` | candidates/tx-history/staged-tx hooks; sites GraphQL (logo check); vserver pricing hooks; shared `use-system-token`; sidebar profile; package-index fetches (`x-admin`/`packages` default sources — user-configured custom source URLs are *not* allowlisted and will be blocked) |
+| `config` (Config) | `producers.{root}` `sites.{root}` `staged-tx.{root}` `transact.{root}` `vserver.{root}` `tokens.{root}` `profiles.{root}` `x-admin.{root}` `packages.{root}` **`http:` `https:`** | candidates/tx-history/staged-tx hooks; sites GraphQL (logo check); vserver pricing hooks; shared `use-system-token`; sidebar profile; package-index fetches. The `http:`/`https:` scheme sources exist because Config's custom package sources are user-configured URLs at arbitrary hosts — a supported feature that cannot be host-allowlisted. They subsume the enumerated hosts (kept to document first-party needs, and so the list survives if the scheme grant is ever replaced by a package-source proxy). Trade-off: Config alone retains a fetch-anywhere channel; acceptable because it is an operator-facing app, but see Watch list. |
 | `fractal-cr` (FractalCore) | `guilds.{root}` `invite.{root}` `staged-tx.{root}` `profiles.{root}` | guild/invite GraphQL (`lib/graphql/fractals/*`); staged-tx via shared `checkLastTx`; sidebar profile |
 | `workshop` (Workshop) | `registry.{root}` `setcode.{root}` `sites.{root}` `profiles.{root}` | app-metadata (registry), code-hash (setcode), site-config (sites) hooks; sidebar profile |
 | `evaluation` (Evaluations) | `profiles.{root}` | own-service GraphQL is same-origin; sidebar profile only |
@@ -511,6 +511,12 @@ object-src 'none';
   lands (interim: `{root} *.{root}`). Truly external images (arbitrary
   user-supplied URLs, off-domain token icons/NFT art) remain blocked by default
   and need per-app opt-in via `setCsp`; re-audit if such a feature ships.
+- **Config's `http:`/`https:` scheme grant.** Config's custom package
+  sources are user-configured URLs at arbitrary hosts, so its `connect-src`
+  carries `http: https:` — the one first-party fetch-anywhere channel left
+  outside the supervisor. To remove it later, proxy package-index fetches
+  through a first-party service (or route them through the supervisor) and
+  drop the scheme sources, leaving only the enumerated host list.
 - **Generated `connect-src` allowlists.** The strict `connect-src 'self'`
   default means every app that fetches other services directly needs a
   `setCsp` override (see *First-party apps needing a `connect-src`
@@ -590,7 +596,7 @@ object-src 'none';
 | --- | --- | --- | --- | --- |
 | Identity, CommonApi (incl. plugin-tester) | `identity`, `common-api` | **Default** | site-wide | Verified same-origin-only fetches |
 | Homepage | `homepage` | Default + `connect-src` allowlist | site-wide (SPA) | Direct GraphQL to `invite`, `tokens`, `token-swap`, `vserver`, `producers`, `profiles` |
-| Config | `config` | Default + `connect-src` allowlist | site-wide (SPA) | Direct GraphQL/fetches to `producers`, `sites`, `staged-tx`, `transact`, `vserver`, `tokens`, `profiles`, `x-admin`, `packages` |
+| Config | `config` | Default + `connect-src` allowlist + `http:`/`https:` | site-wide (SPA) | Direct GraphQL/fetches to first-party services, plus user-configured custom package sources at arbitrary hosts |
 | FractalCore | `fractal-cr` | Default + `connect-src` allowlist | site-wide (SPA) | Direct GraphQL to `guilds`, `invite`, `staged-tx`, `profiles` |
 | Workshop | `workshop` | Default + `connect-src` allowlist | site-wide (SPA) | Direct GraphQL to `registry`, `setcode`, `sites`, `profiles` |
 | Evaluations, Fractals | `evaluation`, `fractals` | Default + `connect-src` allowlist | site-wide (SPA) | Sidebar profile lookup (`profiles`) |
