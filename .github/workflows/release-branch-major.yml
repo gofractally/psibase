@@ -1,0 +1,34 @@
+name: Release branch major
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - release/v*
+
+permissions:
+  contents: read
+
+jobs:
+  check-major:
+    name: Check release branch major
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Enforce major matches release branch
+        run: |
+          base="${{ github.event.pull_request.base.ref }}"
+          if [[ ! "$base" =~ ^release/v[0-9]+$ ]]; then
+            echo "Base branch $base is not a release branch; skipping"
+            exit 0
+          fi
+          ver=$(.github/scripts/psibase-version.sh at HEAD)
+          major="${ver%%.*}"
+          expected="${base#release/v}"
+          if [[ "$major" != "$expected" ]]; then
+            echo "HEAD major $major does not match release branch major $expected" >&2
+            exit 1
+          fi
