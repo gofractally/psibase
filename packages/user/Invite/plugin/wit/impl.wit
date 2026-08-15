@@ -2,7 +2,7 @@ package invite:plugin;
 
 world impl {
     include credentials:plugin/imports;
-    include transact:plugin/hook-actions-sender;
+    include transact:actions/hook-actions-sender;
     include aes:plugin/imports;
     include base64:plugin/imports;
     include tokens:plugin/imports;

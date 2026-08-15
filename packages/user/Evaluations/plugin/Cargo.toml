@@ -33,7 +33,7 @@ world = "impl"
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
 "host:db" = { path = "../../Host/plugin/db/wit/world.wit" }
 "aes:plugin" = { path = "../../Aes/plugin/wit/world.wit" }
-"transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
+"transact:actions" = { path = "../../../system/Transact/plugin/actions/wit/world.wit" }
 "base64:plugin" = { path = "../../Base64/plugin/wit/world.wit" }
 
 [dev-dependencies]

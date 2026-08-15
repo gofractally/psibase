@@ -3,5 +3,5 @@ package auth-any:plugin;
 world impl {
     include host:client/imports;
     include host:http/imports;
-    include transact:plugin/hook-user-auth;
+    include transact:actions/hook-user-auth;
 }

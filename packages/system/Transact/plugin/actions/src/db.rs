@@ -1,5 +1,5 @@
 use crate::bindings::clientdata::plugin::keyvalue as Keyvalue;
-use crate::bindings::transact::plugin::types::{Action, Claim};
+use crate::bindings::transact::actions::types::{Action, Claim};
 use psibase::fracpack::{Pack, Unpack};
 use std::cell::RefCell;
 use std::thread_local;
@@ -12,7 +12,6 @@ thread_local! {
 
 pub struct ProposeLatch {
     /// Account that subsequent actions added under this latch will use as their sender.
-    /// The actual sender for any particular action is stored in the action.
     pub subsequent_action_sender: String,
     pub actions: Vec<Action>,
 }
@@ -52,8 +51,8 @@ impl TxSignatures {
         TX_SIGNATURES.with(|t| t.borrow().is_empty())
     }
 
-    pub fn with<R>(f: impl FnOnce(&[Claim]) -> R) -> R {
-        TX_SIGNATURES.with(|t| f(&t.borrow()))
+    pub fn take() -> Vec<Claim> {
+        TX_SIGNATURES.with(|t| std::mem::take(&mut *t.borrow_mut()))
     }
 }
 

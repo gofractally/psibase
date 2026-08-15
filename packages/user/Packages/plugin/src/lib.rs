@@ -16,7 +16,7 @@ use setcode::plugin::api as SetCode;
 use sites::plugin::api as Sites;
 use transact::plugin::admin as TransactAdmin;
 
-use crate::bindings::transact::plugin::intf::add_action_to_transaction;
+use crate::bindings::transact::actions::intf::add_action_to_transaction;
 use crate::packages::plugin::types;
 use exports::packages::plugin::private_api::Guest as PrivateApi;
 use exports::packages::plugin::queries::Guest as Queries;
@@ -607,9 +607,9 @@ impl PrivateApi for PackagesPlugin {
     }
 }
 
-impl From<Action> for transact::plugin::types::Action {
+impl From<Action> for transact::actions::types::Action {
     fn from(action: Action) -> Self {
-        transact::plugin::types::Action {
+        transact::actions::types::Action {
             sender: action.sender.to_string(),
             service: action.service.to_string(),
             method: action.method.to_string(),
