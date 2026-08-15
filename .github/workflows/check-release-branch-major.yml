@@ -18,22 +18,19 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Skip non-release target branches
-        id: skip
+      - name: Validate release branch
         run: |
           base="${{ github.event.pull_request.base.ref }}"
           if [[ ! "$base" =~ ^release/v[0-9]+$ ]]; then
-            echo "Base branch $base is not a release branch; skipping"
-            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Base branch $base is not a release branch" >&2
+            exit 1
           fi
 
       - name: Read version at HEAD
-        if: steps.skip.outputs.skip != 'true'
         id: head_version
         run: echo "version=$(.github/scripts/psibase-version.sh at HEAD)" >> "$GITHUB_OUTPUT"
 
       - uses: ./.github/actions/major-matches-release-branch
-        if: steps.skip.outputs.skip != 'true'
         with:
           version: ${{ steps.head_version.outputs.version }}
           release-branch: ${{ github.event.pull_request.base.ref }}
