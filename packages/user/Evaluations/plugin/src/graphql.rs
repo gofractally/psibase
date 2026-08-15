@@ -1,4 +1,4 @@
-use crate::bindings::host::common::server as CommonServer;
+use crate::bindings::host::authed_http::api as CommonServer;
 use crate::bindings::host::types::types::Error;
 use crate::types::*;
 

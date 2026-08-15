@@ -14,7 +14,8 @@ use db::*;
 use transact::plugin::hook_handlers::*;
 
 // Other plugins
-use host::common::{self as Host, server as Server};
+use host::authed_http::api as Server;
+use host::call_context::api as HostClient;
 use host::db::store as Store;
 use host::types::types::{self as HostTypes, BodyTypes};
 use virtual_server::plugin::transact as VirtualServer;
@@ -74,14 +75,14 @@ struct TransactPlugin {}
 
 impl Hooks for TransactPlugin {
     fn hook_action_auth() {
-        ActionAuthPlugins::set(Host::client::get_sender());
+        ActionAuthPlugins::set(HostClient::get_sender());
     }
 
     fn hook_actions_sender() {
         assert_authorized_with_whitelist(FunctionName::hook_actions_sender, vec!["invite".into()])
             .unwrap();
 
-        let sender_app = Host::client::get_sender();
+        let sender_app = HostClient::get_sender();
 
         if let Some(hooked) = ActionSenderHook::get() {
             if hooked != sender_app {
@@ -94,7 +95,7 @@ impl Hooks for TransactPlugin {
 
     fn unhook_actions_sender() {
         if let Some(sender) = ActionSenderHook::get() {
-            if sender == Host::client::get_sender() {
+            if sender == HostClient::get_sender() {
                 ActionSenderHook::clear();
             }
         }
@@ -137,14 +138,14 @@ impl Intf for TransactPlugin {
         method_name: String,
         packed_args: Vec<u8>,
     ) -> Result<(), HostTypes::Error> {
-        schedule_action(Host::client::get_sender(), method_name, packed_args)
+        schedule_action(HostClient::get_sender(), method_name, packed_args)
     }
 
     fn set_propose_latch(account: Option<String>) -> Result<(), HostTypes::Error> {
         // Whitelisting accounts so that the accounts user prompts can stage transactions even when accounts is not the act
         assert_authorized_with_whitelist(
             FunctionName::set_propose_latch,
-            vec![Host::client::get_active_app(), String::from("accounts")],
+            vec![HostClient::get_active_app(), String::from("accounts")],
         )?;
 
         let Some(acct) = account else {

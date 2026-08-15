@@ -1,4 +1,4 @@
-use crate::bindings::host::common::server;
+use crate::bindings::host::authed_http::api as server;
 use crate::errors::ErrorType;
 use psibase::services::{
     nft::NID,

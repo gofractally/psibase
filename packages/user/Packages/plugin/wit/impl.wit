@@ -1,7 +1,8 @@
 package packages:plugin;
 
 world impl {
-    include host:common/imports;
+    include host:call-context/imports;
+    include host:authed-http/imports;
     include accounts:query/imports;
     include setcode:plugin/imports;
     include sites:plugin/imports;

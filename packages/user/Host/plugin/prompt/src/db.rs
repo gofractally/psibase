@@ -1,5 +1,5 @@
 use crate::bindings::exports::host::prompt::admin::PromptDetails;
-use crate::host::common::client::{get_active_app, get_sender};
+use crate::host::call_context::api::{get_active_app, get_sender};
 use crate::host::db::store::{DbMode::*, StorageDuration::*, *};
 use chrono::Utc;
 use psibase::fracpack::{Pack, Unpack};

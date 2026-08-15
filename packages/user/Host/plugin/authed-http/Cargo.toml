@@ -1,0 +1,27 @@
+[package]
+name = "host-authed-http"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+wit-bindgen-rt.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+psibase.workspace = true
+psibase-plugin-workspace-hack.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[package.metadata.component]
+package = "host:authed-http"
+
+[package.metadata.component.target]
+world = "impl"
+
+[package.metadata.component.target.dependencies]
+"supervisor:bridge" = { path = "./wit/deps/supervisor.wit" }
+"accounts:query" = { path = "../../../../system/Accounts/plugin/query/wit/world.wit" }
+"host:types" = { path = "../types/wit/world.wit" }
+"host:call-context" = { path = "../call-context/wit/world.wit" }
+"host:session" = { path = "../session/wit/world.wit" }

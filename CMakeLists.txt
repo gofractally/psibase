@@ -291,11 +291,12 @@ add_rs_component_workspace(packages/:Plugins
     packages
     permissions
     sites
-    host-common
+    host-call-context
+    host-authed-http
     host-db
     host-prompt
     host-types
-    host-auth
+    host-session
     host-crypto
     web-crypto
     transact
@@ -460,11 +461,12 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     ACCOUNTS wasi # This name would be overshadowed
     SERVICE host
-        DATA ${Plugins_OUTPUT_FILE_host_common} /common.wasm
+        DATA ${Plugins_OUTPUT_FILE_host_call_context} /call-context.wasm
+        DATA ${Plugins_OUTPUT_FILE_host_authed_http} /authed-http.wasm
         DATA ${Plugins_OUTPUT_FILE_host_db} /db.wasm
         DATA ${Plugins_OUTPUT_FILE_host_prompt} /prompt.wasm
         DATA ${Plugins_OUTPUT_FILE_host_types} /types.wasm
-        DATA ${Plugins_OUTPUT_FILE_host_auth} /auth.wasm
+        DATA ${Plugins_OUTPUT_FILE_host_session} /session.wasm
         DATA ${Plugins_OUTPUT_FILE_host_crypto} /crypto.wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"

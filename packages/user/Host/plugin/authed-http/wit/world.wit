@@ -1,0 +1,31 @@
+package host:authed-http;
+
+/// HTTP to an app's own server, with the current session attached when present.
+/// Session setup must not go through this plugin.
+interface api {
+    use host:types/types.{error, post-request, body-types};
+
+    /// Used to post graphql to the server and get a JSON response back
+    /// The graphql payload is automatically posted to the app's own `/graphql` endpoint.
+    ///
+    /// Parameters
+    /// * `graphql`: The graphql data for the request
+    post-graphql-get-json: func(graphql: string) -> result<string, error>;
+
+    /// Used to make a post request to the app's own http server.
+    ///
+    /// Parameters
+    /// * `request`: The required details of the post request
+    post: func(request: post-request) -> result<body-types, error>;
+
+    /// Used to call a GET endpoint on the app's own http server to retrieve a JSON
+    /// payload.
+    ///
+    /// Parameters
+    /// * `endpoint` - The subpath being requested (e.g. `/common/tapos/head` or `/api/some-request`)
+    get-json: func(endpoint: string) -> result<string, error>;
+}
+
+world imports {
+    import api;
+}

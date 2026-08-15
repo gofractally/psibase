@@ -4,7 +4,7 @@ WebAssembly modules, like [plugins](./plugins.md), always run in some host envir
 
 ## Host-provided capabilities
 
-Except for plugins hosted from the `host` service, plugins do not interact directly with the supervisor. Instead, plugins use the interfaces exposed by the `host` plugins (e.g. `host:common`, `host:prompt`, etc.) to access an allowed subset of the functionality of the platform on which they're running (e.g. browser functionality).
+Except for plugins hosted from the `host` service, plugins do not interact directly with the supervisor. Instead, plugins use the interfaces exposed by the `host` plugins (e.g. `host:call-context`, `host:authed-http`, `host:prompt`, etc.) to access an allowed subset of the functionality of the platform on which they're running (e.g. browser functionality).
 
 The host plugins provide plugins the ability to discover information about the current plugin execution context, such as the account name of the app responsible for making the current call.
 

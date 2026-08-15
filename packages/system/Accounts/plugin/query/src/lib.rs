@@ -4,7 +4,8 @@ mod bindings;
 mod logged_in_user;
 
 use bindings::exports::accounts::query::api::{Account, Guest as API};
-use bindings::host::common::{client as Client, server as Server};
+use bindings::host::authed_http::api as Server;
+use bindings::host::call_context::api as Client;
 use bindings::host::types::types::Error;
 use logged_in_user::logged_in_user_table;
 use psibase::plugin_error;
