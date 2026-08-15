@@ -138,6 +138,7 @@ jobs:
           git push origin "refs/tags/$tag"
           echo "tag=$tag" >>"$GITHUB_OUTPUT"
 
+  # Build here: tag-release pushes with GITHUB_TOKEN, which does not trigger on-tag.yml.
   build-psibase:
     name: Run Builds
     needs: tag-release
@@ -146,6 +147,7 @@ jobs:
     with:
       ref: refs/tags/${{ needs.tag-release.outputs.tag }}
 
+  # Draft here for the same reason — a GITHUB_TOKEN tag push does not trigger on-tag.yml.
   draft-release:
     name: Draft release
     needs:
