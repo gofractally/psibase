@@ -138,7 +138,7 @@ impl Api for ProfilesPlugin {
 
     fn has_read_permission() -> bool {
         permissions::plugin::api::has_auth(
-            &host::common::client::get_sender(),
+            &host::call_context::api::get_sender(),
             permissions::plugin::types::TrustLevel::High,
             &["homepage".into()],
         )

@@ -1,6 +1,6 @@
 use crate::bindings::host::types::types as HostTypes;
 use crate::bindings::host::types::types::Error;
-use crate::{bindings::host::common::server as CommonServer, errors::ErrorType};
+use crate::{bindings::host::authed_http::api as CommonServer, errors::ErrorType};
 use psibase::services::tokens::TID;
 use psibase::AccountNumber;
 use serde::{Deserialize, Serialize};

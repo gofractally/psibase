@@ -113,7 +113,7 @@
             "package": 1
         },
         {
-            "name": "server",
+            "name": "api",
             "types": {
                 "error": 10
             },
@@ -1467,10 +1467,10 @@
     ],
     "packages": [
         {
-            "name": "host:common",
+            "name": "host:authed-http",
             "interfaces": {
                 "types": 0,
-                "server": 2
+                "api": 2
             },
             "worlds": {}
         },

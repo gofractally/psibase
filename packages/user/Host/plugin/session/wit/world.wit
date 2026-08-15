@@ -1,4 +1,4 @@
-package host:auth;
+package host:session;
 
 interface api {
     use host:types/types.{error};

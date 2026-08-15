@@ -1,0 +1,13 @@
+package host:authed-http;
+
+interface api {
+    use host:types/types.{error, post-request, body-types};
+
+    post-graphql-get-json: func(graphql: string) -> result<string, error>;
+    post: func(request: post-request) -> result<body-types, error>;
+    get-json: func(endpoint: string) -> result<string, error>;
+}
+
+world imports {
+    import api;
+}

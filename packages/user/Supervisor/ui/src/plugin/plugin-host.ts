@@ -66,7 +66,7 @@ export class PluginHost implements HostInterface {
             code: 0,
             producer: {
                 service: "host",
-                plugin: "common",
+                plugin: "call-context",
             },
             message,
         };

@@ -1364,22 +1364,22 @@ dependencies = [
 ]
 
 [[package]]
-name = "host-auth"
-version = "0.26.0"
-dependencies = [
- "psibase",
- "psibase-plugin-workspace-hack",
- "wit-bindgen-rt",
-]
-
-[[package]]
-name = "host-common"
+name = "host-authed-http"
 version = "0.26.0"
 dependencies = [
  "psibase",
  "psibase-plugin-workspace-hack",
  "serde",
  "serde_json",
+ "wit-bindgen-rt",
+]
+
+[[package]]
+name = "host-call-context"
+version = "0.26.0"
+dependencies = [
+ "psibase",
+ "psibase-plugin-workspace-hack",
  "url",
  "wit-bindgen-rt",
 ]
@@ -1413,6 +1413,15 @@ dependencies = [
  "psibase",
  "psibase-plugin-workspace-hack",
  "urlencoding",
+ "wit-bindgen-rt",
+]
+
+[[package]]
+name = "host-session"
+version = "0.26.0"
+dependencies = [
+ "psibase",
+ "psibase-plugin-workspace-hack",
  "wit-bindgen-rt",
 ]
 

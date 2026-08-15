@@ -1,0 +1,12 @@
+package host:call-context;
+
+interface api {
+    get-sender: func() -> string;
+    get-receiver: func() -> string;
+    get-app-url: func(app: string) -> string;
+    get-active-app: func() -> string;
+}
+
+world imports {
+    import api;
+}

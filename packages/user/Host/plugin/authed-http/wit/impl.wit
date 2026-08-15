@@ -1,0 +1,10 @@
+package host:authed-http;
+
+world impl {
+    include supervisor:bridge/imports;
+    import accounts:query/api;
+    include host:call-context/imports;
+    include host:session/imports;
+
+    export api;
+}
