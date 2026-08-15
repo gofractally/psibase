@@ -113,7 +113,7 @@ jobs:
         id: tag
         if: steps.version.outputs.changed == 'true'
         run: |
-          ver=$(.github/scripts/psibase-version.sh at HEAD)
+          ver="${{ steps.head_version.outputs.version }}"
           tag=$(.github/scripts/psibase-version.sh tag-name "$ver")
           remote_commit=$(git ls-remote origin "refs/tags/$tag^{}" | awk 'NR==1 {print $1}')
           if [[ -n "$remote_commit" ]]; then
