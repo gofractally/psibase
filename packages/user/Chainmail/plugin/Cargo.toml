@@ -30,7 +30,8 @@ package = "chainmail:plugin"
 world = "impl"
 
 [package.metadata.component.target.dependencies]
-"host:common" = { path = "../../Host/plugin/common/wit/world.wit" }
+"host:call-context" = { path = "../../Host/plugin/call-context/wit/world.wit" }
+"host:authed-http" = { path = "../../Host/plugin/authed-http/wit/world.wit" }
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
 "accounts:query" = { path = "../../../system/Accounts/plugin/query/wit/world.wit" }

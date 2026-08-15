@@ -1,6 +1,7 @@
 package brotli-codec:plugin;
 
 world impl {
-    include host:common/imports;
+    include host:call-context/imports;
+    include host:authed-http/imports;
     export api;
 }
