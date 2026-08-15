@@ -4,7 +4,7 @@ mod bindings;
 use bindings::exports::evaluations::plugin::admin::Guest as Admin;
 use bindings::exports::evaluations::plugin::user::Guest as User;
 use bindings::host::types::types::Error;
-use bindings::transact::plugin::intf::add_action_to_transaction;
+use bindings::transact::actions::intf::add_action_to_transaction;
 
 use psibase::fracpack::Pack;
 

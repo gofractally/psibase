@@ -13,7 +13,7 @@ use host::db::store as Store;
 use host::types::types::Error;
 use sha2::Digest;
 use sha2::Sha256;
-use transact::plugin::{hooks::*, types::*};
+use transact::actions::{hooks::*, types::*};
 
 use crate::bindings::host::crypto::keyvault::sign_explicit;
 
