@@ -3,8 +3,8 @@ package auth-delegate:plugin;
 world impl {
     include host:client/imports;
     include host:http/imports;
-    include transact:plugin/hook-user-auth;
-    include transact:plugin/imports;
+    include transact:actions/hook-user-auth;
+    include transact:actions/imports;
     include permissions:plugin/imports;
 
     export api;

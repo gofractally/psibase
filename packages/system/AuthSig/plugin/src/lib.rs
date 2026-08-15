@@ -12,7 +12,7 @@ use trust::*;
 use bindings::host::crypto::keyvault as HostCrypto;
 use bindings::host::types::types as HostTypes;
 use bindings::host::types::types::{Keypair, Pem};
-use bindings::transact::plugin::intf as Transact;
+use bindings::transact::actions::intf as Transact;
 
 // Exported interfaces
 use bindings::exports::auth_sig::plugin::{

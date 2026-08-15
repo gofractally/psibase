@@ -1,5 +1,5 @@
 use crate::bindings::clientdata::plugin::keyvalue as Keyvalue;
-use crate::bindings::transact::plugin::types::{Action, Claim};
+use crate::bindings::transact::actions::types::{Action, Claim};
 use psibase::fracpack::{Pack, Unpack};
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
@@ -34,7 +34,6 @@ thread_local! {
 
 pub struct ProposeLatch {
     /// Account that subsequent actions added under this latch will use as their sender.
-    /// The actual sender for any particular action is stored in the action.
     pub subsequent_action_sender: String,
     pub actions: Vec<Action>,
 }
@@ -121,10 +120,6 @@ impl ActionClaims {
             .unwrap_or_default()
     }
 
-    pub fn get_all_flat() -> Vec<Claim> {
-        Self::get_all().into_iter().flat_map(|c| c.claims).collect()
-    }
-
     pub fn push(claimant: String, new_claims: Vec<Claim>) {
         let mut all_claims = Self::get_all();
 
@@ -141,6 +136,12 @@ impl ActionClaims {
             Self::KEY_CLAIMS,
             &serde_json::to_vec(&all_claims).expect("Failed to pack claims"),
         );
+    }
+
+    pub fn take_all() -> Vec<Claims> {
+        let all = Self::get_all();
+        Self::clear();
+        all
     }
 
     pub fn clear() {

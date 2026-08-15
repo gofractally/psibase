@@ -1,0 +1,15 @@
+package transact:plugin;
+
+interface auth {
+    use host:types/types.{error};
+
+    /// Gets a bearer token for user to make authenticated queries
+    get-query-token: func(app: string, user: string) -> result<string, error>;
+}
+
+interface network {
+    use host:types/types.{error};
+
+    /// Set snapshot interval period network wide
+    set-snapshot-time: func(seconds: u32) -> result<_, error>;
+}

@@ -28,7 +28,7 @@ world = "impl"
 "host:client" = { path = "../../Host/plugin/client/wit/world.wit" }
 "host:http" = { path = "../../Host/plugin/http/wit/world.wit" }
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
-"transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
+"transact:actions" = { path = "../../../system/Transact/plugin/actions/wit/world.wit" }
 "sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
 
 [dev-dependencies]
