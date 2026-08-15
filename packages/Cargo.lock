@@ -3542,10 +3542,21 @@ dependencies = [
  "chrono",
  "psibase",
  "psibase-plugin-workspace-hack",
- "regex",
  "serde",
  "serde_json",
  "sha2",
+ "wit-bindgen-rt",
+]
+
+[[package]]
+name = "transact-actions"
+version = "0.25.0"
+dependencies = [
+ "psibase",
+ "psibase-plugin-workspace-hack",
+ "regex",
+ "serde",
+ "serde_json",
  "wit-bindgen-rt",
 ]
 

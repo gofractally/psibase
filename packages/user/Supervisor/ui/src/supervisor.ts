@@ -45,6 +45,7 @@ const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("host", "auth"),
     pluginId("host", "prompt"),
     pluginId("transact", "plugin"),
+    pluginId("transact", "actions"),
     pluginId("clientdata", "plugin"),
     pluginId("webcrypto", "plugin"),
 ];

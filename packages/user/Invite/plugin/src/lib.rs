@@ -20,7 +20,7 @@ use bindings::exports::{
 };
 use bindings::{
     aes::plugin as aes, base64::plugin as base64, credentials::plugin as credentials,
-    tokens::plugin as tokens, transact::plugin as transact,
+    tokens::plugin as tokens, transact::actions as transact,
 };
 use invite::plugin::{
     invitee::Guest as Invitee,
