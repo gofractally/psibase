@@ -34,7 +34,7 @@ pub fn compose_host(plugins: &[WasmPlugin], wrap_tracers: bool) -> Result<Compos
         .iter()
         .find(|id| id.plugin == "prompt")
         .or_else(|| part.compose_set.iter().find(|id| id.plugin == "db"))
-        .or_else(|| part.compose_set.iter().find(|id| id.plugin == "common"))
+        .or_else(|| part.compose_set.iter().find(|id| id.plugin == "call-context"))
         .cloned()
         .unwrap();
     encode_set(&entry, &part.compose_set, plugins, wrap_tracers)
@@ -47,7 +47,7 @@ fn encode_set(
     wrap_tracers: bool,
 ) -> Result<ComposeResult> {
     if compose_set.is_empty() {
-        bail!("compose set is empty");
+        bail!("compose set is empty (entry {entry})");
     }
     let by_id: HashMap<_, _> = plugins.iter().map(|p| (p.id.clone(), p)).collect();
     for id in compose_set {

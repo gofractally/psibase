@@ -19,6 +19,7 @@ import {
 import { pluginId } from "@psibase/common-lib/messaging/plugin-id";
 
 import { compilePlugin } from "./component-loading/loader";
+import { wasmMemStats } from "./component-loading/wasm-metrics";
 import { AppInterface } from "./app-interface";
 import { CallContext } from "./call-context";
 import { getRecoverableError } from "./plugin/errors";
@@ -365,8 +366,12 @@ export class Supervisor implements AppInterface {
 
     private async composeHostPlugins(): Promise<void> {
         const wasmPlugins = this.plugins.collectWasmPlugins();
+        const hostBlobPlugins = ["call-context", "authed-http", "session"];
         if (
-            !wasmPlugins.some((p) => p.service === "host" && p.plugin === "common")
+            !wasmPlugins.some(
+                (p) =>
+                    p.service === "host" && hostBlobPlugins.includes(p.plugin),
+            )
         ) {
             return;
         }
@@ -397,10 +402,24 @@ export class Supervisor implements AppInterface {
         let result = this.compositeCache.get(key);
         if (!result) {
             const c = await composer();
-            result = this.unwrapComposerResult(
-                c.compose(entry, wasmPlugins, true),
-            );
+            try {
+                result = this.unwrapComposerResult(
+                    c.compose(entry, wasmPlugins, true),
+                );
+            } catch (e) {
+                console.error(
+                    `compose(${entry.service}:${entry.plugin}) failed`,
+                    e,
+                    "loaded:",
+                    wasmPlugins.map((p) => `${p.service}:${p.plugin}`),
+                );
+                throw e;
+            }
             this.compositeCache.set(key, result);
+            console.info(
+                `compose(${entry.service}:${entry.plugin}) set=`,
+                result.composeSet.map((id) => `${id.service}:${id.plugin}`),
+            );
         }
         await this.attachComposite(result, entry, false, true);
     }
@@ -597,6 +616,7 @@ export class Supervisor implements AppInterface {
         plugins: QualifiedPluginId[],
     ) {
         let result: unknown = null;
+        const memBefore = wasmMemStats();
         try {
             await networkNamePromise;
             this.setParentOrigination(callerOrigin);
@@ -605,9 +625,22 @@ export class Supervisor implements AppInterface {
             result = e;
         } finally {
             this.plugins.disposeAll();
+            this.logWasmMemStats("preload", memBefore);
             this.replyToParent(id, result);
             this.cleanupSessionState();
         }
+    }
+
+    private logWasmMemStats(
+        label: string,
+        before: ReturnType<typeof wasmMemStats>,
+    ): void {
+        const after = wasmMemStats();
+        console.info(
+            `[wasm] ${label}: +${after.instantiations - before.instantiations} core instances this call; ` +
+                `live: ${after.liveMemories} memories / ${after.liveInstances} instances ` +
+                `(drops when GC collects disposed wasm)`,
+        );
     }
 
     // This is an entrypoint for apps to call into plugins.
@@ -616,6 +649,7 @@ export class Supervisor implements AppInterface {
         id: string,
         args: QualifiedFunctionCallArgs,
     ): Promise<any> {
+        const memBefore = wasmMemStats();
         try {
             await networkNamePromise;
             this.setParentOrigination(callerOrigin);
@@ -690,6 +724,10 @@ export class Supervisor implements AppInterface {
             this.replyToParent(id, result);
         } finally {
             this.plugins.disposeAll();
+            this.logWasmMemStats(
+                `entry ${args.service}:${args.plugin}/${args.intf ?? ""}->${args.method}`,
+                memBefore,
+            );
             this.cleanupSessionState();
         }
     }

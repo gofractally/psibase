@@ -197,6 +197,16 @@ export class Plugin {
         if (!this.isInstantiated) return false;
 
         this.pluginModule = undefined;
+        // Also drop the composite instantiate memo: it strongly references
+        // the instantiated composite (and every core Memory inside it), so
+        // keeping it across entry() calls pins each composite's address
+        // space until Chromium's per-tab wasm limit OOMs. It would also let
+        // a later call reuse a stale composite from a previous entry.
+        // compiledPlugin (Module only, no Memory) is intentionally kept so
+        // re-instantiation skips transpiling.
+        this.sharedInstantiate = undefined;
+        this.namespacedExports = false;
+        this.stackManagedByTracer = false;
         this.resources.clear();
         this.nextResourceHandle = 1;
         return true;

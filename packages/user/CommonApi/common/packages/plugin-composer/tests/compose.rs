@@ -31,9 +31,9 @@ fn dummy_component_with_deps(wit: &str, deps: &[&str]) -> Vec<u8> {
         .unwrap()
 }
 
-const HOST_COMMON: &str = r#"
-package host:common;
-interface client { get-sender: func() -> string; }
+const HOST_CALL_CONTEXT: &str = r#"
+package host:call-context;
+interface api { get-sender: func() -> string; }
 "#;
 
 const AUTH_SIG: &str = r#"
@@ -62,8 +62,18 @@ interface api { add-action: func(); }
 interface admin { start-tx: func(); }
 "#;
 
+const TRANSACT_ACTIONS: &str = r#"
+package transact:actions;
+interface intf { add-action-to-transaction: func(); }
+"#;
+
+const CREDENTIALS_API: &str = r#"
+package credentials:plugin;
+interface api { sign-latch: func(); }
+"#;
+
 fn plugin(service: &str, plugin: &str, wit: &str) -> WasmPlugin {
-    plugin_with_deps(service, plugin, wit, &[HOST_COMMON])
+    plugin_with_deps(service, plugin, wit, &[HOST_CALL_CONTEXT])
 }
 
 fn plugin_with_deps(service: &str, plugin: &str, wit: &str, deps: &[&str]) -> WasmPlugin {
@@ -86,7 +96,7 @@ fn partition_permissions_excludes_host() {
 package accounts:query;
 interface api { get-current-user: func() -> option<string>; }
 world impl {
-    import host:common/client;
+    import host:call-context/api;
     export api;
 }
 "#,
@@ -99,11 +109,11 @@ package permissions:plugin;
 interface api { is-authorized: func() -> bool; }
 world impl {
     import accounts:query/api;
-    import host:common/client;
+    import host:call-context/api;
     export api;
 }
 "#,
-        &[HOST_COMMON, ACCOUNTS_QUERY],
+        &[HOST_CALL_CONTEXT, ACCOUNTS_QUERY],
     );
     let part = partition(&permissions.id.clone(), &[query, permissions]).unwrap();
     let keys: Vec<_> = part.compose_set.iter().map(|id| id.key()).collect();
@@ -124,11 +134,11 @@ fn partition_maps_wit_package_to_chain_account() {
 package permissions:plugin;
 interface api { is-authorized: func() -> bool; }
 world impl {
-    import host:common/client;
+    import host:call-context/api;
     export api;
 }
 "#,
-        &[HOST_COMMON],
+        &[HOST_CALL_CONTEXT],
     );
     let transact = plugin_with_deps(
         "transact",
@@ -138,11 +148,11 @@ package transact:plugin;
 interface admin { start-tx: func(); }
 world impl {
     import permissions:plugin/api;
-    import host:common/client;
+    import host:call-context/api;
     export admin;
 }
 "#,
-        &[HOST_COMMON, PERMISSIONS_API],
+        &[HOST_CALL_CONTEXT, PERMISSIONS_API],
     );
     let part = partition(&transact.id.clone(), &[transact, perms]).unwrap();
     let keys: Vec<_> = part.compose_set.iter().map(|id| id.key()).collect();
@@ -163,11 +173,11 @@ fn compose_closes_permissions_import_when_chain_account_differs() {
 package permissions:plugin;
 interface api { is-authorized: func() -> bool; }
 world impl {
-    import host:common/client;
+    import host:call-context/api;
     export api;
 }
 "#,
-        &[HOST_COMMON],
+        &[HOST_CALL_CONTEXT],
     );
     let transact = plugin_with_deps(
         "transact",
@@ -177,11 +187,11 @@ package transact:plugin;
 interface admin { start-tx: func(); }
 world impl {
     import permissions:plugin/api;
-    import host:common/client;
+    import host:call-context/api;
     export admin;
 }
 "#,
-        &[HOST_COMMON, PERMISSIONS_API],
+        &[HOST_CALL_CONTEXT, PERMISSIONS_API],
     );
     let result = compose(&transact.id.clone(), &[transact, perms], false).unwrap();
     let imports = remaining_imports(&result.wasm).unwrap();
@@ -259,7 +269,7 @@ world impl {
     export admin;
 }
 "#,
-        &[HOST_COMMON, AUTH_SIG, ACCOUNTS_QUERY],
+        &[HOST_CALL_CONTEXT, AUTH_SIG, ACCOUNTS_QUERY],
     );
     let query = plugin(
         "accounts",
@@ -290,6 +300,62 @@ world impl { export api; }
 }
 
 #[test]
+fn partition_includes_hook_provider_when_it_is_the_entry() {
+    let actions = plugin(
+        "transact",
+        "actions",
+        r#"
+package transact:actions;
+interface intf { add-action-to-transaction: func(); }
+world impl { export intf; }
+"#,
+    );
+    let credentials = plugin(
+        "credentials",
+        "plugin",
+        r#"
+package credentials:plugin;
+interface api { sign-latch: func(); }
+world impl { export api; }
+"#,
+    );
+    let invite = plugin_with_deps(
+        "invite",
+        "plugin",
+        r#"
+package invite:plugin;
+interface inviter { generate-invite: func() -> string; }
+world impl {
+    import transact:actions/intf;
+    import credentials:plugin/api;
+    export inviter;
+}
+"#,
+        &[TRANSACT_ACTIONS, CREDENTIALS_API],
+    );
+    let invite_id = invite.id.clone();
+    let plugins = [invite, actions, credentials];
+    let part = partition(&invite_id, &plugins).unwrap();
+    let keys: Vec<_> = part.compose_set.iter().map(|id| id.key()).collect();
+    assert!(
+        keys.contains(&"invite:plugin".to_string()),
+        "hook-provider entry must be composed: {keys:?}"
+    );
+    assert!(
+        keys.contains(&"transact:actions".to_string()),
+        "invite's static DAG should be composed: {keys:?}"
+    );
+    assert!(
+        !keys.contains(&"credentials:plugin".to_string()),
+        "other hook providers stay out even when the entry is a hook provider: {keys:?}"
+    );
+
+    let result = compose(&invite_id, &plugins, false)
+        .expect("hook-provider entry must produce a non-empty compose set");
+    assert!(result.compose_set.iter().any(|id| id.service == "invite"));
+}
+
+#[test]
 fn plug_permissions_closes_query_import() {
     let query = plugin(
         "accounts",
@@ -298,7 +364,7 @@ fn plug_permissions_closes_query_import() {
 package accounts:query;
 interface api { get-current-user: func() -> option<string>; }
 world impl {
-    import host:common/client;
+    import host:call-context/api;
     export api;
 }
 "#,
@@ -311,11 +377,11 @@ package permissions:plugin;
 interface api { is-authorized: func() -> bool; }
 world impl {
     import accounts:query/api;
-    import host:common/client;
+    import host:call-context/api;
     export api;
 }
 "#,
-        &[HOST_COMMON, ACCOUNTS_QUERY],
+        &[HOST_CALL_CONTEXT, ACCOUNTS_QUERY],
     );
     let result = compose(&permissions.id.clone(), &[query, permissions], false).unwrap();
     let imports = remaining_imports(&result.wasm).unwrap();
@@ -324,7 +390,7 @@ world impl {
         "accounts:query should be plugged, got {imports:?}"
     );
     assert!(
-        has_import(&imports, "host:common"),
+        has_import(&imports, "host:call-context"),
         "host import should remain, got {imports:?}"
     );
     assert!(result.compose_set.iter().any(|id| id.service == "permissions"));
@@ -607,14 +673,22 @@ interface store {
 }
 
 #[test]
-fn host_subset_composes_without_types_auth_crypto() {
-    let common = plugin_with_deps(
+fn host_subset_composes_without_types_crypto() {
+    const HOST_DB: &str = r#"
+package host:db;
+interface store { get: func() -> string; }
+"#;
+    const HOST_SESSION: &str = r#"
+package host:session;
+interface api { get-active-query-token: func() -> option<string>; }
+"#;
+    let call_context = plugin_with_deps(
         "host",
-        "common",
+        "call-context",
         r#"
-package host:common;
-interface client { get-sender: func() -> string; }
-world impl { export client; }
+package host:call-context;
+interface api { get-sender: func() -> string; }
+world impl { export api; }
 "#,
         &[],
     );
@@ -625,11 +699,41 @@ world impl { export client; }
 package host:db;
 interface store { get: func() -> string; }
 world impl {
-    import host:common/client;
+    import host:call-context/api;
     export store;
 }
 "#,
-        &[HOST_COMMON],
+        &[HOST_CALL_CONTEXT],
+    );
+    let session = plugin_with_deps(
+        "host",
+        "session",
+        r#"
+package host:session;
+interface api { get-active-query-token: func() -> option<string>; }
+world impl {
+    import host:call-context/api;
+    import host:db/store;
+    export api;
+}
+"#,
+        &[HOST_CALL_CONTEXT, HOST_DB],
+    );
+    // authed-http and prompt are the tops of the host DAG — nothing in the
+    // blob imports them, so composing them proves the multi-root walk.
+    let authed_http = plugin_with_deps(
+        "host",
+        "authed-http",
+        r#"
+package host:authed-http;
+interface api { post: func() -> string; }
+world impl {
+    import host:call-context/api;
+    import host:session/api;
+    export api;
+}
+"#,
+        &[HOST_CALL_CONTEXT, HOST_SESSION],
     );
     let prompt = plugin_with_deps(
         "host",
@@ -638,15 +742,12 @@ world impl {
 package host:prompt;
 interface admin { get-active-prompt: func() -> string; }
 world impl {
-    import host:common/client;
+    import host:call-context/api;
     import host:db/store;
     export admin;
 }
 "#,
-        &[HOST_COMMON, r#"
-package host:db;
-interface store { get: func() -> string; }
-"#],
+        &[HOST_CALL_CONTEXT, HOST_DB],
     );
     let types = plugin(
         "host",
@@ -657,26 +758,31 @@ interface api { ping: func(); }
 world impl { export api; }
 "#,
     );
-    let result = plugin_composer::compose_host(&[common, db, prompt, types], false).unwrap();
+    let result = plugin_composer::compose_host(
+        &[call_context, db, session, authed_http, prompt, types],
+        false,
+    )
+    .unwrap();
     let keys: Vec<_> = result.compose_set.iter().map(|id| id.plugin.clone()).collect();
-    assert!(
-        keys.contains(&"common".to_string()),
-        "common should be in the host blob: {keys:?}"
-    );
-    assert!(
-        keys.contains(&"db".to_string()),
-        "db should be in the host blob: {keys:?}"
-    );
-    assert!(keys.contains(&"prompt".to_string()));
+    for expected in ["call-context", "db", "session", "authed-http", "prompt"] {
+        assert!(
+            keys.contains(&expected.to_string()),
+            "{expected} should be in the host blob: {keys:?}"
+        );
+    }
     assert!(!keys.contains(&"types".to_string()));
     let imports = remaining_imports(&result.wasm).unwrap();
     assert!(
-        !has_import(&imports, "host:common/client"),
-        "prompt → common should be plugged: {imports:?}"
+        !has_import(&imports, "host:call-context/api"),
+        "call-context should be plugged: {imports:?}"
     );
     assert!(
         !has_import(&imports, "host:db/store"),
-        "prompt → db should be plugged: {imports:?}"
+        "db should be plugged: {imports:?}"
+    );
+    assert!(
+        !has_import(&imports, "host:session/api"),
+        "authed-http → session should be plugged: {imports:?}"
     );
 }
 

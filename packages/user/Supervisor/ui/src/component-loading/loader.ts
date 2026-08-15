@@ -10,6 +10,11 @@ import { HostInterface } from "../host-interface.js";
 import { assert } from "../utils.js";
 import { ComponentAPI, Functions, Interface } from "../wit-extraction.js";
 import { fixJcoResourceTables, makeJcoReenterable } from "./jco-reenter.js";
+import { installWasmMetrics } from "./wasm-metrics.js";
+
+// All instantiation in this frame flows through this module (loadBasic /
+// compilePlugin), so installing here guarantees the counter sees everything.
+installWasmMetrics();
 
 type PluginImports = Record<string, Record<string, unknown>>;
 

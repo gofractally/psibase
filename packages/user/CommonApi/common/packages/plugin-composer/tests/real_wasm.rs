@@ -61,16 +61,17 @@ fn tracer_can_still_encode_host_db() {
 
 #[test]
 fn compose_real_host_with_tracers() {
-    if !components_dir().join("host_common.wasm").exists() {
+    if !components_dir().join("host_call_context.wasm").exists() {
         eprintln!("skip: no build/components");
         return;
     }
     let plugins = vec![
-        load("host", "common", "host_common.wasm"),
+        load("host", "call-context", "host_call_context.wasm"),
         load("host", "db", "host_db.wasm"),
+        load("host", "session", "host_session.wasm"),
+        load("host", "authed-http", "host_authed_http.wasm"),
         load("host", "prompt", "host_prompt.wasm"),
         load("host", "types", "host_types.wasm"),
-        load("host", "auth", "host_auth.wasm"),
         load("host", "crypto", "host_crypto.wasm"),
     ];
     match compose_host(&plugins, true) {
@@ -91,23 +92,24 @@ fn compose_real_host_with_tracers() {
                     .filter(|i| i.starts_with("host:") || i.starts_with("supervisor:"))
                     .collect::<Vec<_>>()
             );
+            for expected in ["call-context", "db", "session", "authed-http", "prompt"] {
+                assert!(
+                    r.compose_set.iter().any(|id| id.plugin == expected),
+                    "{expected} should be in the host blob, got {:?}",
+                    r.compose_set.iter().map(|id| id.key()).collect::<Vec<_>>()
+                );
+            }
             assert!(
-                r.compose_set.iter().any(|id| id.plugin == "common"),
-                "common should be in the host blob, got {:?}",
-                r.compose_set.iter().map(|id| id.key()).collect::<Vec<_>>()
-            );
-            assert!(
-                r.compose_set.iter().any(|id| id.plugin == "db"),
-                "db should be in the host blob, got {:?}",
-                r.compose_set.iter().map(|id| id.key()).collect::<Vec<_>>()
-            );
-            assert!(
-                !imports.iter().any(|i| i.starts_with("host:common/")),
-                "prompt→common should be plugged, got {imports:?}"
+                !imports.iter().any(|i| i.starts_with("host:call-context/")),
+                "call-context should be plugged, got {imports:?}"
             );
             assert!(
                 !imports.iter().any(|i| i.starts_with("host:db/")),
-                "prompt→db should be plugged, got {imports:?}"
+                "db should be plugged, got {imports:?}"
+            );
+            assert!(
+                !imports.iter().any(|i| i.starts_with("host:session/")),
+                "authed-http→session should be plugged, got {imports:?}"
             );
         }
         Err(e) => panic!("host compose failed: {e:#}"),
@@ -116,11 +118,11 @@ fn compose_real_host_with_tracers() {
 
 #[test]
 fn compose_real_host_without_tracers() {
-    if !components_dir().join("host_common.wasm").exists() {
+    if !components_dir().join("host_call_context.wasm").exists() {
         return;
     }
     let plugins = vec![
-        load("host", "common", "host_common.wasm"),
+        load("host", "call-context", "host_call_context.wasm"),
         load("host", "db", "host_db.wasm"),
         load("host", "prompt", "host_prompt.wasm"),
     ];
@@ -178,16 +180,18 @@ fn compose_branding_closure_with_perms_chain_id() {
     }
     let plugins = vec![
         load("transact", "plugin", "transact.wasm"),
+        load("transact", "actions", "transact_actions.wasm"),
         load("sites", "plugin", "sites.wasm"),
         load("clientdata", "plugin", "clientdata.wasm"),
         load("accounts", "query", "accounts_query.wasm"),
         load("perms", "plugin", "permissions.wasm"),
         load("accounts", "plugin", "accounts.wasm"),
-        load("host", "common", "host_common.wasm"),
+        load("host", "call-context", "host_call_context.wasm"),
         load("host", "db", "host_db.wasm"),
+        load("host", "session", "host_session.wasm"),
+        load("host", "authed-http", "host_authed_http.wasm"),
         load("host", "prompt", "host_prompt.wasm"),
         load("host", "types", "host_types.wasm"),
-        load("host", "auth", "host_auth.wasm"),
         load("host", "crypto", "host_crypto.wasm"),
     ];
     match compose(&PluginId::new("sites", "plugin"), &plugins, false) {
@@ -207,8 +211,10 @@ fn compose_branding_closure_with_perms_chain_id() {
 }
 
 /// Homepage-like plugin list from installed .psi packages, including
-/// vserver (WIT `virtual-server:plugin`) and tokens. transact ↔ vserver
-/// and tokens → transact are WIT cycles; those back-edges stay open.
+/// vserver (WIT `virtual-server:plugin`) and tokens. After the
+/// `transact:actions` split the former back-edges (`vserver → transact`,
+/// `tokens → transact`) land on the leaf and are plugged: the steady-state
+/// tx path `transact:plugin → vserver → tokens → transact:actions` is a DAG.
 #[test]
 fn compose_branding_from_psi_packages() {
     let branding_psi = psi_packages_dir().join("Branding.psi");
@@ -219,6 +225,7 @@ fn compose_branding_from_psi_packages() {
     let plugins = vec![
         load_from_psi("Branding.psi", "data/branding/plugin.wasm", "branding", "plugin"),
         load_from_psi("Transact.psi", "data/transact/plugin.wasm", "transact", "plugin"),
+        load_from_psi("Transact.psi", "data/transact/actions.wasm", "transact", "actions"),
         load_from_psi("Sites.psi", "data/sites/plugin.wasm", "sites", "plugin"),
         load_from_psi("ClientData.psi", "data/clientdata/plugin.wasm", "clientdata", "plugin"),
         load_from_psi("Accounts.psi", "data/accounts/query.wasm", "accounts", "query"),
@@ -227,11 +234,12 @@ fn compose_branding_from_psi_packages() {
         load_from_psi("VirtualServer.psi", "data/vserver/plugin.wasm", "vserver", "plugin"),
         load_from_psi("Tokens.psi", "data/tokens/plugin.wasm", "tokens", "plugin"),
         load_from_psi("NameMarket.psi", "data/namemarket/plugin.wasm", "namemarket", "plugin"),
-        load_from_psi("Host.psi", "data/host/common.wasm", "host", "common"),
+        load_from_psi("Host.psi", "data/host/call-context.wasm", "host", "call-context"),
         load_from_psi("Host.psi", "data/host/db.wasm", "host", "db"),
+        load_from_psi("Host.psi", "data/host/session.wasm", "host", "session"),
+        load_from_psi("Host.psi", "data/host/authed-http.wasm", "host", "authed-http"),
         load_from_psi("Host.psi", "data/host/prompt.wasm", "host", "prompt"),
         load_from_psi("Host.psi", "data/host/types.wasm", "host", "types"),
-        load_from_psi("Host.psi", "data/host/auth.wasm", "host", "auth"),
         load_from_psi("Host.psi", "data/host/crypto.wasm", "host", "crypto"),
     ];
 
@@ -244,6 +252,14 @@ fn compose_branding_from_psi_packages() {
         set.contains(&"accounts:query".to_string()),
         "accounts:query should be composed: {set:?}"
     );
+    assert!(
+        set.contains(&"transact:actions".to_string()),
+        "transact:actions leaf should be composed: {set:?}"
+    );
+    assert!(
+        set.contains(&"transact:plugin".to_string()),
+        "transact driver should be pulled in for finish-tx: {set:?}"
+    );
 
     let result = compose(&PluginId::new("branding", "plugin"), &plugins, true)
         .unwrap_or_else(|e| panic!("branding compose with tracers failed: {e:#}"));
@@ -253,9 +269,21 @@ fn compose_branding_from_psi_packages() {
         result.wasm.len()
     );
     let imports = remaining_imports(&result.wasm).unwrap();
+    // Type-only interfaces (`transact:actions/types` etc.) always stay open,
+    // and hook dispatch stays syncCallDyn. The functional leaf interfaces
+    // must be plugged.
     assert!(
-        imports.iter().any(|i| i.starts_with("transact:plugin/")),
-        "vserver/tokens back-edges to transact should stay open, got {imports:?}"
+        !imports.iter().any(|i| i.starts_with("transact:actions/intf")
+            || i.starts_with("transact:actions/ledger")),
+        "vserver/tokens → transact:actions should be plugged, got {imports:?}"
+    );
+    assert!(
+        !imports.iter().any(|i| i.starts_with("transact:plugin/intf")),
+        "transact:plugin/intf no longer exists; nothing may import it, got {imports:?}"
+    );
+    assert!(
+        imports.iter().any(|i| i.contains("hook-handlers")),
+        "hook dispatch must stay syncCallDyn (open), got {imports:?}"
     );
     assert!(
         !imports.iter().any(|i| i.starts_with("tokens:plugin/")),

@@ -51,7 +51,8 @@ pub const HOOK_PROVIDERS: &[&str] = &[
 
 // Supervisor's JCO instantiate patch stacks borrow / instanceFlags so
 // get-sender and bucket.set can re-enter this blob.
-pub const HOST_COMPOSE_PLUGINS: &[&str] = &["common", "db", "prompt"];
+pub const HOST_COMPOSE_PLUGINS: &[&str] =
+    &["call-context", "db", "session", "authed-http", "prompt"];
 
 pub fn is_unplugged_namespace(namespace: &str) -> bool {
     matches!(namespace, "host" | "wasi" | "supervisor") || is_hook_provider(namespace)

@@ -77,7 +77,57 @@ pub fn inspect_wasm(name: &str, wasm: &[u8]) -> Result<PluginMeta> {
     })
 }
 
-/// WIT closure of `entry`, minus host / WASI / supervisor / hook providers.
+/// BFS over WIT imports. Skips unplugged namespaces (or, when `allowed` is
+/// given, anything outside it) and plugins with no wasm in `metas`.
+///
+/// `keep` is composed even if it is a hook provider (invite / auth-sig as
+/// the `entry()` target). `host` / `wasi` / `supervisor` stay out even
+/// when they are `keep`.
+fn walk_imports(
+    queue: &mut VecDeque<PluginId>,
+    seen: &mut HashSet<PluginId>,
+    compose: &mut Vec<PluginId>,
+    metas: &HashMap<PluginId, PluginMeta>,
+    by_wit: &HashMap<PluginId, PluginId>,
+    allowed: Option<&HashSet<PluginId>>,
+    keep: Option<&PluginId>,
+) {
+    while let Some(id) = queue.pop_front() {
+        if !seen.insert(id.clone()) {
+            continue;
+        }
+        let excluded = match allowed {
+            Some(allowed) => !allowed.contains(&id),
+            None => {
+                if keep == Some(&id) {
+                    matches!(id.service.as_str(), "host" | "wasi" | "supervisor")
+                } else {
+                    is_unplugged(&id)
+                }
+            }
+        };
+        if excluded {
+            continue;
+        }
+        let Some(meta) = metas.get(&id) else {
+            continue;
+        };
+        compose.push(id.clone());
+        for import in &meta.imports {
+            let Some(dep) = resolve_wit_dep(import, by_wit) else {
+                continue;
+            };
+            if allowed.is_none() && is_unplugged(&dep) {
+                continue;
+            }
+            queue.push_back(dep);
+        }
+    }
+}
+
+/// WIT closure of `entry`, minus host / WASI / supervisor / hook providers
+/// other than `entry` itself. A hook-provider entry (invite, auth-sig, …)
+/// is composed with its static DAG; its hook-provider deps stay out.
 /// Plugins in the closure whose wasm is missing stay out of `compose_set`
 /// (their imports remain open).
 pub fn partition(entry: &PluginId, plugins: &[WasmPlugin]) -> Result<Partition> {
@@ -96,26 +146,35 @@ pub fn partition(entry: &PluginId, plugins: &[WasmPlugin]) -> Result<Partition> 
     let mut seen = HashSet::new();
     let mut queue = VecDeque::new();
     queue.push_back(entry.clone());
+    walk_imports(
+        &mut queue,
+        &mut seen,
+        &mut compose,
+        &metas,
+        &by_wit,
+        None,
+        Some(entry),
+    );
 
-    while let Some(id) = queue.pop_front() {
-        if !seen.insert(id.clone()) {
-            continue;
-        }
-        if is_unplugged(&id) {
-            continue;
-        }
-        let Some(meta) = metas.get(&id) else {
-            continue;
-        };
-        compose.push(id.clone());
-        for import in &meta.imports {
-            let Some(dep) = resolve_wit_dep(import, &by_wit) else {
-                continue;
-            };
-            if is_unplugged(&dep) {
-                continue;
+    // The supervisor runs start-tx / finish-tx on the transact driver after
+    // every entry() call. If the closure emits actions (pulled in
+    // transact:actions), compose the driver too so the finish path
+    // (driver → vserver → tokens → actions) is plugged instead of a JS hop.
+    let actions = by_wit.get(&PluginId::new("transact", "actions"));
+    if actions.is_some_and(|id| compose.contains(id)) {
+        if let Some(driver) = by_wit.get(&PluginId::new("transact", "plugin")) {
+            if !seen.contains(driver) {
+                queue.push_back(driver.clone());
+                walk_imports(
+                    &mut queue,
+                    &mut seen,
+                    &mut compose,
+                    &metas,
+                    &by_wit,
+                    None,
+                    Some(entry),
+                );
             }
-            queue.push_back(dep);
         }
     }
 
@@ -132,9 +191,12 @@ pub fn partition(entry: &PluginId, plugins: &[WasmPlugin]) -> Result<Partition> 
     })
 }
 
-/// Host subset: `common`, `db`, `prompt`. `types` / `auth` / `crypto` stay
+/// Host subset: the [`crate::ids::HOST_COMPOSE_PLUGINS`] DAG (`call-context`,
+/// `db`, `session`, `authed-http`, `prompt`). `types` / `crypto` stay
 /// dynamic. Unlike [`partition`], these host plugins are not treated as
-/// unplugged — they are the compose set.
+/// unplugged — they are the compose set. Every present host plugin seeds the
+/// walk: the tops of the DAG (`authed-http`, `prompt`) are not imported by
+/// anything else in the blob, so a single-entry walk would miss them.
 pub fn partition_host(plugins: &[WasmPlugin]) -> Result<Partition> {
     let host: Vec<_> = plugins
         .iter()
@@ -144,13 +206,6 @@ pub fn partition_host(plugins: &[WasmPlugin]) -> Result<Partition> {
     if host.is_empty() {
         return Ok(Partition::default());
     }
-    let entry = host
-        .iter()
-        .find(|p| p.id.plugin == "prompt")
-        .or_else(|| host.iter().find(|p| p.id.plugin == "db"))
-        .or_else(|| host.iter().find(|p| p.id.plugin == "common"))
-        .map(|p| p.id.clone())
-        .unwrap();
 
     let metas: HashMap<PluginId, PluginMeta> = host
         .iter()
@@ -161,28 +216,16 @@ pub fn partition_host(plugins: &[WasmPlugin]) -> Result<Partition> {
 
     let mut compose = Vec::new();
     let mut seen = HashSet::new();
-    let mut queue = VecDeque::new();
-    queue.push_back(entry);
-
-    while let Some(id) = queue.pop_front() {
-        if !seen.insert(id.clone()) {
-            continue;
-        }
-        if !allowed.contains(&id) {
-            continue;
-        }
-        let Some(meta) = metas.get(&id) else {
-            continue;
-        };
-        compose.push(id.clone());
-        for import in &meta.imports {
-            if let Some(dep) = resolve_wit_dep(import, &by_wit) {
-                if allowed.contains(&dep) {
-                    queue.push_back(dep);
-                }
-            }
-        }
-    }
+    let mut queue: VecDeque<_> = host.iter().map(|p| p.id.clone()).collect();
+    walk_imports(
+        &mut queue,
+        &mut seen,
+        &mut compose,
+        &metas,
+        &by_wit,
+        Some(&allowed),
+        None,
+    );
 
     let compose_set: HashSet<_> = compose.iter().cloned().collect();
     let dynamic_set = plugins
