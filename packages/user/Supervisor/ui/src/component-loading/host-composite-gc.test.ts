@@ -3,8 +3,8 @@
 // TEMP diagnostic repro for the prompt.html "second get-active-prompt
 // panics with a zeroed bucket" bug.
 //
-// Drives the real composed host composite (host:prompt + host:call-context +
-// host:db + host:session + host:authed-http + tracers) exactly like the
+// Drives the real composed host composite (host:prompt + host:client +
+// host:db + host:auth + host:http + tracers) exactly like the
 // supervisor loader does (same jco
 // options + jco-reenter patch), with stubbed supervisor bridge imports.
 //
@@ -213,8 +213,10 @@ resourceTransferOwn = function (handle, fromTid, toTid) {
                 harness.frames.pop();
             },
         },
-        // session's transact hop (get-query-token) stays a JS import.
+        // auth's transact hop (get-query-token) stays a JS import.
         "transact:plugin/auth": throwingStub("transact:plugin/auth"),
+        // crypto's permissions hop stays a JS import.
+        "permissions:plugin/api": throwingStub("permissions:plugin/api"),
         "host:types/types": throwingStub("host:types/types"),
         "accounts:query/api": {
             getCurrentUser: () => {

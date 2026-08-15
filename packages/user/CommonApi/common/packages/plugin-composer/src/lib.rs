@@ -40,21 +40,6 @@ impl bindings::Guest for Component {
             .map_err(|e| format!("{e:#}"))
     }
 
-    fn compose_host(
-        plugins: Vec<bindings::WasmPlugin>,
-        wrap_tracers: bool,
-    ) -> Result<bindings::ComposeResult, String> {
-        let plugins = plugins
-            .into_iter()
-            .map(|p| WasmPlugin {
-                id: PluginId::new(p.service, p.plugin),
-                wasm: p.wasm,
-            })
-            .collect::<Vec<_>>();
-        compose_host(&plugins, wrap_tracers)
-            .map(into_wit_result)
-            .map_err(|e| format!("{e:#}"))
-    }
 }
 
 #[cfg(target_arch = "wasm32")]

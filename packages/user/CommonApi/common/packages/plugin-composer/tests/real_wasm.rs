@@ -61,15 +61,15 @@ fn tracer_can_still_encode_host_db() {
 
 #[test]
 fn compose_real_host_with_tracers() {
-    if !components_dir().join("host_call_context.wasm").exists() {
+    if !components_dir().join("host_client.wasm").exists() {
         eprintln!("skip: no build/components");
         return;
     }
     let plugins = vec![
-        load("host", "call-context", "host_call_context.wasm"),
+        load("host", "client", "host_client.wasm"),
         load("host", "db", "host_db.wasm"),
-        load("host", "session", "host_session.wasm"),
-        load("host", "authed-http", "host_authed_http.wasm"),
+        load("host", "auth", "host_auth.wasm"),
+        load("host", "http", "host_http.wasm"),
         load("host", "prompt", "host_prompt.wasm"),
         load("host", "types", "host_types.wasm"),
         load("host", "crypto", "host_crypto.wasm"),
@@ -92,7 +92,14 @@ fn compose_real_host_with_tracers() {
                     .filter(|i| i.starts_with("host:") || i.starts_with("supervisor:"))
                     .collect::<Vec<_>>()
             );
-            for expected in ["call-context", "db", "session", "authed-http", "prompt"] {
+            for expected in [
+                "client",
+                "db",
+                "auth",
+                "http",
+                "prompt",
+                "crypto",
+            ] {
                 assert!(
                     r.compose_set.iter().any(|id| id.plugin == expected),
                     "{expected} should be in the host blob, got {:?}",
@@ -100,16 +107,20 @@ fn compose_real_host_with_tracers() {
                 );
             }
             assert!(
-                !imports.iter().any(|i| i.starts_with("host:call-context/")),
-                "call-context should be plugged, got {imports:?}"
+                !imports.iter().any(|i| i.starts_with("host:client/")),
+                "client should be plugged, got {imports:?}"
             );
             assert!(
                 !imports.iter().any(|i| i.starts_with("host:db/")),
                 "db should be plugged, got {imports:?}"
             );
             assert!(
-                !imports.iter().any(|i| i.starts_with("host:session/")),
-                "authed-http→session should be plugged, got {imports:?}"
+                !imports.iter().any(|i| i.starts_with("host:auth/")),
+                "http→auth should be plugged, got {imports:?}"
+            );
+            assert!(
+                !imports.iter().any(|i| i.starts_with("host:crypto/")),
+                "crypto keyvault should be plugged, got {imports:?}"
             );
         }
         Err(e) => panic!("host compose failed: {e:#}"),
@@ -118,11 +129,11 @@ fn compose_real_host_with_tracers() {
 
 #[test]
 fn compose_real_host_without_tracers() {
-    if !components_dir().join("host_call_context.wasm").exists() {
+    if !components_dir().join("host_client.wasm").exists() {
         return;
     }
     let plugins = vec![
-        load("host", "call-context", "host_call_context.wasm"),
+        load("host", "client", "host_client.wasm"),
         load("host", "db", "host_db.wasm"),
         load("host", "prompt", "host_prompt.wasm"),
     ];
@@ -186,10 +197,10 @@ fn compose_branding_closure_with_perms_chain_id() {
         load("accounts", "query", "accounts_query.wasm"),
         load("perms", "plugin", "permissions.wasm"),
         load("accounts", "plugin", "accounts.wasm"),
-        load("host", "call-context", "host_call_context.wasm"),
+        load("host", "client", "host_client.wasm"),
         load("host", "db", "host_db.wasm"),
-        load("host", "session", "host_session.wasm"),
-        load("host", "authed-http", "host_authed_http.wasm"),
+        load("host", "auth", "host_auth.wasm"),
+        load("host", "http", "host_http.wasm"),
         load("host", "prompt", "host_prompt.wasm"),
         load("host", "types", "host_types.wasm"),
         load("host", "crypto", "host_crypto.wasm"),
@@ -234,10 +245,10 @@ fn compose_branding_from_psi_packages() {
         load_from_psi("VirtualServer.psi", "data/vserver/plugin.wasm", "vserver", "plugin"),
         load_from_psi("Tokens.psi", "data/tokens/plugin.wasm", "tokens", "plugin"),
         load_from_psi("NameMarket.psi", "data/namemarket/plugin.wasm", "namemarket", "plugin"),
-        load_from_psi("Host.psi", "data/host/call-context.wasm", "host", "call-context"),
+        load_from_psi("Host.psi", "data/host/client.wasm", "host", "client"),
         load_from_psi("Host.psi", "data/host/db.wasm", "host", "db"),
-        load_from_psi("Host.psi", "data/host/session.wasm", "host", "session"),
-        load_from_psi("Host.psi", "data/host/authed-http.wasm", "host", "authed-http"),
+        load_from_psi("Host.psi", "data/host/auth.wasm", "host", "auth"),
+        load_from_psi("Host.psi", "data/host/http.wasm", "host", "http"),
         load_from_psi("Host.psi", "data/host/prompt.wasm", "host", "prompt"),
         load_from_psi("Host.psi", "data/host/types.wasm", "host", "types"),
         load_from_psi("Host.psi", "data/host/crypto.wasm", "host", "crypto"),

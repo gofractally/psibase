@@ -191,11 +191,11 @@ pub fn partition(entry: &PluginId, plugins: &[WasmPlugin]) -> Result<Partition> 
     })
 }
 
-/// Host subset: the [`crate::ids::HOST_COMPOSE_PLUGINS`] DAG (`call-context`,
-/// `db`, `session`, `authed-http`, `prompt`). `types` / `crypto` stay
-/// dynamic. Unlike [`partition`], these host plugins are not treated as
+/// Host subset: the [`crate::ids::HOST_COMPOSE_PLUGINS`] DAG (`client`,
+/// `db`, `auth`, `http`, `prompt`, `crypto`). `types` stays
+/// dynamic (`plugin-ref` fails to plug). Unlike [`partition`], these host plugins are not treated as
 /// unplugged — they are the compose set. Every present host plugin seeds the
-/// walk: the tops of the DAG (`authed-http`, `prompt`) are not imported by
+/// walk: the tops of the DAG (`http`, `prompt`) are not imported by
 /// anything else in the blob, so a single-entry walk would miss them.
 pub fn partition_host(plugins: &[WasmPlugin]) -> Result<Partition> {
     let host: Vec<_> = plugins

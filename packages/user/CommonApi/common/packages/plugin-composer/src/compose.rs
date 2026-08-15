@@ -34,7 +34,7 @@ pub fn compose_host(plugins: &[WasmPlugin], wrap_tracers: bool) -> Result<Compos
         .iter()
         .find(|id| id.plugin == "prompt")
         .or_else(|| part.compose_set.iter().find(|id| id.plugin == "db"))
-        .or_else(|| part.compose_set.iter().find(|id| id.plugin == "call-context"))
+        .or_else(|| part.compose_set.iter().find(|id| id.plugin == "client"))
         .cloned()
         .unwrap();
     encode_set(&entry, &part.compose_set, plugins, wrap_tracers)

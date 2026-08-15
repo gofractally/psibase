@@ -1,6 +1,6 @@
 // JCO 1.10.2 keeps resource-borrow lists and Canonical ABI instanceFlags
 // as one frame per instantiate(). A JS hop back into the same composite
-// (host:call-context#get-sender during host:authed-http#post-graphql, host:db bucket.set during
+// (host:client#get-sender during host:http#post-graphql, host:db bucket.set during
 // prompt) shares that frame and traps: "borrows not dropped" or wasm
 // `unreachable` (MAY_ENTER cleared on the root instance).
 //

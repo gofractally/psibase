@@ -18,7 +18,7 @@ import {
 } from "@psibase/common-lib/messaging/function-call-request";
 import { pluginId } from "@psibase/common-lib/messaging/plugin-id";
 
-import { compilePlugin } from "./component-loading/loader";
+import { CompiledPlugin, compilePlugin } from "./component-loading/loader";
 import { wasmMemStats } from "./component-loading/wasm-metrics";
 import { AppInterface } from "./app-interface";
 import { CallContext } from "./call-context";
@@ -37,6 +37,7 @@ import {
     parser,
     serviceFromOrigin,
     setQueryToken,
+    wasmFromUrl,
 } from "./utils";
 
 const rootDomain = siblingUrl();
@@ -69,6 +70,16 @@ class PromptSignal extends Error {
     }
 }
 
+interface CompositeCacheEntry {
+    wasm: Uint8Array;
+    composeSet: Array<{ service: string; plugin: string }>;
+    containsTransact: boolean;
+    // Transpiled + core-compiled composite (Modules only, no Memory).
+    // Memoized so later entries with the same closure skip the jco
+    // transpile; instances are still created (and disposed) per entry.
+    compiled?: Promise<CompiledPlugin>;
+}
+
 // The supervisor facilitates all communication
 export class Supervisor implements AppInterface {
     private plugins: Plugins;
@@ -81,14 +92,7 @@ export class Supervisor implements AppInterface {
 
     private inPreload = false;
 
-    private compositeCache = new Map<
-        string,
-        {
-            wasm: Uint8Array;
-            composeSet: Array<{ service: string; plugin: string }>;
-            containsTransact: boolean;
-        }
-    >();
+    private compositeCache = new Map<string, CompositeCacheEntry>();
 
     parser: Promise<any>;
 
@@ -320,36 +324,54 @@ export class Supervisor implements AppInterface {
         return `${kind}|${parts.join(",")}`;
     }
 
+    private compileComposite(
+        result: CompositeCacheEntry,
+        entry: QualifiedPluginId | undefined,
+        privileged: boolean,
+    ): Promise<CompiledPlugin> {
+        return (async () => {
+            const p = await parser();
+            const api = p.parse("composite", result.wasm);
+            const services = await this.plugins.mergedServiceMap();
+            for (const intf of api.importedFuncs?.interfaces ?? []) {
+                if (
+                    intf.namespace === "wasi" ||
+                    intf.namespace === "supervisor"
+                ) {
+                    continue;
+                }
+                if (!(intf.namespace in services)) {
+                    services[intf.namespace] = intf.namespace;
+                }
+            }
+            return compilePlugin(
+                entry?.service ?? "host",
+                privileged,
+                result.wasm,
+                new PluginHost(this),
+                api,
+                services,
+                { namespacedExports: true, allowCallstack: true },
+            );
+        })();
+    }
+
     private async attachComposite(
-        result: {
-            wasm: Uint8Array;
-            composeSet: Array<{ service: string; plugin: string }>;
-        },
+        result: CompositeCacheEntry,
         entry: QualifiedPluginId | undefined,
         privileged: boolean,
         wrapTracers: boolean,
     ): Promise<void> {
         if (result.composeSet.length === 0) return;
-        const p = await parser();
-        const api = p.parse("composite", result.wasm);
-        const services = await this.plugins.mergedServiceMap();
-        for (const intf of api.importedFuncs?.interfaces ?? []) {
-            if (intf.namespace === "wasi" || intf.namespace === "supervisor") {
-                continue;
-            }
-            if (!(intf.namespace in services)) {
-                services[intf.namespace] = intf.namespace;
-            }
+        if (!result.compiled) {
+            const promise = this.compileComposite(result, entry, privileged);
+            result.compiled = promise;
+            // Allow a retry on transient failure (e.g. a service-map fetch).
+            promise.catch(() => {
+                if (result.compiled === promise) result.compiled = undefined;
+            });
         }
-        const compiled = await compilePlugin(
-            entry?.service ?? "host",
-            privileged,
-            result.wasm,
-            new PluginHost(this),
-            api,
-            services,
-            { namespacedExports: true, allowCallstack: true },
-        );
+        const compiled = await result.compiled;
         let instance: Promise<{ exports: Record<string, unknown> }> | undefined;
         const instantiate = () => {
             if (!instance) instance = compiled.instantiate();
@@ -364,27 +386,47 @@ export class Supervisor implements AppInterface {
         }
     }
 
+    // The Host composite is composed at package build (cmake `compose-host`)
+    // and served as one HTTP-cached artifact; the browser never composes
+    // host plugins. The compose set is derived from the composite's exports.
+    private hostComposite: Promise<CompositeCacheEntry> | undefined;
+
+    private async fetchHostComposite(): Promise<CompositeCacheEntry> {
+        const wasm = await wasmFromUrl(
+            siblingUrl(null, "host", "/composite.wasm"),
+        );
+        const p = await parser();
+        const api = p.parse("host-composite", wasm);
+        const inBlob = new Set<string>();
+        for (const intf of api.exportedFuncs?.interfaces ?? []) {
+            if (intf.namespace === "host") inBlob.add(intf.package);
+        }
+        return {
+            wasm,
+            composeSet: [...inBlob].map((plugin) => ({
+                service: "host",
+                plugin,
+            })),
+            containsTransact: false,
+        };
+    }
+
     private async composeHostPlugins(): Promise<void> {
-        const wasmPlugins = this.plugins.collectWasmPlugins();
-        const hostBlobPlugins = ["call-context", "authed-http", "session"];
-        if (
-            !wasmPlugins.some(
-                (p) =>
-                    p.service === "host" && hostBlobPlugins.includes(p.plugin),
-            )
-        ) {
-            return;
+        if (!this.hostComposite) {
+            const promise = this.fetchHostComposite();
+            this.hostComposite = promise;
+            // Allow a retry if the fetch fails (e.g. transient network).
+            promise.catch(() => {
+                if (this.hostComposite === promise)
+                    this.hostComposite = undefined;
+            });
         }
-        const key = this.cacheKey("host", wasmPlugins);
-        let result = this.compositeCache.get(key);
-        if (!result) {
-            const c = await composer();
-            result = this.unwrapComposerResult(
-                c.composeHost(wasmPlugins, true),
-            );
-            this.compositeCache.set(key, result);
-        }
-        await this.attachComposite(result, undefined, true, true);
+        await this.attachComposite(
+            await this.hostComposite,
+            undefined,
+            true,
+            true,
+        );
     }
 
     private async composeAppPlugins(entry: QualifiedPluginId): Promise<void> {
