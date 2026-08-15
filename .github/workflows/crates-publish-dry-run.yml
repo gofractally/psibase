@@ -16,15 +16,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
 
-      - uses: dtolnay/rust-toolchain@1.86.0
+      - name: Fetch refs for version comparison
+        run: |
+          git fetch --depth=1 origin ${{ github.event.pull_request.base.sha }}
+          git fetch --depth=1 origin ${{ github.event.pull_request.head.sha }}
 
       - uses: ./.github/actions/detect-version-bump
         id: version
         with:
           ref-a: ${{ github.event.pull_request.base.sha }}
           ref-b: ${{ github.event.pull_request.head.sha }}
+
+      - uses: dtolnay/rust-toolchain@1.86.0
+        if: steps.version.outputs.changed == 'true'
 
       - name: Dry-run crate publish
         if: steps.version.outputs.changed == 'true'
