@@ -7,7 +7,7 @@ interface faucet {
 
 world impl {
     include host:types/imports;
-    include transact:plugin/imports;
+    include transact:actions/imports;
     
     export faucet;
 }

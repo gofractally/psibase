@@ -1,17 +1,7 @@
 use crate::bindings::host::http as Host;
-use crate::bindings::transact::plugin::types::*;
-use psibase::{Hex, Tapos, TimePointSec};
+use psibase::{Tapos, TimePointSec};
 use serde::Deserialize;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-
-impl From<Claim> for psibase::Claim {
-    fn from(claim: Claim) -> Self {
-        psibase::Claim {
-            service: claim.verify_service.parse().unwrap(),
-            rawData: Hex::from(claim.raw_data.clone()),
-        }
-    }
-}
 
 #[allow(non_snake_case)]
 #[derive(Deserialize)]

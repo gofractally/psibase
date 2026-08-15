@@ -1,0 +1,22 @@
+package transact:actions;
+
+interface hook-handlers {
+    use host:types/types.{error, plugin-ref};
+
+    on-actions-sender: func(plugin: plugin-ref, service: string, method: string) -> result<option<string>, error>;
+}
+
+world impl {
+    include host:client/imports;
+    include host:types/imports;
+    include clientdata:plugin/imports;
+    include accounts:query/imports;
+    include permissions:plugin/imports;
+
+    import hook-handlers;
+
+    export intf;
+    export hooks;
+    export ledger;
+    export types;
+}

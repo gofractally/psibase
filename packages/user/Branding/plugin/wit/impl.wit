@@ -3,7 +3,7 @@ package branding:plugin;
 world impl {
     include host:client/imports;
     include host:http/imports;
-    import transact:plugin/intf;
+    import transact:actions/intf;
     include sites:plugin/imports;
 
     export api;

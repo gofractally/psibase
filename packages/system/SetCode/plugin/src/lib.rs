@@ -7,7 +7,7 @@ use exports::setcode::plugin::authorized::Guest as Authorized;
 use host::http::api as Server;
 use host::types::types::Error;
 use psibase::services::setcode::action_structs::{setCode, stageCode};
-use transact::plugin::intf::add_action_to_transaction;
+use transact::actions::intf::add_action_to_transaction;
 
 use crate::trust::*;
 use psibase::fracpack::Pack;

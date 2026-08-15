@@ -9,7 +9,7 @@ use bindings::{
     host::{self, types::types::Error},
     permissions,
     profiles::plugin::types::{Avatar, Profile as PluginProfile},
-    transact::plugin::intf::add_action_to_transaction,
+    transact::actions::intf::add_action_to_transaction,
 };
 
 use psibase::fracpack::Pack;

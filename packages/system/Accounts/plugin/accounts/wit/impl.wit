@@ -6,7 +6,7 @@ world impl {
     include host:auth/imports;
     include host:prompt/imports;
     include host:db/imports;
-    include transact:plugin/imports;
+    include transact:actions/imports;
     include permissions:plugin/imports;
     include accounts:query/imports;
     include auth-sig:plugin/imports;
