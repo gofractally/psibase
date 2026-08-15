@@ -33,7 +33,6 @@ jobs:
         id: notes
         env:
           TAG: ${{ inputs.tag }}
-          CHANGELOG: ${{ needs.generate-changelog.outputs.changelog }}
         run: |
           : >release-notes.md
           if [[ $TAG == v0.* ]]; then
@@ -45,7 +44,7 @@ jobs:
                   '' \
                   >>release-notes.md
           fi
-          printf '%s\n' "$CHANGELOG" >>release-notes.md
+          cat changelog.md/changelog.md >>release-notes.md
 
       - name: Build release files list
         id: release-files
