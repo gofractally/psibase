@@ -68,7 +68,7 @@ jobs:
         uses: mikepenz/release-changelog-builder-action@v5.1.0
         with:
           failOnError: true
-          toTag: ${{ github.event.inputs.endtag }}
+          toTag: ${{ inputs.endtag }}
           configurationJson: ${{ steps.read_config.outputs.config }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
