@@ -115,8 +115,14 @@ jobs:
         run: |
           ver=$(.github/scripts/psibase-version.sh at HEAD)
           tag=$(.github/scripts/psibase-version.sh tag-name "$ver")
-          if git ls-remote --exit-code origin "refs/tags/$tag" >/dev/null; then
-            echo "Tag $tag already exists" >&2
+          remote_commit=$(git ls-remote origin "refs/tags/$tag^{}" | awk 'NR==1 {print $1}')
+          if [[ -n "$remote_commit" ]]; then
+            head_sha=$(git rev-parse HEAD)
+            if [[ "$remote_commit" == "$head_sha" ]]; then
+              echo "tag=$tag" >>"$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "Tag $tag already exists at $remote_commit, not HEAD ($head_sha)" >&2
             exit 1
           fi
           if [[ $tag == *-pre ]]; then
