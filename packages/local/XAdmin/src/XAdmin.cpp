@@ -613,6 +613,8 @@ namespace LocalService
          bool                    operator()(Auth::Account&& account)
          {
             hasUser = true;
+            if (account.value == XAdmin::service)
+               return true;
             bool result;
             PSIBASE_SUBJECTIVE_TX
             {
