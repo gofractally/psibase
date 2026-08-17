@@ -72,12 +72,19 @@ fn parse_u64(s: &str) -> Result<u64, ErrorType> {
         .map_err(|e| ErrorType::QueryError(format!("invalid u64 {s}: {e}")))
 }
 
+fn parse_acct(name: &str) -> Result<AccountNumber, ErrorType> {
+    name.parse::<AccountNumber>()
+        .map_err(|_| ErrorType::InvalidAccount(name.to_string()))
+}
+
 /// Scoped path graph: credit lines / routing / FX expanded from `from` toward `to`.
 pub fn fetch_path_graph(
     from: &str,
     to: &str,
     max_hops: u8,
 ) -> Result<PathGraphSnapshot, ErrorType> {
+    let from = parse_acct(from)?.to_string();
+    let to = parse_acct(to)?.to_string();
     let query = format!(
         r#"query {{
             pathGraph(from: "{from}", to: "{to}", maxHops: {max_hops}) {{

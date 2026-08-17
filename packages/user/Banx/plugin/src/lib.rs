@@ -452,6 +452,8 @@ impl Api for BanxPlugin {
         if from.is_empty() || to.is_empty() {
             return Err(ErrorType::InvalidAccount("from/to required".into()).into());
         }
+        let from = parse_account(from)?.to_string();
+        let to = parse_account(to)?.to_string();
         if from == to {
             return Err(ErrorType::NoPath("from and to are the same account".into()).into());
         }
@@ -470,15 +472,15 @@ impl Api for BanxPlugin {
             parse_amount_nonzero(from_asset, &amount)?
         };
 
-        let snap = query::fetch_path_graph::fetch_path_graph(from, to, max_hops)?;
+        let snap = query::fetch_path_graph::fetch_path_graph(&from, &to, max_hops)?;
 
         let quote = if exact_out {
             find_banx_path_exact_out(
                 &snap.lines,
                 &snap.routing,
                 &snap.fx,
-                from,
-                to,
+                &from,
+                &to,
                 amount_raw.value,
                 from_asset,
                 to_asset,
@@ -490,8 +492,8 @@ impl Api for BanxPlugin {
                 &snap.lines,
                 &snap.routing,
                 &snap.fx,
-                from,
-                to,
+                &from,
+                &to,
                 amount_raw.value,
                 from_asset,
                 to_asset,
