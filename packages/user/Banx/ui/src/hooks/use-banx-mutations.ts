@@ -19,7 +19,7 @@ function useInvalidateBanx() {
                 queryKey: QueryKey.forwardOffers(user),
             });
             void qc.invalidateQueries({
-                queryKey: QueryKey.takeoutOffers(user),
+                queryKey: QueryKey.buyClaimOffers(user),
             });
             void qc.invalidateQueries({
                 queryKey: QueryKey.currencyPolicies(user),
@@ -375,7 +375,7 @@ export function useRemoveGlobalForwardOffer() {
     });
 }
 
-export function useSetTakeoutOffer() {
+export function useSetBuyClaimOffer() {
     const invalidate = useInvalidateBanx();
     return useMutation({
         mutationFn: async (p: {
@@ -385,7 +385,7 @@ export function useSetTakeoutOffer() {
             feePercentPpm: number;
             expiresAtSeconds: number;
         }) =>
-            banxCall("setTakeoutOffer", [
+            banxCall("setBuyClaimOffer", [
                 p.debtor,
                 p.assetId,
                 p.feeFixed,
@@ -394,13 +394,13 @@ export function useSetTakeoutOffer() {
             ]),
         onSuccess: () => {
             invalidate();
-            toast.success("Takeout offer saved");
+            toast.success("Buy-claim offer saved");
         },
         onError: (e: Error) => toast.error(e.message),
     });
 }
 
-export function useSetGlobalTakeoutOffer() {
+export function useSetGlobalBuyClaimOffer() {
     const invalidate = useInvalidateBanx();
     return useMutation({
         mutationFn: async (p: {
@@ -409,7 +409,7 @@ export function useSetGlobalTakeoutOffer() {
             feePercentPpm: number;
             expiresAtSeconds: number;
         }) =>
-            banxCall("setGlobalTakeoutOffer", [
+            banxCall("setGlobalBuyClaimOffer", [
                 p.assetId,
                 p.feeFixed,
                 p.feePercentPpm,
@@ -417,33 +417,33 @@ export function useSetGlobalTakeoutOffer() {
             ]),
         onSuccess: () => {
             invalidate();
-            toast.success("Global takeout offer saved");
+            toast.success("Global buy-claim offer saved");
         },
         onError: (e: Error) => toast.error(e.message),
     });
 }
 
-export function useRemoveTakeoutOffer() {
+export function useRemoveBuyClaimOffer() {
     const invalidate = useInvalidateBanx();
     return useMutation({
         mutationFn: async (p: { debtor: string; assetId: number }) =>
-            banxCall("removeTakeoutOffer", [p.debtor, p.assetId]),
+            banxCall("removeBuyClaimOffer", [p.debtor, p.assetId]),
         onSuccess: () => {
             invalidate();
-            toast.success("Takeout offer removed");
+            toast.success("Buy-claim offer removed");
         },
         onError: (e: Error) => toast.error(e.message),
     });
 }
 
-export function useRemoveGlobalTakeoutOffer() {
+export function useRemoveGlobalBuyClaimOffer() {
     const invalidate = useInvalidateBanx();
     return useMutation({
         mutationFn: async (p: { assetId: number }) =>
-            banxCall("removeGlobalTakeoutOffer", [p.assetId]),
+            banxCall("removeGlobalBuyClaimOffer", [p.assetId]),
         onSuccess: () => {
             invalidate();
-            toast.success("Global takeout offer removed");
+            toast.success("Global buy-claim offer removed");
         },
         onError: (e: Error) => toast.error(e.message),
     });

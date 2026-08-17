@@ -91,10 +91,10 @@ interface api {
     /// Remove global path-forward offer for this asset.
     remove-global-forward-offer: func(asset-id: u16) -> result<_, error>;
 
-    /// Post a takeout offer for claims on a **specific** debtor.
+    /// Post a buy-claim offer for claims on a **specific** debtor.
     /// `fee-percent-ppm` is a signed spread: positive haircuts the seller,
     /// negative is a premium (`-50000` = 5% over face).
-    set-takeout-offer: func(
+    set-buy-claim-offer: func(
         debtor: string,
         asset-id: u16,
         fee-fixed: string,
@@ -102,21 +102,21 @@ interface api {
         expires-at-seconds: u32,
     ) -> result<_, error>;
 
-    /// Global takeout offer for this asset (any lined debtor).
-    set-global-takeout-offer: func(
+    /// Global buy-claim offer for this asset (any lined debtor).
+    set-global-buy-claim-offer: func(
         asset-id: u16,
         fee-fixed: string,
         fee-percent-ppm: s32,
         expires-at-seconds: u32,
     ) -> result<_, error>;
 
-    /// Remove a specific takeout offer.
-    remove-takeout-offer: func(debtor: string, asset-id: u16) -> result<_, error>;
+    /// Remove a specific buy-claim offer.
+    remove-buy-claim-offer: func(debtor: string, asset-id: u16) -> result<_, error>;
 
-    /// Remove global takeout offer for this asset.
-    remove-global-takeout-offer: func(asset-id: u16) -> result<_, error>;
+    /// Remove global buy-claim offer for this asset.
+    remove-global-buy-claim-offer: func(asset-id: u16) -> result<_, error>;
 
-    /// Sell claims on `debtor` to `buyer` under buyer's takeout offer.
+    /// Sell claims on `debtor` to `buyer` under buyer's buy-claim offer.
     /// `amount` is face (human decimal); seller receives face after fees as a
     /// claim on the buyer.
     sell-claim: func(

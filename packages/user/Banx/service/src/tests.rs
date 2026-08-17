@@ -721,10 +721,10 @@ mod tests {
         Ok(())
     }
 
-    /// Alice holds Bob debt, sells to Peter under Peter's takeout offer.
+    /// Alice holds Bob debt, sells to Peter under Peter's buy-claim offer.
     /// Peter takes Bob face; Alice gets face after fees as claim on Peter.
     #[psibase::test_case(packages("Banx"))]
-    fn test_sell_claim_takeout(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    fn test_sell_claim_discount(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
 
         let alice = account!("alice");
@@ -748,9 +748,9 @@ mod tests {
         Wrapper::push_from(&chain, peter)
             .st_crd_lne(bob, usd, Quantity::new(10_000), false, 0, 0)
             .get()?;
-        // Global takeout: 5% take fee (no forward offer needed).
+        // Global buy-claim: 5% take fee (no forward offer needed).
         Wrapper::push_from(&chain, peter)
-            .st_glb_tko(usd, Quantity::new(0), (PPM_SCALE * 5 / 100) as i32, never())
+            .st_glb_buy(usd, Quantity::new(0), (PPM_SCALE * 5 / 100) as i32, never())
             .get()?;
 
         Wrapper::push_from(&chain, alice)
@@ -765,7 +765,7 @@ mod tests {
         Ok(())
     }
 
-    /// Same as takeout, but Peter posts a 5% premium: Alice gets 10500 on Peter.
+    /// Same as buy-claim, but Peter posts a 5% premium: Alice gets 10500 on Peter.
     #[psibase::test_case(packages("Banx"))]
     fn test_sell_claim_premium(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
@@ -787,7 +787,7 @@ mod tests {
             .st_crd_lne(bob, usd, Quantity::new(10_000), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, peter)
-            .st_glb_tko(usd, Quantity::new(0), -(PPM_SCALE as i32) * 5 / 100, never())
+            .st_glb_buy(usd, Quantity::new(0), -(PPM_SCALE as i32) * 5 / 100, never())
             .get()?;
 
         Wrapper::push_from(&chain, alice)
@@ -802,7 +802,7 @@ mod tests {
     }
 
     #[psibase::test_case(packages("Banx"))]
-    fn test_specific_takeout_does_not_block_global_forward(
+    fn test_specific_buy_claim_does_not_block_global_forward(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
@@ -819,9 +819,9 @@ mod tests {
         Wrapper::push_from(&chain, steve)
             .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0, 0)
             .get()?;
-        // Specific takeout must not affect path forward.
+        // Specific buy-claim must not affect path forward.
         Wrapper::push_from(&chain, gary)
-            .st_tko_ofr(steve, usd, Quantity::new(0), 0, never())
+            .st_buy_clm(steve, usd, Quantity::new(0), 0, never())
             .get()?;
         Wrapper::push_from(&chain, gary)
             .st_glb_fwd(
@@ -984,7 +984,7 @@ mod tests {
             .st_crd_lne(bob, usd, Quantity::new(100), true, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, peter)
-            .st_glb_tko(usd, Quantity::new(0), 0, never())
+            .st_glb_buy(usd, Quantity::new(0), 0, never())
             .get()?;
         Wrapper::push_from(&chain, alice)
             .sell_claim(peter, bob, usd, Quantity::new(50))
@@ -1271,10 +1271,10 @@ mod tests {
             .st_crd_lne(bob, usd, Quantity::new(10_000), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, peter)
-            .st_glb_tko(usd, Quantity::new(0), (PPM_SCALE * 5 / 100) as i32, never())
+            .st_glb_buy(usd, Quantity::new(0), (PPM_SCALE * 5 / 100) as i32, never())
             .get()?;
         Wrapper::push_from(&chain, peter)
-            .st_tko_ofr(bob, usd, Quantity::new(0), 0, never())
+            .st_buy_clm(bob, usd, Quantity::new(0), 0, never())
             .get()?;
 
         Wrapper::push_from(&chain, alice)
@@ -1408,9 +1408,9 @@ mod tests {
         Ok(())
     }
 
-    /// Same poster/asset: 5% path hop, 0% takeout. Each action uses its own row.
+    /// Same poster/asset: 5% path hop, 0% buy-claim. Each action uses its own row.
     #[psibase::test_case(packages("Banx"))]
-    fn test_forward_and_takeout_fees_independent(
+    fn test_forward_and_buy_claim_fees_independent(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
@@ -1443,7 +1443,7 @@ mod tests {
             )
             .get()?;
         Wrapper::push_from(&chain, gary)
-            .st_glb_tko(usd, Quantity::new(0), 0, never())
+            .st_glb_buy(usd, Quantity::new(0), 0, never())
             .get()?;
 
         Wrapper::push_from(&chain, alice)

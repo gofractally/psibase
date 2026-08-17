@@ -28,12 +28,12 @@ define_trust! {
             - Quote multi-hop paths (read-only GraphQL + search)
         ",
         Medium => "
-            - Post or remove credit lines, forward offers, takeout offers, and currency policies
+            - Post or remove credit lines, forward offers, buy-claim offers, and currency policies
             - Deposit and net obligations
             - Create or cancel invoices, please-book, and settle-auth
             - Fulfill a settle-auth on a loan you owe
             - Convert debt between assets
-            - Sell claims under a buyer's takeout offer
+            - Sell claims under a buyer's buy-claim offer
         ",
         High => "
             - Path-pay (draw on others' credit along a path)
@@ -48,10 +48,10 @@ define_trust! {
             set_global_forward_offer,
             remove_forward_offer,
             remove_global_forward_offer,
-            set_takeout_offer,
-            set_global_takeout_offer,
-            remove_takeout_offer,
-            remove_global_takeout_offer,
+            set_buy_claim_offer,
+            set_global_buy_claim_offer,
+            remove_buy_claim_offer,
+            remove_global_buy_claim_offer,
             set_currency_policy,
             create_request,
             cancel_request,
@@ -210,16 +210,16 @@ impl Api for BanxPlugin {
         add_action_to_transaction(banx::action_structs::rm_glb_fwd::ACTION_NAME, &packed)
     }
 
-    fn set_takeout_offer(
+    fn set_buy_claim_offer(
         debtor: String,
         asset_id: u16,
         fee_fixed: String,
         fee_percent_ppm: i32,
         expires_at_seconds: u32,
     ) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::set_takeout_offer)?;
+        trust::assert_authorized(trust::FunctionName::set_buy_claim_offer)?;
         let fee_fixed = parse_amount(asset_id, &fee_fixed)?;
-        let packed = banx::action_structs::st_tko_ofr {
+        let packed = banx::action_structs::st_buy_clm {
             debtor: parse_account(&debtor)?,
             asset_id,
             fee_fixed,
@@ -227,41 +227,41 @@ impl Api for BanxPlugin {
             expires_at: time_point(expires_at_seconds),
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::st_tko_ofr::ACTION_NAME, &packed)
+        add_action_to_transaction(banx::action_structs::st_buy_clm::ACTION_NAME, &packed)
     }
 
-    fn set_global_takeout_offer(
+    fn set_global_buy_claim_offer(
         asset_id: u16,
         fee_fixed: String,
         fee_percent_ppm: i32,
         expires_at_seconds: u32,
     ) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::set_global_takeout_offer)?;
+        trust::assert_authorized(trust::FunctionName::set_global_buy_claim_offer)?;
         let fee_fixed = parse_amount(asset_id, &fee_fixed)?;
-        let packed = banx::action_structs::st_glb_tko {
+        let packed = banx::action_structs::st_glb_buy {
             asset_id,
             fee_fixed,
             fee_percent: fee_percent_ppm,
             expires_at: time_point(expires_at_seconds),
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::st_glb_tko::ACTION_NAME, &packed)
+        add_action_to_transaction(banx::action_structs::st_glb_buy::ACTION_NAME, &packed)
     }
 
-    fn remove_takeout_offer(debtor: String, asset_id: u16) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::remove_takeout_offer)?;
-        let packed = banx::action_structs::rm_tko_ofr {
+    fn remove_buy_claim_offer(debtor: String, asset_id: u16) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::remove_buy_claim_offer)?;
+        let packed = banx::action_structs::rm_buy_clm {
             debtor: parse_account(&debtor)?,
             asset_id,
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::rm_tko_ofr::ACTION_NAME, &packed)
+        add_action_to_transaction(banx::action_structs::rm_buy_clm::ACTION_NAME, &packed)
     }
 
-    fn remove_global_takeout_offer(asset_id: u16) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::remove_global_takeout_offer)?;
-        let packed = banx::action_structs::rm_glb_tko { asset_id }.packed();
-        add_action_to_transaction(banx::action_structs::rm_glb_tko::ACTION_NAME, &packed)
+    fn remove_global_buy_claim_offer(asset_id: u16) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::remove_global_buy_claim_offer)?;
+        let packed = banx::action_structs::rm_glb_buy { asset_id }.packed();
+        add_action_to_transaction(banx::action_structs::rm_glb_buy::ACTION_NAME, &packed)
     }
 
     fn sell_claim(

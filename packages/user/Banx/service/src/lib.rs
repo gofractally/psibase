@@ -323,12 +323,12 @@ pub mod tables {
         }
     }
 
-    /// Claim-takeout offer: `poster` will buy claims via `sell_claim`.
+    /// Buy-claim offer: `poster` will buy claims via `sell_claim`.
     /// `debtor = 0` is global (any debtor the poster has lined). Residual
     /// is checked at `sell_claim` time, not at post.
-    #[table(name = "TakeoutOfferTab", index = 6)]
+    #[table(name = "BuyClaimOfferTab", index = 6)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
-    pub struct TakeoutOffer {
+    pub struct BuyClaimOffer {
         pub poster: AccountNumber,
         /// Underlying debtor, or [`Self::GLOBAL`].
         pub debtor: AccountNumber,
@@ -342,7 +342,7 @@ pub mod tables {
         pub expires_at: TimePointSec,
     }
 
-    impl TakeoutOffer {
+    impl BuyClaimOffer {
         pub const GLOBAL: AccountNumber = AccountNumber::new(0);
 
         #[primary_key]
@@ -351,11 +351,11 @@ pub mod tables {
         }
 
         fn save(&self) {
-            TakeoutOfferTab::read_write().put(self).unwrap();
+            BuyClaimOfferTab::read_write().put(self).unwrap();
         }
 
         fn get(poster: AccountNumber, debtor: AccountNumber, asset_id: u16) -> Option<Self> {
-            TakeoutOfferTab::read()
+            BuyClaimOfferTab::read()
                 .get_index_pk()
                 .get(&(poster, debtor, asset_id))
         }
@@ -375,7 +375,7 @@ pub mod tables {
             let scale = PPM_SCALE as i64;
             assert!(
                 (fee_percent as i64) > -scale && (fee_percent as i64) < scale,
-                "takeout spread must be between -100% and 100%"
+                "buy-claim spread must be between -100% and 100%"
             );
             Self {
                 poster,
@@ -391,9 +391,9 @@ pub mod tables {
         pub fn remove(poster: AccountNumber, debtor: AccountNumber, asset_id: u16) {
             assert!(
                 Self::get(poster, debtor, asset_id).is_some(),
-                "takeout offer not found"
+                "buy-claim offer not found"
             );
-            TakeoutOfferTab::read_write().erase(&(poster, debtor, asset_id));
+            BuyClaimOfferTab::read_write().erase(&(poster, debtor, asset_id));
         }
 
         pub fn apply_fees(&self, amount_in: Quantity) -> Quantity {
@@ -659,23 +659,23 @@ pub mod tables {
         panic!("ForwardOffer not found (no specific or global forward for this asset)");
     }
 
-    /// Live specific takeout, else live global.
-    pub fn resolve_take(
+    /// Live specific buy-claim, else live global.
+    pub fn resolve_buy_claim(
         buyer: AccountNumber,
         debtor: AccountNumber,
         asset_id: u16,
-    ) -> TakeoutOffer {
-        if let Some(p) = TakeoutOffer::get(buyer, debtor, asset_id) {
+    ) -> BuyClaimOffer {
+        if let Some(p) = BuyClaimOffer::get(buyer, debtor, asset_id) {
             if offer_live(p.expires_at) {
                 return p;
             }
         }
-        if let Some(g) = TakeoutOffer::get(buyer, TakeoutOffer::GLOBAL, asset_id) {
+        if let Some(g) = BuyClaimOffer::get(buyer, BuyClaimOffer::GLOBAL, asset_id) {
             if offer_live(g.expires_at) {
                 return g;
             }
         }
-        panic!("TakeoutOffer not found (buyer has no takeout offer for this asset)");
+        panic!("BuyClaimOffer not found (buyer has no buy-claim offer for this asset)");
     }
 
     /// Debtor-posted quote: re-denominate **any** claim against this debtor
@@ -1359,7 +1359,7 @@ pub mod tables {
     /// `limit` is a stable cap on outstanding exposure (principal + interest).
     /// A draw of `amount` requires `exposure + amount <= limit`.
     /// When `deplete_on_debit`, `remaining` is unused grant (shrinks on draw /
-    /// takeout; not restored by repayment). Revolving lines ignore `remaining`.
+    /// buy-claim; not restored by repayment). Revolving lines ignore `remaining`.
     ///
     /// Interest-free grace lives on [`PairCycle`], not this row.
     #[table(name = "CreditLineTable", index = 3)]
@@ -1373,7 +1373,7 @@ pub mod tables {
 
         /// Stable cap on outstanding exposure (principal + accrued interest).
         pub limit: Quantity,
-        /// If true, draws/takeout also consume [`Self::remaining`].
+        /// If true, draws/buy-claim also consume [`Self::remaining`].
         pub deplete_on_debit: bool,
         /// Rate applied to new draws on this line (ppm APR); see [`crate::interest`].
         pub interest_rate: u32,
@@ -1611,8 +1611,8 @@ pub mod tables {
 #[psibase::service(name = "banx", tables = "tables")]
 pub mod service {
     use crate::tables::{
-        emit_pair_activity, resolve_forward, resolve_take, Asset, CreditLine, CurrencyPolicy,
-        ForwardOffer, InitRow, InitTable, Obligation, PathHop, PayRequest, TakeoutOffer,
+        emit_pair_activity, resolve_forward, resolve_buy_claim, Asset, CreditLine, CurrencyPolicy,
+        ForwardOffer, InitRow, InitTable, Obligation, PathHop, PayRequest, BuyClaimOffer,
     };
     use psibase::{
         services::events,
@@ -1800,11 +1800,11 @@ pub mod service {
         ForwardOffer::remove(get_sender(), ForwardOffer::GLOBAL, asset_id);
     }
 
-    /// Post/update a **specific** takeout offer (`debtor` ≠ 0).
+    /// Post/update a **specific** buy-claim offer (`debtor` ≠ 0).
     ///
     /// Poster will buy claims on that debtor via `sell_claim`.
     #[action]
-    fn st_tko_ofr(
+    fn st_buy_clm(
         debtor: AccountNumber,
         asset_id: u16,
         fee_fixed: Quantity,
@@ -1812,10 +1812,10 @@ pub mod service {
         expires_at: TimePointSec,
     ) {
         assert!(
-            debtor != TakeoutOffer::GLOBAL,
-            "use st_glb_tko for global takeout offer (debtor 0)"
+            debtor != BuyClaimOffer::GLOBAL,
+            "use st_glb_buy for global buy-claim offer (debtor 0)"
         );
-        TakeoutOffer::upsert(
+        BuyClaimOffer::upsert(
             get_sender(),
             debtor,
             asset_id,
@@ -1825,17 +1825,17 @@ pub mod service {
         );
     }
 
-    /// Post/update a **global** takeout offer (`debtor = 0`).
+    /// Post/update a **global** buy-claim offer (`debtor = 0`).
     #[action]
-    fn st_glb_tko(
+    fn st_glb_buy(
         asset_id: u16,
         fee_fixed: Quantity,
         fee_percent: i32,
         expires_at: TimePointSec,
     ) {
-        TakeoutOffer::upsert(
+        BuyClaimOffer::upsert(
             get_sender(),
-            TakeoutOffer::GLOBAL,
+            BuyClaimOffer::GLOBAL,
             asset_id,
             fee_fixed,
             fee_percent,
@@ -1843,26 +1843,26 @@ pub mod service {
         );
     }
 
-    /// Remove a **specific** takeout offer.
+    /// Remove a **specific** buy-claim offer.
     #[action]
-    fn rm_tko_ofr(debtor: AccountNumber, asset_id: u16) {
+    fn rm_buy_clm(debtor: AccountNumber, asset_id: u16) {
         assert!(
-            debtor != TakeoutOffer::GLOBAL,
-            "use rm_glb_tko for global takeout offer"
+            debtor != BuyClaimOffer::GLOBAL,
+            "use rm_glb_buy for global buy-claim offer"
         );
-        TakeoutOffer::remove(get_sender(), debtor, asset_id);
+        BuyClaimOffer::remove(get_sender(), debtor, asset_id);
     }
 
-    /// Remove a **global** takeout offer.
+    /// Remove a **global** buy-claim offer.
     #[action]
-    fn rm_glb_tko(asset_id: u16) {
-        TakeoutOffer::remove(get_sender(), TakeoutOffer::GLOBAL, asset_id);
+    fn rm_glb_buy(asset_id: u16) {
+        BuyClaimOffer::remove(get_sender(), BuyClaimOffer::GLOBAL, asset_id);
     }
 
-    /// Seller (sender) sells claims on `debtor` to `buyer` under buyer's takeout
+    /// Seller (sender) sells claims on `debtor` to `buyer` under buyer's buy-claim
     /// offer. Buyer becomes creditor of `debtor` for `amount`; seller receives
     /// a claim on buyer for face after the offer spread (haircut or premium).
-    /// Requires buyer's line residual to `debtor` and a live takeout offer.
+    /// Requires buyer's line residual to `debtor` and a live buy-claim offer.
     #[action]
     fn sell_claim(
         buyer: AccountNumber,
@@ -1876,7 +1876,7 @@ pub mod service {
         assert!(buyer != debtor, "buyer cannot be the debtor");
         assert!(amount.value > 0, "sell_claim amount must be positive");
 
-        let offer = resolve_take(buyer, debtor, asset_id);
+        let offer = resolve_buy_claim(buyer, debtor, asset_id);
         crate::tables::assert_policy_live(offer.expires_at);
 
         let mut line = CreditLine::get_assert(buyer, debtor, asset_id);
@@ -1884,7 +1884,7 @@ pub mod service {
         let buyer_exp = Obligation::exposure(buyer, debtor, asset_id).value;
         assert!(
             buyer_exp.saturating_add(amount.value) <= line.limit.value,
-            "buyer credit line residual insufficient for claim takeout"
+            "buyer credit line residual insufficient for claim buy-claim"
         );
         line.consume_grant(amount);
 

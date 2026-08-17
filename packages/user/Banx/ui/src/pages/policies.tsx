@@ -5,7 +5,7 @@ import { useAssetMap } from "@/hooks/use-assets";
 import {
     useCurrencyPolicies,
     useForwardOffers,
-    useTakeoutOffers,
+    useBuyClaimOffers,
 } from "@/hooks/use-banx-data";
 import { useConvert, useSetCurrencyPolicy } from "@/hooks/use-banx-mutations";
 import {
@@ -36,7 +36,7 @@ import {
 export function PoliciesPage() {
     const { assets, symbolOf, precisionOf } = useAssetMap();
     const { data: forwardOffers = [] } = useForwardOffers();
-    const { data: takeoutOffers = [] } = useTakeoutOffers();
+    const { data: buyClaimOffers = [] } = useBuyClaimOffers();
     const { data: currency = [] } = useCurrencyPolicies();
     const setCurrency = useSetCurrencyPolicy();
     const convert = useConvert();
@@ -112,7 +112,7 @@ export function PoliciesPage() {
         <div className="space-y-10">
             <PageHeader
                 title="Policies"
-                description="Currency policies handle FX (how many to-units you get per 1 from-unit). Path-forward and takeout offers are posted from Accounts."
+                description="Currency policies handle FX (how many to-units you get per 1 from-unit). Path-forward and buy-claim offers are posted from Accounts."
             />
 
             <section className="grid gap-8 lg:grid-cols-2">
@@ -410,8 +410,8 @@ export function PoliciesPage() {
             </section>
 
             <section className="space-y-4">
-                <h2 className="font-medium">Claim takeout offers</h2>
-                {takeoutOffers.length === 0 ? (
+                <h2 className="font-medium">Buy-claim offers</h2>
+                {buyClaimOffers.length === 0 ? (
                     <p className="text-muted-foreground text-sm">
                         None — post from Accounts (handshake icon). Lets others
                         sell you claims on debtors you have lined.
@@ -435,7 +435,7 @@ export function PoliciesPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {takeoutOffers.map((p) => (
+                                {buyClaimOffers.map((p) => (
                                     <TableRow
                                         key={`${p.isGlobal ? "g" : p.debtor}-${p.assetId}`}
                                     >

@@ -7,7 +7,7 @@ import {
     fetchObligations,
     fetchForwardOffers,
     fetchRequests,
-    fetchTakeoutOffers,
+    fetchBuyClaimOffers,
 } from "@/lib/graphql";
 import { QueryKey } from "@/lib/query-keys";
 
@@ -53,11 +53,11 @@ export function useForwardOffers() {
     });
 }
 
-export function useTakeoutOffers() {
+export function useBuyClaimOffers() {
     const { data: user } = useCurrentUser();
     return useQuery({
-        queryKey: QueryKey.takeoutOffers(user),
-        queryFn: () => fetchTakeoutOffers(user!),
+        queryKey: QueryKey.buyClaimOffers(user),
+        queryFn: () => fetchBuyClaimOffers(user!),
         enabled: !!user,
     });
 }

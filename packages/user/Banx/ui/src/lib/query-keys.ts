@@ -6,8 +6,8 @@ export const QueryKey = {
         ["banx", "obligations", account ?? ""] as const,
     forwardOffers: (account: string | null | undefined) =>
         ["banx", "forwardOffers", account ?? ""] as const,
-    takeoutOffers: (account: string | null | undefined) =>
-        ["banx", "takeoutOffers", account ?? ""] as const,
+    buyClaimOffers: (account: string | null | undefined) =>
+        ["banx", "buyClaimOffers", account ?? ""] as const,
     currencyPolicies: (account: string | null | undefined) =>
         ["banx", "currencyPolicies", account ?? ""] as const,
     requests: (account: string | null | undefined) =>

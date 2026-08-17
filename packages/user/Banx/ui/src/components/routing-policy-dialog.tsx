@@ -558,7 +558,7 @@ export function RoutingPolicyDialog({
                         Sit in the middle of a path pay for this asset. Anyone
                         can hop through you to a next creditor who has lined
                         you (or whom you already owe). This does not buy
-                        claims — post a takeout offer for that.
+                        claims — post a buy-claim offer for that.
                     </DialogDescription>
                 </DialogHeader>
                 <form

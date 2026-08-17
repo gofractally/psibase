@@ -14,9 +14,9 @@ import {
 import { amountFieldValidator, useAppForm } from "@/lib/form";
 import {
     type CreditLine,
-    type TakeoutOffer,
+    type BuyClaimOffer,
     fetchCreditLines,
-    fetchTakeoutOffers,
+    fetchBuyClaimOffers,
 } from "@/lib/graphql";
 import { QueryKey } from "@/lib/query-keys";
 import { PPM_SCALE } from "@/lib/constants";
@@ -40,7 +40,7 @@ import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 import { cn } from "@shared/lib/utils";
 
-function offerLive(p: TakeoutOffer, nowSec: number): boolean {
+function offerLive(p: BuyClaimOffer, nowSec: number): boolean {
     return p.expiresAt === 0 || p.expiresAt >= nowSec;
 }
 
@@ -87,11 +87,11 @@ function residualOnLine(
 
 /** Prefer specific counterparty offer over global; lower fee wins ties. */
 function pickOffer(
-    offers: TakeoutOffer[],
+    offers: BuyClaimOffer[],
     debtor: string,
     assetId: number,
     nowSec: number,
-): TakeoutOffer | null {
+): BuyClaimOffer | null {
     const live = offers.filter(
         (o) =>
             o.assetId === assetId &&
@@ -130,7 +130,7 @@ export type SellClaimTarget = {
 type BuyerOption = {
     buyer: string;
     label: string;
-    offer: TakeoutOffer;
+    offer: BuyClaimOffer;
     residualRaw: bigint;
     maxFaceRaw: bigint;
 };
@@ -178,8 +178,8 @@ export function SellClaimDialog({
 
     const offerQueries = useQueries({
         queries: loadAccounts.map((account) => ({
-            queryKey: QueryKey.takeoutOffers(account),
-            queryFn: () => fetchTakeoutOffers(account),
+            queryKey: QueryKey.buyClaimOffers(account),
+            queryFn: () => fetchBuyClaimOffers(account),
             enabled: open && !!target && !!account,
         })),
     });
@@ -309,7 +309,7 @@ export function SellClaimDialog({
                                     {target.debtor}
                                 </span>{" "}
                                 ({target.symbol}) to a buyer who posted a
-                                takeout offer. You receive a claim on the
+                                buy-claim offer. You receive a claim on the
                                 buyer for face after their spread (haircut or
                                 premium).
                             </>
@@ -356,7 +356,7 @@ export function SellClaimDialog({
                             ) : options.length === 0 ? (
                                 <p className="text-muted-foreground text-sm">
                                     No contacts (or typed account) currently
-                                    have both a live takeout offer and credit
+                                    have both a live buy-claim offer and credit
                                     residual toward {target.debtor} in{" "}
                                     {target.symbol}.
                                 </p>

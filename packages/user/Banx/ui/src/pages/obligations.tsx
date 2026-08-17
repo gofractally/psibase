@@ -28,15 +28,15 @@ import {
     type SellClaimTarget,
 } from "@/components/sell-claim-dialog";
 import {
-    TakeoutOfferDialog,
-    type TakeoutOfferPrefill,
-} from "@/components/takeout-offer-dialog";
+    BuyClaimOfferDialog,
+    type BuyClaimPrefill,
+} from "@/components/buy-claim-offer-dialog";
 import { useAssetMap } from "@/hooks/use-assets";
 import {
     useCreditLines,
     useForwardOffers,
     useObligations,
-    useTakeoutOffers,
+    useBuyClaimOffers,
 } from "@/hooks/use-banx-data";
 import { useSetCreditLine } from "@/hooks/use-banx-mutations";
 import {
@@ -234,7 +234,7 @@ export function ObligationsPage() {
     const { data: obs = [], isLoading: obsLoading } = useObligations();
     const { data: lines = [], isLoading: linesLoading } = useCreditLines();
     const { data: forwardOffers = [] } = useForwardOffers();
-    const { data: takeoutOffers = [] } = useTakeoutOffers();
+    const { data: buyClaimOffers = [] } = useBuyClaimOffers();
     const { assets, symbolOf, precisionOf } = useAssetMap();
     const isLoading = obsLoading || linesLoading;
 
@@ -246,12 +246,12 @@ export function ObligationsPage() {
             ),
         [forwardOffers, nowSec],
     );
-    const globalTakeoutOn = useMemo(
+    const globalBuyClaimOn = useMemo(
         () =>
-            takeoutOffers.some(
+            buyClaimOffers.some(
                 (p) => p.isGlobal && (p.expiresAt === 0 || p.expiresAt >= nowSec),
             ),
-        [takeoutOffers, nowSec],
+        [buyClaimOffers, nowSec],
     );
 
     const [createOpen, setCreateOpen] = useState(false);
@@ -263,9 +263,9 @@ export function ObligationsPage() {
         useState<RoutingPolicyPrefill | null>(null);
     const [sellOpen, setSellOpen] = useState(false);
     const [sellTarget, setSellTarget] = useState<SellClaimTarget | null>(null);
-    const [takeoutOpen, setTakeoutOpen] = useState(false);
-    const [takeoutPrefill, setTakeoutPrefill] =
-        useState<TakeoutOfferPrefill | null>(null);
+    const [buyClaimOpen, setBuyClaimOpen] = useState(false);
+    const [buyClaimPrefill, setBuyClaimPrefill] =
+        useState<BuyClaimPrefill | null>(null);
     const [hideEmptySavings, setHideEmptySavings] = useState(false);
     const [hideEmptyLoans, setHideEmptyLoans] = useState(false);
 
@@ -274,9 +274,9 @@ export function ObligationsPage() {
         setRoutingOpen(true);
     };
 
-    const openTakeout = (prefill?: TakeoutOfferPrefill | null) => {
-        setTakeoutPrefill(prefill ?? null);
-        setTakeoutOpen(true);
+    const openBuyClaim = (prefill?: BuyClaimPrefill | null) => {
+        setBuyClaimPrefill(prefill ?? null);
+        setBuyClaimOpen(true);
     };
 
     const openRequest = (
@@ -385,24 +385,24 @@ export function ObligationsPage() {
                                     variant="outline"
                                     className={cn(
                                         "size-9 shrink-0 transition-shadow",
-                                        globalTakeoutOn
+                                        globalBuyClaimOn
                                             ? "border-emerald-500/60 text-emerald-700 shadow-[0_0_12px_rgba(16,185,129,0.55)] hover:bg-emerald-500/10 dark:text-emerald-400 dark:shadow-[0_0_14px_rgba(52,211,153,0.45)]"
                                             : "border-red-500/70 text-red-700 shadow-[0_0_14px_rgba(239,68,68,0.65)] hover:bg-red-500/10 dark:text-red-400 dark:shadow-[0_0_16px_rgba(248,113,113,0.5)] animate-pulse",
                                     )}
                                     aria-label={
-                                        globalTakeoutOn
-                                            ? "Global takeout offer is on — click to edit"
-                                            : "Global takeout offer is off — click to post one"
+                                        globalBuyClaimOn
+                                            ? "Global buy-claim offer is on — click to edit"
+                                            : "Global buy-claim offer is off — click to post one"
                                     }
-                                    onClick={() => openTakeout(null)}
+                                    onClick={() => openBuyClaim(null)}
                                 >
                                     <Handshake className="size-4" />
                                 </Button>
                             </TooltipTrigger>
                             <TooltipContent side="bottom" className="max-w-xs">
-                                {globalTakeoutOn
-                                    ? "Global takeout on — others can sell you claims. Click to edit."
-                                    : "No global takeout — post one to buy others' claims."}
+                                {globalBuyClaimOn
+                                    ? "Global buy-claim on — others can sell you claims. Click to edit."
+                                    : "No global buy-claim — post one to buy others' claims."}
                             </TooltipContent>
                         </Tooltip>
                     </div>
@@ -419,14 +419,14 @@ export function ObligationsPage() {
                 prefill={routingPrefill}
             />
 
-            <TakeoutOfferDialog
-                open={takeoutOpen}
+            <BuyClaimOfferDialog
+                open={buyClaimOpen}
                 onOpenChange={(open) => {
-                    setTakeoutOpen(open);
-                    if (!open) setTakeoutPrefill(null);
+                    setBuyClaimOpen(open);
+                    if (!open) setBuyClaimPrefill(null);
                 }}
                 assets={assets}
-                prefill={takeoutPrefill}
+                prefill={buyClaimPrefill}
             />
 
             {/* ── Savings / deposits (you are creditor) ───────────────── */}
@@ -513,8 +513,8 @@ export function ObligationsPage() {
                                         assetId: g.assetId,
                                     })
                                 }
-                                onSetTakeout={() =>
-                                    openTakeout({
+                                onSetBuyClaim={() =>
+                                    openBuyClaim({
                                         debtor: g.counterparty,
                                         assetId: g.assetId,
                                     })
@@ -1080,7 +1080,7 @@ function AccountGroupRow({
     balanceLabel,
     onEditCreditLine,
     onSetRouting,
-    onSetTakeout,
+    onSetBuyClaim,
     onAskRequest,
     onAskSettle,
     onSellClaim,
@@ -1100,8 +1100,8 @@ function AccountGroupRow({
     onEditCreditLine?: () => void;
     /** Path-forward offer with this counterparty as next hop. */
     onSetRouting?: () => void;
-    /** Takeout offer to buy claims on this counterparty. */
-    onSetTakeout?: () => void;
+    /** Buy-claim offer to buy claims on this counterparty. */
+    onSetBuyClaim?: () => void;
     /** Open a request (invoice from savings, please-book from a loan). */
     onAskRequest?: () => void;
     /** Authorize the debtor to settle this tab (settle-auth). */
@@ -1156,8 +1156,8 @@ function AccountGroupRow({
     const historyTip = "History — path draws, deposits, nets, and line changes";
     const routingTip =
         "Path-forward offer — let others hop through you to this party";
-    const takeoutTip =
-        "Takeout offer — buy others' claims on this party";
+    const buyClaimTip =
+        "Buy-claim offer — buy others' claims on this party";
     const requestTip =
         tone === "savings"
             ? "Invoice — ask them to path-pay you"
@@ -1165,7 +1165,7 @@ function AccountGroupRow({
     const settleAuthTip =
         "Settle auth — let them pay down this tab without you booking it";
     const sellTip =
-        "Sell claim — transfer this debt to a buyer under their takeout offer";
+        "Sell claim — transfer this debt to a buyer under their buy-claim offer";
 
     return (
         <Collapsible open={open} onOpenChange={setOpen}>
@@ -1315,7 +1315,7 @@ function AccountGroupRow({
                                 </TooltipContent>
                             </Tooltip>
                         ) : null}
-                        {onSetTakeout ? (
+                        {onSetBuyClaim ? (
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <Button
@@ -1323,17 +1323,17 @@ function AccountGroupRow({
                                         size="icon"
                                         variant="outline"
                                         className="size-8 shrink-0"
-                                        aria-label={takeoutTip}
+                                        aria-label={buyClaimTip}
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            onSetTakeout();
+                                            onSetBuyClaim();
                                         }}
                                     >
                                         <Handshake className="size-3.5" />
                                     </Button>
                                 </TooltipTrigger>
                                 <TooltipContent side="top">
-                                    {takeoutTip}
+                                    {buyClaimTip}
                                 </TooltipContent>
                             </Tooltip>
                         ) : null}

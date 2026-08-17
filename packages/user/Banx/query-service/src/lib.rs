@@ -5,7 +5,7 @@ mod service {
     use banx::tables::{
         Asset, AssetTable, CreditLine, CreditLineTable, CurrencyPolicy, CurrencyPolicyTab,
         policy_is_live, ForwardOffer, ForwardOfferTab, Obligation, ObligationTable, PairCycle,
-        PayRequest, PPM_SCALE, RATE_SCALE, RequestTab, TakeoutOffer, TakeoutOfferTab,
+        PayRequest, PPM_SCALE, RATE_SCALE, RequestTab, BuyClaimOffer, BuyClaimOfferTab,
     };
     use psibase::services::tokens::{Decimal, Precision, Quantity};
     use psibase::*;
@@ -186,7 +186,7 @@ mod service {
     }
 
     #[derive(SimpleObject)]
-    struct TakeoutOfferView {
+    struct BuyClaimOfferView {
         poster: AccountNumber,
         /// `0` / empty when global.
         debtor: AccountNumber,
@@ -197,8 +197,8 @@ mod service {
         isGlobal: bool,
     }
 
-    impl From<TakeoutOffer> for TakeoutOfferView {
-        fn from(p: TakeoutOffer) -> Self {
+    impl From<BuyClaimOffer> for BuyClaimOfferView {
+        fn from(p: BuyClaimOffer) -> Self {
             Self {
                 poster: p.poster,
                 debtor: p.debtor,
@@ -418,13 +418,13 @@ mod service {
                 .collect()
         }
 
-        /// Claim-takeout offers posted by `poster` (global + specific debtors).
-        async fn takeoutOffers(&self, poster: AccountNumber) -> Vec<TakeoutOfferView> {
-            TakeoutOfferTab::with_service(banx::SERVICE)
+        /// Buy-claim offers posted by `poster` (global + specific debtors).
+        async fn buyClaimOffers(&self, poster: AccountNumber) -> Vec<BuyClaimOfferView> {
+            BuyClaimOfferTab::with_service(banx::SERVICE)
                 .get_index_pk()
                 .iter()
                 .filter(|p| p.poster == poster)
-                .map(TakeoutOfferView::from)
+                .map(BuyClaimOfferView::from)
                 .collect()
         }
 

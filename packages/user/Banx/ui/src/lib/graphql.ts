@@ -49,7 +49,7 @@ const zForwardOffer = z.object({
     isGlobal: z.boolean(),
 });
 
-const zTakeoutOffer = z.object({
+const zBuyClaimOffer = z.object({
     poster: z.string(),
     debtor: z.string(),
     assetId: z.number(),
@@ -104,7 +104,7 @@ export type Asset = z.infer<typeof zAsset>;
 export type CreditLine = z.infer<typeof zCreditLine>;
 export type Obligation = z.infer<typeof zObligation>;
 export type ForwardOffer = z.infer<typeof zForwardOffer>;
-export type TakeoutOffer = z.infer<typeof zTakeoutOffer>;
+export type BuyClaimOffer = z.infer<typeof zBuyClaimOffer>;
 export type CurrencyPolicy = z.infer<typeof zCurrencyPolicy>;
 export type PayRequest = z.infer<typeof zPayRequest>;
 export type ActivityEvent = z.infer<typeof zActivity>;
@@ -152,15 +152,15 @@ export async function fetchForwardOffers(
     return zForwardOffer.array().parse(data.forwardOffers);
 }
 
-export async function fetchTakeoutOffers(
+export async function fetchBuyClaimOffers(
     account: string,
-): Promise<TakeoutOffer[]> {
-    const data = await gql<{ takeoutOffers: TakeoutOffer[] }>(
-        `{ takeoutOffers(poster: "${account}") {
+): Promise<BuyClaimOffer[]> {
+    const data = await gql<{ buyClaimOffers: BuyClaimOffer[] }>(
+        `{ buyClaimOffers(poster: "${account}") {
             poster debtor assetId feeFixed feePercentPpm expiresAt isGlobal
         } }`,
     );
-    return zTakeoutOffer.array().parse(data.takeoutOffers);
+    return zBuyClaimOffer.array().parse(data.buyClaimOffers);
 }
 
 export async function fetchRequests(account: string): Promise<PayRequest[]> {

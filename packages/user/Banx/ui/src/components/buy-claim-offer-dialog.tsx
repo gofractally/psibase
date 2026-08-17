@@ -1,12 +1,12 @@
 import { useEffect, useMemo } from "react";
 
 import { AssetField, ExpiresField } from "@/components/form-fields";
-import { useTakeoutOffers } from "@/hooks/use-banx-data";
+import { useBuyClaimOffers } from "@/hooks/use-banx-data";
 import {
-    useRemoveGlobalTakeoutOffer,
-    useRemoveTakeoutOffer,
-    useSetGlobalTakeoutOffer,
-    useSetTakeoutOffer,
+    useRemoveGlobalBuyClaimOffer,
+    useRemoveBuyClaimOffer,
+    useSetGlobalBuyClaimOffer,
+    useSetBuyClaimOffer,
 } from "@/hooks/use-banx-mutations";
 import { amountPlaceholder, displayAmount } from "@/lib/amount";
 import {
@@ -19,7 +19,7 @@ import {
     ppmToPercentInput,
     useAppForm,
 } from "@/lib/form";
-import type { Asset, TakeoutOffer } from "@/lib/graphql";
+import type { Asset, BuyClaimOffer } from "@/lib/graphql";
 
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -31,7 +31,7 @@ import {
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
 
-export type TakeoutOfferPrefill = {
+export type BuyClaimPrefill = {
     /** Underlying debtor → specific offer. Omit for global. */
     debtor?: string;
     assetId?: number;
@@ -51,11 +51,11 @@ const defaultFees = (assetId?: number): FeeFields => ({
     expiresAtSeconds: 0,
 });
 
-function offerLive(p: TakeoutOffer, nowSec: number): boolean {
+function offerLive(p: BuyClaimOffer, nowSec: number): boolean {
     return p.expiresAt === 0 || p.expiresAt >= nowSec;
 }
 
-function feesFromOffer(p: TakeoutOffer): FeeFields {
+function feesFromOffer(p: BuyClaimOffer): FeeFields {
     return {
         assetId: p.assetId,
         feeFixed: displayAmount(p.feeFixed),
@@ -64,12 +64,12 @@ function feesFromOffer(p: TakeoutOffer): FeeFields {
     };
 }
 
-const takeoutSpreadValidators = {
+const buyClaimSpreadValidators = {
     onChange: signedPercentFieldValidator(MAX_HOP_FEE_PERCENT),
     onSubmit: signedPercentFieldValidator(MAX_HOP_FEE_PERCENT),
 };
 
-export function TakeoutOfferDialog({
+export function BuyClaimOfferDialog({
     open,
     onOpenChange,
     assets,
@@ -78,16 +78,16 @@ export function TakeoutOfferDialog({
     open: boolean;
     onOpenChange: (open: boolean) => void;
     assets: Asset[];
-    prefill?: TakeoutOfferPrefill | null;
+    prefill?: BuyClaimPrefill | null;
 }) {
     const debtor = prefill?.debtor?.trim() ?? "";
     const isSpecific = !!debtor;
 
-    const { data: offers = [] } = useTakeoutOffers();
-    const setGlobal = useSetGlobalTakeoutOffer();
-    const setSpecific = useSetTakeoutOffer();
-    const removeGlobal = useRemoveGlobalTakeoutOffer();
-    const removeSpecific = useRemoveTakeoutOffer();
+    const { data: offers = [] } = useBuyClaimOffers();
+    const setGlobal = useSetGlobalBuyClaimOffer();
+    const setSpecific = useSetBuyClaimOffer();
+    const removeGlobal = useRemoveGlobalBuyClaimOffer();
+    const removeSpecific = useRemoveBuyClaimOffer();
 
     const precisionOf = (id: number) =>
         assets.find((a) => a.id === id)?.precision ?? 0;
@@ -111,7 +111,7 @@ export function TakeoutOfferDialog({
     }, [offers, debtor, prefill?.assetId, nowSec]);
 
     const liveGlobalByAsset = useMemo(() => {
-        const map = new Map<number, TakeoutOffer>();
+        const map = new Map<number, BuyClaimOffer>();
         for (const p of offers) {
             if (p.isGlobal && offerLive(p, nowSec)) {
                 map.set(p.assetId, p);
@@ -273,7 +273,7 @@ export function TakeoutOfferDialog({
                     />
                     <form.AppField
                         name="feePct"
-                        validators={takeoutSpreadValidators}
+                        validators={buyClaimSpreadValidators}
                         children={(field) => (
                             <field.TextField
                                 label="Spread %"
@@ -304,7 +304,7 @@ export function TakeoutOfferDialog({
             <Dialog open={open} onOpenChange={onOpenChange}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Claim takeout offer</DialogTitle>
+                        <DialogTitle>Buy-claim offer</DialogTitle>
                         <DialogDescription>
                             Buy claims on <strong>{debtor}</strong>. Spread
                             is signed: positive haircuts the seller, negative
@@ -411,7 +411,7 @@ export function TakeoutOfferDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Claim takeout offer</DialogTitle>
+                    <DialogTitle>Buy-claim offer</DialogTitle>
                     <DialogDescription>
                         Buy claims on anyone you have lined in this asset.
                         Spread is signed: positive haircuts the seller,
