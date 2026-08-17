@@ -109,7 +109,7 @@ Posted with the credit line (`st_crd_lne`), stored on a **pair cycle** row keyed
 
 When that pair goes **0 → positive**, the posted `grace_seconds` is **snapshotted** on the cycle. Until that window ends, live interest on that pair is **0**. If they **deposit/net the pair to zero** inside the window, the cycle closes with nothing to charge. Later line edits change posted grace only; they do not rewrite an open snapshot.
 
-After the window, daily compound runs from origination (the “lost grace” case).
+After the window, daily compound runs from the last principal/rate change (origination if nothing changed during grace — the “lost grace” case).
 
 Editing the line later does not change an **open** cycle; it applies to the next 0→positive.
 

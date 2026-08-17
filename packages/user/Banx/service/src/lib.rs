@@ -939,13 +939,16 @@ pub mod tables {
 
         /// Write live interest and start a new epoch. Only for principal/rate
         /// changes — not for a lone accrue, so 5s vs 5y stays identical.
-        /// During a grace window, interest stays 0 and the cycle start is kept
-        /// so post-grace compound still runs from origination.
+        /// During grace, interest stays 0 and the epoch moves to now so
+        /// post-grace compound runs from this principal change, not origination.
         pub fn lock_interest(&mut self) {
             let now = Self::now();
             if PairCycle::pair_in_grace(self.creditor, self.debtor, self.asset_id, now) {
-                if self.accrued_interest.value != 0 {
-                    self.accrued_interest = Quantity::new(0);
+                let dirty = self.accrued_interest.value != 0
+                    || now.seconds != self.last_interest_accrual.seconds;
+                self.accrued_interest = Quantity::new(0);
+                self.last_interest_accrual = now;
+                if dirty && !self.is_clear() {
                     self.save();
                 }
                 return;
@@ -2084,9 +2087,10 @@ pub mod service {
                 }
             }
 
-            if forward.value == 0 {
-                break;
-            }
+            assert!(
+                forward.value > 0,
+                "path_pay hop produced nothing to forward"
+            );
 
             // Same-asset forward hop: live specific, else live global.
             let offer = resolve_forward(next_creditor, path_debtor, asset_id);
