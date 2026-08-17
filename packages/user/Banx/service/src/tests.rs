@@ -2,9 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::interest::{
-        compound_amount, interest_for, SECONDS_PER_DAY, SECONDS_PER_YEAR,
-    };
+    use crate::interest::{compound_amount, interest_for, SECONDS_PER_DAY, SECONDS_PER_YEAR};
     use crate::tables::{
         Asset, CreditLine, Obligation, PairCycle, PathHop, PayRequest, PPM_SCALE, RATE_SCALE,
     };
@@ -55,10 +53,7 @@ mod tests {
         let gold = Asset::get_by_symbol_assert(account!("gold"));
         assert_eq!(gold.id, 5);
         assert_eq!(gold.precision.value(), 6);
-        assert_eq!(
-            gold.description.to_string(),
-            "1.000000 = 1 gram of gold"
-        );
+        assert_eq!(gold.description.to_string(), "1.000000 = 1 gram of gold");
 
         let silver = Asset::get_by_symbol_assert(account!("silver"));
         assert_eq!(silver.id, 6);
@@ -123,7 +118,7 @@ mod tests {
     fn test_interest_path_independence(_chain: psibase::Chain) -> Result<(), psibase::Error> {
         let year = SECONDS_PER_YEAR as u64;
         let p = 1_000_000u64; // $100.0000 at 4 dp
-        // Daily 10%: ~10.52% effective over 365 days (not exact +10%).
+                              // Daily 10%: ~10.52% effective over 365 days (not exact +10%).
         assert_eq!(compound_amount(p, 100_000, year), 1_104_964);
         assert_eq!(compound_amount(p, 100_000, year * 2), 1_220_966);
         assert_eq!(interest_for(p, 100_000, year * 2), 220_966);
@@ -131,12 +126,12 @@ mod tests {
         assert_eq!(compound_amount(0, 100_000, year), 0);
         assert_eq!(interest_for(p, 0, year), 0);
         assert_eq!(compound_amount(p, 100_000, year / 2), 1_051_170);
-        assert_eq!(compound_amount(p, 100_000, SECONDS_PER_DAY as u64), 1_000_273);
-        // $5.0000 at 20% for 12h: half a daily tick, floor to 0.0013.
         assert_eq!(
-            interest_for(50_000, 200_000, 12 * 3600),
-            13
+            compound_amount(p, 100_000, SECONDS_PER_DAY as u64),
+            1_000_273
         );
+        // $5.0000 at 20% for 12h: half a daily tick, floor to 0.0013.
+        assert_eq!(interest_for(50_000, 200_000, 12 * 3600), 13);
 
         Ok(())
     }
@@ -164,7 +159,11 @@ mod tests {
 
         Wrapper::push_from(&chain, gary)
             .st_glb_fwd(
-                usd, Quantity::new(0), PPM_SCALE * 2 / 100, PPM_SCALE, never(),
+                usd,
+                Quantity::new(0),
+                PPM_SCALE * 2 / 100,
+                PPM_SCALE,
+                never(),
             )
             .get()?;
 
@@ -217,9 +216,7 @@ mod tests {
             .get()?;
         // Gary routes same-asset USD to Steve (no fee).
         Wrapper::push_from(&chain, gary)
-            .st_glb_fwd(
-                usd, Quantity::new(0), 0, PPM_SCALE, never(),
-            )
+            .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never())
             .get()?;
 
         Wrapper::push_from(&chain, alice)
@@ -287,19 +284,25 @@ mod tests {
         // Mitchell → John, AUD, 5% hop fee
         Wrapper::push_from(&chain, mitchell)
             .st_glb_fwd(
-                aud, Quantity::new(0), PPM_SCALE * 5 / 100, PPM_SCALE, never(),
+                aud,
+                Quantity::new(0),
+                PPM_SCALE * 5 / 100,
+                PPM_SCALE,
+                never(),
             )
             .get()?;
         // John → Mike, USD (after convert), no fee
         Wrapper::push_from(&chain, john)
-            .st_glb_fwd(
-                usd, Quantity::new(0), 0, PPM_SCALE, never(),
-            )
+            .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never())
             .get()?;
         // Mike → Brandon, USD, 1% hop fee
         Wrapper::push_from(&chain, mike)
             .st_glb_fwd(
-                usd, Quantity::new(0), PPM_SCALE * 1 / 100, PPM_SCALE, never(),
+                usd,
+                Quantity::new(0),
+                PPM_SCALE * 1 / 100,
+                PPM_SCALE,
+                never(),
             )
             .get()?;
         // Mitchell posts convert AUD→USD at 0.65 (applied when path hits USD hop)
@@ -405,17 +408,23 @@ mod tests {
 
         Wrapper::push_from(&chain, mitchell)
             .st_glb_fwd(
-                aud, Quantity::new(0), PPM_SCALE * 5 / 100, PPM_SCALE, never(),
+                aud,
+                Quantity::new(0),
+                PPM_SCALE * 5 / 100,
+                PPM_SCALE,
+                never(),
             )
             .get()?;
         Wrapper::push_from(&chain, john)
-            .st_glb_fwd(
-                usd, Quantity::new(0), 0, PPM_SCALE, never(),
-            )
+            .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never())
             .get()?;
         Wrapper::push_from(&chain, mike)
             .st_glb_fwd(
-                usd, Quantity::new(0), PPM_SCALE * 1 / 100, PPM_SCALE, never(),
+                usd,
+                Quantity::new(0),
+                PPM_SCALE * 1 / 100,
+                PPM_SCALE,
+                never(),
             )
             .get()?;
         Wrapper::push_from(&chain, mitchell)
@@ -469,7 +478,12 @@ mod tests {
             .st_crd_lne(alice, aud, Quantity::new(10_000), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .path_pay(vec![hop(gary, aud)], Quantity::new(100), Quantity::new(100), 0)
+            .path_pay(
+                vec![hop(gary, aud)],
+                Quantity::new(100),
+                Quantity::new(100),
+                0,
+            )
             .get()?;
 
         Wrapper::push_from(&chain, alice)
@@ -495,9 +509,7 @@ mod tests {
 
     /// Reverse claim in the destination asset is cancelled by convert.
     #[psibase::test_case(packages("Banx"))]
-    fn test_convert_autonets_reverse_to_asset(
-        chain: psibase::Chain,
-    ) -> Result<(), psibase::Error> {
+    fn test_convert_autonets_reverse_to_asset(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
         let gary = account!("gary");
@@ -510,7 +522,12 @@ mod tests {
             .st_crd_lne(alice, aud, Quantity::new(10_000), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .path_pay(vec![hop(gary, aud)], Quantity::new(100), Quantity::new(100), 0)
+            .path_pay(
+                vec![hop(gary, aud)],
+                Quantity::new(100),
+                Quantity::new(100),
+                0,
+            )
             .get()?;
         // Gary already owes Alice 80 USD.
         Wrapper::push_from(&chain, gary)
@@ -582,9 +599,7 @@ mod tests {
             .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, gary)
-            .st_glb_fwd(
-                usd, Quantity::new(50), 0, PPM_SCALE, never(),
-            )
+            .st_glb_fwd(usd, Quantity::new(50), 0, PPM_SCALE, never())
             .get()?;
 
         let result = Wrapper::push_from(&chain, alice)
@@ -721,7 +736,7 @@ mod tests {
 
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
 
-        // Alice holds Bob debt via deposit (Bob books liability to Alice... 
+        // Alice holds Bob debt via deposit (Bob books liability to Alice...
         // deposit: sender=receiver owes depositor. Alice deposit depositor=bob → Alice owes Bob.
         // We need Bob owes Alice: Bob deposit depositor=alice.
         Wrapper::push_from(&chain, bob)
@@ -735,9 +750,7 @@ mod tests {
             .get()?;
         // Global takeout: 5% take fee (no forward offer needed).
         Wrapper::push_from(&chain, peter)
-            .st_glb_tko(
-                usd, Quantity::new(0), PPM_SCALE * 5 / 100, never(),
-            )
+            .st_glb_tko(usd, Quantity::new(0), PPM_SCALE * 5 / 100, never())
             .get()?;
 
         Wrapper::push_from(&chain, alice)
@@ -772,13 +785,15 @@ mod tests {
             .get()?;
         // Specific takeout must not affect path forward.
         Wrapper::push_from(&chain, gary)
-            .st_tko_ofr(
-                steve, usd, Quantity::new(0), 0, never(),
-            )
+            .st_tko_ofr(steve, usd, Quantity::new(0), 0, never())
             .get()?;
         Wrapper::push_from(&chain, gary)
             .st_glb_fwd(
-                usd, Quantity::new(0), PPM_SCALE * 2 / 100, PPM_SCALE, never(),
+                usd,
+                Quantity::new(0),
+                PPM_SCALE * 2 / 100,
+                PPM_SCALE,
+                never(),
             )
             .get()?;
 
@@ -814,13 +829,16 @@ mod tests {
             .get()?;
         Wrapper::push_from(&chain, gary)
             .st_fwd_ofr(
-                steve, usd, Quantity::new(0), 0, PPM_SCALE, TimePointSec { seconds: 1 },
+                steve,
+                usd,
+                Quantity::new(0),
+                0,
+                PPM_SCALE,
+                TimePointSec { seconds: 1 },
             )
             .get()?;
         Wrapper::push_from(&chain, gary)
-            .st_glb_fwd(
-                usd, Quantity::new(10), 0, PPM_SCALE, never(),
-            )
+            .st_glb_fwd(usd, Quantity::new(10), 0, PPM_SCALE, never())
             .get()?;
 
         Wrapper::push_from(&chain, alice)
@@ -958,14 +976,33 @@ mod tests {
             .st_crd_lne(alice, aud, Quantity::new(10_000), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .path_pay(vec![hop(gary, aud)], Quantity::new(100), Quantity::new(100), 0)
+            .path_pay(
+                vec![hop(gary, aud)],
+                Quantity::new(100),
+                Quantity::new(100),
+                0,
+            )
             .get()?;
 
         Wrapper::push_from(&chain, alice)
-            .st_cur_pol(aud, usd, Quantity::new(0), RATE_SCALE * 50 / 100, 0, never())
+            .st_cur_pol(
+                aud,
+                usd,
+                Quantity::new(0),
+                RATE_SCALE * 50 / 100,
+                0,
+                never(),
+            )
             .get()?;
         Wrapper::push_from(&chain, gary)
-            .st_cur_pol(aud, usd, Quantity::new(0), RATE_SCALE * 80 / 100, 0, never())
+            .st_cur_pol(
+                aud,
+                usd,
+                Quantity::new(0),
+                RATE_SCALE * 80 / 100,
+                0,
+                never(),
+            )
             .get()?;
 
         // Gary holds the claim; Alice is the debtor. Use Alice's 0.50 quote.
@@ -997,7 +1034,14 @@ mod tests {
             .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .st_cur_pol(aud, usd, Quantity::new(0), RATE_SCALE * 70 / 100, 0, never())
+            .st_cur_pol(
+                aud,
+                usd,
+                Quantity::new(0),
+                RATE_SCALE * 70 / 100,
+                0,
+                never(),
+            )
             .get()?;
         Wrapper::push_from(&chain, gary)
             .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never())
@@ -1043,7 +1087,14 @@ mod tests {
             .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .st_cur_pol(aud, usd, Quantity::new(0), RATE_SCALE * 70 / 100, 0, never())
+            .st_cur_pol(
+                aud,
+                usd,
+                Quantity::new(0),
+                RATE_SCALE * 70 / 100,
+                0,
+                never(),
+            )
             .get()?;
         Wrapper::push_from(&chain, gary)
             .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never())
@@ -1085,7 +1136,14 @@ mod tests {
             .get()
             .is_err());
         assert!(Wrapper::push_from(&chain, alice)
-            .st_crd_lne(account!("bob"), usd, Quantity::new(100), false, PPM_SCALE + 1, 0)
+            .st_crd_lne(
+                account!("bob"),
+                usd,
+                Quantity::new(100),
+                false,
+                PPM_SCALE + 1,
+                0
+            )
             .get()
             .is_err());
         assert!(Wrapper::push_from(&chain, alice)
@@ -1177,9 +1235,7 @@ mod tests {
             .st_crd_lne(bob, usd, Quantity::new(10_000), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, peter)
-            .st_glb_tko(
-                usd, Quantity::new(0), PPM_SCALE * 5 / 100, never(),
-            )
+            .st_glb_tko(usd, Quantity::new(0), PPM_SCALE * 5 / 100, never())
             .get()?;
         Wrapper::push_from(&chain, peter)
             .st_tko_ofr(bob, usd, Quantity::new(0), 0, never())
@@ -1206,7 +1262,14 @@ mod tests {
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
 
         Wrapper::push_from(&chain, bob)
-            .st_crd_lne(alice, usd, Quantity::new(10_000_000), false, 100_000, WEEK_SECS)
+            .st_crd_lne(
+                alice,
+                usd,
+                Quantity::new(10_000_000),
+                false,
+                100_000,
+                WEEK_SECS,
+            )
             .get()?;
         Wrapper::push_from(&chain, alice)
             .path_pay(
@@ -1227,9 +1290,7 @@ mod tests {
     }
 
     #[psibase::test_case(packages("Banx"))]
-    fn test_grace_repay_to_zero_waives(
-        chain: psibase::Chain,
-    ) -> Result<(), psibase::Error> {
+    fn test_grace_repay_to_zero_waives(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
         let bob = account!("bob");
@@ -1238,7 +1299,14 @@ mod tests {
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
 
         Wrapper::push_from(&chain, bob)
-            .st_crd_lne(alice, usd, Quantity::new(10_000_000), false, 100_000, WEEK_SECS)
+            .st_crd_lne(
+                alice,
+                usd,
+                Quantity::new(10_000_000),
+                false,
+                100_000,
+                WEEK_SECS,
+            )
             .get()?;
         Wrapper::push_from(&chain, alice)
             .path_pay(
@@ -1273,7 +1341,14 @@ mod tests {
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
 
         Wrapper::push_from(&chain, bob)
-            .st_crd_lne(alice, usd, Quantity::new(10_000_000), false, 100_000, WEEK_SECS)
+            .st_crd_lne(
+                alice,
+                usd,
+                Quantity::new(10_000_000),
+                false,
+                100_000,
+                WEEK_SECS,
+            )
             .get()?;
         Wrapper::push_from(&chain, alice)
             .path_pay(
@@ -1359,9 +1434,7 @@ mod tests {
     /// C lined B, B lined A. A pays C via B. C can pay A back by unwinding
     /// those claims — no opposite credit lines required.
     #[psibase::test_case(packages("Banx"))]
-    fn test_path_pay_unwinds_reverse_claims(
-        chain: psibase::Chain,
-    ) -> Result<(), psibase::Error> {
+    fn test_path_pay_unwinds_reverse_claims(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let a = account!("alice");
         let b = account!("bobby");
@@ -1520,7 +1593,12 @@ mod tests {
             .st_crd_lne(alice, usd, Quantity::new(10_000), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .path_pay(vec![hop(bob, usd)], Quantity::new(1_000), Quantity::new(1_000), 0)
+            .path_pay(
+                vec![hop(bob, usd)],
+                Quantity::new(1_000),
+                Quantity::new(1_000),
+                0,
+            )
             .get()?;
         assert_eq!(exp(&chain, bob, alice, usd), 1_000);
 
@@ -1577,9 +1655,7 @@ mod tests {
     }
 
     #[psibase::test_case(packages("Banx"))]
-    fn test_settle_auth_debtor_pulls_capped(
-        chain: psibase::Chain,
-    ) -> Result<(), psibase::Error> {
+    fn test_settle_auth_debtor_pulls_capped(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
         let bob = account!("bob");
@@ -1685,7 +1761,12 @@ mod tests {
             .st_crd_lne(alice, aud, Quantity::new(10_000), false, 200_000, 0)
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .path_pay(vec![hop(gary, aud)], Quantity::new(100), Quantity::new(100), 0)
+            .path_pay(
+                vec![hop(gary, aud)],
+                Quantity::new(100),
+                Quantity::new(100),
+                0,
+            )
             .get()?;
         Wrapper::push_from(&chain, alice)
             .st_cur_pol(aud, usd, Quantity::new(0), RATE_SCALE, 0, never())
@@ -1766,7 +1847,9 @@ mod tests {
     /// A hop that converts to nothing must fail even when `min_return` is 0,
     /// so hop-0 does not stick as a prefix settlement.
     #[psibase::test_case(packages("Banx"))]
-    fn test_want_path_pay_unfinished_hop_fails(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    fn test_want_path_pay_unfinished_hop_fails(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
         let gary = account!("gary");
@@ -1783,7 +1866,14 @@ mod tests {
             .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .st_cur_pol(aud, usd, Quantity::new(0), RATE_SCALE * 70 / 100, 0, never())
+            .st_cur_pol(
+                aud,
+                usd,
+                Quantity::new(0),
+                RATE_SCALE * 70 / 100,
+                0,
+                never(),
+            )
             .get()?;
         Wrapper::push_from(&chain, gary)
             .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never())
@@ -1825,7 +1915,14 @@ mod tests {
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
 
         Wrapper::push_from(&chain, bob)
-            .st_crd_lne(alice, usd, Quantity::new(10_000_000), false, 100_000, WEEK_SECS)
+            .st_crd_lne(
+                alice,
+                usd,
+                Quantity::new(10_000_000),
+                false,
+                100_000,
+                WEEK_SECS,
+            )
             .get()?;
         Wrapper::push_from(&chain, alice)
             .path_pay(
@@ -1872,7 +1969,14 @@ mod tests {
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
 
         Wrapper::push_from(&chain, bob)
-            .st_crd_lne(alice, usd, Quantity::new(10_000_000), false, 100_000, WEEK_SECS)
+            .st_crd_lne(
+                alice,
+                usd,
+                Quantity::new(10_000_000),
+                false,
+                100_000,
+                WEEK_SECS,
+            )
             .get()?;
         Wrapper::push_from(&chain, alice)
             .path_pay(
