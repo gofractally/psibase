@@ -1,6 +1,6 @@
 [package]
 name = "banx-pkg"                      # Crate name
-description = "ftb"
+description = "Mutual-credit ledger"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true

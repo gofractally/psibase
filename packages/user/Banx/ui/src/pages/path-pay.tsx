@@ -191,7 +191,7 @@ export function PathPayPage() {
         <div className="space-y-8">
             <PageHeader
                 title="Transfer"
-                description="Draw along a hop list. First hop uses a credit line only; later same-asset hops need a live path-forward offer (fixed + % fee). Asset changes auto-convert via the previous edge debtor's currency policy. Use Find path to discover a route from you to a payee. Fulfilling an invoice requires the last hop to be the payee."
+                description="Pay along hops. First hop: credit line or reverse claim. Later hops: live path-forward. Find path fills the list."
             />
 
             <section className="grid max-w-2xl gap-4 rounded-lg border p-4">
