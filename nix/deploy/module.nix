@@ -217,15 +217,36 @@ in {
         SOFTHSM2_CONF = "${softhsmConf}";
       };
 
-      readWritePaths = lib.unique (
-        [cfg.dataDir]
-        ++ lib.optional cfg.softHsm.enable cfg.softHsm.tokenDir
+      underVarLib = path: let
+        s = toString path;
+        prefix = "/var/lib/";
+        rel = lib.removePrefix prefix s;
+      in
+        if lib.hasPrefix prefix s && rel != ""
+        then rel
+        else null;
+
+      dataDirRel = underVarLib cfg.dataDir;
+      tokenDirRel = underVarLib cfg.softHsm.tokenDir;
+      stateDirectory = lib.concatStringsSep " " (
+        lib.unique (
+          lib.optional (dataDirRel != null) dataDirRel
+          ++ lib.optional (cfg.softHsm.enable && tokenDirRel != null) tokenDirRel
+        )
       );
     in {
       assertions = [
         {
           assertion = !cfg.softHsm.enable || cfg.softHsm.pinFile != null;
           message = "services.psibase.softHsm.pinFile must be set when softHsm.enable is true";
+        }
+        {
+          assertion = dataDirRel != null;
+          message = "services.psibase.dataDir must be under /var/lib so systemd StateDirectory can create it";
+        }
+        {
+          assertion = !cfg.softHsm.enable || tokenDirRel != null;
+          message = "services.psibase.softHsm.tokenDir must be under /var/lib so systemd StateDirectory can create it";
         }
       ];
 
@@ -245,38 +266,25 @@ in {
 
       networking.firewall.allowedTCPPorts = lib.mkIf cfg.openFirewall [cfg.listen];
 
-      # <dataDir>/db is created by triedent, not tmpfiles.
-      systemd.tmpfiles.rules =
-        ["d ${cfg.dataDir} 0750 psibase psibase -"]
-        ++ lib.optionals cfg.softHsm.enable [
-          "d ${cfg.dataDir}/softhsm 0750 psibase psibase -"
-          "d ${cfg.softHsm.tokenDir} 0750 psibase psibase -"
-        ];
-
       systemd.services.psibase-softhsm-init = lib.mkIf cfg.softHsm.enable {
         description = "Initialize SoftHSM token for psibase (once)";
         after = ["local-fs.target"];
 
         path = [pkgs.coreutils pkgs.gawk pkgs.util-linux softhsmPkg];
+        environment = softhsmEnv // {SHELL = pkgs.runtimeShell;};
 
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
-          # Root: read root-owned sops pin; create tokens as psibase.
+          User = "psibase";
+          Group = "psibase";
+          StateDirectory = stateDirectory;
+          StateDirectoryMode = "0750";
+          LoadCredential = "softhsm-pin:${cfg.softHsm.pinFile}";
           ExecStart = pkgs.writeShellScript "psibase-softhsm-init" ''
             set -euo pipefail
-            export SOFTHSM2_CONF=${lib.escapeShellArg softhsmConf}
-            mkdir -p ${lib.escapeShellArg cfg.softHsm.tokenDir}
-            chown psibase:psibase ${lib.escapeShellArg cfg.softHsm.tokenDir}
 
-            # psibase is nologin; script needs a real shell.
-            as_psibase() {
-              runuser -u psibase -- \
-                env SOFTHSM2_CONF="$SOFTHSM2_CONF" PATH="$PATH" \
-                    SHELL=${pkgs.runtimeShell} "$@"
-            }
-
-            if as_psibase softhsm2-util --show-slots 2>/dev/null \
+            if softhsm2-util --show-slots 2>/dev/null \
               | awk -v want=${lib.escapeShellArg cfg.softHsm.tokenLabel} '
                   /^[[:space:]]*Label:/ {
                     sub(/^[[:space:]]*Label:[[:space:]]*/, "")
@@ -289,15 +297,15 @@ in {
               exit 0
             fi
 
-            pin=$(tr -d '\n' < ${lib.escapeShellArg cfg.softHsm.pinFile})
+            pin=$(${pkgs.coreutils}/bin/tr -d '\n' < "$CREDENTIALS_DIRECTORY/softhsm-pin")
             if [ -z "$pin" ]; then
-              echo "SoftHSM PIN file is empty: ${cfg.softHsm.pinFile}" >&2
+              echo "SoftHSM PIN credential is empty" >&2
               exit 1
             fi
 
             # PIN via stdin+pty (not argv). Discard output: failures can leak PIN.
-            if ! printf '%s\n%s\n%s\n%s\n' "$pin" "$pin" "$pin" "$pin" \
-              | as_psibase timeout 60 script -qec ${softhsmInitToken} /dev/null \
+            if ! ${pkgs.coreutils}/bin/printf '%s\n%s\n%s\n%s\n' "$pin" "$pin" "$pin" "$pin" \
+              | timeout 60 script -qec ${softhsmInitToken} /dev/null \
                   >/dev/null 2>&1; then
               echo "softhsm2-util --init-token failed; output suppressed because" >&2
               echo "it can contain the PIN. Re-run by hand to diagnose." >&2
@@ -319,9 +327,12 @@ in {
         environment = cfg.environment // softhsmEnv;
 
         serviceConfig = {
+          Type = "exec";
           User = "psibase";
           Group = "psibase";
           WorkingDirectory = cfg.dataDir;
+          StateDirectory = stateDirectory;
+          StateDirectoryMode = "0750";
           ExecStart = lib.escapeShellArgs psinodeArgs;
           Restart = "on-failure";
           RestartSec = 5;
@@ -330,7 +341,6 @@ in {
 
           ProtectSystem = "strict";
           ProtectHome = true;
-          ReadWritePaths = readWritePaths;
           PrivateTmp = true;
           PrivateDevices = true;
           ProtectProc = "invisible";
