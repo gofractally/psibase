@@ -11,9 +11,6 @@
     objectstore.backend = file
     log.level = INFO
   '';
-  softhsmInitToken = pkgs.writeShellScript "psibase-softhsm-init-token" ''
-    exec softhsm2-util --init-token --free --label ${lib.escapeShellArg cfg.softHsm.tokenLabel}
-  '';
 in {
   options.services.psibase = {
     enable = lib.mkEnableOption "psibase node (psinode)";
@@ -270,8 +267,8 @@ in {
         description = "Initialize SoftHSM token for psibase (once)";
         after = ["local-fs.target"];
 
-        path = [pkgs.coreutils pkgs.gawk pkgs.util-linux softhsmPkg];
-        environment = softhsmEnv // {SHELL = pkgs.runtimeShell;};
+        path = [pkgs.coreutils pkgs.gawk softhsmPkg];
+        environment = softhsmEnv;
 
         serviceConfig = {
           Type = "oneshot";
@@ -297,20 +294,15 @@ in {
               exit 0
             fi
 
-            pin=$(${pkgs.coreutils}/bin/tr -d '\n' < "$CREDENTIALS_DIRECTORY/softhsm-pin")
+            pin=$(tr -d '\n' < "$CREDENTIALS_DIRECTORY/softhsm-pin")
             if [ -z "$pin" ]; then
               echo "SoftHSM PIN credential is empty" >&2
               exit 1
             fi
 
-            # PIN via stdin+pty (not argv). Discard output: failures can leak PIN.
-            if ! ${pkgs.coreutils}/bin/printf '%s\n%s\n%s\n%s\n' "$pin" "$pin" "$pin" "$pin" \
-              | timeout 60 script -qec ${softhsmInitToken} /dev/null \
-                  >/dev/null 2>&1; then
-              echo "softhsm2-util --init-token failed; output suppressed because" >&2
-              echo "it can contain the PIN. Re-run by hand to diagnose." >&2
-              exit 1
-            fi
+            softhsm2-util --init-token --free \
+              --label ${lib.escapeShellArg cfg.softHsm.tokenLabel} \
+              --so-pin "$pin" --pin "$pin"
 
             echo "Initialized SoftHSM token '${cfg.softHsm.tokenLabel}'"
           '';
