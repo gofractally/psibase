@@ -1668,4 +1668,236 @@ mod tests {
         assert_eq!(PayRequest::get_assert(id).remaining.value, 600);
         Ok(())
     }
+
+    /// Only the claim holder may exercise `convert`. Debtor-posted FX is a
+    /// quote the creditor accepts — not a self-serve write-down / APR reset.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_want_convert_rejects_debtor(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let gary = account!("gary");
+        chain.new_account(alice).unwrap();
+        chain.new_account(gary).unwrap();
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, gary)
+            .st_crd_lne(alice, aud, Quantity::new(10_000), false, 200_000, 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .path_pay(vec![hop(gary, aud)], Quantity::new(100), Quantity::new(100), 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .st_cur_pol(aud, usd, Quantity::new(0), RATE_SCALE, 0, never())
+            .get()?;
+
+        let stolen = Wrapper::push_from(&chain, alice)
+            .convert(gary, aud, usd, Quantity::new(100), Quantity::new(100))
+            .get();
+        assert!(
+            stolen.is_err(),
+            "test_want_convert_rejects_debtor: alice (debtor) converted her own \
+             20% AUD claim 1:1 to 0% USD; only gary (creditor) should be able to convert"
+        );
+        assert_eq!(exp(&chain, gary, alice, aud), 100);
+        assert_eq!(exp(&chain, gary, alice, usd), 0);
+        let still = Obligation::get_by_interest_rate(gary, alice, aud, 200_000).unwrap();
+        assert_eq!(still.remaining_principal.value, 100);
+
+        Wrapper::push_from(&chain, alice)
+            .st_cur_pol(
+                aud,
+                usd,
+                Quantity::new(0),
+                RATE_SCALE * 50 / 100,
+                0,
+                never(),
+            )
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .convert(alice, aud, usd, Quantity::new(100), Quantity::new(50))
+            .get()?;
+        assert_eq!(exp(&chain, gary, alice, aud), 0);
+        assert_eq!(exp(&chain, gary, alice, usd), 50);
+        Ok(())
+    }
+
+    /// Editing a depleting line (APR / limit) must not refill a spent grant.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_want_deplete_edit_does_not_refill_grant(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, usd, Quantity::new(100), true, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .path_pay(vec![hop(bob, usd)], Quantity::new(60), Quantity::new(60), 0)
+            .get()?;
+        assert_eq!(CreditLine::get_assert(bob, alice, usd).remaining.value, 40);
+
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, usd, Quantity::new(100), true, 10_000, 0)
+            .get()?;
+        assert_eq!(
+            CreditLine::get_assert(bob, alice, usd).remaining.value,
+            40,
+            "test_want_deplete_edit_does_not_refill_grant: APR-only upsert reset remaining \
+             to the limit; spent grant must stay 40"
+        );
+
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, usd, Quantity::new(200), true, 10_000, 0)
+            .get()?;
+        assert_eq!(
+            CreditLine::get_assert(bob, alice, usd).remaining.value,
+            40,
+            "test_want_deplete_edit_does_not_refill_grant: raising the limit refilled remaining"
+        );
+        Ok(())
+    }
+
+    /// A hop that converts to nothing must fail even when `min_return` is 0,
+    /// so hop-0 does not stick as a prefix settlement.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_want_path_pay_unfinished_hop_fails(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let gary = account!("gary");
+        let steve = account!("steve");
+        for a in [alice, gary, steve] {
+            chain.new_account(a).unwrap();
+        }
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        Wrapper::push_from(&chain, gary)
+            .st_crd_lne(alice, aud, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, steve)
+            .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .st_cur_pol(aud, usd, Quantity::new(0), RATE_SCALE * 70 / 100, 0, never())
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never())
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .deposit(alice, aud, Quantity::new(1_000), 0, 0)
+            .get()?;
+
+        let result = Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(gary, aud), hop(steve, usd)],
+                Quantity::new(1_000),
+                Quantity::new(0),
+                0,
+            )
+            .get();
+        assert!(
+            result.is_err(),
+            "test_want_path_pay_unfinished_hop_fails: 1000 AUD hop-0 fully netted the reverse \
+             book so hop-1 had nothing to convert; path_pay succeeded with min_return=0"
+        );
+        assert_eq!(exp(&chain, alice, gary, aud), 1_000);
+        assert_eq!(exp(&chain, gary, alice, aud), 0);
+        assert_eq!(exp(&chain, steve, gary, usd), 0);
+        Ok(())
+    }
+
+    /// Principal added during grace is not back-dated to cycle start. Lost
+    /// grace compounds from the last principal change.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_want_grace_extra_draw_from_last_change(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, usd, Quantity::new(10_000_000), false, 100_000, WEEK_SECS)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(bob, usd)],
+                Quantity::new(1_000_000),
+                Quantity::new(1_000_000),
+                0,
+            )
+            .get()?;
+
+        chain.start_block_after(Seconds::new(3 * 86_400).into());
+        Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(bob, usd)],
+                Quantity::new(1_000_000),
+                Quantity::new(1_000_000),
+                0,
+            )
+            .get()?;
+
+        chain.start_block_after(Seconds::new(5 * 86_400).into());
+        let want = compound_amount(2_000_000, 100_000, 5 * SECONDS_PER_DAY as u64);
+        let got = exp(&chain, bob, alice, usd);
+        assert_eq!(
+            got, want,
+            "test_want_grace_extra_draw_from_last_change: extra 1M drawn on day 3; \
+             day-8 exposure should be 2M compounded 5 days from that draw ({want}), \
+             not 8 days from origination ({got})"
+        );
+        Ok(())
+    }
+
+    /// Partial repay during grace: remaining principal compounds from that
+    /// repay, not from origination.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_want_grace_partial_repay_from_last_change(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, usd, Quantity::new(10_000_000), false, 100_000, WEEK_SECS)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(bob, usd)],
+                Quantity::new(1_000_000),
+                Quantity::new(1_000_000),
+                0,
+            )
+            .get()?;
+
+        chain.start_block_after(Seconds::new(3 * 86_400).into());
+        Wrapper::push_from(&chain, bob)
+            .deposit(alice, usd, Quantity::new(400_000), 0, 0)
+            .get()?;
+        assert_eq!(exp(&chain, bob, alice, usd), 600_000);
+
+        chain.start_block_after(Seconds::new(5 * 86_400).into());
+        let want = compound_amount(600_000, 100_000, 5 * SECONDS_PER_DAY as u64);
+        let got = exp(&chain, bob, alice, usd);
+        assert_eq!(
+            got, want,
+            "test_want_grace_partial_repay_from_last_change: repaid 400k on day 3; \
+             day-8 exposure should be 600k compounded 5 days from the repay ({want}), \
+             not 8 days from origination ({got})"
+        );
+        Ok(())
+    }
 }
