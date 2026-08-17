@@ -1447,14 +1447,17 @@ pub mod tables {
                 "interest_rate exceeds 100% (PPM_SCALE)"
             );
             if let Some(mut line) = Self::get(creditor, debtor, asset_id) {
+                let was_depleting = line.deplete_on_debit;
                 line.limit = amount;
                 line.deplete_on_debit = deplete_on_debit;
                 line.interest_rate = interest_rate;
-                line.remaining = if deplete_on_debit {
-                    amount
-                } else {
-                    Quantity::new(0)
-                };
+                if !deplete_on_debit {
+                    line.remaining = Quantity::new(0);
+                } else if !was_depleting {
+                    line.remaining = amount;
+                } else if line.remaining.value > amount.value {
+                    line.remaining = amount;
+                }
                 line.save();
             } else {
                 CreditLine::new(
