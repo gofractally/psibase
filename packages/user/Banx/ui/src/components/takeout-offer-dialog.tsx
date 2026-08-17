@@ -14,8 +14,8 @@ import {
     MAX_HOP_FEE_PPM,
     MIN_PERCENT_STEP,
     amountFieldValidator,
-    percentFieldValidator,
-    percentStringToPpm,
+    signedPercentFieldValidator,
+    signedPercentStringToPpm,
     ppmToPercentInput,
     useAppForm,
 } from "@/lib/form";
@@ -64,9 +64,9 @@ function feesFromOffer(p: TakeoutOffer): FeeFields {
     };
 }
 
-const hopFeeValidators = {
-    onChange: percentFieldValidator(MAX_HOP_FEE_PERCENT),
-    onSubmit: percentFieldValidator(MAX_HOP_FEE_PERCENT),
+const takeoutSpreadValidators = {
+    onChange: signedPercentFieldValidator(MAX_HOP_FEE_PERCENT),
+    onSubmit: signedPercentFieldValidator(MAX_HOP_FEE_PERCENT),
 };
 
 export function TakeoutOfferDialog({
@@ -131,7 +131,7 @@ export function TakeoutOfferDialog({
     const payload = (value: FeeFields) => ({
         assetId: value.assetId!,
         feeFixed: value.feeFixed.trim(),
-        feePercentPpm: percentStringToPpm(value.feePct, MAX_HOP_FEE_PPM),
+        feePercentPpm: signedPercentStringToPpm(value.feePct, MAX_HOP_FEE_PPM),
         expiresAtSeconds: value.expiresAtSeconds,
     });
 
@@ -273,12 +273,12 @@ export function TakeoutOfferDialog({
                     />
                     <form.AppField
                         name="feePct"
-                        validators={hopFeeValidators}
+                        validators={takeoutSpreadValidators}
                         children={(field) => (
                             <field.TextField
-                                label="Fee %"
+                                label="Spread %"
                                 inputMode="decimal"
-                                min={0}
+                                min={-MAX_HOP_FEE_PERCENT}
                                 max={MAX_HOP_FEE_PERCENT}
                                 step={MIN_PERCENT_STEP}
                             />
@@ -306,9 +306,10 @@ export function TakeoutOfferDialog({
                     <DialogHeader>
                         <DialogTitle>Claim takeout offer</DialogTitle>
                         <DialogDescription>
-                            Buy claims on <strong>{debtor}</strong>. Sellers
-                            receive face after fees as a claim on you. You
-                            need unused line residual on that debtor.
+                            Buy claims on <strong>{debtor}</strong>. Spread
+                            is signed: positive haircuts the seller, negative
+                            is a premium you pay. You need unused line
+                            residual on that debtor.
                         </DialogDescription>
                     </DialogHeader>
                     <form
@@ -413,8 +414,8 @@ export function TakeoutOfferDialog({
                     <DialogTitle>Claim takeout offer</DialogTitle>
                     <DialogDescription>
                         Buy claims on anyone you have lined in this asset.
-                        Sellers receive face after fees as a claim on you.
-                        This is not a path-forward offer.
+                        Spread is signed: positive haircuts the seller,
+                        negative is a premium. Not a path-forward offer.
                     </DialogDescription>
                 </DialogHeader>
                 <form

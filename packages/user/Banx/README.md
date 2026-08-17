@@ -82,11 +82,11 @@ Posted by the **poster** (`st_fwd_ofr` / `st_glb_fwd`): poster is an intermediat
 
 ## Takeout offers
 
-Posted by the **poster** (`st_tko_ofr` / `st_glb_tko`): anyone can `sell_claim` to the poster while a live row exists. Seller’s claim on a debtor moves to the poster; seller receives face after fees as a claim on the poster. Poster must have line residual on that debtor. Fees and expiry are independent of any path-forward offer.
+Posted by the **poster** (`st_tko_ofr` / `st_glb_tko`): anyone can `sell_claim` to the poster while a live row exists. Seller’s claim on a debtor moves to the poster; seller receives face after the offer **spread** as a claim on the poster. Spread ppm is signed: positive haircuts the seller, negative is a premium (`-50_000` = 5% over face). Poster must have line residual on that debtor. Independent of path-forward offers.
 
 ## Selling a claim
 
-`sell_claim(buyer, debtor, asset, amount)`: you hold a claim on `debtor`, the buyer has a takeout offer and a line to that debtor. Face moves to the buyer; you hold a claim on the buyer for proceeds after fees.
+`sell_claim(buyer, debtor, asset, amount)`: you hold a claim on `debtor`, the buyer has a takeout offer and a line to that debtor. Face moves to the buyer; you hold a claim on the buyer for proceeds (face after spread).
 
 This is not a path payment and does **not** count as “paid in full” for grace.
 

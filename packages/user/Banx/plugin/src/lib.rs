@@ -214,7 +214,7 @@ impl Api for BanxPlugin {
         debtor: String,
         asset_id: u16,
         fee_fixed: String,
-        fee_percent_ppm: u32,
+        fee_percent_ppm: i32,
         expires_at_seconds: u32,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::set_takeout_offer)?;
@@ -233,7 +233,7 @@ impl Api for BanxPlugin {
     fn set_global_takeout_offer(
         asset_id: u16,
         fee_fixed: String,
-        fee_percent_ppm: u32,
+        fee_percent_ppm: i32,
         expires_at_seconds: u32,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::set_global_takeout_offer)?;

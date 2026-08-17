@@ -44,13 +44,15 @@ function offerLive(p: TakeoutOffer, nowSec: number): boolean {
     return p.expiresAt === 0 || p.expiresAt >= nowSec;
 }
 
-/** Stripe-style: out = in * (1 - pct) - fixed (raw units). */
+/** `out = in * (1 - spread) - fixed`. Negative spread is a premium. */
 function applyTakeFee(
     amountRaw: bigint,
     feeFixedRaw: bigint,
     feePercentPpm: number,
 ): bigint | null {
-    if (feePercentPpm >= PPM_SCALE) return null;
+    if (feePercentPpm >= PPM_SCALE || feePercentPpm <= -PPM_SCALE) {
+        return null;
+    }
     const keep = BigInt(PPM_SCALE - feePercentPpm);
     const afterPct = (amountRaw * keep) / BigInt(PPM_SCALE);
     if (feeFixedRaw >= afterPct) return null;
@@ -307,8 +309,9 @@ export function SellClaimDialog({
                                     {target.debtor}
                                 </span>{" "}
                                 ({target.symbol}) to a buyer who posted a
-                                takeout offer. You receive a smaller claim on
-                                the buyer after their fee.
+                                takeout offer. You receive a claim on the
+                                buyer for face after their spread (haircut or
+                                premium).
                             </>
                         ) : (
                             "Select a claim to sell."

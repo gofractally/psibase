@@ -92,11 +92,13 @@ interface api {
     remove-global-forward-offer: func(asset-id: u16) -> result<_, error>;
 
     /// Post a takeout offer for claims on a **specific** debtor.
+    /// `fee-percent-ppm` is a signed spread: positive haircuts the seller,
+    /// negative is a premium (`-50000` = 5% over face).
     set-takeout-offer: func(
         debtor: string,
         asset-id: u16,
         fee-fixed: string,
-        fee-percent-ppm: u32,
+        fee-percent-ppm: s32,
         expires-at-seconds: u32,
     ) -> result<_, error>;
 
@@ -104,7 +106,7 @@ interface api {
     set-global-takeout-offer: func(
         asset-id: u16,
         fee-fixed: string,
-        fee-percent-ppm: u32,
+        fee-percent-ppm: s32,
         expires-at-seconds: u32,
     ) -> result<_, error>;
 

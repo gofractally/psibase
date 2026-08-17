@@ -106,6 +106,19 @@ export function percentToPpm(
     return capped;
 }
 
+/** Human percent → signed ppm, clamped to (-maxAbsPpm, maxAbsPpm). */
+export function signedPercentStringToPpm(
+    pct: string,
+    maxAbsPpm: number = MAX_HOP_FEE_PPM,
+): number {
+    const n = Number(String(pct).trim());
+    if (!Number.isFinite(n) || n === 0) return 0;
+    const ppm = Math.round(n * PPM_PER_PERCENT);
+    if (ppm >= maxAbsPpm) return maxAbsPpm - 1;
+    if (ppm <= -maxAbsPpm) return -(maxAbsPpm - 1);
+    return ppm;
+}
+
 /** Parse a percent string → ppm (same rules as {@link percentToPpm}). */
 export function percentStringToPpm(
     pct: string,

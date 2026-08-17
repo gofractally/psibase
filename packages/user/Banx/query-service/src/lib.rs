@@ -192,7 +192,7 @@ mod service {
         debtor: AccountNumber,
         assetId: u16,
         feeFixed: Decimal,
-        feePercentPpm: u32,
+        feePercentPpm: i32,
         expiresAt: i64,
         isGlobal: bool,
     }

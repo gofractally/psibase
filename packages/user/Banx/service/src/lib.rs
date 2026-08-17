@@ -175,18 +175,32 @@ pub mod tables {
             fee_percent_ppm < PPM_SCALE,
             "hop fee must be under 100%"
         );
-        let keep_ppm = (PPM_SCALE - fee_percent_ppm) as u128;
+        apply_spread(amount_in, fee_fixed, fee_percent_ppm as i32)
+    }
+
+    /// Claim-sale spread: `out = in * (1 - spread_ppm) - fee_fixed`.
+    ///
+    /// `spread_ppm > 0` haircuts the seller (discount). `spread_ppm < 0` is a
+    /// premium (`-50_000` = seller gets 5% over face). Must be in
+    /// `(-PPM_SCALE, PPM_SCALE)`.
+    fn apply_spread(amount_in: Quantity, fee_fixed: Quantity, spread_ppm: i32) -> Quantity {
+        let scale = PPM_SCALE as i64;
+        assert!(
+            (spread_ppm as i64) > -scale && (spread_ppm as i64) < scale,
+            "spread must be between -100% and 100%"
+        );
+        let keep_ppm = (scale - spread_ppm as i64) as u128;
         let after_pct = (amount_in.value as u128)
             .checked_mul(keep_ppm)
-            .expect("hop fee overflow")
+            .expect("spread overflow")
             / (PPM_SCALE as u128);
-        let after_pct = u64::try_from(after_pct).expect("hop fee out exceeds u64");
+        let after_pct = u64::try_from(after_pct).expect("spread out exceeds u64");
         assert!(
             fee_fixed.value < after_pct,
-            "fixed hop fee consumes entire amount after percent fee"
+            "fixed fee consumes entire amount after spread"
         );
         let out = after_pct - fee_fixed.value;
-        assert!(out > 0, "hop fee reduced amount to zero");
+        assert!(out > 0, "spread reduced amount to zero");
         out.into()
     }
 
@@ -321,8 +335,9 @@ pub mod tables {
         pub asset_id: u16,
 
         pub fee_fixed: Quantity,
-        /// ppm (`10_000` = 1%); must be `< PPM_SCALE`.
-        pub fee_percent: u32,
+        /// ppm (`10_000` = 1%). Positive haircuts the seller; negative is a
+        /// premium. Must satisfy `|fee_percent| < PPM_SCALE`.
+        pub fee_percent: i32,
         /// Absolute expiry (`seconds == 0` → never).
         pub expires_at: TimePointSec,
     }
@@ -354,10 +369,14 @@ pub mod tables {
             debtor: AccountNumber,
             asset_id: u16,
             fee_fixed: Quantity,
-            fee_percent: u32,
+            fee_percent: i32,
             expires_at: TimePointSec,
         ) {
-            assert!(fee_percent < PPM_SCALE, "fee must be under 100%");
+            let scale = PPM_SCALE as i64;
+            assert!(
+                (fee_percent as i64) > -scale && (fee_percent as i64) < scale,
+                "takeout spread must be between -100% and 100%"
+            );
             Self {
                 poster,
                 debtor,
@@ -378,7 +397,7 @@ pub mod tables {
         }
 
         pub fn apply_fees(&self, amount_in: Quantity) -> Quantity {
-            apply_hop_fee(amount_in, self.fee_fixed, self.fee_percent)
+            apply_spread(amount_in, self.fee_fixed, self.fee_percent)
         }
     }
 
@@ -1789,7 +1808,7 @@ pub mod service {
         debtor: AccountNumber,
         asset_id: u16,
         fee_fixed: Quantity,
-        fee_percent: u32,
+        fee_percent: i32,
         expires_at: TimePointSec,
     ) {
         assert!(
@@ -1811,7 +1830,7 @@ pub mod service {
     fn st_glb_tko(
         asset_id: u16,
         fee_fixed: Quantity,
-        fee_percent: u32,
+        fee_percent: i32,
         expires_at: TimePointSec,
     ) {
         TakeoutOffer::upsert(
@@ -1842,8 +1861,8 @@ pub mod service {
 
     /// Seller (sender) sells claims on `debtor` to `buyer` under buyer's takeout
     /// offer. Buyer becomes creditor of `debtor` for `amount`; seller receives
-    /// a claim on buyer for face after fees. Requires buyer's line residual to
-    /// `debtor` and a live takeout offer (specific or global).
+    /// a claim on buyer for face after the offer spread (haircut or premium).
+    /// Requires buyer's line residual to `debtor` and a live takeout offer.
     #[action]
     fn sell_claim(
         buyer: AccountNumber,

@@ -20,7 +20,10 @@ export {
     percentStringToPpm,
     percentToPpm,
     ppmToPercentInput,
+    signedPercentStringToPpm,
 } from "@/lib/constants";
+
+export { signedPercentStringToPpm };
 
 /** Non-empty trimmed account string, or undefined if invalid. */
 export function requireAccount(value: string): string | undefined {
@@ -46,6 +49,27 @@ export function percentFieldValidator(maxPercent: number) {
         }
         // More than 4 decimal places cannot survive ppm rounding cleanly
         const decimals = (t.split(".")[1] ?? "").replace(/0+$/, "").length;
+        if (decimals > 4) {
+            return "Max 4 decimal places (1 ppm = 0.0001%)";
+        }
+        return undefined;
+    };
+}
+
+/** Signed percent in (-maxPercent, maxPercent), exclusive of ±100%. */
+export function signedPercentFieldValidator(maxAbsPercent: number) {
+    return ({ value }: { value: string }) => {
+        const t = String(value).trim();
+        if (t === "") return "Required";
+        const n = Number(t);
+        if (!Number.isFinite(n)) return "Enter a number";
+        if (n <= -maxAbsPercent || n >= maxAbsPercent) {
+            return `Must be between -${maxAbsPercent}% and ${maxAbsPercent}%`;
+        }
+        const decimals = (t.replace(/^-/, "").split(".")[1] ?? "").replace(
+            /0+$/,
+            "",
+        ).length;
         if (decimals > 4) {
             return "Max 4 decimal places (1 ppm = 0.0001%)";
         }

@@ -750,7 +750,7 @@ mod tests {
             .get()?;
         // Global takeout: 5% take fee (no forward offer needed).
         Wrapper::push_from(&chain, peter)
-            .st_glb_tko(usd, Quantity::new(0), PPM_SCALE * 5 / 100, never())
+            .st_glb_tko(usd, Quantity::new(0), (PPM_SCALE * 5 / 100) as i32, never())
             .get()?;
 
         Wrapper::push_from(&chain, alice)
@@ -761,6 +761,42 @@ mod tests {
         assert_eq!(exp(&chain, alice, bob, usd), 0);
         assert_eq!(exp(&chain, peter, bob, usd), 10_000);
         assert_eq!(exp(&chain, alice, peter, usd), 9_500);
+
+        Ok(())
+    }
+
+    /// Same as takeout, but Peter posts a 5% premium: Alice gets 10500 on Peter.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_sell_claim_premium(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+
+        let alice = account!("alice");
+        let bob = account!("bob");
+        let peter = account!("peter");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        chain.new_account(peter).unwrap();
+
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, bob)
+            .deposit(alice, usd, Quantity::new(10_000), 0, 0)
+            .get()?;
+
+        Wrapper::push_from(&chain, peter)
+            .st_crd_lne(bob, usd, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, peter)
+            .st_glb_tko(usd, Quantity::new(0), -(PPM_SCALE as i32) * 5 / 100, never())
+            .get()?;
+
+        Wrapper::push_from(&chain, alice)
+            .sell_claim(peter, bob, usd, Quantity::new(10_000))
+            .get()?;
+
+        assert_eq!(exp(&chain, alice, bob, usd), 0);
+        assert_eq!(exp(&chain, peter, bob, usd), 10_000);
+        assert_eq!(exp(&chain, alice, peter, usd), 10_500);
 
         Ok(())
     }
@@ -1235,7 +1271,7 @@ mod tests {
             .st_crd_lne(bob, usd, Quantity::new(10_000), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, peter)
-            .st_glb_tko(usd, Quantity::new(0), PPM_SCALE * 5 / 100, never())
+            .st_glb_tko(usd, Quantity::new(0), (PPM_SCALE * 5 / 100) as i32, never())
             .get()?;
         Wrapper::push_from(&chain, peter)
             .st_tko_ofr(bob, usd, Quantity::new(0), 0, never())
