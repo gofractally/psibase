@@ -472,8 +472,6 @@ impl Api for BanxPlugin {
 
         let snap = query::fetch_path_graph::fetch_path_graph(from, to, max_hops)?;
 
-        // Expiry checks: pass now=0 so "never" and future policies both pass offline;
-        // chain re-validates at execute time. (Wall clock in plugin is not authoritative.)
         let quote = if exact_out {
             find_banx_path_exact_out(
                 &snap.lines,
@@ -485,7 +483,7 @@ impl Api for BanxPlugin {
                 from_asset,
                 to_asset,
                 max_hops,
-                0,
+                snap.now,
             )
         } else {
             find_banx_path(
@@ -498,7 +496,7 @@ impl Api for BanxPlugin {
                 from_asset,
                 to_asset,
                 max_hops,
-                0,
+                snap.now,
             )
         }
         .ok_or_else(|| {

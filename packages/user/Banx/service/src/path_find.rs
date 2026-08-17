@@ -921,4 +921,41 @@ mod tests {
         assert_eq!(q.hops[1].account, "a");
         assert_eq!(q.amount_out, 100);
     }
+
+    /// Same setup as `test_expired_specific_falls_back_to_global`.
+    #[test]
+    fn expired_specific_does_not_beat_live_global() {
+        let lines = vec![
+            line("gary", "alice", 1, 10_000),
+            line("steve", "gary", 1, 10_000),
+        ];
+        let routing = vec![
+            RoutingEdge {
+                creditor: "steve".into(),
+                debtor: "gary".into(),
+                asset_id: 1,
+                hop_fee_fixed: 0,
+                hop_fee_percent_ppm: 0,
+                max_accept_rate_ppm: PPM_SCALE,
+                expires_at: 1,
+            },
+            RoutingEdge {
+                creditor: String::new(),
+                debtor: "gary".into(),
+                asset_id: 1,
+                hop_fee_fixed: 10,
+                hop_fee_percent_ppm: 0,
+                max_accept_rate_ppm: PPM_SCALE,
+                expires_at: 0,
+            },
+        ];
+        let q = find_banx_path(
+            &lines, &routing, &[], "alice", "steve", 100, 1, Some(1), 4, 100,
+        )
+        .expect("path");
+        assert_eq!(
+            q.amount_out, 90,
+            "expired specific (0 fee) must not beat live global (10 fixed)"
+        );
+    }
 }

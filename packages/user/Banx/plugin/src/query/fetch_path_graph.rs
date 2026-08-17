@@ -22,6 +22,7 @@ struct PathGraph {
     credit_lines: Vec<GqlCreditLine>,
     forward_offers: Vec<GqlForward>,
     currency_policies: Vec<GqlCurrency>,
+    now: i64,
 }
 
 #[derive(Deserialize)]
@@ -62,6 +63,7 @@ pub struct PathGraphSnapshot {
     pub lines: Vec<LineEdge>,
     pub routing: Vec<RoutingEdge>,
     pub fx: Vec<FxEdge>,
+    pub now: i64,
 }
 
 fn parse_u64(s: &str) -> Result<u64, ErrorType> {
@@ -78,6 +80,7 @@ pub fn fetch_path_graph(
     let query = format!(
         r#"query {{
             pathGraph(from: "{from}", to: "{to}", maxHops: {max_hops}) {{
+                now
                 creditLines {{
                     creditor debtor assetId residual interestRatePpm
                 }}
@@ -142,5 +145,10 @@ pub fn fetch_path_graph(
         });
     }
 
-    Ok(PathGraphSnapshot { lines, routing, fx })
+    Ok(PathGraphSnapshot {
+        lines,
+        routing,
+        fx,
+        now: g.now,
+    })
 }

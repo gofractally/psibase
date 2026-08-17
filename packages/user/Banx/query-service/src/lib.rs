@@ -4,8 +4,8 @@ mod service {
     use async_graphql::*;
     use banx::tables::{
         Asset, AssetTable, CreditLine, CreditLineTable, CurrencyPolicy, CurrencyPolicyTab,
-        ForwardOffer, ForwardOfferTab, Obligation, ObligationTable, PairCycle, PayRequest,
-        PPM_SCALE, RATE_SCALE, RequestTab, TakeoutOffer, TakeoutOfferTab,
+        policy_is_live, ForwardOffer, ForwardOfferTab, Obligation, ObligationTable, PairCycle,
+        PayRequest, PPM_SCALE, RATE_SCALE, RequestTab, TakeoutOffer, TakeoutOfferTab,
     };
     use psibase::services::tokens::{Decimal, Precision, Quantity};
     use psibase::*;
@@ -247,6 +247,8 @@ mod service {
         creditLines: Vec<CreditLineView>,
         forwardOffers: Vec<ForwardOfferView>,
         currencyPolicies: Vec<CurrencyPolicyView>,
+        /// Chain unix seconds at query time (offer / FX expiry).
+        now: i64,
     }
 
     /// History row from `history.banx.activity` (amounts stored raw on-chain).
@@ -533,11 +535,17 @@ mod service {
                 .collect();
             credit_lines.extend(reverse_only);
 
+            let now_tp = services::transact::Wrapper::call()
+                .currentBlock()
+                .time
+                .seconds();
+            let now = time_sec(now_tp);
+
             let forward_offers: Vec<ForwardOfferView> =
                 ForwardOfferTab::with_service(banx::SERVICE)
                     .get_index_pk()
                     .iter()
-                    .filter(|p| debtors.contains(&p.poster))
+                    .filter(|p| debtors.contains(&p.poster) && policy_is_live(p.expires_at))
                     .map(ForwardOfferView::from)
                     .collect();
 
@@ -545,7 +553,7 @@ mod service {
                 CurrencyPolicyTab::with_service(banx::SERVICE)
                     .get_index_pk()
                     .iter()
-                    .filter(|p| debtors.contains(&p.debtor))
+                    .filter(|p| debtors.contains(&p.debtor) && policy_is_live(p.expires_at))
                     .map(CurrencyPolicyView::from)
                     .collect();
 
@@ -556,6 +564,7 @@ mod service {
                 creditLines: credit_lines,
                 forwardOffers: forward_offers,
                 currencyPolicies: currency_policies,
+                now,
             }
         }
 
