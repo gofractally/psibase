@@ -121,7 +121,7 @@ Default in the UI is **7 days**. `0` means interest from the first second.
 
 The **debtor** posts `st_cur_pol`: from-asset → to-asset, fixed fee in from-asset, rate (human “to per 1 from” in the plugin), optional new APR, expiry.
 
-`convert` rebooks an existing claim, then **auto-nets** the destination asset. The debtor is who **actually owes** `from_asset` on that pair, not whoever posted a policy. Path pay calls convert internally on asset-changing hops (previous edge debtor’s policy).
+`convert` rebooks an existing claim, then **auto-nets** the destination asset. Only the **creditor** (claim holder) may call it. The debtor is who **actually owes** `from_asset` on that pair, not whoever posted a policy. Path pay calls convert internally on asset-changing hops (previous edge debtor’s policy).
 
 ## Amounts and units
 

@@ -1757,28 +1757,29 @@ mod tests {
         let aud = Asset::get_by_symbol_assert(account!("aud")).id;
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
 
+        // gary extends a line to alice for $1 AUD, 20% interest APR.
         Wrapper::push_from(&chain, gary)
-            .st_crd_lne(alice, aud, Quantity::new(10_000), false, 200_000, 0)
+            .st_crd_lne(alice, aud, Quantity::new(10000), false, 200_000, 0)
             .get()?;
+        // Alice sends 100 to gary in australian dollars, creating a debt.
         Wrapper::push_from(&chain, alice)
-            .path_pay(
-                vec![hop(gary, aud)],
-                Quantity::new(100),
-                Quantity::new(100),
-                0,
-            )
+            .path_pay(vec![hop(gary, aud)], 100.into(), 100.into(), 0)
             .get()?;
+        // Alice sets up a USD policy with herself, at 1:1 scale
         Wrapper::push_from(&chain, alice)
-            .st_cur_pol(aud, usd, Quantity::new(0), RATE_SCALE, 0, never())
+            .st_cur_pol(aud, usd, 0.into(), RATE_SCALE, 0, never())
             .get()?;
 
-        let stolen = Wrapper::push_from(&chain, alice)
-            .convert(gary, aud, usd, Quantity::new(100), Quantity::new(100))
-            .get();
+        let stolen =
+            Wrapper::push_from(&chain, alice).convert(gary, aud, usd, 100.into(), 100.into());
+        let err = stolen
+            .trace
+            .error
+            .as_deref()
+            .unwrap_or("(no error — convert succeeded)");
         assert!(
-            stolen.is_err(),
-            "test_want_convert_rejects_debtor: alice (debtor) converted her own \
-             20% AUD claim 1:1 to 0% USD; only gary (creditor) should be able to convert"
+            err.contains("only the creditor can convert"),
+            "test_want_convert_rejects_debtor: want \"only the creditor can convert\", got {err}"
         );
         assert_eq!(exp(&chain, gary, alice, aud), 100);
         assert_eq!(exp(&chain, gary, alice, usd), 0);

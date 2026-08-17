@@ -1908,9 +1908,9 @@ pub mod service {
     /// Convert existing debt using the **debtor's** [`CurrencyPolicy`].
     ///
     /// `counterparty` is the other party on the obligation. Sender must be
-    /// creditor or debtor. Rebooks up to `amount_from` of `from_asset` into
-    /// `to_asset` for that pair; requires output ≥ `min_to`. Auto-nets
-    /// `to_asset` after the rebook.
+    /// the creditor (claim holder). Rebooks up to `amount_from` of
+    /// `from_asset` into `to_asset` for that pair; requires output ≥
+    /// `min_to`. Auto-nets `to_asset` after the rebook.
     #[action]
     fn convert(
         counterparty: AccountNumber,
@@ -1932,6 +1932,7 @@ pub mod service {
             (true, true) => panic!("both directions have from_asset claims; net first"),
             (false, false) => panic!("nothing to convert in from_asset"),
         };
+        assert!(sender == creditor, "only the creditor can convert");
 
         let policy = CurrencyPolicy::get_assert(debtor, from_asset, to_asset);
         policy.convert(creditor, amount_from, min_to);
