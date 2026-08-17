@@ -318,7 +318,13 @@ mod service {
 
         async fn netted(&self) -> Decimal {
             let raw = self.netted.parse::<u64>().unwrap_or(0);
-            dec_raw(raw, self.asset_id)
+            // Convert stores destination qty in `netted` / `other_asset_id`.
+            let asset = if self.kind == "convert" {
+                self.other_asset_id
+            } else {
+                self.asset_id
+            };
+            dec_raw(raw, asset)
         }
     }
 
