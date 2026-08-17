@@ -32,6 +32,7 @@ struct GqlCreditLine {
     debtor: AccountNumber,
     asset_id: u16,
     residual: Decimal,
+    reverse_claim: Decimal,
     interest_rate_ppm: u32,
 }
 
@@ -82,7 +83,7 @@ pub fn fetch_path_graph(
             pathGraph(from: "{from}", to: "{to}", maxHops: {max_hops}) {{
                 now
                 creditLines {{
-                    creditor debtor assetId residual interestRatePpm
+                    creditor debtor assetId residual reverseClaim interestRatePpm
                 }}
                 forwardOffers {{
                     poster nextHop assetId feeFixed feePercentPpm maxLineAprPpm expiresAt
@@ -110,6 +111,7 @@ pub fn fetch_path_graph(
             debtor: l.debtor.to_string(),
             asset_id: l.asset_id,
             residual,
+            reverse_claim: l.reverse_claim.quantity.value,
             interest_rate_ppm: l.interest_rate_ppm,
         });
     }

@@ -71,6 +71,8 @@ mod service {
         remaining: Decimal,
         /// Path residual: line headroom plus reverse claim (they already owe you).
         residual: Decimal,
+        /// Reverse claim included in `residual` (they already owe you).
+        reverseClaim: Decimal,
     }
 
     impl CreditLineView {
@@ -93,11 +95,13 @@ mod service {
                 exposure: dec(0.into(), asset_id),
                 remaining: dec(0.into(), asset_id),
                 residual: dec(residual.into(), asset_id),
+                reverseClaim: dec(residual.into(), asset_id),
             }
         }
 
         fn from_line(line: CreditLine) -> Self {
             let exposure = Obligation::exposure(line.creditor, line.debtor, line.asset_id);
+            let reverse = Obligation::exposure(line.debtor, line.creditor, line.asset_id);
             let cycle = PairCycle::get(line.creditor, line.debtor, line.asset_id);
             Self {
                 creditor: line.creditor,
@@ -119,6 +123,7 @@ mod service {
                         .into(),
                     line.asset_id,
                 ),
+                reverseClaim: dec(reverse, line.asset_id),
             }
         }
     }
