@@ -171,10 +171,7 @@ pub mod tables {
     ///
     /// `out = in * (PPM_SCALE - percent_ppm) / PPM_SCALE - fee_fixed`
     fn apply_hop_fee(amount_in: Quantity, fee_fixed: Quantity, fee_percent_ppm: u32) -> Quantity {
-        assert!(
-            fee_percent_ppm < PPM_SCALE,
-            "hop fee must be under 100%"
-        );
+        assert!(fee_percent_ppm < PPM_SCALE, "hop fee must be under 100%");
         apply_spread(amount_in, fee_fixed, fee_percent_ppm as i32)
     }
 
@@ -465,9 +462,7 @@ pub mod tables {
             expires_at: TimePointSec,
         ) -> u32 {
             assert!(
-                kind == Self::INVOICE
-                    || kind == Self::PLEASE_BOOK
-                    || kind == Self::SETTLE_AUTH,
+                kind == Self::INVOICE || kind == Self::PLEASE_BOOK || kind == Self::SETTLE_AUTH,
                 "request kind must be invoice (1), please-book (2), or settle-auth (3)"
             );
             assert!(poster != counterparty, "cannot request to self");
@@ -502,7 +497,7 @@ pub mod tables {
                 asset_id,
                 kind_s,
                 amount,
-                Quantity::new(0),
+                0.into(),
                 asset_id,
                 id,
                 &row.memo.to_string(),
@@ -618,21 +613,12 @@ pub mod tables {
                 "only the named debtor can fulfill this settle-auth"
             );
             assert!(amount.value > 0, "settle amount must be positive");
-            let exposure =
-                Obligation::exposure(row.poster, row.counterparty, row.asset_id).value;
-            let take = amount
-                .value
-                .min(row.remaining.value)
-                .min(exposure);
+            let exposure = Obligation::exposure(row.poster, row.counterparty, row.asset_id).value;
+            let take = amount.value.min(row.remaining.value).min(exposure);
             assert!(take > 0, "nothing to settle (no exposure on this pair)");
             row.remaining = (row.remaining.value - take).into();
             row.save();
-            (
-                Quantity::new(take),
-                row.memo.to_string(),
-                row.poster,
-                row.asset_id,
-            )
+            (take.into(), row.memo.to_string(), row.poster, row.asset_id)
         }
     }
 
@@ -784,8 +770,8 @@ pub mod tables {
                 creditor,
                 self.debtor,
                 self.to_asset,
-                self.to_interest_rate,
                 to_qty,
+                self.to_interest_rate,
             );
             Obligation::net_pair(creditor, self.debtor, self.to_asset, u64::MAX.into());
             emit_pair_activity(
@@ -1076,7 +1062,10 @@ pub mod tables {
             asset_id: u16,
             amount: u64,
         ) {
-            assert!(from_creditor != to_creditor, "cannot transfer claims to self");
+            assert!(
+                from_creditor != to_creditor,
+                "cannot transfer claims to self"
+            );
             assert!(amount > 0, "transfer amount must be positive");
             Self::accrue_pair(from_creditor, debtor, asset_id);
             let before_from = Self::directed_principal(from_creditor, debtor, asset_id);
@@ -1121,8 +1110,8 @@ pub mod tables {
                         to_creditor,
                         debtor,
                         asset_id,
-                        o.interest_rate,
                         Quantity::new(take_p),
+                        o.interest_rate,
                     );
                     left -= take_p;
                 }
@@ -1170,8 +1159,7 @@ pub mod tables {
         /// Grow principal on this claim (shared by deposit and line draws).
         /// Accrues first so interest is finalized on the prior principal balance.
         fn credit(&mut self, amount: Quantity) {
-            let before =
-                Self::directed_principal(self.creditor, self.debtor, self.asset_id);
+            let before = Self::directed_principal(self.creditor, self.debtor, self.asset_id);
             self.accrue();
             self.remaining_principal = self
                 .remaining_principal
@@ -1181,13 +1169,7 @@ pub mod tables {
                 .into();
             self.save();
             let after = Self::directed_principal(self.creditor, self.debtor, self.asset_id);
-            PairCycle::sync_cycle(
-                self.creditor,
-                self.debtor,
-                self.asset_id,
-                before,
-                after,
-            );
+            PairCycle::sync_cycle(self.creditor, self.debtor, self.asset_id, before, after);
         }
 
         /// Credit the (creditor, debtor, rate) bucket, creating it if needed.
@@ -1195,8 +1177,8 @@ pub mod tables {
             creditor: AccountNumber,
             debtor: AccountNumber,
             asset_id: u16,
-            interest_rate: u32,
             amount: Quantity,
+            interest_rate: u32,
         ) {
             Self::get_existing_or_new(creditor, debtor, asset_id, interest_rate).credit(amount);
         }
@@ -1216,7 +1198,7 @@ pub mod tables {
             amount: Quantity,
             interest_rate: u32,
         ) -> Quantity {
-            Self::credit_pair(depositor, receiver, asset_id, interest_rate, amount);
+            Self::credit_pair(depositor, receiver, asset_id, amount, interest_rate);
             Self::net_pair(depositor, receiver, asset_id, u64::MAX.into())
         }
 
@@ -1231,9 +1213,7 @@ pub mod tables {
     /// actions write the cycle clock via [`Self::sync_cycle`]. Same key as
     /// [`CreditLine`]; separate row so a line upsert cannot clobber the clock.
     #[table(name = "PairCycleTab", index = 7)]
-    #[derive(
-        Default, Clone, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug,
-    )]
+    #[derive(Default, Clone, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct PairCycle {
         pub creditor: AccountNumber,
         pub debtor: AccountNumber,
@@ -1260,11 +1240,7 @@ pub mod tables {
             PairCycleTab::read_write().erase(&(creditor, debtor, asset_id));
         }
 
-        pub fn get(
-            creditor: AccountNumber,
-            debtor: AccountNumber,
-            asset_id: u16,
-        ) -> Option<Self> {
+        pub fn get(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) -> Option<Self> {
             PairCycleTab::read()
                 .get_index_pk()
                 .get(&(creditor, debtor, asset_id))
@@ -1331,10 +1307,7 @@ pub mod tables {
             let Some(mut c) = Self::get(creditor, debtor, asset_id) else {
                 return;
             };
-            if before_principal == 0
-                && after_principal > 0
-                && c.cycle_started_at.seconds == 0
-            {
+            if before_principal == 0 && after_principal > 0 && c.cycle_started_at.seconds == 0 {
                 if c.grace_seconds == 0 {
                     return;
                 }
@@ -1363,9 +1336,7 @@ pub mod tables {
     ///
     /// Interest-free grace lives on [`PairCycle`], not this row.
     #[table(name = "CreditLineTable", index = 3)]
-    #[derive(
-        Default, Clone, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug,
-    )]
+    #[derive(Default, Clone, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct CreditLine {
         pub creditor: AccountNumber,
         pub debtor: AccountNumber,
@@ -1510,11 +1481,7 @@ pub mod tables {
             reverse.saturating_add(line_cap)
         }
 
-        pub fn path_capacity(
-            creditor: AccountNumber,
-            debtor: AccountNumber,
-            asset_id: u16,
-        ) -> u64 {
+        pub fn path_capacity(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) -> u64 {
             Obligation::accrue_pair(creditor, debtor, asset_id);
             Obligation::accrue_pair(debtor, creditor, asset_id);
             Self::path_capacity_live(creditor, debtor, asset_id)
@@ -1547,7 +1514,7 @@ pub mod tables {
                 line.map(|l| l.interest_rate).unwrap_or(0)
             };
 
-            Obligation::credit_pair(creditor, debtor, asset_id, rate, amount);
+            Obligation::credit_pair(creditor, debtor, asset_id, amount, rate);
             let netted = Obligation::net_pair(creditor, debtor, asset_id, u64::MAX.into());
             emit_pair_activity(
                 creditor,
@@ -1611,8 +1578,8 @@ pub mod tables {
 #[psibase::service(name = "banx", tables = "tables")]
 pub mod service {
     use crate::tables::{
-        emit_pair_activity, resolve_forward, resolve_buy_claim, Asset, CreditLine, CurrencyPolicy,
-        ForwardOffer, InitRow, InitTable, Obligation, PathHop, PayRequest, BuyClaimOffer,
+        emit_pair_activity, resolve_buy_claim, resolve_forward, Asset, BuyClaimOffer, CreditLine,
+        CurrencyPolicy, ForwardOffer, InitRow, InitTable, Obligation, PathHop, PayRequest,
     };
     use psibase::{
         services::events,
@@ -1678,16 +1645,8 @@ pub mod service {
             Asset::add(account!("nzd"), fiat4, "New Zealand dollar".into());
 
             let crypto8 = Precision::new(8).expect("crypto asset precision");
-            Asset::add(
-                account!("btc"),
-                crypto8,
-                "1.00000000 = 1 Bitcoin".into(),
-            );
-            Asset::add(
-                account!("eth"),
-                crypto8,
-                "1.00000000 = 1 Ethereum".into(),
-            );
+            Asset::add(account!("btc"), crypto8, "1.00000000 = 1 Bitcoin".into());
+            Asset::add(account!("eth"), crypto8, "1.00000000 = 1 Ethereum".into());
         }
     }
 
@@ -1827,12 +1786,7 @@ pub mod service {
 
     /// Post/update a **global** buy-claim offer (`debtor = 0`).
     #[action]
-    fn st_glb_buy(
-        asset_id: u16,
-        fee_fixed: Quantity,
-        fee_percent: i32,
-        expires_at: TimePointSec,
-    ) {
+    fn st_glb_buy(asset_id: u16, fee_fixed: Quantity, fee_percent: i32, expires_at: TimePointSec) {
         BuyClaimOffer::upsert(
             get_sender(),
             BuyClaimOffer::GLOBAL,
@@ -1864,12 +1818,7 @@ pub mod service {
     /// a claim on buyer for face after the offer spread (haircut or premium).
     /// Requires buyer's line residual to `debtor` and a live buy-claim offer.
     #[action]
-    fn sell_claim(
-        buyer: AccountNumber,
-        debtor: AccountNumber,
-        asset_id: u16,
-        amount: Quantity,
-    ) {
+    fn sell_claim(buyer: AccountNumber, debtor: AccountNumber, asset_id: u16, amount: Quantity) {
         let seller = get_sender();
         assert!(seller != buyer, "cannot sell claim to self");
         assert!(seller != debtor, "cannot sell claim on self as debtor");
@@ -1891,7 +1840,7 @@ pub mod service {
         let proceeds = offer.apply_fees(amount);
         Obligation::transfer_claims(seller, buyer, debtor, asset_id, amount.value);
         // Proceeds: buyer owes seller (0% obligation).
-        Obligation::credit_pair(seller, buyer, asset_id, 0, proceeds);
+        Obligation::credit_pair(seller, buyer, asset_id, proceeds, 0);
         Obligation::net_pair(seller, buyer, asset_id, u64::MAX.into());
         Obligation::net_pair(buyer, debtor, asset_id, u64::MAX.into());
 
@@ -1985,37 +1934,20 @@ pub mod service {
             "interest_rate exceeds 100% (PPM_SCALE)"
         );
         let req_memo = if request_id != 0 {
-            PayRequest::fulfill_please_book(
-                request_id,
-                receiver,
-                depositor,
-                asset_id,
-                amount,
-            )
+            PayRequest::fulfill_please_book(request_id, receiver, depositor, asset_id, amount)
         } else {
             String::new()
         };
         let netted = Obligation::deposit(depositor, receiver, asset_id, amount, interest_rate);
         emit_pair_activity(
-            depositor,
-            receiver,
-            asset_id,
-            "deposit",
-            amount,
-            netted,
-            asset_id,
-            request_id,
+            depositor, receiver, asset_id, "deposit", amount, netted, asset_id, request_id,
             &req_memo,
         );
     }
 
     /// Live pair exposure (principal + interest since last principal/rate change).
     #[action]
-    fn get_exposure(
-        creditor: AccountNumber,
-        debtor: AccountNumber,
-        asset_id: u16,
-    ) -> Quantity {
+    fn get_exposure(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) -> Quantity {
         Obligation::exposure(creditor, debtor, asset_id)
     }
 
@@ -2059,12 +1991,7 @@ pub mod service {
     /// `request_id` 0 = none. Non-zero must be a live invoice naming the
     /// sender as payer; last hop must be the invoice poster in that asset.
     #[action]
-    fn path_pay(
-        hops: Vec<PathHop>,
-        amount: Quantity,
-        min_return: Quantity,
-        request_id: u32,
-    ) {
+    fn path_pay(hops: Vec<PathHop>, amount: Quantity, min_return: Quantity, request_id: u32) {
         assert!(!hops.is_empty(), "path_pay must include at least one hop");
         assert!(amount.value > 0, "path_pay amount must be positive");
         let last_hop = hops[hops.len() - 1];
@@ -2100,8 +2027,7 @@ pub mod service {
                 if take.value == 0 {
                     forward = Quantity::new(0);
                 } else {
-                    let cpol =
-                        CurrencyPolicy::get_assert(prev_edge_debtor, prev_asset, asset_id);
+                    let cpol = CurrencyPolicy::get_assert(prev_edge_debtor, prev_asset, asset_id);
                     forward = cpol.convert(prev_edge_creditor, take, Quantity::new(0));
                 }
             }
@@ -2176,15 +2102,7 @@ pub mod service {
             PayRequest::fulfill_settle(request_id, debtor, amount);
         let netted = Obligation::deposit(debtor, creditor, asset_id, take, 0);
         emit_pair_activity(
-            debtor,
-            creditor,
-            asset_id,
-            "deposit",
-            take,
-            netted,
-            asset_id,
-            request_id,
-            &memo,
+            debtor, creditor, asset_id, "deposit", take, netted, asset_id, request_id, &memo,
         );
     }
 
