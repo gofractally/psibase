@@ -9,6 +9,7 @@ import {
     displayAmount,
     formatRawAmount,
     humanToRaw,
+    lineAvailableRaw,
 } from "@/lib/amount";
 import { amountFieldValidator, useAppForm } from "@/lib/form";
 import {
@@ -73,7 +74,13 @@ function residualOnLine(
     if (!line) return 0n;
     const limit = humanToRaw(line.limit || "0", precision);
     const exposure = humanToRaw(line.exposure || "0", precision);
-    return limit > exposure ? limit - exposure : 0n;
+    const remaining = humanToRaw(line.remaining || "0", precision);
+    return lineAvailableRaw(
+        limit,
+        exposure,
+        remaining,
+        line.depleteOnDebit,
+    );
 }
 
 /** Prefer specific counterparty offer over global; lower fee wins ties. */

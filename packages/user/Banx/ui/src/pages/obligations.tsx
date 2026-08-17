@@ -43,6 +43,7 @@ import {
     amountPlaceholder,
     formatRawAmount,
     humanToRaw,
+    lineAvailableRaw,
 } from "@/lib/amount";
 import {
     DEFAULT_GRACE_SECONDS,
@@ -1000,7 +1001,20 @@ function CreditLineDialog({
                                     precisionOf(editing.assetId),
                                 )}
                             </span>
-                            . Limit should stay ≥ exposure for revolving lines.
+                            {editing.depleteOnDebit ? (
+                                <>
+                                    . Remaining grant:{" "}
+                                    <span className="text-foreground font-mono tabular-nums">
+                                        {formatRawAmount(
+                                            editing.remaining,
+                                            precisionOf(editing.assetId),
+                                        )}
+                                    </span>{" "}
+                                    (repay does not restore it)
+                                </>
+                            ) : (
+                                ". Limit should stay ≥ exposure for revolving lines."
+                            )}
                         </p>
                     ) : null}
                     <DialogFooter>
@@ -1107,11 +1121,20 @@ function AccountGroupRow({
     const exposureRaw = creditLine
         ? humanToRaw(creditLine.exposure || "0", precision)
         : null;
+    const remainingRaw = creditLine
+        ? humanToRaw(creditLine.remaining || "0", precision)
+        : null;
     const availableRaw =
-        limitRaw !== null && exposureRaw !== null
-            ? limitRaw > exposureRaw
-                ? limitRaw - exposureRaw
-                : 0n
+        creditLine &&
+        limitRaw !== null &&
+        exposureRaw !== null &&
+        remainingRaw !== null
+            ? lineAvailableRaw(
+                  limitRaw,
+                  exposureRaw,
+                  remainingRaw,
+                  creditLine.depleteOnDebit,
+              )
             : null;
 
     const rowBg =
@@ -1442,6 +1465,19 @@ function AccountGroupRow({
                                             {symbol}
                                         </span>
                                     </div>
+                                    {creditLine.depleteOnDebit &&
+                                    remainingRaw !== null ? (
+                                        <div>
+                                            Remaining grant{" "}
+                                            <span className="text-foreground font-mono tabular-nums">
+                                                {formatRawAmount(
+                                                    remainingRaw.toString(),
+                                                    precision,
+                                                )}{" "}
+                                                {symbol}
+                                            </span>
+                                        </div>
+                                    ) : null}
                                     {creditLine.graceSeconds > 0 ||
                                     creditLine.cycleStartedAt ? (
                                         <div className="sm:col-span-3">

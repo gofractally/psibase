@@ -22,6 +22,8 @@ const zCreditLine = z.object({
     cycleStartedAt: z.number(),
     cycleGraceSeconds: z.number(),
     exposure: z.string(),
+    /// Unused grant when depleting; "0" on revolving lines.
+    remaining: z.string(),
 });
 
 const zObligation = z.object({
@@ -122,7 +124,7 @@ export async function fetchCreditLines(account: string): Promise<CreditLine[]> {
     const data = await gql<{ creditLines: CreditLine[] }>(
         `{ creditLines(account: "${account}") {
             creditor debtor assetId limit depleteOnDebit interestRatePpm
-            graceSeconds cycleStartedAt cycleGraceSeconds exposure
+            graceSeconds cycleStartedAt cycleGraceSeconds exposure remaining
         } }`,
     );
     return zCreditLine.array().parse(data.creditLines);

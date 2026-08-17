@@ -4,6 +4,21 @@ import { RATE_SCALE } from "@/lib/constants";
  * Parse a human decimal string (GraphQL `Decimal`) to raw ledger units.
  * Returns 0n on empty/invalid input.
  */
+/**
+ * Unused line capacity in raw units. Revolving: `limit − exposure`.
+ * Depleting: also capped by leftover grant (`remaining`); repay does not restore it.
+ */
+export function lineAvailableRaw(
+    limitRaw: bigint,
+    exposureRaw: bigint,
+    remainingRaw: bigint,
+    depleteOnDebit: boolean,
+): bigint {
+    const headroom = limitRaw > exposureRaw ? limitRaw - exposureRaw : 0n;
+    if (!depleteOnDebit) return headroom;
+    return headroom < remainingRaw ? headroom : remainingRaw;
+}
+
 export function humanToRaw(amount: string, precision: number): bigint {
     const s = amount.trim();
     if (!s || !/^-?\d+(\.\d*)?$|^-?\.\d+$/.test(s)) return 0n;
