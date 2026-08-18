@@ -8,7 +8,8 @@ world impl {
     include host:db/imports;
     include transact:plugin/imports;
     include permissions:plugin/imports;
-    include accounts:query/imports;
+    include accounts:chain-query/imports;
+    include accounts:client-query/imports;
     include auth-sig:plugin/imports;
     include name-market:plugin/imports;
     include host:crypto/imports;

@@ -21,7 +21,7 @@ export const isAccountAvailable = async (
                 method: "getAccount",
                 params: [accountName],
                 service: "accounts",
-                plugin: "query",
+                plugin: "chain-query",
                 intf: "api",
             }),
         );

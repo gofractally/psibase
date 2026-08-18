@@ -88,7 +88,7 @@ fn get_action_sender(service: &str, method: &str) -> Result<String, HostTypes::E
             return Ok(s);
         }
     }
-    if let Some(sender) = accounts::query::api::get_current_user() {
+    if let Some(sender) = accounts::client_query::api::get_current_user() {
         return Ok(sender);
     }
 
@@ -133,12 +133,12 @@ fn pack_staged_propose(actions: Vec<ImportAction>, auto_exec: bool) -> (String, 
 }
 
 fn flush_propose_latch() -> Result<(), HostTypes::Error> {
-    OpenTx::flush_latch(accounts::query::api::get_current_user().as_deref())
+    OpenTx::flush_latch(accounts::client_query::api::get_current_user().as_deref())
         .map_err(|_| NotLoggedIn("flush_propose_latch").into())
 }
 
 fn user_auth_claim(user: &str) -> Result<Option<ImportClaim>, HostTypes::Error> {
-    let auth_service_acc = accounts::query::api::get_account(&user.to_string())?
+    let auth_service_acc = accounts::chain_query::api::get_account(&user.to_string())?
         .unwrap()
         .auth_service;
     let plugin_ref = PluginRef::new(&auth_service_acc, "plugin", "transact-hook-user-auth");
@@ -149,7 +149,7 @@ fn user_auth_proof(
     user: &str,
     tx_hash: &[u8; 32],
 ) -> Result<Option<transact::plugin::types::Proof>, HostTypes::Error> {
-    let auth_service_acc = accounts::query::api::get_account(&user.to_string())?
+    let auth_service_acc = accounts::chain_query::api::get_account(&user.to_string())?
         .unwrap()
         .auth_service;
     let plugin_ref = PluginRef::new(&auth_service_acc, "plugin", "transact-hook-user-auth");

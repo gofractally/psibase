@@ -1,0 +1,14 @@
+package accounts:client-query;
+
+interface api {
+    /// Returns true if there is a user logged in to the currently active top-level application.
+    is-logged-in: func() -> bool;
+
+    /// Gets the account name of the user logged into the active application.
+    /// May also return None if no user is logged in.
+    get-current-user: func() -> option<string>;
+}
+
+world imports {
+    import api;
+}
