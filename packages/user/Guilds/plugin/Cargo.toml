@@ -31,4 +31,4 @@ world = "impl"
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
 "invite:plugin" = { path = "../../Invite/plugin/wit/world.wit" }
 "evaluations:plugin" = { path = "../../Evaluations/plugin/wit/world.wit" }
-"accounts:query" = { path = "../../../system/Accounts/plugin/query/wit/world.wit" }
+"accounts:chain-query" = { path = "../../../system/Accounts/plugin/chain-query/wit/world.wit" }

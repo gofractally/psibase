@@ -17,7 +17,7 @@ use supervisor::bridge::types::{self as BridgeTypes, HttpRequest};
 struct HostHttp;
 
 fn get_auth_token() -> Option<String> {
-    let current_user = accounts::query::api::get_current_user();
+    let current_user = accounts::client_query::api::get_current_user();
     if current_user.is_some() {
         HostAuth::get_active_query_token(&CallContext::get_active_app(), &current_user.unwrap())
     } else {

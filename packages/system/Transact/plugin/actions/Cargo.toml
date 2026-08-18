@@ -24,7 +24,7 @@ world = "impl"
 "host:client" = { path = "../../../../user/Host/plugin/client/wit/world.wit" }
 "host:types" = { path = "../../../../user/Host/plugin/types/wit/world.wit" }
 "clientdata:plugin" = { path = "../../../../user/ClientData/plugin/wit/world.wit" }
-"accounts:query" = { path = "../../../Accounts/plugin/query/wit/world.wit" }
+"accounts:client-query" = { path = "../../../Accounts/plugin/client-query/wit/world.wit" }
 "permissions:plugin" = { path = "../../../../user/Permissions/plugin/wit/world.wit" }
 
 [package.metadata.component.bindings]

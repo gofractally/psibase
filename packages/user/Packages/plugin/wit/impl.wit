@@ -3,7 +3,7 @@ package packages:plugin;
 world impl {
     include host:client/imports;
     include host:http/imports;
-    include accounts:query/imports;
+    include accounts:client-query/imports;
     include setcode:plugin/imports;
     include sites:plugin/imports;
     include transact:actions/imports;
