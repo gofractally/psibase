@@ -34,5 +34,5 @@ world = "impl"
 "host:http" = { path = "../../Host/plugin/http/wit/world.wit" }
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/transact/wit/world.wit" }
-"accounts:query" = { path = "../../../system/Accounts/plugin/query/wit/world.wit" }
+"accounts:client-query" = { path = "../../../system/Accounts/plugin/client-query/wit/world.wit" }
 "permissions:plugin" = { path = "../../Permissions/plugin/wit/world.wit" }
