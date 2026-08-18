@@ -31,7 +31,7 @@ world = "impl"
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/transact/wit/world.wit" }
 "guilds:plugin" = { path = "../../Guilds/plugin/wit/world.wit" }
-"accounts:query" = { path = "../../../system/Accounts/plugin/query/wit/world.wit" }
+"accounts:chain-query" = { path = "../../../system/Accounts/plugin/chain-query/wit/world.wit" }
 
 
 [dev-dependencies]
