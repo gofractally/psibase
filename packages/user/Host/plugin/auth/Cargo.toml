@@ -6,6 +6,9 @@ edition.workspace = true
 [dependencies]
 wit-bindgen-rt.workspace = true
 psibase.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+url = "2.4"
 psibase-plugin-workspace-hack.workspace = true
 
 [lib]
@@ -18,7 +21,7 @@ package = "host:auth"
 world = "impl"
 
 [package.metadata.component.target.dependencies]
-"transact:plugin" = { path = "../../../../system/Transact/plugin/transact/wit/world.wit" }
+"transact:login" = { path = "../../../../system/Transact/plugin/login/wit/world.wit" }
 "host:client" = { path = "../client/wit/world.wit" }
 "host:db" = { path = "../db/wit/world.wit" }
 "host:types" = { path = "../types/wit/world.wit" }

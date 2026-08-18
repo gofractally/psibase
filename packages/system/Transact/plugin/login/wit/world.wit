@@ -1,0 +1,29 @@
+package transact:login;
+
+interface types {
+    /// A list of `claim` objects is added to every submitted transaction.
+    /// A claim is something the submitter of a transaction claims to know (e.g. a public key)
+    record claim {
+        /// The name of the service used to verify the claim is valid
+        verify-service: string,
+        /// The raw claim data
+        raw-data: list<u8>,
+    }
+
+    /// The verify-service specified in the claim is the service that knows how to verify that
+    /// a proof actually proves the claim.
+    record proof {
+        signature: list<u8>,
+    }
+}
+
+interface api {
+    use host:types/types.{error};
+
+    /// Build and sign a packed loginSys transaction. No HTTP.
+    build: func(app: string, user: string, root-host: string, auth-service: string) -> result<list<u8>, error>;
+}
+
+world imports {
+    import api;
+}

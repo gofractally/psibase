@@ -12,21 +12,16 @@ use transact::plugin::hook_handlers::*;
 use transact::plugin::types::{Action as ImportAction, Claim as ImportClaim};
 
 use host::client::api as Client;
-use host::http::api as Server;
-use host::types::types::{self as HostTypes, BodyTypes, PluginRef};
+use host::types::types::{self as HostTypes, PluginRef};
 
 use exports::transact::plugin::types::{Action as ExportAction, Claim as ExportClaim};
 use exports::transact::plugin::{
-    api::Guest as Api, auth::Guest as Auth, hooks::Guest as Hooks, ledger::Guest as Ledger,
-    network::Guest as Network,
+    api::Guest as Api, hooks::Guest as Hooks, ledger::Guest as Ledger, network::Guest as Network,
 };
 
 use crate::trust::*;
 use psibase::fracpack::Pack;
 use psibase::services::transact::action_structs::setSnapTime;
-use psibase::{Hex, SignedTransaction, Tapos, TimePointSec, Transaction};
-use serde::Deserialize;
-use sha2::{Digest, Sha256};
 
 psibase::define_trust! {
     descriptions {
@@ -42,7 +37,7 @@ psibase::define_trust! {
         None => [add_signature, unhook_actions_sender, add_action_to_transaction],
         Low => [],
         High => [hook_actions_sender],
-        Max => [set_propose_latch, propose, set_snapshot_time, get_query_token],
+        Max => [set_propose_latch, propose, set_snapshot_time],
     }
 }
 
@@ -180,25 +175,6 @@ fn flush_propose_latch() -> Result<(), HostTypes::Error> {
     Ok(())
 }
 
-fn user_auth_claim(user: &str) -> Result<Option<ImportClaim>, HostTypes::Error> {
-    let auth_service_acc = accounts::chain_query::api::get_account(&user.to_string())?
-        .unwrap()
-        .auth_service;
-    let plugin_ref = PluginRef::new(&auth_service_acc, "plugin", "transact-hook-user-auth");
-    on_user_auth_claim(plugin_ref, user)
-}
-
-fn user_auth_proof(
-    user: &str,
-    tx_hash: &[u8; 32],
-) -> Result<Option<transact::plugin::types::Proof>, HostTypes::Error> {
-    let auth_service_acc = accounts::chain_query::api::get_account(&user.to_string())?
-        .unwrap()
-        .auth_service;
-    let plugin_ref = PluginRef::new(&auth_service_acc, "plugin", "transact-hook-user-auth");
-    on_user_auth_proof(plugin_ref, user, tx_hash)
-}
-
 impl From<ImportAction> for psibase::Action {
     fn from(action: ImportAction) -> Self {
         psibase::Action {
@@ -206,15 +182,6 @@ impl From<ImportAction> for psibase::Action {
             service: action.service.parse().unwrap(),
             method: psibase::MethodNumber::from(action.method.as_str()),
             rawData: action.raw_data.into(),
-        }
-    }
-}
-
-impl From<ImportClaim> for psibase::Claim {
-    fn from(claim: ImportClaim) -> Self {
-        psibase::Claim {
-            service: claim.verify_service.parse().unwrap(),
-            rawData: Hex::from(claim.raw_data.clone()),
         }
     }
 }
@@ -308,74 +275,6 @@ impl Network for TransactPlugin {
             setSnapTime::ACTION_NAME.to_string(),
             packed_args,
         )
-    }
-}
-
-#[derive(Deserialize)]
-struct LoginReply {
-    access_token: String,
-    #[allow(dead_code)]
-    token_type: String,
-}
-
-impl Auth for TransactPlugin {
-    fn get_query_token(app: String, user: String) -> Result<String, HostTypes::Error> {
-        assert_authorized_with_whitelist(FunctionName::get_query_token, vec!["host".into()])?;
-
-        let root_host: String = serde_json::from_str(&Server::get_json("/common/rootdomain")?)
-            .expect("Failed to deserialize rootdomain");
-        let actions = vec![ImportAction {
-            sender: user.clone(),
-            service: app,
-            method: "loginSys".to_string(),
-            raw_data: (root_host,).packed(),
-        }];
-
-        let claims: Vec<ImportClaim> = user_auth_claim(&user)?.into_iter().collect();
-
-        let claims: Vec<psibase::Claim> = claims.into_iter().map(Into::into).collect();
-        let actions: Vec<psibase::Action> = actions.into_iter().map(Into::into).collect();
-
-        let expiration = TimePointSec::from(chrono::Utc::now() + chrono::Duration::seconds(3));
-        let tapos = Tapos {
-            expiration,
-            refBlockSuffix: 0,
-            flags: Tapos::DO_NOT_BROADCAST_FLAG,
-            refBlockIndex: 0,
-        };
-
-        let tx = Transaction {
-            tapos,
-            actions,
-            claims,
-        };
-        let proofs: Vec<Hex<Vec<u8>>> = user_auth_proof(&user, &Sha256::digest(&tx.packed()).into())?
-            .into_iter()
-            .map(|proof| Hex::from(proof.signature))
-            .collect();
-        let signed_tx = SignedTransaction {
-            transaction: Hex::from(tx.packed()),
-            proofs,
-            subjectiveData: None,
-        };
-        if signed_tx.proofs.len() != tx.claims.len() {
-            return Err(ClaimProofMismatch.into());
-        }
-
-        let response = Server::post(&HostTypes::PostRequest {
-            endpoint: "/login".to_string(),
-            body: HostTypes::BodyTypes::Bytes(signed_tx.packed()),
-        })?;
-
-        let reply = match response {
-            BodyTypes::Json(t) => {
-                serde_json::from_str::<LoginReply>(&t).expect("Failed to deserialize response")
-            }
-            _ => {
-                return Err(BadResponse("Invalid body type").into());
-            }
-        };
-        Ok(reply.access_token)
     }
 }
 
