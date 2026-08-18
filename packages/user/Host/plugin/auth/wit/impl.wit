@@ -3,7 +3,7 @@ package host:auth;
 world impl {
     include host:client/imports;
     include host:db/imports;
-    import transact:plugin/auth;
+    import transact:login/api;
     include supervisor:bridge/imports;
 
     export api;
