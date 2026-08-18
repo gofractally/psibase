@@ -1,8 +1,8 @@
 package sites:plugin;
 
 world impl {
-    include host:call-context/imports;
-    include host:authed-http/imports;
+    include host:client/imports;
+    include host:http/imports;
     include transact:plugin/imports;
     include permissions:plugin/imports;
 

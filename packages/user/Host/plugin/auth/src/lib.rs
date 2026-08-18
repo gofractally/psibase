@@ -5,13 +5,13 @@ use bindings::*;
 mod helpers;
 use helpers::*;
 
-use exports::host::session::api::Guest as Api;
+use exports::host::auth::api::Guest as Api;
 
 use psibase::fracpack::{Pack, Unpack};
 
 use crate::bindings::{
     host::{
-        call_context::api as CallContext,
+        client::api as CallContext,
         db::store::{Bucket, Database, DbMode, StorageDuration},
         types::types::Error,
     },
@@ -22,7 +22,7 @@ use crate::bindings::{
     transact::plugin::auth as Transact,
 };
 
-struct HostSession;
+struct HostAuth;
 
 const DB: Database = Database {
     mode: DbMode::NonTransactional,
@@ -63,9 +63,9 @@ fn remove_active_query_token(app: &str, user: &str) {
     Bucket::new(DB, &bucket_id(user)).delete(&&app);
 }
 
-impl Api for HostSession {
+impl Api for HostAuth {
     fn set_logged_in_user(user: String, app: String) -> Result<(), Error> {
-        check_caller(&["accounts"], "set-logged-in-user@host:session/api");
+        check_caller(&["accounts"], "set-logged-in-user@host:auth/api");
 
         let query_token = Bucket::new(DB, &bucket_id(&user))
             .get(&app)
@@ -78,14 +78,14 @@ impl Api for HostSession {
     }
 
     fn log_out_user(user: String, app: String) {
-        check_caller(&["accounts"], "log_out_user@host:session/api");
+        check_caller(&["accounts"], "log_out_user@host:auth/api");
         remove_active_query_token(&app, &user);
     }
 
     fn get_active_query_token(app: String, user: String) -> Option<String> {
         check_caller(
             &["host", "supervisor"],
-            "get-active-query-token@host:session/api",
+            "get-active-query-token@host:auth/api",
         );
 
         Bucket::new(DB, &bucket_id(&user))
@@ -94,4 +94,4 @@ impl Api for HostSession {
     }
 }
 
-bindings::export!(HostSession with_types_in bindings);
+bindings::export!(HostAuth with_types_in bindings);

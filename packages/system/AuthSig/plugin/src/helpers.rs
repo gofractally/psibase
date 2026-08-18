@@ -1,5 +1,5 @@
-use crate::bindings::host::authed_http::api as Server;
-use crate::bindings::host::call_context::api as Client;
+use crate::bindings::host::http::api as Server;
+use crate::bindings::host::client::api as Client;
 use crate::bindings::host::types::types as CommonTypes;
 use crate::bindings::host::types::types::Pem;
 use crate::errors::ErrorType::*;

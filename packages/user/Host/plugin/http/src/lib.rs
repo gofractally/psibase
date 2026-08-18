@@ -7,19 +7,19 @@ use helpers::*;
 
 mod types;
 
-use bindings::host::session::api as HostSession;
-use exports::host::authed_http::api::Guest as Api;
+use bindings::host::auth::api as HostAuth;
+use exports::host::http::api::Guest as Api;
 use helpers::make_error;
-use host::call_context::api as CallContext;
+use host::client::api as CallContext;
 use host::types::types::{BodyTypes, Error, PostRequest};
 use supervisor::bridge::types::{self as BridgeTypes, HttpRequest};
 
-struct HostAuthedHttp;
+struct HostHttp;
 
 fn get_auth_token() -> Option<String> {
     let current_user = accounts::query::api::get_current_user();
     if current_user.is_some() {
-        HostSession::get_active_query_token(&CallContext::get_active_app(), &current_user.unwrap())
+        HostAuth::get_active_query_token(&CallContext::get_active_app(), &current_user.unwrap())
     } else {
         None
     }
@@ -65,7 +65,7 @@ fn do_get(app: String, endpoint: String) -> Result<BridgeTypes::HttpResponse, Er
     .send()?)
 }
 
-impl Api for HostAuthedHttp {
+impl Api for HostHttp {
     fn post_graphql_get_json(graphql: String) -> Result<String, Error> {
         let res = do_post(
             CallContext::get_sender(),
@@ -111,4 +111,4 @@ impl Api for HostAuthedHttp {
     }
 }
 
-bindings::export!(HostAuthedHttp with_types_in bindings);
+bindings::export!(HostHttp with_types_in bindings);

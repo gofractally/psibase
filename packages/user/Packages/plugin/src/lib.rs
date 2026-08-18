@@ -7,8 +7,8 @@ use errors::ErrorType;
 
 use serde::{Deserialize, Serialize};
 
-use host::authed_http::api as Server;
-use host::call_context::api as Client;
+use host::http::api as Server;
+use host::client::api as Client;
 use host::types::types as HostTypes;
 
 use accounts::query::api as Accounts;

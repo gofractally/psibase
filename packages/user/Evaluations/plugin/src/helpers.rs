@@ -5,7 +5,7 @@ use crate::bindings::transact::plugin::intf::add_action_to_transaction;
 use crate::errors::ErrorType;
 use crate::key_table;
 use crate::types;
-use bindings::host::call_context::api as Client;
+use bindings::host::client::api as Client;
 use ecies::{decrypt, encrypt};
 use psibase::{fracpack::Pack, AccountNumber};
 

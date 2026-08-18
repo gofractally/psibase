@@ -1,5 +1,5 @@
 use crate::bindings::accounts::query::api as AccountsQuery;
-use crate::bindings::host::call_context::api as Client;
+use crate::bindings::host::client::api as Client;
 use crate::bindings::host::types::types as CommonTypes;
 use crate::errors::ErrorType::*;
 

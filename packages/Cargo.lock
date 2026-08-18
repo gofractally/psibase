@@ -1364,18 +1364,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "host-authed-http"
+name = "host-auth"
 version = "0.26.0"
 dependencies = [
  "psibase",
  "psibase-plugin-workspace-hack",
- "serde",
- "serde_json",
  "wit-bindgen-rt",
 ]
 
 [[package]]
-name = "host-call-context"
+name = "host-client"
 version = "0.26.0"
 dependencies = [
  "psibase",
@@ -1406,6 +1404,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "host-http"
+version = "0.26.0"
+dependencies = [
+ "psibase",
+ "psibase-plugin-workspace-hack",
+ "serde",
+ "serde_json",
+ "wit-bindgen-rt",
+]
+
+[[package]]
 name = "host-prompt"
 version = "0.26.0"
 dependencies = [
@@ -1413,15 +1422,6 @@ dependencies = [
  "psibase",
  "psibase-plugin-workspace-hack",
  "urlencoding",
- "wit-bindgen-rt",
-]
-
-[[package]]
-name = "host-session"
-version = "0.26.0"
-dependencies = [
- "psibase",
- "psibase-plugin-workspace-hack",
  "wit-bindgen-rt",
 ]
 

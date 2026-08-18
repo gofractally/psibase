@@ -5,7 +5,7 @@ use bindings::accounts::query as Accounts;
 use bindings::exports::identity::plugin::api::Guest as Api;
 use bindings::exports::identity::plugin::queries::Guest as QueriesApi;
 use bindings::exports::identity::plugin::types as IdentityTypes;
-use bindings::host::authed_http::api as CommonServer;
+use bindings::host::http::api as CommonServer;
 use bindings::host::types::types as HostTypes;
 use bindings::transact::plugin::intf as Transact;
 use psibase::fracpack::Pack;

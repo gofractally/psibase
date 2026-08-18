@@ -1,8 +1,8 @@
 package base64:plugin;
 
 world impl {
-    include host:call-context/imports;
-    include host:authed-http/imports;
+    include host:client/imports;
+    include host:http/imports;
     export url;
     export standard;
 }

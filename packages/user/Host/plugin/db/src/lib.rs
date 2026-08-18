@@ -5,7 +5,7 @@ use bindings::*;
 mod bucket;
 
 use exports::host::db::store::{DbMode, Guest as Store};
-use host::call_context::api::get_sender;
+use host::client::api::get_sender;
 
 pub fn check_caller(allowed: &[&str], context: &str) {
     let app = get_sender();

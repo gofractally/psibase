@@ -14,8 +14,8 @@ use db::*;
 use transact::plugin::hook_handlers::*;
 
 // Other plugins
-use host::authed_http::api as Server;
-use host::call_context::api as HostClient;
+use host::http::api as Server;
+use host::client::api as HostClient;
 use host::db::store as Store;
 use host::types::types::{self as HostTypes, BodyTypes};
 use virtual_server::plugin::transact as VirtualServer;

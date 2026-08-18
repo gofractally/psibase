@@ -1,11 +1,10 @@
 [package]
-name = "host-call-context"
+name = "host-auth"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
 wit-bindgen-rt.workspace = true
-url = "2.4"
 psibase.workspace = true
 psibase-plugin-workspace-hack.workspace = true
 
@@ -13,10 +12,14 @@ psibase-plugin-workspace-hack.workspace = true
 crate-type = ["cdylib"]
 
 [package.metadata.component]
-package = "host:call-context"
+package = "host:auth"
 
 [package.metadata.component.target]
 world = "impl"
 
 [package.metadata.component.target.dependencies]
+"transact:plugin" = { path = "../../../../system/Transact/plugin/wit/world.wit" }
+"host:client" = { path = "../client/wit/world.wit" }
+"host:db" = { path = "../db/wit/world.wit" }
+"host:types" = { path = "../types/wit/world.wit" }
 "supervisor:bridge" = { path = "./wit/deps/supervisor.wit" }

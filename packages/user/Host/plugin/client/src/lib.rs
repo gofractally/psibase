@@ -5,16 +5,16 @@ use bindings::*;
 mod helpers;
 use helpers::*;
 
-use exports::host::call_context::api::Guest as Api;
+use exports::host::client::api::Guest as Api;
 use supervisor::bridge::intf as Supervisor;
 use url::Url;
 
-struct HostCallContext;
+struct HostClient;
 
-impl Api for HostCallContext {
+impl Api for HostClient {
     fn get_sender() -> String {
         // Exported for use by other plugins who want to know which app called *them*.
-        // Look back 2 frames: the call-context hop is frame 1.
+        // Look back 2 frames: the client hop is frame 1.
         let frame = 2;
         let stack = get_callstack();
         assert!(stack.len() >= frame);
@@ -42,4 +42,4 @@ impl Api for HostCallContext {
     }
 }
 
-bindings::export!(HostCallContext with_types_in bindings);
+bindings::export!(HostClient with_types_in bindings);
