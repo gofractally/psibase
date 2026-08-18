@@ -146,7 +146,7 @@ script-src 'self';
 style-src 'self' 'unsafe-inline';
 img-src 'self' data: profiles.{root}/avatar/ branding.{root};
 font-src 'self';
-connect-src 'self';
+connect-src 'self' profiles.{root} tokens.{root};
 frame-src supervisor.{root};
 frame-ancestors 'self';
 base-uri 'none';
@@ -157,7 +157,7 @@ object-src 'none';
 As a single header value:
 
 ```
-default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: profiles.{root}/avatar/ branding.{root}; font-src 'self'; connect-src 'self'; frame-src supervisor.{root}; frame-ancestors 'self'; base-uri 'none'; form-action 'self'; object-src 'none';
+default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: profiles.{root}/avatar/ branding.{root}; font-src 'self'; connect-src 'self' profiles.{root} tokens.{root}; frame-src supervisor.{root}; frame-ancestors 'self'; base-uri 'none'; form-action 'self'; object-src 'none';
 ```
 
 > **Notation.** Host sources are written **scheme-relative** (no `http://` /
@@ -177,7 +177,7 @@ default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src
 | `style-src` | `'self' 'unsafe-inline'` | Unavoidable: the shadcn chart component injects a runtime `<style>` via `dangerouslySetInnerHTML`. Style injection cannot execute JS, so risk is low. Removing it requires per-response style nonces, which conflicts with static hosting + ETag caching. |
 | `img-src` | `'self' data: profiles.{root}/avatar/ branding.{root}` | `data:` for generated identicons (dicebear `toDataUri`) and base64 app icons (Workshop). `profiles.{root}/avatar/` (trailing slash = prefix match; CSP ignores query strings, so cache-bust params are fine) is the single avatar proxy host from Prerequisite B, replacing the former `{root} *.{root}` wildcard. `branding.{root}` because Config previews the network logo from `branding.{root}/network_logo.svg` — a fixed first-party host. The apex `{root}` is dropped: it only 302-redirects to the homepage subdomain (`HttpServer.cpp`), so nothing loads images from it. Arbitrary off-domain images still require per-app opt-in. |
 | `font-src` | `'self'` | Fonts are self-hosted; no CDN font usage found. |
-| `connect-src` | `'self'` | **Secure by default.** `'self'` covers everything the platform itself requires of an ordinary app: its own service's `/graphql` and RPC endpoints (served on the app's own subdomain), the `/common/*` endpoints (served same-origin on every subdomain, e.g. the `fetch("/common/chainid")` in shared-ui), and same-origin WebSockets. Supervisor comms is `postMessage` (not governed by CSP), and the supervisor's own cross-subdomain fetching happens inside its iframe under the *supervisor's* CSP. An app that fetches **other** services directly must opt in via `setCsp` with an explicit host list — verified for most first-party apps too (see below). We deliberately do *not* ship a `*.{root}` default: it would make every subdomain a permitted silent exfiltration target for every app whose developer never thinks about CSP. |
+| `connect-src` | `'self' profiles.{root} tokens.{root}` | **Secure by default.** `'self'` covers everything the platform itself requires of an ordinary app: its own service's `/graphql` and RPC endpoints (served on the app's own subdomain), the `/common/*` endpoints (served same-origin on every subdomain, e.g. the `fetch("/common/chainid")` in shared-ui), and same-origin WebSockets. `profiles.{root}` and `tokens.{root}` are additionally granted because the shared UI hooks (`useProfile`, `useSystemToken`) fetch them from nearly every first-party app; both expose only public data and writes require signed transactions, so they are poor exfiltration targets. Supervisor comms is `postMessage` (not governed by CSP), and the supervisor's own cross-subdomain fetching happens inside its iframe under the *supervisor's* CSP. An app that fetches any **other** service directly must opt in via `setCsp` with an explicit host list — remember `setCsp` replaces the default wholesale, so the override must re-state `profiles`/`tokens` if the app needs them. We deliberately do *not* ship a `*.{root}` default: it would make every subdomain a permitted silent exfiltration target for every app whose developer never thinks about CSP. |
 | `frame-src` | `supervisor.{root}` | The only iframe a normal app mounts is the hidden supervisor iframe injected by `@psibase/common-lib`. |
 | `frame-ancestors` | `'self'` | Normal app pages are not meant to be embedded cross-origin (clickjacking defense). Apps that expose a prompt page override this — see exceptions. |
 | `base-uri` | `'none'` | Nothing sets `<base>`; blocks `<base>`-injection that would redirect relative resource loads. |
@@ -245,8 +245,6 @@ default they need a `setCsp` override = **default + enumerated hosts in
 | `config` (Config) | `producers.{root}` `sites.{root}` `staged-tx.{root}` `transact.{root}` `vserver.{root}` `tokens.{root}` `profiles.{root}` `x-admin.{root}` `packages.{root}` **`http:` `https:`** | candidates/tx-history/staged-tx hooks; sites GraphQL (logo check); vserver pricing hooks; shared `use-system-token`; sidebar profile; package-index fetches. The `http:`/`https:` scheme sources exist because Config's custom package sources are user-configured URLs at arbitrary hosts — a supported feature that cannot be host-allowlisted. They subsume the enumerated hosts (kept to document first-party needs, and so the list survives if the scheme grant is ever replaced by a package-source proxy). Trade-off: Config alone retains a fetch-anywhere channel; acceptable because it is an operator-facing app, but see Watch list. |
 | `fractal-cr` (FractalCore) | `guilds.{root}` `invite.{root}` `staged-tx.{root}` `profiles.{root}` | guild/invite GraphQL (`lib/graphql/fractals/*`); staged-tx via shared `checkLastTx`; sidebar profile |
 | `workshop` (Workshop) | `registry.{root}` `setcode.{root}` `sites.{root}` `profiles.{root}` | app-metadata (registry), code-hash (setcode), site-config (sites) hooks; sidebar profile |
-| `evaluation` (Evaluations) | `profiles.{root}` | own-service GraphQL is same-origin; sidebar profile only |
-| `fractals` (Fractals) | `profiles.{root}` | plugin calls via supervisor; sidebar profile only |
 | `tok-stream` (TokenStream) | `token-stream.{root}` `nft.{root}` `tokens.{root}` `profiles.{root}` | stream/nft/token GraphQL (`lib/get-*.ts`); sidebar profile. NB: the UI queries `token-stream.{root}` although the service account is `tok-stream` — the host is allowlisted as the code requests it; if that is a bug, fixing it makes the fetch same-origin |
 | `accounts` (Accounts) | `tokens.{root}` `namemarket.{root}` | system-token lookup and account-market overview in `create-prompt.tsx` (shared `use-system-token`, `use-account-markets`) |
 
@@ -608,7 +606,7 @@ object-src 'none';
 | Config | `config` | Default + `connect-src` allowlist + `http:`/`https:` | site-wide (SPA) | Direct GraphQL/fetches to first-party services, plus user-configured custom package sources at arbitrary hosts |
 | FractalCore | `fractal-cr` | Default + `connect-src` allowlist | site-wide (SPA) | Direct GraphQL to `guilds`, `invite`, `staged-tx`, `profiles` |
 | Workshop | `workshop` | Default + `connect-src` allowlist | site-wide (SPA) | Direct GraphQL to `registry`, `setcode`, `sites`, `profiles` |
-| Evaluations, Fractals | `evaluation`, `fractals` | Default + `connect-src` allowlist | site-wide (SPA) | Sidebar profile lookup (`profiles`) |
+| Evaluations, Fractals | `evaluation`, `fractals` | **Default** (no override) | site-wide (SPA) | Sidebar profile lookup (`profiles`) is covered by the default `connect-src` grant |
 | TokenStream | `tok-stream` | Default + `connect-src` allowlist | site-wide (SPA) | Direct GraphQL to `token-stream`, `nft`, `tokens`, `profiles` |
 | Supervisor | `supervisor` | Exception 1 | site-wide | Wasm/blob, embeds prompts, embedded by all apps; sole holder of the `connect-src` wildcard |
 | Accounts | `accounts` | Exception 2 | site-wide (SPA) | Serves prompt pages embedded by supervisor |

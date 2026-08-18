@@ -88,9 +88,13 @@ namespace SystemService
           * `branding.<root>` for the network logo
         connect-src:
           * `'self'` covers the app's own /graphql and RPC endpoints, the
-            same-origin /common endpoints, and same-origin websockets.
-            Apps that fetch other services' subdomains directly must opt in
-            via setCsp with an explicit host list (e.g. `invite.{{root}}`);
+            same-origin /common endpoints, and same-origin websockets
+          * `profiles.<root>` and `tokens.<root>` are granted by default
+            because the shared UI hooks (useProfile, useSystemToken) fetch
+            them from nearly every app; both expose only public data and
+            writes require signed transactions.
+            Apps that fetch any other service's subdomain directly must opt
+            in via setCsp with an explicit host list (e.g. `invite.{{root}}`);
             no subdomain wildcard is granted by default
         frame-src:
           * only the supervisor may be embedded (hidden iframe used by apps)
@@ -104,7 +108,7 @@ namespace SystemService
           "style-src 'self' 'unsafe-inline';"               //
           "img-src 'self' data: profiles.{{root}}/avatar/ branding.{{root}};"  //
           "font-src 'self';"                                //
-          "connect-src 'self';"                             //
+          "connect-src 'self' profiles.{{root}} tokens.{{root}};"  //
           "frame-src supervisor.{{root}};"                  //
           "frame-ancestors 'self';"                         //
           "base-uri 'none';"                                //

@@ -21,7 +21,7 @@ Host sources are written scheme-relative (no `http://`/`https://` prefix), so th
 | `style-src`       | `'self' 'unsafe-inline'`                                     |
 | `img-src`         | `'self' data: profiles.{{root}}/avatar/ branding.{{root}}`   |
 | `font-src`        | `'self'`                                                     |
-| `connect-src`     | `'self'`                                                     |
+| `connect-src`     | `'self' profiles.{{root}} tokens.{{root}}`                   |
 | `frame-src`       | `supervisor.{{root}}`                                        |
 | `frame-ancestors` | `'self'`                                                     |
 | `base-uri`        | `'none'`                                                     |
@@ -33,7 +33,7 @@ Notable consequences of the strict baseline:
 - Inline `<script>` tags, `eval`, and CDN-hosted scripts are blocked by default. Apps that need them must opt in via `setCsp`.
 - Pages may only be embedded same-origin by default (`frame-ancestors 'self'`). Pages designed to be embedded by the supervisor (e.g. plugin prompt pages) must widen `frame-ancestors` to include the supervisor's origin.
 - The only frameable origin is the supervisor (every app embeds the hidden supervisor iframe).
-- `fetch` and WebSocket connections are same-origin only (`connect-src 'self'`). This covers an app's own `/graphql` and RPC endpoints and the `/common/*` endpoints (served same-origin on every subdomain). Apps that fetch other services' subdomains directly must opt in via `setCsp` with an explicit host list (e.g. `connect-src 'self' invite.{{root}}`); no subdomain wildcard is granted by default.
+- `fetch` and WebSocket connections are limited to the app's own origin plus the `profiles` and `tokens` services. `'self'` covers an app's own `/graphql` and RPC endpoints and the `/common/*` endpoints (served same-origin on every subdomain). `profiles.{{root}}` and `tokens.{{root}}` are granted by default because the shared UI hooks (`useProfile`, `useSystemToken`) fetch them from nearly every app; both expose only public data, and writes require signed transactions. Apps that fetch any other service's subdomain directly must opt in via `setCsp` with an explicit host list (e.g. `connect-src 'self' profiles.{{root}} tokens.{{root}} invite.{{root}}`); no subdomain wildcard is granted by default.
 - Cross-subdomain image loads are limited to user avatars (served by the `profiles` service at `profiles.{{root}}/avatar/<account>`) and the network logo (served from `branding.{{root}}`). Apps that display images from other origins must opt in via `setCsp`.
 
 ### Dynamic CSP

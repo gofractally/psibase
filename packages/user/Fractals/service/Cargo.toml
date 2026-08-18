@@ -11,7 +11,6 @@ plugin = "fractals-plugin"
 data = [{ src = "../ui/dist", dst = "/" }]
 postinstall = [
     { sender = "fractals", service = "sites", method = "enablespa", rawData = "010001" },
-    { sender = "fractals", service = "sites", method = "setcsp", data = { path = "*", csp = "default-src 'self';script-src 'self';style-src 'self' 'unsafe-inline';img-src 'self' data: profiles.{{root}}/avatar/ branding.{{root}};font-src 'self';connect-src 'self' profiles.{{root}};frame-src supervisor.{{root}};frame-ancestors 'self';base-uri 'none';form-action 'self';object-src 'none';" } },
 ]
 
 [package.metadata.psibase.dependencies]
