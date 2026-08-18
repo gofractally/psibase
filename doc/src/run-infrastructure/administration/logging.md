@@ -1,6 +1,6 @@
 # Logging
 
-Logging in psinode can be configured at startup in the server's configuration file (found in `<DATABASE>/config`) or through the [HTTP API](../administration.md#server-configuration) while the server is running.
+Logging in psinode can be configured at startup in the server's configuration file (found in `<DATABASE>/config`) or through the [HTTP API](../../default-apps/x-admin.md) while the server is running.
 
 ## Config File
 
@@ -15,11 +15,11 @@ format = [{TimeStamp}] [{Severity}]: {Message}
 
 Each logger should have the following properties
 
-| Property           | Description                                                                                                      |
-|--------------------|------------------------------------------------------------------------------------------------------------------|
-| `type`             | The type of the logger: [`console`](#console-logger), [`file`](#file-logger), or [`local`](#local-socket-logger) |
-| `filter`           | The [filter](#log-filters) for the logger                                                                        |
-| `format`           | Determines the [format](#log-fomatters) of log messages                                                          |
+| Property | Description                                                                                                      |
+|----------|------------------------------------------------------------------------------------------------------------------|
+| `type`   | The type of the logger: [`console`](#console-logger), [`file`](#file-logger), or [`local`](#local-socket-logger) |
+| `filter` | The [filter](#log-filters) for the logger                                                                        |
+| `format` | Determines the [format](#log-formatters) of log messages                                                         |
 
 
 ### Console logger
@@ -113,7 +113,7 @@ command = /bin/sh
 
 ### Differences from JSON
 
-The config file format is intended to allow manual editing and is therefore more permissive than the JSON format used by the [HTTP API](../administration.md#logging), which is designed as a machine-to-machine interface.
+The config file format is intended to allow manual editing and is therefore more permissive than the JSON format used by the [HTTP API](../../default-apps/x-admin/http-endpoints.md#logging), which is designed as a machine-to-machine interface.
 
 - `rotationSize` and `maxSize` can specify units, such as KiB, MiB, GiB, etc. The JSON format requires a Number in bytes only.
 - TODO: currently rotationTime is pretty human-unfriendly

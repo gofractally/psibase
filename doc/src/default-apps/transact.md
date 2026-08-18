@@ -4,7 +4,7 @@
 
 ### Push transaction
 
-`POST /push_transaction` pushes a transaction. The user must pack the transaction using fracpack and pass in the binary as the request body. See [Pack transaction](../development/front-ends/reference/http-requests.md#pack-transaction) for an RPC request which packs transactions. The `Content-Type` of the request body should be `application/octet-stream`.
+`POST /push_transaction` pushes a transaction. The user must pack the transaction using fracpack and pass in the binary as the request body. The `Content-Type` of the request body should be `application/octet-stream`.
 
 #### Http response timing
 

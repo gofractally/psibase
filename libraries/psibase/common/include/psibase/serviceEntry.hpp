@@ -11,8 +11,7 @@ namespace psibase
    struct ProcessTransactionArgs
    {
       psio::shared_view_ptr<Transaction> transaction;
-      bool                               checkFirstAuthAndExit;
-      PSIO_REFLECT(ProcessTransactionArgs, transaction, checkFirstAuthAndExit)
+      PSIO_REFLECT(ProcessTransactionArgs, transaction)
    };
 
    struct VerifyArgs

@@ -74,7 +74,6 @@ namespace UserService
       method(exists, nftId),
       method(getUserConf, account, flag)
    );
-   PSIBASE_REFLECT_EVENTS(Nft);
    PSIBASE_REFLECT_HISTORY_EVENTS(Nft,
       method(minted, nftId, issuer),
       method(burned, nftId, owner),

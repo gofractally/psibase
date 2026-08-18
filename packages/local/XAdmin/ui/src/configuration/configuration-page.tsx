@@ -17,7 +17,6 @@ import {
     SelectValue,
 } from "@shared/shadcn/ui/select";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
-import { Switch } from "@shared/shadcn/ui/switch";
 import {
     Tabs,
     TabsContent,
@@ -235,21 +234,6 @@ export const ConfigurationForm = ({
                             </TabsTrigger>
                         </TabsList>
                         <TabsContent value="connections">
-                            <Controller
-                                name="p2p"
-                                control={configForm.control}
-                                render={({ field }) => (
-                                    <div className="my-6 flex items-center space-x-2">
-                                        <Switch
-                                            onCheckedChange={field.onChange}
-                                            checked={field.value}
-                                        />
-                                        <Label>
-                                            Accept incoming P2P connections
-                                        </Label>
-                                    </div>
-                                )}
-                            />
                             <div className="flex justify-between gap-4">
                                 <div className="grid w-full items-center gap-1.5">
                                     <Label htmlFor="blockProducerName">

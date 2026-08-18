@@ -1,1 +1,0 @@
-export const REDIRECT_ERROR_CODE = 999999999;

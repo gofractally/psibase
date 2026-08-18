@@ -32,7 +32,6 @@ world = "impl"
 "sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
 "accounts:plugin" = { path = "../../../system/Accounts/plugin/accounts/wit/world.wit" }
 "setcode:plugin" = { path = "../../../system/SetCode/plugin/wit/world.wit" }
-"staged-tx:plugin" = { path = "../../../system/StagedTx/plugin/wit/world.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
 
 [package.metadata.component.bindings]
