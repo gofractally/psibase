@@ -21,4 +21,4 @@ world = "impl"
 [package.metadata.component.target.dependencies]
 "supervisor:bridge" = { path = "./wit/deps/supervisor.wit" }
 "host:types" = { path = "../types/wit/world.wit" }
-"host:call-context" = { path = "../call-context/wit/world.wit" }
+"host:client" = { path = "../client/wit/world.wit" }

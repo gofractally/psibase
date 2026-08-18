@@ -1,10 +1,12 @@
 [package]
-name = "host-session"
+name = "host-http"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
 wit-bindgen-rt.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 psibase.workspace = true
 psibase-plugin-workspace-hack.workspace = true
 
@@ -12,14 +14,14 @@ psibase-plugin-workspace-hack.workspace = true
 crate-type = ["cdylib"]
 
 [package.metadata.component]
-package = "host:session"
+package = "host:http"
 
 [package.metadata.component.target]
 world = "impl"
 
 [package.metadata.component.target.dependencies]
-"transact:plugin" = { path = "../../../../system/Transact/plugin/wit/world.wit" }
-"host:call-context" = { path = "../call-context/wit/world.wit" }
-"host:db" = { path = "../db/wit/world.wit" }
-"host:types" = { path = "../types/wit/world.wit" }
 "supervisor:bridge" = { path = "./wit/deps/supervisor.wit" }
+"accounts:query" = { path = "../../../../system/Accounts/plugin/query/wit/world.wit" }
+"host:types" = { path = "../types/wit/world.wit" }
+"host:client" = { path = "../client/wit/world.wit" }
+"host:auth" = { path = "../auth/wit/world.wit" }

@@ -1,8 +1,8 @@
 package accounts:query;
 
 world impl {
-    include host:call-context/imports;
-    include host:authed-http/imports;
+    include host:client/imports;
+    include host:http/imports;
     include host:db/imports;
     include host:types/imports;
 

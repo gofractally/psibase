@@ -1,4 +1,4 @@
-package host:call-context;
+package host:client;
 
 world impl {
     include supervisor:bridge/imports;

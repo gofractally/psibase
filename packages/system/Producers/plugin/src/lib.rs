@@ -2,11 +2,11 @@
 mod bindings;
 use bindings::*;
 
-use crate::bindings::host::call_context::api as Client;
+use crate::bindings::host::client::api as Client;
 
 use psibase::services::auth_sig::SubjectPublicKeyInfo;
 
-use host::authed_http::api::post_graphql_get_json;
+use host::http::api::post_graphql_get_json;
 use host::types::types::Error;
 use transact::plugin::intf::add_action_to_transaction;
 
