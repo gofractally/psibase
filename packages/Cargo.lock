@@ -25,7 +25,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "accounts-query"
+name = "accounts-chain-query"
 version = "0.27.0"
 dependencies = [
  "psibase",
@@ -33,6 +33,14 @@ dependencies = [
  "rand",
  "serde",
  "serde_json",
+ "wit-bindgen-rt",
+]
+
+[[package]]
+name = "accounts-client-query"
+version = "0.27.0"
+dependencies = [
+ "psibase-plugin-workspace-hack",
  "wit-bindgen-rt",
 ]
 

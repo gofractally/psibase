@@ -30,7 +30,7 @@ world = "impl"
 "host:db" = { path = "../../Host/plugin/db/wit/world.wit" }
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
 "host:prompt" = { path = "../../Host/plugin/prompt/wit/world.wit" }
-"accounts:query" = { path = "../../../system/Accounts/plugin/query/wit/world.wit" }
+"accounts:client-query" = { path = "../../../system/Accounts/plugin/client-query/wit/world.wit" }
 
 [package.metadata.component.bindings.with]
 "host:types/types" = "psibase_plugin::types"

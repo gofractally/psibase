@@ -15,7 +15,8 @@ world impl {
     include host:http/imports;
     include host:types/imports;
     include clientdata:plugin/imports;
-    include accounts:query/imports;
+    include accounts:chain-query/imports;
+    include accounts:client-query/imports;
     include permissions:plugin/imports;
 
     import hook-handlers;
