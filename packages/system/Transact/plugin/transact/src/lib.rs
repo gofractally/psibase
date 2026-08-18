@@ -9,22 +9,18 @@ mod helpers;
 use helpers::*;
 mod types;
 
-use host::http::api as Server;
 use host::db::store as Store;
 use host::types::types::{self as HostTypes, BodyTypes};
 use transact::actions::ledger as ActionsLedger;
 use virtual_server::plugin::preflight as VirtualServer;
 
-use exports::transact::plugin::{
-    admin::Guest as Admin, auth::Guest as Auth, network::Guest as Network,
-};
+use exports::transact::plugin::{admin::Guest as Admin, network::Guest as Network};
 
 use psibase::services::transact::action_structs::setSnapTime;
 
 use crate::trust::*;
 use psibase::fracpack::Pack;
-use psibase::{Hex, SignedTransaction, Tapos, TimePointSec, Transaction, TransactionTrace};
-use serde::Deserialize;
+use psibase::{Hex, SignedTransaction, TransactionTrace};
 use serde_json::from_str;
 use transact::actions::types::Action;
 
@@ -38,7 +34,7 @@ psibase::define_trust! {
         None => [],
         Low => [],
         High => [],
-        Max => [propose, set_snapshot_time, start_tx, finish_tx, get_query_token],
+        Max => [propose, set_snapshot_time, start_tx, finish_tx],
     }
 }
 
@@ -129,71 +125,6 @@ impl Admin for TransactPlugin {
                 Ok(())
             }
         }
-    }
-}
-
-#[derive(Deserialize)]
-struct LoginReply {
-    access_token: String,
-    #[allow(dead_code)]
-    token_type: String,
-}
-
-impl Auth for TransactPlugin {
-    fn get_query_token(app: String, user: String) -> Result<String, HostTypes::Error> {
-        assert_authorized_with_whitelist(FunctionName::get_query_token, vec!["host".into()])?;
-
-        let root_host: String = serde_json::from_str(&Server::get_json("/common/rootdomain")?)
-            .expect("Failed to deserialize rootdomain");
-        let actions = vec![Action {
-            sender: user.clone(),
-            service: app,
-            method: "loginSys".to_string(),
-            raw_data: (root_host,).packed(),
-        }];
-
-        let claims =
-            get_claims_for_user(&user).expect("Failed to retrieve claims from auth plugin");
-
-        let claims: Vec<psibase::Claim> = claims.into_iter().map(Into::into).collect();
-        let actions: Vec<psibase::Action> = actions.into_iter().map(Into::into).collect();
-
-        let expiration = TimePointSec::from(chrono::Utc::now() + chrono::Duration::seconds(3));
-        let tapos = Tapos {
-            expiration: expiration,
-            refBlockSuffix: 0,
-            flags: Tapos::DO_NOT_BROADCAST_FLAG,
-            refBlockIndex: 0,
-        };
-
-        let tx = Transaction {
-            tapos,
-            actions,
-            claims,
-        };
-        let signed_tx = SignedTransaction {
-            transaction: Hex::from(tx.packed()),
-            proofs: get_proofs_for_user(&sha256(&tx.packed()), &user)?,
-            subjectiveData: None,
-        };
-        if signed_tx.proofs.len() != tx.claims.len() {
-            return Err(ClaimProofMismatch.into());
-        }
-
-        let response = Server::post(&HostTypes::PostRequest {
-            endpoint: "/login".to_string(),
-            body: HostTypes::BodyTypes::Bytes(signed_tx.packed()),
-        })?;
-
-        let reply = match response {
-            BodyTypes::Json(t) => {
-                serde_json::from_str::<LoginReply>(&t).expect("Failed to deserialize response")
-            }
-            _ => {
-                return Err(BadResponse("Invalid body type").into());
-            }
-        };
-        Ok(reply.access_token)
     }
 }
 

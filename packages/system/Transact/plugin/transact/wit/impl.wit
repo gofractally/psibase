@@ -23,6 +23,5 @@ world impl {
     import hook-handlers;
 
     export admin;
-    export auth;
     export network;
 }

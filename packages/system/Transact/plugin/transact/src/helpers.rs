@@ -49,20 +49,6 @@ fn user_auth_proof(user: &str, tx_hash: &[u8; 32]) -> Result<Option<Proof>, Host
     on_user_auth_proof(plugin_ref, user, tx_hash)
 }
 
-pub fn get_claims_for_user(user: &String) -> Result<Vec<Claim>, HostTypes::Error> {
-    Ok(user_auth_claim(user)?.into_iter().collect())
-}
-
-pub fn get_proofs_for_user(
-    tx_hash: &[u8; 32],
-    user: &String,
-) -> Result<Vec<Hex<Vec<u8>>>, HostTypes::Error> {
-    Ok(user_auth_proof(user, tx_hash)?
-        .into_iter()
-        .map(|proof| Hex::from(proof.signature))
-        .collect())
-}
-
 pub fn get_proofs(
     tx_hash: &[u8; 32],
     action_claim_groups: &[ActionClaims],
