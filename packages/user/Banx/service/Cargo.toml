@@ -24,4 +24,4 @@ serde_json.workspace = true
 psibase-user-workspace-hack.workspace = true
 
 [dev-dependencies]
-banx-pkg = { path = "..", version = "0.25.0" }
+banx-pkg = { path = "..", version = "0.26.0" }

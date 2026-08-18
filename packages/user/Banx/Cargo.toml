@@ -13,17 +13,17 @@ package-name = "Banx"
 services = ["banx"]
 
 [package.metadata.psibase.dependencies]
-Host = "0.25.0"
-HttpServer = "0.25.0"
-Sites = "0.25.0"
-Transact = "0.25.0"
-Permissions = "0.25.0"
-Config = "0.25.0"
+Host = "0.26.0"
+HttpServer = "0.26.0"
+Sites = "0.26.0"
+Transact = "0.26.0"
+Permissions = "0.26.0"
+Config = "0.26.0"
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-banx = { path = "service", version = "0.25.0" }
-r-banx = { path = "query-service", version = "0.25.0" }
-banx-plugin = { path = "plugin", version = "0.25.0" }
+banx = { path = "service", version = "0.26.0" }
+r-banx = { path = "query-service", version = "0.26.0" }
+banx-plugin = { path = "plugin", version = "0.26.0" }
