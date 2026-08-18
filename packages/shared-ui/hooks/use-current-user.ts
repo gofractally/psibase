@@ -18,7 +18,7 @@ export const queryCurrentUser = queryOptions({
             method: "getCurrentUser",
             params: [],
             service: "accounts",
-            plugin: "query",
+            plugin: "client-query",
             intf: "api",
         });
         return res ? zAccount.parse(res) : null;

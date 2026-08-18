@@ -7,7 +7,7 @@ world impl {
     include host:db/imports;
     include aes:plugin/imports;
     include base64:plugin/imports;
-    include accounts:query/imports;
+    include accounts:client-query/imports;
 
     export admin;
     export user;

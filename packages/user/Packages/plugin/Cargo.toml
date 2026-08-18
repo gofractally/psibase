@@ -31,7 +31,7 @@ world = "impl"
 "host:http" = { path = "../../Host/plugin/http/wit/world.wit" }
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
 "sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
-"accounts:query" = { path = "../../../system/Accounts/plugin/query/wit/world.wit" }
+"accounts:client-query" = { path = "../../../system/Accounts/plugin/client-query/wit/world.wit" }
 "setcode:plugin" = { path = "../../../system/SetCode/plugin/wit/world.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/transact/wit/world.wit" }
 
