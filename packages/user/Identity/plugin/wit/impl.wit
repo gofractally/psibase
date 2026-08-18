@@ -3,7 +3,7 @@ package identity:plugin;
 world impl {
     include host:client/imports;
     include host:http/imports;
-    include accounts:query/imports;
+    include accounts:chain-query/imports;
     include transact:actions/imports;
     include permissions:plugin/imports;
     export api;
