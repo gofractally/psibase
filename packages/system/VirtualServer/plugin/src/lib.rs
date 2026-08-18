@@ -14,7 +14,7 @@ use Exports::{
     transact::Guest as TransactInterface,
 };
 
-use bindings::accounts::query as AccountsQuery;
+use bindings::accounts::client_query as AccountsQuery;
 use bindings::tokens::plugin as TokensPlugin;
 use psibase::AccountNumber;
 use psibase_plugin::*;

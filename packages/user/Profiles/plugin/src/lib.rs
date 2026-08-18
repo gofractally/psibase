@@ -2,7 +2,8 @@
 mod bindings;
 
 use bindings::{
-    accounts::query::api::{get_account, get_current_user},
+    accounts::client_query::api::get_current_user,
+    accounts::chain_query::api::get_account,
     exports::profiles::plugin::{
         api::Guest as Api, contacts::Contact, contacts::Guest as Contacts,
     },
