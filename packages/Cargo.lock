@@ -1377,6 +1377,9 @@ version = "0.26.0"
 dependencies = [
  "psibase",
  "psibase-plugin-workspace-hack",
+ "serde",
+ "serde_json",
+ "url",
  "wit-bindgen-rt",
 ]
 
@@ -3547,7 +3550,6 @@ dependencies = [
 name = "transact"
 version = "0.26.0"
 dependencies = [
- "chrono",
  "psibase",
  "psibase-plugin-workspace-hack",
  "serde",
@@ -3565,6 +3567,17 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "wit-bindgen-rt",
+]
+
+[[package]]
+name = "transact-login"
+version = "0.25.0"
+dependencies = [
+ "chrono",
+ "psibase",
+ "psibase-plugin-workspace-hack",
+ "sha2",
  "wit-bindgen-rt",
 ]
 

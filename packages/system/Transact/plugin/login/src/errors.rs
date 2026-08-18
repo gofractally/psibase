@@ -2,6 +2,5 @@ use psibase::plugin_error;
 
 plugin_error! {
     pub ErrorType
-    TransactionError(msg: String) => "Transaction error: {msg}",
     ClaimProofMismatch => "Number of proofs does not match number of claims",
 }
