@@ -23,8 +23,6 @@ export {
     signedPercentStringToPpm,
 } from "@/lib/constants";
 
-export { signedPercentStringToPpm };
-
 /** Non-empty trimmed account string, or undefined if invalid. */
 export function requireAccount(value: string): string | undefined {
     const t = value.trim();
