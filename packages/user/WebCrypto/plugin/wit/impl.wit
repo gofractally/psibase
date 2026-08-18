@@ -2,8 +2,8 @@ package web-crypto:plugin;
 
 world impl {
     include host:types/imports;
-    include host:call-context/imports;
-    include host:authed-http/imports;
+    include host:client/imports;
+    include host:http/imports;
     include host:db/imports;
 
     export api;

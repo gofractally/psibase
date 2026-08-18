@@ -2,7 +2,7 @@ use crate::bindings::accounts::query::api as AccountsQuery;
 use crate::bindings::auth_sig::plugin as AuthSig;
 use crate::bindings::exports::accounts::plugin::prompt::{Credential, Guest as Prompt};
 use crate::bindings::host::{
-    crypto::keyvault as HostCrypto, call_context::api as Client, session::api as HostAuth,
+    crypto::keyvault as HostCrypto, client::api as Client, auth::api as HostAuth,
     types::types::Error,
 };
 use crate::bindings::invite::plugin::redemption as Invites;

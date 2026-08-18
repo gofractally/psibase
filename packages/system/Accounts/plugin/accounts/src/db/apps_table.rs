@@ -1,4 +1,4 @@
-use crate::bindings::host::session::api as HostAuth;
+use crate::bindings::host::auth::api as HostAuth;
 use crate::bindings::host::db::store::{Bucket, Database, DbMode, StorageDuration};
 use crate::logged_in_user::logged_in_user_table;
 use psibase::fracpack::{Pack, Unpack};

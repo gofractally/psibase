@@ -9,7 +9,7 @@ mod types;
 use types::*;
 
 use bindings::exports::web_crypto::plugin::api::Guest as Api;
-use bindings::host::call_context::api as Client;
+use bindings::host::client::api as Client;
 use bindings::host::types::types as HostTypes;
 use bindings::host::types::types::Pem;
 

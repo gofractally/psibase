@@ -1,6 +1,6 @@
 use crate::bindings::accounts::query::api::get_account;
 use crate::bindings::accounts::query::api::get_current_user;
-use crate::bindings::host::authed_http as Host;
+use crate::bindings::host::http as Host;
 use crate::bindings::host::types::types::{self as HostTypes, BodyTypes, PluginRef};
 use crate::bindings::transact::plugin::hook_handlers::*;
 use crate::errors::ErrorType::*;

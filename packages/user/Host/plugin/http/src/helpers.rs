@@ -6,7 +6,7 @@ pub fn make_error(message: &str) -> Error {
         code: 0,
         producer: PluginId {
             service: "host".to_string(),
-            plugin: "authed-http".to_string(),
+            plugin: "http".to_string(),
         },
         message: message.to_string(),
     }

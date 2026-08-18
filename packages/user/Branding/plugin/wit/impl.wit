@@ -1,8 +1,8 @@
 package branding:plugin;
 
 world impl {
-    include host:call-context/imports;
-    include host:authed-http/imports;
+    include host:client/imports;
+    include host:http/imports;
     import transact:plugin/intf;
     include sites:plugin/imports;
 

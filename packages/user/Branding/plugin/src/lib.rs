@@ -4,7 +4,7 @@ mod bindings;
 use bindings::*;
 use exports::branding::plugin::api::Guest as Api;
 use exports::branding::plugin::queries::Guest as Queries;
-use host::authed_http::api as CommonServer;
+use host::http::api as CommonServer;
 use host::types::types::Error;
 use sites::plugin::api::{upload, File};
 use transact::plugin::intf::add_action_to_transaction;
@@ -17,7 +17,7 @@ mod errors;
 use errors::ErrorType;
 
 fn assert_caller(allowed: &[&str], context: &str) {
-    let sender = host::call_context::api::get_sender();
+    let sender = host::client::api::get_sender();
     assert!(
         allowed.contains(&sender.as_str()),
         "{} can only be called by {:?}",

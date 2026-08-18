@@ -1,4 +1,4 @@
-use crate::bindings::host::authed_http as Host;
+use crate::bindings::host::http as Host;
 use crate::bindings::transact::plugin::types::*;
 use psibase::{Hex, Tapos, TimePointSec};
 use serde::Deserialize;

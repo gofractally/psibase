@@ -5,7 +5,7 @@
 //!
 /// Common calls related to client interactions
 pub mod client {
-    use crate::wasm::bindings::host::call_context::api;
+    use crate::wasm::bindings::host::client::api;
 
     /// Get account name of the active app (the top level app with which the user is interacting).
     /// If the user is interacting with a prompt, the "top level app" is the app with which the user
@@ -33,7 +33,7 @@ pub mod client {
 
 /// Common calls related to interactions with the server
 pub mod server {
-    use crate::wasm::bindings::host::authed_http::api;
+    use crate::wasm::bindings::host::http::api;
     use crate::wasm::bindings::host::types::types::{BodyTypes, Error, PostRequest};
 
     /// Used to call a GET endpoint on the app's own http server to retrieve a JSON payload.

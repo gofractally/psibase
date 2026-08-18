@@ -1,4 +1,4 @@
-package host:authed-http;
+package host:http;
 
 /// HTTP to an app's own server, with the current session attached when present.
 /// Session setup must not go through this plugin.

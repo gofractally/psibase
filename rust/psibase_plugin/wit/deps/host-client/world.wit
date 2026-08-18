@@ -1,4 +1,4 @@
-package host:call-context;
+package host:client;
 
 interface api {
     get-sender: func() -> string;

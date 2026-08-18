@@ -1,5 +1,5 @@
 use crate::exports::host::db::store::{Database, DbMode, GuestBucket, StorageDuration};
-use crate::host::call_context::api::get_sender;
+use crate::host::client::api::get_sender;
 use crate::supervisor::bridge::{database as HostDb, intf::get_chain_id};
 use regex::Regex;
 use std::cell::RefCell;

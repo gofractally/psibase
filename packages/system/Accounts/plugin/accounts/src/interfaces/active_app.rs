@@ -7,8 +7,8 @@ use crate::plugin::AccountsPlugin;
 use accounts::query::api as AccountsQuery;
 use bindings::*;
 use exports::accounts::plugin::active_app::{Guest as ActiveApp, *};
-use host::call_context::api as client;
-use host::session::api as HostAuth;
+use host::client::api as client;
+use host::auth::api as HostAuth;
 use host::prompt::api as Prompt;
 
 impl ActiveApp for AccountsPlugin {

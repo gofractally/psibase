@@ -1364,7 +1364,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "host-session"
+name = "host-auth"
 version = "0.27.0"
 dependencies = [
  "psibase",
@@ -1373,7 +1373,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "host-authed-http"
+name = "host-http"
 version = "0.27.0"
 dependencies = [
  "psibase",
@@ -1384,7 +1384,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "host-call-context"
+name = "host-client"
 version = "0.27.0"
 dependencies = [
  "psibase",

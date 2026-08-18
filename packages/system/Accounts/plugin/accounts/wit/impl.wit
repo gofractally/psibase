@@ -1,9 +1,9 @@
 package accounts:plugin;
 
 world impl {
-    include host:call-context/imports;
-    include host:authed-http/imports;
-    include host:session/imports;
+    include host:client/imports;
+    include host:http/imports;
+    include host:auth/imports;
     include host:prompt/imports;
     include host:db/imports;
     include transact:plugin/imports;

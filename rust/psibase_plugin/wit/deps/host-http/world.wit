@@ -1,4 +1,4 @@
-package host:authed-http;
+package host:http;
 
 interface api {
     use host:types/types.{error, post-request, body-types};
