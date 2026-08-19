@@ -3,12 +3,12 @@
 Banx is a shared notebook of **who owes who**.
 
 There is no pile of coins. You never “have $10 in an account.”
-You only have arrows:
+You only have:
 
 - **Claim:** they owe you.
 - **Debt:** you owe them.
 
-When two arrows face each other, Banx **cancels** them (like Splitwise).
+When both of you owe each other, Banx **nets** them (like Splitwise) and keeps only the leftover.
 
 ---
 
@@ -30,11 +30,11 @@ Bob records it:
 
 > Bob owes Alice $20.
 
-Banx sees both arrows and **nets**. Now Alice only owes Bob $10.
+Banx sees both claims and **nets**. Now Alice only owes Bob $10.
 
 That’s Splitwise. Deposit when someone covers you. The book shrinks by itself.
 
-To “pay it off” in cash, Alice hands Bob $10 and records that she received $10 of value from him — the last arrow cancels. They’re even.
+To “pay it off” in cash, Alice hands Bob $10 and records that she received $10 of value from him — the last claim nets away. They’re even.
 
 No paths. No middle people. Just two friends and the notebook.
 
@@ -58,22 +58,22 @@ Jo hits **accept**. That is Jo’s **deposit**. Banx writes:
 
 > Jo owes Pippa $70.
 
-Pippa now has a **direct balance with Jo**. Next coffee run, same thing: Pippa taps, please-book, Jo accepts. The Jo→Pippa arrow grows.
+Pippa now holds a **claim on Jo**. Next coffee run, same thing: Pippa taps, please-book, Jo accepts. Jo’s debt to Pippa grows.
 
 ### Rent
 
 When the month’s rent is due, **Oli sends Pippa an invoice for $800**.
 
-Pippa does not go to the ATM. She pays the invoice **through Jo**, using the balance she built up shopping.
+Pippa does not go to the ATM. She pays the invoice **through Jo**, using the claim she built up shopping.
 
-1. **Pippa → Jo.** She already has a claim on Jo, so this hop just **shrinks** it. No new line needed.
-2. **Jo → Oli.** Jo can draw on Oli because they are engaged and Oli has given her a deep credit line. Jo has also said she will sit in the middle (a **path-forward offer**). Banx writes the Jo–Oli arrow and nets whatever they already owe each other.
+1. **Pippa to Jo.** She already has a claim on Jo, so this hop just **shrinks** it. No new line needed.
+2. **Jo to Oli.** Jo can draw on Oli because they are engaged and Oli has given her a deep credit line. Jo has also said she will sit in the middle (a **path-forward offer**). Banx books Jo’s debt to Oli and nets whatever they already owe each other.
 
 The invoice is paid. Last hop is Oli, so Banx ticks it off.
 
 Oli never really “sees” money from Pippa. Nobody hands him $800. What he notices, looking at his book with Jo, is that **Jo owes him more** (or he owes Jo less). Pippa’s shopping credit landed on the couple tab instead.
 
-If Pippa’s claim on Jo was bigger than the rent, she still has leftover pocket with Jo for next time. If she is **short**, she can hit the ATM, hand Jo a **$50 note** (or whatever the gap is), and Jo records a deposit. That tops the Jo→Pippa arrow up so the invoice path will go through.
+If Pippa’s claim on Jo was bigger than the rent, she still has leftover with Jo for next time. If she is **short**, she can hit the ATM, hand Jo a **$50 note** (or whatever the gap is), and Jo records a deposit. That tops up Jo’s debt to Pippa so the invoice path will go through.
 
 ---
 
@@ -87,15 +87,15 @@ They both trust **Pippa**. She is Oli’s housemate. Oli already lets her owe hi
 
 So John **path-pays Oli through Pippa**:
 
-1. **John → Pippa.** He draws on her. Now John owes Pippa $150.
-2. **Pippa → Oli.** She draws on that big housemate line. Now Pippa owes Oli **$150 extra**.
+1. **John to Pippa.** He draws on her. Now John owes Pippa $150.
+2. **Pippa to Oli.** She draws on that big housemate line. Now Pippa owes Oli **$150 extra**.
 
 John’s tab with Oli is done. Oli drives home with empty pockets and does not mind. It is on Banx. **Collecting is Pippa’s problem now, not John’s.**
 
 That $150 comes off later the usual ways:
 
 - Pippa covers Jo at the shops again (please-book, Jo accepts) and sends it toward Oli on the same path she uses for rent, or
-- She bumps into Oli and hands him cash. He records a deposit. Their arrows cancel.
+- She bumps into Oli and hands him cash. He records a deposit. Their claims net away.
 
 ---
 
@@ -107,8 +107,8 @@ Sam is too young for a bank account. Banx does not care. The book only needs a n
 
 Sam **path-pays Riley’s parent**, through Sam’s parent:
 
-1. **Sam → Sam’s parent.** Sam draws on the family line. Sam now owes their own parent for the burger. That’s the lesson.
-2. **Sam’s parent → Riley’s parent.** The two households already trust each other for a weekend of this. Banx writes the parent–parent arrow.
+1. **Sam to Sam’s parent.** Sam draws on the family line. Sam now owes their own parent for the burger. That’s the lesson.
+2. **Sam’s parent to Riley’s parent.** The two households already trust each other for a weekend of this. Banx books that the parents owe each other.
 
 Riley’s parent never needs Sam’s bank details. The Visa bill is theirs; the book says **Sam’s parent owes them**.
 
@@ -116,8 +116,8 @@ By Sunday the weekend has added up — more snacks, maybe cinema. A debt has gro
 
 They can:
 
-- settle in **cash** when they do pickup (one deposit, arrows cancel), or
-- **wait**. Next sleepover Riley stays at Sam’s. The arrows run the other way and **net**. After a few weekends they might only ever be $12 apart, and nobody visits an ATM.
+- settle in **cash** when they do pickup (one deposit, the claims net), or
+- **wait**. Next sleepover Riley stays at Sam’s. The debts run the other way and **net**. After a few weekends they might only ever be $12 apart, and nobody visits an ATM.
 
 ---
 
@@ -129,7 +129,7 @@ They can:
 
 **Invoice** — “Please pay me this.” Oli’s rent bill. Pippa pays it with a claim she already holds, walking a path if needed.
 
-**Net** — two people owe each other → keep only the leftover arrow.
+**Net** — two people owe each other; keep only the leftover claim.
 
 **Credit line** — “I’m willing to be owed by you, up to this much.” A ceiling, not a pile of money. Needed when someone draws *new* debt on you (Jo drawing on Oli). Not needed to unwind an IOU that already exists (Pippa’s first hop on Jo).
 
@@ -145,7 +145,8 @@ They can:
 |------|-------------|
 | Creditor | They are owed |
 | Debtor | They owe |
-| Claim | Your “they owe me” arrow |
+| Claim | They owe you |
+| Debt | You owe them |
 | Deposit | Write down real-world value, then cancel what you can |
 | Please-book | “Please accept this IOU” — they have to hit yes |
 | Invoice | “Please pay me this” — they pay with a claim or a path |
