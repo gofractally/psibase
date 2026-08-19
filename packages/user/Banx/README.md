@@ -69,7 +69,7 @@ UI: `/requests`. Accounts inbox icon prefills an invoice (savings) or please-boo
 
 - **Hop 0** — sender draws on the first account (line and/or reverse claim). No hop fee.
 - **Later hops** — the current path debtor must have a **live** path-forward offer. Specific next hop if live; otherwise a live global. Expired specific does **not** block the global. Buy-claim offers are not used here.
-- **Asset change** — convert the previous edge using the previous edge **debtor’s** currency policy, then continue. If debit auto-net ate that edge, convert uses whatever is left (or fails `min_return`).
+- **Asset change** — FX the previous hop’s **notional** (what was forwarded into that hop) using that edge **debtor’s** currency policy. Unwind on that hop does not shrink what the next hop sends. If the hop is still fully booked, it is rebooked into the new asset; if unwind left less, that leftover stays in the from-asset.
 - **min_return** — final residual in the last hop’s asset must be at least this.
 
 Off-chain **Find path** (`quotePath`) searches a scoped subgraph (lines + reverse claims + clearing + FX), not the full network. Exact-in: amount is what you send. Exact-out: amount is what the payee should receive; the quote finds the send. Hop cards can show expected hop/FX fees.

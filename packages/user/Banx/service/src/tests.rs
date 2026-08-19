@@ -654,7 +654,7 @@ mod tests {
         Ok(())
     }
 
-    /// path_pay / CreditLine::debit auto-nets mutual claims on the pair.
+    /// path_pay / CreditLine::path_debit auto-nets mutual claims on the pair.
     #[psibase::test_case(packages("Banx"))]
     fn test_path_pay_auto_nets_reverse_draw(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
@@ -1051,7 +1051,7 @@ mod tests {
     }
 
     #[psibase::test_case(packages("Banx"))]
-    fn test_path_pay_fx_after_full_reverse_net_fails_min_return(
+    fn test_path_pay_fx_after_full_reverse_net(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
@@ -1087,19 +1087,19 @@ mod tests {
             .deposit(alice, aud, Quantity::new(1_000), 0, 0)
             .get()?;
 
-        let result = Wrapper::push_from(&chain, alice)
+        Wrapper::push_from(&chain, alice)
             .path_pay(
                 vec![hop(gary, aud), hop(steve, usd)],
                 Quantity::new(1_000),
                 Quantity::new(700),
                 0,
             )
-            .get();
-        assert!(result.is_err());
-        // Reverted: reverse deposit remains; no new path legs.
-        assert_eq!(exp(&chain, alice, gary, aud), 1_000);
+            .get()?;
+        // Full unwind: Alice–Gary AUD clears; hop notional still FX'd to Steve.
+        assert_eq!(exp(&chain, alice, gary, aud), 0);
         assert_eq!(exp(&chain, gary, alice, aud), 0);
-        assert_eq!(exp(&chain, steve, gary, usd), 0);
+        assert_eq!(exp(&chain, gary, alice, usd), 0);
+        assert_eq!(exp(&chain, steve, gary, usd), 700);
         Ok(())
     }
 
@@ -1143,14 +1143,100 @@ mod tests {
             .path_pay(
                 vec![hop(gary, aud), hop(steve, usd)],
                 Quantity::new(1_000),
-                Quantity::new(420),
+                Quantity::new(700),
                 0,
             )
             .get()?;
-        // 1000 draw nets 400 reverse → 600 AUD converts at 0.70 → 420 USD.
-        assert_eq!(exp(&chain, gary, alice, aud), 0);
-        assert_eq!(exp(&chain, gary, alice, usd), 420);
-        assert_eq!(exp(&chain, steve, gary, usd), 420);
+        // 400 unwind + 600 new: Alice owes Gary 600 AUD; Sam gets 1000×0.70 USD.
+        assert_eq!(exp(&chain, alice, gary, aud), 0);
+        assert_eq!(exp(&chain, gary, alice, aud), 600);
+        assert_eq!(exp(&chain, gary, alice, usd), 0);
+        assert_eq!(exp(&chain, steve, gary, usd), 700);
+        Ok(())
+    }
+
+    /// Same unwind as `test_path_pay_fx_after_partial_reverse_net`, then a
+    /// second FX hop through Sam in GBP.
+    ///
+    ///   Alice → Gary AUD (400 reverse) → Steve USD (0.70) → Sam GBP (0.80)
+    ///
+    /// Hop 0 nets 400; Alice still owes Gary 600 AUD (not rebooked).
+    /// Hop 1 FX uses the 1000 notional → 700 USD to Steve (no leftover shrink).
+    /// Hop 2 FX sees that full 700 (not 420) → 560 GBP to Sam, and rebooks
+    /// Gary→Steve because that hop was fully on the books.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_path_pay_fx_aud_usd_gbp_after_partial_reverse(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let gary = account!("gary");
+        let steve = account!("steve");
+        let sam = account!("sam");
+        for a in [alice, gary, steve, sam] {
+            chain.new_account(a).unwrap();
+        }
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        let gbp = Asset::get_by_symbol_assert(account!("gbp")).id;
+
+        Wrapper::push_from(&chain, gary)
+            .st_crd_lne(alice, aud, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, steve)
+            .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, sam)
+            .st_crd_lne(steve, gbp, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+
+        Wrapper::push_from(&chain, alice)
+            .st_cur_pol(
+                aud,
+                usd,
+                Quantity::new(0),
+                RATE_SCALE * 70 / 100,
+                0,
+                never(),
+            )
+            .get()?;
+        // Previous-edge debtor on the USD→GBP hop is Gary.
+        Wrapper::push_from(&chain, gary)
+            .st_cur_pol(
+                usd,
+                gbp,
+                Quantity::new(0),
+                RATE_SCALE * 80 / 100,
+                0,
+                never(),
+            )
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never())
+            .get()?;
+        Wrapper::push_from(&chain, steve)
+            .st_glb_fwd(gbp, Quantity::new(0), 0, PPM_SCALE, never())
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .deposit(alice, aud, Quantity::new(400), 0, 0)
+            .get()?;
+
+        Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(gary, aud), hop(steve, usd), hop(sam, gbp)],
+                Quantity::new(1_000),
+                Quantity::new(560),
+                0,
+            )
+            .get()?;
+
+        assert_eq!(exp(&chain, alice, gary, aud), 0);
+        assert_eq!(exp(&chain, gary, alice, aud), 600, "unwind leftover stays AUD");
+        assert_eq!(exp(&chain, gary, alice, usd), 0);
+        assert_eq!(exp(&chain, steve, gary, usd), 0, "Gary→Steve USD rebooked");
+        assert_eq!(exp(&chain, steve, gary, gbp), 560, "700 USD × 0.80");
+        assert_eq!(exp(&chain, sam, steve, gbp), 560);
+        assert_eq!(exp(&chain, sam, steve, usd), 0);
         Ok(())
     }
 
@@ -1881,10 +1967,10 @@ mod tests {
         Ok(())
     }
 
-    /// A hop that converts to nothing must fail even when `min_return` is 0,
-    /// so hop-0 does not stick as a prefix settlement.
+    /// Full unwind on hop 0 is not an unfinished path: FX still forwards the
+    /// hop notional (min_return 0 must not look like a prefix-only settlement).
     #[psibase::test_case(packages("Banx"))]
-    fn test_want_path_pay_unfinished_hop_fails(
+    fn test_want_path_pay_full_unwind_still_forwards_fx(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
@@ -1919,22 +2005,17 @@ mod tests {
             .deposit(alice, aud, Quantity::new(1_000), 0, 0)
             .get()?;
 
-        let result = Wrapper::push_from(&chain, alice)
+        Wrapper::push_from(&chain, alice)
             .path_pay(
                 vec![hop(gary, aud), hop(steve, usd)],
                 Quantity::new(1_000),
                 Quantity::new(0),
                 0,
             )
-            .get();
-        assert!(
-            result.is_err(),
-            "test_want_path_pay_unfinished_hop_fails: 1000 AUD hop-0 fully netted the reverse \
-             book so hop-1 had nothing to convert; path_pay succeeded with min_return=0"
-        );
-        assert_eq!(exp(&chain, alice, gary, aud), 1_000);
+            .get()?;
+        assert_eq!(exp(&chain, alice, gary, aud), 0);
         assert_eq!(exp(&chain, gary, alice, aud), 0);
-        assert_eq!(exp(&chain, steve, gary, usd), 0);
+        assert_eq!(exp(&chain, steve, gary, usd), 700);
         Ok(())
     }
 

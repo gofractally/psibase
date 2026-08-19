@@ -712,6 +712,12 @@ pub mod tables {
             Self::get(debtor, from_asset, to_asset).expect("CurrencyPolicy not found")
         }
 
+        /// `to = (from - fee_fixed) * fx_rate / RATE_SCALE`. Does not touch books.
+        pub fn apply(&self, amount_from: Quantity) -> Quantity {
+            assert_policy_live(self.expires_at);
+            apply_rate(amount_from, self.fee_fixed, self.fx_rate)
+        }
+
         /// Debtor posts a convert quote applying to all their creditors.
         pub fn upsert(
             debtor: AccountNumber,
@@ -1528,17 +1534,6 @@ pub mod tables {
                 "",
             );
         }
-
-        /// Draw `amount` of new principal: check `exposure + amount <= limit`,
-        /// consume `remaining` if depleting, credit the line-rate bucket, auto-net.
-        pub fn debit(
-            creditor: AccountNumber,
-            debtor: AccountNumber,
-            asset_id: u16,
-            amount: Quantity,
-        ) {
-            Self::path_debit(creditor, debtor, asset_id, amount);
-        }
     }
 
     /// Emit bilateral history (once per party as `account`) via service events.
@@ -1978,15 +1973,18 @@ pub mod service {
     /// `path_pay([(Gary, AUD), (Steve, USD)], amount_aud, min_return_usd)`:
     /// 1. **First hop** — sender draws `amount` on Gary in **AUD** (line and/or
     ///    reverse claim that auto-nets).
-    /// 2. **Currency change** — rebook previous edge (sender owes Gary AUD) via
-    ///    sender's [`CurrencyPolicy`] AUD→USD.
+    /// 2. **Currency change** — FX the previous hop's **notional** (the amount
+    ///    forwarded into that hop, not leftover after unwind) via the
+    ///    previous-edge debtor's [`CurrencyPolicy`]. If the hop is still fully
+    ///    on the books, rebook it; if unwind left less, keep that leftover in
+    ///    the from-asset and still forward the FX'd notional.
     /// 3. **Later hops** — intermediate's live [`ForwardOffer`] (fee + max
     ///    line APR); draw on next line.
     /// 4. **`min_return`** — final hop principal (in **last** asset) ≥ this.
     ///
     /// Atomic: all legs succeed or none stick.
     ///
-    /// Each draw **auto-nets** that pair/asset (via [`CreditLine::debit`]).
+    /// Each draw **auto-nets** that pair/asset (via [`CreditLine::path_debit`]).
     ///
     /// `request_id` 0 = none. Non-zero must be a live invoice naming the
     /// sender as payer; last hop must be the invoice poster in that asset.
@@ -2018,17 +2016,18 @@ pub mod service {
                 continue;
             }
 
-            // Currency change ⇒ convert remaining previous-edge claim (post-net).
+            // Currency change: FX `forward` (hop notional), not leftover-after-net.
+            // Full leftover ⇒ rebook that claim. Partial/full unwind ⇒ leave
+            // whatever remains in from-asset; still forward the FX'd notional.
             if asset_id != prev_asset {
                 Obligation::accrue_pair(prev_edge_creditor, prev_edge_debtor, prev_asset);
                 let available =
                     Obligation::exposure(prev_edge_creditor, prev_edge_debtor, prev_asset);
-                let take = Quantity::new(forward.value.min(available.value));
-                if take.value == 0 {
-                    forward = Quantity::new(0);
+                let cpol = CurrencyPolicy::get_assert(prev_edge_debtor, prev_asset, asset_id);
+                if available.value >= forward.value {
+                    forward = cpol.convert(prev_edge_creditor, forward, Quantity::new(0));
                 } else {
-                    let cpol = CurrencyPolicy::get_assert(prev_edge_debtor, prev_asset, asset_id);
-                    forward = cpol.convert(prev_edge_creditor, take, Quantity::new(0));
+                    forward = cpol.apply(forward);
                 }
             }
 

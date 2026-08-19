@@ -18,8 +18,7 @@ pub struct LineEdge {
     /// Line headroom plus reverse claim (raw units). 0 = closed.
     pub residual: u64,
     /// Reverse claim included in `residual` (what this creditor already owes
-    /// the debtor). After a hop debit, only `amount - reverse_claim` remains
-    /// to convert; the rest auto-nets.
+    /// the debtor). Unwind nets that pair; FX still uses the hop notional.
     pub reverse_claim: u64,
     pub interest_rate_ppm: u32,
 }
@@ -149,8 +148,6 @@ struct Pred {
     /// Hop that was taken to reach this state.
     hop_account: String,
     hop_asset: u16,
-    /// Reverse claim on that hop's line (auto-netted before a later FX).
-    reverse_claim: u64,
 }
 
 /// Find a multi-hop path from `sender` to `payee` maximizing residual amount.
@@ -223,7 +220,6 @@ pub fn find_banx_path(
                     prev_asset: from_asset,
                     hop_account: line.creditor.clone(),
                     hop_asset: line.asset_id,
-                    reverse_claim: line.reverse_claim,
                 },
             );
             path_accounts.insert(key, HashSet::from([line.creditor.clone()]));
@@ -268,11 +264,10 @@ pub fn find_banx_path(
                 &mut candidates,
             );
 
-            // Asset-change hops: convert leftover after hop auto-net, then route.
+            // Asset-change hops: FX the hop notional (not leftover after unwind).
             if let Some(fx_list) = fx_by_debtor_from.get(&(fx_debtor, *asset)) {
-                let convert_in = amt.saturating_sub(p.map(|pr| pr.reverse_claim).unwrap_or(0));
                 for e in fx_list {
-                    let Some(after_fx) = apply_rate(convert_in, e.fee_fixed, e.fx_rate) else {
+                    let Some(after_fx) = apply_rate(amt, e.fee_fixed, e.fx_rate) else {
                         continue;
                     };
                     expand_hops(
@@ -363,19 +358,11 @@ pub fn find_banx_path(
 }
 
 /// Walk a hop list the same way `path_pay` / search do, recording per-hop fees.
-fn line_reverse(lines: &[LineEdge], creditor: &str, debtor: &str, asset_id: u16) -> u64 {
-    lines
-        .iter()
-        .find(|l| l.creditor == creditor && l.debtor == debtor && l.asset_id == asset_id)
-        .map(|l| l.reverse_claim)
-        .unwrap_or(0)
-}
-
 fn simulate_path_fees(
     hop_keys: &[(String, u16)],
     amount_in: u64,
     sender: &str,
-    lines: &[LineEdge],
+    _lines: &[LineEdge],
     routing: &[RoutingEdge],
     fx: &[FxEdge],
     now: i64,
@@ -389,12 +376,10 @@ fn simulate_path_fees(
     let mut path_debtor = sender.to_string();
     let mut prev_edge_debtor = sender.to_string();
     let mut prev_asset = hop_keys[0].1;
-    let mut prev_reverse = 0u64;
 
     for (i, (next_creditor, asset_id)) in hop_keys.iter().enumerate() {
         let asset_id = *asset_id;
         if i == 0 {
-            prev_reverse = line_reverse(lines, next_creditor, sender, asset_id);
             hops.push(PathHop {
                 account: next_creditor.clone(),
                 asset_id,
@@ -412,7 +397,6 @@ fn simulate_path_fees(
         let mut fx_fee = 0u64;
         let mut fx_from_asset = None;
         if asset_id != prev_asset {
-            let convert_in = forward.saturating_sub(prev_reverse);
             let e = fx.iter().find(|e| {
                 e.debtor == prev_edge_debtor
                     && e.from_asset == prev_asset
@@ -422,7 +406,7 @@ fn simulate_path_fees(
             })?;
             fx_fee = e.fee_fixed;
             fx_from_asset = Some(prev_asset);
-            forward = apply_rate(convert_in, e.fee_fixed, e.fx_rate)?;
+            forward = apply_rate(forward, e.fee_fixed, e.fx_rate)?;
         }
 
         let rpol = resolve_routing(routing, next_creditor, &path_debtor, asset_id, now)?;
@@ -438,7 +422,6 @@ fn simulate_path_fees(
             fx_fee,
             fx_from_asset,
         });
-        prev_reverse = line_reverse(lines, next_creditor, &path_debtor, asset_id);
         prev_edge_debtor = path_debtor;
         path_debtor = next_creditor.clone();
         prev_asset = asset_id;
@@ -633,7 +616,6 @@ fn expand_hops(
                     prev_asset: state_asset,
                     hop_account: line.creditor.clone(),
                     hop_asset,
-                    reverse_claim: line.reverse_claim,
                 },
                 next_visited,
             ),
@@ -999,9 +981,33 @@ mod tests {
         );
     }
 
-    /// Matches `test_path_pay_fx_after_partial_reverse_net`.
     #[test]
-    fn fx_after_partial_reverse_net_matches_chain() {
+    fn fx_converts_full_hop_notional() {
+        let aud = 1u16;
+        let usd = 2u16;
+        let lines = vec![
+            line("gary", "alice", aud, 10_000),
+            line("steve", "gary", usd, 10_000),
+        ];
+        let routing = vec![global_rte("gary", usd, 0)];
+        let fx = vec![FxEdge {
+            debtor: "alice".into(),
+            from_asset: aud,
+            to_asset: usd,
+            fee_fixed: 0,
+            fx_rate: RATE_SCALE * 70 / 100,
+            expires_at: 0,
+        }];
+        let q = find_banx_path(
+            &lines, &routing, &fx, "alice", "steve", 1_000, aud, Some(usd), 4, 0,
+        )
+        .expect("path");
+        assert_eq!(q.amount_out, 700, "1000 AUD at 0.70 → 700 USD, not leftover");
+    }
+
+    /// Unwind does not shrink the FX'd notional (1000 AUD → 700 USD).
+    #[test]
+    fn fx_after_partial_reverse_net_uses_hop_notional() {
         let aud = 1u16;
         let usd = 2u16;
         let hop0 = line_with_reverse("gary", "alice", aud, 10_000, 400);
@@ -1016,27 +1022,17 @@ mod tests {
             expires_at: 0,
         }];
         let q = find_banx_path(
-            &lines,
-            &routing,
-            &fx,
-            "alice",
-            "steve",
-            1_000,
-            aud,
-            Some(usd),
-            4,
-            0,
+            &lines, &routing, &fx, "alice", "steve", 1_000, aud, Some(usd), 4, 0,
         )
         .expect("path");
         assert_eq!(
-            q.amount_out, 420,
-            "1000 against 400 reverse converts 600 at 0.70 → 420, not 1000 → 700"
+            q.amount_out, 700,
+            "1000 AUD hop notional at 0.70 → 700, not leftover 600 → 420"
         );
     }
 
-    /// Matches `test_path_pay_fx_after_full_reverse_net_fails_min_return`.
     #[test]
-    fn fx_after_full_reverse_net_no_quote() {
+    fn fx_after_full_reverse_net_uses_hop_notional() {
         let aud = 1u16;
         let usd = 2u16;
         let lines = vec![
@@ -1052,12 +1048,57 @@ mod tests {
             fx_rate: RATE_SCALE * 70 / 100,
             expires_at: 0,
         }];
-        assert!(
-            find_banx_path(
-                &lines, &routing, &fx, "alice", "steve", 1_000, aud, Some(usd), 4, 0,
-            )
-            .is_none(),
-            "full reverse net leaves nothing to convert"
+        let q = find_banx_path(
+            &lines, &routing, &fx, "alice", "steve", 1_000, aud, Some(usd), 4, 0,
+        )
+        .expect("path");
+        assert_eq!(q.amount_out, 700);
+    }
+
+    /// Matches `test_path_pay_fx_aud_usd_gbp_after_partial_reverse`.
+    #[test]
+    fn fx_aud_usd_gbp_after_partial_reverse_uses_hop_notional() {
+        let aud = 1u16;
+        let usd = 2u16;
+        let gbp = 3u16;
+        let hop0 = line_with_reverse("gary", "alice", aud, 10_000, 400);
+        let lines = vec![
+            hop0,
+            line("steve", "gary", usd, 10_000),
+            line("sam", "steve", gbp, 10_000),
+        ];
+        let routing = vec![global_rte("gary", usd, 0), global_rte("steve", gbp, 0)];
+        let fx = vec![
+            FxEdge {
+                debtor: "alice".into(),
+                from_asset: aud,
+                to_asset: usd,
+                fee_fixed: 0,
+                fx_rate: RATE_SCALE * 70 / 100,
+                expires_at: 0,
+            },
+            FxEdge {
+                debtor: "gary".into(),
+                from_asset: usd,
+                to_asset: gbp,
+                fee_fixed: 0,
+                fx_rate: RATE_SCALE * 80 / 100,
+                expires_at: 0,
+            },
+        ];
+        let q = find_banx_path(
+            &lines, &routing, &fx, "alice", "sam", 1_000, aud, Some(gbp), 4, 0,
+        )
+        .expect("path");
+        assert_eq!(q.hops.len(), 3);
+        assert_eq!(
+            q.hops.iter().map(|h| h.account.as_str()).collect::<Vec<_>>(),
+            vec!["gary", "steve", "sam"]
+        );
+        assert_eq!(q.hops[1].amount, 700);
+        assert_eq!(
+            q.amount_out, 560,
+            "1000 AUD × 0.70 × 0.80 → 560 GBP, not leftover 600 × 0.70 × 0.80"
         );
     }
 }
