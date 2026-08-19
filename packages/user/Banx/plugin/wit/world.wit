@@ -173,8 +173,8 @@ interface api {
         amount: string,
     ) -> result<_, error>;
 
-    /// Poster (middle man / claim holder) posts an FX quote: claims they hold
-    /// in `from-asset` may be rebooked to `to-asset`. Fee is a human decimal in
+    /// Post a from→to FX offer. Others take it with `convert`. Path pay uses
+    /// it to size a hop when you are the middle man. Fee is a human decimal in
     /// **from-asset** units. `to-rate` is how many **to-asset** units you get
     /// for 1 full **from-asset** unit (e.g. `"0.45"`). The plugin converts this
     /// to the chain `fx_rate` (RATE_SCALE fixed-point), including precisions.
@@ -228,8 +228,8 @@ interface api {
     /// `max-amount` is a human decimal string.
     net: func(counterparty: string, asset-id: u16, max-amount: string) -> result<_, error>;
 
-    /// Convert existing debt via the sender's (creditor's) currency policy.
-    /// Amounts are human decimal strings in their respective assets.
+    /// Take the counterparty's currency-policy offer and rebook leftover
+    /// from-asset on this pair into to-asset. Amounts are human decimals.
     convert: func(
         counterparty: string,
         from-asset: u16,

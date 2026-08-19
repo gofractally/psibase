@@ -10,7 +10,7 @@ A payment does not move coins. It **creates or shrinks obligations** along a pat
 - **Obligation** — the actual debt. One pair/asset can have several rows (different rates). **Exposure** is principal + live interest.
 - **Path-forward offer** — B’s standing terms for *sitting in the middle* of a `path_pay`. Specific next hop, or **global** (any next hop).
 - **Claim offer** — standing **buy** (`sell_claim` hits it) or **sell** (`buy_claim` hits it) terms for transferring a claim on a debtor. Specific debtor, or **global**.
-- **Currency policy** — the middle man’s quote to rebook claims they hold from one asset to another (FX + optional fixed fee).
+- **Currency policy** — a posted from→to FX offer. Others take it with `convert`. Path pay uses it to size a hop when the poster is in the middle.
 
 Alice paying Carol $1 via Bob:
 
@@ -124,9 +124,11 @@ Default in the UI is **7 days**. `0` means interest from the first second.
 
 ## Currency (FX)
 
-The **middle man** (claim holder / previous-hop creditor) posts `st_cur_pol`: from-asset → to-asset, fixed fee in from-asset, rate (human “to per 1 from” in the plugin), optional new APR, expiry. The debtor’s policy is not used.
+Anyone posts `st_cur_pol`: from-asset → to-asset, fixed fee in from-asset, rate (human “to per 1 from” in the plugin), optional new APR, expiry. That is an **offer**.
 
-`convert` rebooks an existing claim at the **creditor’s** quote, then **auto-nets** the destination asset. Only the **creditor** may call it. Path pay does **not** rebook: it only uses the middle man’s quote to size the next hop.
+`convert` is a take: sender uses the **counterparty’s** live quote, not their own. Nets `from_asset` first, rebooks the leftover at that offer, then auto-nets `to_asset`. Neither party can re-denominate a claim at a rate they set themselves.
+
+Path pay does **not** rebook. It only uses the middle man’s quote to size the next hop.
 
 ## Amounts and units
 
@@ -161,8 +163,8 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 | `st_req` / `rm_req` | Create / cancel invoice, please-book, or settle-auth |
 | `fl_stl` | Debtor fulfills a settle-auth |
 | `net` | Explicit bilateral net (no UI; writers already auto-net) |
-| `st_cur_pol` | Post convert quote |
-| `convert` | Rebook a claim and auto-net `to_asset` |
+| `st_cur_pol` | Post a from→to FX offer |
+| `convert` | Take the counterparty’s FX offer and rebook |
 | `get_exposure` | Live pair exposure |
 | `add_asset` | Register an asset (service only) |
 

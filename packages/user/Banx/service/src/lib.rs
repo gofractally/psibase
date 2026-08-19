@@ -800,15 +800,17 @@ pub mod tables {
         }
     }
 
-    /// Middle-man / claim-holder quote: `poster` will rebook claims **they
-    /// hold** (or hops through them) from `from_asset` → `to_asset`.
+    /// Standing from→to quote posted by `poster`.
     ///
-    /// `path_pay` uses the previous hop's **creditor** (the person in the
-    /// middle). The debtor's policy is irrelevant.
+    /// `convert`: the other party takes this offer and rebooks a leftover
+    /// tab at this rate. The poster does not re-denominate their own claims.
+    ///
+    /// `path_pay`: the previous hop's **creditor** (middle man) applies their
+    /// quote to size the next hop only. Does not rebook.
     #[table(name = "CurrencyPolicyTab", index = 4)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct CurrencyPolicy {
-        /// Who posted the quote and whose claims may be re-denominated.
+        /// Who posted the from→to offer.
         pub poster: AccountNumber,
         pub from_asset: u16,
         pub to_asset: u16,
@@ -857,7 +859,7 @@ pub mod tables {
             apply_rate(amount_from, self.fee_fixed, self.fx_rate)
         }
 
-        /// Poster (middle man / claim holder) posts an FX quote.
+        /// Poster posts a from→to offer (path hop sizing, or a convert take).
         pub fn upsert(
             poster: AccountNumber,
             from_asset: u16,
@@ -889,8 +891,9 @@ pub mod tables {
         }
 
         /// Rebook up to `amount_from` of what `debtor` owes `creditor` in
-        /// `from_asset` into `to_asset`. Poster must be the creditor.
-        /// Auto-nets the pair in `to_asset`.
+        /// `from_asset` into `to_asset` at this poster's rate. Poster must be
+        /// one of the two parties (the maker). Nets `from_asset` first, then
+        /// auto-nets `to_asset`.
         pub fn convert(
             &self,
             creditor: AccountNumber,
@@ -901,12 +904,12 @@ pub mod tables {
             self.assert_live();
             assert!(amount_from.value > 0, "convert amount must be positive");
             assert!(
-                creditor == self.poster,
-                "FX policy poster must be the creditor"
+                self.poster == creditor || self.poster == debtor,
+                "FX policy poster must be a party to the tab"
             );
             assert!(creditor != debtor, "creditor must differ from debtor");
 
-            Obligation::accrue_pair(creditor, debtor, self.from_asset);
+            Obligation::net_pair(creditor, debtor, self.from_asset, u64::MAX.into());
             let available = Obligation::exposure(creditor, debtor, self.from_asset).value;
             let take = amount_from.value.min(available);
             assert!(take > 0, "nothing to convert in from_asset");
@@ -2122,8 +2125,8 @@ pub mod service {
         offer.execute(seller, buyer, debtor, amount, "buy_claim");
     }
 
-    /// Poster (middle man / claim holder) posts an FX quote: claims they hold
-    /// in `from_asset` may be rebooked to `to_asset`. See [`CurrencyPolicy`].
+    /// Poster posts a from→to FX offer. Others `convert` against it; path
+    /// pay uses it to size a hop when the poster is the middle man.
     #[action]
     fn st_cur_pol(
         from_asset: u16,
@@ -2144,11 +2147,10 @@ pub mod service {
         );
     }
 
-    /// Convert existing debt using the **sender's** (creditor's) [`CurrencyPolicy`].
-    ///
-    /// `counterparty` is the debtor. Sender must hold the claim. Rebooks up to
-    /// `amount_from` of `from_asset` into `to_asset`; requires output ≥ `min_to`.
-    /// Auto-nets `to_asset` after the rebook.
+    /// Take the **counterparty's** [`CurrencyPolicy`]: rebook leftover
+    /// `from_asset` on this pair into `to_asset` at their quote. Sender does
+    /// not use their own policy. Nets `from_asset` first; requires output
+    /// ≥ `min_to`; auto-nets `to_asset` after the rebook.
     #[action]
     fn convert(
         counterparty: AccountNumber,
@@ -2160,20 +2162,23 @@ pub mod service {
         let sender = get_sender();
         assert!(sender != counterparty, "cannot convert with self");
 
-        Obligation::accrue_pair(sender, counterparty, from_asset);
-        Obligation::accrue_pair(counterparty, sender, from_asset);
-        let sender_owes = Obligation::exposure(counterparty, sender, from_asset).value;
-        let counterparty_owes = Obligation::exposure(sender, counterparty, from_asset).value;
-        let (creditor, debtor) = match (sender_owes > 0, counterparty_owes > 0) {
-            (true, false) => (counterparty, sender),
-            (false, true) => (sender, counterparty),
-            (true, true) => panic!("both directions have from_asset claims; net first"),
-            (false, false) => panic!("nothing to convert in from_asset"),
+        Obligation::net_pair(sender, counterparty, from_asset, u64::MAX.into());
+        let they_owe = Obligation::exposure(sender, counterparty, from_asset).value;
+        let i_owe = Obligation::exposure(counterparty, sender, from_asset).value;
+        let (creditor, debtor) = if they_owe > 0 {
+            (sender, counterparty)
+        } else if i_owe > 0 {
+            (counterparty, sender)
+        } else {
+            panic!("nothing to convert in from_asset");
         };
-        assert!(sender == creditor, "only the creditor can convert");
 
-        let policy = CurrencyPolicy::get_assert(creditor, from_asset, to_asset);
-        policy.convert(creditor, debtor, amount_from, min_to);
+        CurrencyPolicy::get_assert(counterparty, from_asset, to_asset).convert(
+            creditor,
+            debtor,
+            amount_from,
+            min_to,
+        );
     }
 
     /// Book a **deposit**: sender receives value and credits `depositor`, then
@@ -2192,7 +2197,7 @@ pub mod service {
         let receiver = get_sender();
         assert!(depositor != receiver, "cannot deposit from self");
         assert!(amount.value > 0, "deposit amount must be positive");
-        let _ = Asset::get_assert(asset_id);
+        Asset::get_assert(asset_id);
         assert!(
             interest_rate <= crate::tables::PPM_SCALE,
             "interest_rate exceeds 100% (PPM_SCALE)"

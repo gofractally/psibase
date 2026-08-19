@@ -127,8 +127,9 @@ export function PoliciesPage() {
                     <h2 className="font-medium">Set currency policy</h2>
                     <p className="text-muted-foreground text-xs">
                         You set the rate for hops that change currency through
-                        you, and for converting claims you hold. Rate is
-                        to-units per 1 from-unit (e.g. 0.45 means $1 → $0.45).
+                        you, and as an offer others can take with Convert. Rate
+                        is to-units per 1 from-unit (e.g. 0.45 means 1 from →
+                        0.45 to).
                     </p>
                     <div className="grid gap-2 sm:grid-cols-2">
                         <currencyForm.Field
@@ -274,6 +275,10 @@ export function PoliciesPage() {
 
             <section className="grid max-w-xl gap-3 rounded-lg border p-4">
                 <h2 className="font-medium">Convert debt</h2>
+                <p className="text-muted-foreground text-xs">
+                    Take their posted quote. Rebooks leftover from-asset on
+                    this pair at their rate — not yours.
+                </p>
                 <form
                     className="grid gap-3"
                     onSubmit={(e) => {
