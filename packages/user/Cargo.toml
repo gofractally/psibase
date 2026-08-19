@@ -72,6 +72,7 @@ members = [
 
 exclude = [
     "CommonApi/common/packages/component-parser",
+    "CommonApi/common/packages/plugin-composer",
     "Aes/plugin",
     "BrotliCodec/plugin",
     "Base64/plugin",
