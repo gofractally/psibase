@@ -31,7 +31,6 @@ pub fn get_assert_top_level_app(
 }
 
 pub fn assert_valid_account(account: &str) {
-    let account_details =
-        AccountsQuery::get_account(account).expect("Get account failed");
+    let account_details = AccountsQuery::get_account(account).expect("Get account failed");
     assert!(account_details.is_some(), "Invalid account name");
 }
