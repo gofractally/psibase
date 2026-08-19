@@ -3,9 +3,9 @@
 mod service {
     use async_graphql::*;
     use banx::tables::{
-        Asset, AssetTable, CreditLine, CreditLineTable, CurrencyPolicy, CurrencyPolicyTab,
-        ForwardOffer, ForwardOfferTab, Obligation, ObligationTable, PairCycle,
-        PayRequest, PPM_SCALE, RATE_SCALE, RequestTab, ClaimOffer, ClaimOfferTab,
+        Asset, AssetTable, ClaimOffer, ClaimOfferTab, Connection, CreditLine, CreditLineTable,
+        CurrencyPolicy, CurrencyPolicyTab, ForwardOffer, ForwardOfferTab, Obligation,
+        ObligationTable, PairCycle, PayRequest, RequestTab, PPM_SCALE, RATE_SCALE,
     };
     use psibase::services::tokens::{Decimal, Precision, Quantity};
     use psibase::*;
@@ -122,7 +122,8 @@ mod service {
                 exposure: dec(exposure, line.asset_id),
                 remaining: dec(line.remaining, line.asset_id),
                 residual: dec(
-                    CreditLine::path_capacity_live(line.creditor, line.debtor, line.asset_id)
+                    Connection::get_live(line.creditor, line.debtor, line.asset_id)
+                        .capacity()
                         .into(),
                     line.asset_id,
                 ),

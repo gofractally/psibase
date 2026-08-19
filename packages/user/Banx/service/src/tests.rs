@@ -751,7 +751,7 @@ mod tests {
         Ok(())
     }
 
-    /// path_pay / CreditLine::path_debit auto-nets mutual claims on the pair.
+    /// path_pay / Connection::draw auto-nets mutual claims on the pair.
     #[psibase::test_case(packages("Banx"))]
     fn test_path_pay_auto_nets_reverse_draw(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
@@ -1028,6 +1028,45 @@ mod tests {
             )
             .get();
         assert!(result.is_err());
+        Ok(())
+    }
+
+    /// High APR on the next hop's line does not block a hop that only unwinds
+    /// a reverse tab (no new draw at that APR).
+    #[psibase::test_case(packages("Banx"))]
+    fn test_max_line_apr_allows_unwind(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let gary = account!("gary");
+        let steve = account!("steve");
+        for a in [alice, gary, steve] {
+            chain.new_account(a).unwrap();
+        }
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        Wrapper::push_from(&chain, gary)
+            .st_crd_lne(alice, usd, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        // Steve owes Gary 100 — Gary's forward to Steve is a pure unwind.
+        Wrapper::push_from(&chain, steve)
+            .deposit(gary, usd, Quantity::new(100), 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, steve)
+            .st_crd_lne(gary, usd, Quantity::new(10_000), false, 20_000, 0)
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .st_glb_fwd(usd, Quantity::new(0), 0, 10_000, never(), false)
+            .get()?;
+
+        Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(gary, usd), hop(steve, usd)],
+                Quantity::new(100),
+                Quantity::new(100),
+                0,
+            )
+            .get()?;
+        assert_eq!(exp(&chain, steve, gary, usd), 0);
+        assert_eq!(exp(&chain, gary, alice, usd), 100);
         Ok(())
     }
 

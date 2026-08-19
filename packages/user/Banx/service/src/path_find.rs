@@ -20,6 +20,8 @@ pub struct LineEdge {
     /// Reverse claim included in `residual` (what this creditor already owes
     /// the debtor). Unwind nets that pair; FX still uses the hop notional.
     pub reverse_claim: u64,
+    /// What the debtor already owes this creditor (same-direction tab).
+    pub exposure: u64,
     pub interest_rate_ppm: u32,
     /// True if a real credit-line row exists (not a reverse-claim-only edge).
     pub is_line: bool,
@@ -177,16 +179,23 @@ pub fn find_banx_path(
         return None;
     }
 
-    // Index lines by debtor for expansion. Known pairs are real credit lines
-    // (including 0-limit); reverse-claim-only edges do not count.
+    // Index lines by debtor for expansion. Known matches Connection::knows:
+    // a line who→them, or a live tab either way (including reverse-only).
     let mut lines_by_debtor: HashMap<&str, Vec<&LineEdge>> = HashMap::new();
     let mut known: HashSet<(String, String, u16)> = HashSet::new();
     for l in lines {
         if l.is_line {
             known.insert((l.creditor.clone(), l.debtor.clone(), l.asset_id));
         }
+        if l.reverse_claim > 0 || l.exposure > 0 {
+            known.insert((l.creditor.clone(), l.debtor.clone(), l.asset_id));
+            known.insert((l.debtor.clone(), l.creditor.clone(), l.asset_id));
+        }
         if l.residual > 0 {
-            lines_by_debtor.entry(l.debtor.as_str()).or_default().push(l);
+            lines_by_debtor
+                .entry(l.debtor.as_str())
+                .or_default()
+                .push(l);
         }
     }
 
@@ -464,16 +473,7 @@ pub fn find_banx_path_exact_out(
 
     let try_in = |amount_in: u64| {
         find_banx_path(
-            lines,
-            routing,
-            fx,
-            sender,
-            payee,
-            amount_in,
-            from_asset,
-            to_asset,
-            max_hops,
-            now,
+            lines, routing, fx, sender, payee, amount_in, from_asset, to_asset, max_hops, now,
         )
     };
 
@@ -603,9 +603,7 @@ fn expand_hops(
         }
 
         let key = (line.creditor.clone(), hop_asset);
-        let better = candidates
-            .get(&key)
-            .map_or(true, |(b, _, _)| draw > *b);
+        let better = candidates.get(&key).map_or(true, |(b, _, _)| draw > *b);
         if !better {
             continue;
         }
@@ -638,26 +636,35 @@ mod tests {
             asset_id: asset,
             residual,
             reverse_claim: 0,
+            exposure: 0,
             interest_rate_ppm: 0,
             is_line: true,
         }
     }
 
-    fn line_with_reverse(
-        c: &str,
-        d: &str,
-        asset: u16,
-        headroom: u64,
-        reverse: u64,
-    ) -> LineEdge {
+    fn line_with_reverse(c: &str, d: &str, asset: u16, headroom: u64, reverse: u64) -> LineEdge {
         LineEdge {
             creditor: c.into(),
             debtor: d.into(),
             asset_id: asset,
             residual: headroom + reverse,
             reverse_claim: reverse,
+            exposure: 0,
             interest_rate_ppm: 0,
             is_line: true,
+        }
+    }
+
+    fn reverse_only(c: &str, d: &str, asset: u16, reverse: u64) -> LineEdge {
+        LineEdge {
+            creditor: c.into(),
+            debtor: d.into(),
+            asset_id: asset,
+            residual: reverse,
+            reverse_claim: reverse,
+            exposure: 0,
+            interest_rate_ppm: 0,
+            is_line: false,
         }
     }
 
@@ -677,19 +684,8 @@ mod tests {
     #[test]
     fn direct_line() {
         let lines = vec![line("bob", "alice", 1, 1_000_000)];
-        let q = find_banx_path(
-            &lines,
-            &[],
-            &[],
-            "alice",
-            "bob",
-            100,
-            1,
-            Some(1),
-            4,
-            0,
-        )
-        .expect("path");
+        let q =
+            find_banx_path(&lines, &[], &[], "alice", "bob", 100, 1, Some(1), 4, 0).expect("path");
         assert_eq!(q.hops.len(), 1);
         assert_eq!(q.hops[0].account, "bob");
         assert_eq!(q.amount_in, 100);
@@ -834,10 +830,8 @@ mod tests {
     #[test]
     fn exact_out_direct_line_no_fee() {
         let lines = vec![line("bob", "alice", 1, 1_000_000)];
-        let q = find_banx_path_exact_out(
-            &lines, &[], &[], "alice", "bob", 100, 1, Some(1), 4, 0,
-        )
-        .expect("path");
+        let q = find_banx_path_exact_out(&lines, &[], &[], "alice", "bob", 100, 1, Some(1), 4, 0)
+            .expect("path");
         assert_eq!(q.amount_in, 100);
         assert_eq!(q.amount_out, 100);
     }
@@ -937,15 +931,10 @@ mod tests {
     #[test]
     fn reverse_claim_edges_unwind_path() {
         // After A→B→C, reverse residuals let C→B→A unwind without opposite lines.
-        let lines = vec![
-            line("b", "c", 1, 100),
-            line("a", "b", 1, 100),
-        ];
+        let lines = vec![line("b", "c", 1, 100), line("a", "b", 1, 100)];
         let routing = vec![global_rte("b", 1, 0)];
-        let q = find_banx_path(
-            &lines, &routing, &[], "c", "a", 100, 1, Some(1), 4, 0,
-        )
-        .expect("reverse path");
+        let q = find_banx_path(&lines, &routing, &[], "c", "a", 100, 1, Some(1), 4, 0)
+            .expect("reverse path");
         assert_eq!(q.hops.len(), 2);
         assert_eq!(q.hops[0].account, "b");
         assert_eq!(q.hops[1].account, "a");
@@ -982,7 +971,16 @@ mod tests {
             },
         ];
         let q = find_banx_path(
-            &lines, &routing, &[], "alice", "steve", 100, 1, Some(1), 4, 100,
+            &lines,
+            &routing,
+            &[],
+            "alice",
+            "steve",
+            100,
+            1,
+            Some(1),
+            4,
+            100,
         )
         .expect("path");
         assert_eq!(
@@ -1009,10 +1007,22 @@ mod tests {
             expires_at: 0,
         }];
         let q = find_banx_path(
-            &lines, &routing, &fx, "alice", "steve", 1_000, aud, Some(usd), 4, 0,
+            &lines,
+            &routing,
+            &fx,
+            "alice",
+            "steve",
+            1_000,
+            aud,
+            Some(usd),
+            4,
+            0,
         )
         .expect("path");
-        assert_eq!(q.amount_out, 700, "1000 AUD at 0.70 → 700 USD, not leftover");
+        assert_eq!(
+            q.amount_out, 700,
+            "1000 AUD at 0.70 → 700 USD, not leftover"
+        );
     }
 
     /// Unwind does not shrink the FX'd notional (1000 AUD → 700 USD).
@@ -1032,7 +1042,16 @@ mod tests {
             expires_at: 0,
         }];
         let q = find_banx_path(
-            &lines, &routing, &fx, "alice", "steve", 1_000, aud, Some(usd), 4, 0,
+            &lines,
+            &routing,
+            &fx,
+            "alice",
+            "steve",
+            1_000,
+            aud,
+            Some(usd),
+            4,
+            0,
         )
         .expect("path");
         assert_eq!(
@@ -1059,7 +1078,16 @@ mod tests {
             expires_at: 0,
         }];
         let q = find_banx_path(
-            &lines, &routing, &fx, "alice", "steve", 1_000, aud, Some(usd), 4, 0,
+            &lines,
+            &routing,
+            &fx,
+            "alice",
+            "steve",
+            1_000,
+            aud,
+            Some(usd),
+            4,
+            0,
         )
         .expect("path");
         assert_eq!(q.amount_out, 700);
@@ -1097,12 +1125,24 @@ mod tests {
             },
         ];
         let q = find_banx_path(
-            &lines, &routing, &fx, "alice", "sam", 1_000, aud, Some(gbp), 4, 0,
+            &lines,
+            &routing,
+            &fx,
+            "alice",
+            "sam",
+            1_000,
+            aud,
+            Some(gbp),
+            4,
+            0,
         )
         .expect("path");
         assert_eq!(q.hops.len(), 3);
         assert_eq!(
-            q.hops.iter().map(|h| h.account.as_str()).collect::<Vec<_>>(),
+            q.hops
+                .iter()
+                .map(|h| h.account.as_str())
+                .collect::<Vec<_>>(),
             vec!["gary", "steve", "sam"]
         );
         assert_eq!(q.hops[1].amount, 700);
@@ -1121,8 +1161,19 @@ mod tests {
         let mut closed = global_rte("gary", 1, 0);
         closed.allow_unknown = false;
         assert!(
-            find_banx_path(&hop_lines, &[closed.clone()], &[], "alice", "steve", 100, 1, Some(1), 4, 0)
-                .is_none(),
+            find_banx_path(
+                &hop_lines,
+                &[closed.clone()],
+                &[],
+                "alice",
+                "steve",
+                100,
+                1,
+                Some(1),
+                4,
+                0
+            )
+            .is_none(),
             "closed forward without gary→steve line"
         );
         let mut with_known = hop_lines;
@@ -1132,6 +1183,7 @@ mod tests {
             asset_id: 1,
             residual: 0,
             reverse_claim: 0,
+            exposure: 0,
             interest_rate_ppm: 0,
             is_line: true,
         });
@@ -1149,5 +1201,46 @@ mod tests {
         )
         .expect("0-limit line is enough");
         assert_eq!(q.amount_out, 100);
+    }
+
+    /// Cafe coffee: john has a prepaid tab (reverse-only), closed specific
+    /// forward to the cafe. Same as Connection::knows via a live tab.
+    #[test]
+    fn closed_forward_known_via_reverse_tab() {
+        let lines = vec![
+            line("john", "mitchell", 1, 1_000_000),
+            reverse_only("cafe", "john", 1, 100_0000),
+        ];
+        let closed = RoutingEdge {
+            creditor: "cafe".into(),
+            debtor: "john".into(),
+            asset_id: 1,
+            hop_fee_fixed: 0,
+            hop_fee_percent_ppm: PPM_SCALE / 100,
+            max_accept_rate_ppm: PPM_SCALE,
+            expires_at: 0,
+            allow_unknown: false,
+        };
+        let q = find_banx_path(
+            &lines,
+            &[closed],
+            &[],
+            "mitchell",
+            "cafe",
+            5_0506,
+            1,
+            Some(1),
+            4,
+            0,
+        )
+        .expect("prepaid tab is enough for closed forward");
+        assert_eq!(
+            q.hops
+                .iter()
+                .map(|h| h.account.as_str())
+                .collect::<Vec<_>>(),
+            vec!["john", "cafe"]
+        );
+        assert_eq!(q.amount_out, 5_0000);
     }
 }

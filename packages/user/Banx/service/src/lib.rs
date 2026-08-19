@@ -223,13 +223,14 @@ pub mod tables {
         pub fee_fixed: Quantity,
         /// ppm (`10_000` = 1%); must be `< PPM_SCALE`.
         pub fee_percent: u32,
-        /// Max APR ppm on a line poster **draws** when forwarding.
+        /// Max APR ppm on a **new** draw when forwarding. Not applied to a
+        /// hop that only unwinds a reverse tab.
         pub max_line_apr: u32,
         /// Absolute expiry (`seconds == 0` → never).
         pub expires_at: TimePointSec,
-        /// If false, poster must have a credit line to the next hop
-        /// (limit 0 is enough). If true, anyone who lined the poster
-        /// can become their creditor.
+        /// If false, poster must already know the next hop (a line to them,
+        /// or a live tab). If true, anyone who lined the poster can become
+        /// their creditor.
         pub allow_unknown: bool,
     }
 
@@ -266,17 +267,13 @@ pub mod tables {
                 return;
             }
             assert!(
-                CreditLine::knows(self.poster, next_creditor, self.asset_id),
+                Connection::knows(self.poster, next_creditor, self.asset_id),
                 "unknown counterparty (no credit line or obligation; set allow_unknown or post a 0-limit line)"
             );
         }
 
         /// Live specific offer, else live global. Panics if neither is live.
-        pub fn get_assert(
-            poster: AccountNumber,
-            next_hop: AccountNumber,
-            asset_id: u16,
-        ) -> Self {
+        pub fn get_assert(poster: AccountNumber, next_hop: AccountNumber, asset_id: u16) -> Self {
             if let Some(p) = Self::get(poster, next_hop, asset_id) {
                 if p.is_live() {
                     return p;
@@ -311,7 +308,7 @@ pub mod tables {
             assert!(fee_percent < PPM_SCALE, "fee must be under 100%");
             if next_hop != Self::GLOBAL {
                 assert!(
-                    CreditLine::knows(next_hop, poster, asset_id),
+                    Connection::knows(next_hop, poster, asset_id),
                     "next hop does not know poster (no credit line or live obligation)"
                 );
             }
@@ -368,14 +365,18 @@ pub mod tables {
                 self.next_hop
             };
             self.assert_known(creditor);
-            if let Some(line) = CreditLine::get(creditor, self.poster, self.asset_id) {
-                assert!(
-                    line.interest_rate <= self.max_line_apr,
-                    "next hop interest rate exceeds max_line_apr"
-                );
-            }
+            let conn = Connection::get(creditor, self.poster, self.asset_id);
             let draw = self.apply_fees(amount_in);
-            CreditLine::path_debit(creditor, self.poster, self.asset_id, draw);
+            // APR cap is only on new line capacity, not a pure unwind.
+            if conn.new_draw(draw) > 0 {
+                if let Some(line) = conn.line() {
+                    assert!(
+                        line.interest_rate <= self.max_line_apr,
+                        "next hop interest rate exceeds max_line_apr"
+                    );
+                }
+            }
+            conn.draw(draw);
             draw
         }
     }
@@ -498,12 +499,7 @@ pub mod tables {
             .save();
         }
 
-        pub fn remove(
-            poster: AccountNumber,
-            debtor: AccountNumber,
-            asset_id: u16,
-            side: u8,
-        ) {
+        pub fn remove(poster: AccountNumber, debtor: AccountNumber, asset_id: u16, side: u8) {
             Self::assert_side(side);
             assert!(
                 Self::get(poster, debtor, asset_id, side).is_some(),
@@ -540,7 +536,7 @@ pub mod tables {
             assert!(amount.value > 0, "claim transfer amount must be positive");
 
             assert!(
-                CreditLine::knows(debtor, buyer, self.asset_id),
+                Connection::knows(debtor, buyer, self.asset_id),
                 "debtor does not know buyer (no credit line or live tab)"
             );
 
@@ -904,7 +900,10 @@ pub mod tables {
         ) -> Quantity {
             self.assert_live();
             assert!(amount_from.value > 0, "convert amount must be positive");
-            assert!(creditor == self.poster, "FX policy poster must be the creditor");
+            assert!(
+                creditor == self.poster,
+                "FX policy poster must be the creditor"
+            );
             assert!(creditor != debtor, "creditor must differ from debtor");
 
             Obligation::accrue_pair(creditor, debtor, self.from_asset);
@@ -1575,15 +1574,6 @@ pub mod tables {
             })
         }
 
-        /// `who` has lined `them`, or they already have a live tab either way.
-        pub fn knows(who: AccountNumber, them: AccountNumber, asset_id: u16) -> bool {
-            if Self::get(who, them, asset_id).is_some() {
-                return true;
-            }
-            Obligation::exposure(who, them, asset_id).value > 0
-                || Obligation::exposure(them, who, asset_id).value > 0
-        }
-
         pub fn upsert_credit_line(
             creditor: AccountNumber,
             debtor: AccountNumber,
@@ -1636,65 +1626,119 @@ pub mod tables {
             CreditLineTable::read_write().erase(&(creditor, debtor, asset_id));
             PairCycle::set_posted_grace(creditor, debtor, asset_id, 0);
         }
+    }
 
-        /// Line headroom plus reverse claim (`creditor` already owes `debtor`).
-        /// That reverse book can be unwound by a path draw + auto-net without
-        /// the opposite credit line existing. Live (no persist).
-        pub fn path_capacity_live(
-            creditor: AccountNumber,
-            debtor: AccountNumber,
-            asset_id: u16,
-        ) -> u64 {
-            let reverse = Obligation::exposure(debtor, creditor, asset_id).value;
-            let line_cap = Self::get(creditor, debtor, asset_id)
-                .map(|l| l.draw_headroom())
-                .unwrap_or(0);
-            reverse.saturating_add(line_cap)
-        }
+    /// Directed pair in one asset: the creditor's line to the debtor (if any)
+    /// plus both tabs. Virtual — not a table.
+    ///
+    /// A path hop is this object: `debtor` draws on `creditor`. The reverse
+    /// tab (creditor already owes debtor) is unwind capacity and does not
+    /// need a line. Sending 1000 against a 400 reverse tab is unwind 400 +
+    /// new 600; after net the debtor owes 600.
+    #[derive(Clone, Debug)]
+    pub struct Connection {
+        pub creditor: AccountNumber,
+        pub debtor: AccountNumber,
+        pub asset_id: u16,
+        line: Option<CreditLine>,
+        /// Debtor already owes creditor.
+        forward: Quantity,
+        /// Creditor already owes debtor (unwind).
+        reverse: Quantity,
+    }
 
-        pub fn path_capacity(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) -> u64 {
+    impl Connection {
+        /// Accrue both tabs, then snapshot.
+        pub fn get(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) -> Self {
             Obligation::accrue_pair(creditor, debtor, asset_id);
             Obligation::accrue_pair(debtor, creditor, asset_id);
-            Self::path_capacity_live(creditor, debtor, asset_id)
+            Self::get_live(creditor, debtor, asset_id)
         }
 
-        /// Draw for `path_pay`: uses a credit line and/or an existing reverse
-        /// claim (auto-net). Grant is consumed only for the portion that is
-        /// new line capacity.
-        pub fn path_debit(
-            creditor: AccountNumber,
-            debtor: AccountNumber,
-            asset_id: u16,
-            amount: Quantity,
-        ) {
-            assert!(amount.value > 0, "path debit amount must be positive");
-            let cap = Self::path_capacity(creditor, debtor, asset_id);
-            assert!(
-                amount.value <= cap,
-                "insufficient path capacity (line + reverse claim)"
-            );
-
-            let reverse = Obligation::exposure(debtor, creditor, asset_id).value;
-            let new_draw = amount.value.saturating_sub(reverse);
-            let line = Self::get(creditor, debtor, asset_id);
-            let rate = if new_draw > 0 {
-                let mut line = line.expect("credit line required for new path draw");
-                line.consume_grant(Quantity::new(new_draw));
-                line.interest_rate
-            } else {
-                line.map(|l| l.interest_rate).unwrap_or(0)
-            };
-
-            Obligation::credit_pair(creditor, debtor, asset_id, amount, rate);
-            let netted = Obligation::net_pair(creditor, debtor, asset_id, u64::MAX.into());
-            emit_pair_activity(
+        /// Snapshot without locking interest (queries, `knows`).
+        pub fn get_live(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) -> Self {
+            Self {
                 creditor,
                 debtor,
                 asset_id,
+                line: CreditLine::get(creditor, debtor, asset_id),
+                forward: Obligation::exposure(creditor, debtor, asset_id),
+                reverse: Obligation::exposure(debtor, creditor, asset_id),
+            }
+        }
+
+        pub fn line(&self) -> Option<&CreditLine> {
+            self.line.as_ref()
+        }
+
+        pub fn forward(&self) -> Quantity {
+            self.forward
+        }
+
+        pub fn reverse(&self) -> Quantity {
+            self.reverse
+        }
+
+        pub fn line_headroom(&self) -> u64 {
+            let Some(line) = &self.line else {
+                return 0;
+            };
+            let vs_limit = line.limit.value.saturating_sub(self.forward.value);
+            if line.deplete_on_debit {
+                vs_limit.min(line.remaining.value)
+            } else {
+                vs_limit
+            }
+        }
+
+        /// Reverse tab plus unused line headroom.
+        pub fn capacity(&self) -> u64 {
+            self.reverse.value.saturating_add(self.line_headroom())
+        }
+
+        /// Slice of `amount` that is new line capacity (not unwind).
+        pub fn new_draw(&self, amount: Quantity) -> u64 {
+            amount.value.saturating_sub(self.reverse.value)
+        }
+
+        /// `who` lined `them`, or they already have a live tab either way.
+        pub fn knows(who: AccountNumber, them: AccountNumber, asset_id: u16) -> bool {
+            let c = Self::get_live(who, them, asset_id);
+            c.line.is_some() || c.forward.value > 0 || c.reverse.value > 0
+        }
+
+        /// Draw for `path_pay`: unwind the reverse tab, then new line
+        /// capacity. Grant is consumed only for the new slice.
+        pub fn draw(mut self, amount: Quantity) {
+            assert!(amount.value > 0, "path debit amount must be positive");
+            assert!(
+                amount.value <= self.capacity(),
+                "insufficient path capacity (line + reverse claim)"
+            );
+
+            let new_draw = self.new_draw(amount);
+            let rate = if new_draw > 0 {
+                let line = self
+                    .line
+                    .as_mut()
+                    .expect("credit line required for new path draw");
+                line.consume_grant(Quantity::new(new_draw));
+                line.interest_rate
+            } else {
+                self.line.as_ref().map(|l| l.interest_rate).unwrap_or(0)
+            };
+
+            Obligation::credit_pair(self.creditor, self.debtor, self.asset_id, amount, rate);
+            let netted =
+                Obligation::net_pair(self.creditor, self.debtor, self.asset_id, u64::MAX.into());
+            emit_pair_activity(
+                self.creditor,
+                self.debtor,
+                self.asset_id,
                 "path_draw",
                 amount,
                 netted,
-                asset_id,
+                self.asset_id,
                 0,
                 "",
             );
@@ -1738,8 +1782,8 @@ pub mod tables {
 #[psibase::service(name = "banx", tables = "tables")]
 pub mod service {
     use crate::tables::{
-        emit_pair_activity, Asset, ClaimOffer, CreditLine,
-        CurrencyPolicy, ForwardOffer, InitRow, InitTable, Obligation, PathHop, PayRequest,
+        emit_pair_activity, Asset, ClaimOffer, Connection, CreditLine, CurrencyPolicy,
+        ForwardOffer, InitRow, InitTable, Obligation, PathHop, PayRequest,
     };
     use psibase::{
         services::events,
@@ -2055,12 +2099,7 @@ pub mod service {
     /// Remove a **global** sell offer.
     #[action]
     fn rm_glb_sell(asset_id: u16) {
-        ClaimOffer::remove(
-            get_sender(),
-            ClaimOffer::GLOBAL,
-            asset_id,
-            ClaimOffer::SELL,
-        );
+        ClaimOffer::remove(get_sender(), ClaimOffer::GLOBAL, asset_id, ClaimOffer::SELL);
     }
 
     /// Seller (sender) sells claims on `debtor` to `buyer` under the buyer's
@@ -2213,7 +2252,7 @@ pub mod service {
     ///
     /// Atomic: all legs succeed or none stick.
     ///
-    /// Each draw **auto-nets** that pair/asset (via [`CreditLine::path_debit`]).
+    /// Each draw **auto-nets** that pair/asset (via [`Connection::draw`]).
     ///
     /// `request_id` 0 = none. Non-zero must be a live invoice naming the
     /// sender as payer; last hop must be the invoice poster in that asset.
@@ -2236,7 +2275,7 @@ pub mod service {
             assert!(next_creditor != path_debtor, "path_pay cannot draw on self");
 
             if i == 0 {
-                CreditLine::path_debit(next_creditor, path_debtor, asset_id, forward);
+                Connection::get(next_creditor, path_debtor, asset_id).draw(forward);
                 prev_edge_creditor = next_creditor;
                 prev_asset = asset_id;
                 path_debtor = next_creditor;

@@ -34,7 +34,7 @@ Posted by the **creditor** (`st_crd_lne` / `setCreditLine`):
 
 `limit` is not a deposited balance. Drawing uses unused headroom: `limit − exposure` (and remaining grant if depleting).
 
-Path capacity is larger than line headroom: **headroom + reverse claim** (what the next hop already owes you). A path draw against a reverse claim is booked and immediately netted, so the existing obligation shrinks.
+A path hop is a **connection**: that directed pair in one asset — the creditor’s line (if any) plus both tabs. Capacity is reverse claim + unused line headroom. A draw unwinds what they already owe you, then books any leftover as new debt on the line (1000 against a 400 reverse tab → unwind 400 + new 600). The reverse book does not need a line.
 
 ## Obligations and netting
 
@@ -78,7 +78,7 @@ You can still edit hops before execute.
 
 ## Path-forward offers
 
-Posted by the **poster** (`st_fwd_ofr` / `st_glb_fwd`): poster is an intermediate; `next_hop` is the next creditor or global. Fees are Stripe-style: `out = in × (1 − percent) − fixed`. `max_line_apr` rejects the next hop’s line if that line’s APR is higher. Specific next hop must already know the poster (a line to them, or a live tab). `allow_unknown` (default off): if off, the poster must already know the next hop the same way; if on, anyone who lined the poster can become their creditor.
+Posted by the **poster** (`st_fwd_ofr` / `st_glb_fwd`): poster is an intermediate; `next_hop` is the next creditor or global. Fees are Stripe-style: `out = in × (1 − percent) − fixed`. `max_line_apr` rejects a **new** draw if the next hop’s line APR is higher; a hop that only unwinds a reverse tab is not checked. Specific next hop must already know the poster (a line to them, or a live tab). `allow_unknown` (default off): if off, the poster must already know the next hop the same way; if on, anyone who lined the poster can become their creditor.
 
 ## Claim offers
 
