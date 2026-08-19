@@ -63,6 +63,12 @@ pub fn is_hook_provider(service: &str) -> bool {
 }
 
 pub fn is_unplugged(id: &PluginId) -> bool {
+    // Host compose plugins fold into the app composite. `host:types` stays
+    // out (`plugin-ref` / wac identity). Namespace-level `host` is still
+    // unplugged so leftover `host:types` imports remain open.
+    if is_host_compose_plugin(id) {
+        return false;
+    }
     is_unplugged_namespace(&id.service)
 }
 

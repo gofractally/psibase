@@ -81,8 +81,9 @@ pub fn inspect_wasm(name: &str, wasm: &[u8]) -> Result<PluginMeta> {
 /// given, anything outside it) and plugins with no wasm in `metas`.
 ///
 /// `keep` is composed even if it is a hook provider (invite / auth-sig as
-/// the `entry()` target). `host` / `wasi` / `supervisor` stay out even
-/// when they are `keep`.
+/// the `entry()` target). `wasi` / `supervisor` / `host:types` stay out
+/// even when they are `keep`. Host compose plugins (`client`, `db`, …)
+/// are walked like any other plugin.
 fn walk_imports(
     queue: &mut VecDeque<PluginId>,
     seen: &mut HashSet<PluginId>,
@@ -100,7 +101,8 @@ fn walk_imports(
             Some(allowed) => !allowed.contains(&id),
             None => {
                 if keep == Some(&id) {
-                    matches!(id.service.as_str(), "host" | "wasi" | "supervisor")
+                    !is_host_compose_plugin(&id)
+                        && matches!(id.service.as_str(), "host" | "wasi" | "supervisor")
                 } else {
                     is_unplugged(&id)
                 }
@@ -125,9 +127,52 @@ fn walk_imports(
     }
 }
 
-/// WIT closure of `entry`, minus host / WASI / supervisor / hook providers
-/// other than `entry` itself. A hook-provider entry (invite, auth-sig, …)
-/// is composed with its static DAG; its hook-provider deps stay out.
+/// True when `id` may take a static `wac` edge to `host:auth`.
+/// Runtime `check_caller` still applies; this is compose-time wiring.
+fn may_import_host_auth(id: &PluginId) -> bool {
+    matches!(
+        (id.service.as_str(), id.plugin.as_str()),
+        ("host", "http") | ("accounts", "plugin")
+    )
+}
+
+/// Compose-time privilege: only host compose plugins import
+/// `supervisor:bridge`; only `host:http` and `accounts:plugin` import
+/// `host:auth`. Checked on import names so a missing dep wasm cannot
+/// smuggle an unauthorized edge into a later `syncCall`.
+fn check_wiring_policy(
+    compose: &[PluginId],
+    metas: &HashMap<PluginId, PluginMeta>,
+) -> Result<()> {
+    for id in compose {
+        let Some(meta) = metas.get(id) else {
+            continue;
+        };
+        for import in &meta.imports {
+            let Some(dep) = plugin_id_from_extern(import) else {
+                continue;
+            };
+            if dep.service == "supervisor" && dep.plugin == "bridge" && !is_host_compose_plugin(id)
+            {
+                anyhow::bail!(
+                    "{id} imports supervisor:bridge; only host compose plugins may"
+                );
+            }
+            if dep.service == "host" && dep.plugin == "auth" && !may_import_host_auth(id) {
+                anyhow::bail!(
+                    "{id} imports host:auth; only host:http and accounts:plugin may"
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+/// WIT closure of `entry`, minus WASI / supervisor / `host:types` / hook
+/// providers other than `entry` itself. Host compose plugins (`client`,
+/// `db`, `auth`, `http`, `prompt`, `crypto`) are included when their wasm
+/// is in `plugins`. A hook-provider entry (invite, auth-sig, …) is
+/// composed with its static DAG; its hook-provider deps stay out.
 /// Plugins in the closure whose wasm is missing stay out of `compose_set`
 /// (their imports remain open).
 pub fn partition(entry: &PluginId, plugins: &[WasmPlugin]) -> Result<Partition> {
@@ -177,6 +222,8 @@ pub fn partition(entry: &PluginId, plugins: &[WasmPlugin]) -> Result<Partition> 
             }
         }
     }
+
+    check_wiring_policy(&compose, &metas)?;
 
     let compose_set: HashSet<_> = compose.iter().cloned().collect();
     let dynamic_set = plugins

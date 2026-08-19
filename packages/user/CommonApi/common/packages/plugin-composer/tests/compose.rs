@@ -93,7 +93,7 @@ fn has_import(imports: &[String], needle: &str) -> bool {
 }
 
 #[test]
-fn partition_permissions_excludes_host() {
+fn partition_skips_host_when_wasm_missing() {
     let query = plugin(
         "accounts",
         "client-query",
@@ -127,7 +127,100 @@ world impl {
         keys.contains(&"accounts:client-query".to_string()),
         "accounts:client-query should be composed: {keys:?}"
     );
-    assert!(!keys.iter().any(|k| k.starts_with("host:")));
+    assert!(
+        !keys.iter().any(|k| k.starts_with("host:")),
+        "host:client wasm is not in the plugin list, so it stays an open import: {keys:?}"
+    );
+}
+
+fn host_client_plugin() -> WasmPlugin {
+    plugin_with_deps(
+        "host",
+        "client",
+        r#"
+package host:client;
+interface api { get-sender: func() -> string; }
+world impl { export api; }
+"#,
+        &[],
+    )
+}
+
+#[test]
+fn partition_includes_host_client_when_present() {
+    let query = plugin(
+        "accounts",
+        "client-query",
+        r#"
+package accounts:client-query;
+interface api { get-current-user: func() -> option<string>; }
+world impl {
+    import host:client/api;
+    export api;
+}
+"#,
+    );
+    let permissions = plugin_with_deps(
+        "permissions",
+        "plugin",
+        r#"
+package permissions:plugin;
+interface api { is-authorized: func() -> bool; }
+world impl {
+    import accounts:client-query/api;
+    import host:client/api;
+    export api;
+}
+"#,
+        &[HOST_CLIENT, ACCOUNTS_CLIENT_QUERY],
+    );
+    let part = partition(
+        &permissions.id.clone(),
+        &[query, permissions, host_client_plugin()],
+    )
+    .unwrap();
+    let keys: Vec<_> = part.compose_set.iter().map(|id| id.key()).collect();
+    assert!(
+        keys.contains(&"host:client".to_string()),
+        "host:client should fold into the app compose set: {keys:?}"
+    );
+}
+
+#[test]
+fn partition_leaves_host_types_unplugged() {
+    let types = plugin_with_deps(
+        "host",
+        "types",
+        r#"
+package host:types;
+interface api { ping: func(); }
+world impl { export api; }
+"#,
+        &[],
+    );
+    let query = plugin_with_deps(
+        "accounts",
+        "client-query",
+        r#"
+package accounts:client-query;
+interface api { get-current-user: func() -> option<string>; }
+world impl {
+    import host:types/api;
+    export api;
+}
+"#,
+        &[r#"
+package host:types;
+interface api { ping: func(); }
+"#],
+    );
+    let part = partition(&query.id.clone(), &[query, types]).unwrap();
+    let keys: Vec<_> = part.compose_set.iter().map(|id| id.key()).collect();
+    assert!(keys.contains(&"accounts:client-query".to_string()));
+    assert!(
+        !keys.contains(&"host:types".to_string()),
+        "host:types stays unplugged: {keys:?}"
+    );
 }
 
 #[test]
@@ -400,6 +493,152 @@ world impl {
     );
     assert!(result.compose_set.iter().any(|id| id.service == "permissions"));
     assert!(result.compose_set.iter().any(|id| id.plugin == "client-query"));
+}
+
+#[test]
+fn compose_plugs_host_client_when_present() {
+    let query = plugin(
+        "accounts",
+        "client-query",
+        r#"
+package accounts:client-query;
+interface api { get-current-user: func() -> option<string>; }
+world impl {
+    import host:client/api;
+    export api;
+}
+"#,
+    );
+    let permissions = plugin_with_deps(
+        "permissions",
+        "plugin",
+        r#"
+package permissions:plugin;
+interface api { is-authorized: func() -> bool; }
+world impl {
+    import accounts:client-query/api;
+    import host:client/api;
+    export api;
+}
+"#,
+        &[HOST_CLIENT, ACCOUNTS_CLIENT_QUERY],
+    );
+    let result = compose(
+        &permissions.id.clone(),
+        &[query, permissions, host_client_plugin()],
+        false,
+    )
+    .unwrap();
+    let imports = remaining_imports(&result.wasm).unwrap();
+    assert!(
+        !has_import(&imports, "host:client/api"),
+        "host:client should be plugged into the app composite, got {imports:?}"
+    );
+    assert!(result.compose_set.iter().any(|id| id.key() == "host:client"));
+}
+
+const SUPERVISOR_BRIDGE: &str = r#"
+package supervisor:bridge;
+interface intf { get: func() -> string; }
+"#;
+
+const HOST_AUTH: &str = r#"
+package host:auth;
+interface api { get-active-query-token: func() -> option<string>; }
+"#;
+
+#[test]
+fn partition_refuses_app_bridge_import() {
+    let app = plugin_with_deps(
+        "branding",
+        "plugin",
+        r#"
+package branding:plugin;
+interface api { ping: func(); }
+world impl {
+    import supervisor:bridge/intf;
+    export api;
+}
+"#,
+        &[SUPERVISOR_BRIDGE],
+    );
+    let err = partition(&app.id.clone(), &[app]).unwrap_err();
+    assert!(
+        err.to_string().contains("supervisor:bridge"),
+        "expected bridge wiring refusal, got {err:#}"
+    );
+}
+
+#[test]
+fn partition_refuses_unauthorized_host_auth_import() {
+    let app = plugin_with_deps(
+        "branding",
+        "plugin",
+        r#"
+package branding:plugin;
+interface api { ping: func(); }
+world impl {
+    import host:auth/api;
+    export api;
+}
+"#,
+        &[HOST_AUTH],
+    );
+    let err = partition(&app.id.clone(), &[app]).unwrap_err();
+    assert!(
+        err.to_string().contains("host:auth"),
+        "expected host:auth wiring refusal, got {err:#}"
+    );
+}
+
+#[test]
+fn partition_allows_http_and_accounts_host_auth() {
+    let auth = plugin_with_deps(
+        "host",
+        "auth",
+        r#"
+package host:auth;
+interface api { get-active-query-token: func() -> option<string>; }
+world impl { export api; }
+"#,
+        &[],
+    );
+    let http = plugin_with_deps(
+        "host",
+        "http",
+        r#"
+package host:http;
+interface api { post: func() -> string; }
+world impl {
+    import host:auth/api;
+    export api;
+}
+"#,
+        &[HOST_AUTH],
+    );
+    let accounts = plugin_with_deps(
+        "accounts",
+        "plugin",
+        r#"
+package accounts:plugin;
+interface api { login: func(); }
+world impl {
+    import host:auth/api;
+    export api;
+}
+"#,
+        &[HOST_AUTH],
+    );
+    let http_part = partition(&http.id.clone(), &[http.clone(), auth.clone()]).unwrap();
+    assert!(http_part
+        .compose_set
+        .iter()
+        .any(|id| id.key() == "host:auth"));
+    let accounts_part = partition(&accounts.id.clone(), &[accounts, auth]).unwrap();
+    assert!(accounts_part
+        .compose_set
+        .iter()
+        .any(|id| id.key() == "host:auth"));
 }
 
 #[test]

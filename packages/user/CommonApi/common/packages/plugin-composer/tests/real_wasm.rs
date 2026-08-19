@@ -285,6 +285,16 @@ fn compose_branding_from_psi_packages() {
         set.contains(&"transact:plugin".to_string()),
         "transact driver should be pulled in for finish-tx: {set:?}"
     );
+    for host in ["host:client", "host:db", "host:auth", "host:http"] {
+        assert!(
+            set.contains(&host.to_string()),
+            "{host} should fold into the branding compose set: {set:?}"
+        );
+    }
+    assert!(
+        !set.contains(&"host:types".to_string()),
+        "host:types stays unplugged: {set:?}"
+    );
 
     let result = compose(&PluginId::new("branding", "plugin"), &plugins, true)
         .unwrap_or_else(|e| panic!("branding compose with tracers failed: {e:#}"));
@@ -325,5 +335,25 @@ fn compose_branding_from_psi_packages() {
     assert!(
         !imports.iter().any(|i| i.starts_with("accounts:chain-query/")),
         "accounts:chain-query should be plugged, got {imports:?}"
+    );
+    assert!(
+        !imports.iter().any(|i| i.starts_with("host:client/")),
+        "host:client should be plugged into the app composite, got {imports:?}"
+    );
+    assert!(
+        !imports.iter().any(|i| i.starts_with("host:db/")),
+        "host:db should be plugged into the app composite, got {imports:?}"
+    );
+    assert!(
+        !imports.iter().any(|i| i.starts_with("host:http/")),
+        "host:http should be plugged into the app composite, got {imports:?}"
+    );
+    assert!(
+        !imports.iter().any(|i| i.starts_with("host:auth/")),
+        "host:auth should be plugged (http/accounts edges), got {imports:?}"
+    );
+    assert!(
+        imports.iter().any(|i| i.starts_with("supervisor:bridge/")),
+        "bridge stays a JS import on the unified composite, got {imports:?}"
     );
 }

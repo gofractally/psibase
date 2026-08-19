@@ -430,8 +430,9 @@ export class Supervisor implements AppInterface {
     }
 
     private async composeAppPlugins(entry: QualifiedPluginId): Promise<void> {
-        // host:* is attached by composeHostPlugins. partition() skips the
-        // host namespace, so compose(host:prompt) yields an empty set.
+        // Host entries stay on the preload Host blob. App entries fold
+        // host compose plugins (client/db/auth/http/prompt/crypto) into
+        // the same instantiate; host:types stays an open import.
         if (entry.service === "host") {
             return;
         }
@@ -463,7 +464,10 @@ export class Supervisor implements AppInterface {
                 result.composeSet.map((id) => `${id.service}:${id.plugin}`),
             );
         }
-        await this.attachComposite(result, entry, false, true);
+        // Host compose plugins lift `supervisor:bridge`. The composite
+        // needs those bindings even when the entry is an app plugin.
+        const privileged = result.composeSet.some((id) => id.service === "host");
+        await this.attachComposite(result, entry, privileged, true);
     }
 
     getRootDomain(): string {
