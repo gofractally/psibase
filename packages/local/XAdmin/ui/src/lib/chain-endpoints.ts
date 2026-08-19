@@ -3,7 +3,6 @@ import { util } from "wasm-transpiled";
 import { z } from "zod";
 
 import {
-    get,
     getArrayBuffer,
     getJson,
     postArrayBufferGetJson,
@@ -101,10 +100,7 @@ class Chain {
         const query = "query { peers { edges { node { id urls endpoint } } } }";
         const res: any = await postGraphQLGetJson(url, query, {
             credentials: "include",
-            headers: {
-                "Content-Type": "application/graphql",
-                ...(await adminBearerAuthHeaders()),
-            },
+            headers: await adminBearerAuthHeaders(),
         });
         return Peers.parse(res.data.peers.edges.map((e: any) => e.node));
     }
@@ -113,10 +109,7 @@ class Chain {
         const url = siblingUrl(null, "x-peers", "/graphql");
         const query = "query { users { edges { node { name } } } }";
         const res: any = await postGraphQLGetJson(url, query, {
-            headers: {
-                "Content-Type": "application/graphql",
-                ...(await adminBearerAuthHeaders()),
-            },
+            headers: await adminBearerAuthHeaders(),
         });
         return z
             .string()
@@ -127,10 +120,7 @@ class Chain {
     public async setPeerUser(account: string, accept: boolean): Promise<void> {
         const url = siblingUrl(null, "x-peers", "/users");
         await postJson(url, { account, accept }, {
-            headers: {
-                "Content-Type": "application/json",
-                ...(await adminBearerAuthHeaders()),
-            },
+            headers: await adminBearerAuthHeaders(),
         });
     }
 
@@ -218,10 +208,7 @@ class Chain {
             { id },
             {
                 credentials: "include",
-                headers: {
-                    "Content-Type": "application/json",
-                    ...(await adminBearerAuthHeaders()),
-                },
+                headers: await adminBearerAuthHeaders(),
             },
         );
     }
@@ -268,10 +255,7 @@ class Chain {
         const url = siblingUrl(null, "x-peers", "/connect");
         const result = await postJsonGetJson(url, config, {
             credentials: "include",
-            headers: {
-                "Content-Type": "application/json",
-                ...(await adminBearerAuthHeaders()),
-            },
+            headers: await adminBearerAuthHeaders(),
         });
         result.urls = [url];
         return Peer.parse(result);
@@ -313,13 +297,11 @@ class Chain {
 
     public async getTransactStats(): Promise<TransactStatsType> {
         const url = siblingUrl(null, "transact", "/stats");
-        const res = await get(url, {
-            headers: {
-                Accept: "application/json",
-                ...(await adminBearerAuthHeaders()),
-            },
-        });
-        return TransactStats.parse(await res.json());
+        return TransactStats.parse(
+            await getJson(url, {
+                headers: await adminBearerAuthHeaders(),
+            }),
+        );
     }
 
     public async installNodeLocalPackage(file: File): Promise<{
