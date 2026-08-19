@@ -48,7 +48,7 @@ psinode - The psibase blockchain server
 
 - `--mount` *directory*[:*mountpoint*]
 
-  Allows privileged node-local services to read files from a directory. If a mountpoint is provided, it determines the path that services use to access it. Otherwise the service paths will be the same as the host paths. The mountpoint must be an absolute path. This option may be specified any number of times. This option is not available over the [HTTP API](../administration.md#server-configuration).
+  Allows privileged node-local services to read files from a directory. If a mountpoint is provided, it determines the path that services use to access it. Otherwise the service paths will be the same as the host paths. The mountpoint must be an absolute path. This option may be specified any number of times. This option is not available over the [HTTP API](../../default-apps/x-admin/http-endpoints.md#server-configuration).
 
 - `--service-threads` *num*
 
@@ -92,7 +92,7 @@ psinode - The psibase blockchain server
 
 Options can also be specified in a configuration file loaded from *database*`/config`. If an option is specified on both the command line and the config file, the command line takes precedence. When a new database is created, a default config file will be created.
 
-The configuration file also controls [logging](../configuration/logging.md).
+The configuration file also controls [logging](../administration/logging.md).
 
 Environmental variables, double quotes, and backslash escapes can be used in the value of most options. `psinode` adds some variables to its environment:
 - `PSIBASE_DATADIR`
