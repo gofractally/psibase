@@ -1,12 +1,10 @@
 import { getJson } from "@psibase/common-lib";
 import { z } from "zod";
 
-const AdminLoginReply = z
-    .object({
-        access_token: z.string(),
-        token_type: z.string(),
-    })
-    .strict();
+const AdminLoginReply = z.object({
+    access_token: z.string(),
+    token_type: z.string(),
+});
 
 let accessToken: string | undefined;
 let fetchPromise: Promise<string> | undefined;
@@ -18,6 +16,11 @@ export async function getAdminLoginAccessToken(): Promise<string> {
     if (fetchPromise === undefined) {
         fetchPromise = (async () => {
             const reply = AdminLoginReply.parse(await getJson("/admin_login"));
+            if (reply.token_type !== "bearer") {
+                throw new Error(
+                    `unsupported admin login token_type: ${reply.token_type}`,
+                );
+            }
             accessToken = reply.access_token;
             return accessToken;
         })();
