@@ -702,7 +702,7 @@ psibase_package(
         DATA ${Plugins_OUTPUT_FILE_auth_any} /plugin.wasm
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "Host(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "Host(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
