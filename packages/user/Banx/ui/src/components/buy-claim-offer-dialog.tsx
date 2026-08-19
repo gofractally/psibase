@@ -7,6 +7,10 @@ import {
     useRemoveBuyClaimOffer,
     useSetGlobalBuyClaimOffer,
     useSetBuyClaimOffer,
+    useRemoveGlobalSellClaimOffer,
+    useRemoveSellClaimOffer,
+    useSetGlobalSellClaimOffer,
+    useSetSellClaimOffer,
 } from "@/hooks/use-banx-mutations";
 import { amountPlaceholder, displayAmount } from "@/lib/amount";
 import {
@@ -35,6 +39,8 @@ export type BuyClaimPrefill = {
     /** Underlying debtor → specific offer. Omit for global. */
     debtor?: string;
     assetId?: number;
+    /** Default buy. Sell is the poster's ask. */
+    side?: "buy" | "sell";
 };
 
 type FeeFields = {
@@ -82,12 +88,22 @@ export function BuyClaimOfferDialog({
 }) {
     const debtor = prefill?.debtor?.trim() ?? "";
     const isSpecific = !!debtor;
+    const isSell = prefill?.side === "sell";
 
-    const { data: offers = [] } = useBuyClaimOffers();
-    const setGlobal = useSetGlobalBuyClaimOffer();
-    const setSpecific = useSetBuyClaimOffer();
-    const removeGlobal = useRemoveGlobalBuyClaimOffer();
-    const removeSpecific = useRemoveBuyClaimOffer();
+    const { data: allOffers = [] } = useBuyClaimOffers();
+    const offers = allOffers.filter((o) => (isSell ? o.isSell : o.isBuy));
+    const setGlobalBuy = useSetGlobalBuyClaimOffer();
+    const setSpecificBuy = useSetBuyClaimOffer();
+    const removeGlobalBuy = useRemoveGlobalBuyClaimOffer();
+    const removeSpecificBuy = useRemoveBuyClaimOffer();
+    const setGlobalSell = useSetGlobalSellClaimOffer();
+    const setSpecificSell = useSetSellClaimOffer();
+    const removeGlobalSell = useRemoveGlobalSellClaimOffer();
+    const removeSpecificSell = useRemoveSellClaimOffer();
+    const setGlobal = isSell ? setGlobalSell : setGlobalBuy;
+    const setSpecific = isSell ? setSpecificSell : setSpecificBuy;
+    const removeGlobal = isSell ? removeGlobalSell : removeGlobalBuy;
+    const removeSpecific = isSell ? removeSpecificSell : removeSpecificBuy;
 
     const precisionOf = (id: number) =>
         assets.find((a) => a.id === id)?.precision ?? 0;
@@ -304,13 +320,28 @@ export function BuyClaimOfferDialog({
             <Dialog open={open} onOpenChange={onOpenChange}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Buy-claim offer</DialogTitle>
+                        <DialogTitle>
+                            {isSell ? "Sell-claim offer" : "Buy-claim offer"}
+                        </DialogTitle>
                         <DialogDescription>
-                            Buy claims on <strong>{debtor}</strong>. Spread
-                            is signed: positive haircuts the seller, negative
-                            is a premium you pay. You need unused line
-                            residual on that debtor. They must have lined
-                            you (limit 0 is enough).
+                            {isSell ? (
+                                <>
+                                    Sell your claims on{" "}
+                                    <strong>{debtor}</strong>. Positive
+                                    spread is your profit (`1` = 1% over
+                                    face); negative is a discount. Buyers
+                                    hit this with buy-claim.
+                                </>
+                            ) : (
+                                <>
+                                    Buy claims on <strong>{debtor}</strong>.
+                                    Spread is signed: positive haircuts the
+                                    seller, negative is a premium you pay.
+                                    You need unused line residual on that
+                                    debtor. They must have lined you (limit
+                                    0 is enough).
+                                </>
+                            )}
                         </DialogDescription>
                     </DialogHeader>
                     <form
@@ -325,7 +356,11 @@ export function BuyClaimOfferDialog({
                             name="enabled"
                             children={(field) => (
                                 <field.SwitchField
-                                    label={`Buy claims on ${debtor}`}
+                                    label={
+                                        isSell
+                                            ? `Sell claims on ${debtor}`
+                                            : `Buy claims on ${debtor}`
+                                    }
                                 />
                             )}
                         />
@@ -412,12 +447,13 @@ export function BuyClaimOfferDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Buy-claim offer</DialogTitle>
+                    <DialogTitle>
+                        {isSell ? "Sell-claim offer" : "Buy-claim offer"}
+                    </DialogTitle>
                     <DialogDescription>
-                        Buy claims on anyone you have lined in this asset.
-                        Spread is signed: positive haircuts the seller,
-                        negative is a premium. The debtor must have lined
-                        you (limit 0 is enough). Not a path-forward offer.
+                        {isSell
+                            ? "Sell claims you hold in this asset. Positive spread is your profit (1 = 1% over face); negative is a discount. Buyers hit this offer."
+                            : "Buy claims on anyone you have lined in this asset. Spread is signed: positive haircuts the seller, negative is a premium. The debtor must have lined you (limit 0 is enough)."}
                     </DialogDescription>
                 </DialogHeader>
                 <form

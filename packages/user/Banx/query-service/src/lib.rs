@@ -4,8 +4,8 @@ mod service {
     use async_graphql::*;
     use banx::tables::{
         Asset, AssetTable, CreditLine, CreditLineTable, CurrencyPolicy, CurrencyPolicyTab,
-        policy_is_live, ForwardOffer, ForwardOfferTab, Obligation, ObligationTable, PairCycle,
-        PayRequest, PPM_SCALE, RATE_SCALE, RequestTab, BuyClaimOffer, BuyClaimOfferTab,
+        ForwardOffer, ForwardOfferTab, Obligation, ObligationTable, PairCycle,
+        PayRequest, PPM_SCALE, RATE_SCALE, RequestTab, ClaimOffer, ClaimOfferTab,
     };
     use psibase::services::tokens::{Decimal, Precision, Quantity};
     use psibase::*;
@@ -192,27 +192,34 @@ mod service {
     }
 
     #[derive(SimpleObject)]
-    struct BuyClaimOfferView {
+    struct ClaimOfferView {
         poster: AccountNumber,
         /// `0` / empty when global.
         debtor: AccountNumber,
         assetId: u16,
+        /// `1` buy, `2` sell.
+        side: u8,
         feeFixed: Decimal,
         feePercentPpm: i32,
         expiresAt: i64,
         isGlobal: bool,
+        isBuy: bool,
+        isSell: bool,
     }
 
-    impl From<BuyClaimOffer> for BuyClaimOfferView {
-        fn from(p: BuyClaimOffer) -> Self {
+    impl From<ClaimOffer> for ClaimOfferView {
+        fn from(p: ClaimOffer) -> Self {
             Self {
                 poster: p.poster,
                 debtor: p.debtor,
                 assetId: p.asset_id,
+                side: p.side,
                 feeFixed: dec(p.fee_fixed, p.asset_id),
                 feePercentPpm: p.fee_percent,
                 expiresAt: time_sec(p.expires_at),
                 isGlobal: p.is_global(),
+                isBuy: p.is_buy(),
+                isSell: p.is_sell(),
             }
         }
     }
@@ -427,13 +434,13 @@ mod service {
                 .collect()
         }
 
-        /// Buy-claim offers posted by `poster` (global + specific debtors).
-        async fn buyClaimOffers(&self, poster: AccountNumber) -> Vec<BuyClaimOfferView> {
-            BuyClaimOfferTab::with_service(banx::SERVICE)
+        /// Claim offers posted by `poster` (buy and sell, global + specific).
+        async fn claimOffers(&self, poster: AccountNumber) -> Vec<ClaimOfferView> {
+            ClaimOfferTab::with_service(banx::SERVICE)
                 .get_index_pk()
                 .iter()
                 .filter(|p| p.poster == poster)
-                .map(BuyClaimOfferView::from)
+                .map(ClaimOfferView::from)
                 .collect()
         }
 
@@ -573,7 +580,7 @@ mod service {
                 ForwardOfferTab::with_service(banx::SERVICE)
                     .get_index_pk()
                     .iter()
-                    .filter(|p| debtors.contains(&p.poster) && policy_is_live(p.expires_at))
+                    .filter(|p| debtors.contains(&p.poster) && p.is_live())
                     .map(ForwardOfferView::from)
                     .collect();
 
@@ -581,7 +588,7 @@ mod service {
                 CurrencyPolicyTab::with_service(banx::SERVICE)
                     .get_index_pk()
                     .iter()
-                    .filter(|p| debtors.contains(&p.poster) && policy_is_live(p.expires_at))
+                    .filter(|p| debtors.contains(&p.poster) && p.is_live())
                     .map(CurrencyPolicyView::from)
                     .collect();
 

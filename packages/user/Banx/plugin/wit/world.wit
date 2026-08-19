@@ -130,11 +130,44 @@ interface api {
     /// Remove global buy-claim offer for this asset.
     remove-global-buy-claim-offer: func(asset-id: u16) -> result<_, error>;
 
-    /// Sell claims on `debtor` to `buyer` under buyer's buy-claim offer.
+    /// Post a sell-claim offer for claims on a **specific** debtor.
+    /// Signed spread: **positive is your profit** (`10000` = 1% over
+    /// face); negative is a discount you will take.
+    set-sell-claim-offer: func(
+        debtor: string,
+        asset-id: u16,
+        fee-fixed: string,
+        fee-percent-ppm: s32,
+        expires-at-seconds: u32,
+    ) -> result<_, error>;
+
+    /// Global sell-claim offer for this asset (any debtor the poster is owed by).
+    set-global-sell-claim-offer: func(
+        asset-id: u16,
+        fee-fixed: string,
+        fee-percent-ppm: s32,
+        expires-at-seconds: u32,
+    ) -> result<_, error>;
+
+    /// Remove a specific sell-claim offer.
+    remove-sell-claim-offer: func(debtor: string, asset-id: u16) -> result<_, error>;
+
+    /// Remove global sell-claim offer for this asset.
+    remove-global-sell-claim-offer: func(asset-id: u16) -> result<_, error>;
+
+    /// Sell claims on `debtor` to `buyer` under buyer's **buy** offer.
     /// `amount` is face (human decimal); seller receives face after fees as a
     /// claim on the buyer.
     sell-claim: func(
         buyer: string,
+        debtor: string,
+        asset-id: u16,
+        amount: string,
+    ) -> result<_, error>;
+
+    /// Buy claims on `debtor` from `seller` under seller's **sell** offer.
+    buy-claim: func(
+        seller: string,
         debtor: string,
         asset-id: u16,
         amount: string,

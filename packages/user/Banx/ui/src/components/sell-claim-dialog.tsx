@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { ArrowLeftRight, Loader2 } from "lucide-react";
 
-import { useSellClaim } from "@/hooks/use-banx-mutations";
+import { useBuyClaim, useSellClaim } from "@/hooks/use-banx-mutations";
 import {
     amountPlaceholder,
     displayAmount,
@@ -14,9 +14,9 @@ import {
 import { amountFieldValidator, useAppForm } from "@/lib/form";
 import {
     type CreditLine,
-    type BuyClaimOffer,
+    type ClaimOffer,
     fetchCreditLines,
-    fetchBuyClaimOffers,
+    fetchClaimOffers,
 } from "@/lib/graphql";
 import { QueryKey } from "@/lib/query-keys";
 import { PPM_SCALE } from "@/lib/constants";
@@ -40,7 +40,7 @@ import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 import { cn } from "@shared/lib/utils";
 
-function offerLive(p: BuyClaimOffer, nowSec: number): boolean {
+function offerLive(p: ClaimOffer, nowSec: number): boolean {
     return p.expiresAt === 0 || p.expiresAt >= nowSec;
 }
 
@@ -87,15 +87,17 @@ function residualOnLine(
 
 /** Prefer specific counterparty offer over global; lower fee wins ties. */
 function pickOffer(
-    offers: BuyClaimOffer[],
+    offers: ClaimOffer[],
     debtor: string,
     assetId: number,
     nowSec: number,
-): BuyClaimOffer | null {
+    wantSell: boolean,
+): ClaimOffer | null {
     const live = offers.filter(
         (o) =>
             o.assetId === assetId &&
             offerLive(o, nowSec) &&
+            (wantSell ? o.isSell : o.isBuy) &&
             (o.isGlobal ||
                 !o.debtor ||
                 o.debtor === debtor ||
@@ -130,7 +132,7 @@ export type SellClaimTarget = {
 type BuyerOption = {
     buyer: string;
     label: string;
-    offer: BuyClaimOffer;
+    offer: ClaimOffer;
     residualRaw: bigint;
     maxFaceRaw: bigint;
 };
@@ -139,13 +141,18 @@ export function SellClaimDialog({
     open,
     onOpenChange,
     target,
+    mode = "sell",
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     target: SellClaimTarget | null;
+    /** `sell` hits a buyer's bid; `buy` hits a seller's ask. */
+    mode?: "sell" | "buy";
 }) {
     const { data: user } = useCurrentUser();
     const sellClaim = useSellClaim();
+    const buyClaim = useBuyClaim();
+    const takingAsk = mode === "buy";
     const { data: hasPermission } = useHasProfilesReadPermission({
         enabled: !!user && open,
     });
@@ -178,8 +185,8 @@ export function SellClaimDialog({
 
     const offerQueries = useQueries({
         queries: loadAccounts.map((account) => ({
-            queryKey: QueryKey.buyClaimOffers(account),
-            queryFn: () => fetchBuyClaimOffers(account),
+            queryKey: QueryKey.claimOffers(account),
+            queryFn: () => fetchClaimOffers(account),
             enabled: open && !!target && !!account,
         })),
     });
@@ -213,6 +220,7 @@ export function SellClaimDialog({
                 target.debtor,
                 target.assetId,
                 nowSec,
+                takingAsk,
             );
             if (!offer) return;
             const debtorLinedBuyer = debtorLines.some(
@@ -231,7 +239,11 @@ export function SellClaimDialog({
             );
             if (residual <= 0n) return;
             const maxFace =
-                residual < maxClaim ? residual : maxClaim;
+                maxClaim === 0n
+                    ? residual
+                    : residual < maxClaim
+                      ? residual
+                      : maxClaim;
             if (maxFace <= 0n) return;
             const contact = (contacts as LocalContact[]).find(
                 (c) => c.account === account,
@@ -255,6 +267,7 @@ export function SellClaimDialog({
         debtorLinesQuery.data,
         nowSec,
         contacts,
+        takingAsk,
     ]);
 
     const selected = options.find((o) => o.buyer === selectedBuyer) ?? null;
@@ -279,21 +292,34 @@ export function SellClaimDialog({
             if (!target || !selected) return;
             const amount = value.amount.trim();
             await new Promise<void>((resolve, reject) => {
-                sellClaim.mutate(
-                    {
-                        buyer: selected.buyer,
-                        debtor: target.debtor,
-                        assetId: target.assetId,
-                        amount,
+                const done = {
+                    onSuccess: () => {
+                        onOpenChange(false);
+                        resolve();
                     },
-                    {
-                        onSuccess: () => {
-                            onOpenChange(false);
-                            resolve();
+                    onError: (e: Error) => reject(e),
+                };
+                if (takingAsk) {
+                    buyClaim.mutate(
+                        {
+                            seller: selected.buyer,
+                            debtor: target.debtor,
+                            assetId: target.assetId,
+                            amount,
                         },
-                        onError: (e: Error) => reject(e),
-                    },
-                );
+                        done,
+                    );
+                } else {
+                    sellClaim.mutate(
+                        {
+                            buyer: selected.buyer,
+                            debtor: target.debtor,
+                            assetId: target.assetId,
+                            amount,
+                        },
+                        done,
+                    );
+                }
             });
         },
     });
@@ -316,10 +342,22 @@ export function SellClaimDialog({
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <ArrowLeftRight className="size-4" />
-                        Sell claim
+                        {takingAsk ? "Buy claim" : "Sell claim"}
                     </DialogTitle>
                     <DialogDescription>
                         {target ? (
+                            takingAsk ? (
+                            <>
+                                Buy a posted claim on{" "}
+                                <span className="text-foreground font-medium">
+                                    {target.debtor}
+                                </span>{" "}
+                                ({target.symbol}). You need line residual on
+                                them, and they must have lined you (limit 0
+                                is enough). You pay face after the seller’s
+                                spread.
+                            </>
+                            ) : (
                             <>
                                 Transfer your claim on{" "}
                                 <span className="text-foreground font-medium">
@@ -331,8 +369,11 @@ export function SellClaimDialog({
                                 claim on the buyer for face after their spread
                                 (haircut or premium).
                             </>
+                            )
                         ) : (
-                            "Select a claim to sell."
+                            takingAsk
+                                ? "Select a claim to buy."
+                                : "Select a claim to sell."
                         )}
                     </DialogDescription>
                 </DialogHeader>
@@ -535,7 +576,10 @@ export function SellClaimDialog({
                             <form.AppForm>
                                 <form.SubmitButton
                                     labels={["Sell claim", "Selling…"]}
-                                    loading={sellClaim.isPending}
+                                    loading={
+                                        sellClaim.isPending ||
+                                        buyClaim.isPending
+                                    }
                                     disabled={!selected || !user}
                                 />
                             </form.AppForm>

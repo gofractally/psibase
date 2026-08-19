@@ -28,12 +28,12 @@ define_trust! {
             - Quote multi-hop paths (read-only GraphQL + search)
         ",
         Medium => "
-            - Post or remove credit lines, forward offers, buy-claim offers, and currency policies
+            - Post or remove credit lines, forward offers, claim offers, and currency policies
             - Deposit and net obligations
             - Create or cancel invoices, please-book, and settle-auth
             - Fulfill a settle-auth on a loan you owe
             - Convert debt between assets
-            - Sell claims under a buyer's buy-claim offer
+            - Buy or sell claims under a posted claim offer
         ",
         High => "
             - Path-pay (draw on others' credit along a path)
@@ -54,6 +54,10 @@ define_trust! {
             set_allow_unknown,
             remove_buy_claim_offer,
             remove_global_buy_claim_offer,
+            set_sell_claim_offer,
+            set_global_sell_claim_offer,
+            remove_sell_claim_offer,
+            remove_global_sell_claim_offer,
             set_currency_policy,
             create_request,
             cancel_request,
@@ -62,6 +66,7 @@ define_trust! {
             net,
             convert,
             sell_claim,
+            buy_claim,
         ],
         High => [path_pay],
     }
@@ -313,6 +318,78 @@ impl Api for BanxPlugin {
         }
         .packed();
         add_action_to_transaction(banx::action_structs::sell_claim::ACTION_NAME, &packed)
+    }
+
+    fn set_sell_claim_offer(
+        debtor: String,
+        asset_id: u16,
+        fee_fixed: String,
+        fee_percent_ppm: i32,
+        expires_at_seconds: u32,
+    ) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::set_sell_claim_offer)?;
+        let fee_fixed = parse_amount(asset_id, &fee_fixed)?;
+        let packed = banx::action_structs::st_sell_clm {
+            debtor: parse_account(&debtor)?,
+            asset_id,
+            fee_fixed,
+            fee_percent: fee_percent_ppm,
+            expires_at: time_point(expires_at_seconds),
+        }
+        .packed();
+        add_action_to_transaction(banx::action_structs::st_sell_clm::ACTION_NAME, &packed)
+    }
+
+    fn set_global_sell_claim_offer(
+        asset_id: u16,
+        fee_fixed: String,
+        fee_percent_ppm: i32,
+        expires_at_seconds: u32,
+    ) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::set_global_sell_claim_offer)?;
+        let fee_fixed = parse_amount(asset_id, &fee_fixed)?;
+        let packed = banx::action_structs::st_glb_sell {
+            asset_id,
+            fee_fixed,
+            fee_percent: fee_percent_ppm,
+            expires_at: time_point(expires_at_seconds),
+        }
+        .packed();
+        add_action_to_transaction(banx::action_structs::st_glb_sell::ACTION_NAME, &packed)
+    }
+
+    fn remove_sell_claim_offer(debtor: String, asset_id: u16) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::remove_sell_claim_offer)?;
+        let packed = banx::action_structs::rm_sell_clm {
+            debtor: parse_account(&debtor)?,
+            asset_id,
+        }
+        .packed();
+        add_action_to_transaction(banx::action_structs::rm_sell_clm::ACTION_NAME, &packed)
+    }
+
+    fn remove_global_sell_claim_offer(asset_id: u16) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::remove_global_sell_claim_offer)?;
+        let packed = banx::action_structs::rm_glb_sell { asset_id }.packed();
+        add_action_to_transaction(banx::action_structs::rm_glb_sell::ACTION_NAME, &packed)
+    }
+
+    fn buy_claim(
+        seller: String,
+        debtor: String,
+        asset_id: u16,
+        amount: String,
+    ) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::buy_claim)?;
+        let amount = parse_amount_nonzero(asset_id, &amount)?;
+        let packed = banx::action_structs::buy_claim {
+            seller: parse_account(&seller)?,
+            debtor: parse_account(&debtor)?,
+            asset_id,
+            amount,
+        }
+        .packed();
+        add_action_to_transaction(banx::action_structs::buy_claim::ACTION_NAME, &packed)
     }
 
     fn set_currency_policy(

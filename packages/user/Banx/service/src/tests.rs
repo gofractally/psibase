@@ -7,6 +7,7 @@ mod tests {
         Asset, CreditLine, Obligation, PairCycle, PathHop, PayRequest, PPM_SCALE, RATE_SCALE,
     };
     use crate::Wrapper;
+    use psibase::services::token_swap::PPM;
     use psibase::services::tokens::{Precision, Quantity};
     use psibase::*;
 
@@ -372,6 +373,72 @@ mod tests {
 
         assert_eq!(exp(&chain, mike, john, aud), 0);
         assert_eq!(exp(&chain, brandon, mike, aud), 0);
+
+        Ok(())
+    }
+
+    /// Cafe cash flow:
+    /// John prepays $100 cash; the cafe books a deposit (cafe owes John).
+    /// Friends pay the cafe through John instead of cards. John posts a
+    /// 1% path-forward toward the cafe. Cafe invoices Mitchell $5; he
+    /// path-pays through John and must send more than $5 so $5 arrives.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_path_pay_cafe(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+
+        let mitchell = account!("mitchell");
+        let john = account!("john");
+        let cafe = account!("cafe");
+        for a in [mitchell, john, cafe] {
+            chain.new_account(a).unwrap();
+        }
+
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+
+        Wrapper::push_from(&chain, cafe)
+            .deposit(john, aud, 100_0000.into(), 0, 0)
+            .get()?;
+
+        Wrapper::push_from(&chain, john)
+            .st_crd_lne(mitchell, aud, 10_0000.into(), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, john)
+            .st_fwd_ofr(
+                cafe,
+                aud,
+                0.into(),
+                PPM_SCALE / 100,
+                PPM_SCALE,
+                never(),
+                false,
+            )
+            .get()?;
+
+        let id = Wrapper::push_from(&chain, cafe)
+            .st_req(
+                PayRequest::INVOICE,
+                mitchell,
+                aud,
+                5_0000.into(),
+                "coffee".into(),
+                never(),
+            )
+            .get()?;
+
+        // 1% hop fee: 50506 * 99/100 floors to 50000.
+        Wrapper::push_from(&chain, mitchell)
+            .path_pay(
+                vec![hop(john, aud), hop(cafe, aud)],
+                5_0506.into(),
+                5_0000.into(),
+                id,
+            )
+            .get()?;
+
+        assert_eq!(PayRequest::get_assert(id).remaining.value, 0);
+        assert_eq!(exp(&chain, john, cafe, aud), 95_0000);
+        assert_eq!(exp(&chain, john, mitchell, aud), 5_0506);
+        assert_eq!(exp(&chain, mitchell, cafe, aud), 0);
 
         Ok(())
     }
@@ -1425,8 +1492,16 @@ mod tests {
             "unwind leftover stays AUD"
         );
         assert_eq!(exp(&chain, gary, alice, usd), 0);
-        assert_eq!(exp(&chain, steve, gary, usd), 700, "Gary keeps USD claim on the hop");
-        assert_eq!(exp(&chain, steve, gary, gbp), 0, "Steve prices GBP; does not rebook USD");
+        assert_eq!(
+            exp(&chain, steve, gary, usd),
+            700,
+            "Gary keeps USD claim on the hop"
+        );
+        assert_eq!(
+            exp(&chain, steve, gary, gbp),
+            0,
+            "Steve prices GBP; does not rebook USD"
+        );
         assert_eq!(exp(&chain, sam, steve, gbp), 560);
         assert_eq!(exp(&chain, sam, steve, usd), 0);
         Ok(())
@@ -1568,8 +1643,16 @@ mod tests {
             )
             .get()?;
         assert_eq!(exp(&chain, gary, alice, aud), 1_000);
-        assert_eq!(exp(&chain, gary, alice, usd), 0, "Alice is not rebooked to USD");
-        assert_eq!(exp(&chain, steve, gary, usd), 700, "Gary's 0.70, not Alice's 0.50");
+        assert_eq!(
+            exp(&chain, gary, alice, usd),
+            0,
+            "Alice is not rebooked to USD"
+        );
+        assert_eq!(
+            exp(&chain, steve, gary, usd),
+            700,
+            "Gary's 0.70, not Alice's 0.50"
+        );
         Ok(())
     }
 

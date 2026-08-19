@@ -416,17 +416,18 @@ export function PoliciesPage() {
             </section>
 
             <section className="space-y-4">
-                <h2 className="font-medium">Buy-claim offers</h2>
+                <h2 className="font-medium">Claim offers</h2>
                 {buyClaimOffers.length === 0 ? (
                     <p className="text-muted-foreground text-sm">
-                        None — post from Accounts (handshake icon). Lets others
-                        sell you claims on debtors you have lined.
+                        None — post from Accounts. Buy offers let others sell
+                        you claims; sell offers let others buy claims you hold.
                     </p>
                 ) : (
                     <div className="overflow-x-auto rounded-md border">
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                    <TableHead>Side</TableHead>
                                     <TableHead>Debtor</TableHead>
                                     <TableHead>Asset</TableHead>
                                     <TableHead className="text-right">
@@ -443,8 +444,11 @@ export function PoliciesPage() {
                             <TableBody>
                                 {buyClaimOffers.map((p) => (
                                     <TableRow
-                                        key={`${p.isGlobal ? "g" : p.debtor}-${p.assetId}`}
+                                        key={`${p.side}-${p.isGlobal ? "g" : p.debtor}-${p.assetId}`}
                                     >
+                                        <TableCell>
+                                            {p.isSell ? "Sell" : "Buy"}
+                                        </TableCell>
                                         <TableCell>
                                             {p.isGlobal ? "Global" : p.debtor}
                                         </TableCell>

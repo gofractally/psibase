@@ -139,7 +139,7 @@ pub mod tables {
 
     pub const FX_RATE_SCALE: u64 = RATE_SCALE;
 
-    pub fn policy_is_live(expires_at: TimePointSec) -> bool {
+    fn expires_live(expires_at: TimePointSec) -> bool {
         if expires_at.seconds == 0 {
             return true;
         }
@@ -148,27 +148,6 @@ pub mod tables {
             .time
             .seconds();
         now.seconds <= expires_at.seconds
-    }
-
-    pub fn assert_policy_live(expires_at: TimePointSec) {
-        assert!(policy_is_live(expires_at), "policy expired");
-    }
-
-    /// Closed offer: the person who will owe must have lined the new creditor
-    /// (limit 0 is enough). Open (`allow_unknown`) skips the check.
-    pub(crate) fn assert_known_or_open(
-        allow_unknown: bool,
-        new_debtor: AccountNumber,
-        new_creditor: AccountNumber,
-        asset_id: u16,
-    ) {
-        if allow_unknown {
-            return;
-        }
-        assert!(
-            CreditLine::get(new_debtor, new_creditor, asset_id).is_some(),
-            "unknown counterparty (no credit line to them; set allow_unknown or post a 0-limit line)"
-        );
     }
 
     /// `out = (in - fee_fixed) * rate / RATE_SCALE`.
@@ -232,7 +211,7 @@ pub mod tables {
 
     /// Path-forward offer: `poster` will sit in the middle of `path_pay`.
     /// `next_hop = 0` is global (any next hop). Specific requires that hop
-    /// has lined the poster.
+    /// already knows the poster (a credit line to them, or a live tab).
     #[table(name = "ForwardOfferTab", index = 1)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct ForwardOffer {
@@ -272,6 +251,26 @@ pub mod tables {
                 .get(&(poster, next_hop, asset_id))
         }
 
+        pub fn is_live(&self) -> bool {
+            expires_live(self.expires_at)
+        }
+
+        fn assert_live(&self) {
+            assert!(self.is_live(), "forward offer expired");
+        }
+
+        /// Closed: poster already knows `next_creditor` (lined them, or a
+        /// live tab either way). Limit 0 is enough.
+        fn assert_known(&self, next_creditor: AccountNumber) {
+            if self.allow_unknown {
+                return;
+            }
+            assert!(
+                CreditLine::knows(self.poster, next_creditor, self.asset_id),
+                "unknown counterparty (no credit line or obligation; set allow_unknown or post a 0-limit line)"
+            );
+        }
+
         /// Live specific offer, else live global. Panics if neither is live.
         pub fn get_assert(
             poster: AccountNumber,
@@ -279,12 +278,12 @@ pub mod tables {
             asset_id: u16,
         ) -> Self {
             if let Some(p) = Self::get(poster, next_hop, asset_id) {
-                if policy_is_live(p.expires_at) {
+                if p.is_live() {
                     return p;
                 }
             }
             if let Some(g) = Self::get(poster, Self::GLOBAL, asset_id) {
-                if policy_is_live(g.expires_at) {
+                if g.is_live() {
                     return g;
                 }
             }
@@ -311,7 +310,10 @@ pub mod tables {
             );
             assert!(fee_percent < PPM_SCALE, "fee must be under 100%");
             if next_hop != Self::GLOBAL {
-                let _ = CreditLine::get_assert(next_hop, poster, asset_id);
+                assert!(
+                    CreditLine::knows(next_hop, poster, asset_id),
+                    "next hop does not know poster (no credit line or live obligation)"
+                );
             }
             let allow_unknown = Self::get(poster, next_hop, asset_id)
                 .map(|p| p.allow_unknown)
@@ -355,7 +357,7 @@ pub mod tables {
 
         /// Fee then debit next hop's line to poster.
         pub fn path_draw(&self, next_creditor: AccountNumber, amount_in: Quantity) -> Quantity {
-            assert_policy_live(self.expires_at);
+            self.assert_live();
             let creditor = if self.is_global() {
                 next_creditor
             } else {
@@ -365,12 +367,7 @@ pub mod tables {
                 );
                 self.next_hop
             };
-            assert_known_or_open(
-                self.allow_unknown,
-                self.poster,
-                creditor,
-                self.asset_id,
-            );
+            self.assert_known(creditor);
             if let Some(line) = CreditLine::get(creditor, self.poster, self.asset_id) {
                 assert!(
                     line.interest_rate <= self.max_line_apr,
@@ -383,79 +380,117 @@ pub mod tables {
         }
     }
 
-    /// Buy-claim offer: `poster` will buy claims via `sell_claim`.
-    /// `debtor = 0` is global (any debtor the poster has lined). Residual
-    /// is checked at `sell_claim` time, not at post.
-    #[table(name = "BuyClaimOfferTab", index = 6)]
+    /// Standing claim offer. `side` is [`Self::BUY`] (poster will buy via
+    /// `sell_claim`) or [`Self::SELL`] (poster will sell via `buy_claim`).
+    /// `debtor = 0` is global. Residual and debtor-line checks run at take
+    /// time, not at post.
+    #[table(name = "ClaimOfferTab", index = 6)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
-    pub struct BuyClaimOffer {
+    pub struct ClaimOffer {
         pub poster: AccountNumber,
         /// Underlying debtor, or [`Self::GLOBAL`].
         pub debtor: AccountNumber,
         pub asset_id: u16,
+        /// [`Self::BUY`] or [`Self::SELL`].
+        pub side: u8,
 
         pub fee_fixed: Quantity,
-        /// ppm (`10_000` = 1%). Positive haircuts the seller; negative is a
-        /// premium. Must satisfy `|fee_percent| < PPM_SCALE`.
+        /// ppm (`10_000` = 1%). Buy: positive haircuts the seller, negative
+        /// is a premium the buyer pays. Sell: positive is the seller's
+        /// profit, negative is a discount. `|fee_percent| < PPM_SCALE`.
         pub fee_percent: i32,
         /// Absolute expiry (`seconds == 0` → never).
         pub expires_at: TimePointSec,
     }
 
-    impl BuyClaimOffer {
+    impl ClaimOffer {
         pub const GLOBAL: AccountNumber = AccountNumber::new(0);
+        pub const BUY: u8 = 1;
+        pub const SELL: u8 = 2;
 
         #[primary_key]
-        fn pk(&self) -> (AccountNumber, AccountNumber, u16) {
-            (self.poster, self.debtor, self.asset_id)
+        fn pk(&self) -> (AccountNumber, AccountNumber, u16, u8) {
+            (self.poster, self.debtor, self.asset_id, self.side)
         }
 
         fn save(&self) {
-            BuyClaimOfferTab::read_write().put(self).unwrap();
+            ClaimOfferTab::read_write().put(self).unwrap();
         }
 
-        fn get(poster: AccountNumber, debtor: AccountNumber, asset_id: u16) -> Option<Self> {
-            BuyClaimOfferTab::read()
+        fn get(
+            poster: AccountNumber,
+            debtor: AccountNumber,
+            asset_id: u16,
+            side: u8,
+        ) -> Option<Self> {
+            ClaimOfferTab::read()
                 .get_index_pk()
-                .get(&(poster, debtor, asset_id))
+                .get(&(poster, debtor, asset_id, side))
         }
 
-        /// Live specific offer, else live global. Panics if neither is live.
-        pub fn get_assert(poster: AccountNumber, debtor: AccountNumber, asset_id: u16) -> Self {
-            if let Some(p) = Self::get(poster, debtor, asset_id) {
-                if policy_is_live(p.expires_at) {
+        pub fn is_live(&self) -> bool {
+            expires_live(self.expires_at)
+        }
+
+        pub fn is_buy(&self) -> bool {
+            self.side == Self::BUY
+        }
+
+        pub fn is_sell(&self) -> bool {
+            self.side == Self::SELL
+        }
+
+        /// Live specific offer, else live global, same `side`.
+        pub fn get_assert(
+            poster: AccountNumber,
+            debtor: AccountNumber,
+            asset_id: u16,
+            side: u8,
+        ) -> Self {
+            if let Some(p) = Self::get(poster, debtor, asset_id, side) {
+                if p.is_live() {
                     return p;
                 }
             }
-            if let Some(g) = Self::get(poster, Self::GLOBAL, asset_id) {
-                if policy_is_live(g.expires_at) {
+            if let Some(g) = Self::get(poster, Self::GLOBAL, asset_id, side) {
+                if g.is_live() {
                     return g;
                 }
             }
-            panic!("BuyClaimOffer not found (buyer has no buy-claim offer for this asset)");
+            panic!("ClaimOffer not found (no live specific or global offer on this side)");
         }
 
         pub fn is_global(&self) -> bool {
             self.debtor == Self::GLOBAL
         }
 
+        fn assert_side(side: u8) {
+            assert!(
+                side == Self::BUY || side == Self::SELL,
+                "claim offer side must be buy (1) or sell (2)"
+            );
+        }
+
         pub fn upsert(
             poster: AccountNumber,
             debtor: AccountNumber,
             asset_id: u16,
+            side: u8,
             fee_fixed: Quantity,
             fee_percent: i32,
             expires_at: TimePointSec,
         ) {
+            Self::assert_side(side);
             let scale = PPM_SCALE as i64;
             assert!(
                 (fee_percent as i64) > -scale && (fee_percent as i64) < scale,
-                "buy-claim spread must be between -100% and 100%"
+                "claim-offer spread must be between -100% and 100%"
             );
             Self {
                 poster,
                 debtor,
                 asset_id,
+                side,
                 fee_fixed,
                 fee_percent,
                 expires_at,
@@ -463,16 +498,78 @@ pub mod tables {
             .save();
         }
 
-        pub fn remove(poster: AccountNumber, debtor: AccountNumber, asset_id: u16) {
+        pub fn remove(
+            poster: AccountNumber,
+            debtor: AccountNumber,
+            asset_id: u16,
+            side: u8,
+        ) {
+            Self::assert_side(side);
             assert!(
-                Self::get(poster, debtor, asset_id).is_some(),
-                "buy-claim offer not found"
+                Self::get(poster, debtor, asset_id, side).is_some(),
+                "claim offer not found"
             );
-            BuyClaimOfferTab::read_write().erase(&(poster, debtor, asset_id));
+            ClaimOfferTab::read_write().erase(&(poster, debtor, asset_id, side));
         }
 
+        /// Seller proceeds. Buy posts use the raw spread (positive haircuts
+        /// the seller). Sell posts flip the sign so **positive is the
+        /// poster's profit** (`+10_000` = 1% over face).
         pub fn apply_fees(&self, amount_in: Quantity) -> Quantity {
-            apply_spread(amount_in, self.fee_fixed, self.fee_percent)
+            let spread = if self.is_sell() {
+                self.fee_percent.checked_neg().expect("sell spread negate")
+            } else {
+                self.fee_percent
+            };
+            apply_spread(amount_in, self.fee_fixed, spread)
+        }
+
+        /// Move `amount` of seller's claim on `debtor` to `buyer`; seller
+        /// receives face after this offer's spread as a claim on buyer.
+        pub fn execute(
+            &self,
+            seller: AccountNumber,
+            buyer: AccountNumber,
+            debtor: AccountNumber,
+            amount: Quantity,
+            kind: &str,
+        ) {
+            assert!(seller != buyer, "cannot transfer claim to self");
+            assert!(seller != debtor, "cannot transfer claim on self as debtor");
+            assert!(buyer != debtor, "buyer cannot be the debtor");
+            assert!(amount.value > 0, "claim transfer amount must be positive");
+
+            assert!(
+                CreditLine::get(debtor, buyer, self.asset_id).is_some(),
+                "debtor has no credit line to buyer (limit 0 is enough)"
+            );
+
+            let mut line = CreditLine::get_assert(buyer, debtor, self.asset_id);
+            Obligation::accrue_pair(buyer, debtor, self.asset_id);
+            let buyer_exp = Obligation::exposure(buyer, debtor, self.asset_id).value;
+            assert!(
+                buyer_exp.saturating_add(amount.value) <= line.limit.value,
+                "buyer credit line residual insufficient for claim"
+            );
+            line.consume_grant(amount);
+
+            let proceeds = self.apply_fees(amount);
+            Obligation::transfer_claims(seller, buyer, debtor, self.asset_id, amount.value);
+            Obligation::credit_pair(seller, buyer, self.asset_id, proceeds, 0);
+            Obligation::net_pair(seller, buyer, self.asset_id, u64::MAX.into());
+            Obligation::net_pair(buyer, debtor, self.asset_id, u64::MAX.into());
+
+            emit_pair_activity(
+                seller,
+                buyer,
+                self.asset_id,
+                kind,
+                amount,
+                proceeds,
+                self.asset_id,
+                0,
+                "",
+            );
         }
     }
 
@@ -525,9 +622,13 @@ pub mod tables {
             Self::get(id).unwrap_or_else(|| panic!("request {id} not found"))
         }
 
+        pub fn is_live(&self) -> bool {
+            expires_live(self.expires_at)
+        }
+
         fn assert_live(&self) {
             assert!(self.remaining.value > 0, "request already fulfilled");
-            assert_policy_live(self.expires_at);
+            assert!(self.is_live(), "request expired");
         }
 
         pub fn create(
@@ -743,9 +844,17 @@ pub mod tables {
             Self::get(poster, from_asset, to_asset).expect("CurrencyPolicy not found")
         }
 
+        pub fn is_live(&self) -> bool {
+            expires_live(self.expires_at)
+        }
+
+        fn assert_live(&self) {
+            assert!(self.is_live(), "currency policy expired");
+        }
+
         /// `to = (from - fee_fixed) * fx_rate / RATE_SCALE`. Does not touch books.
         pub fn apply(&self, amount_from: Quantity) -> Quantity {
-            assert_policy_live(self.expires_at);
+            self.assert_live();
             apply_rate(amount_from, self.fee_fixed, self.fx_rate)
         }
 
@@ -790,7 +899,7 @@ pub mod tables {
             amount_from: Quantity,
             min_to: Quantity,
         ) -> Quantity {
-            assert_policy_live(self.expires_at);
+            self.assert_live();
             assert!(amount_from.value > 0, "convert amount must be positive");
             assert!(creditor == self.poster, "FX policy poster must be the creditor");
             assert!(creditor != debtor, "creditor must differ from debtor");
@@ -1463,6 +1572,15 @@ pub mod tables {
             })
         }
 
+        /// `who` has lined `them`, or they already have a live tab either way.
+        pub fn knows(who: AccountNumber, them: AccountNumber, asset_id: u16) -> bool {
+            if Self::get(who, them, asset_id).is_some() {
+                return true;
+            }
+            Obligation::exposure(who, them, asset_id).value > 0
+                || Obligation::exposure(them, who, asset_id).value > 0
+        }
+
         pub fn upsert_credit_line(
             creditor: AccountNumber,
             debtor: AccountNumber,
@@ -1617,7 +1735,7 @@ pub mod tables {
 #[psibase::service(name = "banx", tables = "tables")]
 pub mod service {
     use crate::tables::{
-        emit_pair_activity, Asset, BuyClaimOffer, CreditLine,
+        emit_pair_activity, Asset, ClaimOffer, CreditLine,
         CurrencyPolicy, ForwardOffer, InitRow, InitTable, Obligation, PathHop, PayRequest,
     };
     use psibase::{
@@ -1827,9 +1945,8 @@ pub mod service {
         ForwardOffer::set_allow_unknown(get_sender(), next_hop, asset_id, allow_unknown);
     }
 
-    /// Post/update a **specific** buy-claim offer (`debtor` ≠ 0).
-    ///
-    /// Poster will buy claims on that debtor via `sell_claim`.
+    /// Post/update a **specific** buy offer (`debtor` ≠ 0). Takers call
+    /// `sell_claim`.
     #[action]
     fn st_buy_clm(
         debtor: AccountNumber,
@@ -1839,94 +1956,128 @@ pub mod service {
         expires_at: TimePointSec,
     ) {
         assert!(
-            debtor != BuyClaimOffer::GLOBAL,
-            "use st_glb_buy for global buy-claim offer (debtor 0)"
+            debtor != ClaimOffer::GLOBAL,
+            "use st_glb_buy for global buy offer (debtor 0)"
         );
-        BuyClaimOffer::upsert(
+        ClaimOffer::upsert(
             get_sender(),
             debtor,
             asset_id,
+            ClaimOffer::BUY,
             fee_fixed,
             fee_percent,
             expires_at,
         );
     }
 
-    /// Post/update a **global** buy-claim offer (`debtor = 0`).
+    /// Post/update a **global** buy offer (`debtor = 0`).
     #[action]
     fn st_glb_buy(asset_id: u16, fee_fixed: Quantity, fee_percent: i32, expires_at: TimePointSec) {
-        BuyClaimOffer::upsert(
+        ClaimOffer::upsert(
             get_sender(),
-            BuyClaimOffer::GLOBAL,
+            ClaimOffer::GLOBAL,
             asset_id,
+            ClaimOffer::BUY,
             fee_fixed,
             fee_percent,
             expires_at,
         );
     }
 
-    /// Remove a **specific** buy-claim offer.
+    /// Remove a **specific** buy offer.
     #[action]
     fn rm_buy_clm(debtor: AccountNumber, asset_id: u16) {
         assert!(
-            debtor != BuyClaimOffer::GLOBAL,
-            "use rm_glb_buy for global buy-claim offer"
+            debtor != ClaimOffer::GLOBAL,
+            "use rm_glb_buy for global buy offer"
         );
-        BuyClaimOffer::remove(get_sender(), debtor, asset_id);
+        ClaimOffer::remove(get_sender(), debtor, asset_id, ClaimOffer::BUY);
     }
 
-    /// Remove a **global** buy-claim offer.
+    /// Remove a **global** buy offer.
     #[action]
     fn rm_glb_buy(asset_id: u16) {
-        BuyClaimOffer::remove(get_sender(), BuyClaimOffer::GLOBAL, asset_id);
+        ClaimOffer::remove(get_sender(), ClaimOffer::GLOBAL, asset_id, ClaimOffer::BUY);
     }
 
-    /// Seller (sender) sells claims on `debtor` to `buyer` under buyer's buy-claim
-    /// offer. Buyer becomes creditor of `debtor` for `amount`; seller receives
-    /// a claim on buyer for face after the offer spread (haircut or premium).
-    /// Requires buyer's line residual to `debtor`, the debtor's line to the
-    /// buyer (limit may be 0), and a live buy-claim offer.
+    /// Post/update a **specific** sell offer (`debtor` ≠ 0). Takers call
+    /// `buy_claim`.
+    #[action]
+    fn st_sell_clm(
+        debtor: AccountNumber,
+        asset_id: u16,
+        fee_fixed: Quantity,
+        fee_percent: i32,
+        expires_at: TimePointSec,
+    ) {
+        assert!(
+            debtor != ClaimOffer::GLOBAL,
+            "use st_glb_sell for global sell offer (debtor 0)"
+        );
+        ClaimOffer::upsert(
+            get_sender(),
+            debtor,
+            asset_id,
+            ClaimOffer::SELL,
+            fee_fixed,
+            fee_percent,
+            expires_at,
+        );
+    }
+
+    /// Post/update a **global** sell offer (`debtor = 0`).
+    #[action]
+    fn st_glb_sell(asset_id: u16, fee_fixed: Quantity, fee_percent: i32, expires_at: TimePointSec) {
+        ClaimOffer::upsert(
+            get_sender(),
+            ClaimOffer::GLOBAL,
+            asset_id,
+            ClaimOffer::SELL,
+            fee_fixed,
+            fee_percent,
+            expires_at,
+        );
+    }
+
+    /// Remove a **specific** sell offer.
+    #[action]
+    fn rm_sell_clm(debtor: AccountNumber, asset_id: u16) {
+        assert!(
+            debtor != ClaimOffer::GLOBAL,
+            "use rm_glb_sell for global sell offer"
+        );
+        ClaimOffer::remove(get_sender(), debtor, asset_id, ClaimOffer::SELL);
+    }
+
+    /// Remove a **global** sell offer.
+    #[action]
+    fn rm_glb_sell(asset_id: u16) {
+        ClaimOffer::remove(
+            get_sender(),
+            ClaimOffer::GLOBAL,
+            asset_id,
+            ClaimOffer::SELL,
+        );
+    }
+
+    /// Seller (sender) sells claims on `debtor` to `buyer` under the buyer's
+    /// **buy** offer. Buyer becomes creditor of `debtor`; seller receives face
+    /// after the offer spread. Requires buyer's line residual and the
+    /// debtor's line to the buyer (limit may be 0).
     #[action]
     fn sell_claim(buyer: AccountNumber, debtor: AccountNumber, asset_id: u16, amount: Quantity) {
         let seller = get_sender();
-        assert!(seller != buyer, "cannot sell claim to self");
-        assert!(seller != debtor, "cannot sell claim on self as debtor");
-        assert!(buyer != debtor, "buyer cannot be the debtor");
-        assert!(amount.value > 0, "sell_claim amount must be positive");
+        let offer = ClaimOffer::get_assert(buyer, debtor, asset_id, ClaimOffer::BUY);
+        offer.execute(seller, buyer, debtor, amount, "sell_claim");
+    }
 
-        let offer = BuyClaimOffer::get_assert(buyer, debtor, asset_id);
-        assert!(
-            CreditLine::get(debtor, buyer, asset_id).is_some(),
-            "debtor has no credit line to buyer (limit 0 is enough)"
-        );
-
-        let mut line = CreditLine::get_assert(buyer, debtor, asset_id);
-        Obligation::accrue_pair(buyer, debtor, asset_id);
-        let buyer_exp = Obligation::exposure(buyer, debtor, asset_id).value;
-        assert!(
-            buyer_exp.saturating_add(amount.value) <= line.limit.value,
-            "buyer credit line residual insufficient for claim buy-claim"
-        );
-        line.consume_grant(amount);
-
-        let proceeds = offer.apply_fees(amount);
-        Obligation::transfer_claims(seller, buyer, debtor, asset_id, amount.value);
-        // Proceeds: buyer owes seller (0% obligation).
-        Obligation::credit_pair(seller, buyer, asset_id, proceeds, 0);
-        Obligation::net_pair(seller, buyer, asset_id, u64::MAX.into());
-        Obligation::net_pair(buyer, debtor, asset_id, u64::MAX.into());
-
-        emit_pair_activity(
-            seller,
-            buyer,
-            asset_id,
-            "sell_claim",
-            amount,
-            proceeds,
-            asset_id,
-            0,
-            "",
-        );
+    /// Buyer (sender) buys claims on `debtor` from `seller` under the seller's
+    /// **sell** offer. Same books as `sell_claim`; the maker's ask applies.
+    #[action]
+    fn buy_claim(seller: AccountNumber, debtor: AccountNumber, asset_id: u16, amount: Quantity) {
+        let buyer = get_sender();
+        let offer = ClaimOffer::get_assert(seller, debtor, asset_id, ClaimOffer::SELL);
+        offer.execute(seller, buyer, debtor, amount, "buy_claim");
     }
 
     /// Poster (middle man / claim holder) posts an FX quote: claims they hold

@@ -11,6 +11,8 @@ import {
     BadgeCheck,
     Handshake,
     Inbox,
+    ShoppingCart,
+    Store,
     Plus,
     Route,
 } from "lucide-react";
@@ -266,6 +268,7 @@ export function ObligationsPage() {
         useState<RoutingPolicyPrefill | null>(null);
     const [sellOpen, setSellOpen] = useState(false);
     const [sellTarget, setSellTarget] = useState<SellClaimTarget | null>(null);
+    const [sellTradeMode, setSellTradeMode] = useState<"sell" | "buy">("sell");
     const [buyClaimOpen, setBuyClaimOpen] = useState(false);
     const [buyClaimPrefill, setBuyClaimPrefill] =
         useState<BuyClaimPrefill | null>(null);
@@ -543,9 +546,17 @@ export function ObligationsPage() {
                                               )
                                         : undefined
                                 }
+                                onPostSellOffer={() =>
+                                    openBuyClaim({
+                                        debtor: g.counterparty,
+                                        assetId: g.assetId,
+                                        side: "sell",
+                                    })
+                                }
                                 onSellClaim={
                                     g.total > 0n
                                         ? () => {
+                                              setSellTradeMode("sell");
                                               setSellTarget({
                                                   debtor: g.counterparty,
                                                   assetId: g.assetId,
@@ -559,6 +570,17 @@ export function ObligationsPage() {
                                           }
                                         : undefined
                                 }
+                                onBuyPostedClaim={() => {
+                                    setSellTradeMode("buy");
+                                    setSellTarget({
+                                        debtor: g.counterparty,
+                                        assetId: g.assetId,
+                                        maxRaw: "0",
+                                        symbol: symbolOf(g.assetId),
+                                        precision: precisionOf(g.assetId),
+                                    });
+                                    setSellOpen(true);
+                                }}
                             />
                         ))}
                     </div>
@@ -572,6 +594,7 @@ export function ObligationsPage() {
                     if (!open) setSellTarget(null);
                 }}
                 target={sellTarget}
+                mode={sellTradeMode}
             />
 
             <Separator />
@@ -1108,9 +1131,11 @@ function AccountGroupRow({
     onEditCreditLine,
     onSetRouting,
     onSetBuyClaim,
+    onPostSellOffer,
     onAskRequest,
     onAskSettle,
     onSellClaim,
+    onBuyPostedClaim,
 }: {
     tone: "savings" | "loan";
     title: string;
@@ -1129,6 +1154,8 @@ function AccountGroupRow({
     onSetRouting?: () => void;
     /** Buy-claim offer to buy claims on this counterparty. */
     onSetBuyClaim?: () => void;
+    onPostSellOffer?: () => void;
+    onBuyPostedClaim?: () => void;
     /** Open a request (invoice from savings, please-book from a loan). */
     onAskRequest?: () => void;
     /** Authorize the debtor to settle this tab (settle-auth). */
@@ -1193,6 +1220,10 @@ function AccountGroupRow({
         "Settle auth — let them pay down this tab without you booking it";
     const sellTip =
         "Sell claim — transfer this debt to a buyer under their buy-claim offer";
+    const postSellTip =
+        "Sell-claim offer — post an ask so others can buy this claim";
+    const buyPostedTip =
+        "Buy posted claim — hit someone's sell-claim ask on this party";
 
     return (
         <Collapsible open={open} onOpenChange={setOpen}>
@@ -1408,6 +1439,28 @@ function AccountGroupRow({
                                 </TooltipContent>
                             </Tooltip>
                         ) : null}
+                        {onPostSellOffer ? (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        type="button"
+                                        size="icon"
+                                        variant="outline"
+                                        className="size-8 shrink-0"
+                                        aria-label={postSellTip}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onPostSellOffer();
+                                        }}
+                                    >
+                                        <Store className="size-3.5" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">
+                                    {postSellTip}
+                                </TooltipContent>
+                            </Tooltip>
+                        ) : null}
                         {onSellClaim ? (
                             <Tooltip>
                                 <TooltipTrigger asChild>
@@ -1427,6 +1480,28 @@ function AccountGroupRow({
                                 </TooltipTrigger>
                                 <TooltipContent side="top">
                                     {sellTip}
+                                </TooltipContent>
+                            </Tooltip>
+                        ) : null}
+                        {onBuyPostedClaim ? (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        type="button"
+                                        size="icon"
+                                        variant="outline"
+                                        className="size-8 shrink-0"
+                                        aria-label={buyPostedTip}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onBuyPostedClaim();
+                                        }}
+                                    >
+                                        <ShoppingCart className="size-3.5" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">
+                                    {buyPostedTip}
                                 </TooltipContent>
                             </Tooltip>
                         ) : null}

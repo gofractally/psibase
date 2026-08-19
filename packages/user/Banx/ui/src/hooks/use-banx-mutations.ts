@@ -19,7 +19,7 @@ function useInvalidateBanx() {
                 queryKey: QueryKey.forwardOffers(user),
             });
             void qc.invalidateQueries({
-                queryKey: QueryKey.buyClaimOffers(user),
+                queryKey: QueryKey.claimOffers(user),
             });
             void qc.invalidateQueries({
                 queryKey: QueryKey.currencyPolicies(user),
@@ -476,6 +476,80 @@ export function useRemoveGlobalBuyClaimOffer() {
     });
 }
 
+export function useSetSellClaimOffer() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            debtor: string;
+            assetId: number;
+            feeFixed: string;
+            feePercentPpm: number;
+            expiresAtSeconds: number;
+        }) =>
+            banxCall("setSellClaimOffer", [
+                p.debtor,
+                p.assetId,
+                p.feeFixed,
+                p.feePercentPpm,
+                p.expiresAtSeconds,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Sell-claim offer saved");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useSetGlobalSellClaimOffer() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            assetId: number;
+            feeFixed: string;
+            feePercentPpm: number;
+            expiresAtSeconds: number;
+        }) =>
+            banxCall("setGlobalSellClaimOffer", [
+                p.assetId,
+                p.feeFixed,
+                p.feePercentPpm,
+                p.expiresAtSeconds,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Global sell-claim offer saved");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useRemoveSellClaimOffer() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: { debtor: string; assetId: number }) =>
+            banxCall("removeSellClaimOffer", [p.debtor, p.assetId]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Sell-claim offer removed");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useRemoveGlobalSellClaimOffer() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: { assetId: number }) =>
+            banxCall("removeGlobalSellClaimOffer", [p.assetId]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Global sell-claim offer removed");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
 export function useSellClaim() {
     const invalidate = useInvalidateBanx();
     return useMutation({
@@ -488,6 +562,23 @@ export function useSellClaim() {
         onSuccess: () => {
             invalidate();
             toast.success("Claim sold");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useBuyClaim() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            seller: string;
+            debtor: string;
+            assetId: number;
+            amount: string;
+        }) => banxCall("buyClaim", [p.seller, p.debtor, p.assetId, p.amount]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Claim bought");
         },
         onError: (e: Error) => toast.error(e.message),
     });

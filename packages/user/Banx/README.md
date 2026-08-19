@@ -9,7 +9,7 @@ A payment does not move coins. It **creates or shrinks obligations** along a pat
 - **Credit line** — B is willing to be owed by A, up to a limit, at an APR. A can *draw* on B: A becomes debtor, B creditor.
 - **Obligation** — the actual debt. One pair/asset can have several rows (different rates). **Exposure** is principal + live interest.
 - **Path-forward offer** — B’s standing terms for *sitting in the middle* of a `path_pay`. Specific next hop, or **global** (any next hop).
-- **Buy-claim offer** — B’s standing terms for *buying* someone else’s claim via `sell_claim`. Specific debtor, or **global** (any lined debtor).
+- **Claim offer** — standing **buy** (`sell_claim` hits it) or **sell** (`buy_claim` hits it) terms for transferring a claim on a debtor. Specific debtor, or **global**.
 - **Currency policy** — the middle man’s quote to rebook claims they hold from one asset to another (FX + optional fixed fee).
 
 Alice paying Carol $1 via Bob:
@@ -78,17 +78,22 @@ You can still edit hops before execute.
 
 ## Path-forward offers
 
-Posted by the **poster** (`st_fwd_ofr` / `st_glb_fwd`): poster is an intermediate; `next_hop` is the next creditor or global. Fees are Stripe-style: `out = in × (1 − percent) − fixed`. `max_line_apr` rejects the next hop’s line if that line’s APR is higher. `allow_unknown` (default off): if off, the poster must have a credit line to the next hop (limit 0 is enough); if on, anyone who lined the poster can become their creditor.
+Posted by the **poster** (`st_fwd_ofr` / `st_glb_fwd`): poster is an intermediate; `next_hop` is the next creditor or global. Fees are Stripe-style: `out = in × (1 − percent) − fixed`. `max_line_apr` rejects the next hop’s line if that line’s APR is higher. Specific next hop must already know the poster (a line to them, or a live tab). `allow_unknown` (default off): if off, the poster must already know the next hop the same way; if on, anyone who lined the poster can become their creditor.
 
-## Buy-claim offers
+## Claim offers
 
-Posted by the **poster** (`st_buy_clm` / `st_glb_buy`): anyone can `sell_claim` to the poster while a live row exists. Seller’s claim on a debtor moves to the poster; seller receives face after the offer **spread** as a claim on the poster. Spread ppm is signed: positive haircuts the seller, negative is a premium (`-50_000` = 5% over face). Poster must have line residual on that debtor. Independent of path-forward offers.
+One table, `side` in the primary key (`1` buy, `2` sell). Spread ppm is signed (`10_000` = 1%). **Buy:** positive haircuts the seller, negative is a premium the buyer pays. **Sell:** positive is the seller’s profit (`+10_000` = 1% over face), negative is a discount. Residual and the debtor’s line to the buyer (limit 0 is enough) are checked at take time.
 
-## Selling a claim
+- **Buy** (`st_buy_clm` / `st_glb_buy`): poster’s bid. Taker calls `sell_claim`.
+- **Sell** (`st_sell_clm` / `st_glb_sell`): poster’s ask. Taker calls `buy_claim`.
 
-`sell_claim(buyer, debtor, asset, amount)`: you hold a claim on `debtor`. The buyer has a buy-claim offer and a line to that debtor. The **debtor must also have a credit line to the buyer** (limit may be 0) so they have accepted that person as a counterparty. Face moves to the buyer; you hold a claim on the buyer for proceeds (face after spread).
+## Transferring a claim
 
-This is not a path payment and does **not** count as “paid in full” for grace.
+`sell_claim(buyer, debtor, asset, amount)`: you hold a claim on `debtor` and hit the buyer’s **buy** offer.
+
+`buy_claim(seller, debtor, asset, amount)`: you buy the seller’s claim on `debtor` under their **sell** offer.
+
+Same books either way: face moves to the buyer; seller holds a claim on the buyer for face after the **maker’s** spread. Not a path payment and not “paid in full” for grace.
 
 ## Interest
 
@@ -132,7 +137,7 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 | Layer | Role |
 |-------|------|
 | **service** | Tables and actions |
-| **r-banx** | GraphQL (assets, lines, obligations, forward/buy-claim, FX, scoped `pathGraph`) |
+| **r-banx** | GraphQL (assets, lines, obligations, forward/claim offers, FX, scoped `pathGraph`) |
 | **plugin** | WIT `api` for the Supervisor (`setCreditLine`, `pathPay`, `quotePath`, …) |
 | **ui** | React app on the `banx` subdomain |
 
@@ -145,10 +150,13 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 | `st_fwd_ofr` / `st_glb_fwd` | Specific / global path-forward offer |
 | `st_fwd_unk` | Set `allow_unknown` on a path-forward offer (`next_hop` 0 = global) |
 | `rm_fwd_ofr` / `rm_glb_fwd` | Remove path-forward offer |
-| `st_buy_clm` / `st_glb_buy` | Specific / global buy-claim offer |
-| `rm_buy_clm` / `rm_glb_buy` | Remove buy-claim offer |
+| `st_buy_clm` / `st_glb_buy` | Specific / global buy claim offer |
+| `rm_buy_clm` / `rm_glb_buy` | Remove buy claim offer |
+| `st_sell_clm` / `st_glb_sell` | Specific / global sell claim offer |
+| `rm_sell_clm` / `rm_glb_sell` | Remove sell claim offer |
 | `path_pay` | Multi-hop draw (`request_id` 0 or invoice) |
-| `sell_claim` | Sell a claim to a buyer’s offer |
+| `sell_claim` | Sell a claim into a buyer’s offer |
+| `buy_claim` | Buy a claim from a seller’s offer |
 | `deposit` | Book a deposit and auto-net (`request_id` 0 or please-book) |
 | `st_req` / `rm_req` | Create / cancel invoice, please-book, or settle-auth |
 | `fl_stl` | Debtor fulfills a settle-auth |

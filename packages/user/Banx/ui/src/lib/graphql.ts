@@ -50,14 +50,20 @@ const zForwardOffer = z.object({
     allowUnknown: z.boolean(),
 });
 
-const zBuyClaimOffer = z.object({
+export const CLAIM_SIDE_BUY = 1;
+export const CLAIM_SIDE_SELL = 2;
+
+const zClaimOffer = z.object({
     poster: z.string(),
     debtor: z.string(),
     assetId: z.number(),
+    side: z.number(),
     feeFixed: z.string(),
     feePercentPpm: z.number(),
     expiresAt: z.number(),
     isGlobal: z.boolean(),
+    isBuy: z.boolean(),
+    isSell: z.boolean(),
 });
 
 const zCurrencyPolicy = z.object({
@@ -106,7 +112,9 @@ export type Asset = z.infer<typeof zAsset>;
 export type CreditLine = z.infer<typeof zCreditLine>;
 export type Obligation = z.infer<typeof zObligation>;
 export type ForwardOffer = z.infer<typeof zForwardOffer>;
-export type BuyClaimOffer = z.infer<typeof zBuyClaimOffer>;
+export type ClaimOffer = z.infer<typeof zClaimOffer>;
+/** @deprecated use ClaimOffer */
+export type BuyClaimOffer = ClaimOffer;
 export type CurrencyPolicy = z.infer<typeof zCurrencyPolicy>;
 export type PayRequest = z.infer<typeof zPayRequest>;
 export type ActivityEvent = z.infer<typeof zActivity>;
@@ -154,15 +162,23 @@ export async function fetchForwardOffers(
     return zForwardOffer.array().parse(data.forwardOffers);
 }
 
-export async function fetchBuyClaimOffers(
+export async function fetchClaimOffers(
     account: string,
-): Promise<BuyClaimOffer[]> {
-    const data = await gql<{ buyClaimOffers: BuyClaimOffer[] }>(
-        `{ buyClaimOffers(poster: "${account}") {
-            poster debtor assetId feeFixed feePercentPpm expiresAt isGlobal
+): Promise<ClaimOffer[]> {
+    const data = await gql<{ claimOffers: ClaimOffer[] }>(
+        `{ claimOffers(poster: "${account}") {
+            poster debtor assetId side feeFixed feePercentPpm expiresAt
+            isGlobal isBuy isSell
         } }`,
     );
-    return zBuyClaimOffer.array().parse(data.buyClaimOffers);
+    return zClaimOffer.array().parse(data.claimOffers);
+}
+
+export async function fetchBuyClaimOffers(
+    account: string,
+): Promise<ClaimOffer[]> {
+    const all = await fetchClaimOffers(account);
+    return all.filter((o) => o.isBuy);
 }
 
 export async function fetchRequests(account: string): Promise<PayRequest[]> {
