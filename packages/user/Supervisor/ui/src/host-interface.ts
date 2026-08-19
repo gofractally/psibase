@@ -32,6 +32,8 @@ export interface CallstackImports {
     "supervisor:callstack/callstack": {
         push: (service: string) => void;
         pop: () => void;
+        serviceStack: () => string[];
+        reset: () => void;
     };
 }
 

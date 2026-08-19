@@ -65,6 +65,8 @@ export class PluginHost implements HostInterface {
             "supervisor:callstack/callstack": {
                 push: (service: string) => this.supervisor.pushTracerFrame(service),
                 pop: () => this.supervisor.popTracerFrame(),
+                serviceStack: () => this.supervisor.getServiceStack(),
+                reset: () => this.supervisor.resetTracerStack(),
             },
         };
     }

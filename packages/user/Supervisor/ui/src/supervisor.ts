@@ -50,6 +50,7 @@ const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("accounts", "client-query"),
     pluginId("host", "auth"),
     pluginId("host", "prompt"),
+    pluginId("host", "callstack"),
     pluginId("transact", "plugin"),
     pluginId("transact", "actions"),
     pluginId("transact", "login"),
@@ -107,6 +108,7 @@ export class Supervisor implements AppInterface {
                 this.embedder,
                 this.parentOrigination.app,
             );
+            this.seedWasmStack();
         }
         return this.context;
     }
@@ -230,11 +232,13 @@ export class Supervisor implements AppInterface {
     private supervisorCall(callArgs: QualifiedFunctionCallArgs): any {
         const context = this.getCallContext();
         context.stack.push("supervisor", "callFunction");
+        this.wasmStack("push", ["supervisor"]);
 
         let ret: any;
         try {
             ret = this.call(callArgs);
         } finally {
+            this.wasmStack("pop");
             context.stack.pop();
         }
 
@@ -244,10 +248,12 @@ export class Supervisor implements AppInterface {
     private supervisorResourceCall(callArgs: QualifiedResourceCallArgs): any {
         const context = this.getCallContext();
         context.stack.push("supervisor", "callResource");
+        this.wasmStack("push", ["supervisor"]);
         let ret: any;
         try {
             ret = this.callResource(callArgs);
         } finally {
+            this.wasmStack("pop");
             context.stack.pop();
         }
 
@@ -398,17 +404,24 @@ export class Supervisor implements AppInterface {
         const p = await parser();
         const api = p.parse("host-composite", wasm);
         const inBlob = new Set<string>();
-        for (const intf of api.exportedFuncs?.interfaces ?? []) {
-            if (intf.namespace === "host") inBlob.add(intf.package);
-        }
-        return {
-            wasm,
-            composeSet: [...inBlob].map((plugin) => ({
-                service: "host",
-                plugin,
-            })),
-            containsTransact: false,
-        };
+            for (const intf of api.exportedFuncs?.interfaces ?? []) {
+                if (intf.namespace === "host") inBlob.add(intf.package);
+                // WIT package is supervisor:callstack; chain id is host:callstack.
+                if (
+                    intf.namespace === "supervisor" &&
+                    intf.package === "callstack"
+                ) {
+                    inBlob.add("callstack");
+                }
+            }
+            return {
+                wasm,
+                composeSet: [...inBlob].map((plugin) => ({
+                    service: "host",
+                    plugin,
+                })),
+                containsTransact: false,
+            };
     }
 
     private async composeHostPlugins(): Promise<void> {
@@ -484,9 +497,40 @@ export class Supervisor implements AppInterface {
         ctx.stack.pop();
     }
 
+    resetTracerStack(): void {
+        this.context?.stack.reset();
+    }
+
     getServiceStack(): string[] {
         assertTruthy(this.context, "Uninitialized call context");
         return this.context.stack.export();
+    }
+
+    // JS-only frames (UI seed, supervisorCall, untraced syncCall) must
+    // appear on the in-WASM leaf so host:client#get-sender stays correct
+    // after callstack is plugged. Tracer frames write the leaf themselves.
+    private callstackPlugin() {
+        return this.plugins
+            .allPlugins()
+            .find((p) => p.id.service === "host" && p.id.plugin === "callstack");
+    }
+
+    private wasmStack(method: string, params: unknown[] = []): void {
+        const p = this.callstackPlugin();
+        if (!p) return;
+        try {
+            p.call("callstack", method, params);
+        } catch {
+            // Not instantiated yet, or leftover JS-only path.
+        }
+    }
+
+    private seedWasmStack(): void {
+        if (!this.context) return;
+        this.wasmStack("reset");
+        for (const service of this.context.stack.export()) {
+            this.wasmStack("push", [service]);
+        }
     }
 
     importKey(privateKey: string): string {
@@ -533,6 +577,7 @@ export class Supervisor implements AppInterface {
         const skipJsPush = p.stackManagedByTracer;
         if (!skipJsPush) {
             this.context.stack.push(args.service, toString(args));
+            this.wasmStack("push", [args.service]);
         }
         const stackBefore = this.context.stack.export();
         let ret: any;
@@ -551,6 +596,7 @@ export class Supervisor implements AppInterface {
             throw new Error(`${label} failed: ${msg}`, { cause: e });
         } finally {
             if (!skipJsPush) {
+                this.wasmStack("pop");
                 this.context.stack.pop();
             }
         }
@@ -606,6 +652,7 @@ export class Supervisor implements AppInterface {
         const skipJsPush = p.stackManagedByTracer;
         if (!skipJsPush) {
             this.context.stack.push(service, toString(args));
+            this.wasmStack("push", [service]);
         }
         const stackBefore = this.context.stack.export();
         let ret: any;
@@ -624,6 +671,7 @@ export class Supervisor implements AppInterface {
             throw new Error(`${label} failed: ${msg}`, { cause: e });
         } finally {
             if (!skipJsPush) {
+                this.wasmStack("pop");
                 this.context.stack.pop();
             }
         }
@@ -718,6 +766,7 @@ export class Supervisor implements AppInterface {
             await this.plugins.instantiateAll();
 
             this.context = this.getCallContext();
+            this.seedWasmStack();
 
             // Starts the tx context.
             this.supervisorCall(

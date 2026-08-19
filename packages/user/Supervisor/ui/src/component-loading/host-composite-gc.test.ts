@@ -212,6 +212,10 @@ resourceTransferOwn = function (handle, fromTid, toTid) {
             pop: () => {
                 harness.frames.pop();
             },
+            serviceStack: () => [...harness.frames],
+            reset: () => {
+                harness.frames.length = 0;
+            },
         },
         // auth's login-builder hop stays a JS import (U2).
         "transact:login/api": throwingStub("transact:login/api"),

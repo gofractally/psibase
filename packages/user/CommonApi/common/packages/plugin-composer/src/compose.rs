@@ -4,7 +4,7 @@ use anyhow::{Context, Result, bail};
 use wac_graph::types::{Package, SubtypeChecker, are_semver_compatible};
 use wac_graph::{CompositionGraph, EncodeOptions, NodeId, PackageId};
 
-use crate::ids::{PluginId, WasmPlugin};
+use crate::ids::{is_callstack_plugin, PluginId, WasmPlugin};
 use crate::partition::{dag_order, inspect_wasm, partition, partition_host};
 use crate::tracer::{can_wrap_with_tracer, make_tracer};
 
@@ -89,7 +89,10 @@ fn compose_graph(
         let inst = graph.instantiate(pkg_id);
         plugin_nodes.insert(id.clone(), (pkg_id, inst));
 
-        let provider = if wrap_tracers && can_wrap_with_tracer(wasm) {
+        let provider = if wrap_tracers
+            && !is_callstack_plugin(id)
+            && can_wrap_with_tracer(wasm)
+        {
             let tracer_bytes = make_tracer(wasm, &id.service)
                 .with_context(|| format!("generate tracer for {id}"))?;
             let tpkg = Package::from_bytes(

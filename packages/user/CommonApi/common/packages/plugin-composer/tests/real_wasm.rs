@@ -22,6 +22,21 @@ fn psi_packages_dir() -> PathBuf {
         .join("../../../../../../build/share/psibase/packages")
 }
 
+fn try_load_from_psi(psi: &str, inner: &str, service: &str, plugin: &str) -> Option<WasmPlugin> {
+    let path = psi_packages_dir().join(psi);
+    let output = Command::new("unzip")
+        .args(["-p", path.to_str().unwrap(), inner])
+        .output()
+        .ok()?;
+    if !output.status.success() || output.stdout.is_empty() {
+        return None;
+    }
+    Some(WasmPlugin {
+        id: PluginId::new(service, plugin),
+        wasm: output.stdout,
+    })
+}
+
 fn load_from_psi(psi: &str, inner: &str, service: &str, plugin: &str) -> WasmPlugin {
     let path = psi_packages_dir().join(psi);
     let output = Command::new("unzip")
@@ -65,7 +80,7 @@ fn compose_real_host_with_tracers() {
         eprintln!("skip: no build/components");
         return;
     }
-    let plugins = vec![
+    let mut plugins = vec![
         load("host", "client", "host_client.wasm"),
         load("host", "db", "host_db.wasm"),
         load("host", "auth", "host_auth.wasm"),
@@ -74,6 +89,10 @@ fn compose_real_host_with_tracers() {
         load("host", "types", "host_types.wasm"),
         load("host", "crypto", "host_crypto.wasm"),
     ];
+    let has_callstack = components_dir().join("host_callstack.wasm").exists();
+    if has_callstack {
+        plugins.push(load("host", "callstack", "host_callstack.wasm"));
+    }
     match compose_host(&plugins, true) {
         Ok(r) => {
             // TEMP: dump the composite for the JS-side repro of the
@@ -130,6 +149,17 @@ fn compose_real_host_with_tracers() {
                 imports.iter().any(|i| i.starts_with("accounts:client-query/")),
                 "accounts:client-query must stay open on the host blob, got {imports:?}"
             );
+            if has_callstack {
+                assert!(
+                    r.compose_set.iter().any(|id| id.plugin == "callstack"),
+                    "callstack should be in the host blob, got {:?}",
+                    r.compose_set.iter().map(|id| id.key()).collect::<Vec<_>>()
+                );
+                assert!(
+                    !imports.iter().any(|i| i.starts_with("supervisor:callstack/")),
+                    "callstack should be plugged, got {imports:?}"
+                );
+            }
         }
         Err(e) => panic!("host compose failed: {e:#}"),
     }
@@ -242,7 +272,7 @@ fn compose_branding_from_psi_packages() {
         eprintln!("skip: no {}", branding_psi.display());
         return;
     }
-    let plugins = vec![
+    let mut plugins = vec![
         load_from_psi("Branding.psi", "data/branding/plugin.wasm", "branding", "plugin"),
         load_from_psi("Transact.psi", "data/transact/plugin.wasm", "transact", "plugin"),
         load_from_psi("Transact.psi", "data/transact/actions.wasm", "transact", "actions"),
@@ -263,6 +293,14 @@ fn compose_branding_from_psi_packages() {
         load_from_psi("Host.psi", "data/host/types.wasm", "host", "types"),
         load_from_psi("Host.psi", "data/host/crypto.wasm", "host", "crypto"),
     ];
+    if let Some(cs) = try_load_from_psi(
+        "Host.psi",
+        "data/host/callstack.wasm",
+        "host",
+        "callstack",
+    ) {
+        plugins.push(cs);
+    }
 
     let part = partition(&PluginId::new("branding", "plugin"), &plugins).unwrap();
     let set: Vec<_> = part.compose_set.iter().map(|i| i.key()).collect();
@@ -356,4 +394,14 @@ fn compose_branding_from_psi_packages() {
         imports.iter().any(|i| i.starts_with("supervisor:bridge/")),
         "bridge stays a JS import on the unified composite, got {imports:?}"
     );
+    if plugins.iter().any(|p| p.id.plugin == "callstack") {
+        assert!(
+            set.contains(&"host:callstack".to_string()),
+            "callstack should fold into the branding compose set: {set:?}"
+        );
+        assert!(
+            !imports.iter().any(|i| i.starts_with("supervisor:callstack/")),
+            "callstack should be plugged into the app composite, got {imports:?}"
+        );
+    }
 }

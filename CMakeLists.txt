@@ -295,6 +295,7 @@ add_rs_component_workspace(packages/:Plugins
     permissions
     sites
     host-client
+    host-callstack
     host-http
     host-db
     host-prompt
@@ -323,7 +324,7 @@ ExternalProject_Add(
     SOURCE_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/plugin-composer
     CONFIGURE_COMMAND   ""
     BUILD_COMMAND       cargo build -r --bin compose-host --features native-tools --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/plugin-composer/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/composer-native
-    COMMAND             ${CMAKE_CURRENT_BINARY_DIR}/composer-native/release/compose-host --out ${HOST_COMPOSITE_OUTPUT} host:client=${Plugins_OUTPUT_FILE_host_client} host:db=${Plugins_OUTPUT_FILE_host_db} host:auth=${Plugins_OUTPUT_FILE_host_auth} host:http=${Plugins_OUTPUT_FILE_host_http} host:prompt=${Plugins_OUTPUT_FILE_host_prompt} host:crypto=${Plugins_OUTPUT_FILE_host_crypto}
+    COMMAND             ${CMAKE_CURRENT_BINARY_DIR}/composer-native/release/compose-host --out ${HOST_COMPOSITE_OUTPUT} host:client=${Plugins_OUTPUT_FILE_host_client} host:callstack=${Plugins_OUTPUT_FILE_host_callstack} host:db=${Plugins_OUTPUT_FILE_host_db} host:auth=${Plugins_OUTPUT_FILE_host_auth} host:http=${Plugins_OUTPUT_FILE_host_http} host:prompt=${Plugins_OUTPUT_FILE_host_prompt} host:crypto=${Plugins_OUTPUT_FILE_host_crypto}
     BUILD_BYPRODUCTS    ${HOST_COMPOSITE_OUTPUT}
     BUILD_ALWAYS        1
     INSTALL_COMMAND     ""
@@ -488,6 +489,7 @@ psibase_package(
     ACCOUNTS wasi # This name would be overshadowed
     SERVICE host
         DATA ${Plugins_OUTPUT_FILE_host_client} /client.wasm
+        DATA ${Plugins_OUTPUT_FILE_host_callstack} /callstack.wasm
         DATA ${Plugins_OUTPUT_FILE_host_http} /http.wasm
         DATA ${Plugins_OUTPUT_FILE_host_db} /db.wasm
         DATA ${Plugins_OUTPUT_FILE_host_prompt} /prompt.wasm

@@ -78,6 +78,7 @@ exclude = [
     "Base64/plugin",
     "ClientData/plugin",
     "Host/plugin/auth",
+    "Host/plugin/callstack",
     "Host/plugin/crypto",
     "Host/plugin/client",
     "Host/plugin/http",

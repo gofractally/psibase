@@ -133,6 +133,24 @@ world impl {
     );
 }
 
+fn host_callstack_plugin() -> WasmPlugin {
+    plugin_with_deps(
+        "host",
+        "callstack",
+        r#"
+package supervisor:callstack;
+interface callstack {
+    push: func(service: string);
+    pop: func();
+    service-stack: func() -> list<string>;
+    reset: func();
+}
+world impl { export callstack; }
+"#,
+        &[],
+    )
+}
+
 fn host_client_plugin() -> WasmPlugin {
     plugin_with_deps(
         "host",
@@ -535,6 +553,130 @@ world impl {
         "host:client should be plugged into the app composite, got {imports:?}"
     );
     assert!(result.compose_set.iter().any(|id| id.key() == "host:client"));
+}
+
+#[test]
+fn partition_includes_callstack_when_present() {
+    let query = plugin(
+        "accounts",
+        "client-query",
+        r#"
+package accounts:client-query;
+interface api { get-current-user: func() -> option<string>; }
+world impl { export api; }
+"#,
+    );
+    let part = partition(
+        &query.id.clone(),
+        &[query, host_callstack_plugin()],
+    )
+    .unwrap();
+    assert!(
+        part.compose_set.iter().any(|id| id.key() == "host:callstack"),
+        "callstack leaf is seeded whenever its wasm is present: {:?}",
+        part.compose_set.iter().map(|id| id.key()).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn compose_plugs_callstack_when_present() {
+    let query = plugin(
+        "accounts",
+        "client-query",
+        r#"
+package accounts:client-query;
+interface api { get-current-user: func() -> option<string>; }
+world impl { export api; }
+"#,
+    );
+    let result = compose(
+        &query.id.clone(),
+        &[query, host_callstack_plugin()],
+        true,
+    )
+    .unwrap();
+    let imports = remaining_imports(&result.wasm).unwrap();
+    assert!(
+        !has_import(&imports, "supervisor:callstack"),
+        "tracers should plug into the in-WASM callstack, got {imports:?}"
+    );
+}
+
+#[test]
+fn compose_plugs_client_callstack_read() {
+    let client = plugin_with_deps(
+        "host",
+        "client",
+        r#"
+package host:client;
+interface api { get-sender: func() -> string; }
+world impl {
+    import supervisor:callstack/callstack;
+    export api;
+}
+"#,
+        &[SUPERVISOR_CALLSTACK],
+    );
+    let query = plugin_with_deps(
+        "accounts",
+        "client-query",
+        r#"
+package accounts:client-query;
+interface api { get-current-user: func() -> option<string>; }
+world impl {
+    import host:client/api;
+    export api;
+}
+"#,
+        &[HOST_CLIENT],
+    );
+    let result = compose(
+        &query.id.clone(),
+        &[query, client, host_callstack_plugin()],
+        true,
+    )
+    .unwrap();
+    let imports = remaining_imports(&result.wasm).unwrap();
+    assert!(
+        !has_import(&imports, "supervisor:callstack"),
+        "client→callstack should be plugged, got {imports:?}"
+    );
+    assert!(
+        !has_import(&imports, "host:client/api"),
+        "host:client should be plugged, got {imports:?}"
+    );
+}
+
+const SUPERVISOR_CALLSTACK: &str = r#"
+package supervisor:callstack;
+interface callstack {
+    push: func(service: string);
+    pop: func();
+    service-stack: func() -> list<string>;
+    reset: func();
+}
+"#;
+
+#[test]
+fn partition_refuses_app_callstack_import() {
+    let app = plugin_with_deps(
+        "branding",
+        "plugin",
+        r#"
+package branding:plugin;
+interface api { ping: func(); }
+world impl {
+    import supervisor:callstack/callstack;
+    export api;
+}
+"#,
+        &[SUPERVISOR_CALLSTACK],
+    );
+    let err = partition(&app.id.clone(), &[app]).unwrap_err();
+    assert!(
+        err.to_string().contains("supervisor:callstack"),
+        "expected callstack wiring refusal, got {err:#}"
+    );
 }
 
 const SUPERVISOR_BRIDGE: &str = r#"

@@ -6,9 +6,9 @@ use wit_component::{
 };
 use wit_parser::abi::WasmType;
 use wit_parser::{
-    Function, FunctionKind, Handle, InterfaceId, LiftLowerAbi, ManglingAndAbi, Resolve,
-    ResourceIntrinsic, Stability, Type, TypeDefKind, TypeId, WasmExport, WasmExportKind,
-    WasmImport, World, WorldId, WorldItem, WorldKey,
+    Function, FunctionKind, Handle, InterfaceId, LiftLowerAbi, ManglingAndAbi, Param,
+    Resolve, ResourceIntrinsic, Stability, Type, TypeDefKind, TypeId, WasmExport,
+    WasmExportKind, WasmImport, World, WorldId, WorldItem, WorldKey,
 };
 
 const CALLSTACK_WIT: &str = r#"
@@ -17,6 +17,8 @@ package supervisor:callstack;
 interface callstack {
     push: func(service: string);
     pop: func();
+    service-stack: func() -> list<string>;
+    reset: func();
 }
 "#;
 
@@ -39,13 +41,7 @@ pub fn make_tracer(plugin_wasm: &[u8], service: &str) -> Result<Vec<u8>> {
         bail!("plugin exports no functions; cannot wrap with a tracer");
     }
 
-    let callstack_pkg = resolve
-        .push_str("callstack.wit", CALLSTACK_WIT)
-        .context("add supervisor:callstack to tracer resolve")?;
-    let callstack_iface = *resolve.packages[callstack_pkg]
-        .interfaces
-        .get("callstack")
-        .context("callstack interface missing")?;
+    let callstack_iface = ensure_full_callstack_iface(&mut resolve)?;
 
     let plugin_world = resolve.worlds[world_id].clone();
     // Exported interfaces often `use` foreign types (e.g. host:types/error).
@@ -105,6 +101,68 @@ pub(crate) fn can_wrap_with_tracer(plugin_wasm: &[u8]) -> bool {
         wit_component::DecodedWasm::WitPackage(_, _) => return false,
     };
     world_has_exported_funcs(&resolve, world_id)
+}
+
+fn existing_callstack_iface(resolve: &Resolve) -> Option<InterfaceId> {
+    for (_, pkg) in resolve.packages.iter() {
+        if pkg.name.namespace == "supervisor" && pkg.name.name == "callstack" {
+            return pkg.interfaces.get("callstack").copied();
+        }
+    }
+    None
+}
+
+fn freestanding(name: &str, params: Vec<(&str, Type)>, result: Option<Type>) -> Function {
+    Function {
+        name: name.to_string(),
+        kind: FunctionKind::Freestanding,
+        params: params
+            .into_iter()
+            .map(|(n, ty)| Param {
+                name: n.to_string(),
+                ty,
+                span: Default::default(),
+            })
+            .collect(),
+        result,
+        docs: Default::default(),
+        stability: Stability::Unknown,
+        span: Default::default(),
+    }
+}
+
+/// cargo-component drops unused imports, so host:client's embedded
+/// `supervisor:callstack` may only have `service-stack`. The tracer still
+/// needs push/pop/reset on that same package.
+fn ensure_full_callstack_iface(resolve: &mut Resolve) -> Result<InterfaceId> {
+    if let Some(id) = existing_callstack_iface(resolve) {
+        let iface = &mut resolve.interfaces[id];
+        if !iface.functions.contains_key("push") {
+            iface.functions.insert(
+                "push".into(),
+                freestanding("push", vec![("service", Type::String)], None),
+            );
+        }
+        if !iface.functions.contains_key("pop") {
+            iface
+                .functions
+                .insert("pop".into(), freestanding("pop", vec![], None));
+        }
+        if !iface.functions.contains_key("reset") {
+            iface
+                .functions
+                .insert("reset".into(), freestanding("reset", vec![], None));
+        }
+        return Ok(id);
+    }
+    let callstack_pkg = resolve
+        .push_str("callstack.wit", CALLSTACK_WIT)
+        .context("add supervisor:callstack to tracer resolve")?;
+    resolve.packages[callstack_pkg]
+        .interfaces
+        .get("callstack")
+        .copied()
+        .context("callstack interface missing")
 }
 
 fn world_has_exported_funcs(resolve: &Resolve, world_id: WorldId) -> bool {
@@ -277,7 +335,11 @@ fn trampoline_module(resolve: &Resolve, world_id: WorldId, service: &str) -> Res
 fn callstack_func_key(resolve: &Resolve, world: &World, func: &str) -> (String, String) {
     for (key, item) in world.imports.iter() {
         if let WorldItem::Interface { id, .. } = item {
-            if resolve.id_of(*id).as_deref() == Some("supervisor:callstack/callstack") {
+            let is_callstack = resolve.interfaces[*id].package.is_some_and(|pkg| {
+                let pkg = &resolve.packages[pkg];
+                pkg.name.namespace == "supervisor" && pkg.name.name == "callstack"
+            });
+            if is_callstack {
                 return (resolve.name_world_key(key), func.to_string());
             }
         }

@@ -5,8 +5,8 @@ use wac_graph::types::Package;
 use wac_graph::CompositionGraph;
 
 use crate::ids::{
-    is_host_compose_plugin, is_unplugged, plugin_id_from_extern, Partition, PluginId,
-    WasmPlugin,
+    is_callstack_plugin, is_host_compose_plugin, is_unplugged, plugin_id_from_extern,
+    Partition, PluginId, WasmPlugin,
 };
 
 #[derive(Clone, Debug)]
@@ -163,6 +163,14 @@ fn check_wiring_policy(
                     "{id} imports host:auth; only host:http and accounts:plugin may"
                 );
             }
+            if dep.service == "supervisor"
+                && dep.plugin == "callstack"
+                && !(id.service == "host" && id.plugin == "client")
+            {
+                anyhow::bail!(
+                    "{id} imports supervisor:callstack; only host:client may"
+                );
+            }
         }
     }
     Ok(())
@@ -220,6 +228,12 @@ pub fn partition(entry: &PluginId, plugins: &[WasmPlugin]) -> Result<Partition> 
                     Some(entry),
                 );
             }
+        }
+    }
+
+    if let Some(cs) = plugins.iter().find(|p| is_callstack_plugin(&p.id)) {
+        if !compose.iter().any(|id| id == &cs.id) {
+            compose.push(cs.id.clone());
         }
     }
 
