@@ -38,7 +38,10 @@ import {
     useObligations,
     useBuyClaimOffers,
 } from "@/hooks/use-banx-data";
-import { useSetCreditLine } from "@/hooks/use-banx-mutations";
+import {
+    useRemoveCreditLine,
+    useSetCreditLine,
+} from "@/hooks/use-banx-mutations";
 import {
     amountPlaceholder,
     formatRawAmount,
@@ -774,6 +777,7 @@ function CreditLineDialog({
     editing: CreditLine | null;
 }) {
     const setLine = useSetCreditLine();
+    const removeLine = useRemoveCreditLine();
     const isEdit = !!editing;
 
     const form = useAppForm({
@@ -875,8 +879,8 @@ function CreditLineDialog({
                     </DialogTitle>
                     <DialogDescription>
                         {isEdit
-                            ? `Update limit, interest, or revolving terms for ${editing!.debtor} in ${editSymbol}.`
-                            : "You are the creditor. Set how much the debtor may draw (and hold outstanding) against you. Drawn amounts show up here as savings-style claims."}
+                            ? `Update limit, interest, or revolving terms for ${editing!.debtor} in ${editSymbol}. A zero limit still keeps them as a known counterparty (needed if they may hold a claim on you). Remove the line to drop that.`
+                            : "You are the creditor. Set how much the debtor may draw (and hold outstanding) against you. Drawn amounts show up here as savings-style claims. A zero limit is still a line — they are on your book."}
                     </DialogDescription>
                 </DialogHeader>
                 <form
@@ -1018,6 +1022,29 @@ function CreditLineDialog({
                         </p>
                     ) : null}
                     <DialogFooter>
+                        {isEdit ? (
+                            <Button
+                                type="button"
+                                variant="destructive"
+                                disabled={removeLine.isPending}
+                                onClick={() => {
+                                    removeLine.mutate(
+                                        {
+                                            debtor: editing!.debtor,
+                                            assetId: editing!.assetId,
+                                        },
+                                        {
+                                            onSuccess: () =>
+                                                onOpenChange(false),
+                                        },
+                                    );
+                                }}
+                            >
+                                {removeLine.isPending
+                                    ? "Removing…"
+                                    : "Remove line"}
+                            </Button>
+                        ) : null}
                         <Button
                             type="button"
                             variant="outline"

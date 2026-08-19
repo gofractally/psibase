@@ -64,6 +64,10 @@ interface api {
         grace-seconds: u32,
     ) -> result<_, error>;
 
+    /// Remove the sender's credit line to `debtor`. Limit 0 is still a line
+    /// (known counterparty); this deletes the row.
+    remove-credit-line: func(debtor: string, asset-id: u16) -> result<_, error>;
+
     /// Post a path-forward offer toward a **specific** next hop. Prefer global
     /// when possible. `fee-fixed` is a human decimal in `asset-id` units.
     /// `fee-percent-ppm` is ppm (`10_000` = 1%).
@@ -108,6 +112,17 @@ interface api {
         fee-fixed: string,
         fee-percent-ppm: s32,
         expires-at-seconds: u32,
+    ) -> result<_, error>;
+
+    /// Set `allow-unknown` on a posted offer. `buy-claim` selects buy-claim
+    /// vs path-forward. Empty `counterparty` (or `"0"`) is the global offer.
+    /// Closed (false): the person who will owe must have lined the new
+    /// creditor (limit 0 is enough). Open (true): they may be unknown.
+    set-allow-unknown: func(
+        buy-claim: bool,
+        counterparty: string,
+        asset-id: u16,
+        allow-unknown: bool,
     ) -> result<_, error>;
 
     /// Remove a specific buy-claim offer.

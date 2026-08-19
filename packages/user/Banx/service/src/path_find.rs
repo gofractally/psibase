@@ -21,6 +21,8 @@ pub struct LineEdge {
     /// the debtor). Unwind nets that pair; FX still uses the hop notional.
     pub reverse_claim: u64,
     pub interest_rate_ppm: u32,
+    /// True if a real credit-line row exists (not a reverse-claim-only edge).
+    pub is_line: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -34,6 +36,8 @@ pub struct RoutingEdge {
     pub max_accept_rate_ppm: u32,
     /// Unix seconds; `0` = never.
     pub expires_at: i64,
+    /// If false, the poster must have a credit line to the next hop.
+    pub allow_unknown: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -173,9 +177,14 @@ pub fn find_banx_path(
         return None;
     }
 
-    // Index lines by debtor for expansion.
+    // Index lines by debtor for expansion. Known pairs are real credit lines
+    // (including 0-limit); reverse-claim-only edges do not count.
     let mut lines_by_debtor: HashMap<&str, Vec<&LineEdge>> = HashMap::new();
+    let mut known: HashSet<(String, String, u16)> = HashSet::new();
     for l in lines {
+        if l.is_line {
+            known.insert((l.creditor.clone(), l.debtor.clone(), l.asset_id));
+        }
         if l.residual > 0 {
             lines_by_debtor.entry(l.debtor.as_str()).or_default().push(l);
         }
@@ -247,6 +256,7 @@ pub fn find_banx_path(
                 *asset, // hop asset
                 amt,
                 &lines_by_debtor,
+                &known,
                 routing,
                 now,
                 &visited,
@@ -266,6 +276,7 @@ pub fn find_banx_path(
                         e.to_asset, // hop / line asset after FX
                         after_fx,
                         &lines_by_debtor,
+                        &known,
                         routing,
                         now,
                         &visited,
@@ -552,6 +563,7 @@ fn expand_hops(
     hop_asset: u16,
     amount_in: u64,
     lines_by_debtor: &HashMap<&str, Vec<&LineEdge>>,
+    known: &HashSet<(String, String, u16)>,
     routing: &[RoutingEdge],
     now: i64,
     visited: &HashSet<String>,
@@ -574,6 +586,11 @@ fn expand_hops(
         let Some(rpol) = resolve_routing(routing, &line.creditor, debtor, hop_asset, now) else {
             continue;
         };
+        if !rpol.allow_unknown
+            && !known.contains(&(debtor.to_string(), line.creditor.clone(), hop_asset))
+        {
+            continue;
+        }
         if line.interest_rate_ppm > rpol.max_accept_rate_ppm {
             continue;
         }
@@ -622,6 +639,7 @@ mod tests {
             residual,
             reverse_claim: 0,
             interest_rate_ppm: 0,
+            is_line: true,
         }
     }
 
@@ -639,6 +657,7 @@ mod tests {
             residual: headroom + reverse,
             reverse_claim: reverse,
             interest_rate_ppm: 0,
+            is_line: true,
         }
     }
 
@@ -651,6 +670,7 @@ mod tests {
             hop_fee_percent_ppm: fee_pct_ppm,
             max_accept_rate_ppm: PPM_SCALE,
             expires_at: 0,
+            allow_unknown: true,
         }
     }
 
@@ -837,6 +857,7 @@ mod tests {
             hop_fee_percent_ppm: 0,
             max_accept_rate_ppm: PPM_SCALE,
             expires_at: 0,
+            allow_unknown: true,
         }];
         let q = find_banx_path_exact_out(
             &lines,
@@ -947,6 +968,7 @@ mod tests {
                 hop_fee_percent_ppm: 0,
                 max_accept_rate_ppm: PPM_SCALE,
                 expires_at: 1,
+                allow_unknown: true,
             },
             RoutingEdge {
                 creditor: String::new(),
@@ -956,6 +978,7 @@ mod tests {
                 hop_fee_percent_ppm: 0,
                 max_accept_rate_ppm: PPM_SCALE,
                 expires_at: 0,
+                allow_unknown: true,
             },
         ];
         let q = find_banx_path(
@@ -1087,5 +1110,44 @@ mod tests {
             q.amount_out, 560,
             "1000 AUD × 0.70 × 0.80 → 560 GBP, not leftover 600 × 0.70 × 0.80"
         );
+    }
+
+    #[test]
+    fn closed_global_requires_line_to_next_hop() {
+        let hop_lines = vec![
+            line("gary", "alice", 1, 10_000),
+            line("steve", "gary", 1, 10_000),
+        ];
+        let mut closed = global_rte("gary", 1, 0);
+        closed.allow_unknown = false;
+        assert!(
+            find_banx_path(&hop_lines, &[closed.clone()], &[], "alice", "steve", 100, 1, Some(1), 4, 0)
+                .is_none(),
+            "closed forward without gary→steve line"
+        );
+        let mut with_known = hop_lines;
+        with_known.push(LineEdge {
+            creditor: "gary".into(),
+            debtor: "steve".into(),
+            asset_id: 1,
+            residual: 0,
+            reverse_claim: 0,
+            interest_rate_ppm: 0,
+            is_line: true,
+        });
+        let q = find_banx_path(
+            &with_known,
+            &[closed],
+            &[],
+            "alice",
+            "steve",
+            100,
+            1,
+            Some(1),
+            4,
+            0,
+        )
+        .expect("0-limit line is enough");
+        assert_eq!(q.amount_out, 100);
     }
 }

@@ -374,6 +374,9 @@ export function PoliciesPage() {
                                         Max line APR
                                     </TableHead>
                                     <TableHead className="text-right">
+                                        Unknown
+                                    </TableHead>
+                                    <TableHead className="text-right">
                                         Expires
                                     </TableHead>
                                 </TableRow>
@@ -397,6 +400,9 @@ export function PoliciesPage() {
                                         </TableCell>
                                         <TableCell className="text-right">
                                             {ppmToPercent(p.maxLineAprPpm)}
+                                        </TableCell>
+                                        <TableCell className="text-right text-sm">
+                                            {p.allowUnknown ? "Allowed" : "Lined only"}
                                         </TableCell>
                                         <TableCell className="text-right text-sm">
                                             {formatExpiresAt(p.expiresAt)}
@@ -430,6 +436,9 @@ export function PoliciesPage() {
                                         Fee %
                                     </TableHead>
                                     <TableHead className="text-right">
+                                        Unknown
+                                    </TableHead>
+                                    <TableHead className="text-right">
                                         Expires
                                     </TableHead>
                                 </TableRow>
@@ -450,6 +459,9 @@ export function PoliciesPage() {
                                         </TableCell>
                                         <TableCell className="text-right">
                                             {ppmToPercent(p.feePercentPpm)}
+                                        </TableCell>
+                                        <TableCell className="text-right text-sm">
+                                            {p.allowUnknown ? "Allowed" : "Lined only"}
                                         </TableCell>
                                         <TableCell className="text-right text-sm">
                                             {formatExpiresAt(p.expiresAt)}

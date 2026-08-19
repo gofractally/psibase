@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { useQueries } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { ArrowLeftRight, Loader2 } from "lucide-react";
 
 import { useSellClaim } from "@/hooks/use-banx-mutations";
@@ -192,9 +192,17 @@ export function SellClaimDialog({
         })),
     });
 
+    const debtorLinesQuery = useQuery({
+        queryKey: QueryKey.creditLines(target?.debtor),
+        queryFn: () => fetchCreditLines(target!.debtor),
+        enabled: open && !!target,
+    });
+
     const options: BuyerOption[] = useMemo(() => {
         if (!target) return [];
         const maxClaim = BigInt(target.maxRaw || "0");
+        const debtorLines = debtorLinesQuery.data;
+        if (!debtorLines) return [];
         const out: BuyerOption[] = [];
         loadAccounts.forEach((account, i) => {
             const offers = offerQueries[i]?.data;
@@ -207,6 +215,15 @@ export function SellClaimDialog({
                 nowSec,
             );
             if (!offer) return;
+            if (!offer.allowUnknown) {
+                const debtorLinedBuyer = debtorLines.some(
+                    (l) =>
+                        l.creditor === target.debtor &&
+                        l.debtor === account &&
+                        l.assetId === target.assetId,
+                );
+                if (!debtorLinedBuyer) return;
+            }
             const residual = residualOnLine(
                 lines,
                 account,
@@ -237,6 +254,7 @@ export function SellClaimDialog({
         loadAccounts,
         offerQueries,
         lineQueries,
+        debtorLinesQuery.data,
         nowSec,
         contacts,
     ]);
@@ -246,7 +264,8 @@ export function SellClaimDialog({
         open &&
         loadAccounts.length > 0 &&
         (offerQueries.some((q) => q.isLoading) ||
-            lineQueries.some((q) => q.isLoading));
+            lineQueries.some((q) => q.isLoading) ||
+            debtorLinesQuery.isLoading);
 
     const precision = target?.precision ?? 0;
     const maxHuman = target
@@ -309,9 +328,11 @@ export function SellClaimDialog({
                                     {target.debtor}
                                 </span>{" "}
                                 ({target.symbol}) to a buyer who posted a
-                                buy-claim offer. You receive a claim on the
-                                buyer for face after their spread (haircut or
-                                premium).
+                                buy-claim offer. Closed offers also need{" "}
+                                {target.debtor} to have lined that buyer (a
+                                zero limit is enough). You receive a claim on
+                                the buyer for face after their spread
+                                (haircut or premium).
                             </>
                         ) : (
                             "Select a claim to sell."

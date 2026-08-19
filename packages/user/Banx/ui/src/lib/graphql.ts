@@ -47,6 +47,7 @@ const zForwardOffer = z.object({
     maxLineAprPpm: z.number(),
     expiresAt: z.number(),
     isGlobal: z.boolean(),
+    allowUnknown: z.boolean(),
 });
 
 const zBuyClaimOffer = z.object({
@@ -57,6 +58,7 @@ const zBuyClaimOffer = z.object({
     feePercentPpm: z.number(),
     expiresAt: z.number(),
     isGlobal: z.boolean(),
+    allowUnknown: z.boolean(),
 });
 
 const zCurrencyPolicy = z.object({
@@ -147,7 +149,7 @@ export async function fetchForwardOffers(
     const data = await gql<{ forwardOffers: ForwardOffer[] }>(
         `{ forwardOffers(poster: "${account}") {
             poster nextHop assetId feeFixed feePercentPpm maxLineAprPpm
-            expiresAt isGlobal
+            expiresAt isGlobal allowUnknown
         } }`,
     );
     return zForwardOffer.array().parse(data.forwardOffers);
@@ -159,6 +161,7 @@ export async function fetchBuyClaimOffers(
     const data = await gql<{ buyClaimOffers: BuyClaimOffer[] }>(
         `{ buyClaimOffers(poster: "${account}") {
             poster debtor assetId feeFixed feePercentPpm expiresAt isGlobal
+            allowUnknown
         } }`,
     );
     return zBuyClaimOffer.array().parse(data.buyClaimOffers);

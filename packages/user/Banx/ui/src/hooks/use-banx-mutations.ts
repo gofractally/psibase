@@ -69,6 +69,19 @@ export function useSetCreditLine() {
     });
 }
 
+export function useRemoveCreditLine() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: { debtor: string; assetId: number }) =>
+            banxCall("removeCreditLine", [p.debtor, p.assetId]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Credit line removed");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
 export function useDeposit() {
     const invalidate = useInvalidateBanx();
     return useMutation({
@@ -307,15 +320,23 @@ export function useSetForwardOffer() {
             feePercentPpm: number;
             maxLineAprPpm: number;
             expiresAtSeconds: number;
-        }) =>
-            banxCall("setForwardOffer", [
+            allowUnknown: boolean;
+        }) => {
+            await banxCall("setForwardOffer", [
                 p.nextHop,
                 p.assetId,
                 p.feeFixed,
                 p.feePercentPpm,
                 p.maxLineAprPpm,
                 p.expiresAtSeconds,
-            ]),
+            ]);
+            await banxCall("setAllowUnknown", [
+                false,
+                p.nextHop,
+                p.assetId,
+                p.allowUnknown,
+            ]);
+        },
         onSuccess: () => {
             invalidate();
             toast.success("Path-forward offer saved");
@@ -333,14 +354,22 @@ export function useSetGlobalForwardOffer() {
             feePercentPpm: number;
             maxLineAprPpm: number;
             expiresAtSeconds: number;
-        }) =>
-            banxCall("setGlobalForwardOffer", [
+            allowUnknown: boolean;
+        }) => {
+            await banxCall("setGlobalForwardOffer", [
                 p.assetId,
                 p.feeFixed,
                 p.feePercentPpm,
                 p.maxLineAprPpm,
                 p.expiresAtSeconds,
-            ]),
+            ]);
+            await banxCall("setAllowUnknown", [
+                false,
+                "",
+                p.assetId,
+                p.allowUnknown,
+            ]);
+        },
         onSuccess: () => {
             invalidate();
             toast.success("Global path-forward offer saved");
@@ -384,14 +413,22 @@ export function useSetBuyClaimOffer() {
             feeFixed: string;
             feePercentPpm: number;
             expiresAtSeconds: number;
-        }) =>
-            banxCall("setBuyClaimOffer", [
+            allowUnknown: boolean;
+        }) => {
+            await banxCall("setBuyClaimOffer", [
                 p.debtor,
                 p.assetId,
                 p.feeFixed,
                 p.feePercentPpm,
                 p.expiresAtSeconds,
-            ]),
+            ]);
+            await banxCall("setAllowUnknown", [
+                true,
+                p.debtor,
+                p.assetId,
+                p.allowUnknown,
+            ]);
+        },
         onSuccess: () => {
             invalidate();
             toast.success("Buy-claim offer saved");
@@ -408,13 +445,21 @@ export function useSetGlobalBuyClaimOffer() {
             feeFixed: string;
             feePercentPpm: number;
             expiresAtSeconds: number;
-        }) =>
-            banxCall("setGlobalBuyClaimOffer", [
+            allowUnknown: boolean;
+        }) => {
+            await banxCall("setGlobalBuyClaimOffer", [
                 p.assetId,
                 p.feeFixed,
                 p.feePercentPpm,
                 p.expiresAtSeconds,
-            ]),
+            ]);
+            await banxCall("setAllowUnknown", [
+                true,
+                "",
+                p.assetId,
+                p.allowUnknown,
+            ]);
+        },
         onSuccess: () => {
             invalidate();
             toast.success("Global buy-claim offer saved");

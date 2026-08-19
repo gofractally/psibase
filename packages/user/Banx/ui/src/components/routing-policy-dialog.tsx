@@ -50,6 +50,7 @@ type FeeFields = {
     hopFeePct: string;
     maxAcceptPct: string;
     expiresAtSeconds: number;
+    allowUnknown: boolean;
 };
 
 const defaultFees = (assetId?: number): FeeFields => ({
@@ -58,6 +59,7 @@ const defaultFees = (assetId?: number): FeeFields => ({
     hopFeePct: "0",
     maxAcceptPct: "100",
     expiresAtSeconds: 0,
+    allowUnknown: false,
 });
 
 function offerLive(p: ForwardOffer, nowSec: number): boolean {
@@ -71,6 +73,7 @@ function feesFromOffer(p: ForwardOffer): FeeFields {
         hopFeePct: ppmToPercentInput(p.feePercentPpm),
         maxAcceptPct: ppmToPercentInput(p.maxLineAprPpm),
         expiresAtSeconds: p.expiresAt,
+        allowUnknown: p.allowUnknown,
     };
 }
 
@@ -81,6 +84,7 @@ function feePayload(value: FeeFields) {
         feePercentPpm: percentStringToPpm(value.hopFeePct, MAX_HOP_FEE_PPM),
         maxLineAprPpm: percentStringToPpm(value.maxAcceptPct, PPM_SCALE),
         expiresAtSeconds: value.expiresAtSeconds,
+        allowUnknown: value.allowUnknown,
     };
 }
 
@@ -474,6 +478,15 @@ export function RoutingPolicyDialog({
                                                 />
                                             )}
                                         />
+                                        <specificForm.AppField
+                                            name="allowUnknown"
+                                            children={(field) => (
+                                                <field.SwitchField
+                                                    label="Allow unknown next hop"
+                                                    description="If off, you must already have a credit line to them (limit 0 is enough). If on, they can become your creditor without that line."
+                                                />
+                                            )}
+                                        />
                                     </div>
                                 ) : null;
                             }}
@@ -540,12 +553,14 @@ export function RoutingPolicyDialog({
                 "expiresAtSeconds",
                 fees.expiresAtSeconds,
             );
+            globalForm.setFieldValue("allowUnknown", fees.allowUnknown);
         } else {
             globalForm.setFieldValue("enabled", false);
             globalForm.setFieldValue("hopFeeFixed", "0");
             globalForm.setFieldValue("hopFeePct", "0");
             globalForm.setFieldValue("maxAcceptPct", "100");
             globalForm.setFieldValue("expiresAtSeconds", 0);
+            globalForm.setFieldValue("allowUnknown", false);
         }
     };
 
@@ -555,10 +570,12 @@ export function RoutingPolicyDialog({
                 <DialogHeader>
                     <DialogTitle>Path-forward offer</DialogTitle>
                     <DialogDescription>
-                        Sit in the middle of a path pay for this asset. Anyone
-                        can hop through you to a next creditor who has lined
-                        you (or whom you already owe). This does not buy
-                        claims — post a buy-claim offer for that.
+                        Sit in the middle of a path pay for this asset. The
+                        next creditor must have lined you (or you already owe
+                        them). Closed by default: you must have lined them too
+                        (limit 0 is enough). Turn on allow-unknown to skip
+                        that. This does not buy claims — post a buy-claim
+                        offer for that.
                     </DialogDescription>
                 </DialogHeader>
                 <form
@@ -689,6 +706,15 @@ export function RoutingPolicyDialog({
                                                 min={0}
                                                 max={MAX_PERCENT}
                                                 step={MIN_PERCENT_STEP}
+                                            />
+                                        )}
+                                    />
+                                    <globalForm.AppField
+                                        name="allowUnknown"
+                                        children={(field) => (
+                                            <field.SwitchField
+                                                label="Allow unknown next hop"
+                                                description="If off, you must already have a credit line to the next person (limit 0 is enough). If on, anyone who lined you can become your creditor."
                                             />
                                         )}
                                     />

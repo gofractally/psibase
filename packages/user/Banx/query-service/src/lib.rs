@@ -73,6 +73,8 @@ mod service {
         residual: Decimal,
         /// Reverse claim included in `residual` (they already owe you).
         reverseClaim: Decimal,
+        /// False when this row is a reverse-claim-only path edge.
+        isLine: bool,
     }
 
     impl CreditLineView {
@@ -96,6 +98,7 @@ mod service {
                 remaining: dec(0.into(), asset_id),
                 residual: dec(residual.into(), asset_id),
                 reverseClaim: dec(residual.into(), asset_id),
+                isLine: false,
             }
         }
 
@@ -124,6 +127,7 @@ mod service {
                     line.asset_id,
                 ),
                 reverseClaim: dec(reverse, line.asset_id),
+                isLine: true,
             }
         }
     }
@@ -168,6 +172,7 @@ mod service {
         maxLineAprPpm: u32,
         expiresAt: i64,
         isGlobal: bool,
+        allowUnknown: bool,
     }
 
     impl From<ForwardOffer> for ForwardOfferView {
@@ -181,6 +186,7 @@ mod service {
                 maxLineAprPpm: p.max_line_apr,
                 expiresAt: time_sec(p.expires_at),
                 isGlobal: p.is_global(),
+                allowUnknown: p.allow_unknown,
             }
         }
     }
@@ -195,6 +201,7 @@ mod service {
         feePercentPpm: i32,
         expiresAt: i64,
         isGlobal: bool,
+        allowUnknown: bool,
     }
 
     impl From<BuyClaimOffer> for BuyClaimOfferView {
@@ -207,6 +214,7 @@ mod service {
                 feePercentPpm: p.fee_percent,
                 expiresAt: time_sec(p.expires_at),
                 isGlobal: p.is_global(),
+                allowUnknown: p.allow_unknown,
             }
         }
     }

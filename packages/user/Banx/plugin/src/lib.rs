@@ -44,12 +44,14 @@ define_trust! {
         Low => [quote_path],
         Medium => [
             set_credit_line,
+            remove_credit_line,
             set_forward_offer,
             set_global_forward_offer,
             remove_forward_offer,
             remove_global_forward_offer,
             set_buy_claim_offer,
             set_global_buy_claim_offer,
+            set_allow_unknown,
             remove_buy_claim_offer,
             remove_global_buy_claim_offer,
             set_currency_policy,
@@ -152,6 +154,16 @@ impl Api for BanxPlugin {
         add_action_to_transaction(banx::action_structs::st_crd_lne::ACTION_NAME, &packed)
     }
 
+    fn remove_credit_line(debtor: String, asset_id: u16) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::remove_credit_line)?;
+        let packed = banx::action_structs::rm_crd_lne {
+            debitor: parse_account(&debtor)?,
+            asset_id,
+        }
+        .packed();
+        add_action_to_transaction(banx::action_structs::rm_crd_lne::ACTION_NAME, &packed)
+    }
+
     fn set_forward_offer(
         next_hop: String,
         asset_id: u16,
@@ -169,6 +181,7 @@ impl Api for BanxPlugin {
             fee_percent: fee_percent_ppm,
             max_line_apr: max_line_apr_ppm,
             expires_at: time_point(expires_at_seconds),
+            allow_unknown: false,
         }
         .packed();
         add_action_to_transaction(banx::action_structs::st_fwd_ofr::ACTION_NAME, &packed)
@@ -189,6 +202,7 @@ impl Api for BanxPlugin {
             fee_percent: fee_percent_ppm,
             max_line_apr: max_line_apr_ppm,
             expires_at: time_point(expires_at_seconds),
+            allow_unknown: false,
         }
         .packed();
         add_action_to_transaction(banx::action_structs::st_glb_fwd::ACTION_NAME, &packed)
@@ -225,6 +239,7 @@ impl Api for BanxPlugin {
             fee_fixed,
             fee_percent: fee_percent_ppm,
             expires_at: time_point(expires_at_seconds),
+            allow_unknown: false,
         }
         .packed();
         add_action_to_transaction(banx::action_structs::st_buy_clm::ACTION_NAME, &packed)
@@ -243,9 +258,40 @@ impl Api for BanxPlugin {
             fee_fixed,
             fee_percent: fee_percent_ppm,
             expires_at: time_point(expires_at_seconds),
+            allow_unknown: false,
         }
         .packed();
         add_action_to_transaction(banx::action_structs::st_glb_buy::ACTION_NAME, &packed)
+    }
+
+    fn set_allow_unknown(
+        buy_claim: bool,
+        counterparty: String,
+        asset_id: u16,
+        allow_unknown: bool,
+    ) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::set_allow_unknown)?;
+        let who = match counterparty.trim() {
+            "" | "0" => AccountNumber::new(0),
+            name => parse_account(name)?,
+        };
+        if buy_claim {
+            let packed = banx::action_structs::st_buy_unk {
+                debtor: who,
+                asset_id,
+                allow_unknown,
+            }
+            .packed();
+            add_action_to_transaction(banx::action_structs::st_buy_unk::ACTION_NAME, &packed)
+        } else {
+            let packed = banx::action_structs::st_fwd_unk {
+                next_hop: who,
+                asset_id,
+                allow_unknown,
+            }
+            .packed();
+            add_action_to_transaction(banx::action_structs::st_fwd_unk::ACTION_NAME, &packed)
+        }
     }
 
     fn remove_buy_claim_offer(debtor: String, asset_id: u16) -> Result<(), Error> {
