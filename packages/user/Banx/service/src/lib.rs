@@ -540,18 +540,21 @@ pub mod tables {
             assert!(amount.value > 0, "claim transfer amount must be positive");
 
             assert!(
-                CreditLine::get(debtor, buyer, self.asset_id).is_some(),
-                "debtor has no credit line to buyer (limit 0 is enough)"
+                CreditLine::knows(debtor, buyer, self.asset_id),
+                "debtor does not know buyer (no credit line or live tab)"
             );
 
-            let mut line = CreditLine::get_assert(buyer, debtor, self.asset_id);
-            Obligation::accrue_pair(buyer, debtor, self.asset_id);
-            let buyer_exp = Obligation::exposure(buyer, debtor, self.asset_id).value;
-            assert!(
-                buyer_exp.saturating_add(amount.value) <= line.limit.value,
-                "buyer credit line residual insufficient for claim"
-            );
-            line.consume_grant(amount);
+            // Buyer→debtor line is only a cap if they posted one. The take
+            // itself is acceptance; the claim keeps its existing APR.
+            if let Some(mut line) = CreditLine::get(buyer, debtor, self.asset_id) {
+                Obligation::accrue_pair(buyer, debtor, self.asset_id);
+                let buyer_exp = Obligation::exposure(buyer, debtor, self.asset_id).value;
+                assert!(
+                    buyer_exp.saturating_add(amount.value) <= line.limit.value,
+                    "buyer credit line residual insufficient for claim"
+                );
+                line.consume_grant(amount);
+            }
 
             let proceeds = self.apply_fees(amount);
             Obligation::transfer_claims(seller, buyer, debtor, self.asset_id, amount.value);
@@ -2062,8 +2065,8 @@ pub mod service {
 
     /// Seller (sender) sells claims on `debtor` to `buyer` under the buyer's
     /// **buy** offer. Buyer becomes creditor of `debtor`; seller receives face
-    /// after the offer spread. Requires buyer's line residual and the
-    /// debtor's line to the buyer (limit may be 0).
+    /// after the offer spread. The debtor must know the buyer (line or
+    /// live tab). A buyer line to the debtor is optional (cap only).
     #[action]
     fn sell_claim(buyer: AccountNumber, debtor: AccountNumber, asset_id: u16, amount: Quantity) {
         let seller = get_sender();

@@ -237,9 +237,13 @@ export function SellClaimDialog({
                 target.assetId,
                 target.precision,
             );
-            if (residual <= 0n) return;
-            const maxFace =
-                maxClaim === 0n
+            const maxFace = takingAsk
+                ? maxClaim > 0n
+                    ? maxClaim
+                    : 10n ** 18n
+                : residual <= 0n
+                  ? 0n
+                  : maxClaim === 0n
                     ? residual
                     : residual < maxClaim
                       ? residual
@@ -352,10 +356,9 @@ export function SellClaimDialog({
                                 <span className="text-foreground font-medium">
                                     {target.debtor}
                                 </span>{" "}
-                                ({target.symbol}). You need line residual on
-                                them, and they must have lined you (limit 0
-                                is enough). You pay face after the seller’s
-                                spread.
+                                ({target.symbol}). They must know you (a
+                                line to you, or a live tab). You pay face
+                                after the seller’s spread.
                             </>
                             ) : (
                             <>

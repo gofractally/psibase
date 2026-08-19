@@ -382,6 +382,8 @@ mod tests {
     /// Friends pay the cafe through John instead of cards. John posts a
     /// 1% path-forward toward the cafe. Cafe invoices Mitchell $5; he
     /// path-pays through John and must send more than $5 so $5 arrives.
+    /// John is leaving, so he sells $90 of leftover cafe credit to Pippa
+    /// at a 5/90 haircut: she takes the $90 tab and owes him $85.
     #[psibase::test_case(packages("Banx"))]
     fn test_path_pay_cafe(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
@@ -389,7 +391,8 @@ mod tests {
         let mitchell = account!("mitchell");
         let john = account!("john");
         let cafe = account!("cafe");
-        for a in [mitchell, john, cafe] {
+        let pippa = account!("pippa");
+        for a in [mitchell, john, cafe, pippa] {
             chain.new_account(a).unwrap();
         }
 
@@ -439,6 +442,28 @@ mod tests {
         assert_eq!(exp(&chain, john, cafe, aud), 95_0000);
         assert_eq!(exp(&chain, john, mitchell, aud), 5_0506);
         assert_eq!(exp(&chain, mitchell, cafe, aud), 0);
+
+        // $90 face at a 5/90 (~5.555%) haircut → Pippa owes John $85.
+        Wrapper::push_from(&chain, john)
+            .st_sell_clm(
+                cafe,
+                aud,
+                Quantity::new(0),
+                -((PPM_SCALE as i32) * 5 / 90),
+                never(),
+            )
+            .get()?;
+        Wrapper::push_from(&chain, cafe)
+            .st_crd_lne(pippa, aud, Quantity::new(0), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, pippa)
+            .buy_claim(john, cafe, aud, 90_0000.into())
+            .get()?;
+
+        assert_eq!(exp(&chain, john, cafe, aud), 5_0000);
+        assert_eq!(exp(&chain, pippa, cafe, aud), 90_0000);
+        assert_eq!(exp(&chain, john, pippa, aud), 85_0000);
+        assert_eq!(exp(&chain, john, mitchell, aud), 5_0506);
 
         Ok(())
     }
