@@ -1,10 +1,12 @@
 #[allow(warnings)]
 mod bindings;
+#[path = "../../shared/logged_in_user_table.rs"]
+mod logged_in_user;
 
-use bindings::exports::accounts::query::api::{Guest as API, Account};
+use bindings::exports::accounts::query::api::{Account, Guest as API};
 use bindings::host::common::{client as Client, server as Server};
-use bindings::host::db::store::{Bucket, Database, DbMode, StorageDuration};
 use bindings::host::types::types::Error;
+use logged_in_user::logged_in_user_table;
 use psibase::plugin_error;
 use psibase::services::accounts as AccountsService;
 use psibase::AccountNumber;
@@ -20,16 +22,6 @@ plugin_error! {
 }
 
 struct AccountsQuery;
-
-fn logged_in_user_table() -> Bucket {
-    Bucket::new(
-        Database {
-            mode: DbMode::NonTransactional,
-            duration: StorageDuration::Persistent,
-        },
-        "logged_in_user",
-    )
-}
 
 #[derive(Deserialize, Debug)]
 struct ResponseRoot {

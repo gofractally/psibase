@@ -4,6 +4,8 @@ mod db;
 mod errors;
 mod helpers;
 mod interfaces;
+#[path = "../../shared/logged_in_user_table.rs"]
+mod logged_in_user;
 mod plugin;
 
 use plugin::AccountsPlugin;
