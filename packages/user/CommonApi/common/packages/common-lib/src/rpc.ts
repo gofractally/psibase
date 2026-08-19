@@ -84,8 +84,31 @@ export async function getText(url: string) {
     return res.text();
 }
 
-export async function getJson<T = any>(url: string): Promise<T> {
-    const res = await get(url, { headers: { Accept: "application/json" } });
+function mergeRequestHeaders(
+    defaults: Record<string, string>,
+    callerHeaders?: HeadersInit,
+): Headers {
+    const headers = new Headers(defaults);
+    if (callerHeaders) {
+        new Headers(callerHeaders).forEach((value, key) => {
+            headers.set(key, value);
+        });
+    }
+    return headers;
+}
+
+export async function getJson<T = any>(
+    url: string,
+    options?: RequestInit,
+): Promise<T> {
+    const { headers: callerHeaders, ...rest } = options ?? {};
+    const res = await get(url, {
+        ...rest,
+        headers: mergeRequestHeaders(
+            { Accept: "application/json" },
+            callerHeaders,
+        ),
+    });
     return res.json();
 }
 
@@ -111,33 +134,31 @@ export async function postGraphQL(
     graphql: string,
     options?: RequestInit,
 ) {
-    if (!options) {
-        options = {};
-    }
+    const { headers: callerHeaders, ...rest } = options ?? {};
     return throwIfError(
         await fetch(url, {
             method: "POST",
-            headers: {
-                "Content-Type": "application/graphql",
-            },
             body: graphql,
-            ...options,
+            ...rest,
+            headers: mergeRequestHeaders(
+                { "Content-Type": "application/graphql" },
+                callerHeaders,
+            ),
         }),
     );
 }
 
 export async function postJson(url: string, json: any, options?: RequestInit) {
-    if (!options) {
-        options = {};
-    }
+    const { headers: callerHeaders, ...rest } = options ?? {};
     return throwIfError(
         await fetch(url, {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
             body: JSON.stringify(json),
-            ...options,
+            ...rest,
+            headers: mergeRequestHeaders(
+                { "Content-Type": "application/json" },
+                callerHeaders,
+            ),
         }),
     );
 }
