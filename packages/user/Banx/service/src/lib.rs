@@ -2289,8 +2289,8 @@ pub mod service {
 
             // FX sizes the next hop only. Previous tab stays in from-asset.
             if asset_id != prev_asset {
-                let cpol = CurrencyPolicy::get_assert(prev_edge_creditor, prev_asset, asset_id);
-                forward = cpol.apply(forward);
+                forward = CurrencyPolicy::get_assert(prev_edge_creditor, prev_asset, asset_id)
+                    .apply(forward);
             }
 
             assert!(
@@ -2299,8 +2299,8 @@ pub mod service {
             );
 
             // Same-asset forward hop: live specific, else live global.
-            let offer = ForwardOffer::get_assert(path_debtor, next_creditor, asset_id);
-            forward = offer.path_draw(next_creditor, forward);
+            forward = ForwardOffer::get_assert(path_debtor, next_creditor, asset_id)
+                .path_draw(next_creditor, forward);
             prev_edge_creditor = next_creditor;
             prev_asset = asset_id;
             path_debtor = next_creditor;
