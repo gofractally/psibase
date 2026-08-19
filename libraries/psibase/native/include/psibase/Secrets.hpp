@@ -10,7 +10,7 @@ namespace psibase
    class Secrets
    {
      public:
-      Secrets(const std::filesystem::path& file, std::span<const char, 32> master_key);
+      Secrets(const std::filesystem::path& file, std::string_view passphrase);
       ~Secrets();
       std::optional<std::span<const char>> get(std::span<const char> key);
       void put(std::span<const char> key, std::span<const char> value);
