@@ -82,11 +82,11 @@ Posted by the **poster** (`st_fwd_ofr` / `st_glb_fwd`): poster is an intermediat
 
 ## Buy-claim offers
 
-Posted by the **poster** (`st_buy_clm` / `st_glb_buy`): anyone can `sell_claim` to the poster while a live row exists. Seller’s claim on a debtor moves to the poster; seller receives face after the offer **spread** as a claim on the poster. Spread ppm is signed: positive haircuts the seller, negative is a premium (`-50_000` = 5% over face). Poster must have line residual on that debtor. `allow_unknown` (default off): if off, the debtor must have a credit line to the buyer (limit 0 is enough); if on, the buyer may be introduced as a new creditor. Independent of path-forward offers.
+Posted by the **poster** (`st_buy_clm` / `st_glb_buy`): anyone can `sell_claim` to the poster while a live row exists. Seller’s claim on a debtor moves to the poster; seller receives face after the offer **spread** as a claim on the poster. Spread ppm is signed: positive haircuts the seller, negative is a premium (`-50_000` = 5% over face). Poster must have line residual on that debtor. Independent of path-forward offers.
 
 ## Selling a claim
 
-`sell_claim(buyer, debtor, asset, amount)`: you hold a claim on `debtor`. The buyer has a buy-claim offer and a line to that debtor. Unless the offer has `allow_unknown`, the **debtor must also have a credit line to the buyer** (limit may be 0). Face moves to the buyer; you hold a claim on the buyer for proceeds (face after spread).
+`sell_claim(buyer, debtor, asset, amount)`: you hold a claim on `debtor`. The buyer has a buy-claim offer and a line to that debtor. The **debtor must also have a credit line to the buyer** (limit may be 0) so they have accepted that person as a counterparty. Face moves to the buyer; you hold a claim on the buyer for proceeds (face after spread).
 
 This is not a path payment and does **not** count as “paid in full” for grace.
 
@@ -146,7 +146,6 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 | `st_fwd_unk` | Set `allow_unknown` on a path-forward offer (`next_hop` 0 = global) |
 | `rm_fwd_ofr` / `rm_glb_fwd` | Remove path-forward offer |
 | `st_buy_clm` / `st_glb_buy` | Specific / global buy-claim offer |
-| `st_buy_unk` | Set `allow_unknown` on a buy-claim offer (`debtor` 0 = global) |
 | `rm_buy_clm` / `rm_glb_buy` | Remove buy-claim offer |
 | `path_pay` | Multi-hop draw (`request_id` 0 or invoice) |
 | `sell_claim` | Sell a claim to a buyer’s offer |

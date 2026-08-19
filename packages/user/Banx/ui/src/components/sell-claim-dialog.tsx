@@ -215,15 +215,13 @@ export function SellClaimDialog({
                 nowSec,
             );
             if (!offer) return;
-            if (!offer.allowUnknown) {
-                const debtorLinedBuyer = debtorLines.some(
-                    (l) =>
-                        l.creditor === target.debtor &&
-                        l.debtor === account &&
-                        l.assetId === target.assetId,
-                );
-                if (!debtorLinedBuyer) return;
-            }
+            const debtorLinedBuyer = debtorLines.some(
+                (l) =>
+                    l.creditor === target.debtor &&
+                    l.debtor === account &&
+                    l.assetId === target.assetId,
+            );
+            if (!debtorLinedBuyer) return;
             const residual = residualOnLine(
                 lines,
                 account,
@@ -328,10 +326,9 @@ export function SellClaimDialog({
                                     {target.debtor}
                                 </span>{" "}
                                 ({target.symbol}) to a buyer who posted a
-                                buy-claim offer. Closed offers also need{" "}
-                                {target.debtor} to have lined that buyer (a
-                                zero limit is enough). You receive a claim on
-                                the buyer for face after their spread
+                                buy-claim offer and whom {target.debtor} has
+                                lined (a zero limit is enough). You receive a
+                                claim on the buyer for face after their spread
                                 (haircut or premium).
                             </>
                         ) : (

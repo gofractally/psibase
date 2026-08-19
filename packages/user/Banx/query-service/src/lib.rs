@@ -201,7 +201,6 @@ mod service {
         feePercentPpm: i32,
         expiresAt: i64,
         isGlobal: bool,
-        allowUnknown: bool,
     }
 
     impl From<BuyClaimOffer> for BuyClaimOfferView {
@@ -214,7 +213,6 @@ mod service {
                 feePercentPpm: p.fee_percent,
                 expiresAt: time_sec(p.expires_at),
                 isGlobal: p.is_global(),
-                allowUnknown: p.allow_unknown,
             }
         }
     }

@@ -755,7 +755,7 @@ mod tests {
             .get()?;
         // Global buy-claim: 5% take fee (no forward offer needed).
         Wrapper::push_from(&chain, peter)
-            .st_glb_buy(usd, Quantity::new(0), (PPM_SCALE * 5 / 100) as i32, never(), false)
+            .st_glb_buy(usd, Quantity::new(0), (PPM_SCALE * 5 / 100) as i32, never())
             .get()?;
         Wrapper::push_from(&chain, bob)
             .st_crd_lne(peter, usd, Quantity::new(0), false, 0, 0)
@@ -800,7 +800,6 @@ mod tests {
                 Quantity::new(0),
                 -(PPM_SCALE as i32) * 5 / 100,
                 never(),
-                false,
             )
             .get()?;
         Wrapper::push_from(&chain, bob)
@@ -838,7 +837,7 @@ mod tests {
             .get()?;
         // Specific buy-claim must not affect path forward.
         Wrapper::push_from(&chain, gary)
-            .st_buy_clm(steve, usd, Quantity::new(0), 0, never(), false)
+            .st_buy_clm(steve, usd, Quantity::new(0), 0, never())
             .get()?;
         Wrapper::push_from(&chain, gary)
             .st_glb_fwd(
@@ -1003,7 +1002,7 @@ mod tests {
             .st_crd_lne(bob, usd, Quantity::new(100), true, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, peter)
-            .st_glb_buy(usd, Quantity::new(0), 0, never(), false)
+            .st_glb_buy(usd, Quantity::new(0), 0, never())
             .get()?;
         Wrapper::push_from(&chain, bob)
             .st_crd_lne(peter, usd, Quantity::new(0), false, 0, 0)
@@ -1037,7 +1036,7 @@ mod tests {
             .st_crd_lne(bob, usd, Quantity::new(10_000), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, peter)
-            .st_glb_buy(usd, Quantity::new(0), 0, never(), false)
+            .st_glb_buy(usd, Quantity::new(0), 0, never())
             .get()?;
 
         assert!(Wrapper::push_from(&chain, alice)
@@ -1048,37 +1047,6 @@ mod tests {
         Wrapper::push_from(&chain, bob)
             .st_crd_lne(peter, usd, Quantity::new(0), false, 0, 0)
             .get()?;
-        Wrapper::push_from(&chain, alice)
-            .sell_claim(peter, bob, usd, Quantity::new(1_000))
-            .get()?;
-        assert_eq!(exp(&chain, peter, bob, usd), 1_000);
-        Ok(())
-    }
-
-    /// Open buy-claim: Peter may become Bob's creditor even if Bob never lined him.
-    #[psibase::test_case(packages("Banx"))]
-    fn test_sell_claim_allow_unknown_skips_debtor_line(
-        chain: psibase::Chain,
-    ) -> Result<(), psibase::Error> {
-        Wrapper::push(&chain).init().get()?;
-        let alice = account!("alice");
-        let bob = account!("bob");
-        let peter = account!("peter");
-        for a in [alice, bob, peter] {
-            chain.new_account(a).unwrap();
-        }
-        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
-        Wrapper::push_from(&chain, bob)
-            .deposit(alice, usd, Quantity::new(1_000), 0, 0)
-            .get()?;
-        Wrapper::push_from(&chain, peter)
-            .st_crd_lne(bob, usd, Quantity::new(10_000), false, 0, 0)
-            .get()?;
-        Wrapper::push_from(&chain, peter)
-            .st_glb_buy(usd, Quantity::new(0), 0, never(), true)
-            .get()?;
-        assert!(CreditLine::get(bob, peter, usd).is_none());
-
         Wrapper::push_from(&chain, alice)
             .sell_claim(peter, bob, usd, Quantity::new(1_000))
             .get()?;
@@ -1198,7 +1166,7 @@ mod tests {
             .st_crd_lne(bob, usd, Quantity::new(10_000), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, peter)
-            .st_glb_buy(usd, Quantity::new(0), 0, never(), false)
+            .st_glb_buy(usd, Quantity::new(0), 0, never())
             .get()?;
         Wrapper::push_from(&chain, bob)
             .st_crd_lne(peter, usd, Quantity::new(0), false, 0, 0)
@@ -1722,10 +1690,10 @@ mod tests {
             .st_crd_lne(bob, usd, Quantity::new(10_000), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, peter)
-            .st_glb_buy(usd, Quantity::new(0), (PPM_SCALE * 5 / 100) as i32, never(), false)
+            .st_glb_buy(usd, Quantity::new(0), (PPM_SCALE * 5 / 100) as i32, never())
             .get()?;
         Wrapper::push_from(&chain, peter)
-            .st_buy_clm(bob, usd, Quantity::new(0), 0, never(), false)
+            .st_buy_clm(bob, usd, Quantity::new(0), 0, never())
             .get()?;
         Wrapper::push_from(&chain, bob)
             .st_crd_lne(peter, usd, Quantity::new(0), false, 0, 0)
@@ -1898,7 +1866,7 @@ mod tests {
             )
             .get()?;
         Wrapper::push_from(&chain, gary)
-            .st_glb_buy(usd, Quantity::new(0), 0, never(), false)
+            .st_glb_buy(usd, Quantity::new(0), 0, never())
             .get()?;
 
         Wrapper::push_from(&chain, alice)

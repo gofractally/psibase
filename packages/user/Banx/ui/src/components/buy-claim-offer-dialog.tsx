@@ -42,7 +42,6 @@ type FeeFields = {
     feeFixed: string;
     feePct: string;
     expiresAtSeconds: number;
-    allowUnknown: boolean;
 };
 
 const defaultFees = (assetId?: number): FeeFields => ({
@@ -50,7 +49,6 @@ const defaultFees = (assetId?: number): FeeFields => ({
     feeFixed: "0",
     feePct: "0",
     expiresAtSeconds: 0,
-    allowUnknown: false,
 });
 
 function offerLive(p: BuyClaimOffer, nowSec: number): boolean {
@@ -63,7 +61,6 @@ function feesFromOffer(p: BuyClaimOffer): FeeFields {
         feeFixed: displayAmount(p.feeFixed),
         feePct: ppmToPercentInput(p.feePercentPpm),
         expiresAtSeconds: p.expiresAt,
-        allowUnknown: p.allowUnknown,
     };
 }
 
@@ -136,7 +133,6 @@ export function BuyClaimOfferDialog({
         feeFixed: value.feeFixed.trim(),
         feePercentPpm: signedPercentStringToPpm(value.feePct, MAX_HOP_FEE_PPM),
         expiresAtSeconds: value.expiresAtSeconds,
-        allowUnknown: value.allowUnknown,
     });
 
     const globalForm = useAppForm({
@@ -298,15 +294,6 @@ export function BuyClaimOfferDialog({
                         />
                     )}
                 />
-                <form.AppField
-                    name="allowUnknown"
-                    children={(field) => (
-                        <field.SwitchField
-                            label="Allow unknown debtor"
-                            description="If off, you only buy claims on people who have already lined you (limit 0 is enough). If on, you can become a new creditor they have not lined."
-                        />
-                    )}
-                />
             </div>
         );
     };
@@ -322,8 +309,8 @@ export function BuyClaimOfferDialog({
                             Buy claims on <strong>{debtor}</strong>. Spread
                             is signed: positive haircuts the seller, negative
                             is a premium you pay. You need unused line
-                            residual on that debtor. Closed by default: they
-                            must have lined you (limit 0 is enough).
+                            residual on that debtor. They must have lined
+                            you (limit 0 is enough).
                         </DialogDescription>
                     </DialogHeader>
                     <form
@@ -413,13 +400,11 @@ export function BuyClaimOfferDialog({
                 "expiresAtSeconds",
                 fees.expiresAtSeconds,
             );
-            globalForm.setFieldValue("allowUnknown", fees.allowUnknown);
         } else {
             globalForm.setFieldValue("enabled", false);
             globalForm.setFieldValue("feeFixed", "0");
             globalForm.setFieldValue("feePct", "0");
             globalForm.setFieldValue("expiresAtSeconds", 0);
-            globalForm.setFieldValue("allowUnknown", false);
         }
     };
 
@@ -431,9 +416,8 @@ export function BuyClaimOfferDialog({
                     <DialogDescription>
                         Buy claims on anyone you have lined in this asset.
                         Spread is signed: positive haircuts the seller,
-                        negative is a premium. Closed by default: the debtor
-                        must have lined you (limit 0 is enough). Not a
-                        path-forward offer.
+                        negative is a premium. The debtor must have lined
+                        you (limit 0 is enough). Not a path-forward offer.
                     </DialogDescription>
                 </DialogHeader>
                 <form

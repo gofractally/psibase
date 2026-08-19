@@ -239,7 +239,6 @@ impl Api for BanxPlugin {
             fee_fixed,
             fee_percent: fee_percent_ppm,
             expires_at: time_point(expires_at_seconds),
-            allow_unknown: false,
         }
         .packed();
         add_action_to_transaction(banx::action_structs::st_buy_clm::ACTION_NAME, &packed)
@@ -258,40 +257,28 @@ impl Api for BanxPlugin {
             fee_fixed,
             fee_percent: fee_percent_ppm,
             expires_at: time_point(expires_at_seconds),
-            allow_unknown: false,
         }
         .packed();
         add_action_to_transaction(banx::action_structs::st_glb_buy::ACTION_NAME, &packed)
     }
 
     fn set_allow_unknown(
-        buy_claim: bool,
-        counterparty: String,
+        next_hop: String,
         asset_id: u16,
         allow_unknown: bool,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::set_allow_unknown)?;
-        let who = match counterparty.trim() {
+        let next_hop = match next_hop.trim() {
             "" | "0" => AccountNumber::new(0),
             name => parse_account(name)?,
         };
-        if buy_claim {
-            let packed = banx::action_structs::st_buy_unk {
-                debtor: who,
-                asset_id,
-                allow_unknown,
-            }
-            .packed();
-            add_action_to_transaction(banx::action_structs::st_buy_unk::ACTION_NAME, &packed)
-        } else {
-            let packed = banx::action_structs::st_fwd_unk {
-                next_hop: who,
-                asset_id,
-                allow_unknown,
-            }
-            .packed();
-            add_action_to_transaction(banx::action_structs::st_fwd_unk::ACTION_NAME, &packed)
+        let packed = banx::action_structs::st_fwd_unk {
+            next_hop,
+            asset_id,
+            allow_unknown,
         }
+        .packed();
+        add_action_to_transaction(banx::action_structs::st_fwd_unk::ACTION_NAME, &packed)
     }
 
     fn remove_buy_claim_offer(debtor: String, asset_id: u16) -> Result<(), Error> {

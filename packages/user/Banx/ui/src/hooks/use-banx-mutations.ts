@@ -331,7 +331,6 @@ export function useSetForwardOffer() {
                 p.expiresAtSeconds,
             ]);
             await banxCall("setAllowUnknown", [
-                false,
                 p.nextHop,
                 p.assetId,
                 p.allowUnknown,
@@ -364,7 +363,6 @@ export function useSetGlobalForwardOffer() {
                 p.expiresAtSeconds,
             ]);
             await banxCall("setAllowUnknown", [
-                false,
                 "",
                 p.assetId,
                 p.allowUnknown,
@@ -413,22 +411,14 @@ export function useSetBuyClaimOffer() {
             feeFixed: string;
             feePercentPpm: number;
             expiresAtSeconds: number;
-            allowUnknown: boolean;
-        }) => {
-            await banxCall("setBuyClaimOffer", [
+        }) =>
+            banxCall("setBuyClaimOffer", [
                 p.debtor,
                 p.assetId,
                 p.feeFixed,
                 p.feePercentPpm,
                 p.expiresAtSeconds,
-            ]);
-            await banxCall("setAllowUnknown", [
-                true,
-                p.debtor,
-                p.assetId,
-                p.allowUnknown,
-            ]);
-        },
+            ]),
         onSuccess: () => {
             invalidate();
             toast.success("Buy-claim offer saved");
@@ -445,21 +435,13 @@ export function useSetGlobalBuyClaimOffer() {
             feeFixed: string;
             feePercentPpm: number;
             expiresAtSeconds: number;
-            allowUnknown: boolean;
-        }) => {
-            await banxCall("setGlobalBuyClaimOffer", [
+        }) =>
+            banxCall("setGlobalBuyClaimOffer", [
                 p.assetId,
                 p.feeFixed,
                 p.feePercentPpm,
                 p.expiresAtSeconds,
-            ]);
-            await banxCall("setAllowUnknown", [
-                true,
-                "",
-                p.assetId,
-                p.allowUnknown,
-            ]);
-        },
+            ]),
         onSuccess: () => {
             invalidate();
             toast.success("Global buy-claim offer saved");

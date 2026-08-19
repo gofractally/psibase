@@ -114,13 +114,12 @@ interface api {
         expires-at-seconds: u32,
     ) -> result<_, error>;
 
-    /// Set `allow-unknown` on a posted offer. `buy-claim` selects buy-claim
-    /// vs path-forward. Empty `counterparty` (or `"0"`) is the global offer.
-    /// Closed (false): the person who will owe must have lined the new
-    /// creditor (limit 0 is enough). Open (true): they may be unknown.
+    /// Set `allow-unknown` on a posted **path-forward** offer. Empty
+    /// `next-hop` (or `"0"`) is the global offer. Closed (false): poster
+    /// must have lined the next hop (limit 0 is enough). Open (true):
+    /// anyone who lined the poster can become their creditor.
     set-allow-unknown: func(
-        buy-claim: bool,
-        counterparty: string,
+        next-hop: string,
         asset-id: u16,
         allow-unknown: bool,
     ) -> result<_, error>;

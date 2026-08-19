@@ -58,7 +58,6 @@ const zBuyClaimOffer = z.object({
     feePercentPpm: z.number(),
     expiresAt: z.number(),
     isGlobal: z.boolean(),
-    allowUnknown: z.boolean(),
 });
 
 const zCurrencyPolicy = z.object({
@@ -161,7 +160,6 @@ export async function fetchBuyClaimOffers(
     const data = await gql<{ buyClaimOffers: BuyClaimOffer[] }>(
         `{ buyClaimOffers(poster: "${account}") {
             poster debtor assetId feeFixed feePercentPpm expiresAt isGlobal
-            allowUnknown
         } }`,
     );
     return zBuyClaimOffer.array().parse(data.buyClaimOffers);

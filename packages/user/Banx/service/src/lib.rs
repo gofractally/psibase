@@ -400,10 +400,6 @@ pub mod tables {
         pub fee_percent: i32,
         /// Absolute expiry (`seconds == 0` → never).
         pub expires_at: TimePointSec,
-        /// If false, the debtor must have a credit line to the buyer
-        /// (limit 0 is enough). If true, the buyer may be introduced as
-        /// a new creditor.
-        pub allow_unknown: bool,
     }
 
     impl BuyClaimOffer {
@@ -450,16 +446,12 @@ pub mod tables {
             fee_fixed: Quantity,
             fee_percent: i32,
             expires_at: TimePointSec,
-            allow_unknown: bool,
         ) {
             let scale = PPM_SCALE as i64;
             assert!(
                 (fee_percent as i64) > -scale && (fee_percent as i64) < scale,
                 "buy-claim spread must be between -100% and 100%"
             );
-            let allow_unknown = Self::get(poster, debtor, asset_id)
-                .map(|p| p.allow_unknown)
-                .unwrap_or(allow_unknown);
             Self {
                 poster,
                 debtor,
@@ -467,21 +459,8 @@ pub mod tables {
                 fee_fixed,
                 fee_percent,
                 expires_at,
-                allow_unknown,
             }
             .save();
-        }
-
-        pub fn set_allow_unknown(
-            poster: AccountNumber,
-            debtor: AccountNumber,
-            asset_id: u16,
-            allow_unknown: bool,
-        ) {
-            let mut row = Self::get(poster, debtor, asset_id)
-                .unwrap_or_else(|| panic!("buy-claim offer not found"));
-            row.allow_unknown = allow_unknown;
-            row.save();
         }
 
         pub fn remove(poster: AccountNumber, debtor: AccountNumber, asset_id: u16) {
@@ -1858,7 +1837,6 @@ pub mod service {
         fee_fixed: Quantity,
         fee_percent: i32,
         expires_at: TimePointSec,
-        allow_unknown: bool,
     ) {
         assert!(
             debtor != BuyClaimOffer::GLOBAL,
@@ -1871,19 +1849,12 @@ pub mod service {
             fee_fixed,
             fee_percent,
             expires_at,
-            allow_unknown,
         );
     }
 
     /// Post/update a **global** buy-claim offer (`debtor = 0`).
     #[action]
-    fn st_glb_buy(
-        asset_id: u16,
-        fee_fixed: Quantity,
-        fee_percent: i32,
-        expires_at: TimePointSec,
-        allow_unknown: bool,
-    ) {
+    fn st_glb_buy(asset_id: u16, fee_fixed: Quantity, fee_percent: i32, expires_at: TimePointSec) {
         BuyClaimOffer::upsert(
             get_sender(),
             BuyClaimOffer::GLOBAL,
@@ -1891,7 +1862,6 @@ pub mod service {
             fee_fixed,
             fee_percent,
             expires_at,
-            allow_unknown,
         );
     }
 
@@ -1911,18 +1881,11 @@ pub mod service {
         BuyClaimOffer::remove(get_sender(), BuyClaimOffer::GLOBAL, asset_id);
     }
 
-    /// Set `allow_unknown` on a posted buy-claim offer (`debtor` 0 = global).
-    #[action]
-    fn st_buy_unk(debtor: AccountNumber, asset_id: u16, allow_unknown: bool) {
-        BuyClaimOffer::set_allow_unknown(get_sender(), debtor, asset_id, allow_unknown);
-    }
-
     /// Seller (sender) sells claims on `debtor` to `buyer` under buyer's buy-claim
     /// offer. Buyer becomes creditor of `debtor` for `amount`; seller receives
     /// a claim on buyer for face after the offer spread (haircut or premium).
-    /// Requires buyer's line residual to `debtor` and a live buy-claim
-    /// offer. Unless the offer has `allow_unknown`, the debtor must have
-    /// a credit line to the buyer (limit may be 0).
+    /// Requires buyer's line residual to `debtor`, the debtor's line to the
+    /// buyer (limit may be 0), and a live buy-claim offer.
     #[action]
     fn sell_claim(buyer: AccountNumber, debtor: AccountNumber, asset_id: u16, amount: Quantity) {
         let seller = get_sender();
@@ -1932,7 +1895,10 @@ pub mod service {
         assert!(amount.value > 0, "sell_claim amount must be positive");
 
         let offer = BuyClaimOffer::get_assert(buyer, debtor, asset_id);
-        crate::tables::assert_known_or_open(offer.allow_unknown, debtor, buyer, asset_id);
+        assert!(
+            CreditLine::get(debtor, buyer, asset_id).is_some(),
+            "debtor has no credit line to buyer (limit 0 is enough)"
+        );
 
         let mut line = CreditLine::get_assert(buyer, debtor, asset_id);
         Obligation::accrue_pair(buyer, debtor, asset_id);
