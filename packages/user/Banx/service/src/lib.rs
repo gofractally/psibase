@@ -1221,6 +1221,9 @@ pub mod tables {
             );
             assert!(amount > 0, "transfer amount must be positive");
             Self::accrue_pair(from_creditor, debtor, asset_id);
+            let now = Self::now();
+            let src_cycle = PairCycle::get(from_creditor, debtor, asset_id);
+            let dest_before = Self::directed_principal(to_creditor, debtor, asset_id);
             let before_from = Self::directed_principal(from_creditor, debtor, asset_id);
             let available = Self::exposure(from_creditor, debtor, asset_id).value;
             assert!(
@@ -1275,6 +1278,14 @@ pub mod tables {
             }
             let after_from = Self::directed_principal(from_creditor, debtor, asset_id);
             PairCycle::sync_cycle(from_creditor, debtor, asset_id, before_from, after_from);
+            PairCycle::inherit_on_transfer(
+                to_creditor,
+                debtor,
+                asset_id,
+                src_cycle.as_ref(),
+                dest_before,
+                now,
+            );
         }
 
         /// Net mutual obligations between `a` and `b` for `asset_id`.
@@ -1474,6 +1485,77 @@ pub mod tables {
                     Self::erase(creditor, debtor, asset_id);
                 } else {
                     c.save();
+                }
+            }
+        }
+
+        fn cycle_end(started: TimePointSec, grace_seconds: u32) -> i64 {
+            started.seconds.saturating_add(i64::from(grace_seconds))
+        }
+
+        /// After a claim moves to a new creditor: keep the source remaining
+        /// window (same end). Do not start the dest's posted grace — that
+        /// would reset an already-aged tab.
+        pub fn inherit_on_transfer(
+            to_creditor: AccountNumber,
+            debtor: AccountNumber,
+            asset_id: u16,
+            src: Option<&Self>,
+            dest_before_principal: u64,
+            now: TimePointSec,
+        ) {
+            let src_in_grace = src.map(|c| c.in_grace_at(now)).unwrap_or(false);
+
+            if dest_before_principal > 0 {
+                if !src_in_grace {
+                    return;
+                }
+                let src = src.unwrap();
+                let src_end = Self::cycle_end(src.cycle_started_at, src.cycle_grace_seconds);
+                let Some(mut dest) = Self::get(to_creditor, debtor, asset_id) else {
+                    return;
+                };
+                if !dest.in_grace_at(now) {
+                    return;
+                }
+                let dest_end = Self::cycle_end(dest.cycle_started_at, dest.cycle_grace_seconds);
+                if src_end <= dest_end {
+                    return;
+                }
+                dest.cycle_grace_seconds = u32::try_from(
+                    src_end.saturating_sub(dest.cycle_started_at.seconds),
+                )
+                .unwrap_or(u32::MAX);
+                dest.save();
+                return;
+            }
+
+            if src_in_grace {
+                let src = src.unwrap();
+                if let Some(mut dest) = Self::get(to_creditor, debtor, asset_id) {
+                    dest.cycle_started_at = src.cycle_started_at;
+                    dest.cycle_grace_seconds = src.cycle_grace_seconds;
+                    dest.save();
+                } else {
+                    Self {
+                        creditor: to_creditor,
+                        debtor,
+                        asset_id,
+                        grace_seconds: 0,
+                        cycle_started_at: src.cycle_started_at,
+                        cycle_grace_seconds: src.cycle_grace_seconds,
+                    }
+                    .save();
+                }
+            } else if let Some(mut dest) = Self::get(to_creditor, debtor, asset_id) {
+                if dest.cycle_started_at.seconds != 0 {
+                    dest.cycle_started_at = TimePointSec { seconds: 0 };
+                    dest.cycle_grace_seconds = 0;
+                    if dest.grace_seconds == 0 {
+                        Self::erase(to_creditor, debtor, asset_id);
+                    } else {
+                        dest.save();
+                    }
                 }
             }
         }

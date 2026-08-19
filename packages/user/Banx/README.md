@@ -118,7 +118,7 @@ After the window, daily compound runs from the last principal/rate change (origi
 
 Editing the line later does not change an **open** cycle; it applies to the next 0→positive.
 
-Sell, convert, and path_pay do **not** count as a grace payoff. They lock whatever is owed (zero during grace) and move or rebook the claim.
+Sell, convert, and path_pay do **not** count as a grace payoff. They lock whatever is owed (zero during grace) and move or rebook the claim. A sold claim keeps the source cycle’s remaining window (same end). It does not start the buyer’s posted grace — that would reset an already-aged tab.
 
 Default in the UI is **7 days**. `0` means interest from the first second.
 

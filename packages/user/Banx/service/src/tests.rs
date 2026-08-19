@@ -2021,6 +2021,123 @@ mod tests {
         Ok(())
     }
 
+    /// Mid-grace sale keeps the original window. Buyer does not start a new one.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_sell_claim_inherits_remaining_grace(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        let peter = account!("peter");
+        for a in [alice, bob, peter] {
+            chain.new_account(a).unwrap();
+        }
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, alice)
+            .st_crd_lne(
+                bob,
+                usd,
+                Quantity::new(10_000_000),
+                false,
+                100_000,
+                WEEK_SECS,
+            )
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .path_pay(
+                vec![hop(alice, usd)],
+                Quantity::new(1_000_000),
+                Quantity::new(1_000_000),
+                0,
+            )
+            .get()?;
+
+        chain.start_block_after(Seconds::new(3 * 86_400).into());
+        assert_eq!(exp(&chain, alice, bob, usd), 1_000_000);
+
+        Wrapper::push_from(&chain, peter)
+            .st_glb_buy(usd, Quantity::new(0), 0, never())
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(peter, usd, Quantity::new(0), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .sell_claim(peter, bob, usd, Quantity::new(1_000_000))
+            .get()?;
+
+        assert_eq!(exp(&chain, alice, bob, usd), 0);
+        assert_eq!(exp(&chain, peter, bob, usd), 1_000_000);
+        chain.start_block_after(Seconds::new(3 * 86_400).into());
+        assert_eq!(
+            exp(&chain, peter, bob, usd),
+            1_000_000,
+            "still inside the original 7-day window"
+        );
+        Ok(())
+    }
+
+    /// A sale after grace has ended must not open the buyer's posted window.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_sell_claim_does_not_reset_expired_grace(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        let peter = account!("peter");
+        for a in [alice, bob, peter] {
+            chain.new_account(a).unwrap();
+        }
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, alice)
+            .st_crd_lne(
+                bob,
+                usd,
+                Quantity::new(10_000_000),
+                false,
+                100_000,
+                WEEK_SECS,
+            )
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .path_pay(
+                vec![hop(alice, usd)],
+                Quantity::new(1_000_000),
+                Quantity::new(1_000_000),
+                0,
+            )
+            .get()?;
+
+        chain.start_block_after(Seconds::new(i64::from(WEEK_SECS) + 86_400).into());
+        let aged = exp(&chain, alice, bob, usd);
+        assert!(aged > 1_000_000, "source already past grace");
+
+        Wrapper::push_from(&chain, peter)
+            .st_crd_lne(bob, usd, Quantity::new(10_000_000), false, 100_000, WEEK_SECS)
+            .get()?;
+        Wrapper::push_from(&chain, peter)
+            .st_glb_buy(usd, Quantity::new(0), 0, never())
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(peter, usd, Quantity::new(0), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .sell_claim(peter, bob, usd, Quantity::new(aged))
+            .get()?;
+
+        let face = exp(&chain, peter, bob, usd);
+        assert!(face > 0);
+        chain.start_block_after(Seconds::new(86_400).into());
+        assert!(
+            exp(&chain, peter, bob, usd) > face,
+            "buyer's posted grace must not restart on an aged claim"
+        );
+        Ok(())
+    }
+
     /// Same poster/asset: 5% path hop, 0% buy-claim. Each action uses its own row.
     #[psibase::test_case(packages("Banx"))]
     fn test_forward_and_buy_claim_fees_independent(
