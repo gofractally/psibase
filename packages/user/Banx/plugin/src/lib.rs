@@ -37,6 +37,7 @@ define_trust! {
         ",
         High => "
             - Path-pay (draw on others' credit along a path)
+            - Pay an invoice along a path (max spend)
         ",
     }
     functions {
@@ -68,7 +69,7 @@ define_trust! {
             sell_claim,
             buy_claim,
         ],
-        High => [path_pay],
+        High => [path_pay, pay_inv],
     }
 }
 
@@ -545,6 +546,38 @@ impl Api for BanxPlugin {
         }
         .packed();
         add_action_to_transaction(banx::action_structs::path_pay::ACTION_NAME, &packed)
+    }
+
+    fn pay_inv(
+        hops: Vec<WitPathHop>,
+        max_spend: String,
+        request_id: u32,
+    ) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::pay_inv)?;
+        if hops.is_empty() {
+            return Err(
+                ErrorType::ConversionError("path must have at least one hop".into()).into(),
+            );
+        }
+        if request_id == 0 {
+            return Err(ErrorType::ConversionError("pay_inv requires an invoice".into()).into());
+        }
+        let first_asset = hops[0].asset_id;
+        let max_spend = parse_amount_nonzero(first_asset, &max_spend)?;
+        let mut path = Vec::with_capacity(hops.len());
+        for h in hops {
+            path.push(banx::tables::PathHop {
+                account: parse_account(&h.account)?,
+                asset_id: h.asset_id,
+            });
+        }
+        let packed = banx::action_structs::pay_inv {
+            hops: path,
+            max_spend,
+            request_id,
+        }
+        .packed();
+        add_action_to_transaction(banx::action_structs::pay_inv::ACTION_NAME, &packed)
     }
 
     fn quote_path(

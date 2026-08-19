@@ -249,6 +249,15 @@ interface api {
         request-id: u32,
     ) -> result<_, error>;
 
+    /// Pay a live invoice: walk hops backward from remaining, send the
+    /// smallest amount that clears the bill if that is ≤ `max-spend`.
+    /// `max-spend` is a human decimal in the first hop's asset.
+    pay-inv: func(
+        hops: list<path-hop>,
+        max-spend: string,
+        request-id: u32,
+    ) -> result<_, error>;
+
     /// Discover a multi-hop path from `from-account` to `to-account` (TokenSwap-style
     /// max-residual search over credit lines / routing / FX). Uses a scoped GraphQL
     /// subgraph around the two endpoints — not a full-network dump.

@@ -205,6 +205,30 @@ export function usePathPay() {
     });
 }
 
+export function usePayInvoice() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            hops: { account: string; assetId: number }[];
+            maxSpend: string;
+            requestId: number;
+        }) =>
+            banxCall("payInv", [
+                p.hops.map((h) => ({
+                    account: h.account,
+                    assetId: h.assetId,
+                })),
+                p.maxSpend,
+                p.requestId,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Invoice paid");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
 export type PathHopQuote = {
     account: string;
     assetId: number;

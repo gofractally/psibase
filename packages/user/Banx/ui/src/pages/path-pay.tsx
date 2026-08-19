@@ -10,6 +10,7 @@ import { useAssetMap } from "@/hooks/use-assets";
 import {
     type PathHopQuote,
     usePathPay,
+    usePayInvoice,
     useQuotePath,
 } from "@/hooks/use-banx-mutations";
 import { amountPlaceholder, displayAmount } from "@/lib/amount";
@@ -37,6 +38,7 @@ export function PathPayPage() {
     const { data: user } = useCurrentUser();
     const { assets, precisionOf, symbolOf } = useAssetMap();
     const pathPay = usePathPay();
+    const payInvoice = usePayInvoice();
     const quotePath = useQuotePath();
     const [searchParams] = useSearchParams();
     const requestId = Number(searchParams.get("request") || "0") || 0;
@@ -131,12 +133,27 @@ export function PathPayPage() {
                 }));
             if (cleaned.length === 0) return;
             await new Promise<void>((resolve, reject) => {
+                if (requestId) {
+                    payInvoice.mutate(
+                        {
+                            hops: cleaned,
+                            maxSpend: value.amount.trim(),
+                            requestId,
+                        },
+                        {
+                            onSuccess: () => resolve(),
+                            onError: (e: Error) => reject(e),
+                        },
+                    );
+                    return
+                }
+
+
                 pathPay.mutate(
                     {
                         hops: cleaned,
                         amount: value.amount.trim(),
                         minReturn: value.minReturn.trim(),
-                        requestId: requestId || undefined,
                     },
                     {
                         onSuccess: () => resolve(),
@@ -671,7 +688,7 @@ export function PathPayPage() {
                 <execForm.AppForm>
                     <execForm.SubmitButton
                         labels={["Transfer", "Submitting…"]}
-                        loading={pathPay.isPending}
+                        loading={pathPay.isPending || payInvoice.isPending}
                     />
                 </execForm.AppForm>
             </form>

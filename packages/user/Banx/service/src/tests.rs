@@ -2295,6 +2295,162 @@ mod tests {
         Ok(())
     }
 
+    /// `pay_inv` walks back: $5 invoice, $20 budget, no hop fee → send $5.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_pay_inv_walks_back_zero_fee(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let mitchell = account!("mitchell");
+        let john = account!("john");
+        let cafe = account!("cafe");
+        for a in [mitchell, john, cafe] {
+            chain.new_account(a).unwrap();
+        }
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+
+        Wrapper::push_from(&chain, john)
+            .st_crd_lne(mitchell, aud, 50_0000.into(), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, cafe)
+            .st_crd_lne(john, aud, 50_0000.into(), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, john)
+            .st_crd_lne(cafe, aud, 0.into(), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, john)
+            .st_fwd_ofr(cafe, aud, 0.into(), 0, PPM_SCALE, never(), false)
+            .get()?;
+
+        let id = Wrapper::push_from(&chain, cafe)
+            .st_req(
+                PayRequest::INVOICE,
+                mitchell,
+                aud,
+                5_0000.into(),
+                "coffee".into(),
+                never(),
+            )
+            .get()?;
+
+        Wrapper::push_from(&chain, mitchell)
+            .pay_inv(vec![hop(john, aud), hop(cafe, aud)], 20_0000.into(), id)
+            .get()?;
+
+        assert_eq!(PayRequest::get_assert(id).remaining.value, 0);
+        assert_eq!(exp(&chain, john, mitchell, aud), 5_0000);
+        assert_eq!(exp(&chain, cafe, john, aud), 5_0000);
+        assert_eq!(exp(&chain, cafe, mitchell, aud), 0);
+        Ok(())
+    }
+
+    /// 1% hop fee: $5 invoice needs send 5.0506, not the $20 budget.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_pay_inv_walks_back_hop_fee(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let mitchell = account!("mitchell");
+        let john = account!("john");
+        let cafe = account!("cafe");
+        for a in [mitchell, john, cafe] {
+            chain.new_account(a).unwrap();
+        }
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+
+        Wrapper::push_from(&chain, john)
+            .st_crd_lne(mitchell, aud, 50_0000.into(), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, cafe)
+            .st_crd_lne(john, aud, 50_0000.into(), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, john)
+            .st_crd_lne(cafe, aud, 0.into(), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, john)
+            .st_fwd_ofr(
+                cafe,
+                aud,
+                0.into(),
+                PPM_SCALE / 100,
+                PPM_SCALE,
+                never(),
+                false,
+            )
+            .get()?;
+
+        let id = Wrapper::push_from(&chain, cafe)
+            .st_req(
+                PayRequest::INVOICE,
+                mitchell,
+                aud,
+                5_0000.into(),
+                "coffee".into(),
+                never(),
+            )
+            .get()?;
+
+        Wrapper::push_from(&chain, mitchell)
+            .pay_inv(vec![hop(john, aud), hop(cafe, aud)], 20_0000.into(), id)
+            .get()?;
+
+        assert_eq!(PayRequest::get_assert(id).remaining.value, 0);
+        assert_eq!(exp(&chain, john, mitchell, aud), 5_0506);
+        assert_eq!(exp(&chain, cafe, john, aud), 5_0000);
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_pay_inv_max_spend_too_small(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let mitchell = account!("mitchell");
+        let john = account!("john");
+        let cafe = account!("cafe");
+        for a in [mitchell, john, cafe] {
+            chain.new_account(a).unwrap();
+        }
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+
+        Wrapper::push_from(&chain, john)
+            .st_crd_lne(mitchell, aud, 50_0000.into(), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, cafe)
+            .st_crd_lne(john, aud, 50_0000.into(), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, john)
+            .st_crd_lne(cafe, aud, 0.into(), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, john)
+            .st_fwd_ofr(cafe, aud, 0.into(), 0, PPM_SCALE, never(), false)
+            .get()?;
+
+        let id = Wrapper::push_from(&chain, cafe)
+            .st_req(
+                PayRequest::INVOICE,
+                mitchell,
+                aud,
+                5_0000.into(),
+                "coffee".into(),
+                never(),
+            )
+            .get()?;
+
+        let failed = Wrapper::push_from(&chain, mitchell).pay_inv(
+            vec![hop(john, aud), hop(cafe, aud)],
+            4_0000.into(),
+            id,
+        );
+        let err = failed
+            .trace
+            .error
+            .as_deref()
+            .unwrap_or("(no error)");
+        assert!(
+            err.contains("max_spend below required send"),
+            "test_pay_inv_max_spend_too_small: got {err}"
+        );
+        assert_eq!(PayRequest::get_assert(id).remaining.value, 5_0000);
+        assert_eq!(exp(&chain, john, mitchell, aud), 0);
+        assert_eq!(exp(&chain, cafe, john, aud), 0);
+        Ok(())
+    }
+
     #[psibase::test_case(packages("Banx"))]
     fn test_invoice_rejects_wrong_payer_or_hop(
         chain: psibase::Chain,

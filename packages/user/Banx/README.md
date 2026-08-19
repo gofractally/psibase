@@ -55,7 +55,7 @@ Three kinds (`st_req` / `createRequest`). Named counterparty, amount, memo (80 b
 
 | Kind | Poster | Fulfiller | Effect |
 |------|--------|-----------|--------|
-| **Invoice** (`1`) | Payee | Named payer, via `path_pay` ending at the payee | Payee holds a **new** claim. Does **not** shrink an existing loan to that payee. |
+| **Invoice** (`1`) | Payee | Named payer, via `pay_inv` | Walks hops backward from remaining; `max_spend` is the send budget. Does **not** shrink an existing loan to that payee. |
 | **Please-book** (`2`) | Debtor (or whoever sent value off-graph) | **Only** the named creditor, via `deposit` with `request_id` | Opposite claim + auto-net. The poster cannot book this themselves. |
 | **Settle-auth** (`3`) | **Creditor** | **Only** the named debtor, via `fl_stl` | Same book as the creditor depositing them. Capped by `min(amount, remaining, live exposure)` — cannot flip the book or mint a claim on the creditor. |
 
@@ -71,6 +71,7 @@ UI: `/requests`. Accounts inbox icon prefills an invoice (savings) or please-boo
 - **Later hops** — the current path debtor must have a **live** path-forward offer. Specific next hop if live; otherwise a live global. Expired specific does **not** block the global. Buy-claim offers are not used here.
 - **Asset change** — the previous hop’s **creditor** (middle man) applies their FX quote to size the next hop. The payer’s tab stays in the from-asset; the middle man takes the to-asset liability. The sender’s policy is ignored.
 - **min_return** — final residual in the last hop’s asset must be at least this.
+- **Invoice** — `pay_inv(hops, max_spend, request_id)`: remaining is exact, `max_spend` is the send budget.
 
 Off-chain **Find path** (`quotePath`) searches a scoped subgraph (lines + reverse claims + clearing + FX), not the full network. Exact-in: amount is what you send. Exact-out: amount is what the payee should receive; the quote finds the send. Hop cards can show expected hop/FX fees.
 
@@ -156,7 +157,8 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 | `rm_buy_clm` / `rm_glb_buy` | Remove buy claim offer |
 | `st_sell_clm` / `st_glb_sell` | Specific / global sell claim offer |
 | `rm_sell_clm` / `rm_glb_sell` | Remove sell claim offer |
-| `path_pay` | Multi-hop draw (`request_id` 0 or invoice) |
+| `path_pay` | Multi-hop draw (`min_return`; optional `request_id` ticks an invoice) |
+| `pay_inv` | Pay invoice: exact remaining, `max_spend` budget |
 | `sell_claim` | Sell a claim into a buyer’s offer |
 | `buy_claim` | Buy a claim from a seller’s offer |
 | `deposit` | Book a deposit and auto-net (`request_id` 0 or please-book) |

@@ -197,6 +197,67 @@ pub mod tables {
         out.into()
     }
 
+    /// Smallest `in` such that [`apply_rate`] ≥ `amount_out`.
+    fn invert_rate(amount_out: Quantity, fee_fixed: Quantity, rate: u64) -> Quantity {
+        assert!(amount_out.value > 0, "invert rate output must be positive");
+        assert!(rate > 0, "fx_rate must be positive");
+        let num = (amount_out.value as u128)
+            .checked_mul(RATE_SCALE as u128)
+            .expect("invert fx overflow");
+        let after = u64::try_from((num + rate as u128 - 1) / (rate as u128))
+            .expect("invert fx exceeds u64");
+        let mut inn = after
+            .checked_add(fee_fixed.value)
+            .expect("invert fx fee overflow");
+        loop {
+            let got = apply_rate(inn.into(), fee_fixed, rate);
+            if got.value >= amount_out.value {
+                return inn.into();
+            }
+            inn = inn.checked_add(1).expect("invert fx bump overflow");
+        }
+    }
+
+    /// Smallest `in` such that [`apply_hop_fee`] ≥ `amount_out`.
+    fn invert_hop_fee(amount_out: Quantity, fee_fixed: Quantity, fee_percent_ppm: u32) -> Quantity {
+        assert!(amount_out.value > 0, "invert hop output must be positive");
+        assert!(fee_percent_ppm < PPM_SCALE, "hop fee must be under 100%");
+        let keep = (PPM_SCALE - fee_percent_ppm) as u128;
+        let need = amount_out
+            .value
+            .checked_add(fee_fixed.value)
+            .expect("invert hop fee overflow");
+        let num = (need as u128)
+            .checked_mul(PPM_SCALE as u128)
+            .expect("invert hop overflow");
+        let mut inn = u64::try_from((num + keep - 1) / keep).expect("invert hop exceeds u64");
+        loop {
+            let got = apply_hop_fee(inn.into(), fee_fixed, fee_percent_ppm);
+            if got.value >= amount_out.value {
+                return inn.into();
+            }
+            inn = inn.checked_add(1).expect("invert hop bump overflow");
+        }
+    }
+
+    /// Exact-out send: walk hops backward from `target_out` at the last hop
+    /// (undo hop fees, then FX).
+    pub(crate) fn path_required_send(hops: &[PathHop], target_out: Quantity) -> Quantity {
+        assert!(!hops.is_empty(), "path_pay must include at least one hop");
+        let mut need = target_out;
+        for i in (1..hops.len()).rev() {
+            let prev = hops[i - 1];
+            let hop = hops[i];
+            let offer = ForwardOffer::get_assert(prev.account, hop.account, hop.asset_id);
+            need = invert_hop_fee(need, offer.fee_fixed, offer.fee_percent);
+            if hop.asset_id != prev.asset_id {
+                let pol = CurrencyPolicy::get_assert(prev.account, prev.asset_id, hop.asset_id);
+                need = invert_rate(need, pol.fee_fixed, pol.fx_rate);
+            }
+        }
+        need
+    }
+
     /// One hop in [`service::path_pay`]: draw on `account` in `asset_id`.
     ///
     /// Example: `[(Gary, AUD), (Steve, USD)]` — currency change implies convert
@@ -207,6 +268,48 @@ pub mod tables {
     pub struct PathHop {
         pub account: AccountNumber,
         pub asset_id: u16,
+    }
+
+    /// Run a path draw. Returns the last-hop residual.
+    pub(crate) fn execute_path(
+        sender: AccountNumber,
+        hops: Vec<PathHop>,
+        amount: Quantity,
+    ) -> Quantity {
+        assert!(!hops.is_empty(), "path must include at least one hop");
+        assert!(amount.value > 0, "path amount must be positive");
+        let mut path_debtor = sender;
+        let mut forward = amount;
+        let mut prev_edge_creditor = sender;
+        let mut prev_asset = hops[0].asset_id;
+
+        for (i, hop) in hops.into_iter().enumerate() {
+            let PathHop {
+                account: next_creditor,
+                asset_id,
+            } = hop;
+            assert!(next_creditor != path_debtor, "path cannot draw on self");
+
+            if i == 0 {
+                Connection::get(next_creditor, path_debtor, asset_id).draw(forward);
+                prev_edge_creditor = next_creditor;
+                prev_asset = asset_id;
+                path_debtor = next_creditor;
+                continue;
+            }
+
+            if asset_id != prev_asset {
+                forward = CurrencyPolicy::get_assert(prev_edge_creditor, prev_asset, asset_id)
+                    .apply(forward);
+            }
+            assert!(forward.value > 0, "path hop produced nothing to forward");
+            forward = ForwardOffer::get_assert(path_debtor, next_creditor, asset_id)
+                .path_draw(next_creditor, forward);
+            prev_edge_creditor = next_creditor;
+            prev_asset = asset_id;
+            path_debtor = next_creditor;
+        }
+        forward
     }
 
     /// Path-forward offer: `poster` will sit in the middle of `path_pay`.
@@ -699,6 +802,31 @@ pub mod tables {
                 &row.memo.to_string(),
             );
             RequestTab::read_write().erase(&id);
+        }
+
+        /// Live remaining for an invoice path. Same checks as fulfill; no mutate.
+        pub fn live_invoice_remaining(
+            id: u32,
+            payer: AccountNumber,
+            last_hop: AccountNumber,
+            last_asset: u16,
+        ) -> Quantity {
+            let row = Self::get_assert(id);
+            assert!(row.kind == Self::INVOICE, "request is not an invoice");
+            row.assert_live();
+            assert!(
+                payer == row.counterparty,
+                "only the named payer can fulfill this invoice"
+            );
+            assert!(
+                last_hop == row.poster,
+                "invoice path must end at the payee (poster)"
+            );
+            assert!(
+                last_asset == row.asset_id,
+                "invoice last hop asset mismatch"
+            );
+            row.remaining
         }
 
         /// After a successful path_pay: last hop must be the payee (poster).
@@ -1522,10 +1650,9 @@ pub mod tables {
                 if src_end <= dest_end {
                     return;
                 }
-                dest.cycle_grace_seconds = u32::try_from(
-                    src_end.saturating_sub(dest.cycle_started_at.seconds),
-                )
-                .unwrap_or(u32::MAX);
+                dest.cycle_grace_seconds =
+                    u32::try_from(src_end.saturating_sub(dest.cycle_started_at.seconds))
+                        .unwrap_or(u32::MAX);
                 dest.save();
                 return;
             }
@@ -1867,8 +1994,8 @@ pub mod tables {
 #[psibase::service(name = "banx", tables = "tables")]
 pub mod service {
     use crate::tables::{
-        emit_pair_activity, Asset, ClaimOffer, Connection, CreditLine, CurrencyPolicy,
-        ForwardOffer, InitRow, InitTable, Obligation, PathHop, PayRequest,
+        emit_pair_activity, execute_path, path_required_send, Asset, ClaimOffer, CreditLine,
+        CurrencyPolicy, ForwardOffer, InitRow, InitTable, Obligation, PathHop, PayRequest,
     };
     use psibase::{
         services::events,
@@ -2343,51 +2470,14 @@ pub mod service {
     ///
     /// `request_id` 0 = none. Non-zero must be a live invoice naming the
     /// sender as payer; last hop must be the invoice poster in that asset.
+    /// Prefer [`pay_inv`] when paying a bill (exact remaining, spend budget).
     #[action]
     fn path_pay(hops: Vec<PathHop>, amount: Quantity, min_return: Quantity, request_id: u32) {
         assert!(!hops.is_empty(), "path_pay must include at least one hop");
         assert!(amount.value > 0, "path_pay amount must be positive");
         let last_hop = hops[hops.len() - 1];
 
-        let mut path_debtor = get_sender();
-        let mut forward = amount;
-        let mut prev_edge_creditor = get_sender(); // overwritten after hop 0
-        let mut prev_asset = hops[0].asset_id;
-
-        for (i, hop) in hops.into_iter().enumerate() {
-            let PathHop {
-                account: next_creditor,
-                asset_id,
-            } = hop;
-            assert!(next_creditor != path_debtor, "path_pay cannot draw on self");
-
-            if i == 0 {
-                Connection::get(next_creditor, path_debtor, asset_id).draw(forward);
-                prev_edge_creditor = next_creditor;
-                prev_asset = asset_id;
-                path_debtor = next_creditor;
-                continue;
-            }
-
-            // FX sizes the next hop only. Previous tab stays in from-asset.
-            if asset_id != prev_asset {
-                forward = CurrencyPolicy::get_assert(prev_edge_creditor, prev_asset, asset_id)
-                    .apply(forward);
-            }
-
-            assert!(
-                forward.value > 0,
-                "path_pay hop produced nothing to forward"
-            );
-
-            // Same-asset forward hop: live specific, else live global.
-            forward = ForwardOffer::get_assert(path_debtor, next_creditor, asset_id)
-                .path_draw(next_creditor, forward);
-            prev_edge_creditor = next_creditor;
-            prev_asset = asset_id;
-            path_debtor = next_creditor;
-        }
-
+        let forward = execute_path(get_sender(), hops, amount);
         assert!(
             forward.value >= min_return.value,
             "path_pay final amount below min_return"
@@ -2402,6 +2492,41 @@ pub mod service {
                 forward,
             );
         }
+    }
+
+    /// Pay a live invoice by walking hops **backward** from remaining.
+    ///
+    /// `max_spend` is a send budget in the first hop's asset. The action
+    /// computes the smallest send that delivers remaining (undo hop fees
+    /// and FX), requires that send ≤ `max_spend`, then executes that send.
+    ///
+    /// `request_id` must be a live invoice naming the sender; last hop must
+    /// be the invoice poster in that asset. No `min_return`.
+    #[action]
+    fn pay_inv(hops: Vec<PathHop>, max_spend: Quantity, request_id: u32) {
+        assert!(request_id != 0, "pay_inv requires an invoice");
+        assert!(!hops.is_empty(), "pay_inv must include at least one hop");
+        assert!(max_spend.value > 0, "pay_inv max_spend must be positive");
+        let last_hop = hops[hops.len() - 1];
+        let remaining = PayRequest::live_invoice_remaining(
+            request_id,
+            get_sender(),
+            last_hop.account,
+            last_hop.asset_id,
+        );
+        let required = path_required_send(&hops, remaining);
+        assert!(
+            required.value <= max_spend.value,
+            "pay_inv max_spend below required send"
+        );
+        let delivered = execute_path(get_sender(), hops, required);
+        PayRequest::fulfill_invoice(
+            request_id,
+            get_sender(),
+            last_hop.account,
+            last_hop.asset_id,
+            delivered,
+        );
     }
 
     /// Post an invoice (`1`), please-book (`2`), or settle-auth (`3`).
