@@ -41,9 +41,14 @@ package auth-sig:plugin;
 interface api { verify: func() -> bool; }
 "#;
 
-const ACCOUNTS_QUERY: &str = r#"
-package accounts:query;
+const ACCOUNTS_CLIENT_QUERY: &str = r#"
+package accounts:client-query;
 interface api { get-current-user: func() -> option<string>; }
+"#;
+
+const TRANSACT_LOGIN: &str = r#"
+package transact:login;
+interface api { build: func() -> list<u8>; }
 "#;
 
 const PERMISSIONS_API: &str = r#"
@@ -91,9 +96,9 @@ fn has_import(imports: &[String], needle: &str) -> bool {
 fn partition_permissions_excludes_host() {
     let query = plugin(
         "accounts",
-        "query",
+        "client-query",
         r#"
-package accounts:query;
+package accounts:client-query;
 interface api { get-current-user: func() -> option<string>; }
 world impl {
     import host:client/api;
@@ -108,19 +113,19 @@ world impl {
 package permissions:plugin;
 interface api { is-authorized: func() -> bool; }
 world impl {
-    import accounts:query/api;
+    import accounts:client-query/api;
     import host:client/api;
     export api;
 }
 "#,
-        &[HOST_CLIENT, ACCOUNTS_QUERY],
+        &[HOST_CLIENT, ACCOUNTS_CLIENT_QUERY],
     );
     let part = partition(&permissions.id.clone(), &[query, permissions]).unwrap();
     let keys: Vec<_> = part.compose_set.iter().map(|id| id.key()).collect();
     assert!(keys.contains(&"permissions:plugin".to_string()));
     assert!(
-        keys.contains(&"accounts:query".to_string()),
-        "accounts:query should be composed: {keys:?}"
+        keys.contains(&"accounts:client-query".to_string()),
+        "accounts:client-query should be composed: {keys:?}"
     );
     assert!(!keys.iter().any(|k| k.starts_with("host:")));
 }
@@ -263,19 +268,19 @@ package transact:plugin;
 interface admin { start-tx: func(); }
 interface hook-handlers { on-auth: func(); }
 world impl {
-    import accounts:query/api;
+    import accounts:client-query/api;
     import hook-handlers;
     import auth-sig:plugin/api;
     export admin;
 }
 "#,
-        &[HOST_CLIENT, AUTH_SIG, ACCOUNTS_QUERY],
+        &[HOST_CLIENT, AUTH_SIG, ACCOUNTS_CLIENT_QUERY],
     );
     let query = plugin(
         "accounts",
-        "query",
+        "client-query",
         r#"
-package accounts:query;
+package accounts:client-query;
 interface api { get-current-user: func() -> option<string>; }
 world impl { export api; }
 "#,
@@ -293,8 +298,8 @@ world impl { export api; }
     let keys: Vec<_> = part.compose_set.iter().map(|id| id.key()).collect();
     assert!(keys.contains(&"transact:plugin".to_string()));
     assert!(
-        keys.contains(&"accounts:query".to_string()),
-        "accounts:query should be composed: {keys:?}"
+        keys.contains(&"accounts:client-query".to_string()),
+        "accounts:client-query should be composed: {keys:?}"
     );
     assert!(!keys.contains(&"auth-sig:plugin".to_string()));
 }
@@ -359,9 +364,9 @@ world impl {
 fn plug_permissions_closes_query_import() {
     let query = plugin(
         "accounts",
-        "query",
+        "client-query",
         r#"
-package accounts:query;
+package accounts:client-query;
 interface api { get-current-user: func() -> option<string>; }
 world impl {
     import host:client/api;
@@ -376,34 +381,34 @@ world impl {
 package permissions:plugin;
 interface api { is-authorized: func() -> bool; }
 world impl {
-    import accounts:query/api;
+    import accounts:client-query/api;
     import host:client/api;
     export api;
 }
 "#,
-        &[HOST_CLIENT, ACCOUNTS_QUERY],
+        &[HOST_CLIENT, ACCOUNTS_CLIENT_QUERY],
     );
     let result = compose(&permissions.id.clone(), &[query, permissions], false).unwrap();
     let imports = remaining_imports(&result.wasm).unwrap();
     assert!(
-        !has_import(&imports, "accounts:query/api"),
-        "accounts:query should be plugged, got {imports:?}"
+        !has_import(&imports, "accounts:client-query/api"),
+        "accounts:client-query should be plugged, got {imports:?}"
     );
     assert!(
         has_import(&imports, "host:client"),
         "host import should remain, got {imports:?}"
     );
     assert!(result.compose_set.iter().any(|id| id.service == "permissions"));
-    assert!(result.compose_set.iter().any(|id| id.plugin == "query"));
+    assert!(result.compose_set.iter().any(|id| id.plugin == "client-query"));
 }
 
 #[test]
 fn nested_transact_keeps_hook_handlers_open() {
     let query = plugin(
         "accounts",
-        "query",
+        "client-query",
         r#"
-package accounts:query;
+package accounts:client-query;
 interface api { get-current-user: func() -> option<string>; }
 world impl { export api; }
 "#,
@@ -415,11 +420,11 @@ world impl { export api; }
 package permissions:plugin;
 interface api { is-authorized: func() -> bool; }
 world impl {
-    import accounts:query/api;
+    import accounts:client-query/api;
     export api;
 }
 "#,
-        &[ACCOUNTS_QUERY],
+        &[ACCOUNTS_CLIENT_QUERY],
     );
     let clientdata = plugin(
         "clientdata",
@@ -438,14 +443,14 @@ package transact:plugin;
 interface admin { start-tx: func(); finish-tx: func(); }
 interface hook-handlers { on-auth: func(); }
 world impl {
-    import accounts:query/api;
+    import accounts:client-query/api;
     import permissions:plugin/api;
     import clientdata:plugin/admin;
     import hook-handlers;
     export admin;
 }
 "#,
-        &[ACCOUNTS_QUERY, PERMISSIONS_API, CLIENTDATA_ADMIN],
+        &[ACCOUNTS_CLIENT_QUERY, PERMISSIONS_API, CLIENTDATA_ADMIN],
     );
     let result = compose(
         &transact.id.clone(),
@@ -455,8 +460,8 @@ world impl {
     .unwrap();
     let imports = remaining_imports(&result.wasm).unwrap();
     assert!(
-        !has_import(&imports, "accounts:query/api"),
-        "accounts:query should be plugged: {imports:?}"
+        !has_import(&imports, "accounts:client-query/api"),
+        "accounts:client-query should be plugged: {imports:?}"
     );
     assert!(
         !has_import(&imports, "permissions:plugin/api"),
@@ -533,9 +538,9 @@ world impl { export queries; }
 fn tracers_add_callstack_import() {
     let query = plugin(
         "accounts",
-        "query",
+        "client-query",
         r#"
-package accounts:query;
+package accounts:client-query;
 interface api { get-current-user: func() -> option<string>; }
 world impl { export api; }
 "#,
@@ -547,11 +552,11 @@ world impl { export api; }
 package permissions:plugin;
 interface api { is-authorized: func() -> bool; }
 world impl {
-    import accounts:query/api;
+    import accounts:client-query/api;
     export api;
 }
 "#,
-        &[ACCOUNTS_QUERY],
+        &[ACCOUNTS_CLIENT_QUERY],
     );
     let result = compose(&permissions.id.clone(), &[query, permissions], true).unwrap();
     let imports = remaining_imports(&result.wasm).unwrap();
@@ -560,8 +565,8 @@ world impl {
         "tracers should import callstack, got {imports:?}"
     );
     assert!(
-        !has_import(&imports, "accounts:query/api"),
-        "accounts:query should be plugged: {imports:?}"
+        !has_import(&imports, "accounts:client-query/api"),
+        "accounts:client-query should be plugged: {imports:?}"
     );
 }
 
@@ -714,10 +719,11 @@ interface api { get-active-query-token: func() -> option<string>; }
 world impl {
     import host:client/api;
     import host:db/store;
+    import transact:login/api;
     export api;
 }
 "#,
-        &[HOST_CLIENT, HOST_DB],
+        &[HOST_CLIENT, HOST_DB, TRANSACT_LOGIN],
     );
     // http and prompt are the tops of the host DAG — nothing in the
     // blob imports them, so composing them proves the multi-root walk.
@@ -730,10 +736,11 @@ interface api { post: func() -> string; }
 world impl {
     import host:client/api;
     import host:auth/api;
+    import accounts:client-query/api;
     export api;
 }
 "#,
-        &[HOST_CLIENT, HOST_AUTH],
+        &[HOST_CLIENT, HOST_AUTH, ACCOUNTS_CLIENT_QUERY],
     );
     let prompt = plugin_with_deps(
         "host",
@@ -783,6 +790,14 @@ world impl { export api; }
     assert!(
         !has_import(&imports, "host:auth/api"),
         "http → auth should be plugged: {imports:?}"
+    );
+    assert!(
+        has_import(&imports, "transact:login"),
+        "transact:login must stay open (not a host plugin): {imports:?}"
+    );
+    assert!(
+        has_import(&imports, "accounts:client-query"),
+        "accounts:client-query must stay open (not a host plugin): {imports:?}"
     );
 }
 

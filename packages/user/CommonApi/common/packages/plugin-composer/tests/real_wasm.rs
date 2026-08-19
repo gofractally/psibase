@@ -122,6 +122,14 @@ fn compose_real_host_with_tracers() {
                 !imports.iter().any(|i| i.starts_with("host:crypto/")),
                 "crypto keyvault should be plugged, got {imports:?}"
             );
+            assert!(
+                imports.iter().any(|i| i.starts_with("transact:login/")),
+                "transact:login must stay open on the host blob, got {imports:?}"
+            );
+            assert!(
+                imports.iter().any(|i| i.starts_with("accounts:client-query/")),
+                "accounts:client-query must stay open on the host blob, got {imports:?}"
+            );
         }
         Err(e) => panic!("host compose failed: {e:#}"),
     }
@@ -175,7 +183,7 @@ fn compose_permissions_query_real_tracers() {
         return;
     }
     let plugins = vec![
-        load("accounts", "query", "accounts_query.wasm"),
+        load("accounts", "client-query", "accounts_client_query.wasm"),
         load("permissions", "plugin", "permissions.wasm"),
     ];
     match compose(&PluginId::new("permissions", "plugin"), &plugins, true) {
@@ -194,7 +202,8 @@ fn compose_branding_closure_with_perms_chain_id() {
         load("transact", "actions", "transact_actions.wasm"),
         load("sites", "plugin", "sites.wasm"),
         load("clientdata", "plugin", "clientdata.wasm"),
-        load("accounts", "query", "accounts_query.wasm"),
+        load("accounts", "client-query", "accounts_client_query.wasm"),
+        load("accounts", "chain-query", "accounts_chain_query.wasm"),
         load("perms", "plugin", "permissions.wasm"),
         load("accounts", "plugin", "accounts.wasm"),
         load("host", "client", "host_client.wasm"),
@@ -239,7 +248,8 @@ fn compose_branding_from_psi_packages() {
         load_from_psi("Transact.psi", "data/transact/actions.wasm", "transact", "actions"),
         load_from_psi("Sites.psi", "data/sites/plugin.wasm", "sites", "plugin"),
         load_from_psi("ClientData.psi", "data/clientdata/plugin.wasm", "clientdata", "plugin"),
-        load_from_psi("Accounts.psi", "data/accounts/query.wasm", "accounts", "query"),
+        load_from_psi("Accounts.psi", "data/accounts/client-query.wasm", "accounts", "client-query"),
+        load_from_psi("Accounts.psi", "data/accounts/chain-query.wasm", "accounts", "chain-query"),
         load_from_psi("Permissions.psi", "data/perms/plugin.wasm", "perms", "plugin"),
         load_from_psi("Accounts.psi", "data/accounts/plugin.wasm", "accounts", "plugin"),
         load_from_psi("VirtualServer.psi", "data/vserver/plugin.wasm", "vserver", "plugin"),
@@ -260,8 +270,12 @@ fn compose_branding_from_psi_packages() {
     assert!(set.contains(&"tokens:plugin".to_string()), "{set:?}");
     assert!(set.contains(&"perms:plugin".to_string()), "{set:?}");
     assert!(
-        set.contains(&"accounts:query".to_string()),
-        "accounts:query should be composed: {set:?}"
+        set.contains(&"accounts:client-query".to_string()),
+        "accounts:client-query should be composed: {set:?}"
+    );
+    assert!(
+        set.contains(&"accounts:chain-query".to_string()),
+        "accounts:chain-query should be composed: {set:?}"
     );
     assert!(
         set.contains(&"transact:actions".to_string()),
@@ -305,7 +319,11 @@ fn compose_branding_from_psi_packages() {
         "forward branding→sites api should be plugged, got {imports:?}"
     );
     assert!(
-        !imports.iter().any(|i| i.starts_with("accounts:query/")),
-        "accounts:query should be plugged, got {imports:?}"
+        !imports.iter().any(|i| i.starts_with("accounts:client-query/")),
+        "accounts:client-query should be plugged, got {imports:?}"
+    );
+    assert!(
+        !imports.iter().any(|i| i.starts_with("accounts:chain-query/")),
+        "accounts:chain-query should be plugged, got {imports:?}"
     );
 }

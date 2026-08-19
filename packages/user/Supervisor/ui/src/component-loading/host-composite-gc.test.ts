@@ -213,12 +213,12 @@ resourceTransferOwn = function (handle, fromTid, toTid) {
                 harness.frames.pop();
             },
         },
-        // auth's transact hop (get-query-token) stays a JS import.
-        "transact:plugin/auth": throwingStub("transact:plugin/auth"),
+        // auth's login-builder hop stays a JS import (U2).
+        "transact:login/api": throwingStub("transact:login/api"),
         // crypto's permissions hop stays a JS import.
         "permissions:plugin/api": throwingStub("permissions:plugin/api"),
         "host:types/types": throwingStub("host:types/types"),
-        "accounts:query/api": {
+        "accounts:client-query/api": {
             getCurrentUser: () => {
                 harness.log.push("getCurrentUser");
                 return "alice";
