@@ -7,7 +7,7 @@ namespace TestService
 {
    struct TestMemo
    {
-      static constexpr auto service = psibase::AccountNumber{"memo-service"};
+      static constexpr auto service = psibase::AccountNumber{"memo-svc"};
 
       // Allow the tests to use string instead of MemoService
       // 1) using string verifies serialization compatibility between string and Memo

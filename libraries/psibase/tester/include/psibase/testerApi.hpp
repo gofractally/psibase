@@ -67,9 +67,6 @@ namespace psibase::tester::raw
    TESTER_NATIVE(kvGet)
    std::uint32_t kvGet(std::uint32_t chain, DbId db, const char* key, std::uint32_t keyLen);
 
-   TESTER_NATIVE(getSequential)
-   std::uint32_t getSequential(std::uint32_t chain, DbId db, std::uint64_t id);
-
    TESTER_NATIVE(kvGreaterEqual)
    std::uint32_t kvGreaterEqual(std::uint32_t chain,
                                 DbId          db,

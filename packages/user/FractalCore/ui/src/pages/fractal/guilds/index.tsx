@@ -2,7 +2,6 @@ import { Plus } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { useFractal } from "@/hooks/fractals/use-fractal";
 
 import { GlowingCard } from "@shared/components/glowing-card";
 import { PageContainer } from "@shared/components/page-container";
@@ -21,16 +20,15 @@ import {
 } from "@shared/shadcn/ui/table";
 
 import { ModalCreateGuild } from "./components/modal-create-guild";
+import { useGuilds } from "@/hooks/fractals/use-guilds";
 
 export const Guilds = () => {
     const [showModal, setShowModal] = useState(false);
 
-    const { data: fractal } = useFractal();
+    const { data: guilds } = useGuilds()
 
     const navigate = useNavigate();
-    const guildsData = fractal?.guilds.nodes;
 
-    const guilds = guildsData || [];
 
     return (
         <>

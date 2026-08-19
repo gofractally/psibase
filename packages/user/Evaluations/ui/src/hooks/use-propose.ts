@@ -1,6 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
+import { EVALUATIONS_SERVICE } from "@shared/domains/fractal/lib/constants";
 import { zAccount } from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";
 
@@ -18,7 +19,7 @@ export const usePropose = () =>
                 Params.parse(params);
             const pars = {
                 method: "propose",
-                service: "evaluations",
+                service: EVALUATIONS_SERVICE,
                 intf: "user",
                 params: [
                     owner,

@@ -10,6 +10,23 @@ using namespace SystemService;
 
 namespace
 {
+   bool isResMonitoring()
+   {
+      return to<Transact>().isResMonitoring();
+   }
+
+   void skipBilling()
+   {
+      if (isResMonitoring())
+         to<Transact>().skipBilling(1);
+   }
+
+   void endSkipBilling()
+   {
+      if (isResMonitoring())
+         to<Transact>().endSkipBilling();
+   }
+
    auto compare_claim = [](const Claim& lhs, const Claim& rhs)
    { return std::tie(lhs.service, lhs.rawData) < std::tie(rhs.service, rhs.rawData); };
 
@@ -56,43 +73,11 @@ namespace
                         { return std::move(c.producers); }, status.consensus.next->consensus.data);
    }
 
-   using IndirectCheckFunc =
-       bool (Actor<SystemService::AuthInterface>::*)(AccountNumber,
-                                                     std::vector<AccountNumber>,
-                                                     std::optional<ServiceMethod>,
-                                                     std::optional<std::vector<AccountNumber>>);
-
-   bool checkOverlapping(std::vector<AccountNumber> producers,
-                         std::vector<AccountNumber> authorizers,
-                         std::size_t                threshold,
-                         IndirectCheckFunc          indirectCheck,
-                         std::vector<AccountNumber> authSet)
+   std::size_t countOverlapping(const std::vector<AccountNumber>& producers,
+                                const std::vector<AccountNumber>& authorizers)
    {
-      // We only check for indirect auth if there are insufficient direct auths.
-      auto nonOverlapping = std::ranges::partition(
+      return std::ranges::count_if(
           producers, [&](const auto& p) { return std::ranges::contains(authorizers, p); });
-      auto numOverlapping = std::ranges::distance(producers.begin(), nonOverlapping.begin());
-      if (numOverlapping >= threshold)
-      {
-         return true;
-      }
-
-      // Now check for indirect authorization
-      for (const auto& account :
-           std::ranges::subrange(nonOverlapping.begin(), nonOverlapping.end()))
-      {
-         auto toAuth = Actor<SystemService::AuthInterface>{
-             SystemService::Producers::service, to<SystemService::Accounts>().getAuthOf(account)};
-
-         if ((toAuth.*indirectCheck)(account, authorizers, std::nullopt,
-                                     std::optional(std::move(authSet))) &&
-             ++numOverlapping >= threshold)
-         {
-            return true;
-         }
-      }
-
-      return false;
    }
 
 }  // namespace
@@ -144,7 +129,9 @@ namespace SystemService
       status->consensus.next = {{std::move(consensus), status->consensus.current.services,
                                  status->consensus.current.wasmConfig},
                                 status->current.blockNum};
+      skipBilling();
       table.put(*status);
+      endSkipBilling();
    }
 
    void Producers::setProducers(std::vector<psibase::Producer> prods)
@@ -171,7 +158,9 @@ namespace SystemService
                status->consensus.current.data),
            status->consensus.current.services, status->consensus.current.wasmConfig},
           status->current.blockNum};
+      skipBilling();
       table.put(*status);
+      endSkipBilling();
    }
 
    void Producers::regCandidate(const std::string& endpoint, psibase::Claim claim)
@@ -231,7 +220,7 @@ namespace SystemService
       return ::getNrProds() - getThreshold(account) + 1;
    }
 
-   void Producers::checkAuthSys(uint32_t                    flags,
+   bool Producers::checkAuthSys(uint32_t                    flags,
                                 AccountNumber               requester,
                                 AccountNumber               sender,
                                 ServiceMethod               action,
@@ -244,9 +233,9 @@ namespace SystemService
       // TODO: refactor duplicated code
       auto type = flags & AuthInterface::requestMask;
       if (type == AuthInterface::runAsRequesterReq)
-         return;  // Request is valid
+         return true;  // Request is valid
       else if (type == AuthInterface::runAsMatchedReq)
-         return;  // Request is valid
+         return true;  // Request is valid
       else if (type == AuthInterface::runAsMatchedExpandedReq)
          abortMessage("runAs: caller attempted to expand powers");
       else if (type == AuthInterface::runAsOtherReq)
@@ -264,11 +253,7 @@ namespace SystemService
       });
 
       auto threshold = expectedClaims.empty() ? 0 : getThreshold(sender);
-      if (matching < threshold)
-      {
-         abortMessage("runAs: have " + std::to_string(matching) + "/" + std::to_string(threshold) +
-                      " producers required to authorize");
-      }
+      return matching >= threshold;
    }
 
    void Producers::canAuthUserSys(AccountNumber user)
@@ -277,43 +262,25 @@ namespace SystemService
             "Can only authorize predefined accounts");
    }
 
-   bool Producers::isAuthSys(AccountNumber                             sender,
-                             std::vector<AccountNumber>                authorizers,
-                             std::optional<ServiceMethod>              method,
-                             std::optional<std::vector<AccountNumber>> authSet_opt)
+   std::vector<AccountNumber> Producers::getDlgsSys(AccountNumber sender)
    {
-      auto authSet = authSet_opt ? std::move(*authSet_opt) : std::vector<AccountNumber>{};
+      return getProducers();
+   }
 
-      // Base case to prevent infinite recursion
-      if (std::ranges::contains(authSet, sender))
-         return false;
-
-      authSet.push_back(sender);
-
+   bool Producers::isAuthSys(AccountNumber                sender,
+                             std::vector<AccountNumber>   authorizers)
+   {
       auto producers = ::getProducers()                          //
                        | std::views::transform(&Producer::name)  //
                        | std::ranges::to<std::vector>();
 
       auto threshold = producers.empty() ? 0 : getThreshold(sender);
-
-      auto _ = recurse();
-      return checkOverlapping(std::move(producers), std::move(authorizers), threshold,
-                              &Actor<AuthInterface>::isAuthSys, std::move(authSet));
+      return countOverlapping(producers, authorizers) >= threshold;
    }
 
-   bool Producers::isRejectSys(AccountNumber                             sender,
-                               std::vector<AccountNumber>                rejecters,
-                               std::optional<ServiceMethod>              method,
-                               std::optional<std::vector<AccountNumber>> authSet_opt)
+   bool Producers::isRejectSys(AccountNumber                sender,
+                               std::vector<AccountNumber>   rejecters)
    {
-      auto authSet = authSet_opt ? std::move(*authSet_opt) : std::vector<AccountNumber>{};
-
-      // Base case to prevent infinite recursion
-      if (std::ranges::contains(authSet, sender))
-         return false;
-
-      authSet.push_back(sender);
-
       auto producers = ::getProducers()                          //
                        | std::views::transform(&Producer::name)  //
                        | std::ranges::to<std::vector>();
@@ -322,10 +289,7 @@ namespace SystemService
          return false;
 
       auto threshold = antiThreshold(sender);
-
-      auto _ = recurse();
-      return checkOverlapping(std::move(producers), std::move(rejecters), threshold,
-                              &Actor<AuthInterface>::isRejectSys, std::move(authSet));
+      return countOverlapping(producers, rejecters) >= threshold;
    }
 
 }  // namespace SystemService

@@ -41,4 +41,9 @@ interface prompt {
     ///   be redeemed to create an account, then the invite will be used. If neither condition
     ///   is met, then the attempt to create an account will fail.
     create-account: func(account-name: string) -> result<string, error>;
+
+    /// Purchases a premium account name, claims it, configures auth-sig, and returns the new account's private key.
+    ///
+    /// The account is not imported onto this device.
+    create-premium: func(account-name: string, max-cost: string) -> result<string, error>;
 }

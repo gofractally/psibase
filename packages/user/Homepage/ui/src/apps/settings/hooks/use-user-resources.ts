@@ -31,7 +31,7 @@ export const useUserResources = (
 
             const query = `
                 query {
-                    userResources(user: "${user}") {
+                    userResources(account: "${user}") {
                         balance
                         bufferCapacity
                         autoFillThresholdPercent
@@ -40,7 +40,7 @@ export const useUserResources = (
             `;
 
             const result = await supervisor.functionCall({
-                service: "virtual-server",
+                service: "vserver",
                 plugin: "plugin",
                 intf: "authorized",
                 method: "graphql",

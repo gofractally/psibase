@@ -10,7 +10,7 @@ impl PluginAuthorized {
         Ok(())
     }
 
-    #[authorized(High, whitelist = ["homepage", "virtual-server", "invite"])]
+    #[authorized(High, whitelist = ["homepage", "vserver", "invite"])]
     fn multi_whitelist() -> Result<(), String> {
         Ok(())
     }

@@ -26,6 +26,11 @@ add_test(
 )
 
 add_test(
+    NAME rs-test-panic
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/release/cargo-psibase test --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/test_panic/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR} --psitest=${CMAKE_BINARY_DIR}/psitest
+)
+
+add_test(
     NAME rs-tests
     COMMAND env PSIBASE_DATADIR=${CMAKE_BINARY_DIR}/share/psibase cargo test -r --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR} -p test_fracpack -p psibase -p cargo-psibase -p psibase-macros-lib -p psibase-macros-derive -p psibase_plugin
 )

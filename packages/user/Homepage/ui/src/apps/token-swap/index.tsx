@@ -1,11 +1,11 @@
-import { AppConfigType } from "@/configured-apps";
+import { defineAppConfig } from "@/app-config";
 import { ArrowRightLeft } from "lucide-react";
 
 import { zAccount } from "@shared/lib/schemas/account";
 
 import { SwapPage } from "./page";
 
-export const tokenSwapConfig: AppConfigType = {
+export const tokenSwapConfig = defineAppConfig({
     service: zAccount.parse("token-swap"),
     name: "Swap",
     description: "Trade tokens.",
@@ -20,4 +20,4 @@ export const tokenSwapConfig: AppConfigType = {
             name: "Home",
         },
     ],
-};
+});

@@ -9,7 +9,7 @@ import {
     Users,
 } from "lucide-react";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import { GenerateInviteDialogContent } from "@/apps/contacts/components/generate-invite-dialog";
 
@@ -45,6 +45,7 @@ import { Skeleton } from "@shared/shadcn/ui/skeleton";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 export function NavUser() {
+    const location = useLocation();
     const navigate = useNavigate();
     const { isMobile } = useSidebar();
     const { setTheme } = useTheme();
@@ -59,8 +60,11 @@ export function NavUser() {
         },
     });
 
-    const onSwitchAccounts = async () => {
-        await login();
+    const onLogin = async () => {
+        await login({
+            enabled: true,
+            returnPath: `${location.pathname}${location.search}${location.hash}`,
+        });
     };
 
     const onLogout = async () => {
@@ -203,9 +207,7 @@ export function NavUser() {
 
                             {user ? (
                                 <>
-                                    <DropdownMenuItem
-                                        onClick={() => onSwitchAccounts()}
-                                    >
+                                    <DropdownMenuItem onClick={onLogin}>
                                         <Users className="mr-2 h-4 w-4" />
                                         Switch account
                                     </DropdownMenuItem>
@@ -218,7 +220,7 @@ export function NavUser() {
                                 </>
                             ) : (
                                 <DropdownMenuItem
-                                    onClick={() => login()}
+                                    onClick={onLogin}
                                     disabled={isPendingUser}
                                 >
                                     <LogIn className="mr-2 h-4 w-4" />

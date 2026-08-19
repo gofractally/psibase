@@ -1,9 +1,10 @@
+import hashJs from "hash.js";
+
 import {
     privateStringToKeyPair,
     publicKeyPairToDER,
     signatureToBin,
 } from "./key-conversions";
-import hashJs from "hash.js";
 
 export class RPCError extends Error {
     trace: any;
@@ -105,7 +106,14 @@ export async function postText(url: string, text: string) {
     );
 }
 
-export async function postGraphQL(url: string, graphql: string) {
+export async function postGraphQL(
+    url: string,
+    graphql: string,
+    options?: RequestInit,
+) {
+    if (!options) {
+        options = {};
+    }
     return throwIfError(
         await fetch(url, {
             method: "POST",
@@ -113,11 +121,15 @@ export async function postGraphQL(url: string, graphql: string) {
                 "Content-Type": "application/graphql",
             },
             body: graphql,
+            ...options,
         }),
     );
 }
 
-export async function postJson(url: string, json: any) {
+export async function postJson(url: string, json: any, options?: RequestInit) {
+    if (!options) {
+        options = {};
+    }
     return throwIfError(
         await fetch(url, {
             method: "POST",
@@ -125,6 +137,7 @@ export async function postJson(url: string, json: any) {
                 "Content-Type": "application/json",
             },
             body: JSON.stringify(json),
+            ...options,
         }),
     );
 }
@@ -149,13 +162,18 @@ export async function postTextGetJson(url: string, text: string) {
 export async function postGraphQLGetJson<GqlResponse>(
     url: string,
     graphQL: string,
+    options?: RequestInit,
 ): Promise<GqlResponse> {
-    const res = await postGraphQL(url, graphQL);
+    const res = await postGraphQL(url, graphQL, options);
     return res.json();
 }
 
-export async function postJsonGetJson(url: string, json: any) {
-    const res = await postJson(url, json);
+export async function postJsonGetJson(
+    url: string,
+    json: any,
+    options?: RequestInit,
+) {
+    const res = await postJson(url, json, options);
     return res.json();
 }
 

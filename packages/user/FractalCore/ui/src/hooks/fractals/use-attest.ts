@@ -2,11 +2,10 @@ import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
-import { getSupervisor } from "@psibase/common-lib";
-
 import { paths } from "@/lib/paths";
 import { zGuildAccount } from "@/lib/zod/wrappers";
 
+import { supervisor } from "@shared/lib/supervisor";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 import { useFractalAccount } from "./use-fractal-account";
@@ -23,19 +22,13 @@ export const useAttest = () => {
 
     return useMutation({
         mutationFn: async (params: z.infer<typeof zParams>) => {
-            await toast
-                .promise(
-                    getSupervisor().functionCall({
-                        method: "attest",
-                        service: fractal,
-                        intf: "userEval",
-                        params: [params.guildAccount, params.groupNumber],
-                    }),
-                    {
-                        error: () => "Unable to attest",
-                    },
-                )
-                .unwrap();
+            const { guildAccount, groupNumber } = zParams.parse(params);
+            await supervisor.functionCall({
+                method: "attest",
+                service: fractal,
+                intf: "userEval",
+                params: [guildAccount, groupNumber],
+            });
 
             // HACK
             // for optimistic update purposes
@@ -48,7 +41,12 @@ export const useAttest = () => {
             navigate(paths.guild.evaluations(guildAccount));
         },
         onError: (error) => {
+            // Attest error: PluginError: Transaction error: service 'evaluations' aborted with message: user myprod has already submitted
             console.error("Attest error:", error);
+            if (error.message.includes("already submitted")) return;
+            toast.error("Unable to attest", {
+                description: error.message,
+            });
         },
     });
 };

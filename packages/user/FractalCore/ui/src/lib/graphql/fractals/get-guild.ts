@@ -1,11 +1,12 @@
 import { z } from "zod";
 
-import { FRACTALS_SERVICE } from "@shared/domains/fractal/lib/constants";
+import { GUILDS_SERVICE } from "@shared/domains/fractal/lib/constants";
 import { graphql } from "@shared/lib/graphql";
 import { Account, zAccount } from "@shared/lib/schemas/account";
 
 export const zGuild = z.object({
     account: zAccount,
+    fractal: zAccount,
     displayName: z.string(),
     council: zAccount.array().nullable(),
     rep: z.object({ member: zAccount }).nullable(),
@@ -25,8 +26,9 @@ export const getGuild = async (guildAccount: Account) => {
     const res = await graphql(
         `
         {
-            guild(guild:"${guildAccount}") {
+            guild(account:"${guildAccount}") {
                 account
+                fractal
                 displayName
                 rep {
                     member
@@ -41,7 +43,7 @@ export const getGuild = async (guildAccount: Account) => {
             }
         }
     `,
-        { service: FRACTALS_SERVICE },
+        { service: GUILDS_SERVICE },
     );
 
     return z

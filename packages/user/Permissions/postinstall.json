@@ -1,6 +1,6 @@
 [
   {
-    "sender": "permissions",
+    "sender": "perms",
     "service": "sites",
     "method": "setcsp",
     "data": {

@@ -40,6 +40,8 @@ interface api {
     upload-avatar: func(avatar: avatar) -> result<_, error>;
     remove-avatar: func() -> result<_, error>;
 
+    has-read-permission: func() -> bool;
+
 }
 
 

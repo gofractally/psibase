@@ -80,11 +80,34 @@ impl<'a, T: PartialEq + Copy + Eq + Hash + Display + Debug> AlignmentMerge<'a, T
         };
 
         // Get all indices for each element
-        let indices: HashMap<_, _> = self
+        let mut indices: HashMap<_, _> = self
             .elements
             .keys()
             .map(|&element| (element, self.get_indices(&element)))
             .collect();
+
+        // If every unique element is left out of exactly N rankings, we can safely remove
+        //   exactly N zeroes from the indices of each element.
+        // This avoids introducing a systematic bias in the final rank-ordering that punishes
+        //   elements proportionally to how highly they are ranked.
+        let min_zero_count = indices
+            .values()
+            .map(|idx_vec| idx_vec.iter().filter(|&&i| i == 0).count())
+            .min()
+            .unwrap_or(0);
+        if min_zero_count > 0 {
+            for idx_vec in indices.values_mut() {
+                let mut removed = 0;
+                idx_vec.retain(|&i| {
+                    if i == 0 && removed < min_zero_count {
+                        removed += 1;
+                        false
+                    } else {
+                        true
+                    }
+                });
+            }
+        }
 
         // Calculate the stats for each element
         for (element, stats) in self.elements.iter_mut() {
@@ -386,5 +409,21 @@ mod tests {
         ];
         run_alignment_merge(&lists, DEBUG_PRINT);
         //RESULT: "alice", "bob", "charlie", "frank", "dan", "everett"
+    }
+
+    #[test]
+    fn test_consensus_no_self_ranking() {
+        let lists = vec![
+            vec!["b", "c", "d", "e"], //
+            vec!["a", "c", "d", "e"],
+            vec!["a", "b", "d", "e"],
+            vec!["a", "b", "c", "e"],
+            vec!["a", "b", "c", "d"],
+        ];
+
+        assert_eq!(
+            run_alignment_merge(&lists, false),
+            Some(vec!["a", "b", "c", "d", "e"])
+        );
     }
 }

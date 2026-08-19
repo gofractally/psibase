@@ -1,4 +1,5 @@
 import type { QueryOptions } from "./types";
+import type { AutoRedirectConfig } from "@psibase/common-lib";
 
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
@@ -22,16 +23,22 @@ export const zProcessedContact = zLocalContact.extend({
 export type LocalContact = z.infer<typeof zLocalContact>;
 export type ProcessedContact = z.infer<typeof zProcessedContact>;
 
-export const queryContacts = (username: Account | null | undefined) =>
+export const queryContacts = (
+    username: Account | null | undefined,
+    autoRedirectConfig: AutoRedirectConfig,
+) =>
     queryOptions({
         queryKey: QueryKey.contacts(username),
         queryFn: async () => {
-            const res = await supervisor.functionCall({
-                service: zAccount.parse("profiles"),
-                method: "get",
-                params: [],
-                intf: "contacts",
-            });
+            const res = await supervisor.functionCall(
+                {
+                    service: zAccount.parse("profiles"),
+                    method: "get",
+                    params: [],
+                    intf: "contacts",
+                },
+                autoRedirectConfig,
+            );
             return zLocalContact.array().parse(res);
         },
     });
@@ -44,10 +51,14 @@ export const useContacts = (
         LocalContact[],
         ReturnType<typeof QueryKey.contacts>
     >,
+    autoRedirectConfig: AutoRedirectConfig = {
+        enabled: true,
+        returnPath: "/",
+    },
 ) => {
     const queryOptions = options ?? {};
     return useQuery({
-        ...queryContacts(username),
+        ...queryContacts(username, autoRedirectConfig),
         ...queryOptions,
         enabled: !!username && queryOptions.enabled,
     });

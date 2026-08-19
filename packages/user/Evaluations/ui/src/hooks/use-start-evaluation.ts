@@ -1,6 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
+import { EVALUATIONS_SERVICE } from "@shared/domains/fractal/lib/constants";
 import { queryClient } from "@shared/lib/query-client";
 import { supervisor } from "@shared/lib/supervisor";
 
@@ -16,7 +17,7 @@ export const useStartEvaluation = () =>
             const { evaluationId } = StartParams.parse(params);
             void (await supervisor.functionCall({
                 method: "start",
-                service: "evaluations",
+                service: EVALUATIONS_SERVICE,
                 intf: "admin",
                 params: [evaluationId],
             }));

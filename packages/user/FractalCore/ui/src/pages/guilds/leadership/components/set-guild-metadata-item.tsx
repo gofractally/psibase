@@ -14,11 +14,14 @@ import {
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 import { SetGuildMetadataModal } from "../../components/set-guild-metadata-modal";
+import { useGuildAccount } from "@/hooks/use-guild-account";
 
 export const SetGuildMetadataItem = () => {
     const { data: roles, isPending, error } = useGuildMemberRoles();
 
     const [show, setShow] = useState(false);
+
+    const guild = useGuildAccount()
 
     if (isPending) {
         return <Skeleton className="h-20 w-full" />;
@@ -30,7 +33,7 @@ export const SetGuildMetadataItem = () => {
 
     return (
         <>
-            <SetGuildMetadataModal openChange={setShow} show={show} />
+            <SetGuildMetadataModal guildAccount={guild} openChange={setShow} show={show} />
             {roles?.isGuildAdmin && (
                 <Item variant="muted">
                     <ItemContent>

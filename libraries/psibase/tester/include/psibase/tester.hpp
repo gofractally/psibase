@@ -7,6 +7,7 @@
 #include <psibase/nativeTables.hpp>
 #include <psibase/trace.hpp>
 #include <psio/to_hex.hpp>
+#include <services/system/Accounts.hpp>
 #include <services/system/PrivateKeyInfo.hpp>
 #include <services/system/Spki.hpp>
 #include <services/system/VirtualServer.hpp>
@@ -20,14 +21,7 @@ namespace psibase
                              SystemService::AuthSig::PrivateKeyInfo>;
    using KeyList = std::vector<KeyPair>;
 
-   inline std::string show(bool include, TransactionTrace t)
-   {
-      if (include || t.error)
-         std::cout << prettyTrace(trimRawData(t)) << "\n";
-      if (t.error)
-         return *t.error;
-      return {};
-   }
+   std::string show(bool include, TransactionTrace t);
 
    inline bool isUserAction(const Action& action)
    {
@@ -38,7 +32,14 @@ namespace psibase
       if (action.sender == SystemService::Transact::service &&
           action.service == SystemService::VirtualServer::service)
          return false;
+      if (action.sender == SystemService::Transact::service &&
+          action.service == SystemService::Accounts::service && action.method == "getAuthOf"_m)
+      {
+         return false;
+      }
       if (action.service == "events"_a && action.method == "sync"_m)
+         return false;
+      if (action.service == "events"_a && action.method == "saveMerkle"_m)
          return false;
       if (action.sender == AccountNumber{})
          return false;
@@ -119,7 +120,7 @@ namespace psibase
       {
          if (_t.error.has_value())
          {
-            std::cout << prettyTrace(trimRawData(_t)).c_str();
+            show(true, _t);
          }
 
          if (_return.has_value())

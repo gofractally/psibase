@@ -2,8 +2,8 @@ use crate::{build, build_plugins, Args, AsyncJobServer, PackageArtifact};
 use anyhow::anyhow;
 use cargo_metadata::{Metadata, Node, Package, PackageId};
 use psibase::{
-    AccountNumber, Checksum256, Meta, PackageInfo, PackageRef, PackagedService, PrettyAction,
-    Schema, ServiceInfo,
+    AccountNumber, Checksum256, Meta, PackageExport, PackageInfo, PackageRef, PackagedService,
+    PrettyAction, Schema, ServiceInfo,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -200,7 +200,6 @@ fn add_files<'a>(
 
 pub struct PackageBuilder<'a> {
     service_crates: Vec<&'a Package>,
-    service_info: Vec<ServiceInfo>,
     plugin_crates: Vec<&'a Package>,
     plugin_targets: Vec<(&'a str, String)>,
     postinstall: Vec<PrettyAction>,
@@ -218,7 +217,6 @@ impl<'a> PackageBuilder<'a> {
         let mut visited = HashSet::new();
         let mut queue = Vec::new();
         let mut service_crates = Vec::new();
-        let mut service_info = Vec::new();
         let mut plugin_crates = Vec::new();
         let mut plugin_targets = Vec::new();
         let mut postinstall = Vec::new();
@@ -284,13 +282,7 @@ impl<'a> PackageBuilder<'a> {
                         version: v,
                     });
                 }
-                let mut info = ServiceInfo {
-                    flags: pmeta.flags,
-                    server: None,
-                    schema: None,
-                };
                 if let Some(server) = pmeta.server {
-                    info.server = Some(server.parse()?);
                     let server_package = &get_dep(package, &server)?.repr;
                     if visited.insert(server_package) {
                         queue.push(&server_package);
@@ -319,7 +311,6 @@ impl<'a> PackageBuilder<'a> {
                     data_sources.push((package.name.as_str(), src.into_std_path_buf(), dest));
                 }
                 service_crates.push(*package);
-                service_info.push(info);
                 if let Some(actions) = &pmeta.postinstall {
                     postinstall.extend_from_slice(actions.as_slice());
                 }
@@ -331,7 +322,6 @@ impl<'a> PackageBuilder<'a> {
 
         Ok(PackageBuilder {
             service_crates,
-            service_info,
             plugin_crates,
             plugin_targets,
             postinstall,
@@ -342,14 +332,13 @@ impl<'a> PackageBuilder<'a> {
 
     fn finish(
         self,
-        service_wasms: Vec<(AccountNumber, ServiceInfo, PathBuf)>,
+        service_wasms: Vec<(AccountNumber, Schema, PathBuf)>,
         args: &Args,
         metadata: &MetadataIndex<'_>,
         root: &PackageId,
     ) -> Result<PackageInfo, anyhow::Error> {
         let PackageBuilder {
             service_crates,
-            service_info: _,
             plugin_crates: _,
             plugin_targets: _,
             postinstall,
@@ -379,6 +368,31 @@ impl<'a> PackageBuilder<'a> {
             .map(|(p, (service, _, _))| (p.name.as_str(), *service))
             .collect();
 
+        let exports: Vec<_> = service_crates
+            .iter()
+            .map(|p| PackageExport {
+                name: p.name.clone(),
+                service: crate_to_account[p.name.as_str()],
+            })
+            .collect();
+
+        let service_wasms: Vec<_> = service_crates
+            .iter()
+            .zip(service_wasms.into_iter())
+            .map(|(p, (service, schema, path))| {
+                let pmeta = get_metadata(p).unwrap();
+                (
+                    service,
+                    ServiceInfo {
+                        flags: pmeta.flags,
+                        server: pmeta.server.map(|s| crate_to_account[&s.as_str()]),
+                        schema: Some(schema),
+                    },
+                    path,
+                )
+            })
+            .collect();
+
         let mut data_files = Vec::new();
         for (service, src, dest) in data_sources {
             add_files(crate_to_account[service], &src, &dest, &mut data_files)?;
@@ -392,6 +406,7 @@ impl<'a> PackageBuilder<'a> {
             depends,
             accounts,
             services,
+            exports,
         };
 
         let out_dir = get_package_dir(args, metadata);
@@ -413,9 +428,15 @@ impl<'a> PackageBuilder<'a> {
                 out.start_file("meta.json", options)?;
                 write!(out, "{}", &serde_json::to_string(&meta)?)?;
                 for (service, info, path) in service_wasms {
-                    out.start_file(format!("service/{}.wasm", service), options)?;
+                    out.start_file(
+                        format!("service/{}.wasm", service).replace("+", "/"),
+                        options,
+                    )?;
                     std::io::copy(&mut File::open(path)?, &mut out)?;
-                    out.start_file(format!("service/{}.json", service), options)?;
+                    out.start_file(
+                        format!("service/{}.json", service).replace("+", "/"),
+                        options,
+                    )?;
                     write!(out, "{}", &serde_json::to_string(&info)?)?;
                 }
                 for (service, dest, src) in data_files {
@@ -564,17 +585,13 @@ pub async fn build_packages(
     let paths = flattened.split(paths)?;
 
     let mut result = Vec::new();
-    for ((mut builder, paths), root) in builders.into_iter().zip(paths).zip(roots) {
+    for ((builder, paths), root) in builders.into_iter().zip(paths).zip(roots) {
         let mut service_wasms = Vec::new();
-        for (mut info, paths) in std::mem::take(&mut builder.service_info)
-            .into_iter()
-            .zip(paths)
-        {
+        for paths in paths {
             let schema: Schema =
                 serde_json::from_str(&std::io::read_to_string(File::open(paths.schema)?)?)?;
             let service = schema.service.clone();
-            info.schema = Some(schema);
-            service_wasms.push((service, info, paths.service));
+            service_wasms.push((service, schema, paths.service));
         }
         result.push(builder.finish(service_wasms, args, metadata, root)?)
     }

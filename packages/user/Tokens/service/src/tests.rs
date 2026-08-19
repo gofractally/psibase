@@ -9,8 +9,6 @@ mod tests {
     use psibase::*;
     use std::str::FromStr;
 
-    const MANUAL_DEBIT: u8 = 0;
-
     fn assert_error(result: ChainEmptyResult, message: &str) {
         let err = result.trace.error.unwrap();
         let contains_error = err.contains(message);
@@ -44,6 +42,16 @@ mod tests {
             .unwrap()
     }
 
+    fn enable_nft_auto_debit(chain: &psibase::Chain, account: AccountNumber) {
+        psibase::services::nft::Wrapper::push_from(&chain, account)
+            .setUserConf(
+                psibase::services::nft::NftHolderFlags::AUTO_DEBIT.index(),
+                true,
+            )
+            .get()
+            .unwrap();
+    }
+
     #[psibase::test_case(packages("Tokens"))]
     fn test_basics(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
@@ -55,7 +63,12 @@ mod tests {
         let bob = account!("bob");
         chain.new_account(bob).unwrap();
         let b = Wrapper::push_from(&chain, bob);
-        b.setUserConf(MANUAL_DEBIT, true);
+        b.setUserConf(
+            psibase::services::tokens::BalanceFlags::AUTO_DEBIT.index(),
+            false,
+        );
+
+        enable_nft_auto_debit(&chain, alice);
 
         let malicious_mike = account!("mike");
         chain.new_account(malicious_mike).unwrap();
@@ -108,11 +121,11 @@ mod tests {
         chain.new_account(alice).unwrap();
         let a = Wrapper::push_from(&chain, alice);
 
+        enable_nft_auto_debit(&chain, alice);
+
         let bob = account!("bob");
         chain.new_account(bob).unwrap();
         let b = Wrapper::push_from(&chain, bob);
-
-        b.setUserConf(MANUAL_DEBIT, true);
 
         let tid = a
             .create(Precision::new(4).unwrap(), 100_0000.into())
@@ -226,7 +239,7 @@ mod tests {
     fn test_subaccounts(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
         http_server::Wrapper::push_from(&chain, Wrapper::SERVICE)
-            .registerServer(account!("r-tokens"))
+            .registerServer(account!("tokens+1"))
             .get()?;
         chain.finish_block();
 
@@ -235,6 +248,20 @@ mod tests {
 
         let bob = account!("bob");
         chain.new_account(bob).unwrap();
+
+        let auto_debit_user = |account| {
+            psibase::services::tokens::Wrapper::push_from(&chain, account)
+                .setUserConf(
+                    psibase::services::tokens::BalanceFlags::AUTO_DEBIT.index(),
+                    true,
+                )
+                .get()
+                .unwrap();
+
+            enable_nft_auto_debit(&chain, account);
+        };
+        auto_debit_user(alice);
+        auto_debit_user(bob);
 
         let token_a = chain.login(account!("alice"), Wrapper::SERVICE)?;
         let token_b = chain.login(account!("bob"), Wrapper::SERVICE)?;

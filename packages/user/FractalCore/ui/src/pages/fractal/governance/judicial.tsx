@@ -26,24 +26,26 @@ import {
     ItemDescription,
     ItemTitle,
 } from "@shared/shadcn/ui/item";
+import { useRoleGuild } from "@/hooks/use-role-guild";
 
 export const Judicial = () => {
     const { data: fractal, error: fractalError } = useFractal();
 
-    const { data, error: guildError } = useGuild(
-        fractal?.fractal?.judiciary.account,
-    );
+    const roleId = fractal?.fractal?.judiciary.roleId;
+    const { data: role, error: roleError } = useRoleGuild(roleId);
+
+    const { data: guild, error: guildError } = useGuild(role?.guild);
 
     const [showModal, setShowModal] = useState(false);
 
     const { data: currentUser } = useCurrentUser();
 
     const isAdministrativeUser =
-        currentUser == data?.rep?.member ||
+        currentUser == guild?.rep?.member ||
         (typeof currentUser == "string" &&
-            data?.council?.includes(currentUser));
+            guild?.council?.includes(currentUser));
 
-    const error = fractalError || guildError;
+    const error = fractalError || guildError || roleError;
     if (error) {
         return <ErrorCard error={error} />;
     }
@@ -78,14 +80,14 @@ export const Judicial = () => {
                     <p className="text-muted-foreground text-sm">
                         The{" "}
                         <span className="text-primary font-medium">
-                            {data?.account}
+                            {guild?.account}
                         </span>{" "}
                         guild is selected to act as the judiciary led by{" "}
-                        {data?.rep ? (
+                        {guild?.rep ? (
                             <>
                                 its representative{" "}
                                 <span className="text-primary font-medium">
-                                    {data.rep.member}
+                                    {guild.rep.member}
                                 </span>
                                 .
                             </>
@@ -96,7 +98,7 @@ export const Judicial = () => {
                 </CardFooter>
             </GlowingCard>
 
-            <GuildOverviewCard guildAccount={data?.account} />
+            <GuildOverviewCard guildAccount={guild?.account} />
 
             {isAdministrativeUser && (
                 <GlowingCard>

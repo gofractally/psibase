@@ -111,10 +111,7 @@ pub fn unauthorized_error(fn_name: &str) -> Error {
 pub trait TrustConfig {
     fn capabilities() -> Capabilities;
 
-    fn authorized(level: TrustLevel, fn_name: &str) -> Result<bool, Error>
-    where
-        Self: Sized,
-    {
+    fn authorized(level: TrustLevel, fn_name: &str) -> Result<bool, Error> {
         Self::authorized_with_whitelist(level, fn_name, &[])
     }
 
@@ -122,11 +119,16 @@ pub trait TrustConfig {
         level: TrustLevel,
         fn_name: &str,
         whitelist: &[&str],
-    ) -> Result<bool, Error>
-    where
-        Self: Sized,
-    {
+    ) -> Result<bool, Error> {
         authorized_with_whitelist::<Self>(level, fn_name, whitelist)
+    }
+
+    fn has_auth(level: TrustLevel) -> bool {
+        has_auth_with_whitelist(level, &[])
+    }
+
+    fn has_auth_with_whitelist(level: TrustLevel, whitelist: &[&str]) -> bool {
+        has_auth_with_whitelist(level, whitelist)
     }
 
     fn get_descriptions() -> (String, String, String) {
@@ -134,22 +136,31 @@ pub trait TrustConfig {
     }
 }
 
-pub fn authorized<T: TrustConfig>(level: TrustLevel, fn_name: &str) -> Result<bool, Error> {
+pub fn authorized<T: TrustConfig + ?Sized>(level: TrustLevel, fn_name: &str) -> Result<bool, Error> {
     authorized_with_whitelist::<T>(level, fn_name, &[])
 }
 
-pub fn authorized_with_whitelist<T: TrustConfig>(
+pub fn has_auth(level: TrustLevel) -> bool {
+    has_auth_with_whitelist(level, &[])
+}
+
+pub fn has_auth_with_whitelist(level: TrustLevel, whitelist: &[&str]) -> bool {
+    let whitelist: Vec<String> = whitelist.iter().map(|s| s.to_string()).collect();
+    permissions::api::has_auth(&host::client::get_sender(), level, &whitelist)
+}
+
+pub fn authorized_with_whitelist<T: TrustConfig + ?Sized>(
     level: TrustLevel,
     fn_name: &str,
     whitelist: &[&str],
 ) -> Result<bool, Error> {
     let whitelist: Vec<String> = whitelist.iter().map(|s| s.to_string()).collect();
     let descriptions = T::get_descriptions();
-    Ok(permissions::api::is_authorized(
+    permissions::api::is_authorized(
         &host::client::get_sender(),
         level,
         &descriptions,
         fn_name,
         &whitelist,
-    )?)
+    )
 }

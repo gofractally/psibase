@@ -27,8 +27,8 @@ impl Api for AuthDynPlugin {
         trust::assert_authorized(trust::FunctionName::set_management)?;
 
         let packed_args = auth_dyn::action_structs::set_mgmt {
-            account: account.as_str().into(),
-            manager: manager.as_str().into(),
+            account: account.parse().unwrap(),
+            manager: manager.parse().unwrap(),
         }
         .packed();
 

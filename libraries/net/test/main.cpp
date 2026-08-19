@@ -14,7 +14,7 @@ struct ConsoleLog
    std::string filter = "Severity > critical";
    std::string format =
        "[{TimeStamp}] [{Severity}] [{Host}]: {Message}{?: {TransactionId}}{?: {BlockId}: "
-       "{BlockHeader}}";
+       "{BlockHeader}}{Indent:4:{TraceConsole}}";
 };
 PSIO_REFLECT(ConsoleLog, type, filter, format);
 

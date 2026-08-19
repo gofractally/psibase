@@ -107,24 +107,25 @@ mod service {
     #[pre_action(exclude(init))]
     fn check_init() {
         let table = InitTable::read();
-        check(
-            table.get_index_pk().get(&()).is_some(),
-            "service not initialized",
-        );
+        table
+            .get_index_pk()
+            .get(&())
+            .expect("service not initialized");
     }
 
     #[action]
     pub fn attest(subject: AccountNumber, value: u8) {
-        check(value <= 100, "bad confidence score");
+        assert!(value <= 100, "bad confidence score");
         let attester = get_sender();
         let issued = transact::Wrapper::call().currentBlock().time.seconds();
 
         let attestation_table = AttestationTable::new();
 
         // verify subject is valid chain account
-        psibase::check(
+        assert!(
             AccountsSvc::call().exists(subject),
-            &format!("subject account {} doesn't exist", subject),
+            "subject account {} doesn't exist",
+            subject
         );
 
         let existing_rec = attestation_table.get_index_pk().get(&(subject, attester));

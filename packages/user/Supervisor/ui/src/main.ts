@@ -63,7 +63,11 @@ addCallHandler(callHandlers, isFunctionCallRequest, (msg) =>
     supervisor.entry(msg.origin, msg.data.id, normalizeCallArgs(msg.data.args)),
 );
 addCallHandler(callHandlers, isPreLoadPluginsRequest, (msg) =>
-    supervisor.preloadPlugins(msg.origin, msg.data.payload.plugins),
+    supervisor.preloadPlugins(
+        msg.origin,
+        msg.data.id,
+        msg.data.payload.plugins,
+    ),
 );
 addCallHandler(callHandlers, isGetJsonRequest, (msg) =>
     supervisor.getJson(msg.origin, msg.data.id, msg.data.payload.plugin),

@@ -102,7 +102,6 @@ extern "C" {
     pub fn getKey(dest: *mut u8, dest_size: u32) -> u32;
     pub fn abortMessage(message: *const u8, len: u32) -> !;
     pub fn kvGet(chain_handle: u32, db: crate::DbId, key: *const u8, key_len: u32) -> u32;
-    pub fn getSequential(chain_handle: u32, db: crate::DbId, id: u64) -> u32;
     pub fn kvGreaterEqual(
         chain_handle: u32,
         db: crate::DbId,
@@ -148,7 +147,6 @@ pub fn get_selected_chain() -> u32 {
 /// this chain's database:
 ///
 /// * [`raw::kvGet`](crate::native_raw::kvGet)
-/// * [`raw::getSequential`](crate::native_raw::getSequential)
 /// * [`raw::kvGreaterEqual`](crate::native_raw::kvGreaterEqual)
 /// * [`raw::kvLessThan`](crate::native_raw::kvLessThan)
 /// * [`raw::kvMax`](crate::native_raw::kvMax)

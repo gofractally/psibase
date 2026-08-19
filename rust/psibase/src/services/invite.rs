@@ -40,7 +40,7 @@ pub struct InvPayload {
 /// This interface should be implemented by a service that wants to handle hooks from the invite service
 /// to be notified when an event occurs related to an invite.
 #[crate::service(
-    name = "invite-hooks",
+    name = "invite-hk",
     actions = "hooks_actions",
     wrapper = "hooks_wrapper",
     structs = "hooks_structs",

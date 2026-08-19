@@ -1,23 +1,27 @@
 #![cfg_attr(target_family = "wasm", allow(dead_code))]
 
 use crate::services::{
-    accounts, auth_sig, brotli_svc::brotli_impl, http_server, packages, producers, setcode, sites,
-    transact, verify_sig, x_sites,
+    brotli_svc::brotli_impl, dyn_ld, http_server, packages, producers, setcode, sites, transact,
+    x_sites,
 };
 use crate::{
-    new_account_owned_action, preapprove_action, reg_server, schema_types, set_code_action,
-    solve_dependencies, version_match, AccountNumber, Action, AnyPublicKey, Checksum256, CodeRow,
-    GenesisService, Hex, MethodNumber, MethodString, Pack, PackageDisposition, PackageOp,
-    PackagePreference, Schema, ToSchema, Unpack, Version,
+    deserialize_pretty_action, new_account_owned_action, preapprove_action, reg_server,
+    schema_types, set_code_action, solve_dependencies, version_match, AccountNumber, Action,
+    AnyPublicKey, Checksum256, CodeRow, CustomPrettyAction, GenesisService, Hex, MethodNumber,
+    MethodString, NullSchemaFetcher, PackageDisposition, PackageOp, PackagePreference, Schema,
+    SchemaFetcher, ServiceWrapper, ToSchema, TypeMatchExt, Version,
 };
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use custom_error::custom_error;
 use flate2::write::GzEncoder;
-use fracpack::CompiledSchema;
+use fracpack::{
+    CompiledSchema, CompiledType, CustomHandler, FracInputStream, Pack, Unpack, UnpackOwned,
+};
 use regex::Regex;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::cell::RefCell;
 use std::collections::{hash_map, HashMap, HashSet};
 use std::ffi::OsString;
 use std::fs::File;
@@ -103,6 +107,15 @@ pub struct PackageRef {
     pub version: String,
 }
 
+#[derive(
+    Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Pack, Unpack, ToSchema, Hash,
+)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct PackageExport {
+    pub name: String,
+    pub service: AccountNumber,
+}
+
 fn network_scope() -> String {
     "network".to_string()
 }
@@ -122,6 +135,7 @@ pub struct Meta {
     pub accounts: Vec<AccountNumber>,
     #[serde(default)]
     pub services: Vec<AccountNumber>,
+    pub exports: Vec<PackageExport>,
 }
 
 impl Meta {
@@ -134,6 +148,7 @@ impl Meta {
             depends: self.depends.clone(),
             accounts: self.accounts.clone(),
             services: self.services.clone(),
+            exports: self.exports.clone(),
             sha256,
             file,
         };
@@ -155,6 +170,8 @@ pub struct PackageInfo {
     #[serde(default)]
     pub services: Vec<AccountNumber>,
     #[serde(default)]
+    pub exports: Vec<PackageExport>,
+    #[serde(default)]
     pub sha256: Checksum256,
     #[serde(default)]
     pub file: String,
@@ -170,6 +187,7 @@ impl PackageInfo {
             depends: self.depends.clone(),
             accounts: self.accounts.clone(),
             services: self.services.clone(),
+            exports: self.exports.clone(),
         }
     }
     pub fn is_local(&self) -> Option<bool> {
@@ -193,6 +211,7 @@ impl InstalledPackageInfo {
             depends: self.depends.clone(),
             accounts: self.accounts.clone(),
             services: self.services.clone(),
+            exports: self.exports.clone(),
         }
     }
 }
@@ -205,6 +224,7 @@ pub struct LocalPackageInfo {
     pub depends: Vec<PackageRef>,
     pub accounts: Vec<AccountNumber>,
     pub services: Vec<AccountNumber>,
+    pub exports: Vec<PackageExport>,
     pub sha256: Checksum256,
 }
 
@@ -218,6 +238,7 @@ impl LocalPackageInfo {
             depends: self.depends.clone(),
             accounts: self.accounts.clone(),
             services: self.services.clone(),
+            exports: self.exports.clone(),
         }
     }
 }
@@ -265,7 +286,7 @@ pub struct PrettyAction {
     pub sender: AccountNumber,
 
     /// Service to execute the action
-    pub service: AccountNumber,
+    pub service: String,
 
     /// Service method to execute
     pub method: MethodNumber,
@@ -283,7 +304,9 @@ impl PrettyAction {
         schemas: &SchemaMap,
     ) -> Result<Hex<Vec<u8>>, anyhow::Error> {
         let schema = schemas.get(&service).unwrap();
-        let custom = schema_types();
+        let mut custom = schema_types();
+        let custom_action = CustomPrettyAction::new(schemas);
+        custom.insert("Action".to_string(), &custom_action);
         let mut cschema = CompiledSchema::new(&schema.types, &custom);
         let Some(act) = schema.actions.get(&MethodString(method.to_string())) else {
             Err(Error::UnknownAction {
@@ -301,30 +324,275 @@ impl PrettyAction {
         }
     }
     pub fn into_action(self, schemas: &SchemaMap) -> Result<Action, anyhow::Error> {
+        let service = AccountNumber::from_exact(&self.service)?;
         let raw_data = if let Some(raw_data) = self.raw_data {
             raw_data
         } else {
-            PrettyAction::pack_data(self.service, self.method, &self.data, schemas)?
+            PrettyAction::pack_data(service, self.method, &self.data, schemas)?
         };
         Ok(Action {
             sender: self.sender,
-            service: self.service,
+            service,
             method: self.method,
             rawData: raw_data,
         })
     }
     pub fn to_action(&self, schemas: &SchemaMap) -> Result<Action, anyhow::Error> {
+        let service = AccountNumber::from_exact(&self.service)?;
         let raw_data = if let Some(raw_data) = &self.raw_data {
             raw_data.clone()
         } else {
-            PrettyAction::pack_data(self.service, self.method, &self.data, schemas)?
+            PrettyAction::pack_data(service, self.method, &self.data, schemas)?
         };
         Ok(Action {
             sender: self.sender,
-            service: self.service,
+            service: service,
             method: self.method,
             rawData: raw_data,
         })
+    }
+    pub fn parse_data_as<T: UnpackOwned + DeserializeOwned>(&self) -> Result<T, anyhow::Error> {
+        if let Some(raw_data) = &self.raw_data {
+            Ok(T::unpacked(&raw_data.0)?)
+        } else if let Some(data) = &self.data {
+            Ok(serde_json::from_value(data.clone())?)
+        } else {
+            Err(anyhow!("Missing action data"))
+        }
+    }
+    pub async fn load_schemas<F: SchemaFetcher>(
+        &self,
+        fetcher: &F,
+        schemas: &mut SchemaMap,
+    ) -> Result<(), anyhow::Error> {
+        if !self.raw_data.is_some() {
+            if let Some(data) = &self.data {
+                SharedPrettyAction {
+                    sender: self.sender,
+                    service: self.service.parse()?,
+                    method: self.method,
+                    data: data,
+                }
+                .load_schemas(fetcher, schemas)
+                .await?;
+            }
+        }
+        Ok(())
+    }
+    pub fn get_required_accounts(
+        &self,
+        accounts: &mut Vec<AccountNumber>,
+        services: &mut Vec<AccountNumber>,
+        schemas: &SchemaMap,
+    ) -> Result<(), anyhow::Error> {
+        let service = self.service.parse()?;
+        accounts.push(self.sender);
+        services.push(service);
+        if let Some(data) = &self.data {
+            let schema = schemas
+                .get(&service)
+                .ok_or_else(|| anyhow!("Missing schema for {}", self.service))?;
+            let mut custom = schema_types();
+            let out = RefCell::new((accounts, services));
+            let custom_action = CustomPrettyActionCollectAccounts::new(
+                |sender, service| {
+                    let mut out = out.borrow_mut();
+                    let (accounts, services) = &mut *out;
+                    // Native callbacks have "" as the sender
+                    if sender != AccountNumber::new(0) {
+                        accounts.push(sender);
+                    }
+                    services.push(service);
+                },
+                schemas,
+            );
+            custom.insert("Action".to_string(), &custom_action);
+            let action_type = schema
+                .actions
+                .get(&MethodString(self.method.to_string()))
+                .ok_or_else(|| anyhow!("Missing action {}::{}", self.service, self.method))?;
+            let mut cschema = CompiledSchema::new(&schema.types, &custom);
+            cschema.extend(&action_type.params);
+            cschema.from_value(&action_type.params, data)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+struct SharedPrettyAction<'a> {
+    pub sender: AccountNumber,
+    pub service: AccountNumber,
+    pub method: MethodNumber,
+    pub data: &'a serde_json::Value,
+}
+
+impl<'a> SharedPrettyAction<'a> {
+    pub async fn load_schemas<F: SchemaFetcher>(
+        &self,
+        fetcher: &F,
+        schemas: &mut SchemaMap,
+    ) -> Result<(), anyhow::Error> {
+        let mut actions = vec![self.clone()];
+        while let Some(next) = actions.pop() {
+            if !schemas.contains_key(&next.service) {
+                schemas.insert(next.service, fetcher.fetch_schema(next.service).await?);
+            }
+            let schema = schemas.get(&next.service).unwrap();
+            let mut custom = schema_types();
+            let actions = std::cell::RefCell::new(&mut actions);
+            let custom_action = CustomPrettyActionCollectSchemas::new(|act: SharedPrettyAction| {
+                actions.borrow_mut().push(SharedPrettyAction {
+                    sender: act.sender,
+                    service: act.service,
+                    method: act.method,
+                    data: unsafe { &*(act.data as *const serde_json::Value) },
+                })
+            });
+            custom.insert("Action".to_string(), &custom_action);
+            let action_type = schema
+                .actions
+                .get(&MethodString(next.method.to_string()))
+                .ok_or_else(|| anyhow!("Missing action {}::{}", next.service, next.method))?;
+            let mut cschema = CompiledSchema::new(&schema.types, &custom);
+            cschema.extend(&action_type.params);
+            cschema.from_value(&action_type.params, next.data)?;
+        }
+        Ok(())
+    }
+}
+
+struct CustomPrettyActionCollectSchemas<F> {
+    f: F,
+}
+
+impl<F> CustomPrettyActionCollectSchemas<F> {
+    fn new(f: F) -> Self {
+        Self { f }
+    }
+}
+
+impl<F: Fn(SharedPrettyAction) -> ()> CustomHandler for CustomPrettyActionCollectSchemas<F> {
+    fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool {
+        schema.matches_action(ty)
+    }
+    fn frac2json(
+        &self,
+        _schema: &CompiledSchema,
+        _ty: &CompiledType,
+        _src: &mut FracInputStream,
+        _allow_empty_container: bool,
+    ) -> Result<serde_json::Value, fracpack::Error> {
+        unimplemented!()
+    }
+    fn json2frac(
+        &self,
+        _schema: &CompiledSchema,
+        ty: &CompiledType,
+        val: &serde_json::Value,
+        dest: &mut Vec<u8>,
+    ) -> Result<(), serde_json::Error> {
+        let (sender, service, method, _raw_data_name) = deserialize_pretty_action(ty, val)?;
+
+        if let Some(data) = val.get("data") {
+            (self.f)(SharedPrettyAction {
+                sender,
+                service,
+                method,
+                data,
+            });
+        }
+
+        Action {
+            sender,
+            service,
+            method,
+            rawData: Vec::<u8>::new().into(),
+        }
+        .pack(dest);
+        Ok(())
+    }
+    fn fracpack_verify(
+        &self,
+        _schema: &CompiledSchema,
+        _ty: &CompiledType,
+        _src: &mut FracInputStream,
+        _allow_empty_container: bool,
+    ) -> Result<(), fracpack::Error> {
+        unimplemented!()
+    }
+    fn is_empty_container(&self, _ty: &CompiledType, _value: &serde_json::Value) -> bool {
+        false
+    }
+}
+
+struct CustomPrettyActionCollectAccounts<'a, F> {
+    f: F,
+    schemas: &'a SchemaMap,
+}
+
+impl<'a, F> CustomPrettyActionCollectAccounts<'a, F> {
+    fn new(f: F, schemas: &'a SchemaMap) -> Self {
+        Self { f, schemas }
+    }
+}
+
+impl<'a, F: Fn(AccountNumber, AccountNumber) -> ()> CustomHandler
+    for CustomPrettyActionCollectAccounts<'a, F>
+{
+    fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool {
+        schema.matches_action(ty)
+    }
+    fn frac2json(
+        &self,
+        _schema: &CompiledSchema,
+        _ty: &CompiledType,
+        _src: &mut FracInputStream,
+        _allow_empty_container: bool,
+    ) -> Result<serde_json::Value, fracpack::Error> {
+        unimplemented!()
+    }
+    fn json2frac(
+        &self,
+        parent_schema: &CompiledSchema,
+        ty: &CompiledType,
+        val: &serde_json::Value,
+        dest: &mut Vec<u8>,
+    ) -> Result<(), serde_json::Error> {
+        let (sender, service, method, _raw_data_name) = deserialize_pretty_action(ty, val)?;
+
+        (self.f)(sender, service);
+        if let Some(data) = val.get("data") {
+            if let Some(schema) = self.schemas.get(&service) {
+                if let Some(action_type) = schema.actions.get(&MethodString(method.to_string())) {
+                    let mut cschema =
+                        CompiledSchema::new(&schema.types, parent_schema.get_custom());
+                    cschema.extend(&action_type.params);
+                    cschema.from_value(&action_type.params, data)?;
+                }
+            }
+        }
+
+        Action {
+            sender,
+            service,
+            method,
+            rawData: Vec::<u8>::new().into(),
+        }
+        .pack(dest);
+        Ok(())
+    }
+    fn fracpack_verify(
+        &self,
+        _schema: &CompiledSchema,
+        _ty: &CompiledType,
+        _src: &mut FracInputStream,
+        _allow_empty_container: bool,
+    ) -> Result<(), fracpack::Error> {
+        unimplemented!()
+    }
+    fn is_empty_container(&self, _ty: &CompiledType, _value: &serde_json::Value) -> bool {
+        false
     }
 }
 
@@ -337,6 +605,25 @@ fn translate_flags(flags: &[String]) -> Result<u64, Error> {
             "isReplacement" => CodeRow::IS_REPLACEMENT,
             _ => Err(Error::InvalidFlags)?,
         };
+    }
+    Ok(result)
+}
+
+fn translate_local_flags(flags: &[String]) -> Result<String, Error> {
+    let mut result = String::new();
+    for flag in flags {
+        match flag.as_str() {
+            "isPrivileged" => {}
+            "isReplacement" => {}
+            _ => Err(Error::InvalidFlags)?,
+        };
+        if result.is_empty() {
+            result += "?";
+        } else {
+            result += "&";
+        }
+        result += flag;
+        result += "=1";
     }
     Ok(result)
 }
@@ -361,7 +648,7 @@ impl<R: Read + Seek> PackagedService<R> {
         let mut service_files: Vec<(AccountNumber, usize)> = vec![];
         let mut data = vec![];
         let mut meta_index = None;
-        let service_re = Regex::new(r"^service/([-a-zA-Z0-9]*)\.(wasm|json)$")?;
+        let service_re = Regex::new(r"^service/([-a-zA-Z0-9]*(?:/\d+)?)\.(wasm|json)$")?;
         let data_re = Regex::new(r"^data/([-a-zA-Z0-9]*)/.*$")?;
         for index in 0..archive.len() {
             let raw_file = archive.by_index_raw(index)?;
@@ -371,10 +658,10 @@ impl<R: Read + Seek> PackagedService<R> {
             } else if let Some(captures) = service_re.captures(filename) {
                 match captures.extract() {
                     (_, [name, "wasm"]) => {
-                        service_files.push((AccountNumber::from_str(name)?, index));
+                        service_files.push((name.replace("/", "+").parse()?, index));
                     }
                     (_, [name, "json"]) => {
-                        info_files.insert(AccountNumber::from_str(name)?, index);
+                        info_files.insert(name.replace("/", "+").parse()?, index);
                     }
                     _ => {}
                 }
@@ -557,6 +844,9 @@ impl<R: Read + Seek> PackagedService<R> {
     pub fn get_accounts(&self) -> &[AccountNumber] {
         &self.meta.accounts
     }
+    pub fn get_services(&self) -> &[AccountNumber] {
+        &self.meta.services
+    }
     pub fn read_postinstall(&mut self) -> Result<Vec<PrettyAction>, anyhow::Error> {
         Ok(self.postinstall.clone())
     }
@@ -570,14 +860,15 @@ impl<R: Read + Seek> PackagedService<R> {
                 .postinstall
                 .iter()
                 .map(|act| act.to_action(schemas))
-                .collect::<Result<Vec<Action>, anyhow::Error>>()?,
+                .collect::<Result<Vec<Action>, anyhow::Error>>()
+                .with_context(|| format!("Invalid postinstall script for {}", self.meta.name))?,
         );
         Ok(())
     }
     pub fn needs_ui(&mut self) -> bool {
         self.postinstall
             .iter()
-            .any(|act| act.service == sites::SERVICE)
+            .any(|act| act.service.parse().unwrap_or(AccountNumber::new(0)) == sites::SERVICE)
     }
 
     fn manifest_services(&self) -> HashMap<AccountNumber, ServiceInfo> {
@@ -626,38 +917,30 @@ impl<R: Read + Seek> PackagedService<R> {
     pub fn create_account(
         &self,
         account: AccountNumber,
-        key: &Option<AnyPublicKey>,
         sender: AccountNumber,
         actions: &mut Vec<Action>,
     ) -> Result<(), anyhow::Error> {
         if let Some(preapprove) = preapprove_action(sender, account) {
             actions.push(preapprove)
         }
-        if let Some(key) = key {
-            if key.key.service != verify_sig::SERVICE {
-                return Err(Error::InvalidVerifyService)?;
-            }
-            actions.push(
-                auth_sig::Wrapper::pack_from(sender)
-                    .newAccount(account, key.key.rawData.0.clone().into()),
-            );
-        } else {
-            actions.push(new_account_owned_action(sender, account, sender));
-        }
+        actions.push(new_account_owned_action(sender, account, sender));
         Ok(())
     }
 
-    pub fn install_accounts(
+    pub fn install_account_group(
         &mut self,
         actions: &mut Vec<Vec<Action>>,
-        mut uploader: Option<&mut StagedUpload>,
+        mut uploader: &mut Option<&mut StagedUpload>,
         sender: AccountNumber,
-        key: &Option<AnyPublicKey>,
+        subaccounts: bool,
     ) -> Result<(), anyhow::Error> {
         // service accounts
         for (account, index, info) in &self.services {
+            if account.is_subaccount() != subaccounts {
+                continue;
+            }
             let mut group = vec![];
-            self.create_account(*account, key, sender, &mut group)?;
+            self.create_account(*account, sender, &mut group)?;
             let code = read(&mut self.archive.by_index(*index)?)?;
             let code_hash: [u8; 32] = Sha256::digest(&code).into();
             if let Some(uploader) = &mut uploader {
@@ -691,13 +974,26 @@ impl<R: Read + Seek> PackagedService<R> {
         }
         // extra accounts
         for account in self.get_accounts() {
+            if account.is_subaccount() != subaccounts {
+                continue;
+            }
             if !self.has_service(*account) {
                 let mut group = vec![];
-                self.create_account(*account, key, sender, &mut group)?;
+                self.create_account(*account, sender, &mut group)?;
                 actions.push(group);
             }
         }
         Ok(())
+    }
+
+    pub fn install_accounts(
+        &mut self,
+        actions: &mut Vec<Vec<Action>>,
+        mut uploader: Option<&mut StagedUpload>,
+        sender: AccountNumber,
+    ) -> Result<(), anyhow::Error> {
+        self.install_account_group(actions, &mut uploader, sender, false)?;
+        self.install_account_group(actions, &mut uploader, sender, true)
     }
 
     // TODO: handle recovery from partial install
@@ -709,11 +1005,14 @@ impl<R: Read + Seek> PackagedService<R> {
         install_ui: bool,
         compression_level: u32,
         schemas: &SchemaMap,
+        packages: &PackageList,
     ) -> Result<(), anyhow::Error> {
         if install_ui {
             self.reg_server(actions)?;
             self.store_data(actions, uploader, compression_level)?;
         }
+
+        self.link(packages, actions)?;
 
         self.postinstall(schemas, actions)?;
         self.commit_install(sender, actions)?;
@@ -725,23 +1024,12 @@ impl<R: Read + Seek> PackagedService<R> {
     // must be services
     pub fn get_required_accounts(
         &self,
+        schemas: &SchemaMap,
     ) -> Result<(Vec<AccountNumber>, Vec<AccountNumber>), anyhow::Error> {
         let mut accounts = vec![];
         let mut services = vec![];
 
         let local = &self.meta.scope == "local";
-
-        for account in self.get_accounts() {
-            if !self.has_service(*account) {
-                if !local {
-                    services.push(accounts::SERVICE)
-                } else {
-                    Err(anyhow!(
-                        "Local packages do not support non-service accounts"
-                    ))?
-                }
-            }
-        }
 
         if !self.data.is_empty() {
             if !local {
@@ -761,9 +1049,14 @@ impl<R: Read + Seek> PackagedService<R> {
             }
         }
 
+        for account in &self.meta.accounts {
+            if account.is_subaccount() {
+                accounts.push(account.base());
+            }
+        }
+
         for act in &self.postinstall {
-            accounts.push(act.sender);
-            services.push(act.service);
+            act.get_required_accounts(&mut accounts, &mut services, schemas)?;
         }
 
         accounts.sort_unstable_by(|a, b| a.value.cmp(&b.value));
@@ -773,19 +1066,6 @@ impl<R: Read + Seek> PackagedService<R> {
         services.dedup();
 
         Ok((accounts, services))
-    }
-
-    // returns accounts whose schemas are required
-    pub fn get_required_schemas(
-        &mut self,
-        out: &mut HashSet<AccountNumber>,
-    ) -> Result<(), anyhow::Error> {
-        for act in &self.postinstall {
-            if act.raw_data.is_none() {
-                out.insert(act.service);
-            }
-        }
-        Ok(())
     }
 
     // Gets schemas for services in this package.
@@ -810,37 +1090,89 @@ impl<R: Read + Seek> PackagedService<R> {
 
     pub fn get_all_schemas(&self, schemas: &mut SchemaMap) -> Result<(), anyhow::Error> {
         for (account, _, info) in &self.services {
-            if let Some(schema) = info.schema.clone() {
-                schemas.insert(*account, schema);
+            if !schemas.contains_key(account) {
+                if let Some(schema) = info.schema.clone() {
+                    schemas.insert(*account, schema);
+                }
             }
         }
         Ok(())
     }
 
-    #[cfg(not(target_family = "wasm"))]
-    pub async fn load_schemas(
-        &mut self,
-        base_url: &reqwest::Url,
-        client: &mut reqwest::Client,
+    pub async fn load_schemas<F: SchemaFetcher>(
+        &self,
+        fetcher: &F,
         schemas: &mut SchemaMap,
     ) -> Result<(), anyhow::Error> {
         self.get_all_schemas(schemas)?;
-        let mut required = HashSet::new();
-        self.get_required_schemas(&mut required)?;
-        for account in required {
-            if !schemas.contains_key(&account) {
-                schemas.insert(
-                    account,
-                    crate::as_json(
-                        client.get(
-                            packages::SERVICE
-                                .url(base_url)?
-                                .join(&format!("/schema?service={account}"))?,
-                        ),
-                    )
-                    .await?,
-                );
+        for act in &self.postinstall {
+            act.load_schemas(fetcher, schemas).await?
+        }
+        Ok(())
+    }
+
+    // Returns services in this package that should have
+    // dependencies linked using dyn-ld
+    fn linked_services(&self) -> Vec<AccountNumber> {
+        let mut visited = HashSet::new();
+        let mut services = Vec::new();
+
+        for (service, _, _) in &self.services {
+            if visited.insert(*service) {
+                services.push(*service)
             }
+        }
+        for (service, _) in &self.data {
+            if visited.insert(*service) {
+                services.push(*service)
+            }
+        }
+        services
+    }
+
+    // packages must contain
+    // - all packages being installed
+    // - installed packages that are not being updated, and that
+    //   the packages being installed depend on
+    pub fn link<A: ActionSink>(
+        &self,
+        packages: &PackageList,
+        actions: &mut A,
+    ) -> Result<(), anyhow::Error> {
+        let mut visited_imports = HashMap::new();
+        let mut imports = Vec::new();
+        for export in &self.meta.exports {
+            imports.push(dyn_ld::DynDep {
+                name: export.name.clone(),
+                service: export.service.clone(),
+            });
+        }
+        for dep in &self.meta.depends {
+            let Some((meta, _)) = packages.get_by_ref(dep)? else {
+                Err(anyhow!(
+                    "Package list does not contain {}-{}",
+                    dep.name,
+                    dep.version
+                ))?
+            };
+            for export in &meta.exports {
+                if let Some(old) = visited_imports.insert(&export.name, export.service) {
+                    if old != export.service {
+                        Err(anyhow!("Ambiguous import for {}", export.name))?
+                    }
+                } else {
+                    imports.push(dyn_ld::DynDep {
+                        name: export.name.clone(),
+                        service: export.service.clone(),
+                    })
+                }
+            }
+        }
+
+        for service in self.linked_services() {
+            actions.push_action(
+                dyn_ld::Wrapper::pack_from(service).link(self.meta.name.clone(), imports.clone()),
+            )?
         }
         Ok(())
     }
@@ -867,11 +1199,11 @@ impl<R: Read + Seek> PackagedService<R> {
             }
             crate::as_text(
                 client
-                    .put(
-                        x_admin::SERVICE
-                            .url(base_url)?
-                            .join(&format!("/services/{}", account))?,
-                    )
+                    .put(x_admin::SERVICE.url(base_url)?.join(&format!(
+                        "/services/{}{}",
+                        account,
+                        translate_local_flags(&info.flags)?
+                    ))?)
                     .body(read(&mut self.archive.by_index(*index)?)?)
                     .header("Content-Type", "application/wasm"),
             )
@@ -939,17 +1271,13 @@ impl<R: Read + Seek> PackagedService<R> {
 }
 
 pub fn get_schemas<T: Read + Seek>(
-    packages: &mut [PackagedService<T>],
-) -> Result<(SchemaMap, HashSet<AccountNumber>), anyhow::Error> {
-    let mut accounts = HashSet::new();
-    for package in &mut packages[..] {
-        package.get_required_schemas(&mut accounts)?
-    }
+    packages: &[PackagedService<T>],
+) -> Result<SchemaMap, anyhow::Error> {
     let mut schemas = HashMap::new();
-    for package in &mut packages[..] {
-        package.get_schemas(&mut accounts, &mut schemas)?
+    for package in &packages[..] {
+        package.get_all_schemas(&mut schemas)?
     }
-    Ok((schemas, accounts))
+    Ok(schemas)
 }
 
 pub trait ActionGroup {
@@ -1011,8 +1339,10 @@ impl PackageManifest {
     pub fn upgrade<T: ActionSink>(
         &self,
         other: PackageManifest,
+        package_name: &str,
         out: &mut T,
     ) -> Result<(), anyhow::Error> {
+        let new_linked_services = other.linked_services_set();
         let new_files: HashSet<_> = other.data.into_iter().collect();
         for file in &self.data {
             if !new_files.contains(file) {
@@ -1033,9 +1363,16 @@ impl PackageManifest {
                 out.push_action(set_code_action(*service, vec![]))?;
             }
         }
+        for service in self.linked_services(new_linked_services) {
+            out.push_action(dyn_ld::Wrapper::pack_from(service).unlink(package_name.to_string()))?;
+        }
         Ok(())
     }
-    pub fn remove<T: ActionSink>(&self, out: &mut T) -> Result<(), anyhow::Error> {
+    pub fn remove<T: ActionSink>(
+        &self,
+        package_name: &str,
+        out: &mut T,
+    ) -> Result<(), anyhow::Error> {
         for file in &self.data {
             out.push_action(sites::Wrapper::pack_from(file.account).remove(file.filename.clone()))?;
         }
@@ -1048,7 +1385,34 @@ impl PackageManifest {
             }
             out.push_action(set_code_action(*service, vec![]))?;
         }
+        for service in self.linked_services(HashSet::new()) {
+            out.push_action(dyn_ld::Wrapper::pack_from(service).unlink(package_name.to_string()))?;
+        }
         Ok(())
+    }
+    fn linked_services_set(&self) -> HashSet<AccountNumber> {
+        let mut visited = HashSet::new();
+        for file in &self.data {
+            visited.insert(file.account);
+        }
+        for (service, _) in &self.services {
+            visited.insert(*service);
+        }
+        visited
+    }
+    fn linked_services(&self, mut visited: HashSet<AccountNumber>) -> Vec<AccountNumber> {
+        let mut services = Vec::new();
+        for file in &self.data {
+            if visited.insert(file.account) {
+                services.push(file.account)
+            }
+        }
+        for (service, _) in &self.services {
+            if visited.insert(*service) {
+                services.push(*service)
+            }
+        }
+        services
     }
 }
 
@@ -1111,6 +1475,7 @@ impl PackageManifest {
 // its direct dependencies
 pub fn validate_dependencies<T: Read + Seek>(
     packages: &mut [PackagedService<T>],
+    schemas: &SchemaMap,
 ) -> Result<(), anyhow::Error> {
     let mut accounts: HashMap<AccountNumber, HashSet<String>> = HashMap::new();
     let mut services: HashMap<AccountNumber, String> = HashMap::new();
@@ -1145,7 +1510,7 @@ pub fn validate_dependencies<T: Read + Seek>(
         }
     }
     for p in &mut packages[..] {
-        let (required_accounts, required_services) = p.get_required_accounts()?;
+        let (required_accounts, required_services) = p.get_required_accounts(schemas)?;
         for account in required_accounts {
             if let Some(packages) = accounts.get(&account) {
                 if !packages.contains(&p.meta.name)
@@ -1214,10 +1579,37 @@ impl<R: Read + Seek> PackageOpFull<R> {
     }
 }
 
-pub async fn fetch_packages<R: PackageRegistry + ?Sized>(
+pub async fn fetch_all_schemas<R: Read + Seek, F: SchemaFetcher>(
+    packages: &Vec<PackageOpFull<R>>,
+    fetcher: &F,
+    schemas: &mut SchemaMap,
+) -> Result<(), anyhow::Error> {
+    for op in packages {
+        match op {
+            PackageOpFull::Install(package) | PackageOpFull::Replace(_, package) => {
+                package.get_all_schemas(schemas)?
+            }
+            _ => {}
+        }
+    }
+    for op in packages {
+        match op {
+            PackageOpFull::Install(package) | PackageOpFull::Replace(_, package) => {
+                package.load_schemas(fetcher, schemas).await?
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
+pub async fn fetch_packages<R: PackageRegistry + ?Sized, F: SchemaFetcher>(
     reg: &R,
     ops: Vec<PackageOp>,
     existing: &PackageList,
+    fetcher: &F,
+    schemas: &mut SchemaMap,
+    essential_services: &EssentialServices,
 ) -> Result<Vec<PackageOpFull<R::R>>, anyhow::Error> {
     let mut result = Vec::with_capacity(ops.len());
     for op in ops {
@@ -1229,7 +1621,8 @@ pub async fn fetch_packages<R: PackageRegistry + ?Sized>(
             PackageOp::Remove(meta) => PackageOpFull::Remove(meta),
         })
     }
-    sort_package_ops(&mut result, existing)?;
+    fetch_all_schemas(&result, fetcher, schemas).await?;
+    sort_package_ops(&mut result, existing, schemas, essential_services)?;
     Ok(result)
 }
 
@@ -1255,11 +1648,10 @@ fn get_transitive_services<'a>(
 fn build_package_order_graph<R: Read + Seek>(
     packages: &Vec<PackageOpFull<R>>,
     existing: &PackageList,
+    schemas: &SchemaMap,
 ) -> Result<HashMap<String, Vec<String>>, anyhow::Error> {
     let mut result: HashMap<String, Vec<String>> = HashMap::new();
     let mut provides_service: HashMap<AccountNumber, &Meta> = HashMap::new();
-    let mut has_postinstall = HashSet::new();
-    let empty_deps = Vec::new();
     let mut service_deps = HashMap::new();
     // Build the graph of service dependencies. Service dependencies
     // can be cyclic as long as nothing calls any of the services in
@@ -1278,19 +1670,11 @@ fn build_package_order_graph<R: Read + Seek>(
                         })?
                     }
                 }
-                if !package.postinstall.is_empty() {
-                    has_postinstall.insert(package.name());
-                }
                 if !package.services.is_empty() {
                     // If a package provides any services, direct dependents can
                     // assume they are installed. This transitively requires all
                     // services that this package might use to be installed.
                     service_deps.insert(package.name().to_string(), &package.meta().depends);
-                } else if !package.postinstall.is_empty() {
-                    // If a package provides a postinstall script, direct dependents
-                    // can assume that it has been run. Dependencies only need to
-                    // be installed first if they are required to install this package
-                    service_deps.insert(package.name().to_string(), &empty_deps);
                 }
             }
             PackageOpFull::Remove(_) => {}
@@ -1333,9 +1717,6 @@ fn build_package_order_graph<R: Read + Seek>(
                 if !meta.services.is_empty() {
                     service_deps.insert(name.clone(), &meta.depends);
                 }
-                // We don't know whether this package has a postinstall
-                // script, and it doesn't matter, because it's already
-                // been executed and won't be executed again.
             }
         }
     }
@@ -1347,7 +1728,7 @@ fn build_package_order_graph<R: Read + Seek>(
             PackageOpFull::Install(package) | PackageOpFull::Replace(_, package) => {
                 let mut all_required_packages = Vec::new();
                 let mut visited = HashSet::new();
-                for service in package.get_required_accounts()?.1 {
+                for service in package.get_required_accounts(schemas)?.1 {
                     let Some(required_package) = provides_service.get(&service) else {
                         Err(Error::MissingDepAccount {
                             name: service,
@@ -1366,16 +1747,6 @@ fn build_package_order_graph<R: Read + Seek>(
                             &mut visited,
                             &mut all_required_packages,
                         )?;
-                    }
-                }
-                // The postinstall script can rely on direct dependencies'
-                // postinstall scripts having run first.
-                if has_postinstall.contains(&package.name()) {
-                    for dep in &package.meta().depends {
-                        if has_postinstall.contains(&dep.name.as_str()) && visited.insert(&dep.name)
-                        {
-                            all_required_packages.push(dep.name.clone());
-                        }
                     }
                 }
                 // Drop packages that are not being modified
@@ -1422,16 +1793,17 @@ fn topological_sort_impl(
 fn get_package_order<R: Read + Seek>(
     packages: &Vec<PackageOpFull<R>>,
     existing: &PackageList,
+    schemas: &SchemaMap,
+    essential_services: &EssentialServices,
 ) -> Result<Vec<usize>, anyhow::Error> {
     let mut permutation = vec![usize::MAX; packages.len()];
     let mut indexes = HashMap::new();
     for (i, package) in packages.iter().enumerate() {
         indexes.insert(package.name().to_string(), i);
     }
-    let graph = build_package_order_graph(packages, existing)?;
+    let graph = build_package_order_graph(packages, existing, schemas)?;
 
     // Process packages containing essential services first
-    let essential_services = EssentialServices::new();
     let mut i = 0;
     for package in packages {
         match package {
@@ -1472,8 +1844,10 @@ fn apply_permutation<T>(vec: &mut Vec<T>, permutation: &mut [usize]) {
 pub fn sort_package_ops<R: Read + Seek>(
     packages: &mut Vec<PackageOpFull<R>>,
     existing: &PackageList,
+    schemas: &SchemaMap,
+    essential_services: &EssentialServices,
 ) -> Result<(), anyhow::Error> {
-    let mut order = get_package_order(packages, existing)?;
+    let mut order = get_package_order(packages, existing, schemas, essential_services)?;
     apply_permutation(packages, &mut order);
     Ok(())
 }
@@ -1503,15 +1877,23 @@ pub fn make_ref(package: &str) -> Result<PackageRef, anyhow::Error> {
 }
 
 // services that should be installed first
+#[derive(Debug, Clone)]
 pub struct EssentialServices {
     remaining: Vec<AccountNumber>,
 }
 
 impl EssentialServices {
-    pub fn new() -> Self {
+    pub fn empty() -> Self {
         Self {
-            remaining: vec![transact::SERVICE, producers::SERVICE, setcode::SERVICE],
+            remaining: Vec::new(),
         }
+    }
+    pub fn with_key(block_signing_key: &Option<AnyPublicKey>) -> Self {
+        let mut remaining = vec![transact::SERVICE, producers::SERVICE, setcode::SERVICE];
+        if let Some(key) = block_signing_key {
+            remaining.push(key.key.service)
+        }
+        Self { remaining }
     }
     pub fn remove(&mut self, accounts: &[AccountNumber]) {
         for account in accounts {
@@ -1547,22 +1929,31 @@ pub trait PackageRegistry {
         &self,
         packages: &[String],
         local: bool,
+        essential_services: &EssentialServices,
     ) -> Result<Vec<PackagedService<Self::R>>, anyhow::Error> {
         let installed = PackageList::new();
         let packages = installed
             .resolve_changes(self, packages, false, local)
             .await?;
-        Ok(fetch_packages(self, packages, &installed)
-            .await?
-            .into_iter()
-            .map(|op| {
-                if let PackageOpFull::Install(package) = op {
-                    package
-                } else {
-                    panic!("Only install is expected when there are no existing packages")
-                }
-            })
-            .collect())
+        let mut schemas = SchemaMap::new();
+        Ok(fetch_packages(
+            self,
+            packages,
+            &installed,
+            &NullSchemaFetcher,
+            &mut schemas,
+            essential_services,
+        )
+        .await?
+        .into_iter()
+        .map(|op| {
+            if let PackageOpFull::Install(package) = op {
+                package
+            } else {
+                panic!("Only install is expected when there are no existing packages")
+            }
+        })
+        .collect())
     }
 }
 
@@ -1728,7 +2119,7 @@ impl HTTPRegistry {
                 &mut client,
                 packages::SERVICE,
                 format!(
-                    "query {{ packages(owner: {}, first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version scope description depends {{ name version }} accounts services sha256 file }} }} }} }}",
+                    "query {{ packages(owner: {}, first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version scope description depends {{ name version }} accounts services exports {{ name service }} sha256 file }} }} }} }}",
                     serde_json::to_string(&owner)?,
                     serde_json::to_string(&end_cursor)?,
                 ))
@@ -2076,7 +2467,7 @@ impl PackageList {
         let mut result = PackageList::new();
         loop {
             let data = crate::gql_query::<InstalledQuery>(base_url, client, packages::SERVICE,
-                                        format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }} accounts services owner }} }} }} }}", serde_json::to_string(&end_cursor)?))
+                                                          format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }}  accounts services exports {{ name service }} owner }} }} }} }}", serde_json::to_string(&end_cursor)?))
                 .await.with_context(|| "Failed to list installed packages")?;
             for edge in data.installed.edges {
                 result.insert_installed(edge.node);
@@ -2097,7 +2488,7 @@ impl PackageList {
         let mut result = PackageList::new();
         loop {
             let data = crate::gql_query::<LocalPackageQuery>(base_url, client, x_packages::SERVICE,
-                                        format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }} accounts services sha256 }} }} }} }}", serde_json::to_string(&end_cursor)?))
+                                                             format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }} accounts services exports {{ name service }} sha256 }} }} }} }}", serde_json::to_string(&end_cursor)?))
                 .await.with_context(|| "Failed to list installed packages")?;
             for edge in data.installed.edges {
                 result.insert_local(edge.node);
@@ -2143,6 +2534,9 @@ impl PackageList {
                 sha256: info.sha256,
             },
         )
+    }
+    pub fn remove_all_versions(&mut self, name: &str) {
+        self.packages.remove(name);
     }
 
     pub fn contains_package(&self, name: &str) -> bool {
@@ -2217,6 +2611,29 @@ impl PackageList {
             (&lhs.0.name, &lhs.0.version).cmp(&(&rhs.0.name, &rhs.0.version))
         });
         result
+    }
+    // If self is the current set of installed packages, returns the
+    // set of installed packages after ops are applied.
+    pub fn into_updated<R: Read + Seek>(
+        mut self,
+        ops: &Vec<PackageOpFull<R>>,
+        owner: AccountNumber,
+    ) -> Self {
+        for op in ops {
+            match op {
+                PackageOpFull::Install(package) => {
+                    self.insert(package.meta().clone(), PackageOrigin::Installed { owner });
+                }
+                PackageOpFull::Replace(old, package) => {
+                    self.packages.remove(&old.name);
+                    self.insert(package.meta().clone(), PackageOrigin::Installed { owner });
+                }
+                PackageOpFull::Remove(meta) => {
+                    self.packages.remove(&meta.name);
+                }
+            }
+        }
+        self
     }
     pub fn get_by_ref(
         &self,

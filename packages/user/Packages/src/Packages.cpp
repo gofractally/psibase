@@ -12,23 +12,6 @@ namespace UserService
 {
    namespace
    {
-      AccountNumber getAuthServ(AccountNumber account)
-      {
-         auto db = Accounts::Tables(Accounts::service);
-         if (auto row = db.open<AccountTable>().getIndex<0>().get(account))
-            return row->authService;
-         else
-            abortMessage("Unknown account " + account.str());
-      }
-      AccountNumber getOwner(AccountNumber account)
-      {
-         auto db = AuthDelegate::Tables(AuthDelegate::service);
-         if (auto row = db.open<AuthDelegateTable>().getIndex<0>().get(account))
-            return row->owner;
-         else
-            abortMessage("Cannot find owner for " + account.str());
-      }
-
       using namespace psio::schema_types;
 
       const AnyType* getFieldType(const Object& ty, std::uint32_t index)
@@ -91,7 +74,7 @@ namespace UserService
       auto sender = getSender();
       for (AccountNumber account : package.accounts)
       {
-         if (auto auth = getAuthServ(account); auth != AuthDelegate::service)
+         if (auto auth = to<Accounts>().getAuthOf(account); auth != AuthDelegate::service)
          {
             // - A single account doesn't need to use delegation
             // - Accounts that have special auth defined in this package are okay
@@ -102,7 +85,7 @@ namespace UserService
          }
          else
          {
-            if (getOwner(account) != sender)
+            if (to<AuthDelegate>().getOwner(account) != sender)
                abortMessage("Account " + account.str() + " in " + package.name +
                             " is not owned by " + sender.str());
          }
@@ -118,12 +101,14 @@ namespace UserService
                  .depends     = std::move(package.depends),
                  .accounts    = std::move(package.accounts),
                  .services    = std::move(package.services),
+                 .exports     = std::move(package.exports),
                  .owner       = sender});
    }
 
    void Packages::setSchema(ServiceSchema schema)
    {
       auto service = getSender();
+      schema.checkValid();
       auto tables  = Tables(getReceiver());
       auto schemas = tables.open<InstalledSchemaTable>();
       if (auto existing = schemas.get(service))
@@ -174,7 +159,6 @@ namespace UserService
                }
             }
          }
-         // UI events do not need to maintain compatibility
          for (const auto& [name, ty] : existing->schema.history)
          {
             auto pos = schema.history.find(name);
@@ -184,10 +168,11 @@ namespace UserService
             }
             else
             {
-               if (!rowMatcher.match(ty, pos->second))
+               if (!rowMatcher.match(ty.type, pos->second.type))
                {
                   abortMessage("Incompatible update to event history." + name);
                }
+               // Changing access is allowed because it doesn't break the layout
             }
          }
          for (const auto& [name, ty] : existing->schema.merkle)
@@ -199,7 +184,7 @@ namespace UserService
             }
             else
             {
-               if (!rowMatcher.match(ty, pos->second))
+               if (!rowMatcher.match(ty.type, pos->second.type))
                {
                   abortMessage("Incompatible update to event merkle." + name);
                }
@@ -207,6 +192,15 @@ namespace UserService
          }
       }
       schemas.put({service, std::move(schema)});
+   }
+
+   std::optional<ServiceSchema> Packages::getSchema(AccountNumber service)
+   {
+      auto schemas = open<InstalledSchemaTable>(KvMode::read);
+      if (auto row = schemas.get(service))
+         return std::move(row->schema);
+      else
+         return std::nullopt;
    }
 
    void Packages::publish(PackageMeta package, Checksum256 sha256, std::string file)
@@ -226,6 +220,7 @@ namespace UserService
           .depends     = std::move(package.depends),
           .accounts    = std::move(package.accounts),
           .services    = std::move(package.services),
+          .exports     = std::move(package.exports),
           .sha256      = std::move(sha256),
           .file        = std::move(file),
       });

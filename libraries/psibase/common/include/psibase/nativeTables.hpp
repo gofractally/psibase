@@ -10,10 +10,10 @@ namespace psibase
 {
    using NativeTableNum = uint16_t;
 
-   static constexpr NativeTableNum statusTable                = 1;   // objective
-   static constexpr NativeTableNum codeTable                  = 2;   // both
-   static constexpr NativeTableNum codeByHashTable            = 3;   // both
-   static constexpr NativeTableNum databaseStatusTable        = 4;   // objective
+   static constexpr NativeTableNum statusTable     = 1;  // objective
+   static constexpr NativeTableNum codeTable       = 2;  // both
+   static constexpr NativeTableNum codeByHashTable = 3;  // both
+   // static constexpr NativeTableNum databaseStatusTable        = 4;   // objective, removed
    static constexpr NativeTableNum transactionWasmConfigTable = 5;   // objective
    static constexpr NativeTableNum proofWasmConfigTable       = 6;   // Also for first auth
    static constexpr NativeTableNum configTable                = 7;   // both
@@ -127,27 +127,6 @@ namespace psibase
 
    auto getCodeKeys(const std::vector<BlockHeaderAuthAccount>& services)
        -> std::vector<CodeByHashKeyType>;
-
-   auto databaseStatusKey() -> KeyPrefixType;
-   struct DatabaseStatusRow
-   {
-      uint64_t nextHistoryEventNumber = 1;
-      uint64_t nextUIEventNumber      = 1;
-      uint64_t nextMerkleEventNumber  = 1;
-
-      uint64_t blockMerkleEventNumber = 1;
-
-      // This table is in native. The native code blocks services
-      // from writing to this since it could break backing stores.
-      static constexpr auto db = psibase::DbId::native;
-      static auto           key() -> KeyPrefixType;
-      PSIO_REFLECT(DatabaseStatusRow,
-                   nextHistoryEventNumber,
-                   nextUIEventNumber,
-                   nextMerkleEventNumber,
-                   blockMerkleEventNumber)
-   };
-   using DatabaseStatusTable = Table<DatabaseStatusRow, SingletonKey{}>;
 
    // Notifications are sent by native code
    //
@@ -351,12 +330,17 @@ namespace psibase
    //   PSIO_REFLECT(ContinuationArgs, id, trace, token)
    //};
 
-   struct BoundMethod
+   /// Identifies a method on a particular service
+   struct ServiceMethod
    {
       AccountNumber service;
       MethodNumber  method;
-      PSIO_REFLECT(BoundMethod, service, method)
+      PSIO_REFLECT(ServiceMethod, service, method)
    };
+   inline constexpr bool psio_custom_schema(ServiceMethod*)
+   {
+      return true;
+   }
 
    using RunKeyType = std::tuple<std::uint16_t, std::uint8_t, std::uint64_t>;
    auto runPrefix() -> KeyPrefixType;
@@ -407,8 +391,8 @@ namespace psibase
       // not limited and therefore should be a system service.
       MicroSeconds maxTime;
       // the action to run
-      Action      action;
-      BoundMethod continuation;
+      Action        action;
+      ServiceMethod continuation;
 
       static const auto db = psibase::DbId::nativeSubjective;
       auto              key() const -> RunKeyType;
@@ -490,7 +474,7 @@ namespace psibase
                                   StatusTable,
                                   CodeTable,
                                   CodeByHashTable,
-                                  DatabaseStatusTable,
+                                  void,
                                   WasmConfigTable,
                                   WasmConfigTable,
                                   ConfigTable,

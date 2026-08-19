@@ -1,6 +1,6 @@
 use crate::{
-    allow_cors_with_origin, check, generate_action_templates, HttpReply, HttpRequest,
-    ProcessActionStruct, ToServiceSchema, WithActionStruct,
+    allow_cors_with_origin, generate_action_templates, HttpReply, HttpRequest, ProcessActionStruct,
+    ToServiceSchema, WithActionStruct,
 };
 use async_graphql::{
     http::{receive_body, GraphiQLSource},
@@ -100,14 +100,12 @@ pub fn serve_pack_action<Wrapper: WithActionStruct>(request: &HttpRequest) -> Op
         >(
             self,
         ) -> Self::Output {
-            let arg_struct_result = serde_json::from_slice::<ArgStruct>(self.0);
-            if let Err(err) = &arg_struct_result {
-                check(false, &format!("err parsing action args json {}", err));
-            }
+            let arg_struct = serde_json::from_slice::<ArgStruct>(self.0)
+                .unwrap_or_else(|err| panic!("err parsing action args json: {err}"));
             HttpReply {
                 status: 200,
                 contentType: "application/octet-stream".into(),
-                body: arg_struct_result.unwrap().packed().into(),
+                body: arg_struct.packed().into(),
                 headers: allow_cors_with_origin("*"),
             }
         }
@@ -169,18 +167,15 @@ pub fn serve_graphql<Query: async_graphql::ObjectType + 'static>(
                 headers: allow_cors_with_origin("*"),
             })
         } else {
-            let request_result = receive_body(
+            let request = receive_body(
                 Some(&request.contentType),
                 request.body.as_ref(),
                 Default::default(),
             )
-            .await;
+            .await
+            .unwrap_or_else(|err| panic!("err parsing graphql request body: {err}"));
 
-            if let Err(err) = &request_result {
-                check(false, &format!("err parsing graphql query {}", err));
-            }
-
-            let res = schema.execute(request_result.unwrap()).await;
+            let res = schema.execute(request).await;
             Some(HttpReply {
                 status: 200,
                 contentType: "application/json".into(),

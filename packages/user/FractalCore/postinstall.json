@@ -1,6 +1,6 @@
 [
   {
-    "sender": "fractal-core",
+    "sender": "fractal-cr",
     "service": "sites",
     "method": "enablespa",
     "data": { "enable": true }

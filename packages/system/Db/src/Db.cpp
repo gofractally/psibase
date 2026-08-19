@@ -30,9 +30,11 @@ namespace
       message += to_string(db);
       abortMessage(message);
    }
-   void prefixError(AccountNumber sender, std::span<const char> prefix)
+   void prefixError(AccountNumber sender, std::span<const char> prefix, std::string_view verb)
    {
-      std::string message = sender.str() + " cannot write to another service's prefix";
+      std::string message = sender.str() + " cannot ";
+      message += verb;
+      message += " another service's prefix";
       if (prefix.size() >= sizeof(std::uint64_t))
       {
          std::uint64_t value;
@@ -64,7 +66,18 @@ UniqueKvHandle Db::open(DbId db, psio::view<const std::vector<char>> prefixView,
          auto expected = psio::convert_to_key(sender);
          if (!std::ranges::starts_with(prefix, expected))
          {
-            prefixError(sender, prefix);
+            prefixError(sender, prefix, "write to");
+         }
+      }
+      else
+      {
+         auto expected = psio::convert_to_key(sender);
+         // Subaccounts of the same primary account, all have
+         // shared read access
+         expected.pop_back();
+         if (!std::ranges::starts_with(prefix, expected))
+         {
+            prefixError(sender, prefix, "read from");
          }
       }
    }

@@ -3,6 +3,21 @@ import { lookup } from "mrmime";
 
 import { siblingUrl } from "@psibase/common-lib";
 
+function parseFlags(flags: string[] | undefined): string {
+    if (flags === undefined || flags.length == 0) {
+        return "";
+    } else {
+        return (
+            "?" +
+            flags
+                .map((name) => {
+                    return `${name}=1`;
+                })
+                .join("&")
+        );
+    }
+}
+
 /**
  * Install a single service from the package
  */
@@ -20,7 +35,12 @@ export async function installService(
     }
 
     const wasmData = await wasmFile.async("arraybuffer");
-    const response = await fetch(`/services/${serviceName}`, {
+
+    const info = JSON.parse(await jsonMetaFile.async("text"));
+
+    const flags = parseFlags(info.flags);
+
+    const response = await fetch(`/services/${serviceName}${flags}`, {
         method: "PUT",
         headers: {
             "Content-Type": "application/wasm",
@@ -35,7 +55,6 @@ export async function installService(
         );
     }
 
-    const info = JSON.parse(await jsonMetaFile.async("text"));
     if (info.server) {
         const response = await fetch(
             siblingUrl(null, "x-http", "/register_server"),

@@ -17,7 +17,7 @@ namespace TestService
 
    struct EmitEvents : psibase::Service
    {
-      static constexpr auto service = psibase::AccountNumber{"event-service"};
+      static constexpr auto service = psibase::AccountNumber{"event-svc"};
 
       struct Events
       {
@@ -25,9 +25,6 @@ namespace TestService
          {
             void e(std::string s, int i);
             void e2(ExampleRecord r);
-         };
-         struct Ui
-         {
          };
          struct Merkle
          {
@@ -55,11 +52,9 @@ namespace TestService
                 method(emitExample, r),
                 method(serveSys, request))
 
-   PSIBASE_REFLECT_EVENTS(EmitEvents)
    PSIBASE_REFLECT_HISTORY_EVENTS(EmitEvents,  //
                                   method(e, s, i),
                                   method(e2, r))
-   PSIBASE_REFLECT_UI_EVENTS(EmitEvents)
    PSIBASE_REFLECT_MERKLE_EVENTS(EmitEvents,  //
                                  method(m, s))
    PSIBASE_REFLECT_TABLES(EmitEvents)

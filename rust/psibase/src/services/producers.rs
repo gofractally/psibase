@@ -3,8 +3,8 @@ use crate as psibase;
 use crate::{account, AccountNumber};
 
 pub const ROOT: AccountNumber = account!("root");
-pub const PRODUCER_ACCOUNT_WEAK: AccountNumber = account!("prods-weak");
-pub const PRODUCER_ACCOUNT_STRONG: AccountNumber = account!("prods-strong");
+pub const PRODUCER_ACCOUNT_WEAK: AccountNumber = account!("producers+2");
+pub const PRODUCER_ACCOUNT_STRONG: AccountNumber = account!("producers+3");
 
 #[crate::service(name = "producers", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
@@ -74,7 +74,7 @@ mod service {
         action: ServiceMethod,
         allowedActions: Vec<ServiceMethod>,
         claims: Vec<Claim>,
-    ) {
+    ) -> bool {
         unimplemented!()
     }
 
@@ -84,22 +84,17 @@ mod service {
     }
 
     #[action]
-    fn isAuthSys(
-        sender: AccountNumber,
-        authorizers: Vec<AccountNumber>,
-        method: Option<ServiceMethod>,
-        auth_set: Option<Vec<AccountNumber>>,
-    ) -> bool {
+    fn getDlgsSys(sender: AccountNumber) -> Vec<AccountNumber> {
         unimplemented!()
     }
 
     #[action]
-    fn isRejectSys(
-        sender: AccountNumber,
-        authorizers: Vec<AccountNumber>,
-        method: Option<ServiceMethod>,
-        auth_set: Option<Vec<AccountNumber>>,
-    ) -> bool {
+    fn isAuthSys(sender: AccountNumber, authorizers: Vec<AccountNumber>) -> bool {
+        unimplemented!()
+    }
+
+    #[action]
+    fn isRejectSys(sender: AccountNumber, rejecters: Vec<AccountNumber>) -> bool {
         unimplemented!()
     }
 }

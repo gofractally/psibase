@@ -45,8 +45,9 @@ mod service {
     #[action]
     #[allow(non_snake_case)]
     fn setNetworkName(name: String) {
-        check(
-            get_sender() == SERVICE,
+        assert_eq!(
+            get_sender(),
+            SERVICE,
             "Only the 'branding' account is authorized to set network branding",
         );
 

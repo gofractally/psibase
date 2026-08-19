@@ -72,6 +72,63 @@ fn validate_caller(caller: &str) -> bool {
     allowed_callers.contains(&caller.to_string())
 }
 
+enum AuthResult {
+    Authorized,
+    Denied,
+    NeedsPrompt { user: String },
+}
+
+fn auth_check(
+    caller: &str,
+    callee: &str,
+    level: TrustLevel,
+    whitelist: &[String],
+    debug_label: &str,
+) -> Result<AuthResult, Error> {
+    // Auto approve for trust level: none
+    if level == TrustLevel::None {
+        return Ok(AuthResult::Authorized);
+    }
+
+    // Whitelisted accounts are authorized
+    if whitelist.iter().any(|w| w == caller) {
+        return Ok(AuthResult::Authorized);
+    }
+
+    // Callee is always authorized to call itself
+    if caller == callee {
+        return Ok(AuthResult::Authorized);
+    }
+
+    // Max trust level is only allowed when caller == callee
+    // TODO incorporate security groups for TrustLevel::Max
+    if level == TrustLevel::Max {
+        return Ok(AuthResult::Denied);
+    }
+
+    if !validate_caller(caller) {
+        return Err(ErrorType::InvalidCaller(
+            caller.to_string(),
+            callee.to_string(),
+            debug_label.to_string(),
+        )
+        .into());
+    }
+
+    let user = Accounts::get_current_user().ok_or_else(|| {
+        ErrorType::LoggedInUserDNE(
+            caller.to_string(),
+            callee.to_string(),
+            debug_label.to_string(),
+        )
+    })?;
+    if is_already_authorized(&user, caller, callee, level) {
+        Ok(AuthResult::Authorized)
+    } else {
+        Ok(AuthResult::NeedsPrompt { user })
+    }
+}
+
 impl Api for PermissionsPlugin {
     fn set_allowed_callers(callers: Vec<String>) {
         assert_eq!(
@@ -83,6 +140,14 @@ impl Api for PermissionsPlugin {
         AllowedCallers::set(callers);
     }
 
+    fn has_auth(caller: String, level: TrustLevel, whitelist: Vec<String>) -> bool {
+        let callee = HostClient::get_sender();
+        matches!(
+            auth_check(&caller, &callee, level, &whitelist, ""),
+            Ok(AuthResult::Authorized)
+        )
+    }
+
     fn is_authorized(
         caller: String,
         level: TrustLevel,
@@ -92,46 +157,18 @@ impl Api for PermissionsPlugin {
     ) -> Result<bool, Error> {
         let callee = HostClient::get_sender();
 
-        if level == TrustLevel::None {
-            // Auto approve for trust level: none
-            return Ok(true);
-        }
-        if whitelist.contains(&caller) {
-            // Whitelisted accounts are authorized
-            return Ok(true);
-        }
-        if caller == callee {
-            // Callee is always authorized to call itself
-            return Ok(true);
-        }
-        if level == TrustLevel::Max {
-            // Max trust level is only allowed when caller == callee
-            // TODO incorporate security groups for TrustLevel::Max
-            return Ok(false);
-        }
-
-        if !validate_caller(&caller) {
-            return Err(ErrorType::InvalidCaller(
-                caller.clone(),
-                callee.clone(),
-                debug_label.clone(),
-            )
-            .into());
-        }
-
-        let user = Accounts::get_current_user().ok_or_else(|| {
-            ErrorType::LoggedInUserDNE(caller.clone(), callee.clone(), debug_label.clone())
-        })?;
-        if is_already_authorized(&user, &caller, &callee, level) {
-            return Ok(true);
-        }
+        let user = match auth_check(&caller, &callee, level, &whitelist, debug_label.as_str())? {
+            AuthResult::Authorized => return Ok(true),
+            AuthResult::Denied => return Ok(false),
+            AuthResult::NeedsPrompt { user } => user,
+        };
 
         HostPrompt::prompt(
             "permissions",
             Some(&PackablePromptContext {
                 user: user.to_string(),
-                caller: caller.to_string(),
-                callee: callee.to_string(),
+                caller: caller.clone(),
+                callee: callee.clone(),
                 level,
                 descriptions,
             }),

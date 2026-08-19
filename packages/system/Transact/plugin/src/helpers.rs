@@ -7,7 +7,7 @@ use crate::errors::ErrorType::*;
 use crate::types::FromExpirationTime;
 use crate::{ActionSenderHook, ProposeLatch, TxSignatures};
 use psibase::fracpack::Pack;
-use psibase::{AccountNumber, Hex, MethodNumber, SignedTransaction, Tapos, Transaction};
+use psibase::{Hex, MethodNumber, SignedTransaction, Tapos, Transaction};
 use serde::Serialize;
 use Host::server as Server;
 
@@ -15,7 +15,7 @@ use regex::Regex;
 use sha2::{Digest, Sha256};
 
 pub fn validate_action_name(action_name: &str) -> Result<(), HostTypes::Error> {
-    let re = Regex::new(r"^[a-zA-Z0-9_]+$").unwrap();
+    let re = Regex::new(r"^([a-zA-Z0-9_]+|#[a-z]{16})$").unwrap();
     if re.is_match(action_name) {
         return Ok(());
     }
@@ -45,8 +45,8 @@ pub fn get_action_sender(service: &str, method: &str) -> Result<String, HostType
 impl From<Action> for psibase::Action {
     fn from(action: Action) -> Self {
         psibase::Action {
-            sender: AccountNumber::from(action.sender.as_str()),
-            service: AccountNumber::from(action.service.as_str()),
+            sender: action.sender.parse().unwrap(),
+            service: action.service.parse().unwrap(),
             method: MethodNumber::from(action.method.as_str()),
             rawData: action.raw_data.into(),
         }

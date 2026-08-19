@@ -1,4 +1,4 @@
-use psibase::{native_raw, services, DbId, KvHandle, KvMode};
+use psibase::{native_raw, services, DbId, KvHandle, KvMode, ServiceWrapper};
 
 pub unsafe fn psibase_proxy_kv_open_impl(
     db: u32,

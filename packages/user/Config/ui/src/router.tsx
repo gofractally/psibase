@@ -3,6 +3,7 @@ import { createBrowserRouter } from "react-router-dom";
 import { ProtectedRoute } from "@shared/components/protected-route";
 
 import { Layout } from "./components/layout";
+import { NameMarketConfig } from "./pages/account-marketplace";
 import { BlockProduction } from "./pages/block-production";
 import { Branding } from "./pages/branding";
 import { Loader } from "./pages/loader";
@@ -75,6 +76,14 @@ export const router = createBrowserRouter([
                 element: (
                     <ProtectedRoute>
                         <ResourcePricing />
+                    </ProtectedRoute>
+                ),
+            },
+            {
+                path: "account-marketplace",
+                element: (
+                    <ProtectedRoute>
+                        <NameMarketConfig />
                     </ProtectedRoute>
                 ),
             },

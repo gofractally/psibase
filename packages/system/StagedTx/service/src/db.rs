@@ -77,6 +77,9 @@ pub mod tables {
         /// The account that responded to the staged transaction
         pub account: AccountNumber,
 
+        /// The account's authSequence when the response was made
+        pub seq: u64,
+
         /// Whether the response is an acceptance or rejection
         pub accepted: bool,
     }
@@ -127,21 +130,20 @@ pub mod impls {
     use psibase::fracpack::Pack;
     use psibase::services::transact::ServiceMethod;
     use psibase::services::{accounts::Wrapper as Accounts, transact::Wrapper as Transact};
-    use psibase::{check, get_sender, AccountNumber, Action, Checksum256, Table};
+    use psibase::{get_sender, AccountNumber, Action, Checksum256, ServiceWrapper, Table};
 
     impl StagedTx {
         pub fn add(actions: Vec<Action>, auto_exec: bool) -> Self {
-            check(
+            assert!(
                 actions.len() > 0,
                 "Staged transaction must contain at least one action",
             );
 
             if auto_exec {
                 let sender = actions[0].sender;
-                check(
-                    Accounts::call().getAccount(sender).is_some(),
-                    "Sender account in staged tx is invalid",
-                );
+                Accounts::call()
+                    .getAccount(sender)
+                    .expect("Sender account in staged tx is invalid");
             }
 
             let monotonic_id = LastUsed::get_next_id();
@@ -169,11 +171,13 @@ pub mod impls {
         }
 
         pub fn get(id: u32, txid: Checksum256) -> Self {
-            let staged_tx = StagedTxTable::new().get_index_pk().get(&id);
-            check(staged_tx.is_some(), "Unknown staged tx");
-            let staged_tx = staged_tx.unwrap();
-            check(
-                staged_tx.txid == txid.into(),
+            let staged_tx = StagedTxTable::new()
+                .get_index_pk()
+                .get(&id)
+                .expect("Unknown staged tx");
+            assert_eq!(
+                staged_tx.txid,
+                txid.into(),
                 "specified txid must match staged tx txid",
             );
 
@@ -211,14 +215,14 @@ pub mod impls {
             let responses = ResponseTable::new();
             responses
                 .get_index_pk()
-                .range((id, AccountNumber::new(0))..=(id, AccountNumber::new(u64::MAX)))
+                .range((id, AccountNumber::MIN)..=(id, AccountNumber::MAX))
                 .for_each(|r| responses.erase(&(r.id, r.account)));
 
             // Delete all stored parties for this staged tx
             let parties = StagedTxPartyTable::new();
             parties
                 .get_index_pk()
-                .range((id, AccountNumber::new(0))..=(id, AccountNumber::new(u64::MAX)))
+                .range((id, AccountNumber::MIN)..=(id, AccountNumber::MAX))
                 .for_each(|p| parties.erase(&(p.id, p.party)));
 
             // Delete the staged tx itself
@@ -228,8 +232,8 @@ pub mod impls {
         pub fn accepters(&self) -> Vec<AccountNumber> {
             ResponseTable::new()
                 .get_index_pk()
-                .range((self.id, AccountNumber::new(0))..=(self.id, AccountNumber::new(u64::MAX)))
-                .filter(|response| response.accepted)
+                .range((self.id, AccountNumber::MIN)..=(self.id, AccountNumber::MAX))
+                .filter(|response| response.accepted && response.is_valid())
                 .map(|response| response.account)
                 .collect()
         }
@@ -237,15 +241,15 @@ pub mod impls {
         pub fn rejecters(&self) -> Vec<AccountNumber> {
             ResponseTable::new()
                 .get_index_pk()
-                .range((self.id, AccountNumber::new(0))..=(self.id, AccountNumber::new(u64::MAX)))
-                .filter(|response| !response.accepted)
+                .range((self.id, AccountNumber::MIN)..=(self.id, AccountNumber::MAX))
+                .filter(|response| !response.accepted && response.is_valid())
                 .map(|response| response.account)
                 .collect()
         }
     }
 
     impl LastUsed {
-        fn get_next_id() -> u32 {
+        pub fn get_next_id() -> u32 {
             let table = LastUsedTable::new();
             let mut last_used = table.get_index_pk().get(&()).unwrap_or_default();
             last_used.id += 1;
@@ -258,20 +262,24 @@ pub mod impls {
     impl Response {
         fn upsert(id: u32, accepted: bool) {
             let table = ResponseTable::new();
-            let response = table
-                .get_index_pk()
-                .get(&(id, get_sender()))
-                .map(|mut response| {
-                    response.accepted = accepted;
-                    response
-                })
-                .unwrap_or_else(|| Response {
-                    id,
-                    account: get_sender(),
-                    accepted,
-                });
+            let account = get_sender();
+            let seq = Accounts::call().getAccount(account).unwrap().authSequence;
 
-            table.put(&response).unwrap();
+            table
+                .put(&Response {
+                    id,
+                    account,
+                    seq,
+                    accepted,
+                })
+                .unwrap();
+        }
+        fn is_valid(&self) -> bool {
+            return Accounts::call()
+                .getAccount(self.account)
+                .unwrap()
+                .authSequence
+                == self.seq;
         }
     }
 

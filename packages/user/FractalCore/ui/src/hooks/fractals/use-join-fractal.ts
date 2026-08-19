@@ -9,22 +9,28 @@ import { zAccount } from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";
 
 import { setDefaultMembership } from "./use-membership";
+import { toast } from "@shared/shadcn/ui/sonner";
 
 const zParams = z.object({
     fractal: zAccount,
 });
 
-const mutationFn = async (fractal: string) => {
+const mutationFn = async (fractal: string): Promise<void> => {
     try {
         await supervisor.functionCall({
             method: "join",
-            params: [fractal],
+            params: [],
             service: fractal,
             intf: "userFractal",
         });
     } catch (error) {
-        const message = "Error joining fractal";
+        const message =
+            error instanceof Error
+                ? error.message
+                : "Error applying to join fractal";
+
         console.error(message, error);
+        toast.error(message);
         throw new Error(message);
     }
 };

@@ -1,4 +1,4 @@
-import { AppConfigType } from "@/configured-apps";
+import { defineAppConfig } from "@/app-config";
 import { Coins } from "lucide-react";
 
 import { zAccount } from "@shared/lib/schemas/account";
@@ -7,7 +7,7 @@ import { TokensLayout } from "./layout";
 import { PendingPage } from "./pending";
 import { TransferPage } from "./transfer";
 
-export const tokensConfig: AppConfigType = {
+export const tokensConfig = defineAppConfig({
     service: zAccount.parse("tokens"),
     name: "Wallet",
     description: "Send tokens and manage balances.",
@@ -28,4 +28,4 @@ export const tokensConfig: AppConfigType = {
             name: "Pending",
         },
     ],
-};
+});

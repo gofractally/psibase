@@ -7,7 +7,7 @@ namespace TestService
 {
    struct SetWasmConfig : psibase::Service
    {
-      static constexpr auto service = psibase::AccountNumber{"wasm-config"};
+      static constexpr auto service = psibase::AccountNumber{"wasmconfig"};
       static constexpr auto flags   = psibase::CodeRow::isPrivileged;
       void                  setWasmCfg(psibase::NativeTableNum table, psibase::WasmConfigRow row);
    };

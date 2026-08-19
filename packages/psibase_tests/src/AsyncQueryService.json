@@ -1,2 +1,17 @@
-[{"sender":"transact","service":"transact","method":"addcallback","rawData":"09000100000000040000001C0000000000000000000E7174249000000033BED4566000000004000000020000000000"}
+[
+  {
+    "sender": "transact",
+    "service": "transact",
+    "method": "addcallback",
+    "data": {
+      "type": 1,
+      "objective": false,
+      "action": {
+        "sender": "",
+        "service": "as-query",
+        "method": "onBlock",
+        "rawData": "0000"
+      }
+    }
+  }
 ]

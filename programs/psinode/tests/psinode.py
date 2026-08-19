@@ -75,6 +75,9 @@ class Cluster(object):
         result = Node(dir=os.path.join(self.dir, hostname), hostname=hostname, producer=name, **kw)
         self.nodes[hostname] = result
         return result
+    def disconnected(self, *names, **kw):
+        '''Create a set of nodes with no connections'''
+        return tuple(self.make_node(name, **kw) for name in names)
     def star(self, *names, **kw):
         '''Create a star graph with the first node in the center'''
         nodes = [self.make_node(name, **kw) for name in names]
@@ -449,7 +452,7 @@ def _init_softhsm(dir, pin):
     return env
 
 class Node(API):
-    def __init__(self, executable='psinode', dir=None, hostname=None, producer=None, p2p=True, listen=[], log_filter=None, log_format=None, database_cache_size=None, start=True, softhsm=None, trustfile=None):
+    def __init__(self, executable='psinode', dir=None, hostname=None, producer=None, p2p=True, listen=[], log_filter=None, log_format=None, database_cache_size=None, start=True, softhsm=None, trustfile=None, env={}):
         '''
         Create a new psinode server
         If dir is not specified, the server will reside in a temporary directory
@@ -464,7 +467,7 @@ class Node(API):
         self.producer = producer
         self.socketpath = os.path.join(self.dir, 'socket')
         self.logpath = os.path.join(self.dir, 'psinode.log')
-        self.env = {}
+        self.env = dict(env)
         session = requests.Session()
         session.mount('http://', _LocalAdapter(self.socketpath))
         super().__init__('http://%s/' % hostname, session)
@@ -610,10 +613,10 @@ class Node(API):
         self.wait(isbooted)
     def install(self, packages=[], sources=[]):
         '''installs a package'''
-        self.run_psibase(['install'] + self.node_args() + ['--package-source=' + s for s in sources] + packages)
+        self.run_psibase(['install', '-y'] + self.node_args() + ['--package-source=' + s for s in sources] + packages)
     def install_local(self, packages=[], sources=[]):
         '''installs a local package'''
-        self.run_psibase(['install', '--local'] + self.node_args() + ['--package-source=' + s for s in sources] + packages)
+        self.run_psibase(['install', '--local', '-y'] + self.node_args() + ['--package-source=' + s for s in sources] + packages)
     def run_psibase(self, args, *, check=True, **kw):
         self._find_psibase()
         result = subprocess.run([self.psibase] + args, check=check, timeout=100, **kw)

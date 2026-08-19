@@ -12,6 +12,10 @@ pub mod api {
     ) -> Result<bool, Error> {
         api::is_authorized(caller, level, descriptions, debug_label, whitelist)
     }
+
+    pub fn has_auth(caller: &str, level: TrustLevel, whitelist: &[String]) -> bool {
+        api::has_auth(caller, level, whitelist)
+    }
 }
 
 pub mod types {

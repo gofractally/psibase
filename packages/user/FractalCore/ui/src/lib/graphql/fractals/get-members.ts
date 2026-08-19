@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 import { FRACTALS_SERVICE } from "@shared/domains/fractal/lib/constants";
-import { MemberStatus } from "@shared/domains/fractal/lib/schemas/member-status";
 import { graphql } from "@shared/lib/graphql";
 import { Account, zAccount } from "@shared/lib/schemas/account";
 import { zDateTime } from "@shared/lib/schemas/date-time";
@@ -9,7 +8,6 @@ import { zDateTime } from "@shared/lib/schemas/date-time";
 export const zMemberListInstance = z.object({
     account: zAccount,
     createdAt: zDateTime,
-    memberStatus: z.nativeEnum(MemberStatus),
 });
 
 export type MembershipListInstance = z.infer<typeof zMemberListInstance>;
@@ -21,7 +19,6 @@ export const getMembers = async (fractalAccount: Account) => {
         members(fractal: "${fractalAccount}") {
             nodes {     
                 account
-                memberStatus
                 createdAt
         }} 
     }`,

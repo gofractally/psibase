@@ -2,14 +2,18 @@
 mod bindings;
 use bindings::*;
 
-use exports::config::plugin::{
-    branding::Guest as Branding, packaging::Guest as Packaging, producers::Guest as Producers,
-    settings::Guest as Settings, symbol::Guest as Symbol, virtual_server::Guest as VirtualServer,
-};
 use host::types::types::Error;
 
-use exports::config::plugin::virtual_server::{
-    CpuPricingParams, NetPricingParams, NetworkVariables, ServerSpecs,
+use exports::config::plugin::{
+    branding::Guest as Branding,
+    name_market::{Guest as NameMarket, MarketConfig},
+    packaging::Guest as Packaging,
+    producers::Guest as Producers,
+    settings::Guest as Settings,
+    symbol::Guest as Symbol,
+    virtual_server::{
+        CpuPricingParams, Guest as VirtualServer, NetPricingParams, NetworkVariables, ServerSpecs,
+    },
 };
 
 use virtual_server::plugin::types::{
@@ -18,6 +22,8 @@ use virtual_server::plugin::types::{
 };
 
 use transact::plugin::intf::set_propose_latch;
+
+const VIRTUAL_SERVER: &'static str = "vserver";
 
 struct ConfigPlugin;
 
@@ -90,6 +96,18 @@ impl Packaging for ConfigPlugin {
     }
 }
 
+impl NameMarket for ConfigPlugin {
+    fn configure_markets(configs: Vec<MarketConfig>) -> Result<(), Error> {
+        if configs.is_empty() {
+            return Ok(());
+        }
+
+        set_propose_latch(Some("namemarket"))?;
+
+        name_market::plugin::market_admin::configure_markets(&configs)
+    }
+}
+
 impl Symbol for ConfigPlugin {
     fn create(symbol: String, recipient: String) -> Result<(), Error> {
         set_propose_latch(Some("symbol"))?;
@@ -117,13 +135,13 @@ impl Symbol for ConfigPlugin {
 
 impl VirtualServer for ConfigPlugin {
     fn init_billing(fee_receiver: String) -> Result<(), Error> {
-        set_propose_latch(Some("virtual-server"))?;
+        set_propose_latch(Some(VIRTUAL_SERVER))?;
 
         virtual_server::plugin::admin::init_billing(&fee_receiver)
     }
 
     fn set_specs(specs: ServerSpecs) -> Result<(), Error> {
-        set_propose_latch(Some("virtual-server"))?;
+        set_propose_latch(Some(VIRTUAL_SERVER))?;
 
         let specs = DestServerSpecs {
             net_bps: specs.net_bps,
@@ -133,27 +151,26 @@ impl VirtualServer for ConfigPlugin {
     }
 
     fn set_network_variables(variables: NetworkVariables) -> Result<(), Error> {
-        set_propose_latch(Some("virtual-server"))?;
+        set_propose_latch(Some(VIRTUAL_SERVER))?;
 
         let variables = DestNetworkVariables {
             block_replay_factor: variables.block_replay_factor,
             per_block_sys_cpu_ns: variables.per_block_sys_cpu_ns,
             obj_storage_bytes: variables.obj_storage_bytes,
+            subj_storage_bytes: variables.subj_storage_bytes,
         };
         virtual_server::plugin::admin::set_network_variables(variables)
     }
 
-    fn enable_billing(enabled: bool) -> Result<(), Error> {
-        if enabled {
-            virtual_server::plugin::billing::fill_gas_tank()?;
-        }
+    fn enable_billing() -> Result<(), Error> {
+        virtual_server::plugin::billing::fill_gas_tank()?;
 
-        set_propose_latch(Some("virtual-server"))?;
-        virtual_server::plugin::admin::enable_billing(enabled)
+        set_propose_latch(Some(VIRTUAL_SERVER))?;
+        virtual_server::plugin::admin::enable_billing()
     }
 
     fn set_cpu_pricing_params(params: CpuPricingParams) -> Result<(), Error> {
-        set_propose_latch(Some("virtual-server"))?;
+        set_propose_latch(Some(VIRTUAL_SERVER))?;
 
         virtual_server::plugin::admin::set_cpu_pricing_params(&DestCpuPricingParams {
             idle_pct: params.idle_pct,
@@ -166,7 +183,7 @@ impl VirtualServer for ConfigPlugin {
     }
 
     fn set_net_pricing_params(params: NetPricingParams) -> Result<(), Error> {
-        set_propose_latch(Some("virtual-server"))?;
+        set_propose_latch(Some(VIRTUAL_SERVER))?;
 
         virtual_server::plugin::admin::set_net_pricing_params(&DestNetPricingParams {
             idle_pct: params.idle_pct,

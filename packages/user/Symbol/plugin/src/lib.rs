@@ -7,9 +7,9 @@ use bindings::exports::symbol::plugin::api::Guest as Api;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
+use psibase::define_trust;
 use psibase::fracpack::Pack;
 use psibase::services::tokens;
-use psibase::{define_trust, AccountNumber};
 
 use crate::errors::ErrorType;
 use crate::graphql::fetch_symbol_owner_nft;
@@ -64,7 +64,7 @@ impl Api for SymbolPlugin {
         })?;
 
         let packed_args = symbol::action_structs::create {
-            symbol: AccountNumber::from(symbol.as_str()),
+            symbol: symbol.parse().unwrap(),
         }
         .packed();
         add_action_to_transaction(symbol::action_structs::create::ACTION_NAME, &packed_args)
@@ -73,7 +73,7 @@ impl Api for SymbolPlugin {
     fn map_symbol(token_id: u32, symbol: String) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::map_symbol)?;
 
-        let nft_id = fetch_symbol_owner_nft(symbol.as_str().into())?;
+        let nft_id = fetch_symbol_owner_nft(symbol.parse().unwrap())?;
         bindings::nft::plugin::user::credit(
             nft_id,
             &symbol::SERVICE.to_string(),
@@ -82,7 +82,7 @@ impl Api for SymbolPlugin {
 
         let map_args = symbol::action_structs::mapSymbol {
             token_id,
-            symbol: AccountNumber::from(symbol.as_str()),
+            symbol: symbol.parse().unwrap(),
         }
         .packed();
         add_action_to_transaction(symbol::action_structs::mapSymbol::ACTION_NAME, &map_args)
@@ -97,8 +97,8 @@ impl Admin for SymbolPlugin {
         )?;
 
         let packed_args = symbol::action_structs::admin_create {
-            symbol: AccountNumber::from(symbol.as_str()),
-            recipient: AccountNumber::from(recipient.as_str()),
+            symbol: symbol.parse().unwrap(),
+            recipient: recipient.parse().unwrap(),
         }
         .packed();
         add_action_to_transaction(

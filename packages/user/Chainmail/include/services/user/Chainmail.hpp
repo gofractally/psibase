@@ -44,8 +44,6 @@ namespace UserService
             void sent(psibase::AccountNumber sender, psibase::AccountNumber receiver, std::string subject, std::string body, psibase::TimePointSec datetime) {}
             void archive(std::string msg_id) {}
          };
-         struct Ui{};
-         struct Merkle{};
       };
       // clang-format on
    };
@@ -59,13 +57,10 @@ namespace UserService
       method(unsave, msg_id, sender, subject, body, datetime),
       method(serveSys, request)
    );
-   PSIBASE_REFLECT_EVENTS(Chainmail);
    PSIBASE_REFLECT_HISTORY_EVENTS(Chainmail,
       method(sent, sender, receiver, subject, body, datetime),
       method(archive, msg_id),
    );
-   PSIBASE_REFLECT_UI_EVENTS(Chainmail);
-   PSIBASE_REFLECT_MERKLE_EVENTS(Chainmail);
    // clang-format on
 
 }  // namespace UserService

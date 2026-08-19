@@ -20,6 +20,9 @@ type Meta<T> = {
     error: string;
     loading: string;
     success: string;
+    /** Replaces the default single `supervisor.functionCall` (e.g. multi-step flows). */
+    customMutationFn?: (params: T) => Promise<void>;
+    mutationKey?: readonly unknown[];
 } & (
     | {
           isStagable?: false | undefined;
@@ -33,17 +36,30 @@ type Meta<T> = {
 
 export const usePluginMutation = <T>(
     { intf, method, service }: Params,
-    { error, loading, success, isStagable = true, onSuccess }: Meta<T>,
+    meta: Meta<T>,
 ) => {
     const navigate = useNavigate();
+    const {
+        error,
+        loading,
+        success,
+        isStagable = true,
+        onSuccess,
+        customMutationFn,
+        mutationKey: userMutationKey,
+    } = meta;
 
     return useMutation<void, Error, T, string | number>({
-        mutationKey: [service, intf, method],
+        mutationKey: userMutationKey ?? [service, intf, method],
         onMutate: () => {
             const res = toast.loading(loading);
             return res;
         },
         mutationFn: async (paramsArray) => {
+            if (customMutationFn) {
+                await customMutationFn(paramsArray);
+                return;
+            }
             await supervisor.functionCall({
                 service,
                 intf,

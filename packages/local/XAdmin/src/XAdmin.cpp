@@ -647,6 +647,13 @@ namespace LocalService
                                 .headers     = std::move(challenges)};
          }
       };
+
+      struct ServiceFlags
+      {
+         std::string isPrivileged  = "0";
+         std::string isReplacement = "0";
+         PSIO_REFLECT(ServiceFlags, isPrivileged, isReplacement)
+      };
    }  // namespace
 
    void XAdmin::startSession()
@@ -904,6 +911,16 @@ namespace LocalService
             auto native          = Native::subjective(KvMode::readWrite);
             auto codeByHashTable = native.open<CodeByHashTable>();
             auto codeTable       = native.open<CodeTable>();
+            auto parsedFlags     = req.query<ServiceFlags>();
+            auto flags           = std::uint64_t{0};
+            if (parsedFlags.isPrivileged == "1")
+            {
+               flags |= CodeRow::isPrivileged;
+            }
+            if (parsedFlags.isReplacement == "1")
+            {
+               flags |= CodeRow::isReplacement;
+            }
             PSIBASE_SUBJECTIVE_TX
             {
                auto account = codeTable.get(service);
@@ -917,7 +934,7 @@ namespace LocalService
                constexpr std::uint8_t vmVersion = 0;
 
                if (vmType == account->vmType && vmVersion == account->vmVersion &&
-                   codeHash == account->codeHash)
+                   codeHash == account->codeHash && flags == account->flags)
                   return HttpReply{};
 
                // decrement old reference count
@@ -928,7 +945,7 @@ namespace LocalService
                }
 
                account->codeHash  = codeHash;
-               account->flags     = CodeRow::isPrivileged;
+               account->flags     = flags;
                account->vmType    = vmType;
                account->vmVersion = vmVersion;
                codeTable.put(*account);

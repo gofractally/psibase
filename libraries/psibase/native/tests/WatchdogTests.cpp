@@ -33,13 +33,13 @@ TEST_CASE("CpuClock should be associated with the current thread")
    std::chrono::nanoseconds t0_elapsed;
    auto                     start = CpuClock::now();
    std::thread              t0{[&]
-                  {
+                               {
                      auto start = CpuClock::now();
-                     std::this_thread::sleep_for(std::chrono::milliseconds(25));
+                     std::this_thread::sleep_for(std::chrono::milliseconds(50));
                      auto end   = CpuClock::now();
                      t0_elapsed = end - start;
                      done       = true;
-                  }};
+                               }};
    while (!done)
    {
    }

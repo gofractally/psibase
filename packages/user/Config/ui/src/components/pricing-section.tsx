@@ -171,7 +171,7 @@ export const PricingSection = ({
             });
             pricingForm.reset(values);
         }
-    }, [pricing, isCpu]);
+    }, [pricing, isCpu, pricingForm]);
 
     if (isLoading) {
         return (
