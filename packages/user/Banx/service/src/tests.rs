@@ -203,8 +203,8 @@ mod tests {
             .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0, 0)
             .get()?;
 
-        // Alice posts FX quote for her debts AUD→USD (0.70).
-        Wrapper::push_from(&chain, alice)
+        // Gary (middle man / claim holder) posts AUD→USD (0.70).
+        Wrapper::push_from(&chain, gary)
             .st_cur_pol(
                 aud,
                 usd,
@@ -228,9 +228,9 @@ mod tests {
             )
             .get()?;
 
-        // After implied convert, Alice owes Gary USD (not AUD).
-        assert_eq!(exp(&chain, gary, alice, aud), 0);
-        assert_eq!(exp(&chain, gary, alice, usd), 700);
+        // Alice stays in AUD; Gary takes the USD liability to Steve.
+        assert_eq!(exp(&chain, gary, alice, aud), 1_000);
+        assert_eq!(exp(&chain, gary, alice, usd), 0);
         assert_eq!(exp(&chain, steve, gary, usd), 700);
 
         Ok(())
@@ -305,8 +305,8 @@ mod tests {
                 never(),
             )
             .get()?;
-        // Mitchell posts convert AUD→USD at 0.65 (applied when path hits USD hop)
-        Wrapper::push_from(&chain, mitchell)
+        // John (AUD creditor / middle man into USD) posts AUD→USD at 0.65
+        Wrapper::push_from(&chain, john)
             .st_cur_pol(
                 aud,
                 usd,
@@ -319,9 +319,9 @@ mod tests {
 
         // 10_000 AUD:
         //   Zac owes Mitchell 10_000 AUD
-        //   Mitchell owes John  9_500 AUD  (5% fee) then convert → 6_175 USD
-        //   John owes Mike      6_175 USD
-        //   Mike owes Brandon   6_113 USD  (1% fee)
+        //   Mitchell owes John  9_500 AUD  (5% hop fee; not rebooked)
+        //   John owes Mike      6_175 USD  (John's 0.65 FX)
+        //   Mike owes Brandon   6_113 USD  (1% hop fee)
         let min_brandon = Quantity::new(6_113);
 
         Wrapper::push_from(&chain, zac)
@@ -344,16 +344,16 @@ mod tests {
             10_000,
             "Zac owes Mitchell 10000 AUD"
         );
-        // Mitchell→John claim converted to USD
+        // John prices AUD→USD but does not rebook Mitchell's AUD tab.
         assert_eq!(
             exp(&chain, john, mitchell, aud),
-            0,
-            "Mitchell→John AUD cleared by convert"
+            9_500,
+            "Mitchell still owes John 9500 AUD"
         );
         assert_eq!(
             exp(&chain, john, mitchell, usd),
-            6_175,
-            "Mitchell owes John 6175 USD after convert"
+            0,
+            "path_pay does not rebook into USD"
         );
         // USD path
         assert_eq!(
@@ -427,7 +427,7 @@ mod tests {
                 never(),
             )
             .get()?;
-        Wrapper::push_from(&chain, mitchell)
+        Wrapper::push_from(&chain, john)
             .st_cur_pol(
                 aud,
                 usd,
@@ -486,7 +486,7 @@ mod tests {
             )
             .get()?;
 
-        Wrapper::push_from(&chain, alice)
+        Wrapper::push_from(&chain, gary)
             .st_cur_pol(
                 aud,
                 usd,
@@ -535,7 +535,7 @@ mod tests {
             .get()?;
         assert_eq!(exp(&chain, alice, gary, usd), 80);
 
-        Wrapper::push_from(&chain, alice)
+        Wrapper::push_from(&chain, gary)
             .st_cur_pol(aud, usd, Quantity::new(0), RATE_SCALE, 0, never())
             .get()?;
         Wrapper::push_from(&chain, gary)
@@ -787,7 +787,12 @@ mod tests {
             .st_crd_lne(bob, usd, Quantity::new(10_000), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, peter)
-            .st_glb_buy(usd, Quantity::new(0), -(PPM_SCALE as i32) * 5 / 100, never())
+            .st_glb_buy(
+                usd,
+                Quantity::new(0),
+                -(PPM_SCALE as i32) * 5 / 100,
+                never(),
+            )
             .get()?;
 
         Wrapper::push_from(&chain, alice)
@@ -1041,12 +1046,12 @@ mod tests {
             )
             .get()?;
 
-        // Gary holds the claim; Alice is the debtor. Use Alice's 0.50 quote.
+        // Gary holds the claim; his 0.80 quote wins. Alice's 0.50 is ignored.
         Wrapper::push_from(&chain, gary)
-            .convert(alice, aud, usd, Quantity::new(100), Quantity::new(50))
+            .convert(alice, aud, usd, Quantity::new(100), Quantity::new(80))
             .get()?;
         assert_eq!(exp(&chain, gary, alice, aud), 0);
-        assert_eq!(exp(&chain, gary, alice, usd), 50);
+        assert_eq!(exp(&chain, gary, alice, usd), 80);
         Ok(())
     }
 
@@ -1069,7 +1074,7 @@ mod tests {
         Wrapper::push_from(&chain, steve)
             .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0, 0)
             .get()?;
-        Wrapper::push_from(&chain, alice)
+        Wrapper::push_from(&chain, gary)
             .st_cur_pol(
                 aud,
                 usd,
@@ -1122,7 +1127,7 @@ mod tests {
         Wrapper::push_from(&chain, steve)
             .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0, 0)
             .get()?;
-        Wrapper::push_from(&chain, alice)
+        Wrapper::push_from(&chain, gary)
             .st_cur_pol(
                 aud,
                 usd,
@@ -1160,10 +1165,9 @@ mod tests {
     ///
     ///   Alice → Gary AUD (400 reverse) → Steve USD (0.70) → Sam GBP (0.80)
     ///
-    /// Hop 0 nets 400; Alice still owes Gary 600 AUD (not rebooked).
-    /// Hop 1 FX uses the 1000 notional → 700 USD to Steve (no leftover shrink).
-    /// Hop 2 FX sees that full 700 (not 420) → 560 GBP to Sam, and rebooks
-    /// Gary→Steve because that hop was fully on the books.
+    /// Hop 0 nets 400; Alice still owes Gary 600 AUD.
+    /// Hop 1: Gary's 0.70 → Steve is owed 700 USD (Gary still owed 600 AUD).
+    /// Hop 2: Steve's 0.80 → Sam is owed 560 GBP (Gary still owed 700 USD).
     #[psibase::test_case(packages("Banx"))]
     fn test_path_pay_fx_aud_usd_gbp_after_partial_reverse(
         chain: psibase::Chain,
@@ -1190,7 +1194,7 @@ mod tests {
             .st_crd_lne(steve, gbp, Quantity::new(10_000), false, 0, 0)
             .get()?;
 
-        Wrapper::push_from(&chain, alice)
+        Wrapper::push_from(&chain, gary)
             .st_cur_pol(
                 aud,
                 usd,
@@ -1200,8 +1204,8 @@ mod tests {
                 never(),
             )
             .get()?;
-        // Previous-edge debtor on the USD→GBP hop is Gary.
-        Wrapper::push_from(&chain, gary)
+        // Steve sits between USD and GBP.
+        Wrapper::push_from(&chain, steve)
             .st_cur_pol(
                 usd,
                 gbp,
@@ -1231,12 +1235,157 @@ mod tests {
             .get()?;
 
         assert_eq!(exp(&chain, alice, gary, aud), 0);
-        assert_eq!(exp(&chain, gary, alice, aud), 600, "unwind leftover stays AUD");
+        assert_eq!(
+            exp(&chain, gary, alice, aud),
+            600,
+            "unwind leftover stays AUD"
+        );
         assert_eq!(exp(&chain, gary, alice, usd), 0);
-        assert_eq!(exp(&chain, steve, gary, usd), 0, "Gary→Steve USD rebooked");
-        assert_eq!(exp(&chain, steve, gary, gbp), 560, "700 USD × 0.80");
+        assert_eq!(exp(&chain, steve, gary, usd), 700, "Gary keeps USD claim on the hop");
+        assert_eq!(exp(&chain, steve, gary, gbp), 0, "Steve prices GBP; does not rebook USD");
         assert_eq!(exp(&chain, sam, steve, gbp), 560);
         assert_eq!(exp(&chain, sam, steve, usd), 0);
+        Ok(())
+    }
+
+    /// path_pay FX does not rebook Alice into USD. Old 20% AUD and new 0% AUD
+    /// both stay; Gary takes the USD liability to Steve.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_path_pay_fx_does_not_rebook_prior_rate_bucket(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let gary = account!("gary");
+        let steve = account!("steve");
+        for a in [alice, gary, steve] {
+            chain.new_account(a).unwrap();
+        }
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, gary)
+            .st_crd_lne(alice, aud, Quantity::new(10_000), false, 200_000, 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(gary, aud)],
+                Quantity::new(500),
+                Quantity::new(500),
+                0,
+            )
+            .get()?;
+        assert_eq!(exp(&chain, gary, alice, aud), 500);
+
+        Wrapper::push_from(&chain, gary)
+            .st_crd_lne(alice, aud, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, steve)
+            .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .st_cur_pol(
+                aud,
+                usd,
+                Quantity::new(0),
+                RATE_SCALE * 70 / 100,
+                0,
+                never(),
+            )
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never())
+            .get()?;
+
+        Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(gary, aud), hop(steve, usd)],
+                Quantity::new(1_000),
+                Quantity::new(700),
+                0,
+            )
+            .get()?;
+
+        let prior = Obligation::get_by_interest_rate(gary, alice, aud, 200_000)
+            .expect("prior 20% AUD bucket");
+        assert_eq!(prior.remaining_principal.value, 500);
+        let new_draw = Obligation::get_by_interest_rate(gary, alice, aud, 0)
+            .expect("new 0% AUD draw stays AUD");
+        assert_eq!(new_draw.remaining_principal.value, 1_000);
+        assert_eq!(exp(&chain, gary, alice, aud), 1500);
+        assert_eq!(exp(&chain, gary, alice, usd), 0);
+        assert_eq!(exp(&chain, steve, gary, usd), 700);
+        Ok(())
+    }
+
+    /// Alice's FX quote must not price a hop through Gary.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_path_pay_fx_uses_middle_man_policy_not_sender(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let gary = account!("gary");
+        let steve = account!("steve");
+        for a in [alice, gary, steve] {
+            chain.new_account(a).unwrap();
+        }
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        Wrapper::push_from(&chain, gary)
+            .st_crd_lne(alice, aud, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, steve)
+            .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never())
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .st_cur_pol(
+                aud,
+                usd,
+                Quantity::new(0),
+                RATE_SCALE * 50 / 100,
+                0,
+                never(),
+            )
+            .get()?;
+
+        let no_gary = Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(gary, aud), hop(steve, usd)],
+                Quantity::new(1_000),
+                Quantity::new(1),
+                0,
+            )
+            .get();
+        assert!(
+            no_gary.is_err(),
+            "path_pay must fail without Gary's AUD→USD policy"
+        );
+
+        Wrapper::push_from(&chain, gary)
+            .st_cur_pol(
+                aud,
+                usd,
+                Quantity::new(0),
+                RATE_SCALE * 70 / 100,
+                0,
+                never(),
+            )
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(gary, aud), hop(steve, usd)],
+                Quantity::new(1_000),
+                Quantity::new(700),
+                0,
+            )
+            .get()?;
+        assert_eq!(exp(&chain, gary, alice, aud), 1_000);
+        assert_eq!(exp(&chain, gary, alice, usd), 0, "Alice is not rebooked to USD");
+        assert_eq!(exp(&chain, steve, gary, usd), 700, "Gary's 0.70, not Alice's 0.50");
         Ok(())
     }
 
@@ -1908,7 +2057,7 @@ mod tests {
         let still = Obligation::get_by_interest_rate(gary, alice, aud, 200_000).unwrap();
         assert_eq!(still.remaining_principal.value, 100);
 
-        Wrapper::push_from(&chain, alice)
+        Wrapper::push_from(&chain, gary)
             .st_cur_pol(
                 aud,
                 usd,
@@ -1988,7 +2137,7 @@ mod tests {
         Wrapper::push_from(&chain, steve)
             .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0, 0)
             .get()?;
-        Wrapper::push_from(&chain, alice)
+        Wrapper::push_from(&chain, gary)
             .st_cur_pol(
                 aud,
                 usd,

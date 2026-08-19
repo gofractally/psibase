@@ -51,7 +51,7 @@ struct GqlForward {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct GqlCurrency {
-    debtor: AccountNumber,
+    poster: AccountNumber,
     from_asset: u16,
     to_asset: u16,
     fee_fixed: Decimal,
@@ -96,7 +96,7 @@ pub fn fetch_path_graph(
                     poster nextHop assetId feeFixed feePercentPpm maxLineAprPpm expiresAt
                 }}
                 currencyPolicies {{
-                    debtor fromAsset toAsset feeFixed fxRate expiresAt
+                    poster fromAsset toAsset feeFixed fxRate expiresAt
                 }}
             }}
         }}"#
@@ -145,7 +145,7 @@ pub fn fetch_path_graph(
     let mut fx = Vec::with_capacity(g.currency_policies.len());
     for c in g.currency_policies {
         fx.push(FxEdge {
-            debtor: c.debtor.to_string(),
+            poster: c.poster.to_string(),
             from_asset: c.from_asset,
             to_asset: c.to_asset,
             fee_fixed: c.fee_fixed.quantity.value,

@@ -10,7 +10,7 @@ A payment does not move coins. It **creates or shrinks obligations** along a pat
 - **Obligation** — the actual debt. One pair/asset can have several rows (different rates). **Exposure** is principal + live interest.
 - **Path-forward offer** — B’s standing terms for *sitting in the middle* of a `path_pay`. Specific next hop, or **global** (any next hop).
 - **Buy-claim offer** — B’s standing terms for *buying* someone else’s claim via `sell_claim`. Specific debtor, or **global** (any lined debtor).
-- **Currency policy** — a debtor’s quote to rebook their debt from one asset to another (FX + optional fixed fee).
+- **Currency policy** — the middle man’s quote to rebook claims they hold from one asset to another (FX + optional fixed fee).
 
 Alice paying Carol $1 via Bob:
 
@@ -69,7 +69,7 @@ UI: `/requests`. Accounts inbox icon prefills an invoice (savings) or please-boo
 
 - **Hop 0** — sender draws on the first account (line and/or reverse claim). No hop fee.
 - **Later hops** — the current path debtor must have a **live** path-forward offer. Specific next hop if live; otherwise a live global. Expired specific does **not** block the global. Buy-claim offers are not used here.
-- **Asset change** — FX the previous hop’s **notional** (what was forwarded into that hop) using that edge **debtor’s** currency policy. Unwind on that hop does not shrink what the next hop sends. If the hop is still fully booked, it is rebooked into the new asset; if unwind left less, that leftover stays in the from-asset.
+- **Asset change** — the previous hop’s **creditor** (middle man) applies their FX quote to size the next hop. The payer’s tab stays in the from-asset; the middle man takes the to-asset liability. The sender’s policy is ignored.
 - **min_return** — final residual in the last hop’s asset must be at least this.
 
 Off-chain **Find path** (`quotePath`) searches a scoped subgraph (lines + reverse claims + clearing + FX), not the full network. Exact-in: amount is what you send. Exact-out: amount is what the payee should receive; the quote finds the send. Hop cards can show expected hop/FX fees.
@@ -119,9 +119,9 @@ Default in the UI is **7 days**. `0` means interest from the first second.
 
 ## Currency (FX)
 
-The **debtor** posts `st_cur_pol`: from-asset → to-asset, fixed fee in from-asset, rate (human “to per 1 from” in the plugin), optional new APR, expiry.
+The **middle man** (claim holder / previous-hop creditor) posts `st_cur_pol`: from-asset → to-asset, fixed fee in from-asset, rate (human “to per 1 from” in the plugin), optional new APR, expiry. The debtor’s policy is not used.
 
-`convert` rebooks an existing claim, then **auto-nets** the destination asset. Only the **creditor** (claim holder) may call it. The debtor is who **actually owes** `from_asset` on that pair, not whoever posted a policy. Path pay calls convert internally on asset-changing hops (previous edge debtor’s policy).
+`convert` rebooks an existing claim at the **creditor’s** quote, then **auto-nets** the destination asset. Only the **creditor** may call it. Path pay does **not** rebook: it only uses the middle man’s quote to size the next hop.
 
 ## Amounts and units
 

@@ -213,6 +213,8 @@ mod service {
 
     #[derive(SimpleObject)]
     struct CurrencyPolicyView {
+        poster: AccountNumber,
+        /// Same as `poster` (old field name).
         debtor: AccountNumber,
         fromAsset: u16,
         toAsset: u16,
@@ -227,7 +229,8 @@ mod service {
     impl From<CurrencyPolicy> for CurrencyPolicyView {
         fn from(p: CurrencyPolicy) -> Self {
             Self {
-                debtor: p.debtor,
+                poster: p.poster,
+                debtor: p.poster,
                 fromAsset: p.from_asset,
                 toAsset: p.to_asset,
                 feeFixed: dec(p.fee_fixed, p.from_asset),
@@ -456,12 +459,20 @@ mod service {
             PayRequest::get(id).map(PayRequestView::from)
         }
 
-        /// Currency convert quotes posted by `debtor`.
-        async fn currencyPolicies(&self, debtor: AccountNumber) -> Vec<CurrencyPolicyView> {
+        /// FX quotes posted by `poster` (middle man / claim holder).
+        /// `debtor` is accepted as an alias of `poster`.
+        async fn currencyPolicies(
+            &self,
+            poster: Option<AccountNumber>,
+            debtor: Option<AccountNumber>,
+        ) -> Vec<CurrencyPolicyView> {
+            let Some(who) = poster.or(debtor) else {
+                return Vec::new();
+            };
             CurrencyPolicyTab::with_service(banx::SERVICE)
                 .get_index_pk()
                 .iter()
-                .filter(|p| p.debtor == debtor)
+                .filter(|p| p.poster == who)
                 .map(CurrencyPolicyView::from)
                 .collect()
         }
@@ -564,7 +575,7 @@ mod service {
                 CurrencyPolicyTab::with_service(banx::SERVICE)
                     .get_index_pk()
                     .iter()
-                    .filter(|p| debtors.contains(&p.debtor) && policy_is_live(p.expires_at))
+                    .filter(|p| debtors.contains(&p.poster) && policy_is_live(p.expires_at))
                     .map(CurrencyPolicyView::from)
                     .collect();
 

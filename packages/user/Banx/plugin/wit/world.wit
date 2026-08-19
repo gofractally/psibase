@@ -126,11 +126,11 @@ interface api {
         amount: string,
     ) -> result<_, error>;
 
-    /// Debtor posts a convert quote from `from-asset` → `to-asset`.
-    /// Fee is a human decimal in **from-asset** units.
-    /// `to-rate` is how many **to-asset** units you get for 1 full **from-asset**
-    /// unit (e.g. `"0.45"` means 1 from → 0.45 to). The plugin converts this to
-    /// the chain `fx_rate` (RATE_SCALE fixed-point), including asset precisions.
+    /// Poster (middle man / claim holder) posts an FX quote: claims they hold
+    /// in `from-asset` may be rebooked to `to-asset`. Fee is a human decimal in
+    /// **from-asset** units. `to-rate` is how many **to-asset** units you get
+    /// for 1 full **from-asset** unit (e.g. `"0.45"`). The plugin converts this
+    /// to the chain `fx_rate` (RATE_SCALE fixed-point), including precisions.
     set-currency-policy: func(
         from-asset: u16,
         to-asset: u16,
@@ -181,7 +181,7 @@ interface api {
     /// `max-amount` is a human decimal string.
     net: func(counterparty: string, asset-id: u16, max-amount: string) -> result<_, error>;
 
-    /// Convert existing debt via a debtor's currency policy.
+    /// Convert existing debt via the sender's (creditor's) currency policy.
     /// Amounts are human decimal strings in their respective assets.
     convert: func(
         counterparty: string,

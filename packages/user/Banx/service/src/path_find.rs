@@ -38,7 +38,8 @@ pub struct RoutingEdge {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FxEdge {
-    pub debtor: String,
+    /// Middle man / previous-hop creditor who posted the quote.
+    pub poster: String,
     pub from_asset: u16,
     pub to_asset: u16,
     pub fee_fixed: u64,
@@ -180,11 +181,11 @@ pub fn find_banx_path(
         }
     }
 
-    let mut fx_by_debtor_from: HashMap<(&str, u16), Vec<&FxEdge>> = HashMap::new();
+    let mut fx_by_poster_from: HashMap<(&str, u16), Vec<&FxEdge>> = HashMap::new();
     for e in fx {
         if policy_live(e.expires_at, now) && e.fx_rate > 0 {
-            fx_by_debtor_from
-                .entry((e.debtor.as_str(), e.from_asset))
+            fx_by_poster_from
+                .entry((e.poster.as_str(), e.from_asset))
                 .or_default()
                 .push(e);
         }
@@ -228,10 +229,9 @@ pub fn find_banx_path(
 
     // Later hops: expand from reached states (TokenSwap-style layered rounds).
     //
-    // On-chain, asset changes convert via CurrencyPolicy of **prev_edge_debtor**
-    // (path debtor before the hop that created the current edge), then route from
-    // the current path_debtor. For state (D, A):
-    //   fx_debtor = pred.prev_account if set, else sender.
+    // On-chain, asset changes use CurrencyPolicy of the **current path
+    // debtor** (previous hop creditor / middle man). For state (D, A):
+    // FX poster = D.
     let max_extra = max_hops.saturating_sub(1);
     for _ in 0..max_extra {
         let mut candidates: HashMap<StateKey, (u64, Pred, HashSet<String>)> = HashMap::new();
@@ -239,16 +239,6 @@ pub fn find_banx_path(
         for ((debtor, asset), &amt) in &best {
             let key = (debtor.clone(), *asset);
             let visited = path_accounts.get(&key).cloned().unwrap_or_default();
-            let p = pred.get(&key);
-            let fx_debtor = p
-                .map(|pr| {
-                    if pr.prev_account.is_empty() {
-                        sender
-                    } else {
-                        pr.prev_account.as_str()
-                    }
-                })
-                .unwrap_or(sender);
 
             // Same-asset forward hops (no convert).
             expand_hops(
@@ -265,7 +255,7 @@ pub fn find_banx_path(
             );
 
             // Asset-change hops: FX the hop notional (not leftover after unwind).
-            if let Some(fx_list) = fx_by_debtor_from.get(&(fx_debtor, *asset)) {
+            if let Some(fx_list) = fx_by_poster_from.get(&(debtor.as_str(), *asset)) {
                 for e in fx_list {
                     let Some(after_fx) = apply_rate(amt, e.fee_fixed, e.fx_rate) else {
                         continue;
@@ -374,7 +364,6 @@ fn simulate_path_fees(
     let mut hops = Vec::with_capacity(hop_keys.len());
     let mut forward = amount_in;
     let mut path_debtor = sender.to_string();
-    let mut prev_edge_debtor = sender.to_string();
     let mut prev_asset = hop_keys[0].1;
 
     for (i, (next_creditor, asset_id)) in hop_keys.iter().enumerate() {
@@ -388,7 +377,6 @@ fn simulate_path_fees(
                 fx_fee: 0,
                 fx_from_asset: None,
             });
-            prev_edge_debtor = path_debtor;
             path_debtor = next_creditor.clone();
             prev_asset = asset_id;
             continue;
@@ -398,7 +386,7 @@ fn simulate_path_fees(
         let mut fx_from_asset = None;
         if asset_id != prev_asset {
             let e = fx.iter().find(|e| {
-                e.debtor == prev_edge_debtor
+                e.poster == path_debtor
                     && e.from_asset == prev_asset
                     && e.to_asset == asset_id
                     && policy_live(e.expires_at, now)
@@ -422,7 +410,6 @@ fn simulate_path_fees(
             fx_fee,
             fx_from_asset,
         });
-        prev_edge_debtor = path_debtor;
         path_debtor = next_creditor.clone();
         prev_asset = asset_id;
     }
@@ -884,7 +871,7 @@ mod tests {
             global_rte("mike", usd, PPM_SCALE * 1 / 100),
         ];
         let fx = vec![FxEdge {
-            debtor: "mitchell".into(),
+            poster: "john".into(),
             from_asset: aud,
             to_asset: usd,
             fee_fixed: 0,
@@ -991,7 +978,7 @@ mod tests {
         ];
         let routing = vec![global_rte("gary", usd, 0)];
         let fx = vec![FxEdge {
-            debtor: "alice".into(),
+            poster: "gary".into(),
             from_asset: aud,
             to_asset: usd,
             fee_fixed: 0,
@@ -1014,7 +1001,7 @@ mod tests {
         let lines = vec![hop0, line("steve", "gary", usd, 10_000)];
         let routing = vec![global_rte("gary", usd, 0)];
         let fx = vec![FxEdge {
-            debtor: "alice".into(),
+            poster: "gary".into(),
             from_asset: aud,
             to_asset: usd,
             fee_fixed: 0,
@@ -1041,7 +1028,7 @@ mod tests {
         ];
         let routing = vec![global_rte("gary", usd, 0)];
         let fx = vec![FxEdge {
-            debtor: "alice".into(),
+            poster: "gary".into(),
             from_asset: aud,
             to_asset: usd,
             fee_fixed: 0,
@@ -1070,7 +1057,7 @@ mod tests {
         let routing = vec![global_rte("gary", usd, 0), global_rte("steve", gbp, 0)];
         let fx = vec![
             FxEdge {
-                debtor: "alice".into(),
+                poster: "gary".into(),
                 from_asset: aud,
                 to_asset: usd,
                 fee_fixed: 0,
@@ -1078,7 +1065,7 @@ mod tests {
                 expires_at: 0,
             },
             FxEdge {
-                debtor: "gary".into(),
+                poster: "steve".into(),
                 from_asset: usd,
                 to_asset: gbp,
                 fee_fixed: 0,

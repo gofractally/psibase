@@ -60,7 +60,8 @@ const zBuyClaimOffer = z.object({
 });
 
 const zCurrencyPolicy = z.object({
-    debtor: z.string(),
+    poster: z.string(),
+    debtor: z.string().optional(),
     fromAsset: z.number(),
     toAsset: z.number(),
     feeFixed: z.string(),
@@ -177,8 +178,8 @@ export async function fetchCurrencyPolicies(
     account: string,
 ): Promise<CurrencyPolicy[]> {
     const data = await gql<{ currencyPolicies: CurrencyPolicy[] }>(
-        `{ currencyPolicies(debtor: "${account}") {
-            debtor fromAsset toAsset feeFixed fxRate toInterestRatePpm expiresAt
+        `{ currencyPolicies(poster: "${account}") {
+            poster fromAsset toAsset feeFixed fxRate toInterestRatePpm expiresAt
         } }`,
     );
     return zCurrencyPolicy.array().parse(data.currencyPolicies);

@@ -664,21 +664,16 @@ pub mod tables {
         panic!("BuyClaimOffer not found (buyer has no buy-claim offer for this asset)");
     }
 
-    /// Debtor-posted quote: re-denominate **any** claim against this debtor
-    /// from `from_asset` → `to_asset` at `fx_rate` (plus optional fixed fee).
+    /// Middle-man / claim-holder quote: `poster` will rebook claims **they
+    /// hold** (or hops through them) from `from_asset` → `to_asset`.
     ///
-    /// No creditor in the key — one policy covers every holder of the debtor's
-    /// obligations in `from_asset`. Convert names the **creditor** whose claim
-    /// is rebooked.
-    ///
-    /// Also used **inside** `path_pay` when consecutive hops change asset:
-    /// the previous edge is rebooked before the next same-asset routing hop.
-    /// Prefer short `expires_at` for FX-sensitive pairs.
+    /// `path_pay` uses the previous hop's **creditor** (the person in the
+    /// middle). The debtor's policy is irrelevant.
     #[table(name = "CurrencyPolicyTab", index = 4)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct CurrencyPolicy {
-        /// Debtor who posts the quote (and whose debts may be re-denominated).
-        pub debtor: AccountNumber,
+        /// Who posted the quote and whose claims may be re-denominated.
+        pub poster: AccountNumber,
         pub from_asset: u16,
         pub to_asset: u16,
 
@@ -695,21 +690,21 @@ pub mod tables {
     impl CurrencyPolicy {
         #[primary_key]
         fn pk(&self) -> (AccountNumber, u16, u16) {
-            (self.debtor, self.from_asset, self.to_asset)
+            (self.poster, self.from_asset, self.to_asset)
         }
 
         fn save(&self) {
             CurrencyPolicyTab::read_write().put(self).unwrap();
         }
 
-        pub fn get(debtor: AccountNumber, from_asset: u16, to_asset: u16) -> Option<Self> {
+        pub fn get(poster: AccountNumber, from_asset: u16, to_asset: u16) -> Option<Self> {
             CurrencyPolicyTab::read()
                 .get_index_pk()
-                .get(&(debtor, from_asset, to_asset))
+                .get(&(poster, from_asset, to_asset))
         }
 
-        pub fn get_assert(debtor: AccountNumber, from_asset: u16, to_asset: u16) -> Self {
-            Self::get(debtor, from_asset, to_asset).expect("CurrencyPolicy not found")
+        pub fn get_assert(poster: AccountNumber, from_asset: u16, to_asset: u16) -> Self {
+            Self::get(poster, from_asset, to_asset).expect("CurrencyPolicy not found")
         }
 
         /// `to = (from - fee_fixed) * fx_rate / RATE_SCALE`. Does not touch books.
@@ -718,9 +713,9 @@ pub mod tables {
             apply_rate(amount_from, self.fee_fixed, self.fx_rate)
         }
 
-        /// Debtor posts a convert quote applying to all their creditors.
+        /// Poster (middle man / claim holder) posts an FX quote.
         pub fn upsert(
-            debtor: AccountNumber,
+            poster: AccountNumber,
             from_asset: u16,
             to_asset: u16,
             fee_fixed: Quantity,
@@ -738,7 +733,7 @@ pub mod tables {
                 "to_interest_rate exceeds 100% (PPM_SCALE)"
             );
             Self {
-                debtor,
+                poster,
                 from_asset,
                 to_asset,
                 fee_fixed,
@@ -749,40 +744,42 @@ pub mod tables {
             .save();
         }
 
-        /// Rebook up to `amount_from` of what `self.debtor` owes `creditor` in
-        /// `from_asset` into `to_asset`. Auto-nets the pair in `to_asset`.
-        /// Returns units created in `to_asset` (before that net).
+        /// Rebook up to `amount_from` of what `debtor` owes `creditor` in
+        /// `from_asset` into `to_asset`. Poster must be the creditor.
+        /// Auto-nets the pair in `to_asset`.
         pub fn convert(
             &self,
             creditor: AccountNumber,
+            debtor: AccountNumber,
             amount_from: Quantity,
             min_to: Quantity,
         ) -> Quantity {
             assert_policy_live(self.expires_at);
             assert!(amount_from.value > 0, "convert amount must be positive");
-            assert!(creditor != self.debtor, "creditor must differ from debtor");
+            assert!(creditor == self.poster, "FX policy poster must be the creditor");
+            assert!(creditor != debtor, "creditor must differ from debtor");
 
-            Obligation::accrue_pair(creditor, self.debtor, self.from_asset);
-            let available = Obligation::exposure(creditor, self.debtor, self.from_asset).value;
+            Obligation::accrue_pair(creditor, debtor, self.from_asset);
+            let available = Obligation::exposure(creditor, debtor, self.from_asset).value;
             let take = amount_from.value.min(available);
             assert!(take > 0, "nothing to convert in from_asset");
 
-            Obligation::apply_reduction(creditor, self.debtor, self.from_asset, take);
+            Obligation::apply_reduction(creditor, debtor, self.from_asset, take);
 
             let to_qty = apply_rate(Quantity::new(take), self.fee_fixed, self.fx_rate);
             assert!(to_qty.value >= min_to.value, "convert output below min_to");
 
             Obligation::credit_pair(
                 creditor,
-                self.debtor,
+                debtor,
                 self.to_asset,
                 to_qty,
                 self.to_interest_rate,
             );
-            Obligation::net_pair(creditor, self.debtor, self.to_asset, u64::MAX.into());
+            Obligation::net_pair(creditor, debtor, self.to_asset, u64::MAX.into());
             emit_pair_activity(
                 creditor,
-                self.debtor,
+                debtor,
                 self.from_asset,
                 "convert",
                 Quantity::new(take),
@@ -1852,8 +1849,8 @@ pub mod service {
         );
     }
 
-    /// Debtor posts a convert quote for **all** holders of their `from_asset`
-    /// obligations → `to_asset`. See [`CurrencyPolicy`].
+    /// Poster (middle man / claim holder) posts an FX quote: claims they hold
+    /// in `from_asset` may be rebooked to `to_asset`. See [`CurrencyPolicy`].
     #[action]
     fn st_cur_pol(
         from_asset: u16,
@@ -1874,12 +1871,11 @@ pub mod service {
         );
     }
 
-    /// Convert existing debt using the **debtor's** [`CurrencyPolicy`].
+    /// Convert existing debt using the **sender's** (creditor's) [`CurrencyPolicy`].
     ///
-    /// `counterparty` is the other party on the obligation. Sender must be
-    /// the creditor (claim holder). Rebooks up to `amount_from` of
-    /// `from_asset` into `to_asset` for that pair; requires output ≥
-    /// `min_to`. Auto-nets `to_asset` after the rebook.
+    /// `counterparty` is the debtor. Sender must hold the claim. Rebooks up to
+    /// `amount_from` of `from_asset` into `to_asset`; requires output ≥ `min_to`.
+    /// Auto-nets `to_asset` after the rebook.
     #[action]
     fn convert(
         counterparty: AccountNumber,
@@ -1903,8 +1899,8 @@ pub mod service {
         };
         assert!(sender == creditor, "only the creditor can convert");
 
-        let policy = CurrencyPolicy::get_assert(debtor, from_asset, to_asset);
-        policy.convert(creditor, amount_from, min_to);
+        let policy = CurrencyPolicy::get_assert(creditor, from_asset, to_asset);
+        policy.convert(creditor, debtor, amount_from, min_to);
     }
 
     /// Book a **deposit**: sender receives value and credits `depositor`, then
@@ -1973,11 +1969,10 @@ pub mod service {
     /// `path_pay([(Gary, AUD), (Steve, USD)], amount_aud, min_return_usd)`:
     /// 1. **First hop** — sender draws `amount` on Gary in **AUD** (line and/or
     ///    reverse claim that auto-nets).
-    /// 2. **Currency change** — FX the previous hop's **notional** (the amount
-    ///    forwarded into that hop, not leftover after unwind) via the
-    ///    previous-edge debtor's [`CurrencyPolicy`]. If the hop is still fully
-    ///    on the books, rebook it; if unwind left less, keep that leftover in
-    ///    the from-asset and still forward the FX'd notional.
+    /// 2. **Currency change** — apply the previous-hop **creditor's**
+    ///    [`CurrencyPolicy`] to size the next hop. Does **not** rebook the
+    ///    previous tab: the payer still owes the middle man in the from-asset;
+    ///    the middle man takes the to-asset liability onward.
     /// 3. **Later hops** — intermediate's live [`ForwardOffer`] (fee + max
     ///    line APR); draw on next line.
     /// 4. **`min_return`** — final hop principal (in **last** asset) ≥ this.
@@ -1996,7 +1991,6 @@ pub mod service {
 
         let mut path_debtor = get_sender();
         let mut forward = amount;
-        let mut prev_edge_debtor = get_sender();
         let mut prev_edge_creditor = get_sender(); // overwritten after hop 0
         let mut prev_asset = hops[0].asset_id;
 
@@ -2009,26 +2003,16 @@ pub mod service {
 
             if i == 0 {
                 CreditLine::path_debit(next_creditor, path_debtor, asset_id, forward);
-                prev_edge_debtor = path_debtor;
                 prev_edge_creditor = next_creditor;
                 prev_asset = asset_id;
                 path_debtor = next_creditor;
                 continue;
             }
 
-            // Currency change: FX `forward` (hop notional), not leftover-after-net.
-            // Full leftover ⇒ rebook that claim. Partial/full unwind ⇒ leave
-            // whatever remains in from-asset; still forward the FX'd notional.
+            // FX sizes the next hop only. Previous tab stays in from-asset.
             if asset_id != prev_asset {
-                Obligation::accrue_pair(prev_edge_creditor, prev_edge_debtor, prev_asset);
-                let available =
-                    Obligation::exposure(prev_edge_creditor, prev_edge_debtor, prev_asset);
-                let cpol = CurrencyPolicy::get_assert(prev_edge_debtor, prev_asset, asset_id);
-                if available.value >= forward.value {
-                    forward = cpol.convert(prev_edge_creditor, forward, Quantity::new(0));
-                } else {
-                    forward = cpol.apply(forward);
-                }
+                let cpol = CurrencyPolicy::get_assert(prev_edge_creditor, prev_asset, asset_id);
+                forward = cpol.apply(forward);
             }
 
             assert!(
@@ -2039,10 +2023,9 @@ pub mod service {
             // Same-asset forward hop: live specific, else live global.
             let offer = resolve_forward(next_creditor, path_debtor, asset_id);
             forward = offer.path_draw(next_creditor, forward);
-            prev_edge_debtor = path_debtor;
             prev_edge_creditor = next_creditor;
-            path_debtor = next_creditor;
             prev_asset = asset_id;
+            path_debtor = next_creditor;
         }
 
         assert!(

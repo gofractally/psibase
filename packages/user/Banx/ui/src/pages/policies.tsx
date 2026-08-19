@@ -126,9 +126,9 @@ export function PoliciesPage() {
                 >
                     <h2 className="font-medium">Set currency policy</h2>
                     <p className="text-muted-foreground text-xs">
-                        You are the debtor posting a convert quote for all
-                        holders of your from-asset obligations. Rate is to-units
-                        per 1 from-unit (e.g. 0.45 means $1 → $0.45).
+                        You set the rate for hops that change currency through
+                        you, and for converting claims you hold. Rate is
+                        to-units per 1 from-unit (e.g. 0.45 means $1 → $0.45).
                     </p>
                     <div className="grid gap-2 sm:grid-cols-2">
                         <currencyForm.Field
