@@ -50,3 +50,17 @@ TEST_CASE("Wrong passphrase")
       CHECK_THROWS(Secrets{dir.path / "secrets", "open sez me"});
    }
 }
+
+TEST_CASE("Secrets temporary")
+{
+   TempDirectory dir;
+   {
+      Secrets secrets{dir.path / "secrets", ""};
+      secrets.put("a"sv, "value"sv);
+      CHECK(!std::filesystem::exists(dir.path / "secrets"));
+   }
+   {
+      Secrets secrets{dir.path / "secrets", ""};
+      CHECK(secrets.get("a"sv) == std::nullopt);
+   }
+}

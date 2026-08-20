@@ -255,30 +255,39 @@ namespace
       std::string_view  skey() const { return {key.data(), key.size()}; }
       PSIO_REFLECT(KeyValue, key, value);
    };
+
+   DecryptedFile newEncryptedFile(std::string_view passphrase)
+   {
+      SCryptParams params;
+      auto         key = deriveKey<32>(passphrase, params);
+      return {key, params, psio::to_frac(std::vector<KeyValue>())};
+   }
+
+   struct EncryptedFileInfo
+   {
+      SCryptParams                  params;
+      std::array<unsigned char, 32> key;
+      std::filesystem::path         filename;
+   };
 }  // namespace
 
 struct Secrets::Impl
 {
-   Impl(const std::filesystem::path& path, std::string_view passphrase)
-       : params(), key(deriveKey<32>(passphrase, params)), filename(path)
-   {
-   }
+   Impl() = default;
    Impl(const std::filesystem::path& path, DecryptedFile&& contents)
-       : params(std::move(contents.params)),
-         key(std::move(contents.key)),
-         filename(path),
+       : file{
+             {.params{std::move(contents.params)}, .key{std::move(contents.key)}, .filename{path}}},
          items(psio::from_frac<std::vector<KeyValue>>(contents.data))
    {
    }
-   SCryptParams                  params;
-   std::array<unsigned char, 32> key;
-   std::filesystem::path         filename;
-   std::vector<KeyValue>         items;
+   std::optional<EncryptedFileInfo> file;
+   std::vector<KeyValue>            items;
 };
 
 Secrets::Secrets(const std::filesystem::path& file, std::string_view passphrase)
     : impl(new Impl{std::filesystem::exists(file) ? Impl(file, readEncryptedFile(file, passphrase))
-                                                  : Impl(file, passphrase)})
+                    : !passphrase.empty()         ? Impl(file, newEncryptedFile(passphrase))
+                                                  : Impl()})
 {
 }
 
@@ -313,5 +322,7 @@ void Secrets::put(std::span<const char> key, std::span<const char> value)
       impl->items.insert(pos, KeyValue{std::vector(key.begin(), key.end()),
                                        std::vector(value.begin(), value.end())});
    }
-   writeEncryptedFile(impl->filename, psio::to_frac(impl->items), impl->params, impl->key);
+   if (impl->file)
+      writeEncryptedFile(impl->file->filename, psio::to_frac(impl->items), impl->file->params,
+                         impl->file->key);
 }
