@@ -1221,7 +1221,8 @@ function AccountGroupRow({
             : "bg-amber-500/[0.04] border-amber-500/15";
     const editTip =
         "Edit credit line — change limit, interest rate, or revolving terms";
-    const historyTip = "History — path draws, deposits, nets, and line changes";
+    const historyTip =
+        "History — payments, path draws, deposits, nets, and line changes";
     const routingTip =
         "Path-forward offer — let others hop through you to this party";
     const buyClaimTip =

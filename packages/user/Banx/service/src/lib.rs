@@ -2034,6 +2034,7 @@ pub mod service {
         add_index("activity", 0); // account
         add_index("activity", 1); // counterparty
         add_index("activity", 2); // asset_id
+        add_index("activity", 6); // other_asset_id (path_pay / convert)
 
         let table = InitTable::new();
         if InitTable::read().get_index_pk().get(&()).is_none() {
@@ -2494,9 +2495,12 @@ pub mod service {
     fn path_pay(hops: Vec<PathHop>, amount: Quantity, min_return: Quantity, request_id: u32) {
         assert!(!hops.is_empty(), "path_pay must include at least one hop");
         assert!(amount.value > 0, "path_pay amount must be positive");
+        let sender = get_sender();
+        let hop_count = hops.len();
+        let first_asset = hops[0].asset_id;
         let last_hop = hops[hops.len() - 1];
 
-        let forward = execute_path(get_sender(), hops, amount);
+        let forward = execute_path(sender, hops, amount);
         assert!(
             forward.value >= min_return.value,
             "path_pay final amount below min_return"
@@ -2505,10 +2509,25 @@ pub mod service {
         if request_id != 0 {
             PayRequest::fulfill_invoice(
                 request_id,
-                get_sender(),
+                sender,
                 last_hop.account,
                 last_hop.asset_id,
                 forward,
+            );
+        }
+        // Hop draws already write adjacent pairs. Multi-hop also writes
+        // sender↔payee so history with the payee shows the payment.
+        if hop_count >= 2 {
+            emit_pair_activity(
+                sender,
+                last_hop.account,
+                first_asset,
+                "path_pay",
+                amount,
+                forward,
+                last_hop.asset_id,
+                request_id,
+                "",
             );
         }
     }
@@ -2527,6 +2546,9 @@ pub mod service {
         assert!(request_id != 0, "pay_inv requires an invoice");
         assert!(!hops.is_empty(), "pay_inv must include at least one hop");
         assert!(max_spend.value > 0, "pay_inv max_spend must be positive");
+        let sender = get_sender();
+        let hop_count = hops.len();
+        let first_asset = hops[0].asset_id;
         let last_hop = hops[hops.len() - 1];
         let remaining =
             PayRequest::live_invoice_remaining(request_id, last_hop.account, last_hop.asset_id);
@@ -2535,14 +2557,27 @@ pub mod service {
             required.value <= max_spend.value,
             "pay_inv max_spend below required send"
         );
-        let delivered = execute_path(get_sender(), hops, required);
+        let delivered = execute_path(sender, hops, required);
         PayRequest::fulfill_invoice(
             request_id,
-            get_sender(),
+            sender,
             last_hop.account,
             last_hop.asset_id,
             delivered,
         );
+        if hop_count >= 2 {
+            emit_pair_activity(
+                sender,
+                last_hop.account,
+                first_asset,
+                "path_pay",
+                required,
+                delivered,
+                last_hop.asset_id,
+                request_id,
+                "",
+            );
+        }
     }
 
     /// Post an invoice (`1`), please-book (`2`), or settle-auth (`3`).
@@ -2591,12 +2626,12 @@ pub mod service {
 
     /// Bilateral activity history (emitted once per party as `account`).
     ///
-    /// - `kind`: `path_draw` | `deposit` | `net` | `convert` | `credit_line` |
-    ///   `rm_credit_line` | `sell_claim` | `invoice` | `please_book` |
-    ///   `settle_auth` | `fulfill` | `req_cancel`
+    /// - `kind`: `path_draw` | `path_pay` | `deposit` | `net` | `convert` |
+    ///   `credit_line` | `rm_credit_line` | `sell_claim` | `invoice` |
+    ///   `please_book` | `settle_auth` | `fulfill` | `req_cancel`
     /// - `amount`: primary quantity (human decimal at `asset_id` precision)
-    /// - `netted`: auto-net cancelled (or convert output); decimal at `other_asset_id` for `convert`
-    /// - `other_asset_id`: convert destination asset; otherwise same as `asset_id`
+    /// - `netted`: auto-net cancelled; convert/`path_pay` output at `other_asset_id`
+    /// - `other_asset_id`: convert/`path_pay` destination asset; else same as `asset_id`
     /// - `request_id`: linked request (`0` = none)
     /// - `memo`: request memo when linked
     #[event(history)]

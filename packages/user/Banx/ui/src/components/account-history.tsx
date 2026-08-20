@@ -15,6 +15,8 @@ function kindLabel(kind: string): string {
     switch (kind) {
         case "path_draw":
             return "Path draw";
+        case "path_pay":
+            return "Payment";
         case "deposit":
             return "Deposit";
         case "net":
@@ -63,6 +65,23 @@ function describeEvent(
                     ? `Auto-netted ${netted} ${sym} against reverse claims`
                     : `Draw on credit line · counterparty ${e.counterparty}`;
             return { title, detail };
+        }
+        case "path_pay": {
+            const same = e.otherAssetId === e.assetId;
+            const gotSym = same ? sym : otherSym;
+            const title =
+                e.actor === viewer
+                    ? `You paid ${netted} ${gotSym}`
+                    : `${e.actor} paid you ${netted} ${gotSym}`;
+            const via =
+                e.actor === viewer
+                    ? `To ${e.counterparty}`
+                    : `From ${e.actor}`;
+            const sent =
+                !same || amt !== netted ? ` · sent ${amt} ${sym}` : "";
+            const req =
+                e.requestId && e.requestId > 0 ? ` · request #${e.requestId}` : "";
+            return { title, detail: `${via}${sent}${req}` };
         }
         case "deposit": {
             const title =

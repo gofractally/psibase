@@ -596,7 +596,9 @@ mod service {
             // `asset_id = ?` with "1" matches nothing; interpolate like Tokens.
             EventQuery::new("history.banx.activity")
                 .condition_with_params(
-                    format!("account = ? AND counterparty = ? AND asset_id = {assetId}"),
+                    format!(
+                        "account = ? AND counterparty = ? AND (asset_id = {assetId} OR other_asset_id = {assetId})"
+                    ),
                     vec![account.to_string(), counterparty.to_string()],
                 )
                 .first(first)
