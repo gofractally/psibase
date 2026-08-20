@@ -25,6 +25,17 @@ TEST_CASE("Secret put/get")
    CHECK(sv(secrets.get("a"sv)) == "value");
 }
 
+TEST_CASE("Secret remove")
+{
+   TempDirectory    dir;
+   std::string_view passphrase = "open sesame";
+   Secrets          secrets{dir.path / "secrets", passphrase};
+   secrets.put("a"sv, "value"sv);
+   CHECK(sv(secrets.get("a"sv)) == "value");
+   secrets.remove("a"sv);
+   CHECK(secrets.get("a"sv) == std::nullopt);
+}
+
 TEST_CASE("Secret load")
 {
    TempDirectory    dir;
@@ -36,6 +47,25 @@ TEST_CASE("Secret load")
    {
       Secrets secrets{dir.path / "secrets", passphrase};
       CHECK(sv(secrets.get("a"sv)) == "value");
+   }
+}
+
+TEST_CASE("Secret remove load")
+{
+   TempDirectory    dir;
+   std::string_view passphrase = "open sesame";
+   {
+      Secrets secrets{dir.path / "secrets", passphrase};
+      secrets.put("a"sv, "value"sv);
+   }
+   {
+      Secrets secrets{dir.path / "secrets", passphrase};
+      CHECK(sv(secrets.get("a"sv)) == "value");
+      secrets.remove("a"sv);
+   }
+   {
+      Secrets secrets{dir.path / "secrets", passphrase};
+      CHECK(secrets.get("a"sv) == std::nullopt);
    }
 }
 

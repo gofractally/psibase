@@ -14,6 +14,7 @@ namespace psibase
       ~Secrets();
       std::optional<std::span<const char>> get(std::span<const char> key);
       void put(std::span<const char> key, std::span<const char> value);
+      void remove(std::span<const char> key);
 
      private:
       struct Impl;

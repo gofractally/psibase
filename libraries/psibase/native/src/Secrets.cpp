@@ -280,6 +280,11 @@ struct Secrets::Impl
          items(psio::from_frac<std::vector<KeyValue>>(contents.data))
    {
    }
+   void flush()
+   {
+      if (file)
+         writeEncryptedFile(file->filename, psio::to_frac(items), file->params, file->key);
+   }
    std::optional<EncryptedFileInfo> file;
    std::vector<KeyValue>            items;
 };
@@ -322,7 +327,16 @@ void Secrets::put(std::span<const char> key, std::span<const char> value)
       impl->items.insert(pos, KeyValue{std::vector(key.begin(), key.end()),
                                        std::vector(value.begin(), value.end())});
    }
-   if (impl->file)
-      writeEncryptedFile(impl->file->filename, psio::to_frac(impl->items), impl->file->params,
-                         impl->file->key);
+   impl->flush();
+}
+
+void Secrets::remove(std::span<const char> key)
+{
+   auto k   = std::string_view{key.data(), key.size()};
+   auto pos = std::ranges::lower_bound(impl->items, k, {}, &KeyValue::skey);
+   if (pos != impl->items.end() && pos->skey() == k)
+   {
+      impl->items.erase(pos);
+      impl->flush();
+   }
 }
