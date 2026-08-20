@@ -60,7 +60,7 @@ const defaultFees = (assetId?: number): FeeFields => ({
     hopFeePct: "0",
     maxAcceptPct: "20",
     expiresAtSeconds: 0,
-    allowUnknown: false,
+    allowUnknown: true,
 });
 
 function offerLive(p: ForwardOffer, nowSec: number): boolean {
@@ -560,7 +560,7 @@ export function RoutingPolicyDialog({
             globalForm.setFieldValue("hopFeePct", "0");
             globalForm.setFieldValue("maxAcceptPct", "20");
             globalForm.setFieldValue("expiresAtSeconds", 0);
-            globalForm.setFieldValue("allowUnknown", false);
+            globalForm.setFieldValue("allowUnknown", true);
         }
     };
 
