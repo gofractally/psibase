@@ -20,8 +20,6 @@ world impl {
     include host:crypto/imports;
     include permissions:plugin/imports;
 
-    include transact:plugin/hook-user-auth;
-
     export session;
     export keyvault;
     export actions;

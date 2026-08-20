@@ -15,7 +15,6 @@ interface session {
 
 world impl {
     include host:common/imports;
-    include transact:plugin/hook-user-auth;
     import accounts:plugin/auth-svc;
 
     export session;

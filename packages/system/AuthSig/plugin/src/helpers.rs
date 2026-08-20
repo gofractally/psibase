@@ -1,4 +1,4 @@
-use crate::bindings::host::common::{client as Client, server as Server};
+use crate::bindings::host::common::server as Server;
 use crate::bindings::host::types::types as CommonTypes;
 use crate::bindings::host::types::types::Pem;
 use crate::errors::ErrorType::*;
@@ -14,8 +14,4 @@ pub fn get_pubkey(account_name: &str) -> Result<Pem, CommonTypes::Error> {
         .map_err(|e| JsonDecodeError(e.to_string()))?;
 
     Ok(summary_val.data.account.pubkey)
-}
-
-pub fn from_transact() -> bool {
-    Client::get_sender() == psibase::services::transact::SERVICE.to_string()
 }

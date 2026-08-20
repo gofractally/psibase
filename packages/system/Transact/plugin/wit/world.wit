@@ -123,26 +123,6 @@ world imports {
     import admin;
 }
 
-
-// All user auth service plugins must include this world.
-world hook-user-auth {
-    export transact-hook-user-auth: interface {
-        use host:types/types.{error, claim};
-
-        /// The verify-service specified in the claim is the service that knows how to verify that
-        /// a proof actually proves the claim.
-        record proof {
-            signature: list<u8>,
-        }
-
-        /// Gets the claim needed to satisfy the authorization of the logged-in user
-        on-user-auth-claim: func(account-name: string) -> result<option<claim>, error>;
-
-        /// Provides proof of the user claim.
-        on-user-auth-proof: func(account-name: string, transaction-hash: list<u8>) -> result<option<proof>, error>;
-    }
-}
-
 world hook-actions-sender {
     import hooks;
     export transact-hook-actions-sender: interface {
