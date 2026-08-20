@@ -1,0 +1,104 @@
+# Psibase runtime package (psinode + psibase CLI + share/psibase data).
+# Bump notes and layout: ./README.md
+{
+  lib,
+  stdenv,
+  fetchurl,
+  autoPatchelfHook,
+  openssl,
+  zlib,
+}: let
+  version = "0.27.0-pre";
+  srcUrl = "https://github.com/gofractally/psibase/releases/download/v${version}/psidk-ubuntu-2404.tar.gz";
+  srcHash = "sha256-NNytfbTfTmqTATn3FolwGfUKPf115aysZzK4i0nZyFk=";
+in
+  lib.throwIfNot stdenv.hostPlatform.isx86_64
+  "prebuilt psibase is only available on x86_64-linux (got ${stdenv.hostPlatform.system}); override services.psibase.package"
+  (stdenv.mkDerivation {
+    pname = "psibase";
+    inherit version;
+
+    src = fetchurl {
+      url = srcUrl;
+      hash = srcHash;
+    };
+
+    sourceRoot = "psidk-ubuntu-2404";
+
+    nativeBuildInputs = [
+      autoPatchelfHook
+    ];
+
+    buildInputs = [
+      openssl
+      zlib
+      stdenv.cc.cc.lib
+    ];
+
+    dontStrip = true;
+    dontConfigure = true;
+    dontBuild = true;
+
+    installPhase = ''
+      runHook preInstall
+
+      for prog in psinode psibase psitest; do
+        install -Dm755 "bin/$prog" "$out/bin/$prog"
+      done
+
+      mkdir -p $out/share/psibase
+      install -Dm644 share/psibase/config.in $out/share/psibase/config.in
+      cp -a share/psibase/packages $out/share/psibase/packages
+      cp -a share/psibase/wasm $out/share/psibase/wasm
+
+      if [ -d share/psibase/licenses ]; then
+        cp -a share/psibase/licenses $out/share/psibase/licenses
+      fi
+      if [ -d share/man ]; then
+        cp -a share/man $out/share/man
+      fi
+
+      runHook postInstall
+    '';
+
+    doInstallCheck = true;
+    installCheckPhase = ''
+      runHook preInstallCheck
+
+      $out/bin/psibase --version
+      # psinode --version writes to stderr and exits 1.
+      psinodeVersion=$($out/bin/psinode --version 2>&1 || true)
+      echo "psinode --version: $psinodeVersion"
+      case "$psinodeVersion" in
+        "psinode "*) ;;
+        *)
+          echo "unexpected psinode --version output" >&2
+          exit 1
+          ;;
+      esac
+
+      for p in \
+        bin/psinode bin/psibase bin/psitest \
+        share/psibase/config.in \
+        share/psibase/packages \
+        share/psibase/packages/index.json \
+        share/psibase/packages/ProdDefault.psi \
+        share/psibase/wasm; do
+        if [ ! -e "$out/$p" ]; then
+          echo "missing from layout: $p" >&2
+          exit 1
+        fi
+      done
+
+      runHook postInstallCheck
+    '';
+
+    meta = with lib; {
+      description = "Psibase node and client (psinode, psibase)";
+      homepage = "https://about.psibase.io";
+      license = licenses.mit;
+      sourceProvenance = with sourceTypes; [binaryNativeCode];
+      platforms = ["x86_64-linux"];
+      mainProgram = "psinode";
+    };
+  })

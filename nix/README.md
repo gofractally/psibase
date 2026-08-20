@@ -2,6 +2,11 @@
 
 How to use Nix as an alternative to the Docker-based development environment (psibase-contributor).
 **Supported platforms: Linux x86_64 and Linux aarch64.**
+
+For deployment rather than development, see [`deploy/README.md`](deploy/README.md):
+the prebuilt `psibase` package and the `services.psibase` NixOS module for
+running a long-lived node. 
+
 Not (yet) supported: macOS
 
 # Overview
@@ -107,9 +112,13 @@ nix develop
 
 # Files
 
-- `flake.nix` / `flake.lock` — Nix flake at repo root
-- `nix/rust-toolchain.toml` — Rust version and targets
+- `flake.nix` / `flake.lock` — Nix flake at repo root (dev shell + deploy exports)
+- `nix/rust-toolchain.toml` — Rust version and targets for the dev shell
+- `nix/dev/` — the contributor `nix develop` shell and its pinned tooling
+- `nix/deploy/` — runtime package and NixOS module ([docs](deploy/README.md))
+
+All `.nix` files are formatted with [alejandra](https://github.com/kamadorueda/alejandra); run `nix fmt`.
 
 # Relationship to Docker
 
-Docker (psibase-contributor) remains a supported path. Nix is an **additional** option for Linux: one clone of psibase, then `nix develop` and build.
+Docker (psibase-contributor) remains a supported path. Nix is an **additional** option for Linux: one clone of psibase, then `nix develop` and build. For running a long-lived node on NixOS, prefer `services.psibase` over the dev shell — see [`deploy/README.md`](deploy/README.md).
