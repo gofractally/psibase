@@ -47,7 +47,6 @@ import {
     useSetCreditLine,
 } from "@/hooks/use-banx-mutations";
 import {
-    amountPlaceholder,
     formatRawAmount,
     humanToRaw,
     lineAvailableRaw,
@@ -64,6 +63,7 @@ import {
     MAX_PERCENT,
     MIN_PERCENT_STEP,
     PPM_SCALE,
+    amountFieldValidator,
     existingAccountValidators,
     percentFieldValidator,
     percentStringToPpm,
@@ -951,13 +951,29 @@ function CreditLineDialog({
                                 return (
                                     <form.AppField
                                         name="limit"
+                                        validators={
+                                            aid !== undefined
+                                                ? {
+                                                      onChange:
+                                                          amountFieldValidator(
+                                                              precisionOf(aid),
+                                                              {
+                                                                  allowZero: true,
+                                                              },
+                                                          ),
+                                                      onSubmit:
+                                                          amountFieldValidator(
+                                                              precisionOf(aid),
+                                                              {
+                                                                  allowZero: true,
+                                                              },
+                                                          ),
+                                                  }
+                                                : undefined
+                                        }
                                         children={(field) => (
                                             <field.TextField
-                                                label={
-                                                    aid !== undefined
-                                                        ? `Limit (${amountPlaceholder(precisionOf(aid))})`
-                                                        : "Limit"
-                                                }
+                                                label="Limit"
                                                 inputMode="decimal"
                                                 required
                                             />

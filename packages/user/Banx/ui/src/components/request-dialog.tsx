@@ -4,7 +4,6 @@ import { AssetField, ExpiresField } from "@/components/form-fields";
 import { InvoiceQrDialog } from "@/components/invoice-qr-dialog";
 import { useRequests } from "@/hooks/use-banx-data";
 import { useCreateRequest } from "@/hooks/use-banx-mutations";
-import { amountPlaceholder } from "@/lib/amount";
 import {
     amountFieldValidator,
     existingAccountValidators,
@@ -99,7 +98,7 @@ export function RequestDialog({
             kind: REQUEST_PLEASE_BOOK,
             counterparty: "",
             assetId: undefined as number | undefined,
-            amount: "1.00",
+            amount: "",
             memo: "",
             expiresAtSeconds: 0,
         },
@@ -147,7 +146,7 @@ export function RequestDialog({
                 : REQUEST_PLEASE_BOOK,
             counterparty: prefill?.counterparty?.trim() ?? "",
             assetId: prefill?.assetId,
-            amount: prefill?.amount?.trim() || "1.00",
+            amount: prefill?.amount?.trim() || "",
             memo: "",
             expiresAtSeconds: 0,
         });
@@ -181,22 +180,12 @@ export function RequestDialog({
         <>
             <Dialog open={open} onOpenChange={onOpenChange}>
                 <DialogContent className="sm:max-w-md">
-                    <form.Subscribe
-                        selector={(s) => s.values.kind}
-                        children={(kind) => (
-                            <DialogHeader>
-                                <DialogTitle>New request</DialogTitle>
-                                <DialogDescription>
-                                    {kindHelp(
-                                        kind,
-                                        lockParty
-                                            ? prefill?.counterparty?.trim()
-                                            : undefined,
-                                    )}
-                                </DialogDescription>
-                            </DialogHeader>
-                        )}
-                    />
+                    <DialogHeader>
+                        <DialogTitle>New request</DialogTitle>
+                        <DialogDescription className="sr-only">
+                            Post an invoice, deposit request, or settle-auth.
+                        </DialogDescription>
+                    </DialogHeader>
                     <form
                         className="grid gap-4"
                         onSubmit={(e) => {
@@ -265,6 +254,14 @@ export function RequestDialog({
                                             Settle auth
                                         </Button>
                                     </div>
+                                    <p className="text-muted-foreground text-xs">
+                                        {kindHelp(
+                                            field.state.value,
+                                            lockParty
+                                                ? prefill?.counterparty?.trim()
+                                                : undefined,
+                                        )}
+                                    </p>
                                 </div>
                             )}
                         />
@@ -312,23 +309,26 @@ export function RequestDialog({
                                                   onChange:
                                                       amountFieldValidator(
                                                           precisionOf(assetId),
+                                                          {
+                                                              allowEmpty: true,
+                                                              allowZero: false,
+                                                          },
                                                       ),
                                                   onSubmit:
                                                       amountFieldValidator(
                                                           precisionOf(assetId),
+                                                          {
+                                                              allowEmpty: false,
+                                                              allowZero: false,
+                                                          },
                                                       ),
                                               }
                                             : undefined
                                     }
                                     children={(field) => (
                                         <field.TextField
-                                            label={
-                                                assetId !== undefined
-                                                    ? `Amount (${amountPlaceholder(precisionOf(assetId))})`
-                                                    : "Amount"
-                                            }
+                                            label="Amount"
                                             inputMode="decimal"
-                                            required
                                         />
                                     )}
                                 />
@@ -367,6 +367,7 @@ export function RequestDialog({
                                     const needParty =
                                         values.kind !== REQUEST_INVOICE &&
                                         !named;
+                                    const needAmount = !values.amount.trim();
                                     return (
                                         <form.AppForm>
                                             <form.SubmitButton
@@ -382,7 +383,9 @@ export function RequestDialog({
                                                 }
                                                 disabled={
                                                     values.assetId ===
-                                                        undefined || needParty
+                                                        undefined ||
+                                                    needParty ||
+                                                    needAmount
                                                 }
                                             />
                                         </form.AppForm>

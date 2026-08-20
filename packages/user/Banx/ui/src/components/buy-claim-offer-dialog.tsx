@@ -423,11 +423,7 @@ export function BuyClaimOfferDialog({
                         }}
                         children={(field) => (
                             <field.TextField
-                                label={
-                                    assetId !== undefined
-                                        ? `Fee fixed (${amountPlaceholder(precision)})`
-                                        : "Fee fixed"
-                                }
+                                label="Fee fixed"
                                 inputMode="decimal"
                                 placeholder={amountPlaceholder(precision)}
                                 disabled={locked}

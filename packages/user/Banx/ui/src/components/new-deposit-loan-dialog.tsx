@@ -2,11 +2,11 @@ import { useEffect, useState } from "react";
 
 import { AssetField } from "@/components/form-fields";
 import { useDeposit, usePathPay } from "@/hooks/use-banx-mutations";
-import { amountPlaceholder } from "@/lib/amount";
 import {
     MAX_PERCENT,
     MIN_PERCENT_STEP,
     PPM_SCALE,
+    amountFieldValidator,
     existingAccountValidators,
     percentFieldValidator,
     percentStringToPpm,
@@ -202,13 +202,33 @@ export function NewDepositLoanDialog({
                                     children={(assetId) => (
                                         <depositForm.AppField
                                             name="amount"
+                                            validators={
+                                                assetId !== undefined
+                                                    ? {
+                                                          onChange:
+                                                              amountFieldValidator(
+                                                                  precisionOf(
+                                                                      assetId,
+                                                                  ),
+                                                                  {
+                                                                      allowZero: false,
+                                                                  },
+                                                              ),
+                                                          onSubmit:
+                                                              amountFieldValidator(
+                                                                  precisionOf(
+                                                                      assetId,
+                                                                  ),
+                                                                  {
+                                                                      allowZero: false,
+                                                                  },
+                                                              ),
+                                                      }
+                                                    : undefined
+                                            }
                                             children={(field) => (
                                                 <field.TextField
-                                                    label={
-                                                        assetId !== undefined
-                                                            ? `Amount (${amountPlaceholder(precisionOf(assetId))})`
-                                                            : "Amount"
-                                                    }
+                                                    label="Amount"
                                                     inputMode="decimal"
                                                     required
                                                 />
@@ -307,13 +327,33 @@ export function NewDepositLoanDialog({
                                 children={(assetId) => (
                                     <loanForm.AppField
                                         name="amount"
+                                        validators={
+                                            assetId !== undefined
+                                                ? {
+                                                      onChange:
+                                                          amountFieldValidator(
+                                                              precisionOf(
+                                                                  assetId,
+                                                              ),
+                                                              {
+                                                                  allowZero: false,
+                                                              },
+                                                          ),
+                                                      onSubmit:
+                                                          amountFieldValidator(
+                                                              precisionOf(
+                                                                  assetId,
+                                                              ),
+                                                              {
+                                                                  allowZero: false,
+                                                              },
+                                                          ),
+                                                  }
+                                                : undefined
+                                        }
                                         children={(field) => (
                                             <field.TextField
-                                                label={
-                                                    assetId !== undefined
-                                                        ? `Draw amount (${amountPlaceholder(precisionOf(assetId))})`
-                                                        : "Draw amount"
-                                                }
+                                                label="Draw amount"
                                                 inputMode="decimal"
                                                 required
                                             />
