@@ -11,6 +11,7 @@ use crate::services::tokens::{Precision, Quantity, TokensError};
 /// Examples:
 /// - `quantity = 30_000`, `precision = 4` represents `3.0`
 /// - `quantity = 3`, `precision = 0` also represents `3.0`
+#[derive(Copy, Clone)]
 pub struct Decimal {
     pub quantity: Quantity,
     pub precision: Precision,

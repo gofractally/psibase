@@ -8,7 +8,7 @@ pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::{
         services::accounts::Wrapper as Accounts,
-        services::tokens::{Precision, Quantity},
+        services::tokens::{Decimal, Precision, Quantity},
         AccountNumber, Fracpack, Memo, ServiceWrapper, Table, TimePointSec, ToSchema,
     };
     use serde::{Deserialize, Serialize};
@@ -1967,6 +1967,9 @@ pub mod tables {
     }
 
     /// Emit bilateral history (once per party as `account`) via service events.
+    ///
+    /// `amount` / `netted` are stored as human decimals at this asset's
+    /// precision (`netted` uses `other_asset_id` for `convert`).
     pub fn emit_pair_activity(
         party_a: AccountNumber,
         party_b: AccountNumber,
@@ -1979,22 +1982,26 @@ pub mod tables {
         memo: &str,
     ) {
         let actor = psibase::get_sender();
-        let amount_s = amount.value.to_string();
-        let netted_s = netted.value.to_string();
-        let kind_s = kind.to_string();
-        let memo_s = memo.to_string();
+        let asset_precision = Asset::get_assert(asset_id).precision;
+        let other_asset_precision = if asset_id == other_asset_id {
+            asset_precision
+        } else {
+            Asset::get_assert(other_asset_id).precision
+        };
+        let amount = Decimal::new(amount, asset_precision);
+        let netted = Decimal::new(netted, other_asset_precision);
         for (account, counterparty) in [(party_a, party_b), (party_b, party_a)] {
             crate::Wrapper::emit().history().activity(
                 account,
                 counterparty,
                 asset_id,
-                kind_s.clone(),
-                amount_s.clone(),
-                netted_s.clone(),
+                kind.to_string(),
+                amount.to_string(),
+                netted.to_string(),
                 other_asset_id,
                 actor,
                 request_id,
-                memo_s.clone(),
+                memo.to_string(),
             );
         }
     }
@@ -2587,8 +2594,8 @@ pub mod service {
     /// - `kind`: `path_draw` | `deposit` | `net` | `convert` | `credit_line` |
     ///   `rm_credit_line` | `sell_claim` | `invoice` | `please_book` |
     ///   `settle_auth` | `fulfill` | `req_cancel`
-    /// - `amount`: primary quantity (raw units)
-    /// - `netted`: amount cancelled by auto-net (or convert output for `convert`)
+    /// - `amount`: primary quantity (human decimal at `asset_id` precision)
+    /// - `netted`: auto-net cancelled (or convert output); decimal at `other_asset_id` for `convert`
     /// - `other_asset_id`: convert destination asset; otherwise same as `asset_id`
     /// - `request_id`: linked request (`0` = none)
     /// - `memo`: request memo when linked

@@ -5,9 +5,9 @@ mod service {
     use banx::tables::{
         Asset, AssetTable, ClaimOffer, ClaimOfferTab, Connection, CreditLine, CreditLineTable,
         CurrencyPolicy, CurrencyPolicyTab, ForwardOffer, ForwardOfferTab, Obligation,
-        ObligationTable, PPM_SCALE, PairCycle, PayRequest, RATE_SCALE, RequestTab,
+        ObligationTable, PairCycle, PayRequest, RequestTab, PPM_SCALE, RATE_SCALE,
     };
-    use psibase::services::tokens::{Decimal, Precision, Quantity};
+    use psibase::services::tokens::{Decimal, Precision};
     use psibase::*;
     use serde::Deserialize;
     use serde_aux::field_attributes::deserialize_number_from_string;
@@ -17,18 +17,7 @@ mod service {
     }
 
     fn asset_precision(id: u16) -> Precision {
-        Asset::get(id)
-            .map(|a| a.precision)
-            .unwrap_or_else(|| Precision::new(0).expect("precision 0"))
-    }
-
-    /// Human decimal for an asset quantity (GraphQL `Decimal` scalar).
-    fn dec(q: Quantity, asset_id: u16) -> Decimal {
-        Decimal::new(q, asset_precision(asset_id))
-    }
-
-    fn dec_raw(raw: u64, asset_id: u16) -> Decimal {
-        dec(Quantity::new(raw), asset_id)
+        Asset::get(id).map(|a| a.precision).unwrap()
     }
 
     #[derive(SimpleObject, Clone)]
@@ -84,25 +73,29 @@ mod service {
             asset_id: u16,
             residual: u64,
         ) -> Self {
+            let p = asset_precision(asset_id);
+            let zero = Decimal::new(0.into(), p);
+            let claim = Decimal::new(residual.into(), p);
             Self {
                 creditor,
                 debtor,
                 assetId: asset_id,
-                limit: dec(0.into(), asset_id),
+                limit: zero,
                 depleteOnDebit: false,
                 interestRatePpm: 0,
                 graceSeconds: 0,
                 cycleStartedAt: 0,
                 cycleGraceSeconds: 0,
-                exposure: dec(0.into(), asset_id),
-                remaining: dec(0.into(), asset_id),
-                residual: dec(residual.into(), asset_id),
-                reverseClaim: dec(residual.into(), asset_id),
+                exposure: zero,
+                remaining: zero,
+                residual: claim,
+                reverseClaim: claim,
                 isLine: false,
             }
         }
 
         fn from_line(line: CreditLine) -> Self {
+            let p = asset_precision(line.asset_id);
             let exposure = Obligation::exposure(line.creditor, line.debtor, line.asset_id);
             let reverse = Obligation::exposure(line.debtor, line.creditor, line.asset_id);
             let cycle = PairCycle::get(line.creditor, line.debtor, line.asset_id);
@@ -110,7 +103,7 @@ mod service {
                 creditor: line.creditor,
                 debtor: line.debtor,
                 assetId: line.asset_id,
-                limit: dec(line.limit, line.asset_id),
+                limit: Decimal::new(line.limit, p),
                 depleteOnDebit: line.deplete_on_debit,
                 interestRatePpm: line.interest_rate,
                 graceSeconds: cycle.as_ref().map(|c| c.grace_seconds).unwrap_or(0),
@@ -119,15 +112,15 @@ mod service {
                     .map(|c| time_sec(c.cycle_started_at))
                     .unwrap_or(0),
                 cycleGraceSeconds: cycle.as_ref().map(|c| c.cycle_grace_seconds).unwrap_or(0),
-                exposure: dec(exposure, line.asset_id),
-                remaining: dec(line.remaining, line.asset_id),
-                residual: dec(
+                exposure: Decimal::new(exposure, p),
+                remaining: Decimal::new(line.remaining, p),
+                residual: Decimal::new(
                     Connection::get_live(line.creditor, line.debtor, line.asset_id)
                         .capacity()
                         .into(),
-                    line.asset_id,
+                    p,
                 ),
-                reverseClaim: dec(reverse, line.asset_id),
+                reverseClaim: Decimal::new(reverse, p),
                 isLine: true,
             }
         }
@@ -148,13 +141,14 @@ mod service {
 
     impl From<Obligation> for ObligationView {
         fn from(o: Obligation) -> Self {
+            let p = asset_precision(o.asset_id);
             Self {
                 id: o.id,
                 creditor: o.creditor,
                 debtor: o.debtor,
                 assetId: o.asset_id,
-                remainingPrincipal: dec(o.remaining_principal, o.asset_id),
-                accruedInterest: dec(o.live_accrued(), o.asset_id),
+                remainingPrincipal: Decimal::new(o.remaining_principal, p),
+                accruedInterest: Decimal::new(o.live_accrued(), p),
                 interestRatePpm: o.interest_rate,
                 createdAt: time_sec(o.created_at),
                 lastInterestAccrual: time_sec(o.last_interest_accrual),
@@ -182,7 +176,7 @@ mod service {
                 poster: p.poster,
                 nextHop: p.next_hop,
                 assetId: p.asset_id,
-                feeFixed: dec(p.fee_fixed, p.asset_id),
+                feeFixed: Decimal::new(p.fee_fixed, asset_precision(p.asset_id)),
                 feePercentPpm: p.fee_percent,
                 maxLineAprPpm: p.max_line_apr,
                 expiresAt: time_sec(p.expires_at),
@@ -215,7 +209,7 @@ mod service {
                 debtor: p.debtor,
                 assetId: p.asset_id,
                 side: p.side,
-                feeFixed: dec(p.fee_fixed, p.asset_id),
+                feeFixed: Decimal::new(p.fee_fixed, asset_precision(p.asset_id)),
                 feePercentPpm: p.fee_percent,
                 expiresAt: time_sec(p.expires_at),
                 isGlobal: p.is_global(),
@@ -247,7 +241,7 @@ mod service {
                 debtor: p.poster,
                 fromAsset: p.from_asset,
                 toAsset: p.to_asset,
-                feeFixed: dec(p.fee_fixed, p.from_asset),
+                feeFixed: Decimal::new(p.fee_fixed, asset_precision(p.from_asset)),
                 fxRate: p.fx_rate.to_string(),
                 toInterestRatePpm: p.to_interest_rate,
                 expiresAt: time_sec(p.expires_at),
@@ -273,19 +267,16 @@ mod service {
         now: i64,
     }
 
-    /// History row from `history.banx.activity` (amounts stored raw on-chain).
+    /// History row from `history.banx.activity` (amounts already human decimals).
     #[derive(Deserialize, SimpleObject)]
-    #[graphql(complex)]
     struct ActivityEvent {
         account: AccountNumber,
         counterparty: AccountNumber,
         #[serde(deserialize_with = "deserialize_number_from_string")]
         asset_id: u16,
         kind: String,
-        #[graphql(skip)]
-        amount: String,
-        #[graphql(skip)]
-        netted: String,
+        amount: Decimal,
+        netted: Decimal,
         #[serde(deserialize_with = "deserialize_number_from_string")]
         other_asset_id: u16,
         actor: AccountNumber,
@@ -311,37 +302,19 @@ mod service {
 
     impl From<PayRequest> for PayRequestView {
         fn from(r: PayRequest) -> Self {
+            let p = asset_precision(r.asset_id);
             Self {
                 id: r.id,
                 kind: r.kind,
                 poster: r.poster,
                 counterparty: r.counterparty,
                 assetId: r.asset_id,
-                amount: dec(r.amount, r.asset_id),
-                remaining: dec(r.remaining, r.asset_id),
+                amount: Decimal::new(r.amount, p),
+                remaining: Decimal::new(r.remaining, p),
                 memo: r.memo.to_string(),
                 expiresAt: time_sec(r.expires_at),
                 createdAt: time_sec(r.created_at),
             }
-        }
-    }
-
-    #[ComplexObject]
-    impl ActivityEvent {
-        async fn amount(&self) -> Decimal {
-            let raw = self.amount.parse::<u64>().unwrap_or(0);
-            dec_raw(raw, self.asset_id)
-        }
-
-        async fn netted(&self) -> Decimal {
-            let raw = self.netted.parse::<u64>().unwrap_or(0);
-            // Convert stores destination qty in `netted` / `other_asset_id`.
-            let asset = if self.kind == "convert" {
-                self.other_asset_id
-            } else {
-                self.asset_id
-            };
-            dec_raw(raw, asset)
         }
     }
 
@@ -422,7 +395,10 @@ mod service {
             debtor: AccountNumber,
             assetId: u16,
         ) -> Decimal {
-            dec(Obligation::exposure(creditor, debtor, assetId), assetId)
+            Decimal::new(
+                Obligation::exposure(creditor, debtor, assetId),
+                asset_precision(assetId),
+            )
         }
 
         /// Path-forward offers posted by `poster` (global + specific next hops).
@@ -620,9 +596,7 @@ mod service {
             // `asset_id = ?` with "1" matches nothing; interpolate like Tokens.
             EventQuery::new("history.banx.activity")
                 .condition_with_params(
-                    format!(
-                        "account = ? AND counterparty = ? AND asset_id = {assetId}"
-                    ),
+                    format!("account = ? AND counterparty = ? AND asset_id = {assetId}"),
                     vec![account.to_string(), counterparty.to_string()],
                 )
                 .first(first)
