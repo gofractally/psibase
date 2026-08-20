@@ -13,19 +13,19 @@ package-name = "Guilds"
 services = ["guilds"]
 
 [package.metadata.psibase.dependencies]
-Accounts = "0.25.0"
-Evaluations = "0.25.0"
-Host = "0.25.0"
-HttpServer = "0.25.0"
-Invite = "0.25.0"
-Permissions = "0.25.0"
-Sites = "0.25.0"
-Transact = "0.25.0"
+Accounts = "0.27.0"
+Evaluations = "0.27.0"
+Host = "0.27.0"
+HttpServer = "0.27.0"
+Invite = "0.27.0"
+Permissions = "0.27.0"
+Sites = "0.27.0"
+Transact = "0.27.0"
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-guilds = { path = "service", version = "0.25.0" }
-r-guilds = { path = "query-service", version = "0.25.0" }
-guilds-plugin = { path = "plugin", version = "0.25.0" }
+guilds = { path = "service", version = "0.27.0" }
+r-guilds = { path = "query-service", version = "0.27.0" }
+guilds-plugin = { path = "plugin", version = "0.27.0" }

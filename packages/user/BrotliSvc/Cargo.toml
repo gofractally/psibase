@@ -13,11 +13,11 @@ package-name = "BrotliSvc"
 services = ["brotli-svc"]
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.25.0"
+HttpServer = "0.27.0"
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-brotli-svc = { path = "service", version = "0.25.0" }
+brotli-svc = { path = "service", version = "0.27.0" }
 psibase-user-workspace-hack.workspace = true

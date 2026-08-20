@@ -13,21 +13,21 @@ package-name = "VirtualServer"
 services = ["virtual-server"]
 
 [package.metadata.psibase.dependencies]
-Sites = "0.25.0"
-Accounts = "0.25.0"
-Host = "0.25.0"
-Nft = "0.25.0"
-Tokens = "0.25.0"
-Transact = "0.25.0"
-Producers = "0.25.0"
-HttpServer = "0.25.0"
-Events = "0.25.0"
-DiffAdjust = "0.25.0"
+Sites = "0.27.0"
+Accounts = "0.27.0"
+Host = "0.27.0"
+Nft = "0.27.0"
+Tokens = "0.27.0"
+Transact = "0.27.0"
+Producers = "0.27.0"
+HttpServer = "0.27.0"
+Events = "0.27.0"
+DiffAdjust = "0.27.0"
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-virtual-server = { path = "service", version = "0.25.0" }
-virtual-server-plugin = { path = "plugin", version = "0.25.0" }
+virtual-server = { path = "service", version = "0.27.0" }
+virtual-server-plugin = { path = "plugin", version = "0.27.0" }
 psibase-system-workspace-hack.workspace = true

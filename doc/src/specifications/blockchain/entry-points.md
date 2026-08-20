@@ -8,10 +8,9 @@ Each entry point starts a fresh transaction context. Modules will be instantiate
 
 `processTransaction` applies a transaction to the chain. It should be defined as a WASM export. Only subjective services can access subjective databases. Objective databases are readable and writable.
 
-| Argument              | Type       | Description                                                                                                                                                    |
-|-----------------------|------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| transaction           | byte array | A packed `Transaction`                                                                                                                                         |
-| checkFirstAuthAndExit | bool       | If true, instead of applying the transaction, check the authorization of the account to be billed for this transaction. This mode must not write the database. |
+| Argument    | Type       | Description            |
+|-------------|------------|------------------------|
+| transaction | byte array | A packed `Transaction` |
 
 Any result is ignored
 

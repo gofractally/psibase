@@ -13,20 +13,20 @@ package-name = "Symbol"
 services = ["symbol"]
 
 [package.metadata.psibase.dependencies]
-Host = "0.25.0"
-HttpServer = "0.25.0"
-Permissions = "0.25.0"
-Sites = "0.25.0"
-Tokens = "0.25.0"
-Transact = "0.25.0"
-Nft = "0.25.0"
-DiffAdjust = "0.25.0"
+Host = "0.27.0"
+HttpServer = "0.27.0"
+Permissions = "0.27.0"
+Sites = "0.27.0"
+Tokens = "0.27.0"
+Transact = "0.27.0"
+Nft = "0.27.0"
+DiffAdjust = "0.27.0"
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-symbol = { path = "service", version = "0.25.0" }
-r-symbol = { path = "query-service", version = "0.25.0" }
-symbol-plugin = { path = "plugin", version = "0.25.0" }
+symbol = { path = "service", version = "0.27.0" }
+r-symbol = { path = "query-service", version = "0.27.0" }
+symbol-plugin = { path = "plugin", version = "0.27.0" }
 psibase-user-workspace-hack.workspace = true

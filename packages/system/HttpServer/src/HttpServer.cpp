@@ -50,20 +50,6 @@ namespace SystemService
 
          return AccountNumber(req.host.substr(0, req.host.size() - rootHost.size() - 1));
       }
-
-      std::string_view hostHeaderPortSuffix(const HttpRequest& req)
-      {
-         if (auto host = HttpHeader::get(req.headers, "host"))
-         {
-            std::string_view h = *host;
-            if (auto pos = h.rfind(':'); pos != std::string_view::npos)
-            {
-               if (h.find(']', pos) == std::string_view::npos)
-                  return h.substr(pos);
-            }
-         }
-         return {};
-      }
    }  // namespace
 
    void HttpServer::registerServer(AccountNumber server)
@@ -120,7 +106,8 @@ namespace SystemService
                                                      "Content-Security-Policy",
                                                      "ETag",
                                                      "Location",
-                                                     "Set-Cookie"};
+                                                     "Set-Cookie",
+                                                     "X-Content-Type-Options"};
 
       void sendReplyImpl(AccountNumber service, std::int32_t socket, HttpReply&& result)
       {

@@ -96,8 +96,25 @@ class Chain {
     public async getPeers(): Promise<z.infer<typeof Peers>> {
         const url = siblingUrl(null, "x-peers", "/graphql");
         const query = "query { peers { edges { node { id urls endpoint } } } }";
-        const res: any = await postGraphQLGetJson(url, query);
+        const res: any = await postGraphQLGetJson(url, query, {
+            credentials: "include",
+        });
         return Peers.parse(res.data.peers.edges.map((e: any) => e.node));
+    }
+
+    public async getPeerUsers(): Promise<string[]> {
+        const url = siblingUrl(null, "x-peers", "/graphql");
+        const query = "query { users { edges { node { name } } } }";
+        const res: any = await postGraphQLGetJson(url, query);
+        return z
+            .string()
+            .array()
+            .parse(res.data.users.edges.map((e: any) => e.node.name));
+    }
+
+    public async setPeerUser(account: string, accept: boolean): Promise<void> {
+        const url = siblingUrl(null, "x-peers", "/users");
+        await postJson(url, { account, accept });
     }
 
     public async getStatus(): Promise<string[]> {
@@ -179,7 +196,7 @@ class Chain {
                 `Failed to find peer with ID ${id} in existing peers`,
             );
         const url = siblingUrl(null, "x-peers", "/disconnect");
-        await postJson(url, { id });
+        await postJson(url, { id }, { credentials: "include" });
     }
 
     public pushArrayBufferBoot(buffer: ArrayBufferLike) {
@@ -221,7 +238,9 @@ class Chain {
         url: string;
     }): Promise<z.infer<typeof Peer>> {
         const url = siblingUrl(null, "x-peers", "/connect");
-        const result = await postJsonGetJson(url, config);
+        const result = await postJsonGetJson(url, config, {
+            credentials: "include",
+        });
         result.urls = [url];
         return Peer.parse(result);
     }
