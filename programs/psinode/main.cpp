@@ -1761,14 +1761,14 @@ void run(const std::string&              db_path,
       };
 
       http_config->lock_keyring =
-          [&chainContext, getPKCS11Slot](std::vector<char> json, auto callback)
+          [&chainContext, getPKCS11Slot, &secrets](std::vector<char> json, auto callback)
       {
          json.push_back('\0');
          psio::json_token_stream stream(json.data());
          auto                    id = psio::from_json<LockKeyringRequest>(stream);
          boost::asio::post(
              chainContext,
-             [getPKCS11Slot, callback = std::move(callback), id = std::move(id)]() mutable
+             [getPKCS11Slot, &secrets, callback = std::move(callback), id = std::move(id)]() mutable
              {
                 try
                 {
@@ -1777,6 +1777,7 @@ void run(const std::string&              db_path,
                    check(pos != sessions->end(), "Not logged in");
                    pos->second->Logout();
                    pos->second.clear();
+                   secrets.remove(pkcs11TokenKey(lib->GetTokenInfo(slot)));
                    callback(std::nullopt);
                 }
                 catch (std::exception& e)
