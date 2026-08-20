@@ -7,8 +7,8 @@ pub mod path_find;
 pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::{
-        services::tokens::{Precision, Quantity},
         AccountNumber, Fracpack, Memo, ServiceWrapper, Table, TimePointSec, ToSchema,
+        services::tokens::{Precision, Quantity},
     };
     use serde::{Deserialize, Serialize};
 
@@ -415,9 +415,6 @@ pub mod tables {
                     "next hop does not know poster (no credit line or live obligation)"
                 );
             }
-            let allow_unknown = Self::get(poster, next_hop, asset_id)
-                .map(|p| p.allow_unknown)
-                .unwrap_or(allow_unknown);
             Self {
                 poster,
                 next_hop,
@@ -1994,13 +1991,14 @@ pub mod tables {
 #[psibase::service(name = "banx", tables = "tables")]
 pub mod service {
     use crate::tables::{
-        emit_pair_activity, execute_path, path_required_send, Asset, ClaimOffer, CreditLine,
-        CurrencyPolicy, ForwardOffer, InitRow, InitTable, Obligation, PathHop, PayRequest,
+        Asset, ClaimOffer, CreditLine, CurrencyPolicy, ForwardOffer, InitRow, InitTable,
+        Obligation, PathHop, PayRequest, emit_pair_activity, execute_path, path_required_send,
     };
     use psibase::{
+        AccountNumber, EventDb, MethodNumber, TimePointSec,
         services::events,
         services::tokens::{Precision, Quantity},
-        AccountNumber, EventDb, MethodNumber, TimePointSec, *,
+        *,
     };
 
     #[action]

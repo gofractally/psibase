@@ -79,7 +79,7 @@ You can still edit hops before execute.
 
 ## Path-forward offers
 
-Posted by the **poster** (`st_fwd_ofr` / `st_glb_fwd`): poster is an intermediate; `next_hop` is the next creditor or global. Fees are Stripe-style: `out = in × (1 − percent) − fixed`. `max_line_apr` rejects a **new** draw if the next hop’s line APR is higher; a hop that only unwinds a reverse tab is not checked. Specific next hop must already know the poster (a line to them, or a live tab). `allow_unknown` (default off): if off, the poster must already know the next hop the same way; if on, anyone who lined the poster can become their creditor.
+Posted by the **poster** (`st_fwd_ofr` / `st_glb_fwd`): poster is an intermediate; `next_hop` is the next creditor or global. Fees are Stripe-style: `out = in × (1 − percent) − fixed`. `max_line_apr` rejects a **new** draw if the next hop’s line APR is higher; a hop that only unwinds a reverse tab is not checked. Specific next hop must already know the poster (a line to them, or a live tab). `allow_unknown` (default off, applied on insert and update): if off, the poster must already know the next hop the same way; if on, anyone who lined the poster can become their creditor. `st_fwd_unk` is a flag-only update without re-posting fees.
 
 ## Claim offers
 
@@ -151,7 +151,7 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 | `st_crd_lne` | Set credit line (limit, deplete, APR, grace seconds) |
 | `rm_crd_lne` | Remove a credit line (0-limit is not a remove) |
 | `st_fwd_ofr` / `st_glb_fwd` | Specific / global path-forward offer |
-| `st_fwd_unk` | Set `allow_unknown` on a path-forward offer (`next_hop` 0 = global) |
+| `st_fwd_unk` | Flag-only `allow_unknown` update (`next_hop` 0 = global) |
 | `rm_fwd_ofr` / `rm_glb_fwd` | Remove path-forward offer |
 | `st_buy_clm` / `st_glb_buy` | Specific / global buy claim offer |
 | `rm_buy_clm` / `rm_glb_buy` | Remove buy claim offer |

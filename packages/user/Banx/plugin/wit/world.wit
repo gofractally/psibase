@@ -71,6 +71,9 @@ interface api {
     /// Post a path-forward offer toward a **specific** next hop. Prefer global
     /// when possible. `fee-fixed` is a human decimal in `asset-id` units.
     /// `fee-percent-ppm` is ppm (`10_000` = 1%).
+    /// `allow-unknown`: closed (false) requires the poster already know the
+    /// next hop; open (true) lets anyone who lined the poster become their
+    /// creditor. Applied on insert and update.
     set-forward-offer: func(
         next-hop: string,
         asset-id: u16,
@@ -78,15 +81,18 @@ interface api {
         fee-percent-ppm: u32,
         max-line-apr-ppm: u32,
         expires-at-seconds: u32,
+        allow-unknown: bool,
     ) -> result<_, error>;
 
     /// Global path-forward offer for this asset (any next hop).
+    /// `allow-unknown` is applied on insert and update; see `set-forward-offer`.
     set-global-forward-offer: func(
         asset-id: u16,
         fee-fixed: string,
         fee-percent-ppm: u32,
         max-line-apr-ppm: u32,
         expires-at-seconds: u32,
+        allow-unknown: bool,
     ) -> result<_, error>;
 
     /// Remove a specific path-forward offer.
@@ -114,10 +120,11 @@ interface api {
         expires-at-seconds: u32,
     ) -> result<_, error>;
 
-    /// Set `allow-unknown` on a posted **path-forward** offer. Empty
-    /// `next-hop` (or `"0"`) is the global offer. Closed (false): poster
-    /// must have lined the next hop (limit 0 is enough). Open (true):
-    /// anyone who lined the poster can become their creditor.
+    /// Flag-only `allow-unknown` update on a posted path-forward offer
+    /// (does not re-post fees). Empty `next-hop` (or `"0"`) is the global
+    /// offer. Closed (false): poster must have lined the next hop (limit 0
+    /// is enough). Open (true): anyone who lined the poster can become
+    /// their creditor.
     set-allow-unknown: func(
         next-hop: string,
         asset-id: u16,

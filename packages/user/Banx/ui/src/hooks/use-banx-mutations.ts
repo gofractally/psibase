@@ -353,10 +353,6 @@ export function useSetForwardOffer() {
                 p.feePercentPpm,
                 p.maxLineAprPpm,
                 p.expiresAtSeconds,
-            ]);
-            await banxCall("setAllowUnknown", [
-                p.nextHop,
-                p.assetId,
                 p.allowUnknown,
             ]);
         },
@@ -385,10 +381,6 @@ export function useSetGlobalForwardOffer() {
                 p.feePercentPpm,
                 p.maxLineAprPpm,
                 p.expiresAtSeconds,
-            ]);
-            await banxCall("setAllowUnknown", [
-                "",
-                p.assetId,
                 p.allowUnknown,
             ]);
         },

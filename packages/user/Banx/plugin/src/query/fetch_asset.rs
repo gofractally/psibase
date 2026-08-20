@@ -24,8 +24,7 @@ pub struct Asset {
 
 impl Asset {
     pub fn precision(&self) -> Result<Precision, ErrorType> {
-        Precision::new(self.precision)
-            .map_err(|e| ErrorType::ConversionError(e.to_string()))
+        Precision::new(self.precision).map_err(|e| ErrorType::ConversionError(e.to_string()))
     }
 }
 

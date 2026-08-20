@@ -177,6 +177,7 @@ impl Api for BanxPlugin {
         fee_percent_ppm: u32,
         max_line_apr_ppm: u32,
         expires_at_seconds: u32,
+        allow_unknown: bool,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::set_forward_offer)?;
         let fee_fixed = parse_amount(asset_id, &fee_fixed)?;
@@ -187,7 +188,7 @@ impl Api for BanxPlugin {
             fee_percent: fee_percent_ppm,
             max_line_apr: max_line_apr_ppm,
             expires_at: time_point(expires_at_seconds),
-            allow_unknown: false,
+            allow_unknown,
         }
         .packed();
         add_action_to_transaction(banx::action_structs::st_fwd_ofr::ACTION_NAME, &packed)
@@ -199,6 +200,7 @@ impl Api for BanxPlugin {
         fee_percent_ppm: u32,
         max_line_apr_ppm: u32,
         expires_at_seconds: u32,
+        allow_unknown: bool,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::set_global_forward_offer)?;
         let fee_fixed = parse_amount(asset_id, &fee_fixed)?;
@@ -208,7 +210,7 @@ impl Api for BanxPlugin {
             fee_percent: fee_percent_ppm,
             max_line_apr: max_line_apr_ppm,
             expires_at: time_point(expires_at_seconds),
-            allow_unknown: false,
+            allow_unknown,
         }
         .packed();
         add_action_to_transaction(banx::action_structs::st_glb_fwd::ACTION_NAME, &packed)
@@ -431,9 +433,9 @@ impl Api for BanxPlugin {
             counterparty: parse_account(&counterparty)?,
             asset_id,
             amount,
-            memo: memo.parse().map_err(|_| {
-                ErrorType::ConversionError("memo too long (max 80 bytes)".into())
-            })?,
+            memo: memo
+                .parse()
+                .map_err(|_| ErrorType::ConversionError("memo too long (max 80 bytes)".into()))?,
             expires_at: time_point(expires_at_seconds),
         }
         .packed();
@@ -446,18 +448,10 @@ impl Api for BanxPlugin {
         add_action_to_transaction(banx::action_structs::rm_req::ACTION_NAME, &packed)
     }
 
-    fn fulfill_settle(
-        request_id: u32,
-        asset_id: u16,
-        amount: String,
-    ) -> Result<(), Error> {
+    fn fulfill_settle(request_id: u32, asset_id: u16, amount: String) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::fulfill_settle)?;
         let amount = parse_amount_nonzero(asset_id, &amount)?;
-        let packed = banx::action_structs::fl_stl {
-            request_id,
-            amount,
-        }
-        .packed();
+        let packed = banx::action_structs::fl_stl { request_id, amount }.packed();
         add_action_to_transaction(banx::action_structs::fl_stl::ACTION_NAME, &packed)
     }
 
@@ -548,11 +542,7 @@ impl Api for BanxPlugin {
         add_action_to_transaction(banx::action_structs::path_pay::ACTION_NAME, &packed)
     }
 
-    fn pay_inv(
-        hops: Vec<WitPathHop>,
-        max_spend: String,
-        request_id: u32,
-    ) -> Result<(), Error> {
+    fn pay_inv(hops: Vec<WitPathHop>, max_spend: String, request_id: u32) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::pay_inv)?;
         if hops.is_empty() {
             return Err(
@@ -605,10 +595,9 @@ impl Api for BanxPlugin {
         // Exact-out: amount is desired receive (to-asset). Exact-in: amount is send (from-asset).
         let amount_raw = if exact_out {
             let Some(to_a) = to_asset else {
-                return Err(ErrorType::ConversionError(
-                    "exact-out quote requires to-asset".into(),
-                )
-                .into());
+                return Err(
+                    ErrorType::ConversionError("exact-out quote requires to-asset".into()).into(),
+                );
             };
             parse_amount_nonzero(to_a, &amount)?
         } else {
@@ -661,10 +650,8 @@ impl Api for BanxPlugin {
         let last_asset = quote.hops.last().map(|h| h.asset_id).unwrap_or(from_asset);
         let from_prec = query::fetch_asset::fetch_asset(from_asset)?.precision()?;
         let to_prec = query::fetch_asset::fetch_asset(last_asset)?.precision()?;
-        let amount_in =
-            Decimal::new(Quantity::new(quote.amount_in), from_prec).to_string();
-        let amount_out =
-            Decimal::new(Quantity::new(quote.amount_out), to_prec).to_string();
+        let amount_in = Decimal::new(Quantity::new(quote.amount_in), from_prec).to_string();
+        let amount_out = Decimal::new(Quantity::new(quote.amount_out), to_prec).to_string();
         // Exact-out: min-return is the requested receive amount; exact-in: full residual.
         let min_return = if exact_out {
             Decimal::new(amount_raw, to_prec).to_string()
@@ -675,10 +662,8 @@ impl Api for BanxPlugin {
         let mut wit_hops = Vec::with_capacity(quote.hops.len());
         for h in quote.hops {
             let hop_prec = query::fetch_asset::fetch_asset(h.asset_id)?.precision()?;
-            let amount =
-                Decimal::new(Quantity::new(h.amount), hop_prec).to_string();
-            let hop_fee =
-                Decimal::new(Quantity::new(h.hop_fee), hop_prec).to_string();
+            let amount = Decimal::new(Quantity::new(h.amount), hop_prec).to_string();
+            let hop_fee = Decimal::new(Quantity::new(h.hop_fee), hop_prec).to_string();
             let fx_fee = if let Some(from_a) = h.fx_from_asset {
                 let fx_prec = query::fetch_asset::fetch_asset(from_a)?.precision()?;
                 Decimal::new(Quantity::new(h.fx_fee), fx_prec).to_string()

@@ -2,11 +2,11 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::interest::{compound_amount, interest_for, SECONDS_PER_DAY, SECONDS_PER_YEAR};
-    use crate::tables::{
-        Asset, CreditLine, Obligation, PairCycle, PathHop, PayRequest, PPM_SCALE, RATE_SCALE,
-    };
     use crate::Wrapper;
+    use crate::interest::{SECONDS_PER_DAY, SECONDS_PER_YEAR, compound_amount, interest_for};
+    use crate::tables::{
+        Asset, CreditLine, Obligation, PPM_SCALE, PairCycle, PathHop, PayRequest, RATE_SCALE,
+    };
     use psibase::services::token_swap::PPM;
     use psibase::services::tokens::{Precision, Quantity};
     use psibase::*;
@@ -119,7 +119,7 @@ mod tests {
     fn test_interest_path_independence(_chain: psibase::Chain) -> Result<(), psibase::Error> {
         let year = SECONDS_PER_YEAR as u64;
         let p = 1_000_000u64; // $100.0000 at 4 dp
-                              // Daily 10%: ~10.52% effective over 365 days (not exact +10%).
+        // Daily 10%: ~10.52% effective over 365 days (not exact +10%).
         assert_eq!(compound_amount(p, 100_000, year), 1_104_964);
         assert_eq!(compound_amount(p, 100_000, year * 2), 1_220_966);
         assert_eq!(interest_for(p, 100_000, year * 2), 220_966);
@@ -1214,10 +1214,12 @@ mod tests {
             .st_glb_buy(usd, Quantity::new(0), 0, never())
             .get()?;
 
-        assert!(Wrapper::push_from(&chain, alice)
-            .sell_claim(peter, bob, usd, Quantity::new(1_000))
-            .get()
-            .is_err());
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .sell_claim(peter, bob, usd, Quantity::new(1_000))
+                .get()
+                .is_err()
+        );
 
         Wrapper::push_from(&chain, bob)
             .st_crd_lne(peter, usd, Quantity::new(0), false, 0, 0)
@@ -1253,15 +1255,17 @@ mod tests {
             .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never(), false)
             .get()?;
 
-        assert!(Wrapper::push_from(&chain, alice)
-            .path_pay(
-                vec![hop(gary, usd), hop(steve, usd)],
-                Quantity::new(100),
-                Quantity::new(100),
-                0,
-            )
-            .get()
-            .is_err());
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .path_pay(
+                    vec![hop(gary, usd), hop(steve, usd)],
+                    Quantity::new(100),
+                    Quantity::new(100),
+                    0,
+                )
+                .get()
+                .is_err()
+        );
 
         Wrapper::push_from(&chain, gary)
             .st_crd_lne(steve, usd, Quantity::new(0), false, 0, 0)
@@ -1297,18 +1301,72 @@ mod tests {
         Wrapper::push_from(&chain, gary)
             .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never(), false)
             .get()?;
-        assert!(Wrapper::push_from(&chain, alice)
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .path_pay(
+                    vec![hop(gary, usd), hop(steve, usd)],
+                    Quantity::new(100),
+                    Quantity::new(100),
+                    0,
+                )
+                .get()
+                .is_err()
+        );
+
+        Wrapper::push_from(&chain, gary)
+            .st_fwd_unk(AccountNumber::new(0), usd, true)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
             .path_pay(
                 vec![hop(gary, usd), hop(steve, usd)],
                 Quantity::new(100),
                 Quantity::new(100),
                 0,
             )
-            .get()
-            .is_err());
+            .get()?;
+        assert_eq!(exp(&chain, steve, gary, usd), 100);
+        Ok(())
+    }
+
+    /// Re-posting a forward offer applies `allow_unknown` (not insert-only).
+    #[psibase::test_case(packages("Banx"))]
+    fn test_st_glb_fwd_update_sets_allow_unknown(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let gary = account!("gary");
+        let steve = account!("steve");
+        for a in [alice, gary, steve] {
+            chain.new_account(a).unwrap();
+        }
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        Wrapper::push_from(&chain, gary)
+            .st_crd_lne(alice, usd, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, steve)
+            .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never(), true)
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never(), false)
+            .get()?;
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .path_pay(
+                    vec![hop(gary, usd), hop(steve, usd)],
+                    Quantity::new(100),
+                    Quantity::new(100),
+                    0,
+                )
+                .get()
+                .is_err()
+        );
 
         Wrapper::push_from(&chain, gary)
-            .st_fwd_unk(AccountNumber::new(0), usd, true)
+            .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never(), true)
             .get()?;
         Wrapper::push_from(&chain, alice)
             .path_pay(
@@ -1352,10 +1410,12 @@ mod tests {
             .rm_crd_lne(peter, usd)
             .get()?;
         assert!(CreditLine::get(bob, peter, usd).is_none());
-        assert!(Wrapper::push_from(&chain, alice)
-            .sell_claim(peter, bob, usd, Quantity::new(1_000))
-            .get()
-            .is_err());
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .sell_claim(peter, bob, usd, Quantity::new(1_000))
+                .get()
+                .is_err()
+        );
         assert_eq!(exp(&chain, alice, bob, usd), 1_000);
         Ok(())
     }
@@ -1773,33 +1833,43 @@ mod tests {
         chain.new_account(alice).unwrap();
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
 
-        assert!(Wrapper::push_from(&chain, alice)
-            .st_crd_lne(alice, usd, Quantity::new(100), false, 0, 0)
-            .get()
-            .is_err());
-        assert!(Wrapper::push_from(&chain, alice)
-            .st_crd_lne(account!("bob"), 99, Quantity::new(100), false, 0, 0)
-            .get()
-            .is_err());
-        assert!(Wrapper::push_from(&chain, alice)
-            .st_crd_lne(
-                account!("bob"),
-                usd,
-                Quantity::new(100),
-                false,
-                PPM_SCALE + 1,
-                0
-            )
-            .get()
-            .is_err());
-        assert!(Wrapper::push_from(&chain, alice)
-            .deposit(alice, usd, Quantity::new(1), 0, 0)
-            .get()
-            .is_err());
-        assert!(Wrapper::push_from(&chain, alice)
-            .deposit(account!("bob"), usd, Quantity::new(0), 0, 0)
-            .get()
-            .is_err());
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .st_crd_lne(alice, usd, Quantity::new(100), false, 0, 0)
+                .get()
+                .is_err()
+        );
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .st_crd_lne(account!("bob"), 99, Quantity::new(100), false, 0, 0)
+                .get()
+                .is_err()
+        );
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .st_crd_lne(
+                    account!("bob"),
+                    usd,
+                    Quantity::new(100),
+                    false,
+                    PPM_SCALE + 1,
+                    0
+                )
+                .get()
+                .is_err()
+        );
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .deposit(alice, usd, Quantity::new(1), 0, 0)
+                .get()
+                .is_err()
+        );
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .deposit(account!("bob"), usd, Quantity::new(0), 0, 0)
+                .get()
+                .is_err()
+        );
         Ok(())
     }
 
@@ -2116,7 +2186,14 @@ mod tests {
         assert!(aged > 1_000_000, "source already past grace");
 
         Wrapper::push_from(&chain, peter)
-            .st_crd_lne(bob, usd, Quantity::new(10_000_000), false, 100_000, WEEK_SECS)
+            .st_crd_lne(
+                bob,
+                usd,
+                Quantity::new(10_000_000),
+                false,
+                100_000,
+                WEEK_SECS,
+            )
             .get()?;
         Wrapper::push_from(&chain, peter)
             .st_glb_buy(usd, Quantity::new(0), 0, never())
@@ -2436,11 +2513,7 @@ mod tests {
             4_0000.into(),
             id,
         );
-        let err = failed
-            .trace
-            .error
-            .as_deref()
-            .unwrap_or("(no error)");
+        let err = failed.trace.error.as_deref().unwrap_or("(no error)");
         assert!(
             err.contains("max_spend below required send"),
             "test_pay_inv_max_spend_too_small: got {err}"
@@ -2484,25 +2557,29 @@ mod tests {
             .get()?;
 
         // Gary is not the named payer.
-        assert!(Wrapper::push_from(&chain, gary)
-            .path_pay(
-                vec![hop(steve, usd)],
-                Quantity::new(100),
-                Quantity::new(100),
-                id,
-            )
-            .get()
-            .is_err());
+        assert!(
+            Wrapper::push_from(&chain, gary)
+                .path_pay(
+                    vec![hop(steve, usd)],
+                    Quantity::new(100),
+                    Quantity::new(100),
+                    id,
+                )
+                .get()
+                .is_err()
+        );
         // Ends at Gary, not Steve.
-        assert!(Wrapper::push_from(&chain, alice)
-            .path_pay(
-                vec![hop(gary, usd)],
-                Quantity::new(100),
-                Quantity::new(100),
-                id,
-            )
-            .get()
-            .is_err());
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .path_pay(
+                    vec![hop(gary, usd)],
+                    Quantity::new(100),
+                    Quantity::new(100),
+                    id,
+                )
+                .get()
+                .is_err()
+        );
         assert_eq!(PayRequest::get_assert(id).remaining.value, 100);
         Ok(())
     }
@@ -2540,10 +2617,12 @@ mod tests {
             .get()?;
 
         // Debtor cannot book their own please-book.
-        assert!(Wrapper::push_from(&chain, alice)
-            .deposit(alice, usd, Quantity::new(1_000), 0, id)
-            .get()
-            .is_err());
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .deposit(alice, usd, Quantity::new(1_000), 0, id)
+                .get()
+                .is_err()
+        );
 
         Wrapper::push_from(&chain, bob)
             .deposit(alice, usd, Quantity::new(1_000), 0, id)
@@ -2573,10 +2652,12 @@ mod tests {
             .get()?;
         Wrapper::push_from(&chain, alice).rm_req(id).get()?;
         assert!(PayRequest::get(id).is_none());
-        assert!(Wrapper::push_from(&chain, bob)
-            .deposit(alice, usd, Quantity::new(50), 0, id)
-            .get()
-            .is_err());
+        assert!(
+            Wrapper::push_from(&chain, bob)
+                .deposit(alice, usd, Quantity::new(50), 0, id)
+                .get()
+                .is_err()
+        );
         Ok(())
     }
 
@@ -2612,10 +2693,12 @@ mod tests {
             .get()?;
 
         // Creditor cannot pull their own settle-auth.
-        assert!(Wrapper::push_from(&chain, bob)
-            .fl_stl(id, Quantity::new(100))
-            .get()
-            .is_err());
+        assert!(
+            Wrapper::push_from(&chain, bob)
+                .fl_stl(id, Quantity::new(100))
+                .get()
+                .is_err()
+        );
 
         Wrapper::push_from(&chain, alice)
             .fl_stl(id, Quantity::new(2_000))
@@ -2626,10 +2709,12 @@ mod tests {
         assert_eq!(PayRequest::get_assert(id).remaining.value, 1_000);
 
         // Nothing left to settle; leftover auth cannot mint a claim on Bob.
-        assert!(Wrapper::push_from(&chain, alice)
-            .fl_stl(id, Quantity::new(1_000))
-            .get()
-            .is_err());
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .fl_stl(id, Quantity::new(1_000))
+                .get()
+                .is_err()
+        );
         assert_eq!(exp(&chain, alice, bob, usd), 0);
         Ok(())
     }
