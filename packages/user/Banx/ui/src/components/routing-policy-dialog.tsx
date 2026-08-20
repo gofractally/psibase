@@ -28,6 +28,7 @@ import {
 import type { Asset, ForwardOffer } from "@/lib/graphql";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { cn } from "@shared/lib/utils";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Dialog,
@@ -387,8 +388,14 @@ export function RoutingPolicyDialog({
                                     assetId !== undefined
                                         ? precisionOf(assetId)
                                         : 0;
-                                return enabled ? (
-                                    <div className="grid gap-5">
+                                const locked = !enabled;
+                                return (
+                                    <div
+                                        className={cn(
+                                            "grid gap-5 transition-opacity duration-200",
+                                            locked && "opacity-40",
+                                        )}
+                                    >
                                         <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
                                             <specificForm.AppField
                                                 name="hopFeeFixed"
@@ -416,6 +423,7 @@ export function RoutingPolicyDialog({
                                                         placeholder={amountPlaceholder(
                                                             precision,
                                                         )}
+                                                        disabled={locked}
                                                     />
                                                 )}
                                             />
@@ -431,6 +439,7 @@ export function RoutingPolicyDialog({
                                                             MAX_HOP_FEE_PERCENT
                                                         }
                                                         step={MIN_PERCENT_STEP}
+                                                        disabled={locked}
                                                     />
                                                 )}
                                             />
@@ -462,6 +471,7 @@ export function RoutingPolicyDialog({
                                                     onChange={(v) =>
                                                         field.handleChange(v)
                                                     }
+                                                    disabled={locked}
                                                 />
                                             )}
                                         />
@@ -475,6 +485,7 @@ export function RoutingPolicyDialog({
                                                     min={0}
                                                     max={MAX_PERCENT}
                                                     step={MIN_PERCENT_STEP}
+                                                    disabled={locked}
                                                 />
                                             )}
                                         />
@@ -484,11 +495,12 @@ export function RoutingPolicyDialog({
                                                 <field.SwitchField
                                                     label="Allow unknown next hop"
                                                     description="If off, you must already have a credit line to them (limit 0 is enough). If on, they can become your creditor without that line."
+                                                    disabled={locked}
                                                 />
                                             )}
                                         />
                                     </div>
-                                ) : null;
+                                );
                             }}
                         />
 
@@ -509,19 +521,7 @@ export function RoutingPolicyDialog({
                                     return (
                                         <specificForm.AppForm>
                                             <specificForm.SubmitButton
-                                                labels={
-                                                    values.enabled
-                                                        ? [
-                                                              existingSpecific
-                                                                  ? "Update offer"
-                                                                  : "Save offer",
-                                                              "Saving…",
-                                                          ]
-                                                        : [
-                                                              "Remove offer",
-                                                              "Removing…",
-                                                          ]
-                                                }
+                                                labels={["Save", "Saving…"]}
                                                 loading={pending}
                                                 disabled={
                                                     assetId === undefined ||
@@ -626,10 +626,18 @@ export function RoutingPolicyDialog({
                             assetId: s.values.assetId,
                         })}
                         children={({ enabled, assetId }) => {
-                            if (!enabled || assetId === undefined) return null;
-                            const precision = precisionOf(assetId);
+                            const precision =
+                                assetId !== undefined
+                                    ? precisionOf(assetId)
+                                    : 0;
+                            const locked = !enabled || assetId === undefined;
                             return (
-                                <div className="grid gap-5">
+                                <div
+                                    className={cn(
+                                        "grid gap-5 transition-opacity duration-200",
+                                        locked && "opacity-40",
+                                    )}
+                                >
                                     <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
                                         <globalForm.AppField
                                             name="hopFeeFixed"
@@ -645,11 +653,16 @@ export function RoutingPolicyDialog({
                                             }}
                                             children={(field) => (
                                                 <field.TextField
-                                                    label={`Fee fixed (${amountPlaceholder(precision)})`}
+                                                    label={
+                                                        assetId !== undefined
+                                                            ? `Fee fixed (${amountPlaceholder(precision)})`
+                                                            : "Fee fixed"
+                                                    }
                                                     inputMode="decimal"
                                                     placeholder={amountPlaceholder(
                                                         precision,
                                                     )}
+                                                    disabled={locked}
                                                 />
                                             )}
                                         />
@@ -663,6 +676,7 @@ export function RoutingPolicyDialog({
                                                     min={0}
                                                     max={MAX_HOP_FEE_PERCENT}
                                                     step={MIN_PERCENT_STEP}
+                                                    disabled={locked}
                                                 />
                                             )}
                                         />
@@ -693,6 +707,7 @@ export function RoutingPolicyDialog({
                                                 onChange={(v) =>
                                                     field.handleChange(v)
                                                 }
+                                                disabled={locked}
                                             />
                                         )}
                                     />
@@ -706,6 +721,7 @@ export function RoutingPolicyDialog({
                                                 min={0}
                                                 max={MAX_PERCENT}
                                                 step={MIN_PERCENT_STEP}
+                                                disabled={locked}
                                             />
                                         )}
                                     />
@@ -715,6 +731,7 @@ export function RoutingPolicyDialog({
                                             <field.SwitchField
                                                 label="Allow unknown next hop"
                                                 description="If off, you must already have a credit line to the next person (limit 0 is enough). If on, anyone who lined you can become your creditor."
+                                                disabled={locked}
                                             />
                                         )}
                                     />
@@ -743,19 +760,7 @@ export function RoutingPolicyDialog({
                                 return (
                                     <globalForm.AppForm>
                                         <globalForm.SubmitButton
-                                            labels={
-                                                values.enabled
-                                                    ? [
-                                                          hasLive
-                                                              ? "Update offer"
-                                                              : "Save offer",
-                                                          "Saving…",
-                                                      ]
-                                                    : [
-                                                          "Remove offer",
-                                                          "Removing…",
-                                                      ]
-                                            }
+                                            labels={["Save", "Saving…"]}
                                             loading={globalPending}
                                             disabled={
                                                 assetId === undefined ||

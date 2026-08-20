@@ -25,6 +25,7 @@ import {
 } from "@/lib/form";
 import type { Asset, BuyClaimOffer } from "@/lib/graphql";
 
+import { cn } from "@shared/lib/utils";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Dialog,
@@ -264,10 +265,16 @@ export function BuyClaimOfferDialog({
         assetId: number | undefined,
         enabled: boolean,
     ) => {
-        if (!enabled || assetId === undefined) return null;
-        const precision = precisionOf(assetId);
+        const precision =
+            assetId !== undefined ? precisionOf(assetId) : 0;
+        const locked = !enabled || assetId === undefined;
         return (
-            <div className="grid gap-5">
+            <div
+                className={cn(
+                    "grid gap-5 transition-opacity duration-200",
+                    locked && "opacity-40",
+                )}
+            >
                 <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
                     <form.AppField
                         name="feeFixed"
@@ -281,9 +288,14 @@ export function BuyClaimOfferDialog({
                         }}
                         children={(field) => (
                             <field.TextField
-                                label={`Fee fixed (${amountPlaceholder(precision)})`}
+                                label={
+                                    assetId !== undefined
+                                        ? `Fee fixed (${amountPlaceholder(precision)})`
+                                        : "Fee fixed"
+                                }
                                 inputMode="decimal"
                                 placeholder={amountPlaceholder(precision)}
+                                disabled={locked}
                             />
                         )}
                     />
@@ -297,6 +309,7 @@ export function BuyClaimOfferDialog({
                                 min={-MAX_HOP_FEE_PERCENT}
                                 max={MAX_HOP_FEE_PERCENT}
                                 step={MIN_PERCENT_STEP}
+                                disabled={locked}
                             />
                         )}
                     />
@@ -307,6 +320,7 @@ export function BuyClaimOfferDialog({
                         <ExpiresField
                             value={field.state.value}
                             onChange={(v) => field.handleChange(v)}
+                            disabled={locked}
                         />
                     )}
                 />
@@ -390,19 +404,7 @@ export function BuyClaimOfferDialog({
                                     return (
                                         <specificForm.AppForm>
                                             <specificForm.SubmitButton
-                                                labels={
-                                                    values.enabled
-                                                        ? [
-                                                              existingSpecific
-                                                                  ? "Update offer"
-                                                                  : "Save offer",
-                                                              "Saving…",
-                                                          ]
-                                                        : [
-                                                              "Remove offer",
-                                                              "Removing…",
-                                                          ]
-                                                }
+                                                labels={["Save", "Saving…"]}
                                                 loading={pending}
                                                 disabled={
                                                     (prefill?.assetId ===
@@ -526,19 +528,7 @@ export function BuyClaimOfferDialog({
                                 return (
                                     <globalForm.AppForm>
                                         <globalForm.SubmitButton
-                                            labels={
-                                                values.enabled
-                                                    ? [
-                                                          hasLive
-                                                              ? "Update offer"
-                                                              : "Save offer",
-                                                          "Saving…",
-                                                      ]
-                                                    : [
-                                                          "Remove offer",
-                                                          "Removing…",
-                                                      ]
-                                            }
+                                            labels={["Save", "Saving…"]}
                                             loading={globalPending}
                                             disabled={
                                                 assetId === undefined ||

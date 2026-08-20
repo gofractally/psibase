@@ -59,11 +59,19 @@ export function AssetField({
 export function ExpiresField({
     value,
     onChange,
+    disabled,
 }: {
     value: number;
     onChange: (seconds: number) => void;
+    disabled?: boolean;
 }) {
-    return <ExpiresAtPicker value={value} onChange={onChange} />;
+    return (
+        <ExpiresAtPicker
+            value={value}
+            onChange={onChange}
+            disabled={disabled}
+        />
+    );
 }
 
 export function GracePeriodField({

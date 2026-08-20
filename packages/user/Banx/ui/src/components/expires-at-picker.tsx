@@ -77,11 +77,13 @@ export function ExpiresAtPicker({
     onChange,
     label = "Expires",
     id,
+    disabled,
 }: {
     value: ExpiresAtSeconds;
     onChange: (seconds: ExpiresAtSeconds) => void;
     label?: string;
     id?: string;
+    disabled?: boolean;
 }) {
     const [open, setOpen] = useState(false);
     const [mode, setMode] = useState<"never" | "at">("never");
@@ -151,6 +153,7 @@ export function ExpiresAtPicker({
                 id={id}
                 type="button"
                 variant="outline"
+                disabled={disabled}
                 className={cn(
                     "w-full justify-start text-left font-normal",
                     !value && "text-muted-foreground",

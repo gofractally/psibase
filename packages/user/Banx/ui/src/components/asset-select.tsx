@@ -2,6 +2,7 @@ import { useEffect, useMemo } from "react";
 
 import type { Asset } from "@/lib/graphql";
 
+import { cn } from "@shared/lib/utils";
 import {
     Select,
     SelectContent,
@@ -78,6 +79,8 @@ export function AssetSelect({
     };
 
     const selected = ordered.find((x) => x.id === effectiveId);
+    const selectedOn =
+        itemActive && selected ? itemActive(selected) : undefined;
 
     return (
         <Select
@@ -86,7 +89,15 @@ export function AssetSelect({
             }
             onValueChange={(v) => onChange(Number(v))}
         >
-            <SelectTrigger>
+            <SelectTrigger
+                className={cn(
+                    "w-full",
+                    selectedOn === true &&
+                        "border-emerald-500 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15 dark:text-emerald-400",
+                    selectedOn === false &&
+                        "border-red-500 bg-red-500/10 text-red-700 hover:bg-red-500/15 dark:text-red-400",
+                )}
+            >
                 <SelectValue placeholder={placeholder}>
                     {selected ? row(selected) : undefined}
                 </SelectValue>
