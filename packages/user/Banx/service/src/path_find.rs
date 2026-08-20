@@ -591,14 +591,16 @@ fn expand_hops(
         {
             continue;
         }
-        if line.interest_rate_ppm > rpol.max_accept_rate_ppm {
-            continue;
-        }
         let Some(draw) = apply_hop_fee(amount_in, rpol.hop_fee_fixed, rpol.hop_fee_percent_ppm)
         else {
             continue;
         };
         if draw > line.residual {
+            continue;
+        }
+        // APR cap is only on new line capacity, not a pure unwind.
+        let new_draw = draw.saturating_sub(line.reverse_claim);
+        if new_draw > 0 && line.is_line && line.interest_rate_ppm > rpol.max_accept_rate_ppm {
             continue;
         }
 
@@ -665,6 +667,40 @@ mod tests {
             exposure: 0,
             interest_rate_ppm: 0,
             is_line: false,
+        }
+    }
+
+    fn line_apr(c: &str, d: &str, asset: u16, residual: u64, apr_ppm: u32) -> LineEdge {
+        LineEdge {
+            interest_rate_ppm: apr_ppm,
+            ..line(c, d, asset, residual)
+        }
+    }
+
+    fn line_with_reverse_apr(
+        c: &str,
+        d: &str,
+        asset: u16,
+        headroom: u64,
+        reverse: u64,
+        apr_ppm: u32,
+    ) -> LineEdge {
+        LineEdge {
+            interest_rate_ppm: apr_ppm,
+            ..line_with_reverse(c, d, asset, headroom, reverse)
+        }
+    }
+
+    fn global_rte_cap(debtor: &str, asset: u16, max_apr: u32, allow_unknown: bool) -> RoutingEdge {
+        RoutingEdge {
+            creditor: String::new(),
+            debtor: debtor.into(),
+            asset_id: asset,
+            hop_fee_fixed: 0,
+            hop_fee_percent_ppm: 0,
+            max_accept_rate_ppm: max_apr,
+            expires_at: 0,
+            allow_unknown,
         }
     }
 
@@ -939,6 +975,88 @@ mod tests {
         assert_eq!(q.hops[0].account, "b");
         assert_eq!(q.hops[1].account, "a");
         assert_eq!(q.amount_out, 100);
+    }
+
+    /// Mirrors `test_max_line_apr_allows_unwind`: high APR on the next hop
+    /// does not block a hop that only unwinds a reverse tab.
+    #[test]
+    fn max_line_apr_allows_unwind() {
+        let usd = 1u16;
+        let lines = vec![
+            line("gary", "alice", usd, 10_000),
+            line_with_reverse_apr("steve", "gary", usd, 10_000, 100, 20_000),
+        ];
+        let routing = vec![global_rte_cap("gary", usd, 10_000, false)];
+        let q = find_banx_path(
+            &lines,
+            &routing,
+            &[],
+            "alice",
+            "steve",
+            100,
+            usd,
+            Some(usd),
+            4,
+            0,
+        )
+        .expect("unwind path despite APR over cap");
+        assert_eq!(q.hops.len(), 2);
+        assert_eq!(q.hops[0].account, "gary");
+        assert_eq!(q.hops[1].account, "steve");
+        assert_eq!(q.amount_in, 100);
+        assert_eq!(q.amount_out, 100);
+    }
+
+    /// Mirrors `test_max_line_apr_rejects_forward`.
+    #[test]
+    fn max_line_apr_rejects_new_draw() {
+        let usd = 1u16;
+        let lines = vec![
+            line("gary", "alice", usd, 10_000),
+            line_apr("steve", "gary", usd, 10_000, 20_000),
+        ];
+        let routing = vec![global_rte_cap("gary", usd, 10_000, true)];
+        assert!(
+            find_banx_path(
+                &lines,
+                &routing,
+                &[],
+                "alice",
+                "steve",
+                100,
+                usd,
+                Some(usd),
+                4,
+                0,
+            )
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn max_line_apr_rejects_mixed_unwind_and_new_draw() {
+        let usd = 1u16;
+        let lines = vec![
+            line("gary", "alice", usd, 10_000),
+            line_with_reverse_apr("steve", "gary", usd, 10_000, 100, 20_000),
+        ];
+        let routing = vec![global_rte_cap("gary", usd, 10_000, false)];
+        assert!(
+            find_banx_path(
+                &lines,
+                &routing,
+                &[],
+                "alice",
+                "steve",
+                101,
+                usd,
+                Some(usd),
+                4,
+                0,
+            )
+            .is_none(),
+            "new-draw slice over reverse tab is still capped"
+        );
     }
 
     /// Same setup as `test_expired_specific_falls_back_to_global`.
