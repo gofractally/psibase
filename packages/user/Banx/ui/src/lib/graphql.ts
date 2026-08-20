@@ -244,6 +244,7 @@ export async function fetchActivity(
             }
         } }`,
     );
+    // `last` is Relay chronological (oldest of the page first). History shows newest on top.
     return (data.activity?.edges ?? [])
         .map((e) => e.node)
         .filter((n): n is NonNullable<typeof n> => n != null)
@@ -261,5 +262,6 @@ export async function fetchActivity(
                 memo: n.memo ?? "",
                 blockTime: n.block?.blockTime ?? undefined,
             }),
-        );
+        )
+        .reverse();
 }

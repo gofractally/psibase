@@ -605,7 +605,7 @@ mod service {
         }
 
         /// Activity history for `account` with a given `counterparty` and `assetId`.
-        /// Newest first (`last`). Amounts are human decimals.
+        /// `last` is Relay-style (chronological page). Amounts are human decimals.
         async fn activity(
             &self,
             account: AccountNumber,
@@ -616,14 +616,14 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<EventConnection<ActivityEvent>> {
+            // `?` params are bound as TEXT. asset_id is an integer column, so
+            // `asset_id = ?` with "1" matches nothing; interpolate like Tokens.
             EventQuery::new("history.banx.activity")
                 .condition_with_params(
-                    "account = ? AND counterparty = ? AND asset_id = ?".to_string(),
-                    vec![
-                        account.to_string(),
-                        counterparty.to_string(),
-                        assetId.to_string(),
-                    ],
+                    format!(
+                        "account = ? AND counterparty = ? AND asset_id = {assetId}"
+                    ),
+                    vec![account.to_string(), counterparty.to_string()],
                 )
                 .first(first)
                 .last(last.or(Some(50)))
