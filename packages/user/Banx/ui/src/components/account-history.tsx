@@ -26,7 +26,7 @@ function kindLabel(kind: string): string {
         case "invoice":
             return "Invoice";
         case "please_book":
-            return "Please-book";
+            return "Deposit request";
         case "settle_auth":
             return "Settle auth";
         case "fulfill":

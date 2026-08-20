@@ -1,6 +1,10 @@
 import { useEffect, useMemo } from "react";
 
-import { AssetField, ExpiresField } from "@/components/form-fields";
+import {
+    AssetField,
+    ExpiresField,
+    UsingGlobalSettingsOverlay,
+} from "@/components/form-fields";
 import { useForwardOffers } from "@/hooks/use-banx-data";
 import {
     useRemoveForwardOffer,
@@ -308,9 +312,15 @@ export function RoutingPolicyDialog({
                     ...feesFromOffer(existingSpecific),
                 });
             } else {
+                const globalOffer =
+                    prefill?.assetId !== undefined
+                        ? liveGlobalByAsset.get(prefill.assetId)
+                        : undefined;
                 specificForm.reset({
                     enabled: false,
-                    ...defaultFees(prefill?.assetId),
+                    ...(globalOffer
+                        ? feesFromOffer(globalOffer)
+                        : defaultFees(prefill?.assetId)),
                 });
             }
         } else if (existingGlobal) {
@@ -332,6 +342,7 @@ export function RoutingPolicyDialog({
         nextHop,
         existingSpecific,
         existingGlobal,
+        liveGlobalByAsset,
     ]);
 
     if (isSpecific) {
@@ -391,7 +402,18 @@ export function RoutingPolicyDialog({
                                         ? precisionOf(assetId)
                                         : 0;
                                 const locked = !enabled;
+                                const globalOffer =
+                                    assetId !== undefined
+                                        ? liveGlobalByAsset.get(assetId)
+                                        : undefined;
+                                const usingGlobal =
+                                    locked &&
+                                    !!globalOffer &&
+                                    !existingSpecific;
                                 return (
+                                    <UsingGlobalSettingsOverlay
+                                        active={usingGlobal}
+                                    >
                                     <div
                                         className={cn(
                                             "grid gap-5 transition-opacity duration-200",
@@ -502,6 +524,7 @@ export function RoutingPolicyDialog({
                                             )}
                                         />
                                     </div>
+                                    </UsingGlobalSettingsOverlay>
                                 );
                             }}
                         />

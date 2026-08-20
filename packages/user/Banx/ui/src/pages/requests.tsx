@@ -1,26 +1,20 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
-import { QrCode } from "lucide-react";
+import { Plus, QrCode } from "lucide-react";
 
 import { formatExpiresAt } from "@/components/expires-at-picker";
-import { AssetField, ExpiresField } from "@/components/form-fields";
 import { InvoiceQrDialog } from "@/components/invoice-qr-dialog";
 import { PageHeader } from "@/components/page-header";
+import { RequestDialog } from "@/components/request-dialog";
 import { useAssetMap } from "@/hooks/use-assets";
 import { useRequests } from "@/hooks/use-banx-data";
 import {
     useCancelRequest,
-    useCreateRequest,
     useDeposit,
     useFulfillSettle,
 } from "@/hooks/use-banx-mutations";
-import { amountPlaceholder, displayAmount } from "@/lib/amount";
-import {
-    amountFieldValidator,
-    existingAccountValidators,
-    useAppForm,
-} from "@/lib/form";
+import { displayAmount } from "@/lib/amount";
 import {
     REQUEST_INVOICE,
     REQUEST_PLEASE_BOOK,
@@ -42,7 +36,7 @@ import {
 
 function kindLabel(kind: number): string {
     if (kind === REQUEST_INVOICE) return "Invoice";
-    if (kind === REQUEST_PLEASE_BOOK) return "Please book";
+    if (kind === REQUEST_PLEASE_BOOK) return "Deposit request";
     if (kind === REQUEST_SETTLE_AUTH) return "Settle auth";
     return `Kind ${kind}`;
 }
@@ -59,18 +53,14 @@ export function RequestsPage() {
     const { data: user } = useCurrentUser();
     const { assets, symbolOf, precisionOf } = useAssetMap();
     const { data: requests = [], isLoading } = useRequests();
-    const create = useCreateRequest();
     const cancel = useCancelRequest();
     const deposit = useDeposit();
     const settle = useFulfillSettle();
     const navigate = useNavigate();
-    const [searchParams] = useSearchParams();
     const nowSec = Math.floor(Date.now() / 1000);
     const [bookingId, setBookingId] = useState<number | null>(null);
     const [qrInvoice, setQrInvoice] = useState<PayRequest | null>(null);
-    const [awaitingQrAfterId, setAwaitingQrAfterId] = useState<number | null>(
-        null,
-    );
+    const [createOpen, setCreateOpen] = useState(false);
 
     const incoming = useMemo(
         () =>
@@ -83,79 +73,6 @@ export function RequestsPage() {
         () => requests.filter((r) => r.poster === user && isOpen(r, nowSec)),
         [requests, user, nowSec],
     );
-
-    const createForm = useAppForm({
-        defaultValues: {
-            kind: REQUEST_PLEASE_BOOK,
-            counterparty: "",
-            assetId: undefined as number | undefined,
-            amount: "1.00",
-            memo: "",
-            expiresAtSeconds: 0,
-        },
-        onSubmit: async ({ value }) => {
-            const named = value.counterparty.trim();
-            if (value.assetId === undefined) return;
-            if (value.kind !== REQUEST_INVOICE && !named) return;
-            await new Promise<void>((resolve, reject) => {
-                create.mutate(
-                    {
-                        kind: value.kind,
-                        counterparty: named || "0",
-                        assetId: value.assetId!,
-                        amount: value.amount.trim(),
-                        memo: value.memo.trim(),
-                        expiresAtSeconds: value.expiresAtSeconds,
-                    },
-                    {
-                        onSuccess: () => {
-                            if (value.kind === REQUEST_INVOICE) {
-                                const maxId = outgoing.reduce(
-                                    (m, r) => Math.max(m, r.id),
-                                    0,
-                                );
-                                setAwaitingQrAfterId(maxId);
-                            }
-                            resolve();
-                        },
-                        onError: (e: Error) => reject(e),
-                    },
-                );
-            });
-        },
-    });
-
-    useEffect(() => {
-        const kind = Number(searchParams.get("kind") || "");
-        const counterparty = searchParams.get("counterparty");
-        const assetId = Number(searchParams.get("assetId") || "");
-        const amount = searchParams.get("amount");
-        if (
-            kind === REQUEST_INVOICE ||
-            kind === REQUEST_PLEASE_BOOK ||
-            kind === REQUEST_SETTLE_AUTH
-        ) {
-            createForm.setFieldValue("kind", kind);
-        }
-        if (counterparty) createForm.setFieldValue("counterparty", counterparty);
-        if (Number.isFinite(assetId) && assetId > 0) {
-            createForm.setFieldValue("assetId", assetId);
-        }
-        if (amount) createForm.setFieldValue("amount", amount);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [searchParams]);
-
-    useEffect(() => {
-        if (awaitingQrAfterId === null) return;
-        const newer = outgoing
-            .filter(
-                (r) => r.kind === REQUEST_INVOICE && r.id > awaitingQrAfterId,
-            )
-            .sort((a, b) => b.id - a.id)[0];
-        if (!newer) return;
-        setQrInvoice(newer);
-        setAwaitingQrAfterId(null);
-    }, [outgoing, awaitingQrAfterId]);
 
     const fulfillInvoice = (r: PayRequest) => {
         navigate(`/path-pay?${invoicePaySearch(r).toString()}`);
@@ -328,179 +245,26 @@ export function RequestsPage() {
         <div className="space-y-10">
             <PageHeader
                 title="Requests"
-                description="Invoices ask someone to path-pay you (they do not clear an existing loan). Please-book asks a creditor to record off-graph value they received — only they can book it. Settle-auth lets a debtor pay down a tab you already authorized, capped by what they owe you."
+                description="Invoices ask someone to path-pay you (they do not clear an existing loan). A deposit request asks them to book value they received off-graph — only they can book it. Settle-auth lets them record a repayment of an existing debt to you, capped by what they owe."
+                action={
+                    <Button
+                        type="button"
+                        size="icon"
+                        className="size-9 shrink-0 rounded-full"
+                        aria-label="New request"
+                        onClick={() => setCreateOpen(true)}
+                    >
+                        <Plus className="size-5" />
+                    </Button>
+                }
             />
 
-            <section className="grid max-w-xl gap-3 rounded-lg border p-4">
-                <h2 className="font-medium">New request</h2>
-                <form
-                    className="grid gap-3"
-                    onSubmit={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        void createForm.handleSubmit();
-                    }}
-                >
-                    <createForm.AppField
-                        name="kind"
-                        children={(field) => (
-                            <div className="grid gap-1">
-                                <span className="text-sm font-medium">
-                                    Kind
-                                </span>
-                                <div className="flex flex-wrap gap-2">
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        variant={
-                                            field.state.value ===
-                                            REQUEST_PLEASE_BOOK
-                                                ? "default"
-                                                : "outline"
-                                        }
-                                        onClick={() =>
-                                            field.handleChange(
-                                                REQUEST_PLEASE_BOOK,
-                                            )
-                                        }
-                                    >
-                                        Please book
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        variant={
-                                            field.state.value ===
-                                            REQUEST_INVOICE
-                                                ? "default"
-                                                : "outline"
-                                        }
-                                        onClick={() =>
-                                            field.handleChange(REQUEST_INVOICE)
-                                        }
-                                    >
-                                        Invoice
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        variant={
-                                            field.state.value ===
-                                            REQUEST_SETTLE_AUTH
-                                                ? "default"
-                                                : "outline"
-                                        }
-                                        onClick={() =>
-                                            field.handleChange(
-                                                REQUEST_SETTLE_AUTH,
-                                            )
-                                        }
-                                    >
-                                        Settle auth
-                                    </Button>
-                                </div>
-                                <p className="text-muted-foreground text-xs">
-                                    {field.state.value === REQUEST_PLEASE_BOOK
-                                        ? "Ask a creditor to deposit you (they received value off-graph)."
-                                        : field.state.value ===
-                                            REQUEST_SETTLE_AUTH
-                                          ? "You are the creditor. The named debtor may pay down what they owe you, up to this amount."
-                                          : "Ask someone to path-pay you. Last hop must be you. Leave payer empty so anyone with a path can pay."}
-                                </p>
-                            </div>
-                        )}
-                    />
-                    <createForm.Subscribe
-                        selector={(s) => s.values.kind}
-                        children={(kind) => (
-                            <createForm.AppField
-                                name="counterparty"
-                                validators={existingAccountValidators({
-                                    optional: kind === REQUEST_INVOICE,
-                                })}
-                                children={(field) => (
-                                    <field.TextField
-                                        label={
-                                            kind === REQUEST_PLEASE_BOOK
-                                                ? "Creditor"
-                                                : kind === REQUEST_SETTLE_AUTH
-                                                  ? "Debtor"
-                                                  : "Payer (optional)"
-                                        }
-                                        placeholder="account"
-                                        required={kind !== REQUEST_INVOICE}
-                                    />
-                                )}
-                            />
-                        )}
-                    />
-                    <createForm.Field
-                        name="assetId"
-                        children={(field) => (
-                            <AssetField
-                                assets={assets}
-                                value={field.state.value}
-                                onChange={(id) => field.handleChange(id)}
-                            />
-                        )}
-                    />
-                    <createForm.Subscribe
-                        selector={(s) => s.values.assetId}
-                        children={(assetId) => (
-                            <createForm.AppField
-                                name="amount"
-                                validators={
-                                    assetId !== undefined
-                                        ? {
-                                              onChange: amountFieldValidator(
-                                                  precisionOf(assetId),
-                                              ),
-                                              onSubmit: amountFieldValidator(
-                                                  precisionOf(assetId),
-                                              ),
-                                          }
-                                        : undefined
-                                }
-                                children={(field) => (
-                                    <field.TextField
-                                        label={
-                                            assetId !== undefined
-                                                ? `Amount (${amountPlaceholder(precisionOf(assetId))})`
-                                                : "Amount"
-                                        }
-                                        inputMode="decimal"
-                                        required
-                                    />
-                                )}
-                            />
-                        )}
-                    />
-                    <createForm.AppField
-                        name="memo"
-                        children={(field) => (
-                            <field.TextField
-                                label="Memo"
-                                placeholder="what this is for"
-                            />
-                        )}
-                    />
-                    <createForm.Field
-                        name="expiresAtSeconds"
-                        children={(field) => (
-                            <ExpiresField
-                                value={field.state.value}
-                                onChange={(v) => field.handleChange(v)}
-                            />
-                        )}
-                    />
-                    <createForm.AppForm>
-                        <createForm.SubmitButton
-                            labels={["Post request", "Posting…"]}
-                            loading={create.isPending}
-                        />
-                    </createForm.AppForm>
-                </form>
-            </section>
+            <RequestDialog
+                open={createOpen}
+                onOpenChange={setCreateOpen}
+                assets={assets}
+                precisionOf={precisionOf}
+            />
 
             <section className="space-y-3">
                 <h2 className="font-medium">Incoming</h2>

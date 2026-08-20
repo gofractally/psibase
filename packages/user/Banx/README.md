@@ -61,7 +61,7 @@ Three kinds (`st_req` / `createRequest`). Counterparty, amount, memo (80 bytes),
 
 Fulfillment is partial (`remaining` declines). Poster can `rm_req` while still open. Activity records `request_id` and memo on create / cancel / fulfill (and on the deposit that books a please-book).
 
-UI: `/requests`. Accounts inbox icon prefills an invoice (savings) or please-book (loan). Incoming invoices open Transfer with the invoice id.
+UI: `/requests` (Plus to create). An account-row Request button opens the same modal with the party filled in (payer field omitted). Kinds in the UI: invoice, deposit request (please-book), settle-auth. Incoming invoices open Transfer with the invoice id.
 
 ## Path pay
 

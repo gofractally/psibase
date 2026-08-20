@@ -1,6 +1,10 @@
 import { useEffect, useMemo } from "react";
 
-import { AssetField, ExpiresField } from "@/components/form-fields";
+import {
+    AssetField,
+    ExpiresField,
+    UsingGlobalSettingsOverlay,
+} from "@/components/form-fields";
 import { useBuyClaimOffers } from "@/hooks/use-banx-data";
 import {
     useRemoveGlobalBuyClaimOffer,
@@ -358,9 +362,15 @@ export function BuyClaimOfferDialog({
                     ...feesFromOffer(existingSpecific),
                 });
             } else {
+                const globalOffer =
+                    prefill?.assetId !== undefined
+                        ? liveGlobalByAsset.get(prefill.assetId)
+                        : undefined;
                 specificForm.reset({
                     enabled: false,
-                    ...defaultFees(prefill?.assetId),
+                    ...(globalOffer
+                        ? feesFromOffer(globalOffer)
+                        : defaultFees(prefill?.assetId)),
                 });
             }
         } else if (existingGlobal) {
@@ -382,6 +392,7 @@ export function BuyClaimOfferDialog({
         debtor,
         existingSpecific,
         existingGlobal,
+        liveGlobalByAsset,
     ]);
 
     const feeFields = (
@@ -520,13 +531,29 @@ export function BuyClaimOfferDialog({
                         />
                         <specificForm.Subscribe
                             selector={(s) => s.values}
-                            children={(values) =>
-                                feeFields(
-                                    specificForm,
-                                    prefill?.assetId ?? values.assetId,
-                                    values.enabled,
-                                )
-                            }
+                            children={(values) => {
+                                const assetId =
+                                    prefill?.assetId ?? values.assetId;
+                                const globalOffer =
+                                    assetId !== undefined
+                                        ? liveGlobalByAsset.get(assetId)
+                                        : undefined;
+                                return (
+                                    <UsingGlobalSettingsOverlay
+                                        active={
+                                            !values.enabled &&
+                                            !!globalOffer &&
+                                            !existingSpecific
+                                        }
+                                    >
+                                        {feeFields(
+                                            specificForm,
+                                            assetId,
+                                            values.enabled,
+                                        )}
+                                    </UsingGlobalSettingsOverlay>
+                                );
+                            }}
                         />
                         <DialogFooter>
                             <Button

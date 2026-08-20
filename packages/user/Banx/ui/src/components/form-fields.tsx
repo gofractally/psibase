@@ -2,6 +2,8 @@
  * Thin wrappers for Banx-specific controls inside TanStack `form.Field`.
  * Shared form fields (TextField, etc.) come from useAppForm's AppField.
  */
+import type { ReactNode } from "react";
+
 import { AssetSelect } from "@/components/asset-select";
 import { ExpiresAtPicker } from "@/components/expires-at-picker";
 import type { Asset } from "@/lib/graphql";
@@ -10,6 +12,7 @@ import {
     type GracePreset,
 } from "@/lib/constants";
 
+import { cn } from "@shared/lib/utils";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 import {
@@ -19,6 +22,37 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@shared/shadcn/ui/select";
+
+/** Cover a locked specific-offer form when a live global offer is in effect. */
+export function UsingGlobalSettingsOverlay({
+    active,
+    children,
+}: {
+    active: boolean;
+    children: ReactNode;
+}) {
+    return (
+        <div className="relative">
+            {children}
+            {active ? (
+                <div
+                    className={cn(
+                        "bg-background/80 absolute inset-0 z-10 flex items-center justify-center rounded-md backdrop-blur-[2px]",
+                    )}
+                    role="status"
+                >
+                    <p className="text-muted-foreground max-w-[16rem] px-4 text-center text-sm leading-snug">
+                        Currently set to{" "}
+                        <span className="text-foreground font-medium">
+                            global
+                        </span>{" "}
+                        settings
+                    </p>
+                </div>
+            ) : null}
+        </div>
+    );
+}
 
 export function AssetField({
     label = "Asset",

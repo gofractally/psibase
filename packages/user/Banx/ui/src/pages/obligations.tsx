@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 
 import {
     ArrowLeftRight,
@@ -8,7 +7,6 @@ import {
     History,
     Pencil,
     PiggyBank,
-    BadgeCheck,
     Handshake,
     Inbox,
     ShoppingCart,
@@ -33,6 +31,10 @@ import {
     BuyClaimOfferDialog,
     type BuyClaimPrefill,
 } from "@/components/buy-claim-offer-dialog";
+import {
+    RequestDialog,
+    type RequestPrefill,
+} from "@/components/request-dialog";
 import { useAssetMap } from "@/hooks/use-assets";
 import {
     useCreditLines,
@@ -71,7 +73,6 @@ import type { Asset, CreditLine, Obligation } from "@/lib/graphql";
 import {
     REQUEST_INVOICE,
     REQUEST_PLEASE_BOOK,
-    REQUEST_SETTLE_AUTH,
 } from "@/lib/graphql";
 
 /** ppm → percent string for form inputs (e.g. 10000 → "1") */
@@ -235,7 +236,6 @@ function mergeCreditLines(
 }
 
 export function ObligationsPage() {
-    const navigate = useNavigate();
     const { data: user } = useCurrentUser();
     const { data: obs = [], isLoading: obsLoading } = useObligations();
     const { data: lines = [], isLoading: linesLoading } = useCreditLines();
@@ -273,6 +273,9 @@ export function ObligationsPage() {
     const [buyClaimOpen, setBuyClaimOpen] = useState(false);
     const [buyClaimPrefill, setBuyClaimPrefill] =
         useState<BuyClaimPrefill | null>(null);
+    const [requestOpen, setRequestOpen] = useState(false);
+    const [requestPrefill, setRequestPrefill] =
+        useState<RequestPrefill | null>(null);
     const [hideEmptySavings, setHideEmptySavings] = useState(false);
     const [hideEmptyLoans, setHideEmptyLoans] = useState(false);
 
@@ -286,21 +289,9 @@ export function ObligationsPage() {
         setBuyClaimOpen(true);
     };
 
-    const openRequest = (
-        kind: number,
-        counterparty: string,
-        assetId: number,
-        amountRaw?: string,
-    ) => {
-        const q = new URLSearchParams({
-            kind: String(kind),
-            counterparty,
-            assetId: String(assetId),
-        });
-        if (amountRaw) {
-            q.set("amount", formatRawAmount(amountRaw, precisionOf(assetId)));
-        }
-        navigate(`/requests?${q.toString()}`);
+    const openRequest = (prefill: RequestPrefill) => {
+        setRequestPrefill(prefill);
+        setRequestOpen(true);
     };
 
     const savingsGroupsAll = useMemo(() => {
@@ -436,6 +427,17 @@ export function ObligationsPage() {
                 prefill={buyClaimPrefill}
             />
 
+            <RequestDialog
+                open={requestOpen}
+                onOpenChange={(open) => {
+                    setRequestOpen(open);
+                    if (!open) setRequestPrefill(null);
+                }}
+                assets={assets}
+                precisionOf={precisionOf}
+                prefill={requestPrefill}
+            />
+
             {/* ── Savings / deposits (you are creditor) ───────────────── */}
             <section className="space-y-4">
                 <SectionHeader
@@ -527,25 +529,18 @@ export function ObligationsPage() {
                                     })
                                 }
                                 onAskRequest={() =>
-                                    openRequest(
-                                        REQUEST_INVOICE,
-                                        g.counterparty,
-                                        g.assetId,
-                                        g.total > 0n
-                                            ? g.total.toString()
-                                            : undefined,
-                                    )
-                                }
-                                onAskSettle={
-                                    g.total > 0n
-                                        ? () =>
-                                              openRequest(
-                                                  REQUEST_SETTLE_AUTH,
-                                                  g.counterparty,
-                                                  g.assetId,
-                                                  g.total.toString(),
-                                              )
-                                        : undefined
+                                    openRequest({
+                                        kind: REQUEST_INVOICE,
+                                        counterparty: g.counterparty,
+                                        assetId: g.assetId,
+                                        amount:
+                                            g.total > 0n
+                                                ? formatRawAmount(
+                                                      g.total.toString(),
+                                                      precisionOf(g.assetId),
+                                                  )
+                                                : undefined,
+                                    })
                                 }
                                 onPostSellOffer={() =>
                                     openBuyClaim({
@@ -670,14 +665,18 @@ export function ObligationsPage() {
                                     })
                                 }
                                 onAskRequest={() =>
-                                    openRequest(
-                                        REQUEST_PLEASE_BOOK,
-                                        g.counterparty,
-                                        g.assetId,
-                                        g.total > 0n
-                                            ? g.total.toString()
-                                            : undefined,
-                                    )
+                                    openRequest({
+                                        kind: REQUEST_PLEASE_BOOK,
+                                        counterparty: g.counterparty,
+                                        assetId: g.assetId,
+                                        amount:
+                                            g.total > 0n
+                                                ? formatRawAmount(
+                                                      g.total.toString(),
+                                                      precisionOf(g.assetId),
+                                                  )
+                                                : undefined,
+                                    })
                                 }
                             />
                         ))}
@@ -1135,7 +1134,6 @@ function AccountGroupRow({
     onSetBuyClaim,
     onPostSellOffer,
     onAskRequest,
-    onAskSettle,
     onSellClaim,
     onBuyPostedClaim,
 }: {
@@ -1158,10 +1156,8 @@ function AccountGroupRow({
     onSetBuyClaim?: () => void;
     onPostSellOffer?: () => void;
     onBuyPostedClaim?: () => void;
-    /** Open a request (invoice from savings, please-book from a loan). */
+    /** Open the new-request modal with this party filled in. */
     onAskRequest?: () => void;
-    /** Authorize the debtor to settle this tab (settle-auth). */
-    onAskSettle?: () => void;
     /** Sell claim on this counterparty (savings / you are creditor). */
     onSellClaim?: () => void;
 }) {
@@ -1214,12 +1210,7 @@ function AccountGroupRow({
         "Path-forward offer — let others hop through you to this party";
     const buyClaimTip =
         "Buy-claim offer — buy others' claims on this party";
-    const requestTip =
-        tone === "savings"
-            ? "Invoice — ask them to path-pay you"
-            : "Please book — ask this creditor to record value they received";
-    const settleAuthTip =
-        "Settle auth — let them pay down this tab without you booking it";
+    const requestTip = "Request — invoice, deposit request, or settle-auth";
     const sellTip =
         "Sell claim — transfer this debt to a buyer under their buy-claim offer";
     const postSellTip =
@@ -1402,9 +1393,9 @@ function AccountGroupRow({
                                 <TooltipTrigger asChild>
                                     <Button
                                         type="button"
-                                        size="icon"
+                                        size="sm"
                                         variant="outline"
-                                        className="size-8 shrink-0"
+                                        className="h-8 shrink-0 gap-1 px-2 text-xs"
                                         aria-label={requestTip}
                                         onClick={(e) => {
                                             e.stopPropagation();
@@ -1412,32 +1403,11 @@ function AccountGroupRow({
                                         }}
                                     >
                                         <Inbox className="size-3.5" />
+                                        Request
                                     </Button>
                                 </TooltipTrigger>
                                 <TooltipContent side="top">
                                     {requestTip}
-                                </TooltipContent>
-                            </Tooltip>
-                        ) : null}
-                        {onAskSettle ? (
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        type="button"
-                                        size="icon"
-                                        variant="outline"
-                                        className="size-8 shrink-0"
-                                        aria-label={settleAuthTip}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onAskSettle();
-                                        }}
-                                    >
-                                        <BadgeCheck className="size-3.5" />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="top">
-                                    {settleAuthTip}
                                 </TooltipContent>
                             </Tooltip>
                         ) : null}
