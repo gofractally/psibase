@@ -2726,6 +2726,7 @@ const RAW_RUNTIME_STATE =
           ["@types/react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.2.3"],\
           ["eslint", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:9.39.4"],\
           ["lucide-react", "virtual:529da78ee9bbad35b13439475ca33f5401b9121f799d4c60e9de66600b411c43755e83652b7a77638cfb7619392b8f0665243a01d9aeed8d87cb42d3382284db#npm:0.475.0"],\
+          ["qrcode.react", "virtual:9b2962d1a1994349b2b4cec56f6c0cac7a661faff04782717b4ad0dae75658fce4119ca07ad4daad897343809e16aa49dc3768310beaecdf5dc4ddb8881e07e7#npm:4.2.0"],\
           ["react", "npm:19.2.7"],\
           ["react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.2.7"],\
           ["react-router-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:6.30.4"],\
@@ -15308,6 +15309,28 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "../.caches/yarn/punycode-npm-2.3.1-97543c420d-14f76a8206.zip/node_modules/punycode/",\
         "packageDependencies": [\
           ["punycode", "npm:2.3.1"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["qrcode.react", [\
+      ["npm:4.2.0", {\
+        "packageLocation": "../.caches/yarn/qrcode.react-npm-4.2.0-2136f2a571-68c691d130.zip/node_modules/qrcode.react/",\
+        "packageDependencies": [\
+          ["qrcode.react", "npm:4.2.0"]\
+        ],\
+        "linkType": "SOFT"\
+      }],\
+      ["virtual:9b2962d1a1994349b2b4cec56f6c0cac7a661faff04782717b4ad0dae75658fce4119ca07ad4daad897343809e16aa49dc3768310beaecdf5dc4ddb8881e07e7#npm:4.2.0", {\
+        "packageLocation": "./.yarn/__virtual__/qrcode.react-virtual-d7aaad6a5b/2/.caches/yarn/qrcode.react-npm-4.2.0-2136f2a571-68c691d130.zip/node_modules/qrcode.react/",\
+        "packageDependencies": [\
+          ["@types/react", "npm:19.2.17"],\
+          ["qrcode.react", "virtual:9b2962d1a1994349b2b4cec56f6c0cac7a661faff04782717b4ad0dae75658fce4119ca07ad4daad897343809e16aa49dc3768310beaecdf5dc4ddb8881e07e7#npm:4.2.0"],\
+          ["react", "npm:19.2.7"]\
+        ],\
+        "packagePeers": [\
+          "@types/react",\
+          "react"\
         ],\
         "linkType": "HARD"\
       }]\

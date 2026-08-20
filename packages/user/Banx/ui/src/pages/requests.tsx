@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
+import { QrCode } from "lucide-react";
+
+import { formatExpiresAt } from "@/components/expires-at-picker";
 import { AssetField, ExpiresField } from "@/components/form-fields";
+import { InvoiceQrDialog } from "@/components/invoice-qr-dialog";
 import { PageHeader } from "@/components/page-header";
 import { useAssetMap } from "@/hooks/use-assets";
 import { useRequests } from "@/hooks/use-banx-data";
@@ -12,7 +16,6 @@ import {
     useFulfillSettle,
 } from "@/hooks/use-banx-mutations";
 import { amountPlaceholder, displayAmount } from "@/lib/amount";
-import { formatExpiresAt } from "@/components/expires-at-picker";
 import { amountFieldValidator, useAppForm } from "@/lib/form";
 import {
     REQUEST_INVOICE,
@@ -20,6 +23,7 @@ import {
     REQUEST_SETTLE_AUTH,
     type PayRequest,
 } from "@/lib/graphql";
+import { invoicePaySearch } from "@/lib/invoice-url";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Button } from "@shared/shadcn/ui/button";
@@ -59,6 +63,10 @@ export function RequestsPage() {
     const [searchParams] = useSearchParams();
     const nowSec = Math.floor(Date.now() / 1000);
     const [bookingId, setBookingId] = useState<number | null>(null);
+    const [qrInvoice, setQrInvoice] = useState<PayRequest | null>(null);
+    const [awaitingQrAfterId, setAwaitingQrAfterId] = useState<number | null>(
+        null,
+    );
 
     const incoming = useMemo(
         () =>
@@ -96,7 +104,16 @@ export function RequestsPage() {
                         expiresAtSeconds: value.expiresAtSeconds,
                     },
                     {
-                        onSuccess: () => resolve(),
+                        onSuccess: () => {
+                            if (value.kind === REQUEST_INVOICE) {
+                                const maxId = outgoing.reduce(
+                                    (m, r) => Math.max(m, r.id),
+                                    0,
+                                );
+                                setAwaitingQrAfterId(maxId);
+                            }
+                            resolve();
+                        },
                         onError: (e: Error) => reject(e),
                     },
                 );
@@ -124,14 +141,20 @@ export function RequestsPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchParams]);
 
+    useEffect(() => {
+        if (awaitingQrAfterId === null) return;
+        const newer = outgoing
+            .filter(
+                (r) => r.kind === REQUEST_INVOICE && r.id > awaitingQrAfterId,
+            )
+            .sort((a, b) => b.id - a.id)[0];
+        if (!newer) return;
+        setQrInvoice(newer);
+        setAwaitingQrAfterId(null);
+    }, [outgoing, awaitingQrAfterId]);
+
     const fulfillInvoice = (r: PayRequest) => {
-        const q = new URLSearchParams({
-            request: String(r.id),
-            payee: r.poster,
-            toAsset: String(r.assetId),
-            amount: displayAmount(r.remaining),
-        });
-        navigate(`/path-pay?${q.toString()}`);
+        navigate(`/path-pay?${invoicePaySearch(r).toString()}`);
     };
 
     const fulfillSettle = async (r: PayRequest) => {
@@ -264,6 +287,19 @@ export function RequestsPage() {
                                             {bookingId === r.id
                                                 ? "Booking…"
                                                 : "Book deposit"}
+                                        </Button>
+                                    ) : null}
+                                    {role === "out" &&
+                                    r.kind === REQUEST_INVOICE ? (
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            className="mr-1"
+                                            onClick={() => setQrInvoice(r)}
+                                        >
+                                            <QrCode className="mr-1 size-4" />
+                                            QR
                                         </Button>
                                     ) : null}
                                     {role === "out" ? (
@@ -476,6 +512,17 @@ export function RequestsPage() {
                 <h2 className="font-medium">You posted</h2>
                 {renderRows(outgoing, "out", "No open requests.")}
             </section>
+
+            <InvoiceQrDialog
+                open={qrInvoice !== null}
+                onOpenChange={(open) => {
+                    if (!open) setQrInvoice(null);
+                }}
+                request={qrInvoice}
+                symbol={
+                    qrInvoice ? symbolOf(qrInvoice.assetId) : ""
+                }
+            />
         </div>
     );
 }
