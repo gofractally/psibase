@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { ChevronDown } from "lucide-react";
+import { Check, ChevronDown, Loader2, XCircle } from "lucide-react";
 
 import { defaultAssetId } from "@/components/asset-select";
 import { AssetField } from "@/components/form-fields";
@@ -24,6 +24,14 @@ import {
     CollapsibleContent,
     CollapsibleTrigger,
 } from "@shared/shadcn/ui/collapsible";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@shared/shadcn/ui/dialog";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 type Hop = { account: string; assetId: number | undefined };
@@ -86,6 +94,51 @@ function canFindPath(
     );
 }
 
+function PathStatus({
+    pending,
+    found,
+    failed,
+    error,
+    onRetry,
+}: {
+    pending: boolean;
+    found: boolean;
+    failed: boolean;
+    error?: string | null;
+    onRetry?: () => void;
+}) {
+    if (pending) {
+        return (
+            <span className="text-muted-foreground inline-flex items-center gap-1.5 text-sm">
+                <Loader2 className="size-4 animate-spin" />
+                Loading
+            </span>
+        );
+    }
+    if (found) {
+        return (
+            <span className="inline-flex items-center gap-1.5 text-sm text-emerald-700 dark:text-emerald-400">
+                <Check className="size-4" strokeWidth={2.5} />
+                Path Found
+            </span>
+        );
+    }
+    if (failed) {
+        return (
+            <button
+                type="button"
+                className="text-destructive inline-flex items-center gap-1.5 text-sm"
+                title={error || "Path failure"}
+                onClick={onRetry}
+            >
+                <XCircle className="size-4" />
+                Path failure
+            </button>
+        );
+    }
+    return null;
+}
+
 /** Debounced auto-quote; also used so blur can flush immediately via `flush`. */
 function AutoFindPath({
     quoteKey,
@@ -119,6 +172,10 @@ export function PathPayPage() {
     const [quote, setQuote] = useState<QuoteSummary | null>(null);
     const [quotedKey, setQuotedKey] = useState<string | null>(null);
     const quotedKeyRef = useRef<string | null>(null);
+    const [failedKey, setFailedKey] = useState<string | null>(null);
+    const failedKeyRef = useRef<string | null>(null);
+    const [quoteError, setQuoteError] = useState<string | null>(null);
+    const [confirmOpen, setConfirmOpen] = useState(false);
     const [advancedOpen, setAdvancedOpen] = useState(false);
     const quotingKeyRef = useRef<string | null>(null);
     const quoteSeq = useRef(0);
@@ -126,6 +183,10 @@ export function PathPayPage() {
     const rememberQuotedKey = (key: string | null) => {
         quotedKeyRef.current = key;
         setQuotedKey(key);
+    };
+    const rememberFailedKey = (key: string | null) => {
+        failedKeyRef.current = key;
+        setFailedKey(key);
     };
 
     const findForm = useAppForm({
@@ -149,7 +210,8 @@ export function PathPayPage() {
             const key = findQuoteKey(user!, value);
             if (
                 key === quotedKeyRef.current ||
-                key === quotingKeyRef.current
+                key === quotingKeyRef.current ||
+                key === failedKeyRef.current
             ) {
                 return;
             }
@@ -195,6 +257,8 @@ export function PathPayPage() {
                                     exactOut ? q.minReturn : q.amountOut,
                                 );
                                 rememberQuotedKey(key);
+                                rememberFailedKey(null);
+                                setQuoteError(null);
                                 setQuote({
                                     amountIn: exactOut
                                         ? q.amountIn
@@ -205,7 +269,15 @@ export function PathPayPage() {
                                 });
                                 resolve();
                             },
-                            onError: (e: Error) => reject(e),
+                            onError: (e: Error) => {
+                                if (seq === quoteSeq.current) {
+                                    rememberQuotedKey(null);
+                                    rememberFailedKey(key);
+                                    setQuote(null);
+                                    setQuoteError(e.message);
+                                }
+                                reject(e);
+                            },
                         },
                     );
                 });
@@ -263,13 +335,15 @@ export function PathPayPage() {
                             requestId,
                         },
                         {
-                            onSuccess: () => resolve(),
+                            onSuccess: () => {
+                                setConfirmOpen(false);
+                                resolve();
+                            },
                             onError: (e: Error) => reject(e),
                         },
                     );
                     return;
                 }
-
 
                 pathPay.mutate(
                     {
@@ -278,7 +352,10 @@ export function PathPayPage() {
                         minReturn: value.minReturn.trim(),
                     },
                     {
-                        onSuccess: () => resolve(),
+                        onSuccess: () => {
+                            setConfirmOpen(false);
+                            resolve();
+                        },
                         onError: (e: Error) => reject(e),
                     },
                 );
@@ -335,7 +412,7 @@ export function PathPayPage() {
     };
 
     const findNow = () => {
-        void findForm.handleSubmit();
+        void findForm.handleSubmit().catch(() => undefined);
     };
 
     return (
@@ -428,6 +505,8 @@ export function PathPayPage() {
                                                 "send",
                                             );
                                             rememberQuotedKey(null);
+                                            rememberFailedKey(null);
+                                            setQuoteError(null);
                                             setQuote(null);
                                         }}
                                     >
@@ -447,6 +526,8 @@ export function PathPayPage() {
                                                 "receive",
                                             );
                                             rememberQuotedKey(null);
+                                            rememberFailedKey(null);
+                                            setQuoteError(null);
                                             setQuote(null);
                                         }}
                                     >
@@ -540,11 +621,6 @@ export function PathPayPage() {
                                 : [];
                             return (
                                 <div className="text-muted-foreground space-y-0.5 text-sm font-mono">
-                                    {quotePath.isPending ? (
-                                        <p className="text-xs">
-                                            Finding path…
-                                        </p>
-                                    ) : null}
                                     {quote ? (
                                         <>
                                             <p>
@@ -607,9 +683,11 @@ export function PathPayPage() {
                         <execForm.Subscribe
                             selector={(s) => s.values.hops}
                             children={(hops) => {
-                                const live =
-                                    !!user &&
-                                    quotedKey === findQuoteKey(user, values);
+                                const key = user
+                                    ? findQuoteKey(user, values)
+                                    : "";
+                                const live = !!key && quotedKey === key;
+                                const failed = !!key && failedKey === key;
                                 const ready =
                                     live &&
                                     hops.some(
@@ -618,6 +696,7 @@ export function PathPayPage() {
                                             h.assetId !== undefined,
                                     );
                                 return (
+                                    <>
                                     <Button
                                         type="button"
                                         disabled={
@@ -625,19 +704,24 @@ export function PathPayPage() {
                                             pathPay.isPending ||
                                             payInvoice.isPending
                                         }
-                                        onClick={() =>
-                                            void execForm.handleSubmit()
-                                        }
+                                        onClick={() => setConfirmOpen(true)}
                                     >
-                                        {pathPay.isPending ||
-                                        payInvoice.isPending
-                                            ? requestId
-                                                ? "Paying…"
-                                                : "Submitting…"
-                                            : requestId
-                                              ? "Pay invoice"
-                                              : "Transfer"}
+                                        {requestId
+                                            ? "Pay invoice"
+                                            : "Transfer"}
                                     </Button>
+                                    <PathStatus
+                                        pending={quotePath.isPending}
+                                        found={live}
+                                        failed={failed}
+                                        error={quoteError}
+                                        onRetry={() => {
+                                            rememberFailedKey(null);
+                                            setQuoteError(null);
+                                            findNow();
+                                        }}
+                                    />
+                                    </>
                                 );
                             }}
                         />
@@ -917,6 +1001,128 @@ export function PathPayPage() {
                 </form>
                     </CollapsibleContent>
                 </Collapsible>
+
+                <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle>
+                                {requestId
+                                    ? "Confirm invoice payment"
+                                    : "Confirm transfer"}
+                            </DialogTitle>
+                            <DialogDescription>
+                                {quote ? (
+                                    <>
+                                        You send{" "}
+                                        <span className="text-foreground font-medium">
+                                            {displayAmount(quote.amountIn)}
+                                        </span>
+                                        {findForm.state.values.fromAsset !==
+                                        undefined
+                                            ? ` ${symbolOf(findForm.state.values.fromAsset)}`
+                                            : ""}
+                                        . Payee gets{" "}
+                                        <span className="text-foreground font-medium">
+                                            {displayAmount(quote.amountOut)}
+                                        </span>
+                                        {findForm.state.values.toAsset !==
+                                        undefined
+                                            ? ` ${symbolOf(findForm.state.values.toAsset)}`
+                                            : ""}
+                                        .
+                                    </>
+                                ) : (
+                                    "Review the path, then confirm."
+                                )}
+                            </DialogDescription>
+                        </DialogHeader>
+                        <execForm.Subscribe
+                            selector={(s) => s.values.hops}
+                            children={(hops) => {
+                                const path = hops.filter(
+                                    (h) =>
+                                        h.account.trim() &&
+                                        h.assetId !== undefined,
+                                );
+                                if (path.length === 0) {
+                                    return (
+                                        <p className="text-muted-foreground text-sm">
+                                            No hops on this path.
+                                        </p>
+                                    );
+                                }
+                                return (
+                                    <ol className="space-y-2 text-sm">
+                                        {path.map((h, i) => {
+                                            const quoted = quote?.hops[i];
+                                            const same =
+                                                quoted &&
+                                                quoted.account ===
+                                                    h.account.trim() &&
+                                                quoted.assetId === h.assetId;
+                                            return (
+                                                <li
+                                                    key={`${h.account}-${h.assetId}-${i}`}
+                                                    className="flex items-baseline justify-between gap-3"
+                                                >
+                                                    <span>
+                                                        <span className="text-muted-foreground mr-2 font-mono text-xs">
+                                                            {i + 1}.
+                                                        </span>
+                                                        <span className="font-medium">
+                                                            {h.account.trim()}
+                                                        </span>
+                                                        <span className="text-muted-foreground">
+                                                            {" "}
+                                                            ·{" "}
+                                                            {symbolOf(
+                                                                h.assetId!,
+                                                            )}
+                                                        </span>
+                                                    </span>
+                                                    {same && quoted?.amount ? (
+                                                        <span className="text-muted-foreground font-mono text-xs">
+                                                            {displayAmount(
+                                                                quoted.amount,
+                                                            )}
+                                                        </span>
+                                                    ) : null}
+                                                </li>
+                                            );
+                                        })}
+                                    </ol>
+                                );
+                            }}
+                        />
+                        <DialogFooter>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setConfirmOpen(false)}
+                                disabled={
+                                    pathPay.isPending || payInvoice.isPending
+                                }
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="button"
+                                disabled={
+                                    pathPay.isPending || payInvoice.isPending
+                                }
+                                onClick={() => void execForm.handleSubmit()}
+                            >
+                                {pathPay.isPending || payInvoice.isPending
+                                    ? requestId
+                                        ? "Paying…"
+                                        : "Submitting…"
+                                    : requestId
+                                      ? "Pay invoice"
+                                      : "Transfer"}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </section>
         </div>
     );

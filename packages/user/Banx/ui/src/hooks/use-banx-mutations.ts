@@ -329,8 +329,6 @@ export function useQuotePath() {
                 minReturn,
             };
         },
-        onError: (e: Error) => toast.error(e.message),
-        onSuccess: () => toast.success("Path found"),
     });
 }
 
