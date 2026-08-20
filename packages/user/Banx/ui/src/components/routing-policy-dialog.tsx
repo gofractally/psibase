@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
     AssetField,
@@ -181,7 +181,7 @@ export function RoutingPolicyDialog({
     const { data: user } = useCurrentUser();
     const intermediate = user?.trim() || "you";
 
-    const { data: offers = [] } = useForwardOffers();
+    const { data: offers = [], isSuccess: offersReady } = useForwardOffers();
     const setGlobal = useSetGlobalForwardOffer();
     const setSpecific = useSetForwardOffer();
     const removeGlobal = useRemoveGlobalForwardOffer();
@@ -190,7 +190,10 @@ export function RoutingPolicyDialog({
     const precisionOf = (id: number) =>
         assets.find((a) => a.id === id)?.precision ?? 0;
 
-    const nowSec = Math.floor(Date.now() / 1000);
+    const [nowSec, setNowSec] = useState(() => Math.floor(Date.now() / 1000));
+    useEffect(() => {
+        if (open) setNowSec(Math.floor(Date.now() / 1000));
+    }, [open]);
 
     const existingSpecific = useMemo(() => {
         if (!nextHop) return undefined;
@@ -303,8 +306,10 @@ export function RoutingPolicyDialog({
         },
     });
 
+    // `isSuccess` stays true across background refetch; only `open` flipping
+    // (or the first success) should load the form. Do not depend on offer rows.
     useEffect(() => {
-        if (!open) return;
+        if (!open || !offersReady) return;
         if (isSpecific) {
             if (existingSpecific) {
                 specificForm.reset({
@@ -335,15 +340,7 @@ export function RoutingPolicyDialog({
             });
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [
-        open,
-        isSpecific,
-        prefill?.assetId,
-        nextHop,
-        existingSpecific,
-        existingGlobal,
-        liveGlobalByAsset,
-    ]);
+    }, [open, offersReady]);
 
     if (isSpecific) {
         const pending = setSpecific.isPending || removeSpecific.isPending;

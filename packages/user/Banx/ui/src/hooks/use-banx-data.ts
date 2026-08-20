@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 
 import {
     fetchActivity,
@@ -8,12 +8,19 @@ import {
     fetchForwardOffers,
     fetchRequests,
     fetchClaimOffers,
+    type ActivityEvent,
+    type ClaimOffer,
+    type CreditLine,
+    type CurrencyPolicy,
+    type ForwardOffer,
+    type Obligation,
+    type PayRequest,
 } from "@/lib/graphql";
 import { QueryKey } from "@/lib/query-keys";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 
-export function useCreditLines() {
+export function useCreditLines(): UseQueryResult<CreditLine[], Error> {
     const { data: user } = useCurrentUser();
     return useQuery({
         queryKey: QueryKey.creditLines(user),
@@ -22,7 +29,7 @@ export function useCreditLines() {
     });
 }
 
-export function useObligations() {
+export function useObligations(): UseQueryResult<Obligation[], Error> {
     const { data: user } = useCurrentUser();
     return useQuery({
         queryKey: QueryKey.obligations(user),
@@ -35,7 +42,7 @@ export function useActivity(
     counterparty: string | undefined,
     assetId: number | undefined,
     enabled: boolean,
-) {
+): UseQueryResult<ActivityEvent[], Error> {
     const { data: user } = useCurrentUser();
     return useQuery({
         queryKey: QueryKey.activity(user, counterparty ?? "", assetId ?? 0),
@@ -44,7 +51,7 @@ export function useActivity(
     });
 }
 
-export function useForwardOffers() {
+export function useForwardOffers(): UseQueryResult<ForwardOffer[], Error> {
     const { data: user } = useCurrentUser();
     return useQuery({
         queryKey: QueryKey.forwardOffers(user),
@@ -53,7 +60,7 @@ export function useForwardOffers() {
     });
 }
 
-export function useClaimOffers() {
+export function useClaimOffers(): UseQueryResult<ClaimOffer[], Error> {
     const { data: user } = useCurrentUser();
     return useQuery({
         queryKey: QueryKey.claimOffers(user),
@@ -66,7 +73,7 @@ export function useBuyClaimOffers() {
     return useClaimOffers();
 }
 
-export function useRequests() {
+export function useRequests(): UseQueryResult<PayRequest[], Error> {
     const { data: user } = useCurrentUser();
     return useQuery({
         queryKey: QueryKey.requests(user),
@@ -75,7 +82,10 @@ export function useRequests() {
     });
 }
 
-export function useCurrencyPolicies() {
+export function useCurrencyPolicies(): UseQueryResult<
+    CurrencyPolicy[],
+    Error
+> {
     const { data: user } = useCurrentUser();
     return useQuery({
         queryKey: QueryKey.currencyPolicies(user),

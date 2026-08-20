@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
     AssetField,
@@ -219,7 +219,8 @@ export function BuyClaimOfferDialog({
     const { data: user } = useCurrentUser();
     const you = user?.trim() || "you";
 
-    const { data: allOffers = [] } = useBuyClaimOffers();
+    const { data: allOffers = [], isSuccess: offersReady } =
+        useBuyClaimOffers();
     const offers = allOffers.filter((o) => (isSell ? o.isSell : o.isBuy));
     const setGlobalBuy = useSetGlobalBuyClaimOffer();
     const setSpecificBuy = useSetBuyClaimOffer();
@@ -237,7 +238,10 @@ export function BuyClaimOfferDialog({
     const precisionOf = (id: number) =>
         assets.find((a) => a.id === id)?.precision ?? 0;
 
-    const nowSec = Math.floor(Date.now() / 1000);
+    const [nowSec, setNowSec] = useState(() => Math.floor(Date.now() / 1000));
+    useEffect(() => {
+        if (open) setNowSec(Math.floor(Date.now() / 1000));
+    }, [open]);
 
     const existingSpecific = useMemo(() => {
         if (!debtor) return undefined;
@@ -353,8 +357,10 @@ export function BuyClaimOfferDialog({
         },
     });
 
+    // `isSuccess` stays true across background refetch; only `open` flipping
+    // (or the first success) should load the form. Do not depend on offer rows.
     useEffect(() => {
-        if (!open) return;
+        if (!open || !offersReady) return;
         if (isSpecific) {
             if (existingSpecific) {
                 specificForm.reset({
@@ -385,15 +391,7 @@ export function BuyClaimOfferDialog({
             });
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [
-        open,
-        isSpecific,
-        prefill?.assetId,
-        debtor,
-        existingSpecific,
-        existingGlobal,
-        liveGlobalByAsset,
-    ]);
+    }, [open, offersReady]);
 
     const feeFields = (
         form: typeof globalForm,
