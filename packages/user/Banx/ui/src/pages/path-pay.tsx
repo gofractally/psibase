@@ -35,9 +35,20 @@ function feeIsPositive(fee: string | undefined): boolean {
     return Number.isFinite(n) ? n > 0 : displayAmount(fee) !== "0";
 }
 
+function parseAssetParam(
+    params: URLSearchParams,
+    key: string,
+    assets: { id: number }[],
+): number | undefined {
+    const n = Number(params.get(key) || "");
+    if (!Number.isFinite(n) || n <= 0) return undefined;
+    return assets.some((a) => a.id === n) ? n : undefined;
+}
+
 export function PathPayPage() {
     const { data: user } = useCurrentUser();
-    const { assets, precisionOf, symbolOf } = useAssetMap();
+    const { assets, byId, precisionOf, symbolOf, isSuccess: assetsReady } =
+        useAssetMap();
     const pathPay = usePathPay();
     const payInvoice = usePayInvoice();
     const quotePath = useQuotePath();
@@ -189,9 +200,14 @@ export function PathPayPage() {
     });
 
     useEffect(() => {
+        if (!assetsReady || assets.length === 0) return;
         const payee = searchParams.get("payee");
         const amount = searchParams.get("amount");
-        const toAsset = Number(searchParams.get("toAsset") || "");
+        const toAsset =
+            parseAssetParam(searchParams, "toAsset", assets) ??
+            defaultAssetId(assets);
+        const fromAsset =
+            parseAssetParam(searchParams, "fromAsset", assets) ?? toAsset;
         if (payee) findForm.setFieldValue("payee", payee);
         if (amount) {
             findForm.setFieldValue("amount", amount);
@@ -200,15 +216,15 @@ export function PathPayPage() {
                 execForm.setFieldValue("amount", amount);
             }
         }
-        if (Number.isFinite(toAsset) && toAsset > 0) {
-            findForm.setFieldValue("toAsset", toAsset);
-            findForm.setFieldValue("fromAsset", toAsset);
+        if (toAsset !== undefined) findForm.setFieldValue("toAsset", toAsset);
+        if (fromAsset !== undefined) {
+            findForm.setFieldValue("fromAsset", fromAsset);
         }
         if (searchParams.get("request")) {
             findForm.setFieldValue("feeMode", "receive");
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [searchParams]);
+    }, [searchParams, assetsReady, assets]);
 
     const addHop = () => {
         const hops = execForm.state.values.hops;
@@ -364,27 +380,32 @@ export function PathPayPage() {
                             // receive (you cover) ⇒ amount in to-asset; send ⇒ from-asset
                             const amountAsset =
                                 feeMode === "receive" ? toAsset : fromAsset;
-                            const precision =
-                                amountAsset !== undefined
-                                    ? precisionOf(amountAsset)
-                                    : 0;
+                            const known =
+                                amountAsset !== undefined &&
+                                byId.has(amountAsset);
+                            const precision = known
+                                ? precisionOf(amountAsset)
+                                : 0;
                             const amountLabel =
                                 feeMode === "receive"
                                     ? "Payee receives"
                                     : "You send";
+                            const amountValidators = known
+                                ? {
+                                      onChange: amountFieldValidator(
+                                          precision,
+                                          { allowZero: false },
+                                      ),
+                                      onSubmit: amountFieldValidator(
+                                          precision,
+                                          { allowZero: false },
+                                      ),
+                                  }
+                                : undefined;
                             return (
                                 <findForm.AppField
                                     name="amount"
-                                    validators={{
-                                        onChange: amountFieldValidator(
-                                            precision,
-                                            { allowZero: false },
-                                        ),
-                                        onSubmit: amountFieldValidator(
-                                            precision,
-                                            { allowZero: false },
-                                        ),
-                                    }}
+                                    validators={amountValidators}
                                     children={(field) => (
                                         <field.TextField
                                             label={amountLabel}
@@ -649,23 +670,28 @@ export function PathPayPage() {
                     <execForm.Subscribe
                         selector={(s) => s.values.hops[0]?.assetId}
                         children={(firstAsset) => {
-                            const precision =
-                                firstAsset !== undefined
-                                    ? precisionOf(firstAsset)
-                                    : 0;
+                            const known =
+                                firstAsset !== undefined &&
+                                byId.has(firstAsset);
+                            const precision = known
+                                ? precisionOf(firstAsset)
+                                : 0;
+                            const amountValidators = known
+                                ? {
+                                      onChange: amountFieldValidator(
+                                          precision,
+                                          { allowZero: false },
+                                      ),
+                                      onSubmit: amountFieldValidator(
+                                          precision,
+                                          { allowZero: false },
+                                      ),
+                                  }
+                                : undefined;
                             return (
                                 <execForm.AppField
                                     name="amount"
-                                    validators={{
-                                        onChange: amountFieldValidator(
-                                            precision,
-                                            { allowZero: false },
-                                        ),
-                                        onSubmit: amountFieldValidator(
-                                            precision,
-                                            { allowZero: false },
-                                        ),
-                                    }}
+                                    validators={amountValidators}
                                     children={(field) => (
                                         <field.TextField
                                             label={
@@ -691,23 +717,28 @@ export function PathPayPage() {
                                     ?.assetId
                             }
                             children={(lastAsset) => {
-                                const precision =
-                                    lastAsset !== undefined
-                                        ? precisionOf(lastAsset)
-                                        : 0;
+                                const known =
+                                    lastAsset !== undefined &&
+                                    byId.has(lastAsset);
+                                const precision = known
+                                    ? precisionOf(lastAsset)
+                                    : 0;
+                                const minValidators = known
+                                    ? {
+                                          onChange: amountFieldValidator(
+                                              precision,
+                                              { allowZero: true },
+                                          ),
+                                          onSubmit: amountFieldValidator(
+                                              precision,
+                                              { allowZero: true },
+                                          ),
+                                      }
+                                    : undefined;
                                 return (
                                     <execForm.AppField
                                         name="minReturn"
-                                        validators={{
-                                            onChange: amountFieldValidator(
-                                                precision,
-                                                { allowZero: true },
-                                            ),
-                                            onSubmit: amountFieldValidator(
-                                                precision,
-                                                { allowZero: true },
-                                            ),
-                                        }}
+                                        validators={minValidators}
                                         children={(field) => (
                                             <field.TextField
                                                 label="Payee min"

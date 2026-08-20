@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 import type { Asset } from "@/lib/graphql";
 
@@ -61,13 +61,19 @@ export function AssetSelect({
     }, [assets, itemActive]);
 
     const fallbackId = useMemo(() => defaultAssetId(ordered), [ordered]);
-    // Always show a concrete selection when we can (avoids blank Radix Select).
-    const effectiveId = value ?? fallbackId;
+    const ids = useMemo(() => new Set(ordered.map((a) => a.id)), [ordered]);
+    // Never pass Radix a value that isn't in the list (empty assets / stale URL id).
+    const valueInList = value !== undefined && ids.has(value);
+    const effectiveId = valueInList ? value : fallbackId;
+    const pushedFallback = useRef<number | undefined>(undefined);
 
     useEffect(() => {
-        if (value !== undefined || fallbackId === undefined) return;
+        if (valueInList || fallbackId === undefined) return;
+        if (value === fallbackId) return;
+        if (pushedFallback.current === fallbackId) return;
+        pushedFallback.current = fallbackId;
         onChange(fallbackId);
-    }, [value, fallbackId, onChange]);
+    }, [valueInList, value, fallbackId, onChange]);
 
     const row = (a: Asset, active: boolean | undefined) => {
         const sym = a.symbol.toUpperCase();

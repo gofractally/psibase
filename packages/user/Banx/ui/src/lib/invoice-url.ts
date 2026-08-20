@@ -2,10 +2,12 @@ import { displayAmount } from "@/lib/amount";
 import type { PayRequest } from "@/lib/graphql";
 
 export function invoicePaySearch(r: PayRequest): URLSearchParams {
+    const asset = String(r.assetId);
     return new URLSearchParams({
         request: String(r.id),
         payee: r.poster,
-        toAsset: String(r.assetId),
+        fromAsset: asset,
+        toAsset: asset,
         amount: displayAmount(r.remaining),
     });
 }
