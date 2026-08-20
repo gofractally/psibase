@@ -58,7 +58,7 @@ const defaultFees = (assetId?: number): FeeFields => ({
     assetId,
     hopFeeFixed: "0",
     hopFeePct: "0",
-    maxAcceptPct: "100",
+    maxAcceptPct: "20",
     expiresAtSeconds: 0,
     allowUnknown: false,
 });
@@ -558,7 +558,7 @@ export function RoutingPolicyDialog({
             globalForm.setFieldValue("enabled", false);
             globalForm.setFieldValue("hopFeeFixed", "0");
             globalForm.setFieldValue("hopFeePct", "0");
-            globalForm.setFieldValue("maxAcceptPct", "100");
+            globalForm.setFieldValue("maxAcceptPct", "20");
             globalForm.setFieldValue("expiresAtSeconds", 0);
             globalForm.setFieldValue("allowUnknown", false);
         }

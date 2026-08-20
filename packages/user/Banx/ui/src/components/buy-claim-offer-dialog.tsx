@@ -12,7 +12,11 @@ import {
     useSetGlobalSellClaimOffer,
     useSetSellClaimOffer,
 } from "@/hooks/use-banx-mutations";
-import { amountPlaceholder, displayAmount } from "@/lib/amount";
+import {
+    amountPlaceholder,
+    displayAmount,
+    formatToPrecision,
+} from "@/lib/amount";
 import {
     MAX_HOP_FEE_PERCENT,
     MAX_HOP_FEE_PPM,
@@ -25,6 +29,7 @@ import {
 } from "@/lib/form";
 import type { Asset, BuyClaimOffer } from "@/lib/graphql";
 
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { cn } from "@shared/lib/utils";
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -76,6 +81,123 @@ const buyClaimSpreadValidators = {
     onSubmit: signedPercentFieldValidator(MAX_HOP_FEE_PERCENT),
 };
 
+const SAMPLE_FACE = 15;
+
+function previewClaimProceeds(
+    face: number,
+    feeFixed: string,
+    feePct: string,
+    isSell: boolean,
+): number | null {
+    const fixed = Number(String(feeFixed).trim());
+    const pct = Number(String(feePct).trim());
+    if (!Number.isFinite(fixed) || !Number.isFinite(pct)) return null;
+    if (fixed < 0 || Math.abs(pct) >= 100) return null;
+    const spread = isSell ? -pct : pct;
+    const afterPct = face * (1 - spread / 100);
+    if (fixed >= afterPct) return null;
+    const out = afterPct - fixed;
+    return out > 0 ? out : null;
+}
+
+function ClaimRow({
+    creditor,
+    debtor,
+    amount,
+}: {
+    creditor: string;
+    debtor?: string;
+    amount: string | null;
+}) {
+    if (amount === null || !debtor) {
+        return (
+            <p className="font-mono text-xs leading-relaxed">
+                <span className="text-foreground font-medium">{creditor}</span>{" "}
+                <span className="text-muted-foreground/50">—</span>
+            </p>
+        );
+    }
+    return (
+        <p className="font-mono text-xs leading-relaxed">
+            <span className="text-foreground font-medium">{debtor}</span>
+            <span className="text-muted-foreground"> owes </span>
+            <span className="text-foreground">{amount}</span>
+            <span className="text-muted-foreground"> to </span>
+            <span className="text-foreground font-medium">{creditor}</span>
+        </p>
+    );
+}
+
+function ClaimFeeExample({
+    feeFixed,
+    feePct,
+    precision,
+    isSell,
+    you,
+    other = "alice",
+    debtor = "carol",
+    sampleFace = SAMPLE_FACE,
+}: {
+    feeFixed: string;
+    feePct: string;
+    precision: number;
+    isSell: boolean;
+    you: string;
+    other?: string;
+    debtor?: string;
+    sampleFace?: number;
+}) {
+    const proceeds = previewClaimProceeds(
+        sampleFace,
+        feeFixed,
+        feePct,
+        isSell,
+    );
+    const faceStr =
+        formatToPrecision(String(sampleFace), precision) ??
+        String(sampleFace);
+    const proceedsStr =
+        proceeds === null
+            ? null
+            : (formatToPrecision(
+                  proceeds.toFixed(Math.max(precision, 6)),
+                  precision,
+              ) ?? proceeds.toFixed(precision));
+    const seller = isSell ? you : other;
+    const buyer = isSell ? other : you;
+
+    return (
+        <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+                <p className="text-muted-foreground font-sans text-[0.7rem] uppercase tracking-wide">
+                    Before
+                </p>
+                <ClaimRow
+                    creditor={seller}
+                    debtor={debtor}
+                    amount={faceStr}
+                />
+                <ClaimRow creditor={buyer} amount={null} />
+            </div>
+            <div className="space-y-1">
+                <p className="text-muted-foreground font-sans text-[0.7rem] uppercase tracking-wide">
+                    After
+                </p>
+                <ClaimRow
+                    creditor={seller}
+                    debtor={buyer}
+                    amount={proceedsStr}
+                />
+                <ClaimRow
+                    creditor={buyer}
+                    debtor={debtor}
+                    amount={faceStr}
+                />
+            </div>
+        </div>
+    );
+}
+
 export function BuyClaimOfferDialog({
     open,
     onOpenChange,
@@ -90,6 +212,8 @@ export function BuyClaimOfferDialog({
     const debtor = prefill?.debtor?.trim() ?? "";
     const isSpecific = !!debtor;
     const isSell = prefill?.side === "sell";
+    const { data: user } = useCurrentUser();
+    const you = user?.trim() || "you";
 
     const { data: allOffers = [] } = useBuyClaimOffers();
     const offers = allOffers.filter((o) => (isSell ? o.isSell : o.isBuy));
@@ -314,6 +438,22 @@ export function BuyClaimOfferDialog({
                         )}
                     />
                 </div>
+                <form.Subscribe
+                    selector={(s) => ({
+                        feeFixed: s.values.feeFixed,
+                        feePct: s.values.feePct,
+                    })}
+                    children={({ feeFixed, feePct }) => (
+                        <ClaimFeeExample
+                            feeFixed={feeFixed}
+                            feePct={feePct}
+                            precision={precision}
+                            isSell={isSell}
+                            you={you}
+                            debtor={debtor || "carol"}
+                        />
+                    )}
+                />
                 <form.Field
                     name="expiresAtSeconds"
                     children={(field) => (
