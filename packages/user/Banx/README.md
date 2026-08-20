@@ -51,11 +51,11 @@ A **deposit** is how off-graph value enters: the receiver books a liability to t
 
 ## Requests
 
-Three kinds (`st_req` / `createRequest`). Named counterparty, amount, memo (80 bytes), optional expiry.
+Three kinds (`st_req` / `createRequest`). Counterparty, amount, memo (80 bytes), optional expiry. Invoice `counterparty` may be `0` (anyone). Please-book and settle-auth still require a named party.
 
 | Kind | Poster | Fulfiller | Effect |
 |------|--------|-----------|--------|
-| **Invoice** (`1`) | Payee | Named payer, via `pay_inv` | Walks hops backward from remaining; `max_spend` is the send budget. Does **not** shrink an existing loan to that payee. |
+| **Invoice** (`1`) | Payee | Anyone with a path to the poster, via `pay_inv` (`counterparty` is who was billed; `0` = open) | Walks hops backward from remaining; `max_spend` is the send budget. Does **not** shrink an existing loan to that payee. |
 | **Please-book** (`2`) | Debtor (or whoever sent value off-graph) | **Only** the named creditor, via `deposit` with `request_id` | Opposite claim + auto-net. The poster cannot book this themselves. |
 | **Settle-auth** (`3`) | **Creditor** | **Only** the named debtor, via `fl_stl` | Same book as the creditor depositing them. Capped by `min(amount, remaining, live exposure)` — cannot flip the book or mint a claim on the creditor. |
 

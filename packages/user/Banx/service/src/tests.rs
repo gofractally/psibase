@@ -2652,18 +2652,6 @@ mod tests {
             )
             .get()?;
 
-        // Gary is not the named payer.
-        assert!(
-            Wrapper::push_from(&chain, gary)
-                .path_pay(
-                    vec![hop(steve, usd)],
-                    Quantity::new(100),
-                    Quantity::new(100),
-                    id,
-                )
-                .get()
-                .is_err()
-        );
         // Ends at Gary, not Steve.
         assert!(
             Wrapper::push_from(&chain, alice)
@@ -2677,6 +2665,77 @@ mod tests {
                 .is_err()
         );
         assert_eq!(PayRequest::get_assert(id).remaining.value, 100);
+
+        // Named counterparty is who was billed; anyone with a path may pay.
+        Wrapper::push_from(&chain, gary)
+            .path_pay(
+                vec![hop(steve, usd)],
+                Quantity::new(100),
+                Quantity::new(100),
+                id,
+            )
+            .get()?;
+        assert_eq!(PayRequest::get_assert(id).remaining.value, 0);
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_invoice_counterparty_zero_anyone_pays(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let steve = account!("steve");
+        for a in [alice, steve] {
+            chain.new_account(a).unwrap();
+        }
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        Wrapper::push_from(&chain, steve)
+            .st_crd_lne(alice, usd, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        let id = Wrapper::push_from(&chain, steve)
+            .st_req(
+                PayRequest::INVOICE,
+                AccountNumber::new(0),
+                usd,
+                Quantity::new(100),
+                "".into(),
+                never(),
+            )
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(steve, usd)],
+                Quantity::new(100),
+                Quantity::new(100),
+                id,
+            )
+            .get()?;
+        assert_eq!(PayRequest::get_assert(id).remaining.value, 0);
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_please_book_rejects_zero_counterparty(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        chain.new_account(alice).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .st_req(
+                    PayRequest::PLEASE_BOOK,
+                    AccountNumber::new(0),
+                    usd,
+                    Quantity::new(100),
+                    "".into(),
+                    never(),
+                )
+                .get()
+                .is_err()
+        );
         Ok(())
     }
 

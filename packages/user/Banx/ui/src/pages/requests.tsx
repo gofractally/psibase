@@ -82,13 +82,14 @@ export function RequestsPage() {
             expiresAtSeconds: 0,
         },
         onSubmit: async ({ value }) => {
-            if (value.assetId === undefined || !value.counterparty.trim())
-                return;
+            const named = value.counterparty.trim();
+            if (value.assetId === undefined) return;
+            if (value.kind !== REQUEST_INVOICE && !named) return;
             await new Promise<void>((resolve, reject) => {
                 create.mutate(
                     {
                         kind: value.kind,
-                        counterparty: value.counterparty.trim(),
+                        counterparty: named || "0",
                         assetId: value.assetId!,
                         amount: value.amount.trim(),
                         memo: value.memo.trim(),
@@ -211,7 +212,10 @@ export function RequestsPage() {
                                 <TableCell>
                                     {role === "in"
                                         ? r.poster
-                                        : r.counterparty}
+                                        : !r.counterparty ||
+                                            r.counterparty === "0"
+                                          ? "Anyone"
+                                          : r.counterparty}
                                 </TableCell>
                                 <TableCell>{symbolOf(r.assetId)}</TableCell>
                                 <TableCell className="text-right font-mono">
@@ -361,26 +365,29 @@ export function RequestsPage() {
                                         : field.state.value ===
                                             REQUEST_SETTLE_AUTH
                                           ? "You are the creditor. The named debtor may pay down what they owe you, up to this amount."
-                                          : "Ask someone to path-pay you. Last hop must be you."}
+                                          : "Ask someone to path-pay you. Last hop must be you. Leave payer empty so anyone with a path can pay."}
                                 </p>
                             </div>
                         )}
                     />
-                    <createForm.AppField
-                        name="counterparty"
-                        children={(field) => (
-                            <field.TextField
-                                label={
-                                    createForm.state.values.kind ===
-                                    REQUEST_PLEASE_BOOK
-                                        ? "Creditor"
-                                        : createForm.state.values.kind ===
-                                            REQUEST_SETTLE_AUTH
-                                          ? "Debtor"
-                                          : "Payer"
-                                }
-                                placeholder="account"
-                                required
+                    <createForm.Subscribe
+                        selector={(s) => s.values.kind}
+                        children={(kind) => (
+                            <createForm.AppField
+                                name="counterparty"
+                                children={(field) => (
+                                    <field.TextField
+                                        label={
+                                            kind === REQUEST_PLEASE_BOOK
+                                                ? "Creditor"
+                                                : kind === REQUEST_SETTLE_AUTH
+                                                  ? "Debtor"
+                                                  : "Payer (optional)"
+                                        }
+                                        placeholder="account"
+                                        required={kind !== REQUEST_INVOICE}
+                                    />
+                                )}
                             />
                         )}
                     />

@@ -80,6 +80,13 @@ fn parse_account(name: &str) -> Result<AccountNumber, Error> {
         .map_err(|_| ErrorType::InvalidAccount(name.to_string()).into())
 }
 
+fn parse_account_or_zero(name: &str) -> Result<AccountNumber, Error> {
+    match name.trim() {
+        "" | "0" => Ok(AccountNumber::new(0)),
+        other => parse_account(other),
+    }
+}
+
 fn time_point(seconds: u32) -> TimePointSec {
     TimePointSec {
         seconds: seconds as i64,
@@ -430,7 +437,7 @@ impl Api for BanxPlugin {
         let amount = parse_amount_nonzero(asset_id, &amount)?;
         let packed = banx::action_structs::st_req {
             kind,
-            counterparty: parse_account(&counterparty)?,
+            counterparty: parse_account_or_zero(&counterparty)?,
             asset_id,
             amount,
             memo: memo

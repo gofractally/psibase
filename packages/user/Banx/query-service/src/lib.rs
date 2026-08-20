@@ -5,7 +5,7 @@ mod service {
     use banx::tables::{
         Asset, AssetTable, ClaimOffer, ClaimOfferTab, Connection, CreditLine, CreditLineTable,
         CurrencyPolicy, CurrencyPolicyTab, ForwardOffer, ForwardOfferTab, Obligation,
-        ObligationTable, PairCycle, PayRequest, RequestTab, PPM_SCALE, RATE_SCALE,
+        ObligationTable, PPM_SCALE, PairCycle, PayRequest, RATE_SCALE, RequestTab,
     };
     use psibase::services::tokens::{Decimal, Precision, Quantity};
     use psibase::*;
@@ -445,8 +445,8 @@ mod service {
                 .collect()
         }
 
-        /// Invoices and please-book requests where `account` is poster and/or
-        /// counterparty.
+        /// Requests where `account` is poster and/or named counterparty.
+        /// Open invoices (`counterparty` 0) appear only for the poster.
         async fn requests(
             &self,
             account: AccountNumber,

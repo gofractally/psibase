@@ -675,8 +675,9 @@ pub mod tables {
         }
     }
 
-    /// Invoice (`INVOICE`): poster is the payee; counterparty should `path_pay`
-    /// so the last hop is the poster. Does **not** shrink an existing debt to
+    /// Invoice (`INVOICE`): poster is the payee; last hop must be the poster.
+    /// `counterparty` is who was billed (`0` = anyone). Anyone with a path
+    /// to the poster may fulfill. Does **not** shrink an existing debt to
     /// the poster.
     ///
     /// Please-book (`PLEASE_BOOK`): poster asked the counterparty (creditor)
@@ -747,10 +748,12 @@ pub mod tables {
                 "request kind must be invoice (1), please-book (2), or settle-auth (3)"
             );
             assert!(poster != counterparty, "cannot request to self");
-            assert!(
-                counterparty != AccountNumber::new(0),
-                "request counterparty required"
-            );
+            if kind != Self::INVOICE {
+                assert!(
+                    counterparty != AccountNumber::new(0),
+                    "request counterparty required"
+                );
+            }
             assert!(amount.value > 0, "request amount must be positive");
             let _ = Asset::get_assert(asset_id);
             let id = InitRow::alloc_request_id();
@@ -807,17 +810,12 @@ pub mod tables {
         /// Live remaining for an invoice path. Same checks as fulfill; no mutate.
         pub fn live_invoice_remaining(
             id: u32,
-            payer: AccountNumber,
             last_hop: AccountNumber,
             last_asset: u16,
         ) -> Quantity {
             let row = Self::get_assert(id);
             assert!(row.kind == Self::INVOICE, "request is not an invoice");
             row.assert_live();
-            assert!(
-                payer == row.counterparty,
-                "only the named payer can fulfill this invoice"
-            );
             assert!(
                 last_hop == row.poster,
                 "invoice path must end at the payee (poster)"
@@ -830,6 +828,8 @@ pub mod tables {
         }
 
         /// After a successful path_pay: last hop must be the payee (poster).
+        /// Signer is recorded as `payer` on the activity; any account with a
+        /// path to the poster may fulfill (`counterparty` is who was billed).
         pub fn fulfill_invoice(
             id: u32,
             payer: AccountNumber,
@@ -840,10 +840,6 @@ pub mod tables {
             let mut row = Self::get_assert(id);
             assert!(row.kind == Self::INVOICE, "request is not an invoice");
             row.assert_live();
-            assert!(
-                payer == row.counterparty,
-                "only the named payer can fulfill this invoice"
-            );
             assert!(
                 last_hop == row.poster,
                 "invoice path must end at the payee (poster)"
@@ -2471,9 +2467,9 @@ pub mod service {
     ///
     /// Each draw **auto-nets** that pair/asset (via [`Connection::draw`]).
     ///
-    /// `request_id` 0 = none. Non-zero must be a live invoice naming the
-    /// sender as payer; last hop must be the invoice poster in that asset.
-    /// Prefer [`pay_inv`] when paying a bill (exact remaining, spend budget).
+    /// `request_id` 0 = none. Non-zero must be a live invoice; last hop must
+    /// be the invoice poster in that asset. Prefer [`pay_inv`] when paying a
+    /// bill (exact remaining, spend budget).
     #[action]
     fn path_pay(hops: Vec<PathHop>, amount: Quantity, min_return: Quantity, request_id: u32) {
         assert!(!hops.is_empty(), "path_pay must include at least one hop");
@@ -2503,20 +2499,17 @@ pub mod service {
     /// computes the smallest send that delivers remaining (undo hop fees
     /// and FX), requires that send ≤ `max_spend`, then executes that send.
     ///
-    /// `request_id` must be a live invoice naming the sender; last hop must
-    /// be the invoice poster in that asset. No `min_return`.
+    /// `request_id` must be a live invoice; last hop must be the invoice
+    /// poster in that asset. No `min_return`. Anyone with a path to the
+    /// poster may pay (`counterparty` is who was billed, `0` = anyone).
     #[action]
     fn pay_inv(hops: Vec<PathHop>, max_spend: Quantity, request_id: u32) {
         assert!(request_id != 0, "pay_inv requires an invoice");
         assert!(!hops.is_empty(), "pay_inv must include at least one hop");
         assert!(max_spend.value > 0, "pay_inv max_spend must be positive");
         let last_hop = hops[hops.len() - 1];
-        let remaining = PayRequest::live_invoice_remaining(
-            request_id,
-            get_sender(),
-            last_hop.account,
-            last_hop.asset_id,
-        );
+        let remaining =
+            PayRequest::live_invoice_remaining(request_id, last_hop.account, last_hop.asset_id);
         let required = path_required_send(&hops, remaining);
         assert!(
             required.value <= max_spend.value,
@@ -2534,7 +2527,7 @@ pub mod service {
 
     /// Post an invoice (`1`), please-book (`2`), or settle-auth (`3`).
     ///
-    /// Invoice: poster is payee; `counterparty` should path-pay ending at poster.
+    /// Invoice: poster is payee; `counterparty` is who was billed (`0` = anyone).
     /// Please-book: poster asks `counterparty` (creditor) to deposit them.
     /// Settle-auth: poster is creditor; named debtor may pull a deposit-equivalent.
     #[action]

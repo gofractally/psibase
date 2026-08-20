@@ -194,11 +194,12 @@ interface api {
         expires-at-seconds: u32,
     ) -> result<_, error>;
 
-    /// Invoice (`kind` = 1): you are the payee; `counterparty` should path-pay
-    /// you. Please-book (`kind` = 2): you ask `counterparty` (creditor) to
-    /// deposit you. Settle-auth (`kind` = 3): you are the creditor; the named
-    /// debtor may pull a deposit-equivalent up to this amount (capped by
-    /// exposure). `amount` is a human decimal. `memo` max 80 bytes.
+    /// Invoice (`kind` = 1): you are the payee; `counterparty` is who was
+    /// billed (empty / `"0"` = anyone with a path may pay). Please-book
+    /// (`kind` = 2): you ask `counterparty` (creditor) to deposit you.
+    /// Settle-auth (`kind` = 3): you are the creditor; the named debtor may
+    /// pull a deposit-equivalent up to this amount (capped by exposure).
+    /// `amount` is a human decimal. `memo` max 80 bytes.
     create-request: func(
         kind: u8,
         counterparty: string,
@@ -258,7 +259,8 @@ interface api {
 
     /// Pay a live invoice: walk hops backward from remaining, send the
     /// smallest amount that clears the bill if that is ≤ `max-spend`.
-    /// `max-spend` is a human decimal in the first hop's asset.
+    /// `max-spend` is a human decimal in the first hop's asset. Last hop
+    /// must be the payee; any account with a path may pay.
     pay-inv: func(
         hops: list<path-hop>,
         max-spend: string,
