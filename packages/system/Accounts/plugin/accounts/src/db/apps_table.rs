@@ -93,7 +93,7 @@ impl AppsTable {
 
     pub fn logout(&self) {
         if let Some(user) = self.get_logged_in_user() {
-            HostAuth::log_out_user(&user, &self.app);
+            HostAuth::end_session(&user, &self.app);
         }
         logged_in_user_table().delete(&self.app);
     }

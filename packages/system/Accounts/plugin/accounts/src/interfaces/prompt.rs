@@ -2,7 +2,7 @@ use crate::bindings::auth_sig::plugin as AuthSig;
 use crate::bindings::exports::accounts::plugin::api::Guest;
 use crate::bindings::exports::accounts::plugin::prompt::{Credential, Guest as Prompt};
 use crate::bindings::host::{
-    auth::api as HostAuth, common::client as Client, crypto::keyvault as HostCrypto,
+    common::client as Client, crypto::keyvault as HostCrypto,
     types::types::Error,
 };
 use crate::bindings::invite::plugin::redemption as Invites;
@@ -132,27 +132,5 @@ impl Prompt for AccountsPlugin {
         AuthSig::keyvault::import_key(&keypair.private_key)?;
 
         Ok(keypair.private_key)
-    }
-
-    fn connect_account(account: String) {
-        assert_eq!(Client::get_sender(), Client::get_receiver());
-
-        // The account must already have been imported
-        assert!(AppsTable::new(&Client::get_receiver())
-            .get_connected_accounts()
-            .contains(&account));
-
-        let app = Client::get_active_app();
-        AppsTable::new(&app).login(&account);
-        UserTable::new(&account).add_connected_app(&app);
-
-        if HostAuth::set_logged_in_user(&account, &app).is_err() {
-            AppsTable::new(&app).logout();
-            UserTable::new(&account).remove_connected_app(&app);
-        }
-
-        if let Some(_) = Invites::get_active_invite() {
-            Invites::accept();
-        }
     }
 }

@@ -9,16 +9,22 @@ mod types;
 use trust::*;
 
 // Other plugins
-use bindings::host::crypto::keyvault as HostCrypto;
-use bindings::host::types::types as HostTypes;
-use bindings::host::types::types::{Keypair, Pem};
-use bindings::transact::plugin::intf as Transact;
+use bindings::{
+    accounts::plugin as AccountsPlugin,
+    host::{
+        common::client as Client,
+        crypto::keyvault as HostCrypto,
+        types::types::{self as HostTypes, Claim, Error, Keypair, Pem},
+    },
+    transact::plugin::intf as Transact,
+};
 
 // Exported interfaces
 use bindings::exports::auth_sig::plugin::{
     actions::Guest as Actions, api::Guest as Api, keyvault::Guest as KeyVault,
+    session::Guest as Session,
 };
-use bindings::exports::transact_hook_user_auth::{Guest as HookUserAuth, *};
+use bindings::exports::transact_hook_user_auth::{Guest as HookUserAuth, Proof};
 
 // Services
 use psibase::services::auth_sig::action_structs as MyService;
@@ -52,16 +58,21 @@ psibase::define_trust! {
 
 struct AuthSig;
 
+fn resolve_credential(account_name: &str) -> Result<Claim, Error> {
+    let pubkey_der = AuthSig::to_der(get_pubkey(account_name)?)?;
+    Ok(Claim {
+        verify_service: psibase::services::verify_sig::SERVICE.to_string(),
+        raw_data: pubkey_der,
+    })
+}
+
 impl HookUserAuth for AuthSig {
     fn on_user_auth_claim(account_name: String) -> Result<Option<Claim>, Error> {
         if !from_transact() {
             return Err(Unauthorized("on_user_auth_claim".to_string()).into());
         }
 
-        Ok(Some(Claim {
-            verify_service: psibase::services::verify_sig::SERVICE.to_string(),
-            raw_data: AuthSig::to_der(get_pubkey(&account_name)?)?,
-        }))
+        Ok(Some(resolve_credential(&account_name)?))
     }
 
     fn on_user_auth_proof(
@@ -75,6 +86,24 @@ impl HookUserAuth for AuthSig {
         let public_key = HostCrypto::to_der(&get_pubkey(&account_name)?)?;
         let signature = AuthSig::sign(transaction_hash, public_key)?;
         Ok(Some(Proof { signature }))
+    }
+}
+
+impl Session for AuthSig {
+    fn authorize(_account_name: String) -> Result<(), Error> {
+        // Wired up in a later change that authorizes at tx start.
+        Err(Unauthorized("session::authorize".to_string()).into())
+    }
+
+    fn login(account_name: String) -> Result<(), Error> {
+        if Client::get_sender() != "accounts" {
+            return Err(Unauthorized("session::login".to_string()).into());
+        }
+
+        // Pass the claim through for query-token minting only. User-tx
+        // claims still come from hook-user-auth at finish-tx.
+        let claim = resolve_credential(&account_name)?;
+        AccountsPlugin::auth_svc::login(&account_name, Some(&claim))
     }
 }
 
