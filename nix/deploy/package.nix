@@ -8,9 +8,9 @@
   openssl,
   zlib,
 }: let
-  version = "0.25.0-pre";
+  version = "0.27.0-pre";
   srcUrl = "https://github.com/gofractally/psibase/releases/download/v${version}/psidk-ubuntu-2404.tar.gz";
-  srcHash = "sha256-fhA6TfGVW5Mw0Yvthe0fEm8BW58fMJLvg0QUsUXfzWw=";
+  srcHash = "sha256-NNytfbTfTmqTATn3FolwGfUKPf115aysZzK4i0nZyFk=";
 in
   lib.throwIfNot stdenv.hostPlatform.isx86_64
   "prebuilt psibase is only available on x86_64-linux (got ${stdenv.hostPlatform.system}); override services.psibase.package"
