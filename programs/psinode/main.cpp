@@ -4,7 +4,9 @@
 #include <psibase/OpenSSLProver.hpp>
 #include <psibase/PKCS11Prover.hpp>
 #include <psibase/RunQueue.hpp>
+#include <psibase/Secrets.hpp>
 #include <psibase/TransactionContext.hpp>
+#include <psibase/fileUtil.hpp>
 #include <psibase/http.hpp>
 #include <psibase/log.hpp>
 #include <psibase/node.hpp>
@@ -422,6 +424,23 @@ struct LockKeyringRequest
    std::string device;
 };
 PSIO_REFLECT(LockKeyringRequest, device);
+
+std::vector<char> pkcs11TokenKey(const std::string& uri)
+{
+   return psio::composite_key(std::uint16_t{0}, std::uint8_t{0}, uri);
+}
+
+std::vector<char> pkcs11TokenKey(const pkcs11::token_info& token)
+{
+   return pkcs11TokenKey(pkcs11::makeURI(token));
+}
+
+struct UnlockKeyringRow
+{
+   std::string device;
+   std::string pin;
+};
+PSIO_REFLECT(UnlockKeyringRow, device, pin);
 
 struct PKCS11TokenInfo
 {
@@ -989,7 +1008,7 @@ struct PsinodeConfig
       constexpr std::string_view opts[] = {
           "producer", "pkcs11-modules",      "listen",       "tls-key",
           "tls-cert", "tls-trustfile",       "http-timeout", "service-threads",
-          "key",      "database-cache-size", "mount"};
+          "key",      "database-cache-size", "mount",        "passphrase-file"};
       return std::ranges::find(opts, name) != std::end(opts) || name.starts_with("logger.") ||
              name.starts_with("service.");
    }
@@ -1060,6 +1079,7 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
    file.keep("", "key");
    file.keep("", "database-cache-size");
    file.keep("", "mount");
+   file.keep("", "passphrase-file");
    //
    to_config(config.loggers, file);
 }
@@ -1152,6 +1172,7 @@ void run(const std::string&              db_path,
          const DbConfig&                 db_conf,
          AccountNumber                   producer,
          std::shared_ptr<CompoundProver> prover,
+         std::string_view                passphrase,
          std::vector<std::string>&       pkcs11_modules,
          std::vector<listen_spec>        listen,
          std::vector<MountArg>&          mountpoints,
@@ -1174,6 +1195,8 @@ void run(const std::string&              db_path,
        WasmCache{128});
    auto system      = sharedState->getSystemContext();
    auto proofSystem = sharedState->getSystemContext();
+
+   Secrets secrets{std::filesystem::path(db_path) / "secrets", passphrase};
 
    if (system->sharedDatabase.isSlow())
    {
@@ -1352,6 +1375,24 @@ void run(const std::string&              db_path,
       check(!!found, "No token matches URI");
       return std::tuple{*foundLib, *found, foundSessions};
    };
+
+   // Unlock cryptographic devices that we have known keys for
+   for (auto& [k, v] : pkcs11Libs)
+   {
+      auto& [lib, sessions] = v;
+      for (auto slot : lib->GetSlotList(true))
+      {
+         auto key = pkcs11TokenKey(lib->GetTokenInfo(slot));
+         if (auto row = secrets.get(key))
+         {
+            auto pin = psio::view<const UnlockKeyringRow>(*row).pin();
+
+            auto pos = sessions.try_emplace(slot, lib, slot).first;
+            pos->second->Login(std::string_view{pin.data(), pin.size()});
+            loadSessionKeys(pos->second);
+         }
+      }
+   }
 
    // http_config must live until server shutdown which happens when chainContext
    // is destroyed.
@@ -1689,15 +1730,15 @@ void run(const std::string&              db_path,
              });
       };
 
-      http_config->unlock_keyring = [&chainContext, &node, loadSessionKeys, getPKCS11Slot](
-                                        std::vector<char> json, auto callback)
+      http_config->unlock_keyring = [&chainContext, &node, loadSessionKeys, getPKCS11Slot,
+                                     &secrets](std::vector<char> json, auto callback)
       {
          json.push_back('\0');
          psio::json_token_stream stream(json.data());
          auto                    pin = psio::from_json<UnlockKeyringRequest>(stream);
          boost::asio::post(chainContext,
-                           [&node, getPKCS11Slot, loadSessionKeys, callback = std::move(callback),
-                            pin = std::move(pin)]() mutable
+                           [&node, getPKCS11Slot, &secrets, loadSessionKeys,
+                            callback = std::move(callback), pin = std::move(pin)]() mutable
                            {
                               try
                               {
@@ -1706,6 +1747,10 @@ void run(const std::string&              db_path,
                                  pos->second->Login(pin.pin);
                                  loadSessionKeys(pos->second);
                                  node.on_key_update();
+                                 UnlockKeyringRow row{
+                                     .device = pkcs11::makeURI(lib->GetTokenInfo(slot)),
+                                     .pin    = std::move(pin.pin)};
+                                 secrets.put(pkcs11TokenKey(row.device), psio::to_frac(row));
                                  callback(std::nullopt);
                               }
                               catch (std::exception& e)
@@ -1716,14 +1761,14 @@ void run(const std::string&              db_path,
       };
 
       http_config->lock_keyring =
-          [&chainContext, getPKCS11Slot](std::vector<char> json, auto callback)
+          [&chainContext, getPKCS11Slot, &secrets](std::vector<char> json, auto callback)
       {
          json.push_back('\0');
          psio::json_token_stream stream(json.data());
          auto                    id = psio::from_json<LockKeyringRequest>(stream);
          boost::asio::post(
              chainContext,
-             [getPKCS11Slot, callback = std::move(callback), id = std::move(id)]() mutable
+             [getPKCS11Slot, &secrets, callback = std::move(callback), id = std::move(id)]() mutable
              {
                 try
                 {
@@ -1732,6 +1777,7 @@ void run(const std::string&              db_path,
                    check(pos != sessions->end(), "Not logged in");
                    pos->second->Logout();
                    pos->second.clear();
+                   secrets.remove(pkcs11TokenKey(lib->GetTokenInfo(slot)));
                    callback(std::nullopt);
                 }
                 catch (std::exception& e)
@@ -1844,6 +1890,7 @@ int main(int argc, char* argv[])
    std::string              db_template;
    std::string              producer = {};
    auto                     keys     = std::make_shared<CompoundProver>();
+   std::string              passphrase;
    std::vector<std::string> pkcs11_modules;
    std::vector<listen_spec> listen;
    std::vector<MountArg>    mountpoints;
@@ -1865,6 +1912,28 @@ int main(int argc, char* argv[])
        "Name of this producer");
    opt("key,k", po::value(&keys->provers)->default_value({}, ""),
        "A private key to use for block production");
+   opt("passphrase-file",
+       po::value<std::string>()->default_value("")->notifier(
+           [&](const std::string& filename)
+           {
+              if (filename != "")
+              {
+                 auto contents = readWholeFile(filename);
+                 passphrase    = std::string(contents.data(), contents.size());
+              }
+              else
+              {
+                 if (const char* var = std::getenv("PSIBASE_PASSPHRASE"))
+                 {
+                    passphrase = var;
+                 }
+                 else
+                 {
+                    passphrase = "";
+                 }
+              }
+           }),
+       "A file containing a passphrase used to encrypt secrets");
    opt("listen,l", po::value(&listen)->default_value({}, "")->value_name("endpoint"),
        "TCP or local socket endpoint on which the server accepts connections");
    opt("mount",
@@ -1997,8 +2066,8 @@ int main(int argc, char* argv[])
       {
          restart.args.reset();
          run(db_path, db_template, DbConfig{db_cache_size}, AccountNumber{producer}, keys,
-             pkcs11_modules, listen, mountpoints, http_timeout, service_threads, root_ca, tls_cert,
-             tls_key, extra_options, restart);
+             passphrase, pkcs11_modules, listen, mountpoints, http_timeout, service_threads,
+             root_ca, tls_cert, tls_key, extra_options, restart);
          if (!restart.args || !restart.args->restart)
          {
             PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Shutdown";

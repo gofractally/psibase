@@ -217,6 +217,7 @@ function(add suffix)
             native/src/prefix.cpp
             native/src/Prover.cpp
             native/src/RunQueue.cpp
+            native/src/Secrets.cpp
             native/src/Socket.cpp
             native/src/SystemContext.cpp
             native/src/TransactionContext.cpp
