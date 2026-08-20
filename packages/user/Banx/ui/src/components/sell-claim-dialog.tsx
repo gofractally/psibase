@@ -15,8 +15,10 @@ import { amountFieldValidator, useAppForm } from "@/lib/form";
 import {
     type CreditLine,
     type ClaimOffer,
+    type Obligation,
     fetchCreditLines,
     fetchClaimOffers,
+    fetchObligations,
 } from "@/lib/graphql";
 import { QueryKey } from "@/lib/query-keys";
 import { PPM_SCALE } from "@/lib/constants";
@@ -44,36 +46,77 @@ function offerLive(p: ClaimOffer, nowSec: number): boolean {
     return p.expiresAt === 0 || p.expiresAt >= nowSec;
 }
 
-/** `out = in * (1 - spread) - fixed`. Negative spread is a premium. */
+/** `out = in * (1 - spread) - fixed`. Negative spread is a premium.
+ *  Sell-offer posts negate the stored spread so positive is seller profit. */
 function applyTakeFee(
     amountRaw: bigint,
     feeFixedRaw: bigint,
     feePercentPpm: number,
+    flipSpread = false,
 ): bigint | null {
-    if (feePercentPpm >= PPM_SCALE || feePercentPpm <= -PPM_SCALE) {
+    const ppm = flipSpread ? -feePercentPpm : feePercentPpm;
+    if (ppm >= PPM_SCALE || ppm <= -PPM_SCALE) {
         return null;
     }
-    const keep = BigInt(PPM_SCALE - feePercentPpm);
+    const keep = BigInt(PPM_SCALE - ppm);
     const afterPct = (amountRaw * keep) / BigInt(PPM_SCALE);
     if (feeFixedRaw >= afterPct) return null;
     const out = afterPct - feeFixedRaw;
     return out > 0n ? out : null;
 }
 
-function residualOnLine(
+function obligationRaw(o: Obligation, precision: number): bigint {
+    return (
+        humanToRaw(o.remainingPrincipal || "0", precision) +
+        humanToRaw(o.accruedInterest || "0", precision)
+    );
+}
+
+/** Same as on-chain `Connection::knows(who, them)`: line who→them, or a live tab either way. */
+function pairKnows(
+    lines: CreditLine[],
+    obligations: Obligation[],
+    who: string,
+    them: string,
+    assetId: number,
+    precision: number,
+): boolean {
+    if (
+        lines.some(
+            (l) =>
+                l.creditor === who &&
+                l.debtor === them &&
+                l.assetId === assetId,
+        )
+    ) {
+        return true;
+    }
+    return obligations.some((o) => {
+        if (o.assetId !== assetId || obligationRaw(o, precision) <= 0n) {
+            return false;
+        }
+        return (
+            (o.creditor === who && o.debtor === them) ||
+            (o.creditor === them && o.debtor === who)
+        );
+    });
+}
+
+/** Buyer→debtor line residual, or `null` if they posted no line (no size cap). */
+function buyerLineCap(
     lines: CreditLine[],
     buyer: string,
     debtor: string,
     assetId: number,
     precision: number,
-): bigint {
+): bigint | null {
     const line = lines.find(
         (l) =>
             l.creditor === buyer &&
             l.debtor === debtor &&
             l.assetId === assetId,
     );
-    if (!line) return 0n;
+    if (!line) return null;
     const limit = humanToRaw(line.limit || "0", precision);
     const exposure = humanToRaw(line.exposure || "0", precision);
     const remaining = humanToRaw(line.remaining || "0", precision);
@@ -83,6 +126,26 @@ function residualOnLine(
         remaining,
         line.depleteOnDebit,
     );
+}
+
+function claimHeldRaw(
+    obligations: Obligation[],
+    seller: string,
+    debtor: string,
+    assetId: number,
+    precision: number,
+): bigint {
+    let sum = 0n;
+    for (const o of obligations) {
+        if (
+            o.creditor === seller &&
+            o.debtor === debtor &&
+            o.assetId === assetId
+        ) {
+            sum += obligationRaw(o, precision);
+        }
+    }
+    return sum;
 }
 
 /** Prefer specific counterparty offer over global; lower fee wins ties. */
@@ -133,7 +196,6 @@ type BuyerOption = {
     buyer: string;
     label: string;
     offer: ClaimOffer;
-    residualRaw: bigint;
     maxFaceRaw: bigint;
 };
 
@@ -195,7 +257,7 @@ export function SellClaimDialog({
         queries: loadAccounts.map((account) => ({
             queryKey: QueryKey.creditLines(account),
             queryFn: () => fetchCreditLines(account),
-            enabled: open && !!target && !!account,
+            enabled: open && !!target && !!account && !takingAsk,
         })),
     });
 
@@ -205,16 +267,30 @@ export function SellClaimDialog({
         enabled: open && !!target,
     });
 
+    const debtorObligationsQuery = useQuery({
+        queryKey: QueryKey.obligations(target?.debtor),
+        queryFn: () => fetchObligations(target!.debtor),
+        enabled: open && !!target,
+    });
+
+    const userLinesQuery = useQuery({
+        queryKey: QueryKey.creditLines(user),
+        queryFn: () => fetchCreditLines(user!),
+        enabled: open && takingAsk && !!user,
+    });
+
     const options: BuyerOption[] = useMemo(() => {
-        if (!target) return [];
+        if (!target || !user) return [];
         const maxClaim = BigInt(target.maxRaw || "0");
         const debtorLines = debtorLinesQuery.data;
-        if (!debtorLines) return [];
+        const debtorObs = debtorObligationsQuery.data;
+        if (!debtorLines || !debtorObs) return [];
+        const buyerLinesForCap = takingAsk ? userLinesQuery.data : null;
+        if (takingAsk && !buyerLinesForCap) return [];
         const out: BuyerOption[] = [];
         loadAccounts.forEach((account, i) => {
             const offers = offerQueries[i]?.data;
-            const lines = lineQueries[i]?.data;
-            if (!offers || !lines) return;
+            if (!offers) return;
             const offer = pickOffer(
                 offers,
                 target.debtor,
@@ -223,31 +299,51 @@ export function SellClaimDialog({
                 takingAsk,
             );
             if (!offer) return;
-            const debtorLinedBuyer = debtorLines.some(
-                (l) =>
-                    l.creditor === target.debtor &&
-                    l.debtor === account &&
-                    l.assetId === target.assetId,
-            );
-            if (!debtorLinedBuyer) return;
-            const residual = residualOnLine(
-                lines,
-                account,
+            const buyer = takingAsk ? user : account;
+            const seller = takingAsk ? account : user;
+            if (
+                buyer === seller ||
+                buyer === target.debtor ||
+                seller === target.debtor
+            ) {
+                return;
+            }
+            if (
+                !pairKnows(
+                    debtorLines,
+                    debtorObs,
+                    target.debtor,
+                    buyer,
+                    target.assetId,
+                    target.precision,
+                )
+            ) {
+                return;
+            }
+            const capLines = takingAsk
+                ? buyerLinesForCap
+                : lineQueries[i]?.data;
+            if (!capLines) return;
+            const lineCap = buyerLineCap(
+                capLines,
+                buyer,
                 target.debtor,
                 target.assetId,
                 target.precision,
             );
-            const maxFace = takingAsk
-                ? maxClaim > 0n
-                    ? maxClaim
-                    : 10n ** 18n
-                : residual <= 0n
-                  ? 0n
-                  : maxClaim === 0n
-                    ? residual
-                    : residual < maxClaim
-                      ? residual
-                      : maxClaim;
+            if (lineCap !== null && lineCap <= 0n) return;
+            const held = takingAsk
+                ? claimHeldRaw(
+                      debtorObs,
+                      seller,
+                      target.debtor,
+                      target.assetId,
+                      target.precision,
+                  )
+                : maxClaim;
+            if (held <= 0n) return;
+            const maxFace =
+                lineCap !== null && lineCap < held ? lineCap : held;
             if (maxFace <= 0n) return;
             const contact = (contacts as LocalContact[]).find(
                 (c) => c.account === account,
@@ -257,7 +353,6 @@ export function SellClaimDialog({
                 buyer: account,
                 label: nick ? `${nick} (${account})` : account,
                 offer,
-                residualRaw: residual,
                 maxFaceRaw: maxFace,
             });
         });
@@ -265,10 +360,13 @@ export function SellClaimDialog({
         return out;
     }, [
         target,
+        user,
         loadAccounts,
         offerQueries,
         lineQueries,
         debtorLinesQuery.data,
+        debtorObligationsQuery.data,
+        userLinesQuery.data,
         nowSec,
         contacts,
         takingAsk,
@@ -279,19 +377,15 @@ export function SellClaimDialog({
         open &&
         loadAccounts.length > 0 &&
         (offerQueries.some((q) => q.isLoading) ||
-            lineQueries.some((q) => q.isLoading) ||
-            debtorLinesQuery.isLoading);
+            (!takingAsk && lineQueries.some((q) => q.isLoading)) ||
+            debtorLinesQuery.isLoading ||
+            debtorObligationsQuery.isLoading ||
+            (takingAsk && userLinesQuery.isLoading));
 
     const precision = target?.precision ?? 0;
-    const maxHuman = target
-        ? formatRawAmount(
-              selected?.maxFaceRaw.toString() ?? target.maxRaw,
-              precision,
-          ).replace(/,/g, "")
-        : "0";
 
     const form = useAppForm({
-        defaultValues: { amount: maxHuman },
+        defaultValues: { amount: "" },
         onSubmit: async ({ value }) => {
             if (!target || !selected) return;
             const amount = value.amount.trim();
@@ -335,7 +429,7 @@ export function SellClaimDialog({
         if (!open) return;
         setSelectedBuyer(null);
         setManualBuyer("");
-        form.setFieldValue("amount", maxHuman);
+        form.setFieldValue("amount", "");
         // form identity is stable enough for reset on open
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, targetKey]);
@@ -357,8 +451,11 @@ export function SellClaimDialog({
                                     {target.debtor}
                                 </span>{" "}
                                 ({target.symbol}). They must know you (a
-                                line to you, or a live tab). You pay face
-                                after the seller’s spread.
+                                line to you, or a live tab). Your line to
+                                them is optional and only caps size. You
+                                get the claim on {target.debtor}; the
+                                seller receives face after their spread as
+                                a claim on you.
                             </>
                             ) : (
                             <>
@@ -366,11 +463,12 @@ export function SellClaimDialog({
                                 <span className="text-foreground font-medium">
                                     {target.debtor}
                                 </span>{" "}
-                                ({target.symbol}) to a buyer who posted a
-                                buy-claim offer and whom {target.debtor} has
-                                lined (a zero limit is enough). You receive a
-                                claim on the buyer for face after their spread
-                                (haircut or premium).
+                                ({target.symbol}) to a buyer with a live
+                                buy-claim offer. {target.debtor} must know
+                                the buyer (a line to them, or a live tab).
+                                A buyer line is optional and only caps
+                                size. You receive a claim on the buyer for
+                                face after their spread.
                             </>
                             )
                         ) : (
@@ -392,7 +490,9 @@ export function SellClaimDialog({
                     >
                         <div className="grid gap-2">
                             <Label htmlFor="sell-buyer-manual">
-                                Buyer account
+                                {takingAsk
+                                    ? "Seller account"
+                                    : "Buyer account"}
                             </Label>
                             <Input
                                 id="sell-buyer-manual"
@@ -403,13 +503,18 @@ export function SellClaimDialog({
                                 }
                             />
                             <p className="text-muted-foreground text-xs">
-                                Type an account to check their offers, or pick
-                                from contacts below.
+                                Type an account to check their{" "}
+                                {takingAsk ? "asks" : "bids"}, or pick from
+                                contacts below.
                             </p>
                         </div>
 
                         <div className="grid gap-2">
-                            <Label>Buyers with capacity</Label>
+                            <Label>
+                                {takingAsk
+                                    ? "Sellers with a live ask"
+                                    : "Buyers with a live bid"}
+                            </Label>
                             {loading ? (
                                 <div className="text-muted-foreground flex items-center gap-2 text-sm">
                                     <Loader2 className="size-4 animate-spin" />
@@ -417,10 +522,9 @@ export function SellClaimDialog({
                                 </div>
                             ) : options.length === 0 ? (
                                 <p className="text-muted-foreground text-sm">
-                                    No contacts (or typed account) currently
-                                    have both a live buy-claim offer and credit
-                                    residual toward {target.debtor} in{" "}
-                                    {target.symbol}.
+                                    {takingAsk
+                                        ? `No contacts (or typed account) currently have a live sell-claim offer on ${target.debtor} in ${target.symbol} that you can take (${target.debtor} must know you).`
+                                        : `No contacts (or typed account) currently have a live buy-claim offer on ${target.debtor} in ${target.symbol} that you can take (${target.debtor} must know the buyer).`}
                                 </p>
                             ) : (
                                 <ul className="max-h-48 space-y-1.5 overflow-y-auto">
@@ -434,6 +538,7 @@ export function SellClaimDialog({
                                                 precision,
                                             ),
                                             o.offer.feePercentPpm,
+                                            takingAsk,
                                         );
                                         return (
                                             <li key={o.buyer}>
@@ -492,7 +597,9 @@ export function SellClaimDialog({
                                                         )}{" "}
                                                         {target.symbol}
                                                         {sample !== null
-                                                            ? ` → you get ${formatRawAmount(sample.toString(), precision)}`
+                                                            ? takingAsk
+                                                                ? ` → seller gets ${formatRawAmount(sample.toString(), precision)}`
+                                                                : ` → you get ${formatRawAmount(sample.toString(), precision)}`
                                                             : ""}
                                                     </p>
                                                 </button>
@@ -541,10 +648,27 @@ export function SellClaimDialog({
                                               amountRaw,
                                               feeFixedRaw,
                                               selected.offer.feePercentPpm,
+                                              takingAsk,
                                           )
                                         : null;
                                 if (proceedsRaw !== null) {
-                                    return (
+                                    return takingAsk ? (
+                                        <p className="text-muted-foreground text-sm font-mono">
+                                            You get{" "}
+                                            {formatRawAmount(
+                                                amountRaw.toString(),
+                                                precision,
+                                            )}{" "}
+                                            {target.symbol} claim on{" "}
+                                            {target.debtor}. Seller receives
+                                            ≈{" "}
+                                            {formatRawAmount(
+                                                proceedsRaw.toString(),
+                                                precision,
+                                            )}{" "}
+                                            {target.symbol} claim on you.
+                                        </p>
+                                    ) : (
                                         <p className="text-muted-foreground text-sm font-mono">
                                             You receive ≈{" "}
                                             {formatRawAmount(
@@ -560,7 +684,8 @@ export function SellClaimDialog({
                                     return (
                                         <p className="text-destructive text-sm">
                                             Fee would consume this amount —
-                                            raise face or pick another buyer.
+                                            raise face or pick another{" "}
+                                            {takingAsk ? "seller" : "buyer"}.
                                         </p>
                                     );
                                 }
@@ -578,7 +703,11 @@ export function SellClaimDialog({
                             </Button>
                             <form.AppForm>
                                 <form.SubmitButton
-                                    labels={["Sell claim", "Selling…"]}
+                                    labels={
+                                        takingAsk
+                                            ? ["Buy claim", "Buying…"]
+                                            : ["Sell claim", "Selling…"]
+                                    }
                                     loading={
                                         sellClaim.isPending ||
                                         buyClaim.isPending

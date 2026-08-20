@@ -18,6 +18,7 @@ import { amountFieldValidator, useAppForm } from "@/lib/form";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Button } from "@shared/shadcn/ui/button";
+import { toast } from "@shared/shadcn/ui/sonner";
 
 type Hop = { account: string; assetId: number | undefined };
 
@@ -132,6 +133,29 @@ export function PathPayPage() {
                     assetId: h.assetId!,
                 }));
             if (cleaned.length === 0) return;
+            if (requestId) {
+                const invoicePayee = (
+                    searchParams.get("payee") ||
+                    findForm.state.values.payee
+                ).trim();
+                const parsedAsset = Number(searchParams.get("toAsset") || "");
+                const invoiceAsset =
+                    Number.isFinite(parsedAsset) && parsedAsset > 0
+                        ? parsedAsset
+                        : findForm.state.values.toAsset;
+                const last = cleaned[cleaned.length - 1];
+                if (
+                    !invoicePayee ||
+                    invoiceAsset === undefined ||
+                    last.account !== invoicePayee ||
+                    last.assetId !== invoiceAsset
+                ) {
+                    toast.error(
+                        "Last hop must be the invoice payee in the invoice asset",
+                    );
+                    return;
+                }
+            }
             await new Promise<void>((resolve, reject) => {
                 if (requestId) {
                     payInvoice.mutate(
@@ -145,7 +169,7 @@ export function PathPayPage() {
                             onError: (e: Error) => reject(e),
                         },
                     );
-                    return
+                    return;
                 }
 
 
@@ -172,6 +196,9 @@ export function PathPayPage() {
         if (amount) {
             findForm.setFieldValue("amount", amount);
             execForm.setFieldValue("minReturn", amount);
+            if (searchParams.get("request")) {
+                execForm.setFieldValue("amount", amount);
+            }
         }
         if (Number.isFinite(toAsset) && toAsset > 0) {
             findForm.setFieldValue("toAsset", toAsset);
@@ -612,7 +639,13 @@ export function PathPayPage() {
                     />
                 </div>
 
-                <div className="grid gap-2 sm:grid-cols-2 sm:gap-4">
+                <div
+                    className={
+                        requestId
+                            ? "grid gap-2"
+                            : "grid gap-2 sm:grid-cols-2 sm:gap-4"
+                    }
+                >
                     <execForm.Subscribe
                         selector={(s) => s.values.hops[0]?.assetId}
                         children={(firstAsset) => {
@@ -635,7 +668,11 @@ export function PathPayPage() {
                                     }}
                                     children={(field) => (
                                         <field.TextField
-                                            label="You send"
+                                            label={
+                                                requestId
+                                                    ? "Max spend"
+                                                    : "You send"
+                                            }
                                             inputMode="decimal"
                                             placeholder={amountPlaceholder(
                                                 precision,
@@ -647,47 +684,54 @@ export function PathPayPage() {
                             );
                         }}
                     />
-                    <execForm.Subscribe
-                        selector={(s) =>
-                            s.values.hops[s.values.hops.length - 1]?.assetId
-                        }
-                        children={(lastAsset) => {
-                            const precision =
-                                lastAsset !== undefined
-                                    ? precisionOf(lastAsset)
-                                    : 0;
-                            return (
-                                <execForm.AppField
-                                    name="minReturn"
-                                    validators={{
-                                        onChange: amountFieldValidator(
-                                            precision,
-                                            { allowZero: true },
-                                        ),
-                                        onSubmit: amountFieldValidator(
-                                            precision,
-                                            { allowZero: true },
-                                        ),
-                                    }}
-                                    children={(field) => (
-                                        <field.TextField
-                                            label="Payee min"
-                                            inputMode="decimal"
-                                            placeholder={amountPlaceholder(
+                    {requestId ? null : (
+                        <execForm.Subscribe
+                            selector={(s) =>
+                                s.values.hops[s.values.hops.length - 1]
+                                    ?.assetId
+                            }
+                            children={(lastAsset) => {
+                                const precision =
+                                    lastAsset !== undefined
+                                        ? precisionOf(lastAsset)
+                                        : 0;
+                                return (
+                                    <execForm.AppField
+                                        name="minReturn"
+                                        validators={{
+                                            onChange: amountFieldValidator(
                                                 precision,
-                                            )}
-                                            required
-                                        />
-                                    )}
-                                />
-                            );
-                        }}
-                    />
+                                                { allowZero: true },
+                                            ),
+                                            onSubmit: amountFieldValidator(
+                                                precision,
+                                                { allowZero: true },
+                                            ),
+                                        }}
+                                        children={(field) => (
+                                            <field.TextField
+                                                label="Payee min"
+                                                inputMode="decimal"
+                                                placeholder={amountPlaceholder(
+                                                    precision,
+                                                )}
+                                                required
+                                            />
+                                        )}
+                                    />
+                                );
+                            }}
+                        />
+                    )}
                 </div>
 
                 <execForm.AppForm>
                     <execForm.SubmitButton
-                        labels={["Transfer", "Submitting…"]}
+                        labels={
+                            requestId
+                                ? ["Pay invoice", "Paying…"]
+                                : ["Transfer", "Submitting…"]
+                        }
                         loading={pathPay.isPending || payInvoice.isPending}
                     />
                 </execForm.AppForm>

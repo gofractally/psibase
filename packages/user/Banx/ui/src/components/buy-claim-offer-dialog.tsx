@@ -337,9 +337,9 @@ export function BuyClaimOfferDialog({
                                     Buy claims on <strong>{debtor}</strong>.
                                     Spread is signed: positive haircuts the
                                     seller, negative is a premium you pay.
-                                    You need unused line residual on that
-                                    debtor. They must have lined you (limit
-                                    0 is enough).
+                                    At take they must know you (a line to
+                                    you, or a live tab). Your line to them
+                                    is optional and only caps size.
                                 </>
                             )}
                         </DialogDescription>
@@ -453,7 +453,7 @@ export function BuyClaimOfferDialog({
                     <DialogDescription>
                         {isSell
                             ? "Sell claims you hold in this asset. Positive spread is your profit (1 = 1% over face); negative is a discount. Buyers hit this offer."
-                            : "Buy claims on anyone you have lined in this asset. Spread is signed: positive haircuts the seller, negative is a premium. The debtor must have lined you (limit 0 is enough)."}
+                            : "Buy claims in this asset. Spread is signed: positive haircuts the seller, negative is a premium. At take the debtor must know you (a line to you, or a live tab). Your line to them is optional and only caps size."}
                     </DialogDescription>
                 </DialogHeader>
                 <form
