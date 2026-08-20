@@ -7,6 +7,9 @@
  * controls (`AssetSelect`, `ExpiresAtPicker`) that are not registered on the
  * shared form.
  */
+import { getAccount } from "@shared/lib/get-account";
+import { zAccount } from "@shared/lib/schemas/account";
+
 export { useAppForm } from "@shared/components/form/app-form";
 
 export {
@@ -27,6 +30,51 @@ export {
 export function requireAccount(value: string): string | undefined {
     const t = value.trim();
     return t || undefined;
+}
+
+function accountFormatError(value: string): string | undefined {
+    const parsed = zAccount.safeParse(value);
+    if (parsed.success) return undefined;
+    return parsed.error.issues[0]?.message ?? "Invalid account";
+}
+
+async function accountExistsError(
+    value: string,
+): Promise<string | undefined> {
+    const fmt = accountFormatError(value);
+    if (fmt) return fmt;
+    const account = await getAccount(value);
+    if (!account?.accountNum) return "Account does not exist";
+    return undefined;
+}
+
+/** Free-text chain account. `optional`: empty is allowed (invoice anyone). */
+export function existingAccountValidators(opts?: { optional?: boolean }) {
+    const optional = opts?.optional ?? false;
+    const emptyMsg = optional ? undefined : "Required";
+    return {
+        onChange: ({ value }: { value: string }) => {
+            const t = value.trim();
+            if (!t) return emptyMsg;
+            return accountFormatError(t);
+        },
+        onChangeAsyncDebounceMs: 400,
+        onChangeAsync: async ({ value }: { value: string }) => {
+            const t = value.trim();
+            if (!t) return emptyMsg;
+            return accountExistsError(t);
+        },
+        onSubmit: ({ value }: { value: string }) => {
+            const t = value.trim();
+            if (!t) return emptyMsg;
+            return accountFormatError(t);
+        },
+        onSubmitAsync: async ({ value }: { value: string }) => {
+            const t = value.trim();
+            if (!t) return emptyMsg;
+            return accountExistsError(t);
+        },
+    };
 }
 
 /**

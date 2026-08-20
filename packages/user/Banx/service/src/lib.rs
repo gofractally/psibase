@@ -7,8 +7,9 @@ pub mod path_find;
 pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::{
-        AccountNumber, Fracpack, Memo, ServiceWrapper, Table, TimePointSec, ToSchema,
+        services::accounts::Wrapper as Accounts,
         services::tokens::{Precision, Quantity},
+        AccountNumber, Fracpack, Memo, ServiceWrapper, Table, TimePointSec, ToSchema,
     };
     use serde::{Deserialize, Serialize};
 
@@ -17,6 +18,11 @@ pub mod tables {
     /// Used for interest APR, FX/`fx_rate`, and max accept rates so one unit
     /// system covers “percent-like” quantities (`10_000` = 1%, full scale = 100%).
     pub const PPM_SCALE: u32 = 1_000_000;
+
+    /// Abort unless `who` is a live chain account (not the reserved 0).
+    pub(crate) fn assert_account_exists(who: AccountNumber) {
+        assert!(Accounts::call().exists(who), "account {who} does not exist");
+    }
 
     #[table(name = "InitTable", index = 0)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
@@ -314,8 +320,9 @@ pub mod tables {
     }
 
     /// Path-forward offer: `poster` will sit in the middle of `path_pay`.
-    /// `next_hop = 0` is global (any next hop). Specific requires that hop
-    /// already knows the poster (a credit line to them, or a live tab).
+    /// `next_hop = 0` is global (any next hop). Specific may be posted
+    /// before that hop knows the poster; `path_draw` still needs a line or
+    /// live tab when the hop runs.
     #[table(name = "ForwardOfferTab", index = 1)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct ForwardOffer {
@@ -412,10 +419,7 @@ pub mod tables {
             assert!(fee_percent < PPM_SCALE, "fee must be under 100%");
             let _ = Asset::get_assert(asset_id);
             if next_hop != Self::GLOBAL {
-                assert!(
-                    Connection::knows(next_hop, poster, asset_id),
-                    "next hop does not know poster (no credit line or live obligation)"
-                );
+                assert_account_exists(next_hop);
             }
             Self {
                 poster,
@@ -585,6 +589,9 @@ pub mod tables {
         ) {
             Self::assert_side(side);
             let _ = Asset::get_assert(asset_id);
+            if debtor != Self::GLOBAL {
+                assert_account_exists(debtor);
+            }
             let scale = PPM_SCALE as i64;
             assert!(
                 (fee_percent as i64) > -scale && (fee_percent as i64) < scale,
@@ -753,6 +760,9 @@ pub mod tables {
                     counterparty != AccountNumber::new(0),
                     "request counterparty required"
                 );
+            }
+            if counterparty != AccountNumber::new(0) {
+                assert_account_exists(counterparty);
             }
             assert!(amount.value > 0, "request amount must be positive");
             let _ = Asset::get_assert(asset_id);
@@ -1794,6 +1804,7 @@ pub mod tables {
             grace_seconds: u32,
         ) {
             assert!(creditor != debtor, "cannot set credit line to self");
+            assert_account_exists(debtor);
             let _ = Asset::get_assert(asset_id);
             assert!(
                 interest_rate <= PPM_SCALE,
@@ -1992,14 +2003,14 @@ pub mod tables {
 #[psibase::service(name = "banx", tables = "tables")]
 pub mod service {
     use crate::tables::{
-        Asset, ClaimOffer, CreditLine, CurrencyPolicy, ForwardOffer, InitRow, InitTable,
-        Obligation, PathHop, PayRequest, emit_pair_activity, execute_path, path_required_send,
+        assert_account_exists, emit_pair_activity, execute_path, path_required_send, Asset,
+        ClaimOffer, CreditLine, CurrencyPolicy, ForwardOffer, InitRow, InitTable, Obligation,
+        PathHop, PayRequest,
     };
     use psibase::{
-        AccountNumber, EventDb, MethodNumber, TimePointSec,
         services::events,
         services::tokens::{Precision, Quantity},
-        *,
+        AccountNumber, EventDb, MethodNumber, TimePointSec, *,
     };
 
     #[action]
@@ -2076,6 +2087,7 @@ pub mod service {
 
     /// Set a credit line for the sender as creditor, offering capacity to `debitor`.
     ///
+    /// `debitor` must already exist as a chain account.
     /// `amount` is the exposure `limit`: max outstanding principal + accrued
     /// interest (revolving cap), not a deposited balance. See [`CreditLine`].
     #[action]
@@ -2404,6 +2416,7 @@ pub mod service {
     ) {
         let receiver = get_sender();
         assert!(depositor != receiver, "cannot deposit from self");
+        assert_account_exists(depositor);
         assert!(amount.value > 0, "deposit amount must be positive");
         Asset::get_assert(asset_id);
         assert!(

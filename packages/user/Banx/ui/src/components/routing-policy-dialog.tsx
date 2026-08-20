@@ -359,8 +359,10 @@ export function RoutingPolicyDialog({
                                     </strong>
                                 </>
                             ) : null}
-                            . Hop fees apply; max line APR rejects a next hop
-                            whose line is more expensive than you accept.
+                            . You can post before they line you; a pay still
+                            needs a line or tab. Hop fees apply; max line APR
+                            rejects a next hop whose line is more expensive
+                            than you accept.
                         </DialogDescription>
                     </DialogHeader>
                     <form
@@ -570,12 +572,12 @@ export function RoutingPolicyDialog({
                 <DialogHeader>
                     <DialogTitle>Path-forward offer</DialogTitle>
                     <DialogDescription>
-                        Sit in the middle of a path pay for this asset. The
-                        next creditor must have lined you (or you already owe
-                        them). Closed by default: you must have lined them too
-                        (limit 0 is enough). Turn on allow-unknown to skip
-                        that. This does not buy claims — post a buy-claim
-                        offer for that.
+                        Sit in the middle of a path pay for this asset. Post
+                        anytime; at pay time the next creditor still needs a
+                        line to you (or a tab either way). Closed by default:
+                        you must have lined them too (limit 0 is enough). Turn
+                        on allow-unknown to skip that. This does not buy
+                        claims — post a buy-claim offer for that.
                     </DialogDescription>
                 </DialogHeader>
                 <form

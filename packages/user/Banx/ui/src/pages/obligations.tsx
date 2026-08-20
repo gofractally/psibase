@@ -62,6 +62,7 @@ import {
     MAX_PERCENT,
     MIN_PERCENT_STEP,
     PPM_SCALE,
+    existingAccountValidators,
     percentFieldValidator,
     percentStringToPpm,
     useAppForm,
@@ -918,6 +919,7 @@ function CreditLineDialog({
                         <>
                             <form.AppField
                                 name="debtor"
+                                validators={existingAccountValidators()}
                                 children={(field) => (
                                     <field.TextField
                                         label="Debtor account"

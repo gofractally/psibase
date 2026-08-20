@@ -16,7 +16,11 @@ import {
     useFulfillSettle,
 } from "@/hooks/use-banx-mutations";
 import { amountPlaceholder, displayAmount } from "@/lib/amount";
-import { amountFieldValidator, useAppForm } from "@/lib/form";
+import {
+    amountFieldValidator,
+    existingAccountValidators,
+    useAppForm,
+} from "@/lib/form";
 import {
     REQUEST_INVOICE,
     REQUEST_PLEASE_BOOK,
@@ -411,6 +415,9 @@ export function RequestsPage() {
                         children={(kind) => (
                             <createForm.AppField
                                 name="counterparty"
+                                validators={existingAccountValidators({
+                                    optional: kind === REQUEST_INVOICE,
+                                })}
                                 children={(field) => (
                                     <field.TextField
                                         label={

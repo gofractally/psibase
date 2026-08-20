@@ -7,6 +7,7 @@ import {
     MAX_PERCENT,
     MIN_PERCENT_STEP,
     PPM_SCALE,
+    existingAccountValidators,
     percentFieldValidator,
     percentStringToPpm,
     useAppForm,
@@ -174,6 +175,7 @@ export function NewDepositLoanDialog({
                             </p>
                             <depositForm.AppField
                                 name="depositor"
+                                validators={existingAccountValidators()}
                                 children={(field) => (
                                     <field.TextField
                                         label="Depositor account"
@@ -279,6 +281,7 @@ export function NewDepositLoanDialog({
                             </p>
                             <loanForm.AppField
                                 name="lender"
+                                validators={existingAccountValidators()}
                                 children={(field) => (
                                     <field.TextField
                                         label="Lender (creditor)"

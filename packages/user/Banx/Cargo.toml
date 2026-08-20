@@ -13,6 +13,7 @@ package-name = "Banx"
 services = ["banx"]
 
 [package.metadata.psibase.dependencies]
+Accounts = "0.26.0"
 Host = "0.26.0"
 HttpServer = "0.26.0"
 Sites = "0.26.0"

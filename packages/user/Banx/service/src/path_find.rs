@@ -1016,21 +1016,19 @@ mod tests {
             line_apr("steve", "gary", usd, 10_000, 20_000),
         ];
         let routing = vec![global_rte_cap("gary", usd, 10_000, true)];
-        assert!(
-            find_banx_path(
-                &lines,
-                &routing,
-                &[],
-                "alice",
-                "steve",
-                100,
-                usd,
-                Some(usd),
-                4,
-                0,
-            )
-            .is_none()
-        );
+        assert!(find_banx_path(
+            &lines,
+            &routing,
+            &[],
+            "alice",
+            "steve",
+            100,
+            usd,
+            Some(usd),
+            4,
+            0,
+        )
+        .is_none());
     }
 
     #[test]

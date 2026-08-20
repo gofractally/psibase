@@ -23,7 +23,7 @@ If Carol later pays Alice $1 back the same way, those two claims **auto-net** to
 
 ## Credit lines
 
-Posted by the **creditor** (`st_crd_lne` / `setCreditLine`):
+Posted by the **creditor** (`st_crd_lne` / `setCreditLine`). The debtor must already exist as a chain account.
 
 | Term | Meaning |
 |------|---------|
@@ -79,7 +79,7 @@ You can still edit hops before execute.
 
 ## Path-forward offers
 
-Posted by the **poster** (`st_fwd_ofr` / `st_glb_fwd`): poster is an intermediate; `next_hop` is the next creditor or global. Fees are Stripe-style: `out = in × (1 − percent) − fixed`. `max_line_apr` rejects a **new** draw if the next hop’s line APR is higher; a hop that only unwinds a reverse tab is not checked. Specific next hop must already know the poster (a line to them, or a live tab). `allow_unknown` (default off, applied on insert and update): if off, the poster must already know the next hop the same way; if on, anyone who lined the poster can become their creditor. `st_fwd_unk` is a flag-only update without re-posting fees.
+Posted by the **poster** (`st_fwd_ofr` / `st_glb_fwd`): poster is an intermediate; `next_hop` is the next creditor or global. Fees are Stripe-style: `out = in × (1 − percent) − fixed`. `max_line_apr` rejects a **new** draw if the next hop’s line APR is higher; a hop that only unwinds a reverse tab is not checked. A specific offer can be posted before that hop knows the poster; the hop still needs a line or live tab at `path_pay` time. The named next hop must exist. `allow_unknown` (applied on insert and update): if off, the poster must already know the next hop (a line to them, or a live tab); if on, anyone who lined the poster can become their creditor. `st_fwd_unk` is a flag-only update without re-posting fees.
 
 ## Claim offers
 
