@@ -466,21 +466,31 @@ export function BuyClaimOfferDialog({
                         void globalForm.handleSubmit();
                     }}
                 >
-                    <globalForm.Field
-                        name="assetId"
-                        listeners={{
-                            onChange: ({ value }) => {
-                                if (value === undefined) return;
-                                loadGlobalForAsset(value);
-                            },
-                        }}
-                        children={(field) => (
-                            <AssetField
-                                label="Asset"
-                                assets={assets}
-                                value={field.state.value}
-                                onChange={(id) => field.handleChange(id)}
-                                itemActive={(a) => liveGlobalByAsset.has(a.id)}
+                    <globalForm.Subscribe
+                        selector={(s) => s.values.enabled}
+                        children={(enabled) => (
+                            <globalForm.Field
+                                name="assetId"
+                                listeners={{
+                                    onChange: ({ value }) => {
+                                        if (value === undefined) return;
+                                        loadGlobalForAsset(value);
+                                    },
+                                }}
+                                children={(field) => (
+                                    <AssetField
+                                        label="Asset"
+                                        assets={assets}
+                                        value={field.state.value}
+                                        onChange={(id) =>
+                                            field.handleChange(id)
+                                        }
+                                        itemActive={(a) =>
+                                            liveGlobalByAsset.has(a.id)
+                                        }
+                                        selectedActive={enabled}
+                                    />
+                                )}
                             />
                         )}
                     />

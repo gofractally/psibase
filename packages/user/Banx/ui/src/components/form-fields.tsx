@@ -27,6 +27,7 @@ export function AssetField({
     onChange,
     disabled,
     itemActive,
+    selectedActive,
 }: {
     label?: string;
     assets: Asset[];
@@ -35,6 +36,8 @@ export function AssetField({
     disabled?: boolean;
     /** Green/red status dots + sort actives first (see AssetSelect). */
     itemActive?: (asset: Asset) => boolean;
+    /** Closed-trigger dot, e.g. the Enabled switch. */
+    selectedActive?: boolean;
 }) {
     return (
         <div className="grid gap-2">
@@ -50,6 +53,7 @@ export function AssetField({
                     value={value}
                     onChange={onChange}
                     itemActive={itemActive}
+                    selectedActive={selectedActive}
                 />
             )}
         </div>
