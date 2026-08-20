@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import {
-    defaultAssetId,
-} from "@/components/asset-select";
+import { ChevronDown } from "lucide-react";
+
+import { defaultAssetId } from "@/components/asset-select";
 import { AssetField } from "@/components/form-fields";
 import { PageHeader } from "@/components/page-header";
 import { useAssetMap } from "@/hooks/use-assets";
@@ -17,7 +17,13 @@ import { amountPlaceholder, displayAmount } from "@/lib/amount";
 import { amountFieldValidator, useAppForm } from "@/lib/form";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { cn } from "@shared/lib/utils";
 import { Button } from "@shared/shadcn/ui/button";
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from "@shared/shadcn/ui/collapsible";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 type Hop = { account: string; assetId: number | undefined };
@@ -45,6 +51,61 @@ function parseAssetParam(
     return assets.some((a) => a.id === n) ? n : undefined;
 }
 
+type FindValues = {
+    payee: string;
+    fromAsset: number | undefined;
+    toAsset: number | undefined;
+    maxHops: string;
+    amount: string;
+    feeMode: "send" | "receive";
+};
+
+function findQuoteKey(user: string, v: FindValues): string {
+    return [
+        user,
+        v.payee.trim(),
+        v.fromAsset ?? "",
+        v.toAsset ?? "",
+        v.amount.trim(),
+        v.maxHops.trim() || "6",
+        v.feeMode,
+    ].join("|");
+}
+
+function canFindPath(
+    user: string | null | undefined,
+    v: FindValues,
+): boolean {
+    return (
+        !!user &&
+        !!v.payee.trim() &&
+        v.fromAsset !== undefined &&
+        v.toAsset !== undefined &&
+        v.amount.trim() !== "" &&
+        Number(v.amount) > 0
+    );
+}
+
+/** Debounced auto-quote; also used so blur can flush immediately via `flush`. */
+function AutoFindPath({
+    quoteKey,
+    enabled,
+    onFind,
+}: {
+    quoteKey: string;
+    enabled: boolean;
+    onFind: () => void;
+}) {
+    const onFindRef = useRef(onFind);
+    onFindRef.current = onFind;
+    useEffect(() => {
+        if (!enabled) return;
+        const t = window.setTimeout(() => onFindRef.current(), 450);
+        return () => window.clearTimeout(t);
+    }, [quoteKey, enabled]);
+    return null;
+}
+
 export function PathPayPage() {
     const { data: user } = useCurrentUser();
     const { assets, byId, precisionOf, symbolOf, isSuccess: assetsReady } =
@@ -56,6 +117,16 @@ export function PathPayPage() {
     const requestId = Number(searchParams.get("request") || "0") || 0;
 
     const [quote, setQuote] = useState<QuoteSummary | null>(null);
+    const [quotedKey, setQuotedKey] = useState<string | null>(null);
+    const quotedKeyRef = useRef<string | null>(null);
+    const [advancedOpen, setAdvancedOpen] = useState(false);
+    const quotingKeyRef = useRef<string | null>(null);
+    const quoteSeq = useRef(0);
+
+    const rememberQuotedKey = (key: string | null) => {
+        quotedKeyRef.current = key;
+        setQuotedKey(key);
+    };
 
     const findForm = useAppForm({
         defaultValues: {
@@ -74,59 +145,75 @@ export function PathPayPage() {
                 : "send") as "send" | "receive",
         },
         onSubmit: async ({ value }) => {
+            if (!canFindPath(user, value)) return;
+            const key = findQuoteKey(user!, value);
             if (
-                !user ||
-                !value.payee.trim() ||
-                value.fromAsset === undefined ||
-                value.toAsset === undefined
-            )
+                key === quotedKeyRef.current ||
+                key === quotingKeyRef.current
+            ) {
                 return;
+            }
+            quotingKeyRef.current = key;
+            const seq = ++quoteSeq.current;
             const hopsN = Math.min(12, Math.max(1, Number(value.maxHops) || 6));
             // `receive` ⇒ you cover fees (exact-out). `send` ⇒ payee covers (exact-in).
             const exactOut = value.feeMode === "receive";
             const typedAmount = value.amount.trim();
-            await new Promise<void>((resolve, reject) => {
-                quotePath.mutate(
-                    {
-                        fromAccount: user,
-                        toAccount: value.payee.trim(),
-                        amount: typedAmount,
-                        fromAsset: value.fromAsset!,
-                        toAsset: value.toAsset!,
-                        maxHops: hopsN,
-                        exactOut,
-                    },
-                    {
-                        onSuccess: (q) => {
-                            execForm.setFieldValue(
-                                "hops",
-                                q.hops.map((h) => ({
-                                    account: h.account,
-                                    assetId: h.assetId as number | undefined,
-                                })),
-                            );
-                            // Exact-in: trust the typed send amount.
-                            // Exact-out: use quoted send (includes fee buffer).
-                            execForm.setFieldValue(
-                                "amount",
-                                exactOut ? q.amountIn : typedAmount,
-                            );
-                            execForm.setFieldValue(
-                                "minReturn",
-                                exactOut ? q.minReturn : q.amountOut,
-                            );
-                            setQuote({
-                                amountIn: exactOut ? q.amountIn : typedAmount,
-                                amountOut: q.amountOut,
-                                exactOut,
-                                hops: q.hops,
-                            });
-                            resolve();
+            try {
+                await new Promise<void>((resolve, reject) => {
+                    quotePath.mutate(
+                        {
+                            fromAccount: user!,
+                            toAccount: value.payee.trim(),
+                            amount: typedAmount,
+                            fromAsset: value.fromAsset!,
+                            toAsset: value.toAsset!,
+                            maxHops: hopsN,
+                            exactOut,
                         },
-                        onError: (e: Error) => reject(e),
-                    },
-                );
-            });
+                        {
+                            onSuccess: (q) => {
+                                if (seq !== quoteSeq.current) {
+                                    resolve();
+                                    return;
+                                }
+                                execForm.setFieldValue(
+                                    "hops",
+                                    q.hops.map((h) => ({
+                                        account: h.account,
+                                        assetId: h.assetId as
+                                            | number
+                                            | undefined,
+                                    })),
+                                );
+                                execForm.setFieldValue(
+                                    "amount",
+                                    exactOut ? q.amountIn : typedAmount,
+                                );
+                                execForm.setFieldValue(
+                                    "minReturn",
+                                    exactOut ? q.minReturn : q.amountOut,
+                                );
+                                rememberQuotedKey(key);
+                                setQuote({
+                                    amountIn: exactOut
+                                        ? q.amountIn
+                                        : typedAmount,
+                                    amountOut: q.amountOut,
+                                    exactOut,
+                                    hops: q.hops,
+                                });
+                                resolve();
+                            },
+                            onError: (e: Error) => reject(e),
+                        },
+                    );
+                });
+            } finally {
+                if (quotingKeyRef.current === key) {
+                    quotingKeyRef.current = null;
+                }
+            }
         },
     });
 
@@ -247,26 +334,34 @@ export function PathPayPage() {
         setQuote(null);
     };
 
+    const findNow = () => {
+        void findForm.handleSubmit();
+    };
+
     return (
         <div className="space-y-8">
             <PageHeader
                 title="Transfer"
-                description="Pay along hops. First hop: credit line or reverse claim. Later hops: live path-forward. Find path fills the list."
+                description={
+                    requestId
+                        ? `Pay invoice #${requestId}. A path is quoted as you fill this in.`
+                        : "Send along a path of credit. A route is quoted as you fill this in."
+                }
             />
 
             <section className="grid max-w-2xl gap-4 rounded-lg border p-4">
-                <h2 className="font-medium">
-                    Find path
-                    {requestId
-                        ? ` · invoice #${requestId}`
-                        : null}
-                </h2>
-                <p className="text-muted-foreground text-xs">
-                    Off-chain quote using credit lines, path-forward offers, and FX
-                    policies expanded from your account toward the payee (not a
-                    full network dump). Fills the hop list below; you can still
-                    edit hops before paying.
-                </p>
+                <findForm.Subscribe
+                    selector={(s) => s.values}
+                    children={(values) => (
+                        <AutoFindPath
+                            quoteKey={
+                                user ? findQuoteKey(user, values) : ""
+                            }
+                            enabled={canFindPath(user, values)}
+                            onFind={findNow}
+                        />
+                    )}
+                />
                 <form
                     className="grid gap-3"
                     onSubmit={(e) => {
@@ -275,26 +370,18 @@ export function PathPayPage() {
                         void findForm.handleSubmit();
                     }}
                 >
-                    <div className="grid gap-3 sm:grid-cols-2">
-                        <findForm.AppField
-                            name="payee"
-                            children={(field) => (
-                                <field.TextField
-                                    label="Payee"
-                                    placeholder="brandon"
-                                />
-                            )}
-                        />
-                        <findForm.AppField
-                            name="maxHops"
-                            children={(field) => (
-                                <field.TextField
-                                    label="Max hops"
-                                    inputMode="numeric"
-                                />
-                            )}
-                        />
-                    </div>
+                    <findForm.AppField
+                        name="payee"
+                        listeners={{
+                            onBlur: () => findNow(),
+                        }}
+                        children={(field) => (
+                            <field.TextField
+                                label="Payee"
+                                placeholder="brandon"
+                            />
+                        )}
+                    />
                     <div className="grid gap-3 sm:grid-cols-2">
                         <findForm.Field
                             name="fromAsset"
@@ -323,7 +410,9 @@ export function PathPayPage() {
                         selector={(s) => s.values.feeMode}
                         children={(feeMode) => (
                             <div className="grid gap-2">
-                                <p className="text-sm font-medium">Amount means</p>
+                                <p className="text-sm font-medium">
+                                    Amount means
+                                </p>
                                 <div className="grid grid-cols-2 gap-2">
                                     <Button
                                         type="button"
@@ -338,6 +427,7 @@ export function PathPayPage() {
                                                 "feeMode",
                                                 "send",
                                             );
+                                            rememberQuotedKey(null);
                                             setQuote(null);
                                         }}
                                     >
@@ -356,6 +446,7 @@ export function PathPayPage() {
                                                 "feeMode",
                                                 "receive",
                                             );
+                                            rememberQuotedKey(null);
                                             setQuote(null);
                                         }}
                                     >
@@ -377,7 +468,6 @@ export function PathPayPage() {
                             feeMode: s.values.feeMode,
                         })}
                         children={({ fromAsset, toAsset, feeMode }) => {
-                            // receive (you cover) ⇒ amount in to-asset; send ⇒ from-asset
                             const amountAsset =
                                 feeMode === "receive" ? toAsset : fromAsset;
                             const known =
@@ -406,6 +496,9 @@ export function PathPayPage() {
                                 <findForm.AppField
                                     name="amount"
                                     validators={amountValidators}
+                                    listeners={{
+                                        onBlur: () => findNow(),
+                                    }}
                                     children={(field) => (
                                         <field.TextField
                                             label={amountLabel}
@@ -419,116 +512,181 @@ export function PathPayPage() {
                             );
                         }}
                     />
+                    <findForm.Subscribe
+                        selector={(s) => ({
+                            fromAsset: s.values.fromAsset,
+                            toAsset: s.values.toAsset,
+                        })}
+                        children={({ fromAsset, toAsset }) => {
+                            if (!quote && !quotePath.isPending) return null;
+                            const feeParts = quote
+                                ? quote.hops.flatMap((h, i) => {
+                                      const parts: string[] = [];
+                                      if (feeIsPositive(h.hopFee)) {
+                                          parts.push(
+                                              `hop ${i + 1}: ${displayAmount(h.hopFee)} ${symbolOf(h.assetId)}`,
+                                          );
+                                      }
+                                      if (
+                                          feeIsPositive(h.fxFee) &&
+                                          h.fxFromAsset !== undefined
+                                      ) {
+                                          parts.push(
+                                              `FX→hop ${i + 1}: ${displayAmount(h.fxFee)} ${symbolOf(h.fxFromAsset)}`,
+                                          );
+                                      }
+                                      return parts;
+                                  })
+                                : [];
+                            return (
+                                <div className="text-muted-foreground space-y-0.5 text-sm font-mono">
+                                    {quotePath.isPending ? (
+                                        <p className="text-xs">
+                                            Finding path…
+                                        </p>
+                                    ) : null}
+                                    {quote ? (
+                                        <>
+                                            <p>
+                                                {quote.exactOut ? (
+                                                    <>
+                                                        You send:{" "}
+                                                        {displayAmount(
+                                                            quote.amountIn,
+                                                        )}
+                                                        {fromAsset !==
+                                                        undefined
+                                                            ? ` ${symbolOf(fromAsset)}`
+                                                            : ""}
+                                                        {" · "}
+                                                        Payee gets ≥{" "}
+                                                        {displayAmount(
+                                                            quote.amountOut,
+                                                        )}
+                                                        {toAsset !== undefined
+                                                            ? ` ${symbolOf(toAsset)}`
+                                                            : ""}
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        You send:{" "}
+                                                        {displayAmount(
+                                                            quote.amountIn,
+                                                        )}
+                                                        {fromAsset !==
+                                                        undefined
+                                                            ? ` ${symbolOf(fromAsset)}`
+                                                            : ""}
+                                                        {" · "}
+                                                        Est. out:{" "}
+                                                        {displayAmount(
+                                                            quote.amountOut,
+                                                        )}
+                                                        {toAsset !== undefined
+                                                            ? ` ${symbolOf(toAsset)}`
+                                                            : ""}
+                                                    </>
+                                                )}
+                                            </p>
+                                            <p className="text-xs">
+                                                Expected fees:{" "}
+                                                {feeParts.length > 0
+                                                    ? feeParts.join(" · ")
+                                                    : "none"}
+                                            </p>
+                                        </>
+                                    ) : null}
+                                </div>
+                            );
+                        }}
+                    />
                     <div className="flex flex-wrap items-center gap-3">
                         <findForm.Subscribe
                             selector={(s) => s.values}
                             children={(values) => (
-                                <findForm.AppForm>
-                                    <findForm.SubmitButton
-                                        labels={["Find path", "Searching…"]}
-                                        loading={quotePath.isPending}
-                                        disabled={
-                                            !user ||
-                                            !values.payee.trim() ||
-                                            values.fromAsset === undefined ||
-                                            values.toAsset === undefined
-                                        }
-                                    />
-                                </findForm.AppForm>
-                            )}
-                        />
-                        <findForm.Subscribe
-                            selector={(s) => ({
-                                fromAsset: s.values.fromAsset,
-                                toAsset: s.values.toAsset,
-                            })}
-                            children={({ fromAsset, toAsset }) => {
-                                if (!quote) return null;
-                                const feeParts = quote.hops.flatMap((h, i) => {
-                                    const parts: string[] = [];
-                                    if (feeIsPositive(h.hopFee)) {
-                                        parts.push(
-                                            `hop ${i + 1}: ${displayAmount(h.hopFee)} ${symbolOf(h.assetId)}`,
-                                        );
-                                    }
-                                    if (
-                                        feeIsPositive(h.fxFee) &&
-                                        h.fxFromAsset !== undefined
-                                    ) {
-                                        parts.push(
-                                            `FX→hop ${i + 1}: ${displayAmount(h.fxFee)} ${symbolOf(h.fxFromAsset)}`,
-                                        );
-                                    }
-                                    return parts;
-                                });
+                        <execForm.Subscribe
+                            selector={(s) => s.values.hops}
+                            children={(hops) => {
+                                const live =
+                                    !!user &&
+                                    quotedKey === findQuoteKey(user, values);
+                                const ready =
+                                    live &&
+                                    hops.some(
+                                        (h) =>
+                                            h.account.trim() &&
+                                            h.assetId !== undefined,
+                                    );
                                 return (
-                                    <div className="text-muted-foreground space-y-0.5 text-sm font-mono">
-                                        <p>
-                                            {quote.exactOut ? (
-                                                <>
-                                                    You send:{" "}
-                                                    {displayAmount(
-                                                        quote.amountIn,
-                                                    )}
-                                                    {fromAsset !== undefined
-                                                        ? ` ${symbolOf(fromAsset)}`
-                                                        : ""}
-                                                    {" · "}
-                                                    Payee gets ≥{" "}
-                                                    {displayAmount(
-                                                        quote.amountOut,
-                                                    )}
-                                                    {toAsset !== undefined
-                                                        ? ` ${symbolOf(toAsset)}`
-                                                        : ""}
-                                                </>
-                                            ) : (
-                                                <>
-                                                    You send:{" "}
-                                                    {displayAmount(
-                                                        quote.amountIn,
-                                                    )}
-                                                    {fromAsset !== undefined
-                                                        ? ` ${symbolOf(fromAsset)}`
-                                                        : ""}
-                                                    {" · "}
-                                                    Est. out:{" "}
-                                                    {displayAmount(
-                                                        quote.amountOut,
-                                                    )}
-                                                    {toAsset !== undefined
-                                                        ? ` ${symbolOf(toAsset)}`
-                                                        : ""}
-                                                </>
-                                            )}
-                                        </p>
-                                        {feeParts.length > 0 ? (
-                                            <p className="text-xs">
-                                                Expected fees:{" "}
-                                                {feeParts.join(" · ")}
-                                            </p>
-                                        ) : (
-                                            <p className="text-xs">
-                                                Expected fees: none
-                                            </p>
-                                        )}
-                                    </div>
+                                    <Button
+                                        type="button"
+                                        disabled={
+                                            !ready ||
+                                            pathPay.isPending ||
+                                            payInvoice.isPending
+                                        }
+                                        onClick={() =>
+                                            void execForm.handleSubmit()
+                                        }
+                                    >
+                                        {pathPay.isPending ||
+                                        payInvoice.isPending
+                                            ? requestId
+                                                ? "Paying…"
+                                                : "Submitting…"
+                                            : requestId
+                                              ? "Pay invoice"
+                                              : "Transfer"}
+                                    </Button>
                                 );
                             }}
                         />
+                            )}
+                        />
                     </div>
                 </form>
-            </section>
 
-            <form
-                onSubmit={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    void execForm.handleSubmit();
-                }}
-                className="grid max-w-2xl gap-4 rounded-lg border p-4"
-            >
-                <h2 className="font-medium">Hops &amp; execute</h2>
+                <Collapsible
+                    open={advancedOpen}
+                    onOpenChange={setAdvancedOpen}
+                >
+                    <CollapsibleTrigger asChild>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            className="text-muted-foreground h-8 w-full justify-between px-2 text-sm font-medium"
+                        >
+                            Advanced settings
+                            <ChevronDown
+                                className={cn(
+                                    "size-4 transition-transform duration-200",
+                                    advancedOpen && "rotate-180",
+                                )}
+                            />
+                        </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="grid gap-4 pt-3">
+                <form
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        void execForm.handleSubmit();
+                    }}
+                    className="grid gap-4"
+                >
+                <findForm.AppField
+                    name="maxHops"
+                    listeners={{
+                        onBlur: () => findNow(),
+                    }}
+                    children={(field) => (
+                        <field.TextField
+                            label="Max hops"
+                            inputMode="numeric"
+                        />
+                    )}
+                />
+                <h3 className="text-sm font-medium">Hops &amp; execute</h3>
                 <execForm.Subscribe
                     selector={(s) => s.values.hops}
                     children={(hops) => (
@@ -756,17 +914,10 @@ export function PathPayPage() {
                     )}
                 </div>
 
-                <execForm.AppForm>
-                    <execForm.SubmitButton
-                        labels={
-                            requestId
-                                ? ["Pay invoice", "Paying…"]
-                                : ["Transfer", "Submitting…"]
-                        }
-                        loading={pathPay.isPending || payInvoice.isPending}
-                    />
-                </execForm.AppForm>
-            </form>
+                </form>
+                    </CollapsibleContent>
+                </Collapsible>
+            </section>
         </div>
     );
 }
