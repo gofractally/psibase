@@ -1,4 +1,4 @@
-#[psibase::service(name = "banx+1")]
+#[psibase::service(name = "banx-app+1")]
 #[allow(non_snake_case)]
 mod service {
     use async_graphql::*;
@@ -267,7 +267,7 @@ mod service {
         now: i64,
     }
 
-    /// History row from `history.banx.activity` (amounts already human decimals).
+    /// History row from `history.banx-app.activity` (amounts already human decimals).
     #[derive(Deserialize, SimpleObject)]
     struct ActivityEvent {
         account: AccountNumber,
@@ -594,7 +594,7 @@ mod service {
         ) -> async_graphql::Result<EventConnection<ActivityEvent>> {
             // `?` params are bound as TEXT. asset_id is an integer column, so
             // `asset_id = ?` with "1" matches nothing; interpolate like Tokens.
-            EventQuery::new("history.banx.activity")
+            EventQuery::new("history.banx-app.activity")
                 .condition_with_params(
                     format!(
                         "account = ? AND counterparty = ? AND (asset_id = {assetId} OR other_asset_id = {assetId})"

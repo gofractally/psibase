@@ -325,7 +325,7 @@ Anyone posts `st_cur_pol`: from-asset → to-asset, fixed fee in from-asset, `fx
 
 ## History
 
-Each writer emits a bilateral `history.banx.activity` event: one row per party as `account`, the other as `counterparty`. Amounts are **human decimals** at emit (asset precision; convert’s `netted` uses the destination asset).
+Each writer emits a bilateral `history.banx-app.activity` event: one row per party as `account`, the other as `counterparty`. Amounts are **human decimals** at emit (asset precision; convert’s `netted` uses the destination asset).
 
 Kinds include `path_draw`, `deposit`, `net`, `convert`, `credit_line`, `rm_credit_line`, `sell_claim` / `buy_claim`, `invoice`, `please_book`, `settle_auth`, `fulfill`, `req_cancel`.
 

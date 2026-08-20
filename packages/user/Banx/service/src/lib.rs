@@ -2007,7 +2007,7 @@ pub mod tables {
     }
 }
 
-#[psibase::service(name = "banx", tables = "tables")]
+#[psibase::service(name = "banx-app", tables = "tables")]
 pub mod service {
     use crate::tables::{
         assert_account_exists, emit_pair_activity, execute_path, path_required_send, Asset,

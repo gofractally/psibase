@@ -191,7 +191,7 @@ cd packages/user/Banx/ui && yarn && yarn build
 cargo-psibase package
 ```
 
-Install with `cargo-psibase install` against a local psinode. Open `https://banx.<root>/`. GraphiQL: `/graphiql`.
+Install with `cargo-psibase install` against a local psinode. Open `https://banx-app.<root>/`. GraphiQL: `/graphiql`.
 
 ## Test
 

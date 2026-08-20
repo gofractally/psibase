@@ -1,4 +1,4 @@
-export const BANX_SERVICE = "banx" as const;
+export const BANX_SERVICE = "banx-app" as const;
 
 export const SECONDS_PER_DAY = 86_400;
 
