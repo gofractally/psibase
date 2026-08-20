@@ -179,6 +179,7 @@ export function PathPayPage() {
     const [advancedOpen, setAdvancedOpen] = useState(false);
     const quotingKeyRef = useRef<string | null>(null);
     const quoteSeq = useRef(0);
+    const clearAfterPayRef = useRef<() => void>(() => {});
 
     const rememberQuotedKey = (key: string | null) => {
         quotedKeyRef.current = key;
@@ -336,7 +337,7 @@ export function PathPayPage() {
                         },
                         {
                             onSuccess: () => {
-                                setConfirmOpen(false);
+                                clearAfterPayRef.current();
                                 resolve();
                             },
                             onError: (e: Error) => reject(e),
@@ -353,7 +354,7 @@ export function PathPayPage() {
                     },
                     {
                         onSuccess: () => {
-                            setConfirmOpen(false);
+                            clearAfterPayRef.current();
                             resolve();
                         },
                         onError: (e: Error) => reject(e),
@@ -410,6 +411,30 @@ export function PathPayPage() {
         execForm.setFieldValue("hops", hops.slice(0, -1));
         setQuote(null);
     };
+
+    const clearAfterPay = () => {
+        setConfirmOpen(false);
+        rememberQuotedKey(null);
+        rememberFailedKey(null);
+        setQuoteError(null);
+        setQuote(null);
+        quotingKeyRef.current = null;
+        quoteSeq.current += 1;
+        findForm.setFieldValue("amount", "");
+        findForm.setFieldMeta("amount", (prev) => ({
+            ...prev,
+            errors: [],
+            errorMap: {},
+            isTouched: false,
+            isDirty: false,
+        }));
+        execForm.setFieldValue("hops", [
+            { account: "", assetId: undefined },
+        ]);
+        execForm.setFieldValue("amount", "");
+        execForm.setFieldValue("minReturn", "");
+    };
+    clearAfterPayRef.current = clearAfterPay;
 
     const findNow = () => {
         void findForm.handleSubmit().catch(() => undefined);
@@ -565,11 +590,17 @@ export function PathPayPage() {
                                 ? {
                                       onChange: amountFieldValidator(
                                           precision,
-                                          { allowZero: false },
+                                          {
+                                              allowEmpty: true,
+                                              allowZero: false,
+                                          },
                                       ),
                                       onSubmit: amountFieldValidator(
                                           precision,
-                                          { allowZero: false },
+                                          {
+                                              allowEmpty: true,
+                                              allowZero: false,
+                                          },
                                       ),
                                   }
                                 : undefined;
@@ -922,11 +953,17 @@ export function PathPayPage() {
                                 ? {
                                       onChange: amountFieldValidator(
                                           precision,
-                                          { allowZero: false },
+                                          {
+                                              allowEmpty: true,
+                                              allowZero: false,
+                                          },
                                       ),
                                       onSubmit: amountFieldValidator(
                                           precision,
-                                          { allowZero: false },
+                                          {
+                                              allowEmpty: true,
+                                              allowZero: false,
+                                          },
                                       ),
                                   }
                                 : undefined;
@@ -945,7 +982,6 @@ export function PathPayPage() {
                                             placeholder={amountPlaceholder(
                                                 precision,
                                             )}
-                                            required
                                         />
                                     )}
                                 />
@@ -969,11 +1005,17 @@ export function PathPayPage() {
                                     ? {
                                           onChange: amountFieldValidator(
                                               precision,
-                                              { allowZero: true },
+                                              {
+                                                  allowEmpty: true,
+                                                  allowZero: true,
+                                              },
                                           ),
                                           onSubmit: amountFieldValidator(
                                               precision,
-                                              { allowZero: true },
+                                              {
+                                                  allowEmpty: true,
+                                                  allowZero: true,
+                                              },
                                           ),
                                       }
                                     : undefined;
@@ -988,7 +1030,6 @@ export function PathPayPage() {
                                                 placeholder={amountPlaceholder(
                                                     precision,
                                                 )}
-                                                required
                                             />
                                         )}
                                     />
