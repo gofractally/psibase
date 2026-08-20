@@ -83,13 +83,13 @@ namespace SystemService
             (e.g. the shared chart component)
         img-src:
           * `data:` for generated identicons and inline app icons
-          * `profiles.<root>/avatar/` (prefix match) for user avatars,
+          * `profiles.{{root}}/avatar/` (prefix match) for user avatars,
             served by the profiles service
-          * `branding.<root>` for the network logo
+          * `branding.{{root}}` for the network logo
         connect-src:
           * `'self'` covers the app's own /graphql and RPC endpoints, the
             same-origin /common endpoints, and same-origin websockets
-          * `profiles.<root>` and `tokens.<root>` are granted by default
+          * `profiles.{{root}}` and `tokens.{{root}}` are granted by default
             because the shared UI hooks (useProfile, useSystemToken) fetch
             them from nearly every app; both expose only public data and
             writes require signed transactions.
