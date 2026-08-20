@@ -1874,6 +1874,35 @@ mod tests {
     }
 
     #[psibase::test_case(packages("Banx"))]
+    fn test_offer_upserts_require_registered_asset(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        chain.new_account(alice).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        let missing = 99u16;
+
+        let fx = Wrapper::push_from(&chain, alice)
+            .st_cur_pol(usd, missing, Quantity::new(0), RATE_SCALE, 0, never())
+            .get();
+        assert!(fx.is_err());
+        let fx_from = Wrapper::push_from(&chain, alice)
+            .st_cur_pol(missing, usd, Quantity::new(0), RATE_SCALE, 0, never())
+            .get();
+        assert!(fx_from.is_err());
+        let fwd = Wrapper::push_from(&chain, alice)
+            .st_glb_fwd(missing, Quantity::new(0), 0, PPM_SCALE, never(), true)
+            .get();
+        assert!(fwd.is_err());
+        let buy = Wrapper::push_from(&chain, alice)
+            .st_glb_buy(missing, Quantity::new(0), 0, never())
+            .get();
+        assert!(buy.is_err());
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
     fn test_accrue_and_interest_first_net(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
@@ -2521,6 +2550,73 @@ mod tests {
         assert_eq!(PayRequest::get_assert(id).remaining.value, 5_0000);
         assert_eq!(exp(&chain, john, mitchell, aud), 0);
         assert_eq!(exp(&chain, cafe, john, aud), 0);
+        Ok(())
+    }
+
+    /// Expired FX must fail at invert (`currency policy expired`), not after
+    /// sizing a send and hitting `max_spend below required send`.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_pay_inv_expired_fx_fails_at_invert(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let gary = account!("gary");
+        let steve = account!("steve");
+        for a in [alice, gary, steve] {
+            chain.new_account(a).unwrap();
+        }
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, gary)
+            .st_crd_lne(alice, aud, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, steve)
+            .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never(), true)
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .st_cur_pol(
+                aud,
+                usd,
+                Quantity::new(0),
+                RATE_SCALE * 70 / 100,
+                0,
+                TimePointSec { seconds: 1 },
+            )
+            .get()?;
+
+        let id = Wrapper::push_from(&chain, steve)
+            .st_req(
+                PayRequest::INVOICE,
+                alice,
+                usd,
+                Quantity::new(700),
+                "x".into(),
+                never(),
+            )
+            .get()?;
+
+        let failed = Wrapper::push_from(&chain, alice).pay_inv(
+            vec![hop(gary, aud), hop(steve, usd)],
+            Quantity::new(500),
+            id,
+        );
+        let err = failed.trace.error.as_deref().unwrap_or("(no error)");
+        assert!(
+            err.contains("currency policy expired"),
+            "test_pay_inv_expired_fx_fails_at_invert: got {err}"
+        );
+        assert!(
+            !err.contains("max_spend below required send"),
+            "expired FX must not be inverted then fail the budget: got {err}"
+        );
+        assert_eq!(PayRequest::get_assert(id).remaining.value, 700);
+        assert_eq!(exp(&chain, gary, alice, aud), 0);
+        assert_eq!(exp(&chain, steve, gary, usd), 0);
         Ok(())
     }
 

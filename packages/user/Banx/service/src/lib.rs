@@ -252,6 +252,7 @@ pub mod tables {
             need = invert_hop_fee(need, offer.fee_fixed, offer.fee_percent);
             if hop.asset_id != prev.asset_id {
                 let pol = CurrencyPolicy::get_assert(prev.account, prev.asset_id, hop.asset_id);
+                pol.assert_live();
                 need = invert_rate(need, pol.fee_fixed, pol.fx_rate);
             }
         }
@@ -409,6 +410,7 @@ pub mod tables {
                 "max_line_apr exceeds 100% (PPM_SCALE)"
             );
             assert!(fee_percent < PPM_SCALE, "fee must be under 100%");
+            let _ = Asset::get_assert(asset_id);
             if next_hop != Self::GLOBAL {
                 assert!(
                     Connection::knows(next_hop, poster, asset_id),
@@ -582,6 +584,7 @@ pub mod tables {
             expires_at: TimePointSec,
         ) {
             Self::assert_side(side);
+            let _ = Asset::get_assert(asset_id);
             let scale = PPM_SCALE as i64;
             assert!(
                 (fee_percent as i64) > -scale && (fee_percent as i64) < scale,
@@ -974,7 +977,7 @@ pub mod tables {
             expires_live(self.expires_at)
         }
 
-        fn assert_live(&self) {
+        pub(crate) fn assert_live(&self) {
             assert!(self.is_live(), "currency policy expired");
         }
 
@@ -998,6 +1001,8 @@ pub mod tables {
                 from_asset != to_asset,
                 "currency convert requires different assets"
             );
+            let _ = Asset::get_assert(from_asset);
+            let _ = Asset::get_assert(to_asset);
             assert!(fx_rate > 0, "fx_rate must be positive");
             assert!(
                 to_interest_rate <= PPM_SCALE,
