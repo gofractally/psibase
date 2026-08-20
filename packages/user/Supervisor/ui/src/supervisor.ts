@@ -37,7 +37,6 @@ import {
     parser,
     serviceFromOrigin,
     setQueryToken,
-    wasmFromUrl,
 } from "./utils";
 
 const rootDomain = siblingUrl();
@@ -161,11 +160,6 @@ export class Supervisor implements AppInterface {
             await this.loader.processPlugins();
             await this.loader.awaitReady();
 
-            try {
-                await this.composeHostPlugins();
-            } catch (e) {
-                console.warn("Host composite skipped:", e);
-            }
             await this.plugins.compileUncompiled();
 
             // Required to instantiate system plugins to execute the plugin calls below
@@ -392,61 +386,12 @@ export class Supervisor implements AppInterface {
         }
     }
 
-    // The Host composite is composed at package build (cmake `compose-host`)
-    // and served as one HTTP-cached artifact; the browser never composes
-    // host plugins. The compose set is derived from the composite's exports.
-    private hostComposite: Promise<CompositeCacheEntry> | undefined;
-
-    private async fetchHostComposite(): Promise<CompositeCacheEntry> {
-        const wasm = await wasmFromUrl(
-            siblingUrl(null, "host", "/composite.wasm"),
-        );
-        const p = await parser();
-        const api = p.parse("host-composite", wasm);
-        const inBlob = new Set<string>();
-            for (const intf of api.exportedFuncs?.interfaces ?? []) {
-                if (intf.namespace === "host") inBlob.add(intf.package);
-                // WIT package is supervisor:callstack; chain id is host:callstack.
-                if (
-                    intf.namespace === "supervisor" &&
-                    intf.package === "callstack"
-                ) {
-                    inBlob.add("callstack");
-                }
-            }
-            return {
-                wasm,
-                composeSet: [...inBlob].map((plugin) => ({
-                    service: "host",
-                    plugin,
-                })),
-                containsTransact: false,
-            };
-    }
-
-    private async composeHostPlugins(): Promise<void> {
-        if (!this.hostComposite) {
-            const promise = this.fetchHostComposite();
-            this.hostComposite = promise;
-            // Allow a retry if the fetch fails (e.g. transient network).
-            promise.catch(() => {
-                if (this.hostComposite === promise)
-                    this.hostComposite = undefined;
-            });
-        }
-        await this.attachComposite(
-            await this.hostComposite,
-            undefined,
-            true,
-            true,
-        );
-    }
-
     private async composeAppPlugins(entry: QualifiedPluginId): Promise<void> {
-        // Host entries stay on the preload Host blob. App entries fold
-        // host compose plugins (client/db/auth/http/prompt/crypto) into
-        // the same instantiate; host:types stays an open import.
-        if (entry.service === "host") {
+        // Host compose plugins fold into this entry's composite. host:types
+        // stays individual (`plugin-ref` / wac identity). Preload instantiates
+        // host plugins individually so query-token / prompt can run before
+        // the entry closure is downloaded; this call re-attaches them.
+        if (entry.service === "host" && entry.plugin === "types") {
             return;
         }
         const wasmPlugins = this.plugins.collectWasmPlugins();

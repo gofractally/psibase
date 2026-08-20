@@ -24,6 +24,12 @@ pub fn compose(
     encode_set(entry, &part.compose_set, plugins, wrap_tracers)
 }
 
+/// Host-only compose set (`partition_host`). Used by tests and kept for
+/// deferred package-build compose (02-v1 item 2). Supervisor v1 composes
+/// Host via [`compose`] at `entry()` with the app closure.
+/// Host-only compose set (`partition_host`). Used by tests and kept for
+/// deferred package-build compose (02-v1 item 2). Supervisor v1 composes
+/// Host via [`compose`] at `entry()` with the app closure.
 pub fn compose_host(plugins: &[WasmPlugin], wrap_tracers: bool) -> Result<ComposeResult> {
     let part = partition_host(plugins)?;
     if part.compose_set.is_empty() {

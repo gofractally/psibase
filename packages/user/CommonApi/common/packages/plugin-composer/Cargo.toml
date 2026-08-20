@@ -25,17 +25,5 @@ lto = true
 [lib]
 crate-type = ["cdylib", "rlib"]
 
-[features]
-# Gates the native compose-host bin so `cargo component build` (wasm)
-# does not try to componentize it.
-native-tools = []
-
-# Native build-time tool: composes the host blob into build/components/
-# host_composite.wasm, shipped in Host.psi as /composite.wasm.
-[[bin]]
-name = "compose-host"
-path = "src/bin/compose_host.rs"
-required-features = ["native-tools"]
-
 [package.metadata.component]
 package = "plugin:composer"

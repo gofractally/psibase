@@ -28,6 +28,6 @@ world composer {
         wrap-tracers: bool,
     ) -> result<compose-result, string>;
 
-    // Host composition happens at package build (`compose-host` bin);
-    // the browser fetches host/composite.wasm instead of composing.
+    // Host compose plugins fold into this `compose` at `entry()` time.
+    // Package-build compose+transpile of Host is deferred.
 }

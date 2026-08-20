@@ -3,10 +3,10 @@
 // TEMP diagnostic repro for the prompt.html "second get-active-prompt
 // panics with a zeroed bucket" bug.
 //
-// Drives the real composed host composite (host:prompt + host:client +
-// host:db + host:auth + host:http + tracers) exactly like the
-// supervisor loader does (same jco
-// options + jco-reenter patch), with stubbed supervisor bridge imports.
+// Drives a Host-only composite from `compose_host` (DUMP_HOST_COMPOSITE)
+// with the same jco options + jco-reenter patch as the loader, stubbed
+// supervisor bridge imports. Supervisor v1 does not ship this blob;
+// Host folds into the app `entry()` composite instead.
 //
 // Produce the composite first:
 //   DUMP_HOST_COMPOSITE=/tmp/host_composite.wasm cargo test \

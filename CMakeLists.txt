@@ -313,24 +313,6 @@ add_rs_component_workspace(packages/:Plugins
     producers
 )
 
-# Build-time Host composite: compose the host plugin blob (with tracers)
-# into one component, shipped in Host.psi as /composite.wasm. The browser
-# fetches the HTTP-cached artifact instead of composing host plugins in the
-# client every page session. host-types stays out (plugin-ref fails to plug).
-set(HOST_COMPOSITE_OUTPUT ${COMPONENT_BIN_DIR}/host_composite.wasm)
-ExternalProject_Add(
-    HostComposite
-    DEPENDS             Plugins
-    SOURCE_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/plugin-composer
-    CONFIGURE_COMMAND   ""
-    BUILD_COMMAND       cargo build -r --bin compose-host --features native-tools --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/plugin-composer/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/composer-native
-    COMMAND             ${CMAKE_CURRENT_BINARY_DIR}/composer-native/release/compose-host --out ${HOST_COMPOSITE_OUTPUT} host:client=${Plugins_OUTPUT_FILE_host_client} host:callstack=${Plugins_OUTPUT_FILE_host_callstack} host:db=${Plugins_OUTPUT_FILE_host_db} host:auth=${Plugins_OUTPUT_FILE_host_auth} host:http=${Plugins_OUTPUT_FILE_host_http} host:prompt=${Plugins_OUTPUT_FILE_host_prompt} host:crypto=${Plugins_OUTPUT_FILE_host_crypto}
-    BUILD_BYPRODUCTS    ${HOST_COMPOSITE_OUTPUT}
-    BUILD_ALWAYS        1
-    INSTALL_COMMAND     ""
-)
-set(HostComposite_DEP HostComposite ${HOST_COMPOSITE_OUTPUT})
-
 include(GNUInstallDirs)
 
 # Build service packages
@@ -496,8 +478,7 @@ psibase_package(
         DATA ${Plugins_OUTPUT_FILE_host_types} /types.wasm
         DATA ${Plugins_OUTPUT_FILE_host_auth} /auth.wasm
         DATA ${Plugins_OUTPUT_FILE_host_crypto} /crypto.wasm
-        DATA ${HOST_COMPOSITE_OUTPUT} /composite.wasm
-    DEPENDS ${Plugins_DEP} ${HostComposite_DEP}
+    DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
 )
 
