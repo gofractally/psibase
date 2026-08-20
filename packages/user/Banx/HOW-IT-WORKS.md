@@ -113,6 +113,36 @@ Sam **path-pays Riley’s parent** through Sam’s parent:
 
 Riley’s parent never needs Sam’s bank details. The Visa bill is theirs; the book says **Sam’s parent owes them**. Next weekend the debts run the other way and **net**.
 
+### 5. Mitchell’s bucks (clearing through the groom)
+
+**Mitchell** is getting married. **John** is organising the bucks among the men: **Zac**, **Daniel**, **Josh**, and himself. There will be other guests, but these four are the ones putting cards down.
+
+The weekend needs money **now**, before anyone is in the same room: a house, tickets, a deposit for the entertainment. The usual way is ugly. Whoever books the Airbnb is $1,000 out. Then they chase the others for cash on a loud night, or swap BSB and account numbers in a group chat. Someone always ducks. The bloke who paid is stuck.
+
+Mitchell does not want his friends in that position. Before anything is booked he **extends a decent credit line to each invitee** — he is willing to be owed by them, enough to cover a share of the weekend. He also says he will **sit in the middle** (a path-forward offer). The men who might front a bill line him the other way, so they can hold a claim **on Mitchell** instead of on each other.
+
+Now the expenses:
+
+**John books the house, $1,000 on his card.** Five shares of $200. He keeps his own and **invoices** Mitchell, Zac, Daniel, and Josh $200 each.
+
+They do not PayID John. They **path-pay him through Mitchell**:
+
+1. **Zac to Mitchell.** Zac draws on Mitchell’s line. Zac owes Mitchell $200.
+2. **Mitchell to John.** Mitchell forwards. John now holds a claim on Mitchell (or Mitchell owes him less).
+
+Same for Daniel and Josh. John is **paid**. He is not chasing Zac’s bank details. He is owed by **Mitchell**.
+
+**Zac buys the tickets, $400.** He invoices the other four $80. They pay through Mitchell again. Zac is not floating four mates until Monday.
+
+**Daniel puts down the entertainment deposit.** Same invoices, same path. He is not the group’s unofficial lender.
+
+By the next day the pairwise IOUs between the bucks have been **exchanged for Mitchell’s debt**. Look at the books:
+
+- Each invitee owes **Mitchell** their share of what they did not front themselves.
+- Whoever paid a real card holds a claim **on Mitchell** for the rest of that bill.
+
+Nobody has to settle with four hungover people. **Only Mitchell chases or settles.** He can collect cash, net against a claim he already has, or wait. The man who put the house on his Visa already has his settlement path. No awkward cash requests on or after the night.
+
 ---
 
 ## The ledger
@@ -356,6 +386,6 @@ Off-chain path search lives in the service crate (`path_find`) and is called fro
 
 **Path pay** — pay someone by walking through a friend, all or nothing.
 
-**Path-forward** — “I’ll be that friend in the middle.”
+**Path-forward** — “I’ll be that friend in the middle.” Mitchell on the bucks weekend.
 
-**Buy-claim / sell-claim** — someone *buys your IOU*. Different tool from path pay.
+**Buy-claim / sell-claim** — someone *buys your IOU*. Different tool from path pay. Not in these stories.
