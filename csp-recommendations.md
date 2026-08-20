@@ -118,9 +118,9 @@ default they need a `setCsp` override = **default + enumerated hosts in
 | --- | --- | --- |
 | `homepage` (Homepage, incl. Chainmail/Contacts/Tokens/Token-swap/Accounts-marketplace sub-apps) | `invite.{root}` `tokens.{root}` `token-swap.{root}` `vserver.{root}` `producers.{root}` `profiles.{root}` `namemarket.{root}` | invite GraphQL (`pages/invite.tsx`); tokens GraphQL (`apps/tokens/lib/graphql/ui.ts`, shared `use-system-token`); token-swap GraphQL (`apps/token-swap/hooks/use-pools.ts`); shared `use-billing-config` (vserver); shared `get-producers`; shared `use-profile` (nav/contacts); shared `use-account-markets` |
 | `config` (Config) | `producers.{root}` `sites.{root}` `staged-tx.{root}` `transact.{root}` `vserver.{root}` `tokens.{root}` `profiles.{root}` `x-admin.{root}` `packages.{root}` **`http:` `https:`** | candidates/tx-history/staged-tx hooks; sites GraphQL (logo check); vserver pricing hooks; shared `use-system-token`; sidebar profile; package-index fetches. The `http:`/`https:` scheme sources exist because Config's custom package sources are user-configured URLs at arbitrary hosts — a supported feature that cannot be host-allowlisted. They subsume the enumerated hosts (kept to document first-party needs, and so the list survives if the scheme grant is ever replaced by a package-source proxy). Trade-off: Config alone retains a fetch-anywhere channel; acceptable because it is an operator-facing app, but see Watch list. |
-| `fractal-cr` (FractalCore) | `guilds.{root}` `invite.{root}` `staged-tx.{root}` `profiles.{root}` | guild/invite GraphQL (`lib/graphql/fractals/*`); staged-tx via shared `checkLastTx`; sidebar profile |
+| `fractal-cr` (FractalCore) | `guilds.{root}` `fractals.{root}` `evaluation.{root}` `invite.{root}` `staged-tx.{root}` `profiles.{root}` | guild/fractal/invite GraphQL (`lib/graphql/fractals/*`, shared `get-fractal`/`get-membership`); evaluation GraphQL (`lib/graphql/evaluations/*`); staged-tx via shared `checkLastTx`; sidebar profile |
 | `workshop` (Workshop) | `registry.{root}` `setcode.{root}` `sites.{root}` `profiles.{root}` | app-metadata (registry), code-hash (setcode), site-config (sites) hooks; sidebar profile |
-| `tok-stream` (TokenStream) | `token-stream.{root}` `nft.{root}` `tokens.{root}` `profiles.{root}` | stream/nft/token GraphQL (`lib/get-*.ts`); sidebar profile. |
+| `tok-stream` (TokenStream) | `nft.{root}` `tokens.{root}` `profiles.{root}` | nft/token GraphQL (`lib/get-*.ts`); stream GraphQL is same-origin (covered by `'self'`); sidebar profile. |
 | `accounts` (Accounts) | `tokens.{root}` `namemarket.{root}` | system-token lookup and account-market overview in `create-prompt.tsx` (shared `use-system-token`, `use-account-markets`) |
 
 Explorer and Docs also exist on this branch but need exceptions (see below)
@@ -410,10 +410,10 @@ object-src 'none';
 | Identity, CommonApi (incl. plugin-tester) | `identity`, `common-api` | **Default** | site-wide | Verified same-origin-only fetches |
 | Homepage | `homepage` | Default + `connect-src` allowlist | site-wide (SPA) | Direct GraphQL to `invite`, `tokens`, `token-swap`, `vserver`, `producers`, `profiles` |
 | Config | `config` | Default + `connect-src` allowlist + `http:`/`https:` | site-wide (SPA) | Direct GraphQL/fetches to first-party services, plus user-configured custom package sources at arbitrary hosts |
-| FractalCore | `fractal-cr` | Default + `connect-src` allowlist | site-wide (SPA) | Direct GraphQL to `guilds`, `invite`, `staged-tx`, `profiles` |
+| FractalCore | `fractal-cr` | Default + `connect-src` allowlist | site-wide (SPA) | Direct GraphQL to `guilds`, `fractals`, `evaluation`, `invite`, `staged-tx`, `profiles` |
 | Workshop | `workshop` | Default + `connect-src` allowlist | site-wide (SPA) | Direct GraphQL to `registry`, `setcode`, `sites`, `profiles` |
 | Evaluations, Fractals | `evaluation`, `fractals` | **Default** (no override) | site-wide (SPA) | Sidebar profile lookup (`profiles`) is covered by the default `connect-src` grant |
-| TokenStream | `tok-stream` | Default + `connect-src` allowlist | site-wide (SPA) | Direct GraphQL to `token-stream`, `nft`, `tokens`, `profiles` |
+| TokenStream | `tok-stream` | Default + `connect-src` allowlist | site-wide (SPA) | Direct GraphQL to `nft`, `tokens`, `profiles` (own stream GraphQL is same-origin) |
 | Supervisor | `supervisor` | Exception 1 | site-wide | Wasm/blob, embeds prompts, embedded by all apps; sole holder of the `connect-src` wildcard |
 | Accounts | `accounts` | Exception 2 | site-wide (SPA) | Serves prompt pages embedded by supervisor |
 | Permissions | `perms` | Exception 3 | path (`/plugin/web/prompt/permissions/index.html`) | Serves a prompt page embedded by supervisor |

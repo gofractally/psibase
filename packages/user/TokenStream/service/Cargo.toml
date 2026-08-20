@@ -9,7 +9,7 @@ publish.workspace = true
 postinstall = [
     { sender = "tok-stream", service = "sites", method = "enablespa", data = { enable = true } },
     { sender = "tok-stream", service = "tokens", method = "setUserConf", data = { index = 0, enabled = false } },
-    { sender = "tok-stream", service = "sites", method = "setcsp", data = { path = "*", csp = "default-src 'self';script-src 'self';style-src 'self' 'unsafe-inline';img-src 'self' data: profiles.{{root}}/avatar/ branding.{{root}};font-src 'self';connect-src 'self' token-stream.{{root}} nft.{{root}} tokens.{{root}} profiles.{{root}};frame-src supervisor.{{root}};frame-ancestors 'self';base-uri 'none';form-action 'self';object-src 'none';" } },
+    { sender = "tok-stream", service = "sites", method = "setcsp", data = { path = "*", csp = "default-src 'self';script-src 'self';style-src 'self' 'unsafe-inline';img-src 'self' data: profiles.{{root}}/avatar/ branding.{{root}};font-src 'self';connect-src 'self' nft.{{root}} tokens.{{root}} profiles.{{root}};frame-src supervisor.{{root}};frame-ancestors 'self';base-uri 'none';form-action 'self';object-src 'none';" } },
 ]
 
 server = "r-token-stream"
