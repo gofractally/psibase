@@ -15,7 +15,7 @@ use db::*;
 use host::common::{self as Host, server as Server};
 use host::db::store as Store;
 use host::types::types::{self as HostTypes, BodyTypes};
-use transact::plugin::types::Claim;
+use transact::plugin::types::{Action, Claim};
 use virtual_server::plugin::transact as VirtualServer;
 
 // Exported interfaces/types
