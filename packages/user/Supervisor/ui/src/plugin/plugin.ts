@@ -8,6 +8,7 @@ import {
 import { kebabToCamel, kebabToPascal } from "../case";
 import { CompiledPlugin } from "../component-loading";
 import {
+    CompileOptions,
     ServiceMap,
     compilePlugin,
     getPluginService,
@@ -39,6 +40,9 @@ export class Plugin {
 
     private compiledPlugin: CompiledPlugin | undefined;
     private pluginModule: any;
+    private sharedInstantiate: (() => Promise<{ exports: Record<string, unknown> }>) | undefined;
+    private namespacedExports = false;
+    stackManagedByTracer = false;
 
     private resources: Map<number, any> = new Map();
     private nextResourceHandle: number = 1;
@@ -120,17 +124,7 @@ export class Plugin {
     }
 
     private async doReady(): Promise<void> {
-        const api = await this.parsed;
-        const services = await this.services;
-        const privileged = this.id.service === "host";
-        this.compiledPlugin = await compilePlugin(
-            this.id.service,
-            privileged,
-            this.bytes!,
-            this.host,
-            api,
-            services,
-        );
+        await this.parsed;
     }
 
     private get isInstantiated(): boolean {
@@ -151,8 +145,49 @@ export class Plugin {
         this.ready = this.doReady();
     }
 
+    getBytes(): Uint8Array | undefined {
+        return this.bytes;
+    }
+
+    isCompiled(): boolean {
+        return this.compiledPlugin !== undefined || this.sharedInstantiate !== undefined;
+    }
+
+    async compileIndividual(options: CompileOptions = {}): Promise<void> {
+        if (this.compiledPlugin || this.sharedInstantiate) return;
+        const api = await this.parsed;
+        const services = await this.services;
+        const privileged = this.id.service === "host";
+        this.compiledPlugin = await compilePlugin(
+            this.id.service,
+            privileged,
+            this.bytes!,
+            this.host,
+            api,
+            services,
+            options,
+        );
+    }
+
+    attachShared(
+        instantiate: () => Promise<{ exports: Record<string, unknown> }>,
+        namespaced: boolean,
+        traced: boolean,
+    ): void {
+        this.pluginModule = undefined;
+        this.compiledPlugin = undefined;
+        this.sharedInstantiate = instantiate;
+        this.namespacedExports = namespaced;
+        this.stackManagedByTracer = traced;
+    }
+
     async instantiate(): Promise<void> {
         if (this.pluginModule) return;
+        if (this.sharedInstantiate) {
+            const { exports } = await this.sharedInstantiate();
+            this.pluginModule = exports;
+            return;
+        }
         if (!this.compiledPlugin) throw new PluginInvalid(this.id);
         const { exports } = await this.compiledPlugin.instantiate();
         this.pluginModule = exports;
@@ -162,6 +197,16 @@ export class Plugin {
         if (!this.isInstantiated) return false;
 
         this.pluginModule = undefined;
+        // Also drop the composite instantiate memo: it strongly references
+        // the instantiated composite (and every core Memory inside it), so
+        // keeping it across entry() calls pins each composite's address
+        // space until Chromium's per-tab wasm limit OOMs. It would also let
+        // a later call reuse a stale composite from a previous entry.
+        // compiledPlugin (Module only, no Memory) is intentionally kept so
+        // re-instantiation skips transpiling.
+        this.sharedInstantiate = undefined;
+        this.namespacedExports = false;
+        this.stackManagedByTracer = false;
         this.resources.clear();
         this.nextResourceHandle = 1;
         return true;
@@ -182,12 +227,33 @@ export class Plugin {
         }
 
         const jsMethod = kebabToCamel(method);
+        const iface = this.lookupInterface(intf);
         const func =
             typeof intf === "undefined" || intf === ""
                 ? this.pluginModule[jsMethod]
-                : this.pluginModule[kebabToCamel(intf)][jsMethod];
+                : iface?.[jsMethod];
+
+        if (typeof func !== "function") {
+            const keys = Object.keys(iface ?? this.pluginModule ?? {}).slice(0, 20);
+            throw new Error(
+                `${pluginString(this.id)}/${intf ?? ""}->${method} is not a function ` +
+                    `(looked up ${jsMethod}; keys: ${keys.join(", ")})`,
+            );
+        }
 
         return func(...params);
+    }
+
+    exportsResources(): boolean {
+        if (!this.componentAPI) return false;
+        return this.componentAPI.exportedFuncs.interfaces.some((i) =>
+            i.funcs.some(
+                (f) =>
+                    f.name.includes("[constructor]") ||
+                    f.name.includes("[method]") ||
+                    f.name.includes("[static]"),
+            ),
+        );
     }
 
     resourceCall(
@@ -213,7 +279,7 @@ export class Plugin {
                 );
             }
             const module = intf
-                ? this.pluginModule[kebabToCamel(intf)]
+                ? this.lookupInterface(intf)
                 : this.pluginModule;
             const resourceClass = module?.[jsType];
             if (!resourceClass) {
@@ -253,6 +319,33 @@ export class Plugin {
         }
 
         return resource[jsMethod](...params);
+    }
+
+    private lookupInterface(intf: string | undefined): any {
+        if (typeof intf === "undefined" || intf === "") {
+            return this.pluginModule;
+        }
+        const keys = [`${this.id.service}:${this.id.plugin}/${intf}`];
+        if (this.componentAPI) {
+            for (const i of this.componentAPI.exportedFuncs.interfaces) {
+                if (i.name !== intf) continue;
+                const wit = `${i.namespace}:${i.package}/${intf}`;
+                if (!keys.includes(wit)) keys.push(wit);
+            }
+        }
+        for (const key of keys) {
+            if (this.pluginModule[key]) {
+                return this.pluginModule[key];
+            }
+        }
+        // Flattened `api` collides across plugins in a composite.
+        if (!this.namespacedExports) {
+            const camel = kebabToCamel(intf);
+            if (this.pluginModule[camel]) {
+                return this.pluginModule[camel];
+            }
+        }
+        return undefined;
     }
 
     getJson(): string {

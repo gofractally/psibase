@@ -68,6 +68,10 @@ export class ServiceContext {
         return { plugin: p, new: true };
     }
 
+    listPlugins(): Plugin[] {
+        return this.plugins;
+    }
+
     hasLoaded(plugin: Plugin): boolean {
         return this.plugins.some(
             (p) =>

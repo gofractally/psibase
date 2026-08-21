@@ -1,7 +1,7 @@
 package host:client;
 
 /// Facts about the current plugin call, derived from the service call stack.
-/// This plugin is a leaf: it imports only the bridge (service-stack, root domain).
+/// Identity reads come from supervisor:callstack; the bridge is root domain.
 interface api {
     /// Gets the account name of the caller app
     get-sender: func() -> string;

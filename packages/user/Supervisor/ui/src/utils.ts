@@ -51,6 +51,7 @@ export function assert(
 }
 
 let modulePromise: Promise<any>;
+let composerPromise: Promise<any>;
 
 export const parser = (): Promise<any> => {
     if (!modulePromise) {
@@ -64,6 +65,20 @@ export const parser = (): Promise<any> => {
             .then(({ exports }) => exports);
     }
     return modulePromise;
+};
+
+export const composer = (): Promise<any> => {
+    if (!composerPromise) {
+        const url = siblingUrl(
+            null,
+            "supervisor",
+            "/common/plugin_composer.wasm",
+        );
+        composerPromise = wasmFromUrl(url)
+            .then((bytes) => loadBasic(bytes, "plugin-composer.js"))
+            .then(({ exports }) => exports);
+    }
+    return composerPromise;
 };
 
 let queryToken: string | undefined;

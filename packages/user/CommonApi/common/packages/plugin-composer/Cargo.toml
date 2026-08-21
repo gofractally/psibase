@@ -1,0 +1,29 @@
+[package]
+name = "plugin-composer"
+version = "0.25.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.81"
+indexmap = "2.2.6"
+wac-graph = "0.10.1"
+wat = "1.247.0"
+wit-bindgen-rt = { version = "0.37.0", features = ["bitflags"] }
+wit-component = { version = "0.247.0", features = ["dummy-module"] }
+wit-parser = "0.247.0"
+
+[dev-dependencies]
+wit-component = { version = "0.247.0", features = ["dummy-module"] }
+
+[profile.release]
+codegen-units = 1
+opt-level = "s"
+debug = false
+strip = true
+lto = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[package.metadata.component]
+package = "plugin:composer"

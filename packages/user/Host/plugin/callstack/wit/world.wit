@@ -1,0 +1,14 @@
+package supervisor:callstack;
+
+/// In-composite service stack. Tracers write; host:client reads.
+/// JS seeds the UI / supervisor frames and leftover imports still bind here.
+interface callstack {
+    push: func(service: string);
+    pop: func();
+    service-stack: func() -> list<string>;
+    reset: func();
+}
+
+world imports {
+    import callstack;
+}

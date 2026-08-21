@@ -7,6 +7,7 @@ import {
 
 import {
     BridgeImports,
+    CallstackImports,
     HostInterface,
     HttpRequest,
     HttpResponse,
@@ -55,10 +56,19 @@ export class PluginHost implements HostInterface {
     private supervisor: Supervisor;
 
     public bridge: BridgeImports;
+    public callstack: CallstackImports;
 
     constructor(supervisor: Supervisor) {
         this.supervisor = supervisor;
         this.bridge = this.privilegedPluginImports();
+        this.callstack = {
+            "supervisor:callstack/callstack": {
+                push: (service: string) => this.supervisor.pushTracerFrame(service),
+                pop: () => this.supervisor.popTracerFrame(),
+                serviceStack: () => this.supervisor.getServiceStack(),
+                reset: () => this.supervisor.resetTracerStack(),
+            },
+        };
     }
 
     private recoverableError(message: string): RecoverableErrorPayload {

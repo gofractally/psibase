@@ -1,16 +1,10 @@
 package supervisor:bridge;
 
 interface types {
-    record error {
-        code: u32,
-        producer: plugin-id,
-        message: string,
-    }
-
-    record plugin-id {
-        service: string,
-        plugin: string,
-    }
+    // Anchor shared types in host:types so wac can merge the implicit
+    // supervisor:bridge/intf import across host plugins (crypto's copy
+    // uses host:types/types.error directly).
+    use host:types/types.{error, plugin-id};
 
     variant body-types {
         bytes(list<u8>),

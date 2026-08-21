@@ -1384,6 +1384,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "host-callstack"
+version = "0.27.0"
+dependencies = [
+ "psibase-plugin-workspace-hack",
+ "wit-bindgen-rt",
+]
+
+[[package]]
 name = "host-http"
 version = "0.27.0"
 dependencies = [
