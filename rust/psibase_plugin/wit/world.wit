@@ -10,5 +10,5 @@ world plugin-imports {
     
     import permissions:plugin/api;
     import permissions:plugin/types;
-    import transact:plugin/intf;
+    import transact:actions/intf;
 }

@@ -6,7 +6,7 @@ use bindings::exports::nft::plugin::user::Guest as User;
 use bindings::exports::nft::plugin::user_config::Guest as UserConfig;
 
 use bindings::host::types::types::Error;
-use bindings::transact::plugin::intf::add_action_to_transaction;
+use bindings::transact::actions::intf::add_action_to_transaction;
 
 use psibase::fracpack::Pack;
 use psibase::{define_trust, FlagsType};

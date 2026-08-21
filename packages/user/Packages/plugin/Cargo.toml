@@ -33,7 +33,8 @@ world = "impl"
 "sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
 "accounts:query" = { path = "../../../system/Accounts/plugin/query/wit/world.wit" }
 "setcode:plugin" = { path = "../../../system/SetCode/plugin/wit/world.wit" }
-"transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
+"transact:actions" = { path = "../../../system/Transact/plugin/actions/wit/world.wit" }
+"transact:plugin" = { path = "../../../system/Transact/plugin/transact/wit/admin.wit" }
 
 [package.metadata.component.bindings]
 derives = ["serde::Deserialize", "serde::Serialize"]
