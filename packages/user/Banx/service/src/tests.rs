@@ -183,6 +183,86 @@ mod tests {
         Ok(())
     }
 
+    /// Bandit books $10 AUD of chores (he owes Bluey). Bluey pays Bingo $2.50
+    /// for a popper through dad — Bingo will not take Bluey's IOU. No line
+    /// from Bandit to Bluey: she can only spend what she is already owed.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_bluey_pays_bingo_popper_through_bandit(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let bandit = account!("bandit");
+        let bluey = account!("bluey");
+        let bingo = account!("bingo");
+        for a in [bandit, bluey, bingo] {
+            chain.new_account(a).unwrap();
+        }
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let chores = Quantity::new(100_000); // $10.0000
+        let popper = Quantity::new(25_000); // $2.5000
+        let leftover = Quantity::new(chores.value - popper.value);
+
+        Wrapper::push_from(&chain, bandit)
+            .deposit(bluey, aud, chores, 0, 0)
+            .get()?;
+        assert_eq!(exp(&chain, bluey, bandit, aud), chores.value);
+
+        // Children consider their parents debt to be as good as cash.
+        // Therefore set high credit limits.
+        Wrapper::push_from(&chain, bingo)
+            .st_crd_lne(bandit, aud, Quantity::new(1_000_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, bluey)
+            .st_crd_lne(bandit, aud, Quantity::new(1_000_000), false, 0, 0)
+            .get()?;
+
+        // Bandit allows forwarding to his children, free of charge.
+        Wrapper::push_from(&chain, bandit)
+            .st_fwd_ofr(bingo, aud, Quantity::new(0), 0, PPM_SCALE, never(), true)
+            .get()?;
+
+        Wrapper::push_from(&chain, bandit)
+            .st_fwd_ofr(bluey, aud, Quantity::new(0), 0, PPM_SCALE, never(), true)
+            .get()?;
+
+        assert!(Wrapper::push_from(&chain, bluey)
+            .path_pay(vec![hop(bingo, aud)], popper, popper, 0)
+            .get()
+            .is_err());
+
+        Wrapper::push_from(&chain, bluey)
+            .path_pay(vec![hop(bandit, aud), hop(bingo, aud)], popper, popper, 0)
+            .get()?;
+
+        assert_eq!(exp(&chain, bluey, bandit, aud), leftover.value);
+        assert_eq!(exp(&chain, bingo, bandit, aud), popper.value);
+        assert_eq!(exp(&chain, bandit, bluey, aud), 0);
+        assert_eq!(exp(&chain, bingo, bluey, aud), 0);
+        assert_eq!(exp(&chain, bluey, bingo, aud), 0);
+
+        assert!(Wrapper::push_from(&chain, bluey)
+            .path_pay(
+                vec![hop(bandit, aud), hop(bingo, aud)],
+                Quantity::new(leftover.value + 1),
+                Quantity::new(leftover.value + 1),
+                0,
+            )
+            .get()
+            .is_err());
+
+        Wrapper::push_from(&chain, bluey)
+            .path_pay(
+                vec![hop(bandit, aud), hop(bingo, aud)],
+                leftover,
+                leftover,
+                0,
+            )
+            .get()?;
+        assert_eq!(exp(&chain, bluey, bandit, aud), 0);
+        assert_eq!(exp(&chain, bingo, bandit, aud), chores.value);
+        Ok(())
+    }
+
     #[psibase::test_case(packages("Banx"))]
     fn test_path_pay_cross_asset(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
