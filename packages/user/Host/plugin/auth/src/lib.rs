@@ -19,7 +19,6 @@ use crate::bindings::{
         intf as Supervisor,
         types::{BodyTypes, Header, HttpRequest},
     },
-    transact::plugin::auth as Transact,
 };
 
 struct HostAuth;
@@ -35,7 +34,11 @@ fn bucket_id(user: &str) -> String {
 
 fn cookie_request(app: &str, endpoint: &str, body: String) -> HttpRequest {
     HttpRequest {
-        uri: format!("{}/{}", CallContext::get_app_url(app), endpoint.trim_start_matches('/')),
+        uri: format!(
+            "{}/{}",
+            CallContext::get_app_url(app),
+            endpoint.trim_start_matches('/')
+        ),
         method: "POST".to_string(),
         headers: vec![Header {
             key: "Content-Type".to_string(),
@@ -64,13 +67,13 @@ fn remove_active_query_token(app: &str, user: &str) {
 }
 
 impl Api for HostAuth {
-    fn set_logged_in_user(user: String, app: String) -> Result<(), Error> {
+    fn set_logged_in_user(user: String, app: String, auth_service: String) -> Result<(), Error> {
         check_caller(&["accounts"], "set-logged-in-user@host:auth/api");
 
-        let query_token = Bucket::new(DB, &bucket_id(&user))
-            .get(&app)
-            .map(|t| String::unpacked(&t).unwrap())
-            .unwrap_or_else(|| Transact::get_query_token(&app, &user).unwrap());
+        let query_token = match Bucket::new(DB, &bucket_id(&user)).get(&app) {
+            Some(t) => String::unpacked(&t).unwrap(),
+            None => mint_query_token(&app, &user, &auth_service)?,
+        };
 
         set_active_query_token(&query_token, &app, &user);
 

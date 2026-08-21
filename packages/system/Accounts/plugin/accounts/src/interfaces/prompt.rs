@@ -1,9 +1,9 @@
-use crate::bindings::accounts::client_query::api as CurrentUser;
 use crate::bindings::accounts::chain_query::api as AccountsQuery;
+use crate::bindings::accounts::client_query::api as CurrentUser;
 use crate::bindings::auth_sig::plugin as AuthSig;
 use crate::bindings::exports::accounts::plugin::prompt::{Credential, Guest as Prompt};
 use crate::bindings::host::{
-    crypto::keyvault as HostCrypto, client::api as Client, auth::api as HostAuth,
+    auth::api as HostAuth, client::api as Client, crypto::keyvault as HostCrypto,
     types::types::Error,
 };
 use crate::bindings::invite::plugin::redemption as Invites;
@@ -144,10 +144,14 @@ impl Prompt for AccountsPlugin {
             .contains(&account));
 
         let app = Client::get_active_app();
+        let auth_service = AccountsQuery::get_account(&account)
+            .expect("Get account failed")
+            .expect("Account not found")
+            .auth_service;
         AppsTable::new(&app).login(&account);
         UserTable::new(&account).add_connected_app(&app);
 
-        if HostAuth::set_logged_in_user(&account, &app).is_err() {
+        if HostAuth::set_logged_in_user(&account, &app, &auth_service).is_err() {
             AppsTable::new(&app).logout();
             UserTable::new(&account).remove_connected_app(&app);
         }
