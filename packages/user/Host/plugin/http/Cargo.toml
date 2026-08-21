@@ -1,5 +1,5 @@
 [package]
-name = "host-common"
+name = "host-http"
 version.workspace = true
 edition.workspace = true
 
@@ -7,7 +7,6 @@ edition.workspace = true
 wit-bindgen-rt.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-url = "2.4"
 psibase.workspace = true
 psibase-plugin-workspace-hack.workspace = true
 
@@ -15,7 +14,7 @@ psibase-plugin-workspace-hack.workspace = true
 crate-type = ["cdylib"]
 
 [package.metadata.component]
-package = "host:common"
+package = "host:http"
 
 [package.metadata.component.target]
 world = "impl"
@@ -24,4 +23,5 @@ world = "impl"
 "supervisor:bridge" = { path = "./wit/deps/supervisor.wit" }
 "accounts:query" = { path = "../../../../system/Accounts/plugin/query/wit/world.wit" }
 "host:types" = { path = "../types/wit/world.wit" }
+"host:client" = { path = "../client/wit/world.wit" }
 "host:auth" = { path = "../auth/wit/world.wit" }
