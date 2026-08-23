@@ -6,7 +6,8 @@ world impl {
     include accounts:query/imports;
     include setcode:plugin/imports;
     include sites:plugin/imports;
-    include transact:plugin/imports;
+    include transact:actions/imports;
+    import transact:plugin/admin;
 
     export queries;
     export private-api;

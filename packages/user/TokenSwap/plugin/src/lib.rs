@@ -8,7 +8,7 @@ use bindings::exports::token_swap::plugin::liquidity::Guest as Liquidity;
 use bindings::exports::token_swap::plugin::swap::Guest as Swap;
 
 use bindings::host::types::types::Error;
-use bindings::transact::plugin::intf::add_action_to_transaction;
+use bindings::transact::actions::intf::add_action_to_transaction;
 
 use bindings::tokens::plugin::helpers::decimal_to_u64;
 use bindings::tokens::plugin::user::credit;
