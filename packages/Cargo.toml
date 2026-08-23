@@ -7,6 +7,7 @@ members = [
     "system/AuthDelegate/plugin/",
     "system/AuthSig/plugin/",
     "system/Transact/plugin/actions/",
+    "system/Transact/plugin/login/",
     "system/Transact/plugin/transact/",
     "system/SetCode/plugin/",
     "system/Producers/plugin/",
