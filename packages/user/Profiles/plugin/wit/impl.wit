@@ -6,7 +6,8 @@ world impl {
     include transact:actions/imports;
 
     include host:db/imports;
-    include accounts:query/imports;
+    include accounts:chain-query/imports;
+    include accounts:client-query/imports;
     include permissions:plugin/imports;
 
     export api;

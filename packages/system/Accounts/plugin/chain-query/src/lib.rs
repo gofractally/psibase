@@ -1,13 +1,9 @@
 #[allow(warnings)]
 mod bindings;
-#[path = "../../shared/logged_in_user_table.rs"]
-mod logged_in_user;
 
-use bindings::exports::accounts::query::api::{Account, Guest as API};
+use bindings::exports::accounts::chain_query::api::{Account, Guest as API};
 use bindings::host::http::api as Server;
-use bindings::host::client::api as Client;
 use bindings::host::types::types::Error;
-use logged_in_user::logged_in_user_table;
 use psibase::plugin_error;
 use psibase::services::accounts as AccountsService;
 use psibase::AccountNumber;
@@ -104,18 +100,8 @@ fn generate_account(prefix: Option<String>) -> Result<String, Error> {
 }
 
 impl API for AccountsQuery {
-    fn is_logged_in() -> bool {
-        Self::get_current_user().is_some()
-    }
-
     fn get_account(name: String) -> Result<Option<Account>, Error> {
         lookup_account(name)
-    }
-
-    fn get_current_user() -> Option<String> {
-        logged_in_user_table()
-            .get(&Client::get_active_app())
-            .map(|a| String::from_utf8(a).unwrap())
     }
 
     fn gen_rand_account(prefix: Option<String>) -> Result<String, Error> {
