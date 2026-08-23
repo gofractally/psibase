@@ -5,8 +5,8 @@ import { RATE_SCALE } from "@/lib/constants";
  * Returns 0n on empty/invalid input.
  */
 /**
- * Unused line capacity in raw units. Revolving: `limit − exposure`.
- * Depleting: also capped by leftover grant (`remaining`); repay does not restore it.
+ * Line headroom in raw units. Revolving: `limit − exposure`.
+ * Depleting: also capped by `remaining`; repay does not restore it.
  */
 export function lineAvailableRaw(
     limitRaw: bigint,

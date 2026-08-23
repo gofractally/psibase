@@ -6,21 +6,21 @@
 
 use std::collections::{HashMap, HashSet};
 
-/// Matches service `RATE_SCALE` / `PPM_SCALE`.
-pub const RATE_SCALE: u64 = 1_000_000;
-pub const PPM_SCALE: u32 = 1_000_000;
+pub use crate::math::{
+    try_apply_hop_fee as apply_hop_fee, try_apply_rate as apply_rate, PPM_SCALE, RATE_SCALE,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LineEdge {
     pub creditor: String,
     pub debtor: String,
     pub asset_id: u16,
-    /// Line headroom plus reverse claim (raw units). 0 = closed.
-    pub residual: u64,
-    /// Reverse claim included in `residual` (what this creditor already owes
+    /// Reverse claim plus line headroom (raw units). 0 = closed.
+    pub capacity: u64,
+    /// Reverse claim included in `capacity` (what this creditor already owes
     /// the debtor). Unwind nets that pair; FX still uses the hop notional.
     pub reverse_claim: u64,
-    /// What the debtor already owes this creditor (same-direction tab).
+    /// What the debtor already owes this creditor (same-direction claim).
     pub exposure: u64,
     pub interest_rate_ppm: u32,
     /// True if a real credit-line row exists (not a reverse-claim-only edge).
@@ -84,43 +84,6 @@ fn is_global_creditor(c: &str) -> bool {
     c.is_empty() || c == "0"
 }
 
-/// `out = (in - fee_fixed) * rate / RATE_SCALE`. Returns `None` if invalid.
-pub fn apply_rate(amount_in: u64, fee_fixed: u64, rate: u64) -> Option<u64> {
-    if fee_fixed >= amount_in || rate == 0 {
-        return None;
-    }
-    let after = amount_in - fee_fixed;
-    let out = (after as u128)
-        .checked_mul(rate as u128)?
-        .checked_div(RATE_SCALE as u128)?;
-    let out = u64::try_from(out).ok()?;
-    if out == 0 {
-        return None;
-    }
-    Some(out)
-}
-
-/// Stripe-style: `out = in * (PPM_SCALE - percent) / PPM_SCALE - fixed`.
-pub fn apply_hop_fee(amount_in: u64, fee_fixed: u64, fee_percent_ppm: u32) -> Option<u64> {
-    // Must be under 100% (same as on-chain: hop_fee_percent < PPM_SCALE).
-    if fee_percent_ppm >= PPM_SCALE {
-        return None;
-    }
-    let keep = (PPM_SCALE - fee_percent_ppm) as u128;
-    let after_pct = (amount_in as u128)
-        .checked_mul(keep)?
-        .checked_div(PPM_SCALE as u128)?;
-    let after_pct = u64::try_from(after_pct).ok()?;
-    if fee_fixed >= after_pct {
-        return None;
-    }
-    let out = after_pct - fee_fixed;
-    if out == 0 {
-        return None;
-    }
-    Some(out)
-}
-
 fn resolve_routing<'a>(
     routing: &'a [RoutingEdge],
     next_creditor: &str,
@@ -157,7 +120,7 @@ struct Pred {
     hop_asset: u16,
 }
 
-/// Find a multi-hop path from `sender` to `payee` maximizing residual amount.
+/// Find a multi-hop path from `sender` to `payee` maximizing amount_out.
 ///
 /// `max_hops` is the maximum number of path_pay hops (1 = direct line only).
 /// `now` is unix seconds for policy expiry (use 0 to ignore wall-clock).
@@ -180,7 +143,7 @@ pub fn find_banx_path(
     }
 
     // Index lines by debtor for expansion. Known matches Connection::knows:
-    // a line who→them, or a live tab either way (including reverse-only).
+    // a line who→them, or a live claim either way (including reverse-only).
     let mut lines_by_debtor: HashMap<&str, Vec<&LineEdge>> = HashMap::new();
     let mut known: HashSet<(String, String, u16)> = HashSet::new();
     for l in lines {
@@ -191,7 +154,7 @@ pub fn find_banx_path(
             known.insert((l.creditor.clone(), l.debtor.clone(), l.asset_id));
             known.insert((l.debtor.clone(), l.creditor.clone(), l.asset_id));
         }
-        if l.residual > 0 {
+        if l.capacity > 0 {
             lines_by_debtor
                 .entry(l.debtor.as_str())
                 .or_default()
@@ -225,7 +188,7 @@ pub fn find_banx_path(
         if line.creditor == sender {
             continue;
         }
-        if amount_in > line.residual {
+        if amount_in > line.capacity {
             continue;
         }
         let key = (line.creditor.clone(), line.asset_id);
@@ -362,7 +325,7 @@ pub fn find_banx_path(
     Some(PathQuote {
         hops,
         amount_in,
-        // Prefer search residual when both agree; simulation is the fee source of truth.
+        // Prefer search amount_out when both agree; simulation is the fee source of truth.
         amount_out: if sim_out > 0 { sim_out } else { amount_out },
     })
 }
@@ -440,8 +403,8 @@ fn simulate_path_fees(
 /// Find a path that delivers at least `amount_out` to the payee, minimizing
 /// `amount_in` (sender absorbs hop/FX fees).
 ///
-/// Important: we must **not** probe the full first-hop residual first. A large
-/// `amount_in` often exceeds intermediate residuals and makes the exact-in
+/// Important: we must **not** probe the full first-hop capacity first. A large
+/// `amount_in` often exceeds intermediate capacity and makes the exact-in
 /// searcher return `None` even when a smaller send works (the exact-in UX
 /// case). Expand upward from a small probe, then binary-search the minimum
 /// send that still clears `amount_out`.
@@ -463,8 +426,8 @@ pub fn find_banx_path_exact_out(
 
     let max_in = lines
         .iter()
-        .filter(|l| l.debtor == sender && l.asset_id == from_asset && l.residual > 0)
-        .map(|l| l.residual)
+        .filter(|l| l.debtor == sender && l.asset_id == from_asset && l.capacity > 0)
+        .map(|l| l.capacity)
         .max()
         .unwrap_or(0);
     if max_in == 0 {
@@ -479,12 +442,12 @@ pub fn find_banx_path_exact_out(
 
     // Phase 1: find some amount_in that clears `amount_out`.
     //
-    // Do not probe max first-hop residual first — large notions often exceed
-    // intermediate residuals and look like "no path". Grow from small values.
+    // Do not probe max first-hop capacity first — large notions often exceed
+    // intermediate capacity and look like "no path". Grow from small values.
     //
     // Feasibility is not fully monotonic (fixed hop fees reject tiny notions;
-    // residual caps reject huge ones), so when doubling jumps over residual
-    // capacity we binary-search the gap for the largest still-feasible send.
+    // hop capacity rejects huge ones), so when doubling jumps over capacity
+    // we binary-search the gap for the largest still-feasible send.
     let mut probe = 1u64;
     let mut upper: Option<PathQuote> = None;
     let mut last_ok: Option<PathQuote> = None;
@@ -500,7 +463,7 @@ pub fn find_banx_path_exact_out(
             }
             None => {
                 if let Some(ref ok) = last_ok {
-                    // Doubling jumped past residual capacity. Search (ok, probe)
+                    // Doubling jumped past capacity. Search (ok, probe)
                     // for the largest feasible amount_in — may still be enough.
                     let mut flo = ok.amount_in.saturating_add(1);
                     let mut fhi = probe.saturating_sub(1);
@@ -595,7 +558,7 @@ fn expand_hops(
         else {
             continue;
         };
-        if draw > line.residual {
+        if draw > line.capacity {
             continue;
         }
         // APR cap is only on new line capacity, not a pure unwind.
@@ -631,12 +594,12 @@ fn expand_hops(
 mod tests {
     use super::*;
 
-    fn line(c: &str, d: &str, asset: u16, residual: u64) -> LineEdge {
+    fn line(c: &str, d: &str, asset: u16, capacity: u64) -> LineEdge {
         LineEdge {
             creditor: c.into(),
             debtor: d.into(),
             asset_id: asset,
-            residual,
+            capacity,
             reverse_claim: 0,
             exposure: 0,
             interest_rate_ppm: 0,
@@ -649,7 +612,7 @@ mod tests {
             creditor: c.into(),
             debtor: d.into(),
             asset_id: asset,
-            residual: headroom + reverse,
+            capacity: headroom + reverse,
             reverse_claim: reverse,
             exposure: 0,
             interest_rate_ppm: 0,
@@ -662,7 +625,7 @@ mod tests {
             creditor: c.into(),
             debtor: d.into(),
             asset_id: asset,
-            residual: reverse,
+            capacity: reverse,
             reverse_claim: reverse,
             exposure: 0,
             interest_rate_ppm: 0,
@@ -670,10 +633,10 @@ mod tests {
         }
     }
 
-    fn line_apr(c: &str, d: &str, asset: u16, residual: u64, apr_ppm: u32) -> LineEdge {
+    fn line_apr(c: &str, d: &str, asset: u16, capacity: u64, apr_ppm: u32) -> LineEdge {
         LineEdge {
             interest_rate_ppm: apr_ppm,
-            ..line(c, d, asset, residual)
+            ..line(c, d, asset, capacity)
         }
     }
 
@@ -765,7 +728,7 @@ mod tests {
     }
 
     #[test]
-    fn exact_in_still_works_with_tight_mid_residual() {
+    fn exact_in_still_works_with_tight_mid_capacity() {
         let lines = vec![
             line("gary", "alice", 1, 1_000_000),
             line("steve", "gary", 1, 20_000),
@@ -815,7 +778,7 @@ mod tests {
     }
 
     #[test]
-    fn exact_out_when_first_hop_residual_far_exceeds_mid_path() {
+    fn exact_out_when_first_hop_capacity_far_exceeds_mid_path() {
         let lines = vec![
             line("gary", "alice", 1, 1_000_000),
             line("steve", "gary", 1, 20_000),
@@ -839,7 +802,7 @@ mod tests {
     }
 
     #[test]
-    fn exact_out_doubling_gap_near_residual_cap() {
+    fn exact_out_doubling_gap_near_capacity_cap() {
         let lines = vec![
             line("gary", "alice", 1, 1_000_000),
             line("steve", "gary", 1, 20_000),
@@ -966,7 +929,7 @@ mod tests {
 
     #[test]
     fn reverse_claim_edges_unwind_path() {
-        // After A→B→C, reverse residuals let C→B→A unwind without opposite lines.
+        // After A→B→C, reverse claims let C→B→A unwind without opposite lines.
         let lines = vec![line("b", "c", 1, 100), line("a", "b", 1, 100)];
         let routing = vec![global_rte("b", 1, 0)];
         let q = find_banx_path(&lines, &routing, &[], "c", "a", 100, 1, Some(1), 4, 0)
@@ -978,7 +941,7 @@ mod tests {
     }
 
     /// Mirrors `test_max_line_apr_allows_unwind`: high APR on the next hop
-    /// does not block a hop that only unwinds a reverse tab.
+    /// does not block a hop that only unwinds a reverse claim.
     #[test]
     fn max_line_apr_allows_unwind() {
         let usd = 1u16;
@@ -1053,7 +1016,7 @@ mod tests {
                 0,
             )
             .is_none(),
-            "new-draw slice over reverse tab is still capped"
+            "new_draw over reverse claim is still capped"
         );
     }
 
@@ -1297,7 +1260,7 @@ mod tests {
             creditor: "gary".into(),
             debtor: "steve".into(),
             asset_id: 1,
-            residual: 0,
+            capacity: 0,
             reverse_claim: 0,
             exposure: 0,
             interest_rate_ppm: 0,
@@ -1319,10 +1282,10 @@ mod tests {
         assert_eq!(q.amount_out, 100);
     }
 
-    /// Cafe coffee: john has a prepaid tab (reverse-only), closed specific
-    /// forward to the cafe. Same as Connection::knows via a live tab.
+    /// Cafe coffee: john has a prepaid reverse claim, closed specific
+    /// forward to the cafe. Same as Connection::knows via a live claim.
     #[test]
-    fn closed_forward_known_via_reverse_tab() {
+    fn closed_forward_known_via_reverse_claim() {
         let lines = vec![
             line("john", "mitchell", 1, 1_000_000),
             reverse_only("cafe", "john", 1, 100_0000),
@@ -1349,7 +1312,7 @@ mod tests {
             4,
             0,
         )
-        .expect("prepaid tab is enough for closed forward");
+        .expect("prepaid reverse claim is enough for closed forward");
         assert_eq!(
             q.hops
                 .iter()

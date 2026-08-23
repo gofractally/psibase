@@ -72,7 +72,7 @@ function obligationRaw(o: Obligation, precision: number): bigint {
     );
 }
 
-/** Same as on-chain `Connection::knows(who, them)`: line who→them, or a live tab either way. */
+/** Same as on-chain `Connection::knows(who, them)`: line who→them, or a live claim either way. */
 function pairKnows(
     lines: CreditLine[],
     obligations: Obligation[],
@@ -102,7 +102,7 @@ function pairKnows(
     });
 }
 
-/** Buyer→debtor line residual, or `null` if they posted no line (no size cap). */
+/** Buyer→debtor line capacity, or `null` if they posted no line (no size cap). */
 function buyerLineCap(
     lines: CreditLine[],
     buyer: string,
@@ -451,7 +451,7 @@ export function SellClaimDialog({
                                     {target.debtor}
                                 </span>{" "}
                                 ({target.symbol}). They must know you (a
-                                line to you, or a live tab). Your line to
+                                line to you, or a live claim). Your line to
                                 them is optional and only caps size. You
                                 get the claim on {target.debtor}; the
                                 seller receives face after their spread as
@@ -465,7 +465,7 @@ export function SellClaimDialog({
                                 </span>{" "}
                                 ({target.symbol}) to a buyer with a live
                                 buy-claim offer. {target.debtor} must know
-                                the buyer (a line to them, or a live tab).
+                                the buyer (a line to them, or a live claim).
                                 A buyer line is optional and only caps
                                 size. You receive a claim on the buyer for
                                 face after their spread.

@@ -1047,7 +1047,7 @@ function CreditLineDialog({
                             </span>
                             {editing.depleteOnDebit ? (
                                 <>
-                                    . Remaining grant:{" "}
+                                    . Remaining:{" "}
                                     <span className="text-foreground font-mono tabular-nums">
                                         {formatRawAmount(
                                             editing.remaining,
@@ -1559,7 +1559,7 @@ function AccountGroupRow({
                                     {creditLine.depleteOnDebit &&
                                     remainingRaw !== null ? (
                                         <div>
-                                            Remaining grant{" "}
+                                            Remaining{" "}
                                             <span className="text-foreground font-mono tabular-nums">
                                                 {formatRawAmount(
                                                     remainingRaw.toString(),

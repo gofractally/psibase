@@ -427,7 +427,7 @@ mod tests {
             10_000,
             "Zac owes Mitchell 10000 AUD"
         );
-        // John prices AUD→USD but does not rebook Mitchell's AUD tab.
+        // John prices AUD→USD but does not rebook Mitchell's AUD claim.
         assert_eq!(
             exp(&chain, john, mitchell, aud),
             9_500,
@@ -461,8 +461,8 @@ mod tests {
     /// Friends pay the cafe through John instead of cards. John posts a
     /// 1% path-forward toward the cafe. Cafe invoices Mitchell $5; he
     /// path-pays through John and must send more than $5 so $5 arrives.
-    /// John is leaving, so he sells $90 of leftover cafe credit to Pippa
-    /// at a 5/90 haircut: she takes the $90 tab and owes him $85.
+    /// John is leaving, so he sells $90 of cafe claim to Pippa
+    /// at a 5/90 haircut: she takes the $90 claim and owes him $85.
     #[psibase::test_case(packages("Banx"))]
     fn test_path_pay_cafe(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
@@ -683,7 +683,7 @@ mod tests {
         Ok(())
     }
 
-    /// Convert nets `from_asset` before the rebook. A reverse tab of 40 against
+    /// Convert nets `from_asset` before the rebook. A reverse claim of 40 against
     /// a 100 claim leaves 60 to convert — no separate `net` first.
     #[psibase::test_case(packages("Banx"))]
     fn test_convert_nets_from_asset_first(chain: psibase::Chain) -> Result<(), psibase::Error> {
@@ -1155,7 +1155,7 @@ mod tests {
     }
 
     /// High APR on the next hop's line does not block a hop that only unwinds
-    /// a reverse tab (no new draw at that APR).
+    /// a reverse claim (no new draw at that APR).
     #[psibase::test_case(packages("Banx"))]
     fn test_max_line_apr_allows_unwind(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
@@ -1218,14 +1218,14 @@ mod tests {
         assert_eq!(exp(&chain, bob, alice, usd), 60);
         assert!(exp(&chain, bob, alice, usd) <= line.limit.value);
 
-        // Leftover grant is 40, not 40-after-shrunk-cap.
+        // Remaining is 40, not 40-after-shrunk-cap.
         Wrapper::push_from(&chain, alice)
             .path_pay(vec![hop(bob, usd)], Quantity::new(40), Quantity::new(40), 0)
             .get()?;
         assert_eq!(exp(&chain, bob, alice, usd), 100);
         assert_eq!(CreditLine::get_assert(bob, alice, usd).remaining.value, 0);
 
-        // Repay does not restore grant.
+        // Repay does not restore remaining.
         Wrapper::push_from(&chain, bob)
             .deposit(alice, usd, Quantity::new(100), 0, 0)
             .get()?;
@@ -1238,7 +1238,7 @@ mod tests {
     }
 
     #[psibase::test_case(packages("Banx"))]
-    fn test_sell_claim_consumes_depleting_grant(
+    fn test_sell_claim_consumes_depleting_remaining(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
@@ -1271,24 +1271,24 @@ mod tests {
         Ok(())
     }
 
-    /// Claim transfer spends depleting grant only on the *new* slice,
+    /// Claim transfer spends remaining only on `new_draw`,
     /// same as `path_pay` (`new_draw = amount − reverse`).
     ///
     /// Auto-net means a pair is only ever live in one direction, so the
-    /// line cap is `capacity` (reverse + headroom). Grant is the bug if
-    /// we `consume_grant(amount)` for the full face: a standing buy offer
+    /// line cap is `capacity` (reverse + headroom). Remaining is the bug if
+    /// we `consume_remaining(amount)` for the full face: a standing buy offer
     /// plus a depleting line can be griefed — the seller hits the bid,
     /// the books net to zero against the buyer's existing debt to the
-    /// debtor, and the grant still shrinks.
+    /// debtor, and remaining still shrinks.
     ///
     /// Books before the take:
     /// - Alice holds 50 on Bob (the claim being sold)
-    /// - Peter owes Bob 50 (the reverse tab)
-    /// - Peter's depleting line to Bob is 100, grant still 100
+    /// - Peter owes Bob 50 (the reverse claim)
+    /// - Peter's depleting line to Bob is 100, remaining still 100
     ///
-    /// After a take of 50: pair nets to 0, grant still 100.
+    /// After a take of 50: pair nets to 0, remaining still 100.
     #[psibase::test_case(packages("Banx"))]
-    fn test_sell_claim_grant_only_new_draw(
+    fn test_sell_claim_remaining_only_new_draw(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
@@ -1304,7 +1304,7 @@ mod tests {
         Wrapper::push_from(&chain, bob)
             .deposit(alice, usd, Quantity::new(50), 0, 0)
             .get()?;
-        // Peter owes Bob 50. Same pair, other way: the reverse tab.
+        // Peter owes Bob 50. Same pair, other way: the reverse claim.
         Wrapper::push_from(&chain, peter)
             .deposit(bob, usd, Quantity::new(50), 0, 0)
             .get()?;
@@ -1314,7 +1314,7 @@ mod tests {
         Wrapper::push_from(&chain, peter)
             .st_glb_buy(usd, Quantity::new(0), 0, never())
             .get()?;
-        // Debtor must know the buyer. Live tabs already exist both ways;
+        // Debtor must know the buyer. Live claims already exist both ways;
         // a 0-limit line is the same consent `path_pay` would use.
         Wrapper::push_from(&chain, bob)
             .st_crd_lne(peter, usd, Quantity::new(0), false, 0, 0)
@@ -1338,8 +1338,8 @@ mod tests {
         let line = CreditLine::get_assert(peter, bob, usd);
         assert_eq!(
             line.remaining.value, 100,
-            "face 50 fully unwound the reverse tab, so new_draw is 0 \
-             and grant must stay 100"
+            "face 50 fully unwound the reverse claim, so new_draw is 0 \
+             and remaining must stay 100"
         );
         Ok(())
     }
@@ -3049,7 +3049,7 @@ mod tests {
                 alice,
                 usd,
                 Quantity::new(2_000),
-                "tab".into(),
+                "settle".into(),
                 never(),
             )
             .get()?;
@@ -3170,9 +3170,9 @@ mod tests {
         Ok(())
     }
 
-    /// Editing a depleting line (APR / limit) must not refill a spent grant.
+    /// Editing a depleting line (APR / limit) must not refill spent remaining.
     #[psibase::test_case(packages("Banx"))]
-    fn test_want_deplete_edit_does_not_refill_grant(
+    fn test_want_deplete_edit_does_not_refill_remaining(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
@@ -3196,8 +3196,8 @@ mod tests {
         assert_eq!(
             CreditLine::get_assert(bob, alice, usd).remaining.value,
             40,
-            "test_want_deplete_edit_does_not_refill_grant: APR-only upsert reset remaining \
-             to the limit; spent grant must stay 40"
+            "test_want_deplete_edit_does_not_refill_remaining: APR-only upsert reset remaining \
+             to the limit; spent remaining must stay 40"
         );
 
         Wrapper::push_from(&chain, bob)
@@ -3206,7 +3206,7 @@ mod tests {
         assert_eq!(
             CreditLine::get_assert(bob, alice, usd).remaining.value,
             40,
-            "test_want_deplete_edit_does_not_refill_grant: raising the limit refilled remaining"
+            "test_want_deplete_edit_does_not_refill_remaining: raising the limit refilled remaining"
         );
         Ok(())
     }

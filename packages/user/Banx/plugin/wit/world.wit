@@ -27,7 +27,7 @@ interface types {
         hops: list<path-hop-quote>,
         /// Amount to draw on the first hop (human decimal in first hop asset).
         amount-in: string,
-        /// Estimated residual after fees (human decimal in last hop asset).
+        /// Estimated amount_out after fees (human decimal in last hop asset).
         amount-out: string,
         /// Suggested min-return for `path-pay` (human decimal in last hop asset).
         min-return: string,
@@ -268,7 +268,7 @@ interface api {
     ) -> result<_, error>;
 
     /// Discover a multi-hop path from `from-account` to `to-account` (TokenSwap-style
-    /// max-residual search over credit lines / routing / FX). Uses a scoped GraphQL
+    /// max amount_out search over credit lines / forward offers / FX). Uses a scoped GraphQL
     /// subgraph around the two endpoints — not a full-network dump.
     ///
     /// - `exact-out = false` (default): `amount` is what you send (`from-asset`);

@@ -1,8 +1,8 @@
 use crate::bindings::host::common::server;
 use crate::errors::ErrorType;
 use banx::path_find::{FxEdge, LineEdge, RoutingEdge};
-use psibase::AccountNumber;
 use psibase::services::tokens::Decimal;
+use psibase::AccountNumber;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -31,7 +31,7 @@ struct GqlCreditLine {
     creditor: AccountNumber,
     debtor: AccountNumber,
     asset_id: u16,
-    residual: Decimal,
+    capacity: Decimal,
     reverse_claim: Decimal,
     exposure: Decimal,
     interest_rate_ppm: u32,
@@ -93,7 +93,7 @@ pub fn fetch_path_graph(
             pathGraph(from: "{from}", to: "{to}", maxHops: {max_hops}) {{
                 now
                 creditLines {{
-                    creditor debtor assetId residual reverseClaim exposure interestRatePpm isLine
+                    creditor debtor assetId capacity reverseClaim exposure interestRatePpm isLine
                 }}
                 forwardOffers {{
                     poster nextHop assetId feeFixed feePercentPpm maxLineAprPpm
@@ -116,12 +116,12 @@ pub fn fetch_path_graph(
 
     let mut lines = Vec::with_capacity(g.credit_lines.len());
     for l in g.credit_lines {
-        let residual = l.residual.quantity.value;
+        let capacity = l.capacity.quantity.value;
         lines.push(LineEdge {
             creditor: l.creditor.to_string(),
             debtor: l.debtor.to_string(),
             asset_id: l.asset_id,
-            residual,
+            capacity,
             reverse_claim: l.reverse_claim.quantity.value,
             exposure: l.exposure.quantity.value,
             interest_rate_ppm: l.interest_rate_ppm,

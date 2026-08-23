@@ -1,5 +1,7 @@
 /// Daily compound interest (path-independent closed form).
 pub mod interest;
+/// Shared fee / FX integer math (on-chain and path search).
+pub mod math;
 /// Off-chain path discovery for multi-hop `path_pay` (TokenSwap-style search).
 pub mod path_find;
 
@@ -13,11 +15,10 @@ pub mod tables {
     };
     use serde::{Deserialize, Serialize};
 
-    /// Parts-per-million scale: `PPM_SCALE` = 100%.
-    ///
-    /// Used for interest APR, FX/`fx_rate`, and max accept rates so one unit
-    /// system covers “percent-like” quantities (`10_000` = 1%, full scale = 100%).
-    pub const PPM_SCALE: u32 = 1_000_000;
+    pub use crate::math::{PPM_SCALE, RATE_SCALE};
+
+    /// Alias of [`RATE_SCALE`] (1:1 FX).
+    pub const FX_RATE_SCALE: u64 = RATE_SCALE;
 
     /// Abort unless `who` is a live chain account (not the reserved 0).
     pub(crate) fn assert_account_exists(who: AccountNumber) {
@@ -139,12 +140,6 @@ pub mod tables {
         }
     }
 
-    /// Scale for rates/takes: `out = in * rate / RATE_SCALE`.
-    /// Equal to [`PPM_SCALE`]; `RATE_SCALE` = identity (1:1).
-    pub const RATE_SCALE: u64 = PPM_SCALE as u64;
-
-    pub const FX_RATE_SCALE: u64 = RATE_SCALE;
-
     fn expires_live(expires_at: TimePointSec) -> bool {
         if expires_at.seconds == 0 {
             return true;
@@ -158,92 +153,57 @@ pub mod tables {
 
     /// `out = (in - fee_fixed) * rate / RATE_SCALE`.
     fn apply_rate(amount_in: Quantity, fee_fixed: Quantity, rate: u64) -> Quantity {
-        assert!(fee_fixed < amount_in, "fixed fee consumes entire amount");
-        let after = amount_in - fee_fixed;
-        let out = (after.value as u128)
-            .checked_mul(rate as u128)
-            .expect("rate convert overflow")
-            / (RATE_SCALE as u128);
-        let out = u64::try_from(out).expect("rate out exceeds u64");
-        assert!(out > 0, "rate conversion rounded to zero");
-        out.into()
+        crate::math::try_apply_rate(amount_in.value, fee_fixed.value, rate)
+            .map(Quantity::new)
+            .unwrap_or_else(|| {
+                assert!(
+                    fee_fixed.value < amount_in.value,
+                    "fixed fee consumes entire amount"
+                );
+                panic!("rate conversion failed")
+            })
     }
 
     /// Same-asset hop fee (Stripe-style): percent of gross, then fixed.
-    ///
-    /// `out = in * (PPM_SCALE - percent_ppm) / PPM_SCALE - fee_fixed`
     fn apply_hop_fee(amount_in: Quantity, fee_fixed: Quantity, fee_percent_ppm: u32) -> Quantity {
         assert!(fee_percent_ppm < PPM_SCALE, "hop fee must be under 100%");
         apply_spread(amount_in, fee_fixed, fee_percent_ppm as i32)
     }
 
     /// Claim-sale spread: `out = in * (1 - spread_ppm) - fee_fixed`.
-    ///
-    /// `spread_ppm > 0` haircuts the seller (discount). `spread_ppm < 0` is a
-    /// premium (`-50_000` = seller gets 5% over face). Must be in
-    /// `(-PPM_SCALE, PPM_SCALE)`.
     fn apply_spread(amount_in: Quantity, fee_fixed: Quantity, spread_ppm: i32) -> Quantity {
-        let scale = PPM_SCALE as i64;
-        assert!(
-            (spread_ppm as i64) > -scale && (spread_ppm as i64) < scale,
-            "spread must be between -100% and 100%"
-        );
-        let keep_ppm = (scale - spread_ppm as i64) as u128;
-        let after_pct = (amount_in.value as u128)
-            .checked_mul(keep_ppm)
-            .expect("spread overflow")
-            / (PPM_SCALE as u128);
-        let after_pct = u64::try_from(after_pct).expect("spread out exceeds u64");
-        assert!(
-            fee_fixed.value < after_pct,
-            "fixed fee consumes entire amount after spread"
-        );
-        let out = after_pct - fee_fixed.value;
-        assert!(out > 0, "spread reduced amount to zero");
-        out.into()
+        crate::math::try_apply_spread(amount_in.value, fee_fixed.value, spread_ppm)
+            .map(Quantity::new)
+            .unwrap_or_else(|| {
+                let scale = PPM_SCALE as i64;
+                assert!(
+                    (spread_ppm as i64) > -scale && (spread_ppm as i64) < scale,
+                    "spread must be between -100% and 100%"
+                );
+                panic!("spread reduced amount to zero")
+            })
     }
 
     /// Smallest `in` such that [`apply_rate`] ≥ `amount_out`.
     fn invert_rate(amount_out: Quantity, fee_fixed: Quantity, rate: u64) -> Quantity {
-        assert!(amount_out.value > 0, "invert rate output must be positive");
-        assert!(rate > 0, "fx_rate must be positive");
-        let num = (amount_out.value as u128)
-            .checked_mul(RATE_SCALE as u128)
-            .expect("invert fx overflow");
-        let after = u64::try_from((num + rate as u128 - 1) / (rate as u128))
-            .expect("invert fx exceeds u64");
-        let mut inn = after
-            .checked_add(fee_fixed.value)
-            .expect("invert fx fee overflow");
-        loop {
-            let got = apply_rate(inn.into(), fee_fixed, rate);
-            if got.value >= amount_out.value {
-                return inn.into();
-            }
-            inn = inn.checked_add(1).expect("invert fx bump overflow");
-        }
+        crate::math::try_invert_rate(amount_out.value, fee_fixed.value, rate)
+            .map(Quantity::new)
+            .unwrap_or_else(|| {
+                assert!(amount_out.value > 0, "invert rate output must be positive");
+                assert!(rate > 0, "fx_rate must be positive");
+                panic!("invert fx overflow")
+            })
     }
 
     /// Smallest `in` such that [`apply_hop_fee`] ≥ `amount_out`.
     fn invert_hop_fee(amount_out: Quantity, fee_fixed: Quantity, fee_percent_ppm: u32) -> Quantity {
-        assert!(amount_out.value > 0, "invert hop output must be positive");
-        assert!(fee_percent_ppm < PPM_SCALE, "hop fee must be under 100%");
-        let keep = (PPM_SCALE - fee_percent_ppm) as u128;
-        let need = amount_out
-            .value
-            .checked_add(fee_fixed.value)
-            .expect("invert hop fee overflow");
-        let num = (need as u128)
-            .checked_mul(PPM_SCALE as u128)
-            .expect("invert hop overflow");
-        let mut inn = u64::try_from((num + keep - 1) / keep).expect("invert hop exceeds u64");
-        loop {
-            let got = apply_hop_fee(inn.into(), fee_fixed, fee_percent_ppm);
-            if got.value >= amount_out.value {
-                return inn.into();
-            }
-            inn = inn.checked_add(1).expect("invert hop bump overflow");
-        }
+        crate::math::try_invert_hop_fee(amount_out.value, fee_fixed.value, fee_percent_ppm)
+            .map(Quantity::new)
+            .unwrap_or_else(|| {
+                assert!(amount_out.value > 0, "invert hop output must be positive");
+                assert!(fee_percent_ppm < PPM_SCALE, "hop fee must be under 100%");
+                panic!("invert hop overflow")
+            })
     }
 
     /// Exact-out send: walk hops backward from `target_out` at the last hop
@@ -277,7 +237,7 @@ pub mod tables {
         pub asset_id: u16,
     }
 
-    /// Run a path draw. Returns the last-hop residual.
+    /// Run a path draw. Returns the last-hop amount.
     pub(crate) fn execute_path(
         sender: AccountNumber,
         hops: Vec<PathHop>,
@@ -322,7 +282,7 @@ pub mod tables {
     /// Path-forward offer: `poster` will sit in the middle of `path_pay`.
     /// `next_hop = 0` is global (any next hop). Specific may be posted
     /// before that hop knows the poster; `path_draw` still needs a line or
-    /// live tab when the hop runs.
+    /// live claim when the hop runs.
     #[table(name = "ForwardOfferTab", index = 1)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct ForwardOffer {
@@ -334,13 +294,13 @@ pub mod tables {
         pub fee_fixed: Quantity,
         /// ppm (`10_000` = 1%); must be `< PPM_SCALE`.
         pub fee_percent: u32,
-        /// Max APR ppm on a **new** draw when forwarding. Not applied to a
-        /// hop that only unwinds a reverse tab.
+        /// Max APR ppm on a **new_draw** when forwarding. Not applied to a
+        /// hop that only unwinds a reverse claim.
         pub max_line_apr: u32,
         /// Absolute expiry (`seconds == 0` → never).
         pub expires_at: TimePointSec,
         /// If false, poster must already know the next hop (a line to them,
-        /// or a live tab). If true, anyone who lined the poster can become
+        /// or a live claim). If true, anyone who lined the poster can become
         /// their creditor.
         pub allow_unknown: bool,
     }
@@ -372,14 +332,14 @@ pub mod tables {
         }
 
         /// Closed: poster already knows `next_creditor` (lined them, or a
-        /// live tab either way). Limit 0 is enough.
+        /// live claim either way). Limit 0 is enough.
         fn assert_known(&self, next_creditor: AccountNumber) {
             if self.allow_unknown {
                 return;
             }
             assert!(
                 Connection::knows(self.poster, next_creditor, self.asset_id),
-                "unknown counterparty (no credit line or obligation; set allow_unknown or post a 0-limit line)"
+                "unknown counterparty (no credit line or live claim; set allow_unknown or post a 0-limit line)"
             );
         }
 
@@ -647,18 +607,12 @@ pub mod tables {
 
             assert!(
                 Connection::knows(debtor, buyer, self.asset_id),
-                "debtor does not know buyer (no credit line or live tab)"
+                "debtor does not know buyer (no credit line or live claim)"
             );
 
-            // Same pair as a path draw (buyer = creditor). Line is optional;
-            // if present, size is capacity and grant is only the new slice.
-            Connection::get(buyer, debtor, self.asset_id).accept_claim(amount);
-
+            Connection::get(buyer, debtor, self.asset_id).accept_claim(seller, amount);
             let proceeds = self.apply_fees(amount);
-            Obligation::transfer_claims(seller, buyer, debtor, self.asset_id, amount.value);
-            Obligation::credit_pair(seller, buyer, self.asset_id, proceeds, 0);
-            Obligation::net_pair(seller, buyer, self.asset_id, u64::MAX.into());
-            Obligation::net_pair(buyer, debtor, self.asset_id, u64::MAX.into());
+            Connection::get(seller, buyer, self.asset_id).deposit(proceeds, 0);
 
             emit_pair_activity(
                 seller,
@@ -837,7 +791,7 @@ pub mod tables {
             payer: AccountNumber,
             last_hop: AccountNumber,
             last_asset: u16,
-            residual: Quantity,
+            delivered: Quantity,
         ) {
             let mut row = Self::get_assert(id);
             assert!(row.kind == Self::INVOICE, "request is not an invoice");
@@ -850,8 +804,8 @@ pub mod tables {
                 last_asset == row.asset_id,
                 "invoice last hop asset mismatch"
             );
-            assert!(residual.value > 0, "invoice fulfill residual is zero");
-            let take = Quantity::new(row.remaining.value.min(residual.value));
+            assert!(delivered.value > 0, "invoice fulfill delivered is zero");
+            let take = Quantity::new(row.remaining.value.min(delivered.value));
             row.remaining = (row.remaining.value - take.value).into();
             row.save();
             emit_pair_activity(
@@ -928,8 +882,8 @@ pub mod tables {
 
     /// Standing from→to quote posted by `poster`.
     ///
-    /// `convert`: the other party takes this offer and rebooks a leftover
-    /// tab at this rate. The poster does not re-denominate their own claims.
+    /// `convert`: the other party takes this offer and rebooks leftover
+    /// exposure at this rate. The poster does not re-denominate their own claims.
     ///
     /// `path_pay`: the previous hop's **creditor** (middle man) applies their
     /// quote to size the next hop only. Does not rebook.
@@ -1018,43 +972,37 @@ pub mod tables {
             .save();
         }
 
-        /// Rebook up to `amount_from` of what `debtor` owes `creditor` in
-        /// `from_asset` into `to_asset` at this poster's rate. Poster must be
-        /// one of the two parties (the maker). Nets `from_asset` first, then
-        /// auto-nets `to_asset`.
+        /// Rebook leftover `from_asset` between the two parties into
+        /// `to_asset` at this poster's rate. Poster must be a party.
+        /// Nets `from_asset` once, then auto-nets `to_asset`.
         pub fn convert(
             &self,
-            creditor: AccountNumber,
-            debtor: AccountNumber,
+            party_a: AccountNumber,
+            party_b: AccountNumber,
             amount_from: Quantity,
             min_to: Quantity,
         ) -> Quantity {
             self.assert_live();
             assert!(amount_from.value > 0, "convert amount must be positive");
             assert!(
-                self.poster == creditor || self.poster == debtor,
-                "FX policy poster must be a party to the tab"
+                self.poster == party_a || self.poster == party_b,
+                "FX policy poster must be a party to the pair"
             );
-            assert!(creditor != debtor, "creditor must differ from debtor");
+            assert!(party_a != party_b, "creditor must differ from debtor");
 
-            Obligation::net_pair(creditor, debtor, self.from_asset, u64::MAX.into());
-            let available = Obligation::exposure(creditor, debtor, self.from_asset).value;
-            let take = amount_from.value.min(available);
+            let conn = Connection::net_leftover(party_a, party_b, self.from_asset);
+            let take = amount_from.value.min(conn.forward().value);
             assert!(take > 0, "nothing to convert in from_asset");
-
-            Obligation::apply_reduction(creditor, debtor, self.from_asset, take);
-
-            let to_qty = apply_rate(Quantity::new(take), self.fee_fixed, self.fx_rate);
-            assert!(to_qty.value >= min_to.value, "convert output below min_to");
-
-            Obligation::credit_pair(
-                creditor,
-                debtor,
+            let creditor = conn.creditor;
+            let debtor = conn.debtor;
+            let to_qty = conn.rebook(
+                Quantity::new(take),
+                min_to,
                 self.to_asset,
-                to_qty,
+                self.fee_fixed,
+                self.fx_rate,
                 self.to_interest_rate,
             );
-            Obligation::net_pair(creditor, debtor, self.to_asset, u64::MAX.into());
             emit_pair_activity(
                 creditor,
                 debtor,
@@ -1475,25 +1423,6 @@ pub mod tables {
             Self::get_existing_or_new(creditor, debtor, asset_id, interest_rate).credit(amount);
         }
 
-        /// Book a deposit: `receiver` owes `depositor` (bank-liability style),
-        /// then **auto-net** the pair so mutual claims cancel as far as possible.
-        ///
-        /// 1. Credit the reverse obligation (depositor creditor, receiver debtor).
-        /// 2. [`net_pair`] with unlimited `max_amount` (interest first, highest
-        ///    rate first). Remainder stays one-way if exposures were unequal.
-        ///
-        /// Returns the amount netted away (may be less than `amount`).
-        pub fn deposit(
-            depositor: AccountNumber,
-            receiver: AccountNumber,
-            asset_id: u16,
-            amount: Quantity,
-            interest_rate: u32,
-        ) -> Quantity {
-            Self::credit_pair(depositor, receiver, asset_id, amount, interest_rate);
-            Self::net_pair(depositor, receiver, asset_id, u64::MAX.into())
-        }
-
         fn save(&self) {
             ObligationTable::read_write().put(&self).unwrap()
         }
@@ -1623,7 +1552,7 @@ pub mod tables {
 
         /// After a claim moves to a new creditor: keep the source remaining
         /// window (same end). Do not start the dest's posted grace — that
-        /// would reset an already-aged tab.
+        /// would reset an already-aged claim.
         pub fn inherit_on_transfer(
             to_creditor: AccountNumber,
             debtor: AccountNumber,
@@ -1693,9 +1622,9 @@ pub mod tables {
     ///
     /// `limit` is a stable cap on outstanding exposure (principal + interest).
     /// A draw of `amount` requires `exposure + amount <= limit`.
-    /// When `deplete_on_debit`, `remaining` is unused grant (shrinks on new
-    /// draw / claim take; unwind does not; not restored by repayment).
-    /// Revolving lines ignore `remaining`.
+    /// When `deplete_on_debit`, `remaining` shrinks on new_draw / claim take
+    /// (unwind does not; repayment does not restore it). Revolving lines
+    /// ignore `remaining`.
     ///
     /// Interest-free grace lives on [`PairCycle`], not this row.
     #[table(name = "CreditLineTable", index = 3)]
@@ -1708,11 +1637,11 @@ pub mod tables {
         /// Stable cap on outstanding exposure (principal + accrued interest).
         pub limit: Quantity,
         /// If true, new draws and claim takes also consume [`Self::remaining`]
-        /// (unwind against the reverse tab does not).
+        /// (unwind against the reverse claim does not).
         pub deplete_on_debit: bool,
         /// Rate applied to new draws on this line (ppm APR); see [`crate::interest`].
         pub interest_rate: u32,
-        /// Unused grant when `deplete_on_debit`. Ignored for revolving lines.
+        /// When `deplete_on_debit`. Ignored for revolving lines.
         pub remaining: Quantity,
     }
 
@@ -1749,25 +1678,13 @@ pub mod tables {
             }
         }
 
-        /// Drawable headroom: `limit - exposure`, also capped by `remaining`
-        /// when depleting.
-        pub fn draw_headroom(&self) -> u64 {
-            let exposure = Obligation::exposure(self.creditor, self.debtor, self.asset_id).value;
-            let vs_limit = self.limit.value.saturating_sub(exposure);
-            if self.deplete_on_debit {
-                vs_limit.min(self.remaining.value)
-            } else {
-                vs_limit
-            }
-        }
-
-        pub fn consume_grant(&mut self, amount: Quantity) {
+        pub fn consume_remaining(&mut self, amount: Quantity) {
             if !self.deplete_on_debit {
                 return;
             }
             assert!(
                 amount.value <= self.remaining.value,
-                "insufficient remaining grant"
+                "insufficient remaining"
             );
             self.remaining = (self.remaining.value - amount.value).into();
             self.save();
@@ -1844,12 +1761,12 @@ pub mod tables {
     }
 
     /// Directed pair in one asset: the creditor's line to the debtor (if any)
-    /// plus both tabs. Virtual — not a table.
+    /// plus both claims. Virtual — not a table.
     ///
     /// A path hop is this object: `debtor` draws on `creditor`. The reverse
-    /// tab (creditor already owes debtor) is unwind capacity and does not
-    /// need a line. Sending 1000 against a 400 reverse tab is unwind 400 +
-    /// new 600; after net the debtor owes 600.
+    /// claim (creditor already owes debtor) is unwind capacity and does not
+    /// need a line. Sending 1000 against a 400 reverse claim is unwind 400 +
+    /// new_draw 600; after net the debtor owes 600.
     #[derive(Clone, Debug)]
     pub struct Connection {
         pub creditor: AccountNumber,
@@ -1863,7 +1780,7 @@ pub mod tables {
     }
 
     impl Connection {
-        /// Accrue both tabs, then snapshot.
+        /// Accrue both claims, then snapshot.
         pub fn get(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) -> Self {
             Obligation::accrue_pair(creditor, debtor, asset_id);
             Obligation::accrue_pair(debtor, creditor, asset_id);
@@ -1906,7 +1823,7 @@ pub mod tables {
             }
         }
 
-        /// Reverse tab plus unused line headroom.
+        /// Reverse claim plus unused line headroom.
         pub fn capacity(&self) -> u64 {
             self.reverse.value.saturating_add(self.line_headroom())
         }
@@ -1916,37 +1833,102 @@ pub mod tables {
             amount.value.saturating_sub(self.reverse.value)
         }
 
-        /// `who` lined `them`, or they already have a live tab either way.
+        /// `who` lined `them`, or they already have a live claim either way.
         pub fn knows(who: AccountNumber, them: AccountNumber, asset_id: u16) -> bool {
             let c = Self::get_live(who, them, asset_id);
             c.line.is_some() || c.forward.value > 0 || c.reverse.value > 0
         }
 
-        /// Buyer taking a claim on `debtor` (this connection's debtor).
-        ///
-        /// No buyer line: no cap (the take *is* acceptance). With a line:
-        /// same capacity as [`Self::draw`], and depleting grant is spent
-        /// only on [`Self::new_draw`].
-        pub fn accept_claim(mut self, amount: Quantity) {
-            assert!(amount.value > 0, "claim transfer amount must be positive");
-            if self.line.is_none() {
-                return;
-            }
-            assert!(
-                amount.value <= self.capacity(),
-                "buyer credit line residual insufficient for claim"
+        /// Credit this directed claim, then auto-net. Returns the amount netted.
+        fn credit_and_net(&self, amount: Quantity, interest_rate: u32) -> Quantity {
+            Obligation::credit_pair(
+                self.creditor,
+                self.debtor,
+                self.asset_id,
+                amount,
+                interest_rate,
             );
-            let new_draw = self.new_draw(amount);
-            if new_draw > 0 {
-                self.line
-                    .as_mut()
-                    .unwrap()
-                    .consume_grant(Quantity::new(new_draw));
+            Obligation::net_pair(self.creditor, self.debtor, self.asset_id, u64::MAX.into())
+        }
+
+        /// Accrue, full-net, return the leftover directed connection.
+        pub fn net_leftover(a: AccountNumber, b: AccountNumber, asset_id: u16) -> Self {
+            Obligation::net_pair(a, b, asset_id, u64::MAX.into());
+            let ab = Obligation::exposure(a, b, asset_id).value;
+            let ba = Obligation::exposure(b, a, asset_id).value;
+            if ab > 0 {
+                Self::get_live(a, b, asset_id)
+            } else if ba > 0 {
+                Self::get_live(b, a, asset_id)
+            } else {
+                panic!("nothing to convert in from_asset")
             }
         }
 
-        /// Draw for `path_pay`: unwind the reverse tab, then new line
-        /// capacity. Grant is consumed only for the new slice.
+        /// Book a deposit: this creditor is owed `amount` by this debtor, then
+        /// auto-net. No line required.
+        pub fn deposit(self, amount: Quantity, interest_rate: u32) -> Quantity {
+            assert!(amount.value > 0, "deposit amount must be positive");
+            self.credit_and_net(amount, interest_rate)
+        }
+
+        /// Reduce this leftover claim by `take` and credit the same pair in
+        /// `to_asset`. Caller must already have netted `from_asset`.
+        pub fn rebook(
+            self,
+            take: Quantity,
+            min_to: Quantity,
+            to_asset: u16,
+            fee_fixed: Quantity,
+            fx_rate: u64,
+            to_interest_rate: u32,
+        ) -> Quantity {
+            assert!(take.value > 0, "convert amount must be positive");
+            Obligation::apply_reduction(self.creditor, self.debtor, self.asset_id, take.value);
+            let to_qty = apply_rate(take, fee_fixed, fx_rate);
+            assert!(to_qty.value >= min_to.value, "convert output below min_to");
+            Obligation::credit_pair(
+                self.creditor,
+                self.debtor,
+                to_asset,
+                to_qty,
+                to_interest_rate,
+            );
+            Obligation::net_pair(self.creditor, self.debtor, to_asset, u64::MAX.into());
+            to_qty
+        }
+
+        /// Buyer (this creditor) taking `amount` of `seller`'s claim on this
+        /// debtor. No buyer line: no cap. With a line: same capacity as
+        /// [`Self::draw`], remaining only on [`Self::new_draw`]. Then transfer
+        /// and auto-net this pair.
+        pub fn accept_claim(mut self, seller: AccountNumber, amount: Quantity) {
+            assert!(amount.value > 0, "claim transfer amount must be positive");
+            if self.line.is_some() {
+                assert!(
+                    amount.value <= self.capacity(),
+                    "buyer credit line capacity insufficient for claim"
+                );
+                let new_draw = self.new_draw(amount);
+                if new_draw > 0 {
+                    self.line
+                        .as_mut()
+                        .unwrap()
+                        .consume_remaining(Quantity::new(new_draw));
+                }
+            }
+            Obligation::transfer_claims(
+                seller,
+                self.creditor,
+                self.debtor,
+                self.asset_id,
+                amount.value,
+            );
+            Obligation::net_pair(self.creditor, self.debtor, self.asset_id, u64::MAX.into());
+        }
+
+        /// Draw for `path_pay`: unwind the reverse claim, then new line
+        /// capacity. Remaining is consumed only for [`Self::new_draw`].
         pub fn draw(mut self, amount: Quantity) {
             assert!(amount.value > 0, "path debit amount must be positive");
             assert!(
@@ -1960,15 +1942,13 @@ pub mod tables {
                     .line
                     .as_mut()
                     .expect("credit line required for new path draw");
-                line.consume_grant(Quantity::new(new_draw));
+                line.consume_remaining(Quantity::new(new_draw));
                 line.interest_rate
             } else {
                 self.line.as_ref().map(|l| l.interest_rate).unwrap_or(0)
             };
 
-            Obligation::credit_pair(self.creditor, self.debtor, self.asset_id, amount, rate);
-            let netted =
-                Obligation::net_pair(self.creditor, self.debtor, self.asset_id, u64::MAX.into());
+            let netted = self.credit_and_net(amount, rate);
             emit_pair_activity(
                 self.creditor,
                 self.debtor,
@@ -2028,8 +2008,8 @@ pub mod tables {
 pub mod service {
     use crate::tables::{
         assert_account_exists, emit_pair_activity, execute_path, path_required_send, Asset,
-        ClaimOffer, CreditLine, CurrencyPolicy, ForwardOffer, InitRow, InitTable, Obligation,
-        PathHop, PayRequest,
+        ClaimOffer, Connection, CreditLine, CurrencyPolicy, ForwardOffer, InitRow, InitTable,
+        Obligation, PathHop, PayRequest,
     };
     use psibase::{
         services::events,
@@ -2353,7 +2333,7 @@ pub mod service {
     /// Seller (sender) sells claims on `debtor` to `buyer` under the buyer's
     /// **buy** offer. Buyer becomes creditor of `debtor`; seller receives face
     /// after the offer spread. The debtor must know the buyer (line or
-    /// live tab). A buyer line to the debtor is optional (cap only).
+    /// live claim). A buyer line to the debtor is optional (cap only).
     #[action]
     fn sell_claim(buyer: AccountNumber, debtor: AccountNumber, asset_id: u16, amount: Quantity) {
         let seller = get_sender();
@@ -2406,21 +2386,9 @@ pub mod service {
     ) {
         let sender = get_sender();
         assert!(sender != counterparty, "cannot convert with self");
-
-        Obligation::net_pair(sender, counterparty, from_asset, u64::MAX.into());
-        let they_owe = Obligation::exposure(sender, counterparty, from_asset).value;
-        let i_owe = Obligation::exposure(counterparty, sender, from_asset).value;
-        let (creditor, debtor) = if they_owe > 0 {
-            (sender, counterparty)
-        } else if i_owe > 0 {
-            (counterparty, sender)
-        } else {
-            panic!("nothing to convert in from_asset");
-        };
-
         CurrencyPolicy::get_assert(counterparty, from_asset, to_asset).convert(
-            creditor,
-            debtor,
+            sender,
+            counterparty,
             amount_from,
             min_to,
         );
@@ -2453,7 +2421,7 @@ pub mod service {
         } else {
             String::new()
         };
-        let netted = Obligation::deposit(depositor, receiver, asset_id, amount, interest_rate);
+        let netted = Connection::get(depositor, receiver, asset_id).deposit(amount, interest_rate);
         emit_pair_activity(
             depositor, receiver, asset_id, "deposit", amount, netted, asset_id, request_id,
             &req_memo,
@@ -2495,7 +2463,7 @@ pub mod service {
     ///    reverse claim that auto-nets).
     /// 2. **Currency change** — apply the previous-hop **creditor's**
     ///    [`CurrencyPolicy`] to size the next hop. Does **not** rebook the
-    ///    previous tab: the payer still owes the middle man in the from-asset;
+    ///    previous claim: the payer still owes the middle man in the from-asset;
     ///    the middle man takes the to-asset liability onward.
     /// 3. **Later hops** — intermediate's live [`ForwardOffer`] (fee + max
     ///    line APR); draw on next line.
@@ -2635,7 +2603,7 @@ pub mod service {
         let debtor = get_sender();
         let (take, memo, creditor, asset_id) =
             PayRequest::fulfill_settle(request_id, debtor, amount);
-        let netted = Obligation::deposit(debtor, creditor, asset_id, take, 0);
+        let netted = Connection::get(debtor, creditor, asset_id).deposit(take, 0);
         emit_pair_activity(
             debtor, creditor, asset_id, "deposit", take, netted, asset_id, request_id, &memo,
         );

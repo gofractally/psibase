@@ -29,12 +29,13 @@ Posted by the **creditor** (`st_crd_lne` / `setCreditLine`). The debtor must alr
 |------|---------|
 | Limit | Cap on outstanding exposure (principal + interest), revolving unless deplete is on |
 | APR | Daily compound, ppm (`10_000` = 1%) |
-| Deplete | If on, each *new* draw also spends a remaining grant; repayment does not restore it |
+| Remaining | Unused depleting-line budget. Ignored on revolving lines |
+| Deplete | If on, each `new_draw` spends `remaining`; repayment does not restore it |
 | Grace | Interest-free window in **seconds** after this pair goes 0→positive |
 
-`limit` is not a deposited balance. Drawing uses unused headroom: `limit − exposure` (and remaining grant if depleting).
+`limit` is not a deposited balance. Drawing uses **headroom**: `limit − exposure` (and `remaining` if depleting).
 
-A path hop is a **connection**: that directed pair in one asset — the creditor’s line (if any) plus both tabs. Capacity is reverse claim + unused line headroom. A draw unwinds what they already owe you, then books any leftover as new debt on the line (1000 against a 400 reverse tab → unwind 400 + new 600). The reverse book does not need a line.
+A path hop is a **connection**: that directed pair in one asset — the creditor’s line (if any) plus both claims. **Capacity** is reverse claim + headroom. A draw unwinds the reverse claim, then books **new_draw** on the line (1000 against a 400 reverse claim → unwind 400 + new_draw 600). The reverse claim does not need a line.
 
 ## Obligations and netting
 
@@ -69,8 +70,8 @@ UI: `/requests` (Plus to create). An account-row Request button opens the same m
 
 - **Hop 0** — sender draws on the first account (line and/or reverse claim). No hop fee.
 - **Later hops** — the current path debtor must have a **live** path-forward offer. Specific next hop if live; otherwise a live global. Expired specific does **not** block the global. Buy-claim offers are not used here.
-- **Asset change** — the previous hop’s **creditor** (middle man) applies their FX quote to size the next hop. The payer’s tab stays in the from-asset; the middle man takes the to-asset liability. The sender’s policy is ignored.
-- **min_return** — final residual in the last hop’s asset must be at least this.
+- **Asset change** — the previous hop’s **creditor** (middle man) applies their FX quote to size the next hop. The payer’s claim stays in the from-asset; the middle man takes the to-asset liability. The sender’s policy is ignored.
+- **min_return** — final **amount_out** in the last hop’s asset must be at least this.
 - **Invoice** — `pay_inv(hops, max_spend, request_id)`: remaining is exact, `max_spend` is the send budget.
 
 Off-chain **Find path** (`quotePath`) searches a scoped subgraph (lines + reverse claims + clearing + FX), not the full network. Exact-in: amount is what you send. Exact-out: amount is what the payee should receive; the quote finds the send. Hop cards can show expected hop/FX fees.
@@ -79,11 +80,11 @@ You can still edit hops before execute.
 
 ## Path-forward offers
 
-Posted by the **poster** (`st_fwd_ofr` / `st_glb_fwd`): poster is an intermediate; `next_hop` is the next creditor or global. Fees are Stripe-style: `out = in × (1 − percent) − fixed`. `max_line_apr` rejects a **new** draw if the next hop’s line APR is higher; a hop that only unwinds a reverse tab is not checked. A specific offer can be posted before that hop knows the poster; the hop still needs a line or live tab at `path_pay` time. The named next hop must exist. `allow_unknown` (applied on insert and update): if off, the poster must already know the next hop (a line to them, or a live tab); if on, anyone who lined the poster can become their creditor. `st_fwd_unk` is a flag-only update without re-posting fees.
+Posted by the **poster** (`st_fwd_ofr` / `st_glb_fwd`): poster is an intermediate; `next_hop` is the next creditor or global. Fees are Stripe-style: `out = in × (1 − percent) − fixed`. `max_line_apr` rejects a **new_draw** if the next hop’s line APR is higher; a hop that only unwinds a reverse claim is not checked. A specific offer can be posted before that hop knows the poster; the hop still needs a line or live claim at `path_pay` time. The named next hop must exist. `allow_unknown` (applied on insert and update): if off, the poster must already know the next hop (a line to them, or a live claim); if on, anyone who lined the poster can become their creditor. `st_fwd_unk` is a flag-only update without re-posting fees.
 
 ## Claim offers
 
-One table, `side` in the primary key (`1` buy, `2` sell). Spread ppm is signed (`10_000` = 1%). **Buy:** positive haircuts the seller, negative is a premium the buyer pays. **Sell:** positive is the seller’s profit (`+10_000` = 1% over face), negative is a discount. The debtor must know the buyer (a line to them, or a live tab). A buyer line to the debtor is optional: if present it caps size like a path hop (reverse tab + headroom) and a depleting grant is spent only on the new slice.
+One table, `side` in the primary key (`1` buy, `2` sell). Spread ppm is signed (`10_000` = 1%). **Buy:** positive haircuts the seller, negative is a premium the buyer pays. **Sell:** positive is the seller’s profit (`+10_000` = 1% over face), negative is a discount. The debtor must know the buyer (a line to them, or a live claim). A buyer line to the debtor is optional: if present it caps size like a path hop (reverse claim + headroom) and `remaining` is spent only on **new_draw**.
 
 - **Buy** (`st_buy_clm` / `st_glb_buy`): poster’s bid. Taker calls `sell_claim`.
 - **Sell** (`st_sell_clm` / `st_glb_sell`): poster’s ask. Taker calls `buy_claim`.
@@ -119,7 +120,7 @@ After the window, daily compound runs from the last principal/rate change (origi
 
 Editing the line later does not change an **open** cycle; it applies to the next 0→positive.
 
-Sell, convert, and path_pay do **not** count as a grace payoff. They lock whatever is owed (zero during grace) and move or rebook the claim. A sold claim keeps the source cycle’s remaining window (same end). It does not start the buyer’s posted grace — that would reset an already-aged tab.
+Sell, convert, and path_pay do **not** count as a grace payoff. They lock whatever is owed (zero during grace) and move or rebook the claim. A sold claim keeps the source cycle’s remaining window (same end). It does not start the buyer’s posted grace — that would reset an already-aged claim.
 
 Default in the UI is **7 days**. `0` means interest from the first second.
 

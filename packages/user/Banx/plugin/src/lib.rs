@@ -644,7 +644,7 @@ impl Api for BanxPlugin {
             ErrorType::NoPath(if exact_out {
                 format!(
                     "cannot deliver {amount} to {to} from {from} within {max_hops} hops \
-                     (insufficient residual after fees, or no route)"
+                     (insufficient amount_out after fees, or no route)"
                 )
             } else {
                 format!(
@@ -659,7 +659,7 @@ impl Api for BanxPlugin {
         let to_prec = query::fetch_asset::fetch_asset(last_asset)?.precision()?;
         let amount_in = Decimal::new(Quantity::new(quote.amount_in), from_prec).to_string();
         let amount_out = Decimal::new(Quantity::new(quote.amount_out), to_prec).to_string();
-        // Exact-out: min-return is the requested receive amount; exact-in: full residual.
+        // Exact-out: min-return is the requested receive amount; exact-in: amount_out.
         let min_return = if exact_out {
             Decimal::new(amount_raw, to_prec).to_string()
         } else {

@@ -56,11 +56,11 @@ mod service {
         cycleGraceSeconds: u32,
         /// Outstanding principal + interest for this directed pair/asset.
         exposure: Decimal,
-        /// Unused grant when depleting; 0 on revolving lines.
+        /// When depleting; 0 on revolving lines.
         remaining: Decimal,
-        /// Path residual: line headroom plus reverse claim (they already owe you).
-        residual: Decimal,
-        /// Reverse claim included in `residual` (they already owe you).
+        /// Reverse claim plus line headroom (they already owe you).
+        capacity: Decimal,
+        /// Reverse claim included in `capacity` (they already owe you).
         reverseClaim: Decimal,
         /// False when this row is a reverse-claim-only path edge.
         isLine: bool,
@@ -71,11 +71,11 @@ mod service {
             creditor: AccountNumber,
             debtor: AccountNumber,
             asset_id: u16,
-            residual: u64,
+            reverse_claim: u64,
         ) -> Self {
             let p = asset_precision(asset_id);
             let zero = Decimal::new(0.into(), p);
-            let claim = Decimal::new(residual.into(), p);
+            let claim = Decimal::new(reverse_claim.into(), p);
             Self {
                 creditor,
                 debtor,
@@ -88,7 +88,7 @@ mod service {
                 cycleGraceSeconds: 0,
                 exposure: zero,
                 remaining: zero,
-                residual: claim,
+                capacity: claim,
                 reverseClaim: claim,
                 isLine: false,
             }
@@ -114,7 +114,7 @@ mod service {
                 cycleGraceSeconds: cycle.as_ref().map(|c| c.cycle_grace_seconds).unwrap_or(0),
                 exposure: Decimal::new(exposure, p),
                 remaining: Decimal::new(line.remaining, p),
-                residual: Decimal::new(
+                capacity: Decimal::new(
                     Connection::get_live(line.creditor, line.debtor, line.asset_id)
                         .capacity()
                         .into(),
@@ -524,13 +524,17 @@ mod service {
                     if seen_line.contains(&key) {
                         continue;
                     }
-                    let residual = Obligation::exposure(o.creditor, o.debtor, o.asset_id).value;
-                    if residual == 0 {
+                    let reverse_claim =
+                        Obligation::exposure(o.creditor, o.debtor, o.asset_id).value;
+                    if reverse_claim == 0 {
                         continue;
                     }
                     seen_line.insert(key);
                     reverse_only.push(CreditLineView::from_reverse_claim(
-                        o.debtor, o.creditor, o.asset_id, residual,
+                        o.debtor,
+                        o.creditor,
+                        o.asset_id,
+                        reverse_claim,
                     ));
                     if debtors.insert(o.debtor) {
                         grew = true;

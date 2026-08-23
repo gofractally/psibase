@@ -22,7 +22,7 @@ const zCreditLine = z.object({
     cycleStartedAt: z.number(),
     cycleGraceSeconds: z.number(),
     exposure: z.string(),
-    /// Unused grant when depleting; "0" on revolving lines.
+    /// When depleting; "0" on revolving lines.
     remaining: z.string(),
 });
 

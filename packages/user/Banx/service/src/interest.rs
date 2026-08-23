@@ -5,7 +5,7 @@
 //! Full days: `bal = bal * (365 * PPM + rate) / (365 * PPM)` (`1 + APR/365`).
 //! Leftover seconds in the current day are pro-rata on that daily rate.
 
-use crate::tables::PPM_SCALE;
+use crate::math::PPM_SCALE;
 
 /// 365 * 24 * 60 * 60 — fixed, no leap seconds / leap years.
 pub const SECONDS_PER_YEAR: u128 = 31_536_000;

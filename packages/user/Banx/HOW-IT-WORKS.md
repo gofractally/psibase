@@ -21,7 +21,7 @@ The rest of Banx is machinery around that:
 |-------|---------|
 | **Credit line** | “I am willing to be owed by you, up to this much, at this APR.” A ceiling, not a pile of money. Posted by the **creditor**. |
 | **Obligation** | The actual debt. One pair/asset can have several rows (different APRs). **Exposure** is principal + live interest. |
-| **Connection** | One directed pair in one asset: the line (if any) plus both tabs. A path hop *is* a connection. Capacity = reverse claim + unused line headroom. |
+| **Connection** | One directed pair in one asset: the line (if any) plus both claims. A path hop *is* a connection. Capacity = reverse claim + unused line headroom. |
 | **Path-forward offer** | “I will sit in the middle of a path.” Specific next hop, or **global**. |
 | **Claim offer** | Standing bid or ask to **transfer** a claim on a debtor (not a path payment). |
 | **Currency policy** | Posted from→to FX quote. Path pay uses it only to **size** the next hop. `convert` actually rebooks. |
@@ -100,7 +100,7 @@ John **path-pays Oli through Pippa**:
 1. **John to Pippa.** John owes Pippa $150.
 2. **Pippa to Oli.** Pippa owes Oli $150 extra.
 
-John’s tab with Oli is done. **Collecting is Pippa’s problem now, not John’s.**
+John’s books with Oli are done. **Collecting is Pippa’s problem now, not John’s.**
 
 ### 4. Sleepover weekend
 
@@ -182,10 +182,11 @@ Posted by the creditor (`st_crd_lne`). The debtor must already exist as a chain 
 |------|---------|
 | Limit | Cap on outstanding **exposure** (principal + interest) |
 | APR | Daily compound, ppm (`10_000` = 1%) |
-| Deplete | If on, each *new* draw also spends a remaining grant; repayment does not restore it |
+| Remaining | Unused depleting-line budget. Ignored on revolving lines |
+| Deplete | If on, each `new_draw` spends `remaining`; repayment does not restore it |
 | Grace | Interest-free window in **seconds** after this pair goes 0→positive (stored on a **pair cycle**, not on the line row) |
 
-`limit` is not a deposited balance. Drawing uses unused headroom: `limit − exposure` (and remaining grant if depleting).
+`limit` is not a deposited balance. Drawing uses **headroom**: `limit − exposure` (and `remaining` if depleting).
 
 A **0-limit line** is still a line: consent to be a known counterparty. Removing the row is `rm_crd_lne`. Outstanding obligations are untouched.
 
@@ -193,15 +194,17 @@ A **0-limit line** is still a line: consent to be a known counterparty. Removing
 
 Not a table. For creditor C, debtor D, asset X:
 
-- **Forward tab:** D already owes C.
-- **Reverse tab:** C already owes D (unwind capacity — **no line required**).
+- **Forward:** D already owes C.
+- **Reverse:** C already owes D (unwind — **no line required**).
 - **Line:** C’s facility to D, if any.
 
-**Capacity** = reverse + unused line headroom.
+**Headroom** = unused line (`limit − exposure`, also capped by `remaining` if depleting).
+**Capacity** = reverse claim + headroom.
+**new_draw** = amount − reverse (the part that hits the line).
 
-**Draw** of 1000 against a 400 reverse tab: unwind 400 + new 600 on the line. After net, D owes C 600. Grant (depleting lines) is consumed only for the **new** slice.
+**Draw** of 1000 against a 400 reverse claim: unwind 400 + new_draw 600. After net, D owes C 600. `remaining` (depleting lines) is consumed only for **new_draw**.
 
-`knows(who, them, asset)`: `who` lined `them`, or there is a live tab either way.
+`knows(who, them, asset)`: `who` lined `them`, or there is a live claim either way.
 
 ---
 
@@ -211,7 +214,7 @@ Not a table. For creditor C, debtor D, asset X:
 
 ### Hop 0
 
-The **sender** draws `amount` on the first hop. No routing fee. Needs a connection (line and/or reverse claim).
+The **sender** draws `amount` on the first hop. No hop fee. Needs a connection (line and/or reverse claim).
 
 ### Later hops
 
@@ -220,14 +223,14 @@ The current path debtor (the previous hop’s account) must have a **live path-f
 - Live **specific** next hop if present; else live **global**.
 - Expired specific does **not** block the global.
 - Fees are Stripe-style: `out = in × (1 − percent) − fixed`. Hop 0 has no fee.
-- `max_line_apr` rejects a **new** draw if the next hop’s line APR is higher. A hop that only unwinds a reverse tab is not checked.
-- `allow_unknown`: if off, the poster must already know the next hop (line or live tab). If on, anyone who lined the poster can become their creditor. Checked at **pay** time, not when posting. A specific offer may be posted before that hop knows the poster; the hop still needs a line or live tab when it runs.
+- `max_line_apr` rejects a **new_draw** if the next hop’s line APR is higher. A hop that only unwinds a reverse claim is not checked.
+- `allow_unknown`: if off, the poster must already know the next hop (line or live claim). If on, anyone who lined the poster can become their creditor. Checked at **pay** time, not when posting. A specific offer may be posted before that hop knows the poster; the hop still needs a line or live claim when it runs.
 
 ### Currency change
 
-If hop *i*’s asset differs from hop *i−1*, the previous hop’s **creditor** (the middle man) applies their FX quote to **size** the next hop. That does **not** rebook the previous tab: the payer still owes the middle man in the from-asset; the middle man takes the to-asset liability onward. The sender’s FX policy is ignored.
+If hop *i*’s asset differs from hop *i−1*, the previous hop’s **creditor** (the middle man) applies their FX quote to **size** the next hop. That does **not** rebook the previous claim: the payer still owes the middle man in the from-asset; the middle man takes the to-asset liability onward. The sender’s FX policy is ignored.
 
-`min_return` is the final residual in the **last** hop’s asset.
+`min_return` is the final **amount_out** in the **last** hop’s asset.
 
 ### Paying an invoice
 
@@ -283,7 +286,7 @@ One table, `side` in the primary key (`1` buy, `2` sell). `debtor = 0` is global
 
 `out = in × (1 − spread) − fee_fixed` after flipping sell so positive is the poster’s profit.
 
-The **debtor must know the buyer** (line to them, or a live tab). A buyer line to the debtor is optional: if present it **caps size** with the same capacity as a path hop (reverse tab + headroom) and a depleting grant is spent only on the **new** slice. Checks run at **take**, not at post.
+The **debtor must know the buyer** (line to them, or a live claim). A buyer line to the debtor is optional: if present it **caps size** with the same capacity as a path hop (reverse claim + headroom) and `remaining` is spent only on **new_draw**. Checks run at **take**, not at post.
 
 Sell / convert / path_pay are **not** a grace payoff. They lock whatever is owed (zero during grace) and move or rebook. A sold claim keeps the source cycle’s remaining window (same end). It does not start the buyer’s posted grace.
 
