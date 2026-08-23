@@ -650,17 +650,9 @@ pub mod tables {
                 "debtor does not know buyer (no credit line or live tab)"
             );
 
-            // Buyer→debtor line is only a cap if they posted one. The take
-            // itself is acceptance; the claim keeps its existing APR.
-            if let Some(mut line) = CreditLine::get(buyer, debtor, self.asset_id) {
-                Obligation::accrue_pair(buyer, debtor, self.asset_id);
-                let buyer_exp = Obligation::exposure(buyer, debtor, self.asset_id).value;
-                assert!(
-                    buyer_exp.saturating_add(amount.value) <= line.limit.value,
-                    "buyer credit line residual insufficient for claim"
-                );
-                line.consume_grant(amount);
-            }
+            // Same pair as a path draw (buyer = creditor). Line is optional;
+            // if present, size is capacity and grant is only the new slice.
+            Connection::get(buyer, debtor, self.asset_id).accept_claim(amount);
 
             let proceeds = self.apply_fees(amount);
             Obligation::transfer_claims(seller, buyer, debtor, self.asset_id, amount.value);
@@ -1701,8 +1693,9 @@ pub mod tables {
     ///
     /// `limit` is a stable cap on outstanding exposure (principal + interest).
     /// A draw of `amount` requires `exposure + amount <= limit`.
-    /// When `deplete_on_debit`, `remaining` is unused grant (shrinks on draw /
-    /// buy-claim; not restored by repayment). Revolving lines ignore `remaining`.
+    /// When `deplete_on_debit`, `remaining` is unused grant (shrinks on new
+    /// draw / claim take; unwind does not; not restored by repayment).
+    /// Revolving lines ignore `remaining`.
     ///
     /// Interest-free grace lives on [`PairCycle`], not this row.
     #[table(name = "CreditLineTable", index = 3)]
@@ -1714,7 +1707,8 @@ pub mod tables {
 
         /// Stable cap on outstanding exposure (principal + accrued interest).
         pub limit: Quantity,
-        /// If true, draws/buy-claim also consume [`Self::remaining`].
+        /// If true, new draws and claim takes also consume [`Self::remaining`]
+        /// (unwind against the reverse tab does not).
         pub deplete_on_debit: bool,
         /// Rate applied to new draws on this line (ppm APR); see [`crate::interest`].
         pub interest_rate: u32,
@@ -1926,6 +1920,29 @@ pub mod tables {
         pub fn knows(who: AccountNumber, them: AccountNumber, asset_id: u16) -> bool {
             let c = Self::get_live(who, them, asset_id);
             c.line.is_some() || c.forward.value > 0 || c.reverse.value > 0
+        }
+
+        /// Buyer taking a claim on `debtor` (this connection's debtor).
+        ///
+        /// No buyer line: no cap (the take *is* acceptance). With a line:
+        /// same capacity as [`Self::draw`], and depleting grant is spent
+        /// only on [`Self::new_draw`].
+        pub fn accept_claim(mut self, amount: Quantity) {
+            assert!(amount.value > 0, "claim transfer amount must be positive");
+            if self.line.is_none() {
+                return;
+            }
+            assert!(
+                amount.value <= self.capacity(),
+                "buyer credit line residual insufficient for claim"
+            );
+            let new_draw = self.new_draw(amount);
+            if new_draw > 0 {
+                self.line
+                    .as_mut()
+                    .unwrap()
+                    .consume_grant(Quantity::new(new_draw));
+            }
         }
 
         /// Draw for `path_pay`: unwind the reverse tab, then new line

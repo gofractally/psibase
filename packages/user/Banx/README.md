@@ -83,7 +83,7 @@ Posted by the **poster** (`st_fwd_ofr` / `st_glb_fwd`): poster is an intermediat
 
 ## Claim offers
 
-One table, `side` in the primary key (`1` buy, `2` sell). Spread ppm is signed (`10_000` = 1%). **Buy:** positive haircuts the seller, negative is a premium the buyer pays. **Sell:** positive is the seller’s profit (`+10_000` = 1% over face), negative is a discount. The debtor must know the buyer (a line to them, or a live tab). A buyer line to the debtor is optional and only caps size if present.
+One table, `side` in the primary key (`1` buy, `2` sell). Spread ppm is signed (`10_000` = 1%). **Buy:** positive haircuts the seller, negative is a premium the buyer pays. **Sell:** positive is the seller’s profit (`+10_000` = 1% over face), negative is a discount. The debtor must know the buyer (a line to them, or a live tab). A buyer line to the debtor is optional: if present it caps size like a path hop (reverse tab + headroom) and a depleting grant is spent only on the new slice.
 
 - **Buy** (`st_buy_clm` / `st_glb_buy`): poster’s bid. Taker calls `sell_claim`.
 - **Sell** (`st_sell_clm` / `st_glb_sell`): poster’s ask. Taker calls `buy_claim`.

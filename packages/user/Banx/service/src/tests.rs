@@ -1271,6 +1271,79 @@ mod tests {
         Ok(())
     }
 
+    /// Claim transfer spends depleting grant only on the *new* slice,
+    /// same as `path_pay` (`new_draw = amount − reverse`).
+    ///
+    /// Auto-net means a pair is only ever live in one direction, so the
+    /// line cap is `capacity` (reverse + headroom). Grant is the bug if
+    /// we `consume_grant(amount)` for the full face: a standing buy offer
+    /// plus a depleting line can be griefed — the seller hits the bid,
+    /// the books net to zero against the buyer's existing debt to the
+    /// debtor, and the grant still shrinks.
+    ///
+    /// Books before the take:
+    /// - Alice holds 50 on Bob (the claim being sold)
+    /// - Peter owes Bob 50 (the reverse tab)
+    /// - Peter's depleting line to Bob is 100, grant still 100
+    ///
+    /// After a take of 50: pair nets to 0, grant still 100.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_sell_claim_grant_only_new_draw(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        let peter = account!("peter");
+        for a in [alice, bob, peter] {
+            chain.new_account(a).unwrap();
+        }
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        // Alice holds 50 on Bob.
+        Wrapper::push_from(&chain, bob)
+            .deposit(alice, usd, Quantity::new(50), 0, 0)
+            .get()?;
+        // Peter owes Bob 50. Same pair, other way: the reverse tab.
+        Wrapper::push_from(&chain, peter)
+            .deposit(bob, usd, Quantity::new(50), 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, peter)
+            .st_crd_lne(bob, usd, Quantity::new(100), true, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, peter)
+            .st_glb_buy(usd, Quantity::new(0), 0, never())
+            .get()?;
+        // Debtor must know the buyer. Live tabs already exist both ways;
+        // a 0-limit line is the same consent `path_pay` would use.
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(peter, usd, Quantity::new(0), false, 0, 0)
+            .get()?;
+
+        assert_eq!(exp(&chain, alice, bob, usd), 50);
+        assert_eq!(exp(&chain, bob, peter, usd), 50);
+        assert_eq!(CreditLine::get_assert(peter, bob, usd).remaining.value, 100);
+
+        Wrapper::push_from(&chain, alice)
+            .sell_claim(peter, bob, usd, Quantity::new(50))
+            .get()?;
+
+        // Wash: Peter's new claim on Bob nets against the 50 he owed.
+        assert_eq!(exp(&chain, peter, bob, usd), 0);
+        assert_eq!(exp(&chain, bob, peter, usd), 0);
+        assert_eq!(exp(&chain, alice, bob, usd), 0);
+        // Alice is paid in a claim on Peter (0% spread).
+        assert_eq!(exp(&chain, alice, peter, usd), 50);
+
+        let line = CreditLine::get_assert(peter, bob, usd);
+        assert_eq!(
+            line.remaining.value, 100,
+            "face 50 fully unwound the reverse tab, so new_draw is 0 \
+             and grant must stay 100"
+        );
+        Ok(())
+    }
+
     #[psibase::test_case(packages("Banx"))]
     fn test_sell_claim_requires_debtor_line_to_buyer(
         chain: psibase::Chain,
