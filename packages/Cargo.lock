@@ -1373,13 +1373,22 @@ dependencies = [
 ]
 
 [[package]]
-name = "host-common"
+name = "host-http"
 version = "0.27.0"
 dependencies = [
  "psibase",
  "psibase-plugin-workspace-hack",
  "serde",
  "serde_json",
+ "wit-bindgen-rt",
+]
+
+[[package]]
+name = "host-client"
+version = "0.27.0"
+dependencies = [
+ "psibase",
+ "psibase-plugin-workspace-hack",
  "url",
  "wit-bindgen-rt",
 ]
