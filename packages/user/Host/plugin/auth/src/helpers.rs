@@ -2,7 +2,7 @@ use crate::bindings::host::client::api::get_sender;
 use crate::bindings::host::types::types::{Error, PluginId};
 use crate::bindings::supervisor::bridge::{
     intf as Supervisor,
-    types::{self as BridgeTypes, BodyTypes, Header, HttpRequest},
+    types::{BodyTypes, Header, HttpRequest},
 };
 use crate::bindings::transact::login::api as Login;
 use serde::Deserialize;
@@ -12,19 +12,6 @@ pub fn check_caller(allowed: &[&str], context: &str) {
     let app = get_sender();
     if !allowed.contains(&app.as_str()) {
         panic!("[{}] Unauthorized caller: {}", context, app);
-    }
-}
-
-impl From<BridgeTypes::Error> for Error {
-    fn from(e: BridgeTypes::Error) -> Self {
-        Error {
-            code: e.code,
-            producer: PluginId {
-                service: e.producer.service,
-                plugin: e.producer.plugin,
-            },
-            message: e.message,
-        }
     }
 }
 
@@ -75,7 +62,7 @@ pub fn mint_query_token(app: &str, user: &str, auth_service: &str) -> Result<Str
         body: Some(BodyTypes::Bytes(packed)),
     };
 
-    let response = Supervisor::send_request(&req, false).map_err(Error::from)?;
+    let response = Supervisor::send_request(&req, false)?;
     match response.body {
         Some(BodyTypes::Json(t)) => {
             let reply = serde_json::from_str::<LoginReply>(&t)

@@ -1,25 +1,9 @@
-use crate::bindings::host::types::types::{BodyTypes, Error, PluginId};
+use crate::bindings::host::types::types::{BodyTypes, Error};
 use crate::bindings::supervisor::bridge::types::{self as BridgeTypes, HttpRequest, HttpResponse};
 use crate::supervisor::bridge::intf as Supervisor;
 
-impl From<BridgeTypes::PluginId> for PluginId {
-    fn from(e: BridgeTypes::PluginId) -> Self {
-        PluginId {
-            service: e.service,
-            plugin: e.plugin,
-        }
-    }
-}
-
-impl From<BridgeTypes::Error> for Error {
-    fn from(e: BridgeTypes::Error) -> Self {
-        Error {
-            code: e.code,
-            producer: e.producer.into(),
-            message: e.message,
-        }
-    }
-}
+// BridgeTypes::Error / PluginId are now `use`d from host:types (so wac can
+// merge supervisor:bridge/intf across host plugins) — no conversion needed.
 
 impl From<BridgeTypes::BodyTypes> for BodyTypes {
     fn from(e: BridgeTypes::BodyTypes) -> Self {

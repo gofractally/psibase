@@ -2,6 +2,7 @@ package host:client;
 
 world impl {
     include supervisor:bridge/imports;
+    include supervisor:callstack/imports;
 
     export api;
 }

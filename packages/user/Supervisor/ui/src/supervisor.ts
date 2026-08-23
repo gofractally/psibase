@@ -18,15 +18,19 @@ import {
 } from "@psibase/common-lib/messaging/function-call-request";
 import { pluginId } from "@psibase/common-lib/messaging/plugin-id";
 
+import { CompiledPlugin, compilePlugin } from "./component-loading/loader";
+import { wasmMemStats } from "./component-loading/wasm-metrics";
 import { AppInterface } from "./app-interface";
 import { CallContext } from "./call-context";
 import { getRecoverableError } from "./plugin/errors";
+import { PluginHost } from "./plugin/plugin-host";
 import { PluginLoader } from "./plugin/plugin-loader";
 import { Plugins } from "./plugin/plugins";
 import {
     OriginationData,
     assert,
     chainIdPromise,
+    composer,
     isEmbedded,
     networkName,
     networkNamePromise,
@@ -45,6 +49,7 @@ const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("accounts", "client-query"),
     pluginId("host", "auth"),
     pluginId("host", "prompt"),
+    pluginId("host", "callstack"),
     pluginId("transact", "plugin"),
     pluginId("transact", "actions"),
     pluginId("transact", "login"),
@@ -65,6 +70,16 @@ class PromptSignal extends Error {
     }
 }
 
+interface CompositeCacheEntry {
+    wasm: Uint8Array;
+    composeSet: Array<{ service: string; plugin: string }>;
+    containsTransact: boolean;
+    // Transpiled + core-compiled composite (Modules only, no Memory).
+    // Memoized so later entries with the same closure skip the jco
+    // transpile; instances are still created (and disposed) per entry.
+    compiled?: Promise<CompiledPlugin>;
+}
+
 // The supervisor facilitates all communication
 export class Supervisor implements AppInterface {
     private plugins: Plugins;
@@ -76,6 +91,8 @@ export class Supervisor implements AppInterface {
     private embedder: string | undefined;
 
     private inPreload = false;
+
+    private compositeCache = new Map<string, CompositeCacheEntry>();
 
     parser: Promise<any>;
 
@@ -90,6 +107,7 @@ export class Supervisor implements AppInterface {
                 this.embedder,
                 this.parentOrigination.app,
             );
+            this.seedWasmStack();
         }
         return this.context;
     }
@@ -142,6 +160,8 @@ export class Supervisor implements AppInterface {
             await this.loader.processPlugins();
             await this.loader.awaitReady();
 
+            await this.plugins.compileUncompiled();
+
             // Required to instantiate system plugins to execute the plugin calls below
             await this.plugins.instantiateAll();
 
@@ -163,8 +183,6 @@ export class Supervisor implements AppInterface {
 
             setQueryToken(this.getActiveQueryToken());
 
-            // Phase 1: Compile app plugins (NO instantiation yet — Memory deferred).
-            // The sync call to getAuthServices below only touches Phase 0 plugins.
             this.loader.trackPlugins([...plugins]);
             await this.loader.processPlugins();
             await this.loader.awaitReady();
@@ -208,11 +226,13 @@ export class Supervisor implements AppInterface {
     private supervisorCall(callArgs: QualifiedFunctionCallArgs): any {
         const context = this.getCallContext();
         context.stack.push("supervisor", "callFunction");
+        this.wasmStack("push", ["supervisor"]);
 
         let ret: any;
         try {
             ret = this.call(callArgs);
         } finally {
+            this.wasmStack("pop");
             context.stack.pop();
         }
 
@@ -222,10 +242,12 @@ export class Supervisor implements AppInterface {
     private supervisorResourceCall(callArgs: QualifiedResourceCallArgs): any {
         const context = this.getCallContext();
         context.stack.push("supervisor", "callResource");
+        this.wasmStack("push", ["supervisor"]);
         let ret: any;
         try {
             ret = this.callResource(callArgs);
         } finally {
+            this.wasmStack("pop");
             context.stack.pop();
         }
 
@@ -269,13 +291,191 @@ export class Supervisor implements AppInterface {
         window.addEventListener("pagehide", () => this.shutdown());
     }
 
+    private unwrapComposerResult(raw: any): {
+        wasm: Uint8Array;
+        composeSet: Array<{ service: string; plugin: string }>;
+        containsTransact: boolean;
+    } {
+        if (raw && typeof raw === "object" && "tag" in raw) {
+            if (raw.tag === "err") {
+                throw new Error(String(raw.val));
+            }
+            raw = raw.val;
+        }
+        return {
+            wasm: raw.wasm as Uint8Array,
+            composeSet: (raw.composeSet ?? raw["compose-set"]) as Array<{
+                service: string;
+                plugin: string;
+            }>,
+            containsTransact: Boolean(
+                raw.containsTransact ?? raw["contains-transact"],
+            ),
+        };
+    }
+
+    private cacheKey(
+        kind: string,
+        plugins: Array<{ service: string; plugin: string; wasm: Uint8Array }>,
+    ): string {
+        const parts = plugins
+            .map((p) => `${p.service}:${p.plugin}:${p.wasm.byteLength}`)
+            .sort();
+        return `${kind}|${parts.join(",")}`;
+    }
+
+    private compileComposite(
+        result: CompositeCacheEntry,
+        entry: QualifiedPluginId | undefined,
+        privileged: boolean,
+    ): Promise<CompiledPlugin> {
+        return (async () => {
+            const p = await parser();
+            const api = p.parse("composite", result.wasm);
+            const services = await this.plugins.mergedServiceMap();
+            for (const intf of api.importedFuncs?.interfaces ?? []) {
+                if (
+                    intf.namespace === "wasi" ||
+                    intf.namespace === "supervisor"
+                ) {
+                    continue;
+                }
+                if (!(intf.namespace in services)) {
+                    services[intf.namespace] = intf.namespace;
+                }
+            }
+            return compilePlugin(
+                entry?.service ?? "host",
+                privileged,
+                result.wasm,
+                new PluginHost(this),
+                api,
+                services,
+                { namespacedExports: true, allowCallstack: true },
+            );
+        })();
+    }
+
+    private async attachComposite(
+        result: CompositeCacheEntry,
+        entry: QualifiedPluginId | undefined,
+        privileged: boolean,
+        wrapTracers: boolean,
+    ): Promise<void> {
+        if (result.composeSet.length === 0) return;
+        if (!result.compiled) {
+            const promise = this.compileComposite(result, entry, privileged);
+            result.compiled = promise;
+            // Allow a retry on transient failure (e.g. a service-map fetch).
+            promise.catch(() => {
+                if (result.compiled === promise) result.compiled = undefined;
+            });
+        }
+        const compiled = await result.compiled;
+        let instance: Promise<{ exports: Record<string, unknown> }> | undefined;
+        const instantiate = () => {
+            if (!instance) instance = compiled.instantiate();
+            return instance;
+        };
+        for (const id of result.composeSet) {
+            const plugin = this.plugins.getPlugin(id).plugin;
+            await plugin.parsed;
+            // Every compose-set plugin is tracer-wrapped. Supervisor skips
+            // the JS push so the tracer is the only frame (no double push).
+            plugin.attachShared(instantiate, true, wrapTracers);
+        }
+    }
+
+    private async composeAppPlugins(entry: QualifiedPluginId): Promise<void> {
+        // Host compose plugins fold into this entry's composite. host:types
+        // stays individual (`plugin-ref` / wac identity). Preload instantiates
+        // host plugins individually so query-token / prompt can run before
+        // the entry closure is downloaded; this call re-attaches them.
+        if (entry.service === "host" && entry.plugin === "types") {
+            return;
+        }
+        const wasmPlugins = this.plugins.collectWasmPlugins();
+        if (wasmPlugins.length === 0) return;
+        if (!wasmPlugins.some((p) => p.service === entry.service && p.plugin === entry.plugin)) {
+            return;
+        }
+        const key = this.cacheKey(`app:${entry.service}:${entry.plugin}`, wasmPlugins);
+        let result = this.compositeCache.get(key);
+        if (!result) {
+            const c = await composer();
+            try {
+                result = this.unwrapComposerResult(
+                    c.compose(entry, wasmPlugins, true),
+                );
+            } catch (e) {
+                console.error(
+                    `compose(${entry.service}:${entry.plugin}) failed`,
+                    e,
+                    "loaded:",
+                    wasmPlugins.map((p) => `${p.service}:${p.plugin}`),
+                );
+                throw e;
+            }
+            this.compositeCache.set(key, result);
+            console.info(
+                `compose(${entry.service}:${entry.plugin}) set=`,
+                result.composeSet.map((id) => `${id.service}:${id.plugin}`),
+            );
+        }
+        // Host compose plugins lift `supervisor:bridge`. The composite
+        // needs those bindings even when the entry is an app plugin.
+        const privileged = result.composeSet.some((id) => id.service === "host");
+        await this.attachComposite(result, entry, privileged, true);
+    }
+
     getRootDomain(): string {
         return rootDomain;
+    }
+
+    pushTracerFrame(service: string): void {
+        const ctx = this.getCallContext();
+        ctx.stack.push(service, `tracer:${service}`);
+    }
+
+    popTracerFrame(): void {
+        const ctx = this.getCallContext();
+        ctx.stack.pop();
+    }
+
+    resetTracerStack(): void {
+        this.context?.stack.reset();
     }
 
     getServiceStack(): string[] {
         assertTruthy(this.context, "Uninitialized call context");
         return this.context.stack.export();
+    }
+
+    // JS-only frames (UI seed, supervisorCall, untraced syncCall) must
+    // appear on the in-WASM leaf so host:client#get-sender stays correct
+    // after callstack is plugged. Tracer frames write the leaf themselves.
+    private callstackPlugin() {
+        return this.plugins
+            .allPlugins()
+            .find((p) => p.id.service === "host" && p.id.plugin === "callstack");
+    }
+
+    private wasmStack(method: string, params: unknown[] = []): void {
+        const p = this.callstackPlugin();
+        if (!p) return;
+        try {
+            p.call("callstack", method, params);
+        } catch {
+            // Not instantiated yet, or leftover JS-only path.
+        }
+    }
+
+    private seedWasmStack(): void {
+        if (!this.context) return;
+        this.wasmStack("reset");
+        for (const service of this.context.stack.export()) {
+            this.wasmStack("push", [service]);
+        }
     }
 
     importKey(privateKey: string): string {
@@ -317,13 +517,33 @@ export class Supervisor implements AppInterface {
 
         const { service, plugin, intf, method, params } = args;
         const p = this.plugins.getAssertPlugin({ service, plugin });
+        const label = `${service}:${plugin}/${intf ?? ""}->${method}`;
 
-        this.context.stack.push(args.service, toString(args));
+        const skipJsPush = p.stackManagedByTracer;
+        if (!skipJsPush) {
+            this.context.stack.push(args.service, toString(args));
+            this.wasmStack("push", [args.service]);
+        }
+        const stackBefore = this.context.stack.export();
         let ret: any;
         try {
             ret = p.call(intf, method, params);
+        } catch (e) {
+            if (e instanceof PromptSignal) throw e;
+            const rec = getRecoverableError(e);
+            console.error(
+                `[supervisor] trap ${label} traced=${skipJsPush} ` +
+                    `stack=[${stackBefore.join(" > ")}]`,
+                rec ?? e,
+            );
+            if (rec) throw e;
+            const msg = e instanceof Error ? e.message : String(e);
+            throw new Error(`${label} failed: ${msg}`, { cause: e });
         } finally {
-            this.context.stack.pop();
+            if (!skipJsPush) {
+                this.wasmStack("pop");
+                this.context.stack.pop();
+            }
         }
 
         return ret;
@@ -373,13 +593,32 @@ export class Supervisor implements AppInterface {
         assertTruthy(this.context, "Uninitialized call context");
         const { service, plugin, intf, type, handle, method, params } = args;
         const p = this.plugins.getAssertPlugin({ service, plugin });
-
-        this.context.stack.push(service, toString(args));
+        const label = `${service}:${plugin}/${intf ?? ""}->${type}.${method}`;
+        const skipJsPush = p.stackManagedByTracer;
+        if (!skipJsPush) {
+            this.context.stack.push(service, toString(args));
+            this.wasmStack("push", [service]);
+        }
+        const stackBefore = this.context.stack.export();
         let ret: any;
         try {
             ret = p.resourceCall(intf, type, handle, method, params);
+        } catch (e) {
+            if (e instanceof PromptSignal) throw e;
+            const rec = getRecoverableError(e);
+            console.error(
+                `[supervisor] trap ${label} traced=${skipJsPush} ` +
+                    `stack=[${stackBefore.join(" > ")}]`,
+                rec ?? e,
+            );
+            if (rec) throw e;
+            const msg = e instanceof Error ? e.message : String(e);
+            throw new Error(`${label} failed: ${msg}`, { cause: e });
         } finally {
-            this.context.stack.pop();
+            if (!skipJsPush) {
+                this.wasmStack("pop");
+                this.context.stack.pop();
+            }
         }
 
         return ret;
@@ -416,6 +655,7 @@ export class Supervisor implements AppInterface {
         plugins: QualifiedPluginId[],
     ) {
         let result: unknown = null;
+        const memBefore = wasmMemStats();
         try {
             await networkNamePromise;
             this.setParentOrigination(callerOrigin);
@@ -424,9 +664,22 @@ export class Supervisor implements AppInterface {
             result = e;
         } finally {
             this.plugins.disposeAll();
+            this.logWasmMemStats("preload", memBefore);
             this.replyToParent(id, result);
             this.cleanupSessionState();
         }
+    }
+
+    private logWasmMemStats(
+        label: string,
+        before: ReturnType<typeof wasmMemStats>,
+    ): void {
+        const after = wasmMemStats();
+        console.info(
+            `[wasm] ${label}: +${after.instantiations - before.instantiations} core instances this call; ` +
+                `live: ${after.liveMemories} memories / ${after.liveInstances} instances ` +
+                `(drops when GC collects disposed wasm)`,
+        );
     }
 
     // This is an entrypoint for apps to call into plugins.
@@ -435,6 +688,7 @@ export class Supervisor implements AppInterface {
         id: string,
         args: QualifiedFunctionCallArgs,
     ): Promise<any> {
+        const memBefore = wasmMemStats();
         try {
             await networkNamePromise;
             this.setParentOrigination(callerOrigin);
@@ -449,9 +703,15 @@ export class Supervisor implements AppInterface {
                 },
             ]);
 
+            await this.composeAppPlugins({
+                service: args.service,
+                plugin: args.plugin,
+            });
+            await this.plugins.compileUncompiled();
             await this.plugins.instantiateAll();
 
             this.context = this.getCallContext();
+            this.seedWasmStack();
 
             // Starts the tx context.
             this.supervisorCall(
@@ -504,6 +764,10 @@ export class Supervisor implements AppInterface {
             this.replyToParent(id, result);
         } finally {
             this.plugins.disposeAll();
+            this.logWasmMemStats(
+                `entry ${args.service}:${args.plugin}/${args.intf ?? ""}->${args.method}`,
+                memBefore,
+            );
             this.cleanupSessionState();
         }
     }

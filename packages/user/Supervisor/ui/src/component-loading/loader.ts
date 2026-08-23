@@ -9,6 +9,12 @@ import { kebabToCamel, kebabToPascal } from "../case.js";
 import { HostInterface } from "../host-interface.js";
 import { assert } from "../utils.js";
 import { ComponentAPI, Functions, Interface } from "../wit-extraction.js";
+import { fixJcoResourceTables, makeJcoReenterable } from "./jco-reenter.js";
+import { installWasmMetrics } from "./wasm-metrics.js";
+
+// All instantiation in this frame flows through this module (loadBasic /
+// compilePlugin), so installing here guarantees the counter sees everything.
+installWasmMetrics();
 
 type PluginImports = Record<string, Record<string, unknown>>;
 
@@ -208,6 +214,11 @@ export interface InstantiateResult {
     exports: Record<string, unknown>;
 }
 
+export interface CompileOptions {
+    namespacedExports?: boolean;
+    allowCallstack?: boolean;
+}
+
 export interface CompiledPlugin {
     instantiate: () => Promise<InstantiateResult>;
 }
@@ -218,6 +229,7 @@ async function compileWasmComponent(
     wasmBytes: Uint8Array,
     imports: PluginImports,
     debugFileName: string,
+    namespacedExports = false,
 ): Promise<CompiledPlugin> {
     const name = "component";
     const opts: GenerateOptions = {
@@ -227,7 +239,7 @@ async function compileWasmComponent(
         noNodejsCompat: true,
         tlaCompat: false,
         validLiftingOptimization: false,
-        noNamespacedExports: true,
+        noNamespacedExports: !namespacedExports,
         tracing: false,
     };
 
@@ -245,6 +257,8 @@ async function compileWasmComponent(
     }
 
     assert(jsSource !== null, "jco generate produced no JS file");
+    jsSource = fixJcoResourceTables(jsSource);
+    jsSource = makeJcoReenterable(jsSource);
 
     // If a future jco version (or some adversarial input) ever caused it to emit a
     //   static `import`/`export ... from`, the browser would silently fetch it.
@@ -303,7 +317,7 @@ function assertSupervisorImportsSatisfied(
 
         const key = `${intf.namespace}:${intf.package}/${intf.name}`;
 
-        if (!privileged) {
+        if (intf.package !== "callstack" && !privileged) {
             throw new Error(
                 `Plugin ${service} imports ${key} but is not privileged`,
             );
@@ -335,10 +349,16 @@ export async function compilePlugin(
     pluginHost: HostInterface,
     api: ComponentAPI,
     services: ServiceMap | null,
+    options: CompileOptions = {},
 ): Promise<CompiledPlugin> {
     const imports: PluginImports = {
         ...getWasiImports(),
         ...(privileged ? pluginHost.bridge : {}),
+        ...(options.allowCallstack || api.importedFuncs.interfaces.some(
+            (intf) => intf.namespace === "supervisor" && intf.package === "callstack",
+        )
+            ? pluginHost.callstack
+            : {}),
         ...buildProxiedImports(api.importedFuncs, pluginHost, services),
     };
     assertSupervisorImportsSatisfied(
@@ -347,7 +367,12 @@ export async function compilePlugin(
         api.importedFuncs,
         imports,
     );
-    return compileWasmComponent(wasmBytes, imports, `${service}.plugin.js`);
+    return compileWasmComponent(
+        wasmBytes,
+        imports,
+        `${service}.plugin.js`,
+        options.namespacedExports === true,
+    );
 }
 
 // Loads a utility WASM component (not a plugin) with only WASI imports.
