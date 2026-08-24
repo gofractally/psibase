@@ -279,6 +279,48 @@ pub mod tables {
         forward
     }
 
+    /// Execute hops, optionally tick an invoice, emit sender↔payee activity
+    /// for multi-hop. Returns last-hop amount. Panics if `forward < min_return`.
+    pub(crate) fn run_path(
+        sender: AccountNumber,
+        hops: Vec<PathHop>,
+        amount: Quantity,
+        min_return: Quantity,
+        request_id: u32,
+    ) -> Quantity {
+        let hop_count = hops.len();
+        let first_asset = hops[0].asset_id;
+        let last_hop = hops[hops.len() - 1];
+        let forward = execute_path(sender, hops, amount);
+        assert!(
+            forward.value >= min_return.value,
+            "path_pay final amount below min_return"
+        );
+        if request_id != 0 {
+            PayRequest::fulfill_invoice(
+                request_id,
+                sender,
+                last_hop.account,
+                last_hop.asset_id,
+                forward,
+            );
+        }
+        if hop_count >= 2 {
+            emit_pair_activity(
+                sender,
+                last_hop.account,
+                first_asset,
+                "path_pay",
+                amount,
+                forward,
+                last_hop.asset_id,
+                request_id,
+                "",
+            );
+        }
+        forward
+    }
+
     /// Path-forward offer: `poster` will sit in the middle of `path_pay`.
     /// `next_hop = 0` is global (any next hop). Specific may be posted
     /// before that hop knows the poster; `path_draw` still needs a line or
@@ -990,7 +1032,8 @@ pub mod tables {
             );
             assert!(party_a != party_b, "creditor must differ from debtor");
 
-            let conn = Connection::net_leftover(party_a, party_b, self.from_asset);
+            let conn = Connection::net_leftover(party_a, party_b, self.from_asset)
+                .expect("nothing to convert in from_asset");
             let take = amount_from.value.min(conn.forward().value);
             assert!(take > 0, "nothing to convert in from_asset");
             let creditor = conn.creditor;
@@ -1175,7 +1218,7 @@ pub mod tables {
         /// changes — not for a lone accrue, so 5s vs 5y stays identical.
         /// During grace, interest stays 0 and the epoch moves to now so
         /// post-grace compound runs from this principal change, not origination.
-        pub fn lock_interest(&mut self) {
+        pub fn accrue(&mut self) {
             let now = Self::now();
             if PairCycle::pair_in_grace(self.creditor, self.debtor, self.asset_id, now) {
                 let dirty = self.accrued_interest.value != 0
@@ -1209,15 +1252,10 @@ pub mod tables {
                 .sum()
         }
 
-        /// Lock interest before a principal change on this row.
-        pub fn accrue(&mut self) {
-            self.lock_interest();
-        }
-
-        /// Lock every obligation on this directed pair/asset.
+        /// Accrue every obligation on this directed pair/asset.
         pub fn accrue_pair(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) {
             for mut pair in Self::obligations(creditor, debtor, asset_id) {
-                pair.lock_interest();
+                pair.accrue();
             }
         }
 
@@ -1852,16 +1890,16 @@ pub mod tables {
         }
 
         /// Accrue, full-net, return the leftover directed connection.
-        pub fn net_leftover(a: AccountNumber, b: AccountNumber, asset_id: u16) -> Self {
+        pub fn net_leftover(a: AccountNumber, b: AccountNumber, asset_id: u16) -> Option<Self> {
             Obligation::net_pair(a, b, asset_id, u64::MAX.into());
             let ab = Obligation::exposure(a, b, asset_id).value;
             let ba = Obligation::exposure(b, a, asset_id).value;
             if ab > 0 {
-                Self::get_live(a, b, asset_id)
+                Some(Self::get_live(a, b, asset_id))
             } else if ba > 0 {
-                Self::get_live(b, a, asset_id)
+                Some(Self::get_live(b, a, asset_id))
             } else {
-                panic!("nothing to convert in from_asset")
+                None
             }
         }
 
@@ -2211,7 +2249,7 @@ pub mod tables {
 #[psibase::service(name = "banx-app", tables = "tables")]
 pub mod service {
     use crate::tables::{
-        assert_account_exists, emit_pair_activity, execute_path, path_required_send, Asset,
+        assert_account_exists, emit_pair_activity, path_required_send, run_path, Asset,
         CashQuote, ClaimOffer, Connection, CreditLine, CurrencyPolicy, ForwardOffer, InitRow,
         InitTable, Obligation, PathHop, PayRequest,
     };
@@ -2767,41 +2805,7 @@ pub mod service {
     fn path_pay(hops: Vec<PathHop>, amount: Quantity, min_return: Quantity, request_id: u32) {
         assert!(!hops.is_empty(), "path_pay must include at least one hop");
         assert!(amount.value > 0, "path_pay amount must be positive");
-        let sender = get_sender();
-        let hop_count = hops.len();
-        let first_asset = hops[0].asset_id;
-        let last_hop = hops[hops.len() - 1];
-
-        let forward = execute_path(sender, hops, amount);
-        assert!(
-            forward.value >= min_return.value,
-            "path_pay final amount below min_return"
-        );
-
-        if request_id != 0 {
-            PayRequest::fulfill_invoice(
-                request_id,
-                sender,
-                last_hop.account,
-                last_hop.asset_id,
-                forward,
-            );
-        }
-        // Hop draws already write adjacent pairs. Multi-hop also writes
-        // sender↔payee so history with the payee shows the payment.
-        if hop_count >= 2 {
-            emit_pair_activity(
-                sender,
-                last_hop.account,
-                first_asset,
-                "path_pay",
-                amount,
-                forward,
-                last_hop.asset_id,
-                request_id,
-                "",
-            );
-        }
+        run_path(get_sender(), hops, amount, min_return, request_id);
     }
 
     /// Pay a live invoice by walking hops **backward** from remaining.
@@ -2818,9 +2822,6 @@ pub mod service {
         assert!(request_id != 0, "pay_inv requires an invoice");
         assert!(!hops.is_empty(), "pay_inv must include at least one hop");
         assert!(max_spend.value > 0, "pay_inv max_spend must be positive");
-        let sender = get_sender();
-        let hop_count = hops.len();
-        let first_asset = hops[0].asset_id;
         let last_hop = hops[hops.len() - 1];
         let remaining =
             PayRequest::live_invoice_remaining(request_id, last_hop.account, last_hop.asset_id);
@@ -2829,27 +2830,7 @@ pub mod service {
             required.value <= max_spend.value,
             "pay_inv max_spend below required send"
         );
-        let delivered = execute_path(sender, hops, required);
-        PayRequest::fulfill_invoice(
-            request_id,
-            sender,
-            last_hop.account,
-            last_hop.asset_id,
-            delivered,
-        );
-        if hop_count >= 2 {
-            emit_pair_activity(
-                sender,
-                last_hop.account,
-                first_asset,
-                "path_pay",
-                required,
-                delivered,
-                last_hop.asset_id,
-                request_id,
-                "",
-            );
-        }
+        run_path(get_sender(), hops, required, remaining, request_id);
     }
 
     /// Post an invoice (`1`), please-book (`2`), or settle-auth (`3`).
