@@ -7,6 +7,15 @@ impl Asset {
         AssetTable::read_write().put(self).unwrap();
     }
 
+    fn new(symbol: AccountNumber, precision: Precision, description: Memo) -> Self {
+        Self {
+            id: InitRow::alloc_asset_id(),
+            symbol,
+            precision,
+            description,
+        }
+    }
+
     pub fn get(id: u16) -> Option<Self> {
         AssetTable::read().get_index_pk().get(&id)
     }
@@ -29,12 +38,7 @@ impl Asset {
             Self::get_by_symbol(symbol).is_none(),
             "asset symbol already exists"
         );
-        let asset = Self {
-            id: InitRow::alloc_asset_id(),
-            symbol,
-            precision,
-            description,
-        };
+        let asset = Self::new(symbol, precision, description);
         asset.save();
         asset
     }

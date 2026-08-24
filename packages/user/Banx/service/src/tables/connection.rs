@@ -83,8 +83,8 @@ impl Connection {
     /// `deposit`. A hop that only unwinds such a reverse claim is allowed
     /// separately (`new_draw == 0`).
     pub fn knows(who: AccountNumber, them: AccountNumber, asset_id: u16) -> bool {
-        let c = Self::get_live(who, them, asset_id);
-        c.line.is_some() || c.reverse.value > 0
+        let connection = Self::get_live(who, them, asset_id);
+        connection.line.is_some() || connection.reverse.value > 0
     }
 
     /// Credit this directed claim, then auto-net. Returns the amount netted.
@@ -162,7 +162,7 @@ impl Connection {
                 self.line
                     .as_mut()
                     .unwrap()
-                    .consume_remaining(Quantity::new(new_draw));
+                    .consume_remaining(new_draw.into());
             }
         }
         Obligation::transfer_claims(
