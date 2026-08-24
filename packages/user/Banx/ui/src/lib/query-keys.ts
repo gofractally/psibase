@@ -12,6 +12,12 @@ export const QueryKey = {
         ["banx", "claimOffers", account ?? ""] as const,
     currencyPolicies: (account: string | null | undefined) =>
         ["banx", "currencyPolicies", account ?? ""] as const,
+    cashQuotes: (poster: string | null | undefined) =>
+        ["banx", "cashQuotes", poster ?? "*"] as const,
+    cashVault: (account: string | null | undefined) =>
+        ["banx", "cashVault", account ?? ""] as const,
+    tokenPrecision: (tokenId: number) =>
+        ["banx", "tokenPrecision", tokenId] as const,
     requests: (account: string | null | undefined) =>
         ["banx", "requests", account ?? ""] as const,
     activity: (

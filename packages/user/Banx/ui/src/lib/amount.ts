@@ -117,3 +117,26 @@ export function formatToPrecision(
     const frac = fracPart.slice(0, precision).padEnd(precision, "0");
     return `${whole}.${frac}`;
 }
+
+/** `to = (from − fee_fixed) × fx_rate / RATE_SCALE` as a human to-amount. */
+export function applyQuotedRate(
+    amountFrom: string,
+    feeFixed: string,
+    fxRate: string,
+    fromPrecision: number,
+    toPrecision: number,
+): string | null {
+    const inn = humanToRaw(amountFrom, fromPrecision);
+    const fee = humanToRaw(feeFixed, fromPrecision);
+    if (inn <= 0n || fee >= inn) return null;
+    let rate: bigint;
+    try {
+        rate = BigInt(fxRate || "0");
+    } catch {
+        return null;
+    }
+    if (rate <= 0n) return null;
+    const out = ((inn - fee) * rate) / BigInt(RATE_SCALE);
+    if (out <= 0n) return null;
+    return formatRawAmount(out.toString(), toPrecision);
+}

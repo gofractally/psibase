@@ -23,8 +23,8 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
                 <CardContent className="space-y-4">
                     <p className="text-muted-foreground text-sm">
                         Banx is a mutual-credit graph: credit lines, deposits,
-                        path payments, and FX rebooking. Connect an account to
-                        manage your positions.
+                        path payments, FX, and a Tokens cash window. Connect an
+                        account to manage your positions.
                     </p>
                     <Button
                         disabled={isPending}

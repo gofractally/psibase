@@ -499,12 +499,12 @@ mod service {
             Tokens::call().getToken(tokenId).precision.value()
         }
 
-        /// Cash quotes (Banx asset ↔ token) posted by `poster`.
-        async fn cashQuotes(&self, poster: AccountNumber) -> Vec<CashQuoteView> {
+        /// Cash quotes (Banx asset ↔ token). Omit `poster` for every desk.
+        async fn cashQuotes(&self, poster: Option<AccountNumber>) -> Vec<CashQuoteView> {
             CashQuoteTab::with_service(banx::SERVICE)
                 .get_index_pk()
                 .iter()
-                .filter(|q| q.poster == poster)
+                .filter(|q| poster.map(|p| q.poster == p).unwrap_or(true))
                 .map(CashQuoteView::from)
                 .collect()
         }

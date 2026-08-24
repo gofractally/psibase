@@ -285,8 +285,8 @@ interface api {
     /// Remove a cash quote.
     remove-cash-quote: func(asset-id: u16, token-id: u32, is-out: bool) -> result<_, error>;
 
-    /// Move tokens already credited to Banx into `{sender}/{token-id}`
-    /// (Tokens sub-account on Banx).
+    /// Move tokens already credited to Banx into `{sender}/{token-id}`.
+    /// The UI credits Banx first, then calls this.
     cash-fund: func(token-id: u32, amount: string) -> result<_, error>;
 
     /// Withdraw tokens from `{sender}/{token-id}` on Banx.

@@ -181,6 +181,7 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 - `/payees` — contacts; deposit or draw
 - `/path-pay` — Transfer: find a path and execute
 - `/requests` — invoices and please-book
+- `/cash` — Tokens cash window: post quotes, fund/withdraw vault, cash in/out
 - `/policies` — path-forward offers, buy-claim offers, and currency policies
 - `/assets` — registered assets
 

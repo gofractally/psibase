@@ -1,5 +1,6 @@
 import {
     ArrowLeftRight,
+    Banknote,
     Coins,
     Contact,
     GitBranch,
@@ -26,6 +27,7 @@ const items: {
     { to: "/path-pay", label: "Transfer", icon: GitBranch },
     { to: "/requests", label: "Requests", icon: Inbox },
     { to: "/payees", label: "Payees", icon: Contact },
+    { to: "/cash", label: "Cash", icon: Banknote },
     { to: "/policies", label: "Policies", icon: ArrowLeftRight },
     { to: "/assets", label: "Assets", icon: Coins },
 ];

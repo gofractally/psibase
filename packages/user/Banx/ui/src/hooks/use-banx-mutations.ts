@@ -27,6 +27,10 @@ function useInvalidateBanx() {
             void qc.invalidateQueries({
                 queryKey: QueryKey.requests(user),
             });
+            void qc.invalidateQueries({ queryKey: ["banx", "cashQuotes"] });
+            void qc.invalidateQueries({
+                queryKey: QueryKey.cashVault(user),
+            });
         }
     };
 }
@@ -621,6 +625,136 @@ export function useSetCurrencyPolicy() {
         onSuccess: () => {
             invalidate();
             toast.success("Currency policy saved");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useSetCashQuote() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            assetId: number;
+            tokenId: number;
+            isOut: boolean;
+            feeFixed: string;
+            toRate: string;
+            expiresAtSeconds: number;
+        }) =>
+            banxCall("setCashQuote", [
+                p.assetId,
+                p.tokenId,
+                p.isOut,
+                p.feeFixed,
+                p.toRate,
+                p.expiresAtSeconds,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Cash quote saved");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useRemoveCashQuote() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            assetId: number;
+            tokenId: number;
+            isOut: boolean;
+        }) => banxCall("removeCashQuote", [p.assetId, p.tokenId, p.isOut]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Cash quote removed");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+async function tokensCredit(tokenId: number, amount: string) {
+    await supervisor.functionCall({
+        service: "tokens",
+        intf: "user",
+        method: "credit",
+        params: [tokenId, BANX_SERVICE, amount, "csh_fund"],
+    });
+}
+
+export function useCashFund() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: { tokenId: number; amount: string }) => {
+            await tokensCredit(p.tokenId, p.amount);
+            await banxCall("cashFund", [p.tokenId, p.amount]);
+        },
+        onSuccess: () => {
+            invalidate();
+            toast.success("Vault funded");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useCashWithdraw() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: { tokenId: number; amount: string }) =>
+            banxCall("cashWithdraw", [p.tokenId, p.amount]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Withdrawn from vault");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useCashOut() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            cashier: string;
+            assetId: number;
+            tokenId: number;
+            amountBanx: string;
+            minTokens: string;
+        }) =>
+            banxCall("cashOut", [
+                p.cashier,
+                p.assetId,
+                p.tokenId,
+                p.amountBanx,
+                p.minTokens,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Cashed out");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useCashIn() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            cashier: string;
+            assetId: number;
+            tokenId: number;
+            amountTokens: string;
+            minBanx: string;
+        }) =>
+            banxCall("cashIn", [
+                p.cashier,
+                p.assetId,
+                p.tokenId,
+                p.amountTokens,
+                p.minBanx,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Cashed in");
         },
         onError: (e: Error) => toast.error(e.message),
     });

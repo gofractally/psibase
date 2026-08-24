@@ -66,6 +66,22 @@ const zClaimOffer = z.object({
     isSell: z.boolean(),
 });
 
+const zCashQuote = z.object({
+    poster: z.string(),
+    assetId: z.number(),
+    tokenId: z.number(),
+    isOut: z.boolean(),
+    feeFixed: z.string(),
+    fxRate: z.string(),
+    expiresAt: z.number(),
+});
+
+const zCashVault = z.object({
+    poster: z.string(),
+    tokenId: z.number(),
+    balance: z.string(),
+});
+
 const zCurrencyPolicy = z.object({
     poster: z.string(),
     debtor: z.string().optional(),
@@ -115,6 +131,8 @@ export type ForwardOffer = z.infer<typeof zForwardOffer>;
 export type ClaimOffer = z.infer<typeof zClaimOffer>;
 /** @deprecated use ClaimOffer */
 export type BuyClaimOffer = ClaimOffer;
+export type CashQuote = z.infer<typeof zCashQuote>;
+export type CashVault = z.infer<typeof zCashVault>;
 export type CurrencyPolicy = z.infer<typeof zCurrencyPolicy>;
 export type PayRequest = z.infer<typeof zPayRequest>;
 export type ActivityEvent = z.infer<typeof zActivity>;
@@ -189,6 +207,30 @@ export async function fetchRequests(account: string): Promise<PayRequest[]> {
         } }`,
     );
     return zPayRequest.array().parse(data.requests);
+}
+
+const cashQuoteFields = `poster assetId tokenId isOut feeFixed fxRate expiresAt`;
+
+export async function fetchCashQuotes(poster?: string): Promise<CashQuote[]> {
+    const arg = poster?.trim() ? `(poster: "${poster.trim()}")` : "";
+    const data = await gql<{ cashQuotes: CashQuote[] }>(
+        `{ cashQuotes${arg} { ${cashQuoteFields} } }`,
+    );
+    return zCashQuote.array().parse(data.cashQuotes);
+}
+
+export async function fetchCashVault(poster: string): Promise<CashVault[]> {
+    const data = await gql<{ cashVault: CashVault[] }>(
+        `{ cashVault(poster: "${poster}") { poster tokenId balance } }`,
+    );
+    return zCashVault.array().parse(data.cashVault);
+}
+
+export async function fetchTokenPrecision(tokenId: number): Promise<number> {
+    const data = await gql<{ tokenPrecision: number }>(
+        `{ tokenPrecision(tokenId: ${tokenId}) }`,
+    );
+    return z.number().parse(data.tokenPrecision);
 }
 
 export async function fetchCurrencyPolicies(

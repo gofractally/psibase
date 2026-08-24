@@ -23,6 +23,10 @@ function kindLabel(kind: string): string {
             return "Net settlement";
         case "convert":
             return "Convert";
+        case "cash_out":
+            return "Cash out";
+        case "cash_in":
+            return "Cash in";
         case "credit_line":
             return "Credit line";
         case "invoice":
@@ -103,6 +107,22 @@ function describeEvent(
             return {
                 title: `Converted ${amt} ${sym} → ${toAmt} ${otherSym}`,
                 detail: `Rebook via currency policy · actor ${e.actor}`,
+            };
+        case "cash_out":
+            return {
+                title:
+                    e.actor === viewer
+                        ? `You cashed out ${amt} ${sym}`
+                        : `${e.actor} cashed out ${amt} ${sym}`,
+                detail: `Tokens from vault · ${e.counterparty}`,
+            };
+        case "cash_in":
+            return {
+                title:
+                    e.actor === viewer
+                        ? `You cashed in ${amt} ${sym}`
+                        : `${e.actor} cashed in ${amt} ${sym}`,
+                detail: `Tokens into vault · ${e.counterparty}`,
             };
         case "invoice":
         case "please_book":
