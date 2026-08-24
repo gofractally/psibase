@@ -35,7 +35,6 @@ export interface BridgeImports {
             req: HttpRequest,
             withCredentials?: boolean,
         ) => HttpResponse;
-        serviceStack: () => string[];
         getRootDomain: () => string;
         getChainId: () => string;
         sign: (msg: Uint8Array, publicKey: string) => Uint8Array;
@@ -52,9 +51,19 @@ export interface BridgeImports {
     };
 }
 
+/// supervisor:callstack host functions. Write is defined in WIT for PR2 tracers;
+/// this PR only binds the read interface, and only to host:client.
+export interface CallstackImports {
+    "supervisor:callstack/read": {
+        serviceStack: () => string[];
+        reset: () => void;
+    };
+}
+
 // This is the interface linked to the host plugin
 export interface HostInterface {
     bridge: BridgeImports;
+    callstack: CallstackImports;
 
     // Proxy entry points used by buildInterfaceProxy. Not exposed to plugins
     //   directly; reachable only through closures the proxy installs.

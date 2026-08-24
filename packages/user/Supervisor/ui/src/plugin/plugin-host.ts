@@ -7,6 +7,7 @@ import {
 
 import {
     BridgeImports,
+    CallstackImports,
     HostInterface,
     HttpRequest,
     HttpResponse,
@@ -55,10 +56,12 @@ export class PluginHost implements HostInterface {
     private supervisor: Supervisor;
 
     public bridge: BridgeImports;
+    public callstack: CallstackImports;
 
     constructor(supervisor: Supervisor) {
         this.supervisor = supervisor;
         this.bridge = this.privilegedPluginImports();
+        this.callstack = this.callstackImports();
     }
 
     private recoverableError(message: string): RecoverableErrorPayload {
@@ -208,7 +211,6 @@ export class PluginHost implements HostInterface {
             "supervisor:bridge/intf": {
                 sendRequest: (req, withCredentials) =>
                     this.sendRequest(req, withCredentials),
-                serviceStack: () => this.supervisor.getServiceStack(),
                 getRootDomain: () => this.supervisor.getRootDomain(),
                 getChainId: () => {
                     assertTruthy(chainId, "Chain ID not initialized");
@@ -227,6 +229,15 @@ export class PluginHost implements HostInterface {
             },
             "supervisor:bridge/prompt": {
                 requestPrompt: () => this.supervisor.requestPrompt(),
+            },
+        };
+    }
+
+    private callstackImports(): CallstackImports {
+        return {
+            "supervisor:callstack/read": {
+                serviceStack: () => this.supervisor.getServiceStack(),
+                reset: () => this.supervisor.resetServiceStack(),
             },
         };
     }

@@ -1,9 +1,6 @@
 package supervisor:bridge;
 
 interface intf {
-    // The last items in the list are the most recent services in the callstack
-    service-stack: func() -> list<string>;
-
     get-root-domain: func() -> string;
 }
 
