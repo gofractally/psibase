@@ -3715,4 +3715,63 @@ mod tests {
         assert_eq!(token_balance(&chain, gas, bob), 1_000_000);
         Ok(())
     }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_cash_james_friends(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let james = account!("james");
+        chain.new_account(james).unwrap();
+        let gas = mint_gas(&chain, james, james, 1_000_000);
+        fund_vault(&chain, james, gas, 400_000);
+        assert_eq!(vault_bal(&chain, james, gas), 400_000);
+        assert_eq!(token_balance(&chain, gas, james), 600_000);
+
+        // james friend Bob comes along
+        let bob = account!("bob");
+        chain.new_account(bob).unwrap();
+        enable_auto_debit(&chain, bob);
+
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        // Out: 1 USD → 0.1 gas. Fair reverse is 1 gas → 10 USD.
+        let out_rate = RATE_SCALE / 10;
+        // In: 1 gas → 9 USD (10% worse than the reverse).
+        let in_rate = RATE_SCALE * 9;
+
+        // James lists a rate he's willing to sell his gas tokens for USD.
+        Wrapper::push_from(&chain, james)
+            .st_csh_qte(usd, gas, true, 0.into(), out_rate, never())
+            .get()?;
+
+        // James gives his friend Bob a credit line so he can access funds
+        Wrapper::push_from(&chain, james)
+            .st_crd_lne(bob, usd, 10_000.into(), false, 0, 0)
+            .get()?;
+
+        // Bob can now access the gas token with only his credit line
+        Wrapper::push_from(&chain, bob)
+            .cash_out(james, usd, gas, 5_000.into(), 500.into())
+            .get()?;
+
+        assert_eq!(token_balance(&chain, gas, bob), 500);
+        assert_eq!(exp(&chain, james, bob, usd), 5_000);
+        assert_eq!(vault_bal(&chain, james, gas), 399_500);
+
+        // James allows his friend to send it back, but only at a 10% worse rate.
+        Wrapper::push_from(&chain, james)
+            .st_csh_qte(usd, gas, false, 0.into(), in_rate, never())
+            .get()?;
+
+        fund_vault(&chain, bob, gas, 500);
+
+        Wrapper::push_from(&chain, bob)
+            .cash_in(james, usd, gas, 500.into(), 4_500.into())
+            .get()?;
+
+        assert_eq!(token_balance(&chain, gas, bob), 0);
+        assert_eq!(vault_bal(&chain, bob, gas), 0);
+        assert_eq!(vault_bal(&chain, james, gas), 400_000);
+        assert_eq!(exp(&chain, james, bob, usd), 500);
+
+        Ok(())
+    }
 }

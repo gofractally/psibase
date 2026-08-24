@@ -9,9 +9,9 @@ pub mod path_find;
 pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::{
-        AccountNumber, Fracpack, Memo, ServiceWrapper, Table, TimePointSec, ToSchema,
         services::accounts::Wrapper as Accounts,
         services::tokens::{Decimal, Precision, Quantity, Wrapper as Tokens},
+        AccountNumber, Fracpack, Memo, ServiceWrapper, Table, TimePointSec, ToSchema,
     };
     use serde::{Deserialize, Serialize};
 
@@ -2029,8 +2029,7 @@ pub mod tables {
             token_id: u32,
             is_out: bool,
         ) -> Self {
-            let q = Self::get(poster, asset_id, token_id, is_out)
-                .unwrap_or_else(|| panic!("cash quote not found"));
+            let q = Self::get(poster, asset_id, token_id, is_out).expect("cash quote not found");
             q.assert_live();
             q
         }
@@ -2136,9 +2135,8 @@ pub mod tables {
             );
         }
 
-        /// Taker sends `amount_tokens` (already credited to Banx); books a
-        /// deposit onto the poster. Tokens stay in `{poster}/{token_id}` for
-        /// later `cash_out` / `csh_wd`.
+        /// Taker sends `amount_tokens` from `{taker}/{token_id}` (filled by
+        /// `csh_fund`) into the poster's vault; books a deposit onto the poster.
         pub fn cash_in(&self, taker: AccountNumber, amount_tokens: Quantity, min_banx: Quantity) {
             assert!(!self.is_out, "cash quote is not in");
             assert!(taker != self.poster, "cannot cash_in with self");
@@ -2146,9 +2144,13 @@ pub mod tables {
             let banx_amt = self.apply(amount_tokens);
             assert!(
                 banx_amt.value >= min_banx.value,
-                "cash_in Banx below min_banx"
+                "{}",
+                &format!(
+                    "cash_in Banx {} below min_banx of {}",
+                    banx_amt.value, min_banx.value
+                )
             );
-            Self::tokens_debit(taker, self.token_id, amount_tokens, "cash_in");
+            Self::from_sub(taker, self.token_id, amount_tokens);
             Self::to_sub(self.poster, self.token_id, amount_tokens);
             let netted = Connection::get(taker, self.poster, self.asset_id).deposit(banx_amt, 0);
             emit_pair_activity(
@@ -2209,15 +2211,14 @@ pub mod tables {
 #[psibase::service(name = "banx-app", tables = "tables")]
 pub mod service {
     use crate::tables::{
-        Asset, CashQuote, ClaimOffer, Connection, CreditLine, CurrencyPolicy, ForwardOffer,
-        InitRow, InitTable, Obligation, PathHop, PayRequest, assert_account_exists,
-        emit_pair_activity, execute_path, path_required_send,
+        assert_account_exists, emit_pair_activity, execute_path, path_required_send, Asset,
+        CashQuote, ClaimOffer, Connection, CreditLine, CurrencyPolicy, ForwardOffer, InitRow,
+        InitTable, Obligation, PathHop, PayRequest,
     };
     use psibase::{
-        AccountNumber, EventDb, MethodNumber, TimePointSec,
         services::events,
         services::tokens::{Precision, Quantity, Wrapper as Tokens},
-        *,
+        AccountNumber, EventDb, MethodNumber, TimePointSec, *,
     };
 
     #[action]
@@ -2640,8 +2641,9 @@ pub mod service {
         );
     }
 
-    /// Send tokens (already credited to Banx) at `cashier`'s in quote; book
-    /// Banx deposit onto the cashier. Tokens stay in the cashier's vault.
+    /// Send tokens from the sender's `{sender}/{token_id}` vault at
+    /// `cashier`'s in quote; book Banx deposit onto the cashier. Tokens
+    /// move into the cashier's vault. Sender fills their vault with `csh_fund`.
     #[action]
     fn cash_in(
         cashier: AccountNumber,
