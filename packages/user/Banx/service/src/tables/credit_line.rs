@@ -24,11 +24,7 @@ impl CreditLine {
             limit,
             deplete_on_debit,
             interest_rate,
-            remaining: if deplete_on_debit {
-                limit
-            } else {
-                Quantity::new(0)
-            },
+            remaining: if deplete_on_debit { limit } else { 0.into() },
         }
     }
 
@@ -81,7 +77,7 @@ impl CreditLine {
             line.deplete_on_debit = deplete_on_debit;
             line.interest_rate = interest_rate;
             if !deplete_on_debit {
-                line.remaining = Quantity::new(0);
+                line.remaining = 0.into();
             } else if !was_depleting {
                 line.remaining = amount;
             } else if line.remaining.value > amount.value {
