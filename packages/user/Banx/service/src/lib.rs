@@ -122,7 +122,7 @@ pub mod service {
             asset_id,
             "credit_line",
             amount,
-            Quantity::new(0),
+            0.into(),
             asset_id,
             0,
             "",
