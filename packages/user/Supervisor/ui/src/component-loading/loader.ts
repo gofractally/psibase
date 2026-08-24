@@ -6,7 +6,7 @@ import * as ioNs from "@bytecodealliance/preview2-shim/io";
 import * as randomNs from "@bytecodealliance/preview2-shim/random";
 
 import { kebabToCamel, kebabToPascal } from "../case.js";
-import { HostInterface } from "../host-interface.js";
+import { CallstackImports, HostInterface } from "../host-interface.js";
 import { assert } from "../utils.js";
 import { ComponentAPI, Functions, Interface } from "../wit-extraction.js";
 
@@ -303,7 +303,8 @@ function assertSupervisorImportsSatisfied(
 
         const key = `${intf.namespace}:${intf.package}/${intf.name}`;
 
-        if (!privileged) {
+        // callstack grant is decided by bindCallstackImports, not host privilege.
+        if (intf.package !== "callstack" && !privileged) {
             throw new Error(
                 `Plugin ${service} imports ${key} but is not privileged`,
             );
@@ -328,8 +329,51 @@ function assertSupervisorImportsSatisfied(
     }
 }
 
+export function bindCallstackImports(
+    service: string,
+    plugin: string,
+    importedFuncs: Functions,
+    callstack: CallstackImports,
+): PluginImports {
+    const callstackIntfs = importedFuncs.interfaces.filter(
+        (intf) =>
+            intf.namespace === "supervisor" &&
+            intf.package === "callstack" &&
+            intf.funcs.length > 0,
+    );
+    if (callstackIntfs.length === 0) {
+        return {};
+    }
+
+    const id = `${service}:${plugin}`;
+    const isHostClient = service === "host" && plugin === "client";
+
+    for (const intf of callstackIntfs) {
+        if (intf.name === "write") {
+            throw new Error(
+                `Plugin ${id} imports supervisor:callstack/write but is not a generated tracer`,
+            );
+        }
+        if (intf.name !== "read") {
+            throw new Error(
+                `Plugin ${id} imports supervisor:callstack/${intf.name} but is not allowed to bind supervisor:callstack`,
+            );
+        }
+        if (!isHostClient) {
+            throw new Error(
+                `Plugin ${id} imports supervisor:callstack/read but is not host:client`,
+            );
+        }
+    }
+
+    return {
+        "supervisor:callstack/read": callstack["supervisor:callstack/read"],
+    };
+}
+
 export async function compilePlugin(
     service: string,
+    plugin: string,
     privileged: boolean,
     wasmBytes: Uint8Array,
     pluginHost: HostInterface,
@@ -339,6 +383,12 @@ export async function compilePlugin(
     const imports: PluginImports = {
         ...getWasiImports(),
         ...(privileged ? pluginHost.bridge : {}),
+        ...bindCallstackImports(
+            service,
+            plugin,
+            api.importedFuncs,
+            pluginHost.callstack,
+        ),
         ...buildProxiedImports(api.importedFuncs, pluginHost, services),
     };
     assertSupervisorImportsSatisfied(

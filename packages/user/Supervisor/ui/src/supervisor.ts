@@ -278,6 +278,11 @@ export class Supervisor implements AppInterface {
         return this.context.stack.export();
     }
 
+    resetServiceStack(): void {
+        assertTruthy(this.context, "Uninitialized call context");
+        this.context.stack.reset();
+    }
+
     importKey(privateKey: string): string {
         // future: call out to SubtleCrypto
         // future: store privateKey, indexed by pubKey

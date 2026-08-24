@@ -1,0 +1,27 @@
+package supervisor:callstack;
+
+/// Identity reads. Bound only to host:client among authored plugins.
+interface read {
+    /// Last items are the most recent services on the call stack.
+    service-stack: func() -> list<string>;
+    reset: func();
+}
+
+/// Frame writes. Bound only to Supervisor-generated tracers (PR2).
+interface write {
+    push: func(service: string);
+    pop: func();
+}
+
+world read-imports {
+    import read;
+}
+
+world write-imports {
+    import write;
+}
+
+world imports {
+    import read;
+    import write;
+}
