@@ -25,15 +25,15 @@ impl ForwardOffer {
         assert!(self.is_live(), "forward offer expired");
     }
 
-    /// Closed: poster already knows `next_creditor` (lined them, or a
-    /// live claim either way). Limit 0 is enough.
-    fn assert_known(&self, next_creditor: AccountNumber) {
-        if self.allow_unknown {
+    /// Closed: poster lined `next_creditor` (0-limit is enough) or already
+    /// owes them. Pure unwind (`new_draw == 0`) does not need that.
+    fn assert_known(&self, next_creditor: AccountNumber, new_draw: u64) {
+        if self.allow_unknown || new_draw == 0 {
             return;
         }
         assert!(
             Connection::knows(self.poster, next_creditor, self.asset_id),
-            "unknown counterparty (no credit line or live claim; set allow_unknown or post a 0-limit line)"
+            "unknown counterparty (no credit line or existing debt to them; set allow_unknown or post a 0-limit line)"
         );
     }
 
@@ -124,11 +124,12 @@ impl ForwardOffer {
             );
             self.next_hop
         };
-        self.assert_known(creditor);
         let conn = Connection::get(creditor, self.poster, self.asset_id);
         let draw = self.apply_fees(amount_in);
+        let new_draw = conn.new_draw(draw);
+        self.assert_known(creditor, new_draw);
         // APR cap is only on new line capacity, not a pure unwind.
-        if conn.new_draw(draw) > 0 {
+        if new_draw > 0 {
             if let Some(line) = conn.line() {
                 assert!(
                     line.interest_rate <= self.max_line_apr,

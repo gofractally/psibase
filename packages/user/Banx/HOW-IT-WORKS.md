@@ -204,7 +204,7 @@ Not a table. For creditor C, debtor D, asset X:
 
 **Draw** of 1000 against a 400 reverse claim: unwind 400 + new_draw 600. After net, D owes C 600. `remaining` (depleting lines) is consumed only for **new_draw**.
 
-`knows(who, them, asset)`: `who` lined `them`, or there is a live claim either way.
+`knows(who, them, asset)`: `who` lined `them` (0-limit is enough), or `who` already owes `them`. A claim only the other way (`them` owes `who`) is not enough — anyone can create that with `deposit`. A hop that only unwinds such a reverse claim (`new_draw == 0`) is still allowed.
 
 ---
 
@@ -224,7 +224,7 @@ The current path debtor (the previous hop’s account) must have a **live path-f
 - Expired specific does **not** block the global.
 - Fees are Stripe-style: `out = in × (1 − percent) − fixed`. Hop 0 has no fee.
 - `max_line_apr` rejects a **new_draw** if the next hop’s line APR is higher. A hop that only unwinds a reverse claim is not checked.
-- `allow_unknown`: if off, the poster must already know the next hop (line or live claim). If on, anyone who lined the poster can become their creditor. Checked at **pay** time, not when posting. A specific offer may be posted before that hop knows the poster; the hop still needs a line or live claim when it runs.
+- `allow_unknown`: if off, the poster must already know the next hop (lined them, or already owes them). A hop that only unwinds a reverse claim does not need that. If on, anyone who lined the poster can become their creditor. Checked at **pay** time, not when posting. A specific offer may be posted before that hop knows the poster; at pay time the hop still needs a line, existing debt, or unwind capacity.
 
 ### Currency change
 

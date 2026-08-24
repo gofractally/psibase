@@ -1387,6 +1387,42 @@ mod tests {
         Ok(())
     }
 
+    /// Mallory cannot become a claim-buyer on Bob by owing Bob dust.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_sell_claim_dust_deposit_does_not_know_buyer(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        let mallory = account!("mallory");
+        for a in [alice, bob, mallory] {
+            chain.new_account(a).unwrap();
+        }
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        Wrapper::push_from(&chain, bob)
+            .deposit(alice, usd, Quantity::new(1_000), 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, mallory)
+            .st_crd_lne(bob, usd, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, mallory)
+            .st_glb_buy(usd, Quantity::new(0), 0, never())
+            .get()?;
+        Wrapper::push_from(&chain, mallory)
+            .deposit(bob, usd, Quantity::new(1), 0, 0)
+            .get()?;
+
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .sell_claim(mallory, bob, usd, Quantity::new(1_000))
+                .get()
+                .is_err(),
+            "dust deposit must not make bob know mallory as buyer"
+        );
+        Ok(())
+    }
+
     /// Closed global forward: Gary must have lined Steve before Steve can be
     /// introduced as Gary's creditor.
     #[psibase::test_case(packages("Banx"))]
@@ -1435,6 +1471,84 @@ mod tests {
             )
             .get()?;
         assert_eq!(exp(&chain, steve, gary, usd), 100);
+        Ok(())
+    }
+
+    /// Mallory cannot open Alice's closed forward by owing her dust, then
+    /// lining her so a path would new_draw.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_closed_forward_dust_deposit_does_not_know_next_hop(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let mallory = account!("mallory");
+        let sender = account!("sender");
+        for a in [alice, mallory, sender] {
+            chain.new_account(a).unwrap();
+        }
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        Wrapper::push_from(&chain, alice)
+            .st_crd_lne(sender, usd, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, mallory)
+            .st_crd_lne(alice, usd, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never(), false)
+            .get()?;
+        Wrapper::push_from(&chain, mallory)
+            .deposit(alice, usd, Quantity::new(1), 0, 0)
+            .get()?;
+
+        assert!(
+            Wrapper::push_from(&chain, sender)
+                .path_pay(
+                    vec![hop(alice, usd), hop(mallory, usd)],
+                    Quantity::new(100),
+                    Quantity::new(100),
+                    0,
+                )
+                .get()
+                .is_err(),
+            "dust + attacker line must not open a closed forward"
+        );
+        Ok(())
+    }
+
+    /// Prepaid reverse claim: cafe owes john, closed forward, hop only
+    /// unwinds — no john→cafe line needed.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_closed_forward_unwind_does_not_need_line(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let mitchell = account!("mitchell");
+        let john = account!("john");
+        let cafe = account!("cafe");
+        for a in [mitchell, john, cafe] {
+            chain.new_account(a).unwrap();
+        }
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        Wrapper::push_from(&chain, john)
+            .st_crd_lne(mitchell, usd, Quantity::new(1_000_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, cafe)
+            .deposit(john, usd, Quantity::new(100_0000), 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, john)
+            .st_fwd_ofr(cafe, usd, Quantity::new(0), 0, PPM_SCALE, never(), false)
+            .get()?;
+
+        Wrapper::push_from(&chain, mitchell)
+            .path_pay(
+                vec![hop(john, usd), hop(cafe, usd)],
+                Quantity::new(50_0000),
+                Quantity::new(50_0000),
+                0,
+            )
+            .get()?;
+        assert_eq!(exp(&chain, john, cafe, usd), 50_0000);
         Ok(())
     }
 

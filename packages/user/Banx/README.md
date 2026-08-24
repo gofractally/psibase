@@ -80,7 +80,7 @@ You can still edit hops before execute.
 
 ## Path-forward offers
 
-Posted by the **poster** (`st_fwd_ofr` / `st_glb_fwd`): poster is an intermediate; `next_hop` is the next creditor or global. Fees are Stripe-style: `out = in × (1 − percent) − fixed`. `max_line_apr` rejects a **new_draw** if the next hop’s line APR is higher; a hop that only unwinds a reverse claim is not checked. A specific offer can be posted before that hop knows the poster; the hop still needs a line or live claim at `path_pay` time. The named next hop must exist. `allow_unknown` (applied on insert and update): if off, the poster must already know the next hop (a line to them, or a live claim); if on, anyone who lined the poster can become their creditor. `st_fwd_unk` is a flag-only update without re-posting fees.
+Posted by the **poster** (`st_fwd_ofr` / `st_glb_fwd`): poster is an intermediate; `next_hop` is the next creditor or global. Fees are Stripe-style: `out = in × (1 − percent) − fixed`. `max_line_apr` rejects a **new_draw** if the next hop’s line APR is higher; a hop that only unwinds a reverse claim is not checked. A specific offer can be posted before that hop knows the poster; the hop still needs a line or live claim at `path_pay` time. The named next hop must exist. `allow_unknown` (applied on insert and update): if off, the poster must already know the next hop (a line to them, or existing debt to them); a hop that only unwinds a reverse claim is allowed without that. If on, anyone who lined the poster can become their creditor. `st_fwd_unk` is a flag-only update without re-posting fees.
 
 ## Claim offers
 

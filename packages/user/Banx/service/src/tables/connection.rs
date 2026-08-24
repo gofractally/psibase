@@ -76,10 +76,15 @@ impl Connection {
         amount.value.saturating_sub(self.reverse.value)
     }
 
-    /// `who` lined `them`, or they already have a live claim either way.
+    /// Consent for `them` to become (or remain) a creditor of `who`.
+    ///
+    /// True if `who` lined `them` (0-limit is enough) or `who` already owes
+    /// `them`. Not if only `them` owes `who` — anyone can create that with
+    /// `deposit`. A hop that only unwinds such a reverse claim is allowed
+    /// separately (`new_draw == 0`).
     pub fn knows(who: AccountNumber, them: AccountNumber, asset_id: u16) -> bool {
         let c = Self::get_live(who, them, asset_id);
-        c.line.is_some() || c.forward.value > 0 || c.reverse.value > 0
+        c.line.is_some() || c.reverse.value > 0
     }
 
     /// Credit this directed claim, then auto-net. Returns the amount netted.

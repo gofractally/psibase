@@ -101,8 +101,9 @@ pub mod tables {
         pub max_line_apr: u32,
         /// Absolute expiry (`seconds == 0` → never).
         pub expires_at: TimePointSec,
-        /// If false, poster must already know the next hop (a line to them,
-        /// or a live claim). If true, anyone who lined the poster can become
+        /// If false, poster must already know the next hop (lined them, or
+        /// already owes them). A hop that only unwinds a reverse claim does
+        /// not need that. If true, anyone who lined the poster can become
         /// their creditor.
         pub allow_unknown: bool,
     }

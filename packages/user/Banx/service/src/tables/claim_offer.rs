@@ -129,10 +129,13 @@ impl ClaimOffer {
         assert!(buyer != debtor, "buyer cannot be the debtor");
         assert!(amount.value > 0, "claim transfer amount must be positive");
 
-        assert!(
-            Connection::knows(debtor, buyer, self.asset_id),
-            "debtor does not know buyer (no credit line or live claim)"
-        );
+        let take = Connection::get_live(buyer, debtor, self.asset_id);
+        if take.new_draw(amount) > 0 {
+            assert!(
+                Connection::knows(debtor, buyer, self.asset_id),
+                "debtor does not know buyer (no credit line or existing debt to them)"
+            );
+        }
 
         Connection::get(buyer, debtor, self.asset_id).accept_claim(seller, amount);
         let proceeds = self.apply_fees(amount);

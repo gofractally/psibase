@@ -143,16 +143,19 @@ pub fn find_banx_path(
     }
 
     // Index lines by debtor for expansion. Known matches Connection::knows:
-    // a line who→them, or a live claim either way (including reverse-only).
+    // who lined them, or who already owes them. Them owing who is not
+    // enough (anyone can `deposit`); a hop with new_draw == 0 still proceeds.
     let mut lines_by_debtor: HashMap<&str, Vec<&LineEdge>> = HashMap::new();
     let mut known: HashSet<(String, String, u16)> = HashSet::new();
     for l in lines {
         if l.is_line {
             known.insert((l.creditor.clone(), l.debtor.clone(), l.asset_id));
         }
-        if l.reverse_claim > 0 || l.exposure > 0 {
-            known.insert((l.creditor.clone(), l.debtor.clone(), l.asset_id));
+        if l.exposure > 0 {
             known.insert((l.debtor.clone(), l.creditor.clone(), l.asset_id));
+        }
+        if l.reverse_claim > 0 {
+            known.insert((l.creditor.clone(), l.debtor.clone(), l.asset_id));
         }
         if l.capacity > 0 {
             lines_by_debtor
@@ -549,11 +552,6 @@ fn expand_hops(
         let Some(rpol) = resolve_routing(routing, &line.creditor, debtor, hop_asset, now) else {
             continue;
         };
-        if !rpol.allow_unknown
-            && !known.contains(&(debtor.to_string(), line.creditor.clone(), hop_asset))
-        {
-            continue;
-        }
         let Some(draw) = apply_hop_fee(amount_in, rpol.hop_fee_fixed, rpol.hop_fee_percent_ppm)
         else {
             continue;
@@ -563,6 +561,12 @@ fn expand_hops(
         }
         // APR cap is only on new line capacity, not a pure unwind.
         let new_draw = draw.saturating_sub(line.reverse_claim);
+        if !rpol.allow_unknown
+            && new_draw > 0
+            && !known.contains(&(debtor.to_string(), line.creditor.clone(), hop_asset))
+        {
+            continue;
+        }
         if new_draw > 0 && line.is_line && line.interest_rate_ppm > rpol.max_accept_rate_ppm {
             continue;
         }
@@ -1323,5 +1327,31 @@ mod tests {
             vec!["john", "cafe"]
         );
         assert_eq!(q.amount_out, 5_0000);
+    }
+
+    #[test]
+    fn closed_forward_dust_plus_line_does_not_open_new_draw() {
+        let lines = vec![
+            line("alice", "sender", 1, 10_000),
+            line_with_reverse("mallory", "alice", 1, 10_000, 1),
+        ];
+        let mut closed = global_rte("alice", 1, 0);
+        closed.allow_unknown = false;
+        assert!(
+            find_banx_path(
+                &lines,
+                &[closed],
+                &[],
+                "sender",
+                "mallory",
+                100,
+                1,
+                Some(1),
+                4,
+                0,
+            )
+            .is_none(),
+            "mallory owing alice 1 must not open a 100 new_draw hop"
+        );
     }
 }
