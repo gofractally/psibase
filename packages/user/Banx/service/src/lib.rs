@@ -539,6 +539,30 @@ pub mod service {
         }
     }
 
+    /// Write off claims the sender holds on `debtor` (one-sided
+    /// [`Obligation::apply_reduction`]). Debtor does not sign.
+    ///
+    /// Capped at live exposure. Same waterfall as net. Partial does **not**
+    /// reset an open grace cycle; reducing principal to 0 closes it.
+    #[action]
+    fn forgive(debtor: AccountNumber, asset_id: u16, amount: Quantity) {
+        let creditor = get_sender();
+        assert_account_exists(debtor);
+        Asset::get_assert(asset_id);
+        let take = Obligation::forgive_pair(creditor, debtor, asset_id, amount);
+        emit_pair_activity(
+            creditor,
+            debtor,
+            asset_id,
+            "forgive",
+            take,
+            Quantity::new(0),
+            asset_id,
+            0,
+            "",
+        );
+    }
+
     /// Path payment along `hops`: each hop is `(account, asset_id)`.
     ///
     /// # Example

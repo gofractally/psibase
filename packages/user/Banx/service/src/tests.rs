@@ -2237,6 +2237,12 @@ mod tests {
                 .get()
                 .is_err()
         );
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .forgive(ghost, usd, Quantity::new(1))
+                .get()
+                .is_err()
+        );
         Ok(())
     }
 
@@ -2266,6 +2272,10 @@ mod tests {
             .st_glb_buy(missing, Quantity::new(0), 0, never())
             .get();
         assert!(buy.is_err());
+        let write_off = Wrapper::push_from(&chain, alice)
+            .forgive(alice, missing, Quantity::new(1))
+            .get();
+        assert!(write_off.is_err());
         Ok(())
     }
 
@@ -2441,6 +2451,221 @@ mod tests {
 
         chain.start_block_after(Seconds::new(i64::from(WEEK_SECS)).into());
         assert_eq!(exp(&chain, bob, alice, usd), 0);
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_forgive_writes_off_claim(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        // Bob books a deposit from Alice → Alice holds 1000 on Bob.
+        Wrapper::push_from(&chain, bob)
+            .deposit(alice, usd, Quantity::new(1_000), 0, 0)
+            .get()?;
+        assert_eq!(exp(&chain, alice, bob, usd), 1_000);
+        assert_eq!(exp(&chain, bob, alice, usd), 0);
+
+        Wrapper::push_from(&chain, alice)
+            .forgive(bob, usd, Quantity::new(300))
+            .get()?;
+        assert_eq!(exp(&chain, alice, bob, usd), 700);
+        assert_eq!(
+            exp(&chain, bob, alice, usd),
+            0,
+            "forgive does not book a reverse claim"
+        );
+
+        // Over-ask is capped at live exposure (leftover is unused).
+        Wrapper::push_from(&chain, alice)
+            .forgive(bob, usd, Quantity::new(10_000))
+            .get()?;
+        assert_eq!(exp(&chain, alice, bob, usd), 0);
+        assert_eq!(exp(&chain, bob, alice, usd), 0);
+
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .forgive(alice, usd, Quantity::new(1))
+                .get()
+                .is_err()
+        );
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .forgive(bob, usd, Quantity::new(0))
+                .get()
+                .is_err()
+        );
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .forgive(bob, usd, Quantity::new(1))
+                .get()
+                .is_err(),
+            "nothing left to forgive"
+        );
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_forgive_interest_first_waterfall(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, bob)
+            .deposit(alice, usd, Quantity::new(1_000_000), 100_000, 0)
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .deposit(alice, usd, Quantity::new(1_000_000), 10_000, 0)
+            .get()?;
+
+        chain.start_block_after(Seconds::new(SECONDS_PER_YEAR as i64).into());
+        assert_eq!(exp(&chain, alice, bob, usd), 2_114_819);
+
+        Wrapper::push_from(&chain, alice)
+            .forgive(bob, usd, Quantity::new(104_964))
+            .get()?;
+        assert_eq!(exp(&chain, alice, bob, usd), 2_009_855);
+        let hi = Obligation::get_by_interest_rate(alice, bob, usd, 100_000).unwrap();
+        assert_eq!(hi.accrued_interest.value, 0);
+        assert_eq!(hi.remaining_principal.value, 1_000_000);
+        let lo = Obligation::get_by_interest_rate(alice, bob, usd, 10_000).unwrap();
+        assert_eq!(lo.accrued_interest.value, 9_855);
+        Ok(())
+    }
+
+    /// Partial write-off keeps the open grace snapshot. Remaining principal
+    /// compounds from that change after the original window ends.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_forgive_partial_keeps_grace(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(
+                alice,
+                usd,
+                Quantity::new(10_000_000),
+                false,
+                100_000,
+                WEEK_SECS,
+            )
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(bob, usd)],
+                Quantity::new(1_000_000),
+                Quantity::new(1_000_000),
+                0,
+            )
+            .get()?;
+
+        let opened = PairCycle::get(bob, alice, usd).expect("open cycle");
+        assert!(opened.cycle_started_at.seconds != 0);
+        assert_eq!(opened.cycle_grace_seconds, WEEK_SECS);
+
+        chain.start_block_after(Seconds::new(3 * 86_400).into());
+        Wrapper::push_from(&chain, bob)
+            .forgive(alice, usd, Quantity::new(400_000))
+            .get()?;
+        assert_eq!(exp(&chain, bob, alice, usd), 600_000);
+
+        let after = PairCycle::get(bob, alice, usd).expect("cycle still open");
+        assert_eq!(
+            after.cycle_started_at.seconds,
+            opened.cycle_started_at.seconds
+        );
+        assert_eq!(after.cycle_grace_seconds, WEEK_SECS);
+
+        chain.start_block_after(Seconds::new(3 * 86_400).into());
+        assert_eq!(
+            exp(&chain, bob, alice, usd),
+            600_000,
+            "still inside the original 7-day window"
+        );
+
+        chain.start_block_after(Seconds::new(2 * 86_400).into());
+        let want = compound_amount(600_000, 100_000, 5 * SECONDS_PER_DAY as u64);
+        let got = exp(&chain, bob, alice, usd);
+        assert_eq!(
+            got, want,
+            "forgave 400k on day 3; day-8 exposure should be 600k compounded \
+             5 days from the write-off ({want}), not 8 days from origination ({got})"
+        );
+        Ok(())
+    }
+
+    /// Writing principal to 0 closes the cycle. A later draw starts a new one.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_forgive_to_zero_closes_grace(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(
+                alice,
+                usd,
+                Quantity::new(10_000_000),
+                false,
+                100_000,
+                WEEK_SECS,
+            )
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(bob, usd)],
+                Quantity::new(1_000_000),
+                Quantity::new(1_000_000),
+                0,
+            )
+            .get()?;
+
+        chain.start_block_after(Seconds::new(86_400).into());
+        Wrapper::push_from(&chain, bob)
+            .forgive(alice, usd, Quantity::new(1_000_000))
+            .get()?;
+        assert_eq!(exp(&chain, bob, alice, usd), 0);
+        let closed = PairCycle::get(bob, alice, usd).expect("posted grace row remains");
+        assert_eq!(closed.cycle_started_at.seconds, 0);
+        assert_eq!(closed.cycle_grace_seconds, 0);
+
+        chain.start_block_after(Seconds::new(i64::from(WEEK_SECS)).into());
+        assert_eq!(exp(&chain, bob, alice, usd), 0);
+
+        Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(bob, usd)],
+                Quantity::new(1_000_000),
+                Quantity::new(1_000_000),
+                0,
+            )
+            .get()?;
+        let reopened = PairCycle::get(bob, alice, usd).expect("new cycle");
+        assert!(reopened.cycle_started_at.seconds != 0);
+        assert_eq!(reopened.cycle_grace_seconds, WEEK_SECS);
+
+        chain.start_block_after(Seconds::new(86_400).into());
+        assert_eq!(
+            exp(&chain, bob, alice, usd),
+            1_000_000,
+            "new cycle has a fresh grace window"
+        );
         Ok(())
     }
 

@@ -29,7 +29,7 @@ define_trust! {
         ",
         Medium => "
             - Post or remove credit lines, forward offers, claim offers, and currency policies
-            - Deposit and net obligations
+            - Deposit, net, and forgive (write off) obligations
             - Create or cancel invoices, please-book, and settle-auth
             - Fulfill a settle-auth on a loan you owe
             - Convert debt between assets
@@ -67,6 +67,7 @@ define_trust! {
             fulfill_settle,
             deposit,
             net,
+            forgive,
             convert,
             sell_claim,
             buy_claim,
@@ -540,6 +541,18 @@ impl Api for BanxPlugin {
         }
         .packed();
         add_action_to_transaction(banx::action_structs::net::ACTION_NAME, &packed)
+    }
+
+    fn forgive(debtor: String, asset_id: u16, amount: String) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::forgive)?;
+        let amount = parse_amount_nonzero(asset_id, &amount)?;
+        let packed = banx::action_structs::forgive {
+            debtor: parse_account(&debtor)?,
+            asset_id,
+            amount,
+        }
+        .packed();
+        add_action_to_transaction(banx::action_structs::forgive::ACTION_NAME, &packed)
     }
 
     fn convert(

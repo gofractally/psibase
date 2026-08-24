@@ -4,6 +4,7 @@ import {
     ArrowLeftRight,
     Building2,
     ChevronDown,
+    CircleMinus,
     History,
     Pencil,
     PiggyBank,
@@ -16,6 +17,10 @@ import {
 } from "lucide-react";
 
 import { AccountHistoryDialog } from "@/components/account-history";
+import {
+    ForgiveDialog,
+    type ForgiveTarget,
+} from "@/components/forgive-dialog";
 import { AssetField, GracePeriodField } from "@/components/form-fields";
 import { NewDepositLoanDialog } from "@/components/new-deposit-loan-dialog";
 import { PageHeader } from "@/components/page-header";
@@ -276,6 +281,10 @@ export function ObligationsPage() {
     const [requestOpen, setRequestOpen] = useState(false);
     const [requestPrefill, setRequestPrefill] =
         useState<RequestPrefill | null>(null);
+    const [forgiveOpen, setForgiveOpen] = useState(false);
+    const [forgiveTarget, setForgiveTarget] = useState<ForgiveTarget | null>(
+        null,
+    );
     const [hideEmptySavings, setHideEmptySavings] = useState(false);
     const [hideEmptyLoans, setHideEmptyLoans] = useState(false);
 
@@ -566,6 +575,22 @@ export function ObligationsPage() {
                                           }
                                         : undefined
                                 }
+                                onForgive={
+                                    g.total > 0n
+                                        ? () => {
+                                              setForgiveTarget({
+                                                  debtor: g.counterparty,
+                                                  assetId: g.assetId,
+                                                  maxRaw: g.total.toString(),
+                                                  symbol: symbolOf(g.assetId),
+                                                  precision: precisionOf(
+                                                      g.assetId,
+                                                  ),
+                                              });
+                                              setForgiveOpen(true);
+                                          }
+                                        : undefined
+                                }
                                 onBuyPostedClaim={() => {
                                     setSellTradeMode("buy");
                                     setSellTarget({
@@ -591,6 +616,15 @@ export function ObligationsPage() {
                 }}
                 target={sellTarget}
                 mode={sellTradeMode}
+            />
+
+            <ForgiveDialog
+                open={forgiveOpen}
+                onOpenChange={(open) => {
+                    setForgiveOpen(open);
+                    if (!open) setForgiveTarget(null);
+                }}
+                target={forgiveTarget}
             />
 
             <Separator />
@@ -1151,6 +1185,7 @@ function AccountGroupRow({
     onPostSellOffer,
     onAskRequest,
     onSellClaim,
+    onForgive,
     onBuyPostedClaim,
 }: {
     tone: "savings" | "loan";
@@ -1176,6 +1211,8 @@ function AccountGroupRow({
     onAskRequest?: () => void;
     /** Sell claim on this counterparty (savings / you are creditor). */
     onSellClaim?: () => void;
+    /** Write off a claim on this counterparty (savings / you are creditor). */
+    onForgive?: () => void;
 }) {
     const [open, setOpen] = useState(false);
     const [historyOpen, setHistoryOpen] = useState(false);
@@ -1222,7 +1259,7 @@ function AccountGroupRow({
     const editTip =
         "Edit credit line — change limit, interest rate, or revolving terms";
     const historyTip =
-        "History — payments, path draws, deposits, nets, and line changes";
+        "History — payments, path draws, deposits, nets, write-offs, and line changes";
     const routingTip =
         "Path-forward offer — let others hop through you to this party";
     const buyClaimTip =
@@ -1230,6 +1267,8 @@ function AccountGroupRow({
     const requestTip = "Request — invoice, deposit request, or settle-auth";
     const sellTip =
         "Sell claim — transfer this debt to a buyer under their buy-claim offer";
+    const forgiveTip =
+        "Write off — drop some or all of this claim; they do not need to sign";
     const postSellTip =
         "Sell-claim offer — post an ask so others can buy this claim";
     const buyPostedTip =
@@ -1469,6 +1508,28 @@ function AccountGroupRow({
                                 </TooltipTrigger>
                                 <TooltipContent side="top">
                                     {sellTip}
+                                </TooltipContent>
+                            </Tooltip>
+                        ) : null}
+                        {onForgive ? (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        type="button"
+                                        size="icon"
+                                        variant="outline"
+                                        className="size-8 shrink-0"
+                                        aria-label={forgiveTip}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onForgive();
+                                        }}
+                                    >
+                                        <CircleMinus className="size-3.5" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">
+                                    {forgiveTip}
                                 </TooltipContent>
                             </Tooltip>
                         ) : null}

@@ -236,6 +236,11 @@ interface api {
     /// `max-amount` is a human decimal string.
     net: func(counterparty: string, asset-id: u16, max-amount: string) -> result<_, error>;
 
+    /// Write off claims the sender holds on `debtor` (one-sided; debtor does
+    /// not sign). `amount` is a human decimal, capped on chain at live
+    /// exposure. Partial does not reset grace; principal to 0 closes the cycle.
+    forgive: func(debtor: string, asset-id: u16, amount: string) -> result<_, error>;
+
     /// Take the counterparty's currency-policy offer and rebook leftover
     /// from-asset on this pair into to-asset. Amounts are human decimals.
     convert: func(

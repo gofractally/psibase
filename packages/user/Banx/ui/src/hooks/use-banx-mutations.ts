@@ -183,6 +183,22 @@ export function useNet() {
     });
 }
 
+export function useForgive() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            debtor: string;
+            assetId: number;
+            amount: string;
+        }) => banxCall("forgive", [p.debtor, p.assetId, p.amount]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Claim written off");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
 export function usePathPay() {
     const invalidate = useInvalidateBanx();
     return useMutation({

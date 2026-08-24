@@ -174,6 +174,15 @@ Every draw, deposit, claim transfer, and convert **auto-nets** the pair/asset.
 
 `net` still exists as an action for scripts. The UI does not expose it; writers already full-net.
 
+### Write-off (`forgive`)
+
+The creditor drops some or all of a claim they hold. One-sided `apply_reduction` — the debtor does not sign. Same waterfall as net (interest first, highest APR). Capped at live exposure.
+
+- **Partial** does **not** reset an open grace snapshot (same as a partial deposit).
+- **Principal → 0** closes the cycle. A later 0→positive starts a new window.
+
+UI: write-off on a savings/deposit row.
+
 ### Credit lines
 
 Posted by the creditor (`st_crd_lne`). The debtor must already exist as a chain account.
@@ -308,7 +317,7 @@ Compounding walks day by day in WASM, so a loan left untouched for years is more
 
 Posted with the credit line, stored on **PairCycle** `(creditor, debtor, asset)` so a later line upsert cannot clobber the clock.
 
-When that pair goes **0 → positive**, posted `grace_seconds` is **snapshotted**. Until that window ends, live interest is **0**. If they deposit/net the pair to **zero** inside the window, the cycle closes with nothing to charge.
+When that pair goes **0 → positive**, posted `grace_seconds` is **snapshotted**. Until that window ends, live interest is **0**. If they deposit/net/forgive the pair to **zero** inside the window, the cycle closes with nothing to charge. Partial reductions leave the snapshot.
 
 After the window, daily compound runs from the last principal/rate change (origination if nothing changed during grace). Editing the line later does not change an **open** cycle; it applies to the next 0→positive. `0` means interest from the first second.
 
@@ -349,7 +358,7 @@ Multiple tokens per Banx asset: one quote row per `(poster, asset, token, is_out
 
 Each writer emits a bilateral `history.banx-app.activity` event: one row per party as `account`, the other as `counterparty`. Amounts are **human decimals** at emit (asset precision; convert’s `netted` uses the destination asset).
 
-Kinds include `path_draw`, `deposit`, `net`, `convert`, `cash_out`, `cash_in`, `credit_line`, `rm_credit_line`, `sell_claim` / `buy_claim`, `invoice`, `please_book`, `settle_auth`, `fulfill`, `req_cancel`.
+Kinds include `path_draw`, `deposit`, `net`, `forgive`, `convert`, `cash_out`, `cash_in`, `credit_line`, `rm_credit_line`, `sell_claim` / `buy_claim`, `invoice`, `please_book`, `settle_auth`, `fulfill`, `req_cancel`.
 
 Hop draws write the adjacent pairs (Alice↔Bob, Bob↔Carol). A **multi-hop** `path_pay` / `pay_inv` also writes **sender↔payee** (`kind: path_pay`): `amount` is what was sent (`asset_id` = first hop), `netted` is what was delivered (`other_asset_id` = last hop). Direct (1-hop) pays are only `path_draw` on that pair — same two people.
 
@@ -403,6 +412,8 @@ Off-chain path search lives in the service crate (`path_find`) and is called fro
 **Invoice** — “Please pay me this.” Paid with a claim or a path. Last hop is the payee.
 
 **Net** — two people owe each other; keep only the leftover.
+
+**Write-off / forgive** — you hold a claim and drop some or all of it. They do not sign. Partial keeps grace; zero principal closes the cycle.
 
 **Credit line** — “I’ll let you owe me up to X.” Needed when someone draws *new* debt on you. Not needed to unwind an IOU that already exists.
 

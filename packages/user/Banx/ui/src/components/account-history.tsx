@@ -21,6 +21,8 @@ function kindLabel(kind: string): string {
             return "Deposit";
         case "net":
             return "Net settlement";
+        case "forgive":
+            return "Write-off";
         case "convert":
             return "Convert";
         case "cash_out":
@@ -103,6 +105,16 @@ function describeEvent(
                 title: `Netted ${amt} ${sym}`,
                 detail: `Mutual claims cancelled · actor ${e.actor}`,
             };
+        case "forgive": {
+            const title =
+                e.actor === viewer
+                    ? `You wrote off ${amt} ${sym}`
+                    : `${e.actor} wrote off ${amt} ${sym}`;
+            return {
+                title,
+                detail: `Claim forgiven · counterparty ${e.counterparty}`,
+            };
+        }
         case "convert":
             return {
                 title: `Converted ${amt} ${sym} → ${toAmt} ${otherSym}`,

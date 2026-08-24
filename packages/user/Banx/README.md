@@ -50,6 +50,8 @@ A **deposit** is how off-graph value enters: the receiver books a liability to t
 
 `net` remains as an action (either party, optional `max_amount`) for scripts or cleanup. The UI does not expose it; writers already full-net.
 
+`forgive` is a one-sided write-off: the **creditor** reduces claims they hold (same waterfall). The debtor does not sign. Partial leaves an open grace snapshot; writing principal to 0 closes the cycle. UI: write-off on a savings row.
+
 ## Requests
 
 Three kinds (`st_req` / `createRequest`). Counterparty, amount, memo (80 bytes), optional expiry. Invoice `counterparty` may be `0` (anyone). Please-book and settle-auth still require a named party.
@@ -114,7 +116,7 @@ Tiny principals can floor to zero daily increment (integer units). Use realistic
 
 Posted with the credit line (`st_crd_lne`), stored on a **pair cycle** row keyed by `(creditor, debtor, asset)` — not on the facility terms. UI: None, 1 / 7 / 30 days, or custom days → seconds.
 
-When that pair goes **0 → positive**, the posted `grace_seconds` is **snapshotted** on the cycle. Until that window ends, live interest on that pair is **0**. If they **deposit/net the pair to zero** inside the window, the cycle closes with nothing to charge. Later line edits change posted grace only; they do not rewrite an open snapshot.
+When that pair goes **0 → positive**, the posted `grace_seconds` is **snapshotted** on the cycle. Until that window ends, live interest on that pair is **0**. If they **deposit/net/forgive the pair to zero** inside the window, the cycle closes with nothing to charge. A **partial** deposit/net/forgive does **not** reset the snapshot. Later line edits change posted grace only; they do not rewrite an open snapshot.
 
 After the window, daily compound runs from the last principal/rate change (origination if nothing changed during grace — the “lost grace” case).
 
@@ -166,6 +168,7 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 | `st_req` / `rm_req` | Create / cancel invoice, please-book, or settle-auth |
 | `fl_stl` | Debtor fulfills a settle-auth |
 | `net` | Explicit bilateral net (no UI; writers already auto-net) |
+| `forgive` | Creditor write-off of claims they hold (one-sided; UI on savings rows) |
 | `st_cur_pol` | Post a from→to FX offer |
 | `convert` | Take the counterparty’s FX offer and rebook |
 | `st_csh_qte` / `rm_csh_qte` | Post / remove a Banx↔Tokens cash quote (`is_out` true = out) |

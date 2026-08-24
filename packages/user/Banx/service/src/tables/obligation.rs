@@ -342,6 +342,30 @@ impl Obligation {
         cancel.into()
     }
 
+    /// Creditor write-off: reduce claims `debtor` owes `creditor` by
+    /// `min(amount, exposure)`. Does not touch the reverse direction.
+    ///
+    /// Same waterfall as net (interest, then principal, highest APR).
+    /// Partial leaves an open grace snapshot; principal → 0 closes the cycle
+    /// via [`apply_reduction`] → [`PairCycle::sync_cycle`].
+    pub fn forgive_pair(
+        creditor: AccountNumber,
+        debtor: AccountNumber,
+        asset_id: u16,
+        amount: Quantity,
+    ) -> Quantity {
+        assert!(creditor != debtor, "cannot forgive self");
+        assert!(amount.value > 0, "forgive amount must be positive");
+
+        Self::accrue_pair(creditor, debtor, asset_id);
+        let take = Self::exposure(creditor, debtor, asset_id)
+            .value
+            .min(amount.value);
+        assert!(take > 0, "nothing to forgive");
+        Self::apply_reduction(creditor, debtor, asset_id, take);
+        take.into()
+    }
+
     /// Grow principal on this claim (shared by deposit and line draws).
     /// Accrues first so interest is finalized on the prior principal balance.
     fn credit(&mut self, amount: Quantity) {
