@@ -26,6 +26,6 @@ Tokens = "0.27.0"
 crate-type = ["rlib"]
 
 [dependencies]
-banx = { path = "service", version = "0.26.0" }
-r-banx = { path = "query-service", version = "0.26.0" }
-banx-plugin = { path = "plugin", version = "0.26.0" }
+banx = { path = "service", version = "0.27.0" }
+r-banx = { path = "query-service", version = "0.27.0" }
+banx-plugin = { path = "plugin", version = "0.27.0" }

@@ -63,6 +63,9 @@ impl Admin for AccountsPlugin {
         .unwrap();
 
         let connected_accounts = Self::get_all_accounts();
+        if connected_accounts.is_empty() {
+            return Ok(Vec::new());
+        }
         let accounts = connected_accounts
             .iter()
             .map(|a| format!("\"{}\"", a))

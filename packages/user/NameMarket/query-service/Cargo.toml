@@ -12,6 +12,6 @@ psibase_service.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde-aux.workspace = true
-name-market = { path = "../service", version = "0.26.0" }
+name-market = { path = "../service", version = "0.27.0" }
 async-graphql.workspace = true
 psibase-user-workspace-hack.workspace = true
