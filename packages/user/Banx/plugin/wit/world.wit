@@ -267,6 +267,52 @@ interface api {
         request-id: u32,
     ) -> result<_, error>;
 
+    /// Post a cash quote: Banx `asset-id` ↔ Tokens `token-id`.
+    /// `is-out` true: taker draws Banx, receives tokens. False: taker sends
+    /// tokens, books Banx onto the poster.
+    /// `fee-fixed` is a human decimal in Banx units (out) or token units (in).
+    /// `to-rate` is how many **to** units per 1 **from** unit (same as
+    /// `set-currency-policy`).
+    set-cash-quote: func(
+        asset-id: u16,
+        token-id: u32,
+        is-out: bool,
+        fee-fixed: string,
+        to-rate: string,
+        expires-at-seconds: u32,
+    ) -> result<_, error>;
+
+    /// Remove a cash quote.
+    remove-cash-quote: func(asset-id: u16, token-id: u32, is-out: bool) -> result<_, error>;
+
+    /// Move tokens already credited to Banx into `{sender}/{token-id}`
+    /// (Tokens sub-account on Banx).
+    cash-fund: func(token-id: u32, amount: string) -> result<_, error>;
+
+    /// Withdraw tokens from `{sender}/{token-id}` on Banx.
+    cash-withdraw: func(token-id: u32, amount: string) -> result<_, error>;
+
+    /// Draw Banx on `cashier`'s line; receive tokens from their vault.
+    /// `amount-banx` / `min-tokens` are human decimals.
+    cash-out: func(
+        cashier: string,
+        asset-id: u16,
+        token-id: u32,
+        amount-banx: string,
+        min-tokens: string,
+    ) -> result<_, error>;
+
+    /// Send tokens from the sender's `{sender}/{token-id}` vault (filled by
+    /// `cash-fund`) at `cashier`'s in quote.
+    /// `amount-tokens` / `min-banx` are human decimals.
+    cash-in: func(
+        cashier: string,
+        asset-id: u16,
+        token-id: u32,
+        amount-tokens: string,
+        min-banx: string,
+    ) -> result<_, error>;
+
     /// Discover a multi-hop path from `from-account` to `to-account` (TokenSwap-style
     /// max amount_out search over credit lines / forward offers / FX). Uses a scoped GraphQL
     /// subgraph around the two endpoints — not a full-network dump.

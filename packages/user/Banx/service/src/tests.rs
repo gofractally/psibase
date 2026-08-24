@@ -2,11 +2,11 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::interest::{compound_amount, interest_for, SECONDS_PER_DAY, SECONDS_PER_YEAR};
-    use crate::tables::{
-        Asset, CreditLine, Obligation, PairCycle, PathHop, PayRequest, PPM_SCALE, RATE_SCALE,
-    };
     use crate::Wrapper;
+    use crate::interest::{SECONDS_PER_DAY, SECONDS_PER_YEAR, compound_amount, interest_for};
+    use crate::tables::{
+        Asset, CreditLine, Obligation, PPM_SCALE, PairCycle, PathHop, PayRequest, RATE_SCALE,
+    };
     use psibase::services::tokens::{Precision, Quantity};
     use psibase::*;
 
@@ -118,7 +118,7 @@ mod tests {
     fn test_interest_path_independence(_chain: psibase::Chain) -> Result<(), psibase::Error> {
         let year = SECONDS_PER_YEAR as u64;
         let p = 1_000_000u64; // $100.0000 at 4 dp
-                              // Daily 10%: ~10.52% effective over 365 days (not exact +10%).
+        // Daily 10%: ~10.52% effective over 365 days (not exact +10%).
         assert_eq!(compound_amount(p, 100_000, year), 1_104_964);
         assert_eq!(compound_amount(p, 100_000, year * 2), 1_220_966);
         assert_eq!(interest_for(p, 100_000, year * 2), 220_966);
@@ -225,10 +225,12 @@ mod tests {
             .st_fwd_ofr(bluey, aud, Quantity::new(0), 0, PPM_SCALE, never(), true)
             .get()?;
 
-        assert!(Wrapper::push_from(&chain, bluey)
-            .path_pay(vec![hop(bingo, aud)], popper, popper, 0)
-            .get()
-            .is_err());
+        assert!(
+            Wrapper::push_from(&chain, bluey)
+                .path_pay(vec![hop(bingo, aud)], popper, popper, 0)
+                .get()
+                .is_err()
+        );
 
         Wrapper::push_from(&chain, bluey)
             .path_pay(vec![hop(bandit, aud), hop(bingo, aud)], popper, popper, 0)
@@ -240,15 +242,17 @@ mod tests {
         assert_eq!(exp(&chain, bingo, bluey, aud), 0);
         assert_eq!(exp(&chain, bluey, bingo, aud), 0);
 
-        assert!(Wrapper::push_from(&chain, bluey)
-            .path_pay(
-                vec![hop(bandit, aud), hop(bingo, aud)],
-                Quantity::new(leftover.value + 1),
-                Quantity::new(leftover.value + 1),
-                0,
-            )
-            .get()
-            .is_err());
+        assert!(
+            Wrapper::push_from(&chain, bluey)
+                .path_pay(
+                    vec![hop(bandit, aud), hop(bingo, aud)],
+                    Quantity::new(leftover.value + 1),
+                    Quantity::new(leftover.value + 1),
+                    0,
+                )
+                .get()
+                .is_err()
+        );
 
         Wrapper::push_from(&chain, bluey)
             .path_pay(
@@ -1366,10 +1370,12 @@ mod tests {
             .st_glb_buy(usd, Quantity::new(0), 0, never())
             .get()?;
 
-        assert!(Wrapper::push_from(&chain, alice)
-            .sell_claim(peter, bob, usd, Quantity::new(1_000))
-            .get()
-            .is_err());
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .sell_claim(peter, bob, usd, Quantity::new(1_000))
+                .get()
+                .is_err()
+        );
 
         Wrapper::push_from(&chain, bob)
             .st_crd_lne(peter, usd, Quantity::new(0), false, 0, 0)
@@ -1405,15 +1411,17 @@ mod tests {
             .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never(), false)
             .get()?;
 
-        assert!(Wrapper::push_from(&chain, alice)
-            .path_pay(
-                vec![hop(gary, usd), hop(steve, usd)],
-                Quantity::new(100),
-                Quantity::new(100),
-                0,
-            )
-            .get()
-            .is_err());
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .path_pay(
+                    vec![hop(gary, usd), hop(steve, usd)],
+                    Quantity::new(100),
+                    Quantity::new(100),
+                    0,
+                )
+                .get()
+                .is_err()
+        );
 
         Wrapper::push_from(&chain, gary)
             .st_crd_lne(steve, usd, Quantity::new(0), false, 0, 0)
@@ -1451,15 +1459,17 @@ mod tests {
             .st_fwd_ofr(steve, usd, Quantity::new(0), 0, PPM_SCALE, never(), true)
             .get()?;
 
-        assert!(Wrapper::push_from(&chain, alice)
-            .path_pay(
-                vec![hop(gary, usd), hop(steve, usd)],
-                Quantity::new(100),
-                Quantity::new(100),
-                0,
-            )
-            .get()
-            .is_err());
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .path_pay(
+                    vec![hop(gary, usd), hop(steve, usd)],
+                    Quantity::new(100),
+                    Quantity::new(100),
+                    0,
+                )
+                .get()
+                .is_err()
+        );
 
         Wrapper::push_from(&chain, steve)
             .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0, 0)
@@ -1495,15 +1505,17 @@ mod tests {
         Wrapper::push_from(&chain, gary)
             .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never(), false)
             .get()?;
-        assert!(Wrapper::push_from(&chain, alice)
-            .path_pay(
-                vec![hop(gary, usd), hop(steve, usd)],
-                Quantity::new(100),
-                Quantity::new(100),
-                0,
-            )
-            .get()
-            .is_err());
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .path_pay(
+                    vec![hop(gary, usd), hop(steve, usd)],
+                    Quantity::new(100),
+                    Quantity::new(100),
+                    0,
+                )
+                .get()
+                .is_err()
+        );
 
         Wrapper::push_from(&chain, gary)
             .st_fwd_unk(AccountNumber::new(0), usd, true)
@@ -1545,15 +1557,17 @@ mod tests {
         Wrapper::push_from(&chain, gary)
             .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never(), false)
             .get()?;
-        assert!(Wrapper::push_from(&chain, alice)
-            .path_pay(
-                vec![hop(gary, usd), hop(steve, usd)],
-                Quantity::new(100),
-                Quantity::new(100),
-                0,
-            )
-            .get()
-            .is_err());
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .path_pay(
+                    vec![hop(gary, usd), hop(steve, usd)],
+                    Quantity::new(100),
+                    Quantity::new(100),
+                    0,
+                )
+                .get()
+                .is_err()
+        );
 
         Wrapper::push_from(&chain, gary)
             .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never(), true)
@@ -1600,10 +1614,12 @@ mod tests {
             .rm_crd_lne(peter, usd)
             .get()?;
         assert!(CreditLine::get(bob, peter, usd).is_none());
-        assert!(Wrapper::push_from(&chain, alice)
-            .sell_claim(peter, bob, usd, Quantity::new(1_000))
-            .get()
-            .is_err());
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .sell_claim(peter, bob, usd, Quantity::new(1_000))
+                .get()
+                .is_err()
+        );
         assert_eq!(exp(&chain, alice, bob, usd), 1_000);
         Ok(())
     }
@@ -2021,28 +2037,38 @@ mod tests {
         chain.new_account(alice).unwrap();
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
 
-        assert!(Wrapper::push_from(&chain, alice)
-            .st_crd_lne(alice, usd, Quantity::new(100), false, 0, 0)
-            .get()
-            .is_err());
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .st_crd_lne(alice, usd, Quantity::new(100), false, 0, 0)
+                .get()
+                .is_err()
+        );
         let bob = account!("bob");
         chain.new_account(bob).unwrap();
-        assert!(Wrapper::push_from(&chain, alice)
-            .st_crd_lne(bob, 99, Quantity::new(100), false, 0, 0)
-            .get()
-            .is_err());
-        assert!(Wrapper::push_from(&chain, alice)
-            .st_crd_lne(bob, usd, Quantity::new(100), false, PPM_SCALE + 1, 0)
-            .get()
-            .is_err());
-        assert!(Wrapper::push_from(&chain, alice)
-            .deposit(alice, usd, Quantity::new(1), 0, 0)
-            .get()
-            .is_err());
-        assert!(Wrapper::push_from(&chain, alice)
-            .deposit(bob, usd, Quantity::new(0), 0, 0)
-            .get()
-            .is_err());
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .st_crd_lne(bob, 99, Quantity::new(100), false, 0, 0)
+                .get()
+                .is_err()
+        );
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .st_crd_lne(bob, usd, Quantity::new(100), false, PPM_SCALE + 1, 0)
+                .get()
+                .is_err()
+        );
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .deposit(alice, usd, Quantity::new(1), 0, 0)
+                .get()
+                .is_err()
+        );
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .deposit(bob, usd, Quantity::new(0), 0, 0)
+                .get()
+                .is_err()
+        );
         Ok(())
     }
 
@@ -2054,37 +2080,49 @@ mod tests {
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
         let ghost = account!("nobody");
 
-        assert!(Wrapper::push_from(&chain, alice)
-            .st_crd_lne(ghost, usd, Quantity::new(100), false, 0, 0)
-            .get()
-            .is_err());
-        assert!(Wrapper::push_from(&chain, alice)
-            .st_fwd_ofr(ghost, usd, Quantity::new(0), 0, PPM_SCALE, never(), true)
-            .get()
-            .is_err());
-        assert!(Wrapper::push_from(&chain, alice)
-            .st_buy_clm(ghost, usd, Quantity::new(0), 0, never())
-            .get()
-            .is_err());
-        assert!(Wrapper::push_from(&chain, alice)
-            .st_sell_clm(ghost, usd, Quantity::new(0), 0, never())
-            .get()
-            .is_err());
-        assert!(Wrapper::push_from(&chain, alice)
-            .st_req(
-                PayRequest::INVOICE,
-                ghost,
-                usd,
-                Quantity::new(1),
-                "".into(),
-                never(),
-            )
-            .get()
-            .is_err());
-        assert!(Wrapper::push_from(&chain, alice)
-            .deposit(ghost, usd, Quantity::new(1), 0, 0)
-            .get()
-            .is_err());
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .st_crd_lne(ghost, usd, Quantity::new(100), false, 0, 0)
+                .get()
+                .is_err()
+        );
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .st_fwd_ofr(ghost, usd, Quantity::new(0), 0, PPM_SCALE, never(), true)
+                .get()
+                .is_err()
+        );
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .st_buy_clm(ghost, usd, Quantity::new(0), 0, never())
+                .get()
+                .is_err()
+        );
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .st_sell_clm(ghost, usd, Quantity::new(0), 0, never())
+                .get()
+                .is_err()
+        );
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .st_req(
+                    PayRequest::INVOICE,
+                    ghost,
+                    usd,
+                    Quantity::new(1),
+                    "".into(),
+                    never(),
+                )
+                .get()
+                .is_err()
+        );
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .deposit(ghost, usd, Quantity::new(1), 0, 0)
+                .get()
+                .is_err()
+        );
         Ok(())
     }
 
@@ -2868,15 +2906,17 @@ mod tests {
             .get()?;
 
         // Ends at Gary, not Steve.
-        assert!(Wrapper::push_from(&chain, alice)
-            .path_pay(
-                vec![hop(gary, usd)],
-                Quantity::new(100),
-                Quantity::new(100),
-                id,
-            )
-            .get()
-            .is_err());
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .path_pay(
+                    vec![hop(gary, usd)],
+                    Quantity::new(100),
+                    Quantity::new(100),
+                    id,
+                )
+                .get()
+                .is_err()
+        );
         assert_eq!(PayRequest::get_assert(id).remaining.value, 100);
 
         // Named counterparty is who was billed; anyone with a path may pay.
@@ -2936,17 +2976,19 @@ mod tests {
         let alice = account!("alice");
         chain.new_account(alice).unwrap();
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
-        assert!(Wrapper::push_from(&chain, alice)
-            .st_req(
-                PayRequest::PLEASE_BOOK,
-                AccountNumber::new(0),
-                usd,
-                Quantity::new(100),
-                "".into(),
-                never(),
-            )
-            .get()
-            .is_err());
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .st_req(
+                    PayRequest::PLEASE_BOOK,
+                    AccountNumber::new(0),
+                    usd,
+                    Quantity::new(100),
+                    "".into(),
+                    never(),
+                )
+                .get()
+                .is_err()
+        );
         Ok(())
     }
 
@@ -2983,10 +3025,12 @@ mod tests {
             .get()?;
 
         // Debtor cannot book their own please-book.
-        assert!(Wrapper::push_from(&chain, alice)
-            .deposit(alice, usd, Quantity::new(1_000), 0, id)
-            .get()
-            .is_err());
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .deposit(alice, usd, Quantity::new(1_000), 0, id)
+                .get()
+                .is_err()
+        );
 
         Wrapper::push_from(&chain, bob)
             .deposit(alice, usd, Quantity::new(1_000), 0, id)
@@ -3016,10 +3060,12 @@ mod tests {
             .get()?;
         Wrapper::push_from(&chain, alice).rm_req(id).get()?;
         assert!(PayRequest::get(id).is_none());
-        assert!(Wrapper::push_from(&chain, bob)
-            .deposit(alice, usd, Quantity::new(50), 0, id)
-            .get()
-            .is_err());
+        assert!(
+            Wrapper::push_from(&chain, bob)
+                .deposit(alice, usd, Quantity::new(50), 0, id)
+                .get()
+                .is_err()
+        );
         Ok(())
     }
 
@@ -3055,10 +3101,12 @@ mod tests {
             .get()?;
 
         // Creditor cannot pull their own settle-auth.
-        assert!(Wrapper::push_from(&chain, bob)
-            .fl_stl(id, Quantity::new(100))
-            .get()
-            .is_err());
+        assert!(
+            Wrapper::push_from(&chain, bob)
+                .fl_stl(id, Quantity::new(100))
+                .get()
+                .is_err()
+        );
 
         Wrapper::push_from(&chain, alice)
             .fl_stl(id, Quantity::new(2_000))
@@ -3069,10 +3117,12 @@ mod tests {
         assert_eq!(PayRequest::get_assert(id).remaining.value, 1_000);
 
         // Nothing left to settle; leftover auth cannot mint a claim on Bob.
-        assert!(Wrapper::push_from(&chain, alice)
-            .fl_stl(id, Quantity::new(1_000))
-            .get()
-            .is_err());
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .fl_stl(id, Quantity::new(1_000))
+                .get()
+                .is_err()
+        );
         assert_eq!(exp(&chain, alice, bob, usd), 0);
         Ok(())
     }
@@ -3364,6 +3414,305 @@ mod tests {
              day-8 exposure should be 600k compounded 5 days from the repay ({want}), \
              not 8 days from origination ({got})"
         );
+        Ok(())
+    }
+
+    fn enable_auto_debit(chain: &psibase::Chain, who: AccountNumber) {
+        psibase::services::tokens::Wrapper::push_from(chain, who)
+            .setUserConf(
+                psibase::services::tokens::BalanceFlags::AUTO_DEBIT.index(),
+                true,
+            )
+            .get()
+            .unwrap();
+    }
+
+    fn token_balance(chain: &psibase::Chain, token_id: u32, who: AccountNumber) -> u64 {
+        psibase::services::tokens::Wrapper::push(chain)
+            .getBalance(token_id, who)
+            .get()
+            .unwrap()
+            .value
+    }
+
+    /// Alice mints a 4 dp token (same scale as USD) and credits `holder`.
+    fn mint_gas(
+        chain: &psibase::Chain,
+        minter: AccountNumber,
+        holder: AccountNumber,
+        supply: u64,
+    ) -> u32 {
+        psibase::services::nft::Wrapper::push_from(chain, minter)
+            .setUserConf(
+                psibase::services::nft::NftHolderFlags::AUTO_DEBIT.index(),
+                true,
+            )
+            .get()
+            .unwrap();
+        enable_auto_debit(chain, minter);
+        enable_auto_debit(chain, holder);
+        let tokens = psibase::services::tokens::Wrapper::push_from(chain, minter);
+        let token_id = tokens
+            .create(Precision::new(4).unwrap(), Quantity::new(supply))
+            .get()
+            .unwrap();
+        tokens
+            .mint(
+                token_id,
+                Quantity::new(supply),
+                "gas".to_string().try_into().unwrap(),
+            )
+            .get()
+            .unwrap();
+        if holder != minter {
+            psibase::services::tokens::Wrapper::push_from(chain, minter)
+                .credit(
+                    token_id,
+                    holder,
+                    Quantity::new(supply),
+                    "gas".to_string().try_into().unwrap(),
+                )
+                .get()
+                .unwrap();
+        }
+        token_id
+    }
+
+    fn fund_vault(chain: &psibase::Chain, poster: AccountNumber, token_id: u32, amount: u64) {
+        psibase::services::tokens::Wrapper::push_from(chain, poster)
+            .credit(
+                token_id,
+                Wrapper::SERVICE,
+                Quantity::new(amount),
+                "fund".to_string().try_into().unwrap(),
+            )
+            .get()
+            .unwrap();
+        Wrapper::push_from(chain, poster)
+            .csh_fund(token_id, Quantity::new(amount))
+            .get()
+            .unwrap();
+    }
+
+    fn vault_bal(chain: &psibase::Chain, poster: AccountNumber, token_id: u32) -> u64 {
+        psibase::services::tokens::Wrapper::push_from(chain, Wrapper::SERVICE)
+            .getSubBal(token_id, crate::tables::cash_sub(poster, token_id))
+            .get()
+            .unwrap()
+            .map(|q| q.value)
+            .unwrap_or(0)
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_cash_out_and_in_gas_usd(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        enable_auto_debit(&chain, alice);
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        let gas = mint_gas(&chain, bob, bob, 10_000_000);
+        fund_vault(&chain, bob, gas, 5_000_000);
+
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, usd, Quantity::new(1_000_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .st_csh_qte(usd, gas, true, 0.into(), RATE_SCALE, never())
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .st_csh_qte(usd, gas, false, 0.into(), RATE_SCALE, never())
+            .get()?;
+
+        Wrapper::push_from(&chain, alice)
+            .cash_out(
+                bob,
+                usd,
+                gas,
+                Quantity::new(1_000_000),
+                Quantity::new(1_000_000),
+            )
+            .get()?;
+        assert_eq!(exp(&chain, bob, alice, usd), 1_000_000);
+        assert_eq!(token_balance(&chain, gas, alice), 1_000_000);
+        assert_eq!(vault_bal(&chain, bob, gas), 4_000_000);
+
+        fund_vault(&chain, alice, gas, 1_000_000);
+        Wrapper::push_from(&chain, alice)
+            .cash_in(
+                bob,
+                usd,
+                gas,
+                Quantity::new(1_000_000),
+                Quantity::new(1_000_000),
+            )
+            .get()?;
+        assert_eq!(exp(&chain, bob, alice, usd), 0);
+        assert_eq!(token_balance(&chain, gas, alice), 0);
+        assert_eq!(vault_bal(&chain, alice, gas), 0);
+        assert_eq!(vault_bal(&chain, bob, gas), 5_000_000);
+        assert_eq!(token_balance(&chain, gas, bob), 5_000_000);
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_cash_out_non_one_to_one(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        enable_auto_debit(&chain, alice);
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        let gas = mint_gas(&chain, bob, bob, 10_000_000);
+        fund_vault(&chain, bob, gas, 5_000_000);
+        // 1 USD raw → 2 gas raw
+        let rate = RATE_SCALE * 2;
+
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, usd, Quantity::new(100_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .st_csh_qte(usd, gas, true, 0.into(), rate, never())
+            .get()?;
+
+        Wrapper::push_from(&chain, alice)
+            .cash_out(
+                bob,
+                usd,
+                gas,
+                Quantity::new(100_000),
+                Quantity::new(200_000),
+            )
+            .get()?;
+        assert_eq!(exp(&chain, bob, alice, usd), 100_000);
+        assert_eq!(token_balance(&chain, gas, alice), 200_000);
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_cash_in_buys_usd_claim(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        enable_auto_debit(&chain, alice);
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        let gas = mint_gas(&chain, bob, alice, 500_000);
+
+        Wrapper::push_from(&chain, bob)
+            .st_csh_qte(usd, gas, false, 0.into(), RATE_SCALE, never())
+            .get()?;
+        fund_vault(&chain, alice, gas, 500_000);
+        Wrapper::push_from(&chain, alice)
+            .cash_in(
+                bob,
+                usd,
+                gas,
+                Quantity::new(500_000),
+                Quantity::new(500_000),
+            )
+            .get()?;
+        // Alice paid gas from her vault; Bob owes Alice USD. Gas stays in Bob's vault.
+        assert_eq!(exp(&chain, alice, bob, usd), 500_000);
+        assert_eq!(vault_bal(&chain, alice, gas), 0);
+        assert_eq!(vault_bal(&chain, bob, gas), 500_000);
+        assert_eq!(token_balance(&chain, gas, bob), 0);
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_cash_out_requires_vault(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        enable_auto_debit(&chain, alice);
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        let gas = mint_gas(&chain, bob, bob, 1_000_000);
+
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, usd, Quantity::new(100_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .st_csh_qte(usd, gas, true, 0.into(), RATE_SCALE, never())
+            .get()?;
+        let err = Wrapper::push_from(&chain, alice)
+            .cash_out(
+                bob,
+                usd,
+                gas,
+                Quantity::new(100_000),
+                Quantity::new(100_000),
+            )
+            .get()
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("Insufficient sub-account balance")
+                || err.to_string().contains("has no sub-account"),
+            "got {err}"
+        );
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_cash_in_requires_vault(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        enable_auto_debit(&chain, alice);
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        let gas = mint_gas(&chain, bob, alice, 100_000);
+
+        Wrapper::push_from(&chain, bob)
+            .st_csh_qte(usd, gas, false, 0.into(), RATE_SCALE, never())
+            .get()?;
+        psibase::services::tokens::Wrapper::push_from(&chain, alice)
+            .credit(
+                gas,
+                Wrapper::SERVICE,
+                Quantity::new(100_000),
+                "no fund".to_string().try_into().unwrap(),
+            )
+            .get()?;
+        let err = Wrapper::push_from(&chain, alice)
+            .cash_in(
+                bob,
+                usd,
+                gas,
+                Quantity::new(100_000),
+                Quantity::new(100_000),
+            )
+            .get()
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("Insufficient sub-account balance")
+                || err.to_string().contains("has no sub-account"),
+            "got {err}"
+        );
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_cash_withdraw_returns_tokens(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let bob = account!("bob");
+        chain.new_account(bob).unwrap();
+        let gas = mint_gas(&chain, bob, bob, 1_000_000);
+        fund_vault(&chain, bob, gas, 400_000);
+        assert_eq!(vault_bal(&chain, bob, gas), 400_000);
+        assert_eq!(token_balance(&chain, gas, bob), 600_000);
+
+        Wrapper::push_from(&chain, bob)
+            .csh_wd(gas, Quantity::new(400_000))
+            .get()?;
+        assert_eq!(vault_bal(&chain, bob, gas), 0);
+        assert_eq!(token_balance(&chain, gas, bob), 1_000_000);
         Ok(())
     }
 }

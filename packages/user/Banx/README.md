@@ -168,6 +168,10 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 | `net` | Explicit bilateral net (no UI; writers already auto-net) |
 | `st_cur_pol` | Post a from→to FX offer |
 | `convert` | Take the counterparty’s FX offer and rebook |
+| `st_csh_qte` / `rm_csh_qte` | Post / remove a Banx↔Tokens cash quote (`is_out` true = out) |
+| `csh_fund` / `csh_wd` | Fund / withdraw Tokens sub-account `{poster}/{token_id}` on Banx |
+| `cash_out` | Draw Banx on the cashier; tokens from their vault |
+| `cash_in` | Take tokens from the sender’s vault; book Banx onto the cashier; tokens stay in the cashier’s vault |
 | `get_exposure` | Live pair exposure |
 | `add_asset` | Register an asset (service only) |
 

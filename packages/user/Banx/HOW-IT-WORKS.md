@@ -326,11 +326,30 @@ Anyone posts `st_cur_pol`: from-asset → to-asset, fixed fee in from-asset, `fx
 
 ---
 
+## Cash window (Banx ↔ Tokens)
+
+Banx claims stay claims. Tokens stay Tokens. A **cash quote** is the edge: the poster (cashier) says a Tokens `TID` trades for a Banx asset at `fx_rate`, not necessarily 1:1.
+
+`to = (from − fee_fixed) × fx_rate / RATE_SCALE`.
+
+| `is_out` | From | To | Take |
+|----------|------|-----|------|
+| true | Banx | tokens | `cash_out`: draw on the poster’s line, receive tokens from their vault |
+| false | tokens | Banx | `cash_in`: send tokens into the poster’s vault, book a deposit onto the poster |
+
+Inventory is Banx’s Tokens sub-account `{account}/{token_id}`. `csh_fund` is credit Banx, then Banx `toSub` into **your** bucket. `csh_wd` is `fromSub` back to you. `cash_in` `fromSub`s the taker and `toSub`s the cashier (same bucket `cash_out` spends). No Banx vault table.
+
+Out uses the same capacity / remaining as a path draw. In is the same book as deposit (repay if you owe them; otherwise you hold a claim on them). The poster’s quote is consent. Tokens history records the coin move; Banx activity is `cash_out` / `cash_in`.
+
+Multiple tokens per Banx asset: one quote row per `(poster, asset, token, is_out)`.
+
+---
+
 ## History
 
 Each writer emits a bilateral `history.banx-app.activity` event: one row per party as `account`, the other as `counterparty`. Amounts are **human decimals** at emit (asset precision; convert’s `netted` uses the destination asset).
 
-Kinds include `path_draw`, `deposit`, `net`, `convert`, `credit_line`, `rm_credit_line`, `sell_claim` / `buy_claim`, `invoice`, `please_book`, `settle_auth`, `fulfill`, `req_cancel`.
+Kinds include `path_draw`, `deposit`, `net`, `convert`, `cash_out`, `cash_in`, `credit_line`, `rm_credit_line`, `sell_claim` / `buy_claim`, `invoice`, `please_book`, `settle_auth`, `fulfill`, `req_cancel`.
 
 Hop draws write the adjacent pairs (Alice↔Bob, Bob↔Carol). A **multi-hop** `path_pay` / `pay_inv` also writes **sender↔payee** (`kind: path_pay`): `amount` is what was sent (`asset_id` = first hop), `netted` is what was delivered (`other_asset_id` = last hop). Direct (1-hop) pays are only `path_draw` on that pair — same two people.
 

@@ -20,6 +20,7 @@ Sites = "0.27.0"
 Transact = "0.27.0"
 Permissions = "0.27.0"
 Config = "0.27.0"
+Tokens = "0.27.0"
 
 [lib]
 crate-type = ["rlib"]

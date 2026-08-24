@@ -9,9 +9,9 @@ pub mod path_find;
 pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::{
-        services::accounts::Wrapper as Accounts,
-        services::tokens::{Decimal, Precision, Quantity},
         AccountNumber, Fracpack, Memo, ServiceWrapper, Table, TimePointSec, ToSchema,
+        services::accounts::Wrapper as Accounts,
+        services::tokens::{Decimal, Precision, Quantity, Wrapper as Tokens},
     };
     use serde::{Deserialize, Serialize};
 
@@ -1927,9 +1927,9 @@ pub mod tables {
             Obligation::net_pair(self.creditor, self.debtor, self.asset_id, u64::MAX.into());
         }
 
-        /// Draw for `path_pay`: unwind the reverse claim, then new line
-        /// capacity. Remaining is consumed only for [`Self::new_draw`].
-        pub fn draw(mut self, amount: Quantity) {
+        /// Unwind reverse claim, then new line capacity. Remaining is
+        /// consumed only for [`Self::new_draw`]. Returns amount netted.
+        fn apply_draw(mut self, amount: Quantity) -> Quantity {
             assert!(amount.value > 0, "path debit amount must be positive");
             assert!(
                 amount.value <= self.capacity(),
@@ -1947,14 +1947,216 @@ pub mod tables {
             } else {
                 self.line.as_ref().map(|l| l.interest_rate).unwrap_or(0)
             };
+            self.credit_and_net(amount, rate)
+        }
 
-            let netted = self.credit_and_net(amount, rate);
+        /// Draw for `path_pay`.
+        pub fn draw(self, amount: Quantity) {
+            let creditor = self.creditor;
+            let debtor = self.debtor;
+            let asset_id = self.asset_id;
+            let netted = self.apply_draw(amount);
             emit_pair_activity(
-                self.creditor,
-                self.debtor,
-                self.asset_id,
+                creditor,
+                debtor,
+                asset_id,
                 "path_draw",
                 amount,
+                netted,
+                asset_id,
+                0,
+                "",
+            );
+        }
+    }
+
+    /// Tokens sub-account on Banx for one cashier + token.
+    ///
+    /// Tokens already keys balances by `token_id`; the string names the
+    /// poster so cashiers do not share Banx's primary balance.
+    pub fn cash_sub(poster: AccountNumber, token_id: u32) -> String {
+        format!("{poster}/{token_id}")
+    }
+
+    /// Maker quote: Banx asset ↔ Tokens `token_id`. Poster is the cashier.
+    ///
+    /// `is_out`: taker draws Banx on the poster and receives tokens.
+    /// Otherwise taker sends tokens; poster is deposited (repay or a new
+    /// claim on the poster).
+    ///
+    /// `to = (from − fee_fixed) * fx_rate / RATE_SCALE`. Out `from` is Banx;
+    /// in `from` is tokens.
+    #[table(name = "CashQuoteTab", index = 9)]
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    pub struct CashQuote {
+        pub poster: AccountNumber,
+        pub asset_id: u16,
+        pub token_id: u32,
+        /// True: Banx → tokens (`cash_out`). False: tokens → Banx (`cash_in`).
+        pub is_out: bool,
+        pub fee_fixed: Quantity,
+        pub fx_rate: u64,
+        pub expires_at: TimePointSec,
+    }
+
+    impl CashQuote {
+        #[primary_key]
+        fn pk(&self) -> (AccountNumber, u16, u32, bool) {
+            (self.poster, self.asset_id, self.token_id, self.is_out)
+        }
+
+        fn save(&self) {
+            CashQuoteTab::read_write().put(self).unwrap();
+        }
+
+        fn get(poster: AccountNumber, asset_id: u16, token_id: u32, is_out: bool) -> Option<Self> {
+            CashQuoteTab::read()
+                .get_index_pk()
+                .get(&(poster, asset_id, token_id, is_out))
+        }
+
+        pub fn is_live(&self) -> bool {
+            expires_live(self.expires_at)
+        }
+
+        fn assert_live(&self) {
+            assert!(self.is_live(), "cash quote expired");
+        }
+
+        pub fn get_assert(
+            poster: AccountNumber,
+            asset_id: u16,
+            token_id: u32,
+            is_out: bool,
+        ) -> Self {
+            let q = Self::get(poster, asset_id, token_id, is_out)
+                .unwrap_or_else(|| panic!("cash quote not found"));
+            q.assert_live();
+            q
+        }
+
+        pub fn upsert(
+            poster: AccountNumber,
+            asset_id: u16,
+            token_id: u32,
+            is_out: bool,
+            fee_fixed: Quantity,
+            fx_rate: u64,
+            expires_at: TimePointSec,
+        ) {
+            let _ = Asset::get_assert(asset_id);
+            let _ = Tokens::call().getToken(token_id);
+            assert!(fx_rate > 0, "fx_rate must be positive");
+            Self {
+                poster,
+                asset_id,
+                token_id,
+                is_out,
+                fee_fixed,
+                fx_rate,
+                expires_at,
+            }
+            .save();
+        }
+
+        pub fn remove(poster: AccountNumber, asset_id: u16, token_id: u32, is_out: bool) {
+            assert!(
+                Self::get(poster, asset_id, token_id, is_out).is_some(),
+                "cash quote not found"
+            );
+            CashQuoteTab::read_write().erase(&(poster, asset_id, token_id, is_out));
+        }
+
+        pub fn apply(&self, amount_from: Quantity) -> Quantity {
+            self.assert_live();
+            apply_rate(amount_from, self.fee_fixed, self.fx_rate)
+        }
+
+        fn token_memo(kind: &str) -> Memo {
+            kind.to_string().try_into().expect("cash memo")
+        }
+
+        /// Pull `amount` tokens from shared(`from`, Banx) into Banx primary.
+        fn tokens_debit(from: AccountNumber, token_id: u32, amount: Quantity, memo: &str) {
+            Tokens::call().debit(token_id, from, amount, Self::token_memo(memo));
+        }
+
+        fn to_sub(poster: AccountNumber, token_id: u32, amount: Quantity) {
+            Tokens::call().toSub(token_id, cash_sub(poster, token_id), amount);
+        }
+
+        fn from_sub(poster: AccountNumber, token_id: u32, amount: Quantity) {
+            Tokens::call().fromSub(token_id, cash_sub(poster, token_id), amount);
+        }
+
+        /// Shared(`from`, Banx) → poster's Tokens sub-account on Banx.
+        pub fn take_tokens(from: AccountNumber, token_id: u32, amount: Quantity, memo: &str) {
+            Self::tokens_debit(from, token_id, amount, memo);
+            Self::to_sub(from, token_id, amount);
+        }
+
+        /// Poster's sub-account → `to` (via Banx primary).
+        pub fn pay_tokens(
+            poster: AccountNumber,
+            to: AccountNumber,
+            token_id: u32,
+            amount: Quantity,
+            memo: &str,
+        ) {
+            Self::from_sub(poster, token_id, amount);
+            Tokens::call().credit(token_id, to, amount, Self::token_memo(memo));
+        }
+
+        /// Taker draws `amount_banx` on poster; receives tokens. `min_tokens` is
+        /// the cash-out floor. Tokens come from `{poster}/{token_id}` on Banx.
+        pub fn cash_out(&self, taker: AccountNumber, amount_banx: Quantity, min_tokens: Quantity) {
+            assert!(self.is_out, "cash quote is not out");
+            assert!(taker != self.poster, "cannot cash_out with self");
+            assert!(amount_banx.value > 0, "cash_out amount must be positive");
+            let tokens = self.apply(amount_banx);
+            assert!(
+                tokens.value >= min_tokens.value,
+                "cash_out tokens below min_tokens"
+            );
+            let creditor = self.poster;
+            let debtor = taker;
+            let asset_id = self.asset_id;
+            let netted = Connection::get(creditor, debtor, asset_id).apply_draw(amount_banx);
+            Self::pay_tokens(creditor, taker, self.token_id, tokens, "cash_out");
+            emit_pair_activity(
+                creditor,
+                debtor,
+                asset_id,
+                "cash_out",
+                amount_banx,
+                netted,
+                asset_id,
+                0,
+                "",
+            );
+        }
+
+        /// Taker sends `amount_tokens` (already credited to Banx); books a
+        /// deposit onto the poster. Tokens stay in `{poster}/{token_id}` for
+        /// later `cash_out` / `csh_wd`.
+        pub fn cash_in(&self, taker: AccountNumber, amount_tokens: Quantity, min_banx: Quantity) {
+            assert!(!self.is_out, "cash quote is not in");
+            assert!(taker != self.poster, "cannot cash_in with self");
+            assert!(amount_tokens.value > 0, "cash_in amount must be positive");
+            let banx_amt = self.apply(amount_tokens);
+            assert!(
+                banx_amt.value >= min_banx.value,
+                "cash_in Banx below min_banx"
+            );
+            Self::tokens_debit(taker, self.token_id, amount_tokens, "cash_in");
+            Self::to_sub(self.poster, self.token_id, amount_tokens);
+            let netted = Connection::get(taker, self.poster, self.asset_id).deposit(banx_amt, 0);
+            emit_pair_activity(
+                taker,
+                self.poster,
+                self.asset_id,
+                "cash_in",
+                banx_amt,
                 netted,
                 self.asset_id,
                 0,
@@ -2007,14 +2209,15 @@ pub mod tables {
 #[psibase::service(name = "banx-app", tables = "tables")]
 pub mod service {
     use crate::tables::{
-        assert_account_exists, emit_pair_activity, execute_path, path_required_send, Asset,
-        ClaimOffer, Connection, CreditLine, CurrencyPolicy, ForwardOffer, InitRow, InitTable,
-        Obligation, PathHop, PayRequest,
+        Asset, CashQuote, ClaimOffer, Connection, CreditLine, CurrencyPolicy, ForwardOffer,
+        InitRow, InitTable, Obligation, PathHop, PayRequest, assert_account_exists,
+        emit_pair_activity, execute_path, path_required_send,
     };
     use psibase::{
+        AccountNumber, EventDb, MethodNumber, TimePointSec,
         services::events,
-        services::tokens::{Precision, Quantity},
-        AccountNumber, EventDb, MethodNumber, TimePointSec, *,
+        services::tokens::{Precision, Quantity, Wrapper as Tokens},
+        *,
     };
 
     #[action]
@@ -2372,6 +2575,88 @@ pub mod service {
         );
     }
 
+    /// Post a cash quote: Banx `asset_id` ↔ Tokens `token_id`.
+    ///
+    /// `is_out` true: taker draws Banx, receives tokens. False: taker sends
+    /// tokens, books a Banx deposit onto the poster.
+    /// `fee_fixed` is in Banx units for out, token units for in.
+    /// `fx_rate`: `to = (from − fee) * fx_rate / RATE_SCALE`.
+    #[action]
+    fn st_csh_qte(
+        asset_id: u16,
+        token_id: u32,
+        is_out: bool,
+        fee_fixed: Quantity,
+        fx_rate: u64,
+        expires_at: TimePointSec,
+    ) {
+        CashQuote::upsert(
+            get_sender(),
+            asset_id,
+            token_id,
+            is_out,
+            fee_fixed,
+            fx_rate,
+            expires_at,
+        );
+    }
+
+    /// Remove a cash quote.
+    #[action]
+    fn rm_csh_qte(asset_id: u16, token_id: u32, is_out: bool) {
+        CashQuote::remove(get_sender(), asset_id, token_id, is_out);
+    }
+
+    /// Move tokens from shared(sender, Banx) into Banx's Tokens sub-account
+    /// `{sender}/{token_id}`. Sender must `tokens.credit` Banx first.
+    #[action]
+    fn csh_fund(token_id: u32, amount: Quantity) {
+        assert!(amount.value > 0, "csh_fund amount must be positive");
+        let _ = Tokens::call().getToken(token_id);
+        CashQuote::take_tokens(get_sender(), token_id, amount, "csh_fund");
+    }
+
+    /// Return tokens from Banx's `{sender}/{token_id}` sub-account.
+    #[action]
+    fn csh_wd(token_id: u32, amount: Quantity) {
+        assert!(amount.value > 0, "csh_wd amount must be positive");
+        let poster = get_sender();
+        CashQuote::pay_tokens(poster, poster, token_id, amount, "csh_wd");
+    }
+
+    /// Draw `amount_banx` on `cashier`'s line; receive tokens from their vault.
+    #[action]
+    fn cash_out(
+        cashier: AccountNumber,
+        asset_id: u16,
+        token_id: u32,
+        amount_banx: Quantity,
+        min_tokens: Quantity,
+    ) {
+        CashQuote::get_assert(cashier, asset_id, token_id, true).cash_out(
+            get_sender(),
+            amount_banx,
+            min_tokens,
+        );
+    }
+
+    /// Send tokens (already credited to Banx) at `cashier`'s in quote; book
+    /// Banx deposit onto the cashier. Tokens stay in the cashier's vault.
+    #[action]
+    fn cash_in(
+        cashier: AccountNumber,
+        asset_id: u16,
+        token_id: u32,
+        amount_tokens: Quantity,
+        min_banx: Quantity,
+    ) {
+        CashQuote::get_assert(cashier, asset_id, token_id, false).cash_in(
+            get_sender(),
+            amount_tokens,
+            min_banx,
+        );
+    }
+
     /// Take the **counterparty's** [`CurrencyPolicy`]: rebook leftover
     /// `from_asset` on this pair into `to_asset` at their quote. Sender does
     /// not use their own policy. Nets `from_asset` first; requires output
@@ -2613,7 +2898,8 @@ pub mod service {
     ///
     /// - `kind`: `path_draw` | `path_pay` | `deposit` | `net` | `convert` |
     ///   `credit_line` | `rm_credit_line` | `sell_claim` | `invoice` |
-    ///   `please_book` | `settle_auth` | `fulfill` | `req_cancel`
+    ///   `please_book` | `settle_auth` | `fulfill` | `req_cancel` |
+    ///   `cash_out` | `cash_in`
     /// - `amount`: primary quantity (human decimal at `asset_id` precision)
     /// - `netted`: auto-net cancelled; convert/`path_pay` output at `other_asset_id`
     /// - `other_asset_id`: convert/`path_pay` destination asset; else same as `asset_id`

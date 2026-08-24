@@ -3,14 +3,16 @@
 mod service {
     use async_graphql::*;
     use banx::tables::{
-        Asset, AssetTable, ClaimOffer, ClaimOfferTab, Connection, CreditLine, CreditLineTable,
-        CurrencyPolicy, CurrencyPolicyTab, ForwardOffer, ForwardOfferTab, Obligation,
-        ObligationTable, PairCycle, PayRequest, RequestTab, PPM_SCALE, RATE_SCALE,
+        Asset, AssetTable, CashQuote, CashQuoteTab, ClaimOffer, ClaimOfferTab, Connection,
+        CreditLine, CreditLineTable, CurrencyPolicy, CurrencyPolicyTab, ForwardOffer,
+        ForwardOfferTab, Obligation, ObligationTable, PPM_SCALE, PairCycle, PayRequest, RATE_SCALE,
+        RequestTab,
     };
-    use psibase::services::tokens::{Decimal, Precision};
+    use psibase::services::tokens::{Decimal, Precision, Wrapper as Tokens};
     use psibase::*;
     use serde::Deserialize;
     use serde_aux::field_attributes::deserialize_number_from_string;
+    use tokens::tables::tables::{SubAccountBalanceTable, SubAccountTable};
 
     fn time_sec(t: TimePointSec) -> i64 {
         t.seconds as i64
@@ -249,6 +251,49 @@ mod service {
         }
     }
 
+    fn token_precision(token_id: u32) -> Precision {
+        Tokens::call().getToken(token_id).precision
+    }
+
+    #[derive(SimpleObject)]
+    struct CashQuoteView {
+        poster: AccountNumber,
+        assetId: u16,
+        tokenId: u32,
+        /// True: Banx → tokens (`cash_out`). False: tokens → Banx (`cash_in`).
+        isOut: bool,
+        /// Banx units for out, token units for in.
+        feeFixed: Decimal,
+        fxRate: String,
+        expiresAt: i64,
+    }
+
+    impl From<CashQuote> for CashQuoteView {
+        fn from(p: CashQuote) -> Self {
+            let prec = if p.is_out {
+                asset_precision(p.asset_id)
+            } else {
+                token_precision(p.token_id)
+            };
+            Self {
+                poster: p.poster,
+                assetId: p.asset_id,
+                tokenId: p.token_id,
+                isOut: p.is_out,
+                feeFixed: Decimal::new(p.fee_fixed, prec),
+                fxRate: p.fx_rate.to_string(),
+                expiresAt: time_sec(p.expires_at),
+            }
+        }
+    }
+
+    #[derive(SimpleObject)]
+    struct CashVaultView {
+        poster: AccountNumber,
+        tokenId: u32,
+        balance: Decimal,
+    }
+
     #[derive(SimpleObject, Clone)]
     struct ConstantsView {
         ppmScale: u32,
@@ -447,6 +492,42 @@ mod service {
 
         async fn request(&self, id: u32) -> Option<PayRequestView> {
             PayRequest::get(id).map(PayRequestView::from)
+        }
+
+        /// Tokens precision (for cash-quote rates).
+        async fn tokenPrecision(&self, tokenId: u32) -> u8 {
+            Tokens::call().getToken(tokenId).precision.value()
+        }
+
+        /// Cash quotes (Banx asset ↔ token) posted by `poster`.
+        async fn cashQuotes(&self, poster: AccountNumber) -> Vec<CashQuoteView> {
+            CashQuoteTab::with_service(banx::SERVICE)
+                .get_index_pk()
+                .iter()
+                .filter(|q| q.poster == poster)
+                .map(CashQuoteView::from)
+                .collect()
+        }
+
+        /// Tokens in Banx's `{poster}/{token_id}` sub-account (cash window).
+        async fn cashVault(&self, poster: AccountNumber) -> Vec<CashVaultView> {
+            let prefix = format!("{poster}/");
+            SubAccountTable::with_service(Tokens::SERVICE)
+                .get_index_pk()
+                .iter()
+                .filter(|sa| sa.account == banx::SERVICE && sa.sub_account.starts_with(&prefix))
+                .filter_map(|sa| {
+                    let token_id: u32 = sa.sub_account.rsplit('/').next()?.parse().ok()?;
+                    let bal = SubAccountBalanceTable::with_service(Tokens::SERVICE)
+                        .get_index_pk()
+                        .get(&(sa.id, token_id))?;
+                    Some(CashVaultView {
+                        poster,
+                        tokenId: token_id,
+                        balance: Decimal::new(bal.balance, token_precision(token_id)),
+                    })
+                })
+                .collect()
         }
 
         /// FX quotes posted by `poster` (middle man / claim holder).

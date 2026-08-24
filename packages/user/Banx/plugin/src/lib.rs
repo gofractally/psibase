@@ -34,10 +34,12 @@ define_trust! {
             - Fulfill a settle-auth on a loan you owe
             - Convert debt between assets
             - Buy or sell claims under a posted claim offer
+            - Post cash quotes, fund/withdraw the cash vault, cash_in (from your vault)
         ",
         High => "
             - Path-pay (draw on others' credit along a path)
             - Pay an invoice along a path (max spend)
+            - cash_out (draw Banx, receive tokens)
         ",
     }
     functions {
@@ -68,8 +70,13 @@ define_trust! {
             convert,
             sell_claim,
             buy_claim,
+            set_cash_quote,
+            remove_cash_quote,
+            cash_fund,
+            cash_withdraw,
+            cash_in,
         ],
-        High => [path_pay, pay_inv],
+        High => [path_pay, pay_inv, cash_out],
     }
 }
 
@@ -107,6 +114,47 @@ fn parse_amount_nonzero(asset_id: u16, amount: &str) -> Result<Quantity, Error> 
         return Err(ErrorType::AmountIsZero().into());
     }
     Ok(q)
+}
+
+fn parse_token_amount(token_id: u32, amount: &str) -> Result<Quantity, Error> {
+    let precision = query::fetch_asset::fetch_token_precision(token_id)?;
+    Quantity::from_str(amount, precision)
+        .map_err(|e| ErrorType::ConversionError(e.to_string()).into())
+}
+
+fn parse_token_amount_nonzero(token_id: u32, amount: &str) -> Result<Quantity, Error> {
+    let q = parse_token_amount(token_id, amount)?;
+    if q.value == 0 {
+        return Err(ErrorType::AmountIsZero().into());
+    }
+    Ok(q)
+}
+
+fn human_to_fx_rate_precs(
+    from_prec: psibase::services::tokens::Precision,
+    to_prec: psibase::services::tokens::Precision,
+    to_rate: &str,
+) -> Result<u64, Error> {
+    let to_for_one = Quantity::from_str(to_rate, to_prec)
+        .map_err(|e| ErrorType::ConversionError(e.to_string()))?;
+    if to_for_one.value == 0 {
+        return Err(ErrorType::AmountIsZero().into());
+    }
+    let one_from = Quantity::from_str("1", from_prec)
+        .map_err(|e| ErrorType::ConversionError(e.to_string()))?;
+    let fx = (to_for_one.value as u128)
+        .checked_mul(banx::tables::RATE_SCALE as u128)
+        .ok_or_else(|| ErrorType::ConversionError("fx_rate overflow".into()))?
+        / (one_from.value as u128);
+    let fx =
+        u64::try_from(fx).map_err(|_| ErrorType::ConversionError("fx_rate exceeds u64".into()))?;
+    if fx == 0 {
+        return Err(ErrorType::ConversionError(
+            "to-rate too small for precisions (fx_rate rounds to 0)".into(),
+        )
+        .into());
+    }
+    Ok(fx)
 }
 
 /// Convert a human "to-asset per 1 from-asset" rate into chain `fx_rate`.
@@ -693,6 +741,104 @@ impl Api for BanxPlugin {
             amount_out,
             min_return,
         })
+    }
+
+    fn set_cash_quote(
+        asset_id: u16,
+        token_id: u32,
+        is_out: bool,
+        fee_fixed: String,
+        to_rate: String,
+        expires_at_seconds: u32,
+    ) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::set_cash_quote)?;
+        let token_prec = query::fetch_asset::fetch_token_precision(token_id)?;
+        let asset = query::fetch_asset::fetch_asset(asset_id)?;
+        let asset_prec = asset.precision()?;
+        let (fee_fixed, fx_rate) = if is_out {
+            (
+                parse_amount(asset_id, &fee_fixed)?,
+                human_to_fx_rate_precs(asset_prec, token_prec, &to_rate)?,
+            )
+        } else {
+            (
+                parse_token_amount(token_id, &fee_fixed)?,
+                human_to_fx_rate_precs(token_prec, asset_prec, &to_rate)?,
+            )
+        };
+        let packed = banx::action_structs::st_csh_qte {
+            asset_id,
+            token_id,
+            is_out,
+            fee_fixed,
+            fx_rate,
+            expires_at: time_point(expires_at_seconds),
+        }
+        .packed();
+        add_action_to_transaction(banx::action_structs::st_csh_qte::ACTION_NAME, &packed)
+    }
+
+    fn remove_cash_quote(asset_id: u16, token_id: u32, is_out: bool) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::remove_cash_quote)?;
+        let packed = banx::action_structs::rm_csh_qte {
+            asset_id,
+            token_id,
+            is_out,
+        }
+        .packed();
+        add_action_to_transaction(banx::action_structs::rm_csh_qte::ACTION_NAME, &packed)
+    }
+
+    fn cash_fund(token_id: u32, amount: String) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::cash_fund)?;
+        let amount = parse_token_amount_nonzero(token_id, &amount)?;
+        let packed = banx::action_structs::csh_fund { token_id, amount }.packed();
+        add_action_to_transaction(banx::action_structs::csh_fund::ACTION_NAME, &packed)
+    }
+
+    fn cash_withdraw(token_id: u32, amount: String) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::cash_withdraw)?;
+        let amount = parse_token_amount_nonzero(token_id, &amount)?;
+        let packed = banx::action_structs::csh_wd { token_id, amount }.packed();
+        add_action_to_transaction(banx::action_structs::csh_wd::ACTION_NAME, &packed)
+    }
+
+    fn cash_out(
+        cashier: String,
+        asset_id: u16,
+        token_id: u32,
+        amount_banx: String,
+        min_tokens: String,
+    ) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::cash_out)?;
+        let packed = banx::action_structs::cash_out {
+            cashier: parse_account(&cashier)?,
+            asset_id,
+            token_id,
+            amount_banx: parse_amount_nonzero(asset_id, &amount_banx)?,
+            min_tokens: parse_token_amount(token_id, &min_tokens)?,
+        }
+        .packed();
+        add_action_to_transaction(banx::action_structs::cash_out::ACTION_NAME, &packed)
+    }
+
+    fn cash_in(
+        cashier: String,
+        asset_id: u16,
+        token_id: u32,
+        amount_tokens: String,
+        min_banx: String,
+    ) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::cash_in)?;
+        let packed = banx::action_structs::cash_in {
+            cashier: parse_account(&cashier)?,
+            asset_id,
+            token_id,
+            amount_tokens: parse_token_amount_nonzero(token_id, &amount_tokens)?,
+            min_banx: parse_amount(asset_id, &min_banx)?,
+        }
+        .packed();
+        add_action_to_transaction(banx::action_structs::cash_in::ACTION_NAME, &packed)
     }
 }
 

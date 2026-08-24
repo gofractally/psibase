@@ -58,3 +58,29 @@ pub fn fetch_asset(asset_id: u16) -> Result<Asset, ErrorType> {
 
     Ok(asset)
 }
+
+#[derive(Serialize, Deserialize)]
+struct PrecResponse {
+    data: PrecData,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PrecData {
+    token_precision: u8,
+}
+
+/// Tokens precision via Banx GraphQL (`tokenPrecision`).
+pub fn fetch_token_precision(token_id: u32) -> Result<Precision, ErrorType> {
+    let query = format!(
+        r#"query {{
+            tokenPrecision(tokenId: {token_id})
+        }}"#
+    );
+    let result =
+        server::post_graphql_get_json(&query).map_err(|e| ErrorType::QueryError(e.message))?;
+    let response: PrecResponse =
+        serde_json::from_str(&result).map_err(|e| ErrorType::QueryError(e.to_string()))?;
+    Precision::new(response.data.token_precision)
+        .map_err(|e| ErrorType::ConversionError(e.to_string()))
+}

@@ -7,7 +7,7 @@
 use std::collections::{HashMap, HashSet};
 
 pub use crate::math::{
-    try_apply_hop_fee as apply_hop_fee, try_apply_rate as apply_rate, PPM_SCALE, RATE_SCALE,
+    PPM_SCALE, RATE_SCALE, try_apply_hop_fee as apply_hop_fee, try_apply_rate as apply_rate,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -979,19 +979,21 @@ mod tests {
             line_apr("steve", "gary", usd, 10_000, 20_000),
         ];
         let routing = vec![global_rte_cap("gary", usd, 10_000, true)];
-        assert!(find_banx_path(
-            &lines,
-            &routing,
-            &[],
-            "alice",
-            "steve",
-            100,
-            usd,
-            Some(usd),
-            4,
-            0,
-        )
-        .is_none());
+        assert!(
+            find_banx_path(
+                &lines,
+                &routing,
+                &[],
+                "alice",
+                "steve",
+                100,
+                usd,
+                Some(usd),
+                4,
+                0,
+            )
+            .is_none()
+        );
     }
 
     #[test]
