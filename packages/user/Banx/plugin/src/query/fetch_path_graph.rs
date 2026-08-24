@@ -1,8 +1,8 @@
 use crate::bindings::host::common::server;
 use crate::errors::ErrorType;
 use banx::path_find::{FxEdge, LineEdge, RoutingEdge};
-use psibase::AccountNumber;
 use psibase::services::tokens::Decimal;
+use psibase::AccountNumber;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -75,19 +75,12 @@ fn parse_u64(s: &str) -> Result<u64, ErrorType> {
         .map_err(|e| ErrorType::QueryError(format!("invalid u64 {s}: {e}")))
 }
 
-fn parse_acct(name: &str) -> Result<AccountNumber, ErrorType> {
-    name.parse::<AccountNumber>()
-        .map_err(|_| ErrorType::InvalidAccount(name.to_string()))
-}
-
 /// Scoped path graph: credit lines / routing / FX expanded from `from` toward `to`.
 pub fn fetch_path_graph(
-    from: &str,
-    to: &str,
+    from: AccountNumber,
+    to: AccountNumber,
     max_hops: u8,
 ) -> Result<PathGraphSnapshot, ErrorType> {
-    let from = parse_acct(from)?.to_string();
-    let to = parse_acct(to)?.to_string();
     let query = format!(
         r#"query {{
             pathGraph(from: "{from}", to: "{to}", maxHops: {max_hops}) {{
@@ -118,8 +111,8 @@ pub fn fetch_path_graph(
     for l in g.credit_lines {
         let capacity = l.capacity.quantity.value;
         lines.push(LineEdge {
-            creditor: l.creditor.to_string(),
-            debtor: l.debtor.to_string(),
+            creditor: l.creditor,
+            debtor: l.debtor,
             asset_id: l.asset_id,
             capacity,
             reverse_claim: l.reverse_claim.quantity.value,
@@ -131,15 +124,9 @@ pub fn fetch_path_graph(
 
     let mut routing = Vec::with_capacity(g.forward_offers.len());
     for r in g.forward_offers {
-        // path_find: empty creditor = global next hop
-        let creditor = if r.next_hop.value == 0 {
-            String::new()
-        } else {
-            r.next_hop.to_string()
-        };
         routing.push(RoutingEdge {
-            creditor,
-            debtor: r.poster.to_string(),
+            creditor: r.next_hop,
+            debtor: r.poster,
             asset_id: r.asset_id,
             hop_fee_fixed: r.fee_fixed.quantity.value,
             hop_fee_percent_ppm: r.fee_percent_ppm,
@@ -152,7 +139,7 @@ pub fn fetch_path_graph(
     let mut fx = Vec::with_capacity(g.currency_policies.len());
     for c in g.currency_policies {
         fx.push(FxEdge {
-            poster: c.poster.to_string(),
+            poster: c.poster,
             from_asset: c.from_asset,
             to_asset: c.to_asset,
             fee_fixed: c.fee_fixed.quantity.value,
