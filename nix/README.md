@@ -84,7 +84,9 @@ nix build
 # or: nix build .#psibase
 ```
 
-This compiles psibase from source (C++, Rust, WASM, Yarn UIs) and installs the runtime layout:
+This compiles psibase from source (C++, Rust, WASM, Yarn UIs) and installs the runtime layout.
+
+Yarn UIs (except XAdmin) are separate store paths (`nix build .#psibase-yarn-uis`). A C++-only change reuses those paths and skips Vite. XAdmin still builds inside the main derivation.
 
 ```
 result/bin/{psinode,psibase,psitest}

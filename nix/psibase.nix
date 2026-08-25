@@ -4,6 +4,7 @@
   lib,
   stdenv,
   stdenvNoCC,
+  callPackage,
   fetchurl,
   fetchFromGitHub,
   cmake,
@@ -248,6 +249,34 @@ let
     dontFixup = true;
   };
 
+  yarnUis = callPackage ./yarn-uis.nix {
+    inherit
+      yarnBerry
+      nodejs20
+      yarnOfflineCache
+      version
+      ;
+  };
+
+  # relPath under packages/ → prebuilt dist derivation. XAdmin is omitted.
+  prebuiltUiDist = {
+    "user/CommonApi/common/packages/common-lib" = yarnUis.common-lib;
+    "system/Accounts/ui" = yarnUis.accounts;
+    "user/Evaluations/ui" = yarnUis.evaluations;
+    "user/Fractals/ui" = yarnUis.fractals;
+    "user/FractalCore/ui" = yarnUis.fractal-core;
+    "user/TokenStream/ui" = yarnUis.token-stream;
+    "user/CommonApi/common/packages/plugin-tester/ui" = yarnUis.plugin-tester;
+    "user/Explorer/ui" = yarnUis.explorer;
+    "user/Homepage/ui" = yarnUis.homepage;
+    "user/Identity/ui" = yarnUis.identity;
+    "user/Permissions/ui" = yarnUis.permissions;
+    "user/Supervisor/ui" = yarnUis.supervisor;
+    "user/Workshop/ui" = yarnUis.workshop;
+    "user/Config/ui" = yarnUis.config;
+    "local/XProxy/ui" = yarnUis.xproxy;
+  };
+
   srcFiltered = lib.cleanSourceWith {
     name = "psibase-src";
     inherit src;
@@ -384,6 +413,13 @@ stdenv.mkDerivation {
     cp ${htmJs} packages/user/CommonApi/common/resources/thirdParty/src/htm.module.js
     cp ${reactJs} packages/user/CommonApi/common/resources/thirdParty/src/react.production.min.js
     cp ${reactDomJs} packages/user/CommonApi/common/resources/thirdParty/src/react-dom.production.min.js
+
+    ${lib.concatStrings (
+      lib.mapAttrsToList (rel: drv: ''
+        mkdir -p packages/${rel}/dist
+        cp -a ${drv}/. packages/${rel}/dist/
+      '') prebuiltUiDist
+    )}
   '';
 
   configurePhase = ''
@@ -443,6 +479,7 @@ stdenv.mkDerivation {
       -DCMAKE_IGNORE_PATH=/usr/lib:/usr/lib64 \
       -DCMAKE_SYSTEM_IGNORE_PATH=/usr/lib:/usr/lib64 \
       -DFORCE_COLORED_OUTPUT=OFF \
+      -DPSIBASE_PREBUILT_UI=ON \
       ..
 
     runHook postConfigure
@@ -515,7 +552,7 @@ stdenv.mkDerivation {
   '';
 
   passthru = {
-    inherit yarnOfflineCache cargoVendor wasmDepTarballs;
+    inherit yarnOfflineCache cargoVendor wasmDepTarballs yarnUis;
   };
 
   meta = with lib; {

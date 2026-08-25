@@ -1,28 +1,44 @@
 include(ExternalProject)
 
+# Nix copies prebuilt dist/ and sets this so leftover local dist/ does not
+# skip yarn in the incremental cmake loop.
+option(PSIBASE_PREBUILT_UI "Skip yarn for UIs that already have dist/" OFF)
+
 # Static (not built) resource dependencies
 file(GLOB common-misc-resources LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/resources/*)
 
-add_custom_target(YarnInstall
-    COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/packages && yarn --version && yarn
-    COMMENT "Installing yarn dependencies"
-    BUILD_ALWAYS 1
-)
+if(PSIBASE_PREBUILT_UI)
+    # Yarn install already ran in the Nix configurePhase.
+    add_custom_target(YarnInstall)
+else()
+    add_custom_target(YarnInstall
+        COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/packages && yarn --version && yarn
+        COMMENT "Installing yarn dependencies"
+        BUILD_ALWAYS 1
+    )
+endif()
 
-# Common library that other UIs depend on
-ExternalProject_Add(CommonApiCommonLib_js
-    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/common-lib
-    DEPENDS YarnInstall
-    BUILD_COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/common-lib && yarn build
-    CONFIGURE_COMMAND ""
-    BUILD_BYPRODUCTS 
-        ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/common-lib/dist
-        ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/common-lib/dist/common-lib.js
-        ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/common-lib/dist/common-lib.umd.cjs
-        ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/common-lib/dist/index.d.ts
-    INSTALL_COMMAND ""
-    BUILD_ALWAYS 1
-)
+# Common library that other UIs depend on.
+set(_PSIBASE_COMMON_LIB_JS
+    ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/common-lib/dist/common-lib.js)
+if(PSIBASE_PREBUILT_UI AND EXISTS ${_PSIBASE_COMMON_LIB_JS})
+    message(STATUS "Using prebuilt CommonApiCommonLib_js")
+    add_custom_target(CommonApiCommonLib_js DEPENDS ${_PSIBASE_COMMON_LIB_JS})
+else()
+    ExternalProject_Add(CommonApiCommonLib_js
+        SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/common-lib
+        DEPENDS YarnInstall
+        BUILD_COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/common-lib && yarn build
+        CONFIGURE_COMMAND ""
+        BUILD_BYPRODUCTS
+            ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/common-lib/dist
+            ${_PSIBASE_COMMON_LIB_JS}
+            ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/common-lib/dist/common-lib.umd.cjs
+            ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/common-lib/dist/index.d.ts
+        INSTALL_COMMAND ""
+        BUILD_ALWAYS 1
+    )
+endif()
 
 # Define all UI projects
 set(UI_PROJECTS
@@ -44,19 +60,24 @@ set(UI_PROJECTS
 )
 
 message(STATUS "common-misc-resources: ${common-misc-resources}")
-# Create ExternalProject for each UI
+# Create ExternalProject for each UI. A populated dist/ (Nix prebuild) skips yarn.
 foreach(UI ${UI_PROJECTS})
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${UI})
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 TARGET_NAME ${UI})
     set(OUTPUT_FILEPATH ${CMAKE_CURRENT_SOURCE_DIR}/packages/${PATH}/dist/index.html)
-    ExternalProject_Add(${TARGET_NAME}
-        SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/packages/${PATH}
-        BUILD_COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/packages/${PATH} && yarn build
-        CONFIGURE_COMMAND ""
-        BUILD_BYPRODUCTS ${OUTPUT_FILEPATH} ${CMAKE_CURRENT_SOURCE_DIR}/packages/${PATH}/dist
-        DEPENDS CommonApiCommonLib_js YarnInstall
-        INSTALL_COMMAND ""
-        BUILD_ALWAYS 1
-    )
+    if(PSIBASE_PREBUILT_UI AND EXISTS ${OUTPUT_FILEPATH})
+        message(STATUS "Using prebuilt ${TARGET_NAME}")
+        add_custom_target(${TARGET_NAME} DEPENDS ${OUTPUT_FILEPATH})
+    else()
+        ExternalProject_Add(${TARGET_NAME}
+            SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/packages/${PATH}
+            BUILD_COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/packages/${PATH} && yarn build
+            CONFIGURE_COMMAND ""
+            BUILD_BYPRODUCTS ${OUTPUT_FILEPATH} ${CMAKE_CURRENT_SOURCE_DIR}/packages/${PATH}/dist
+            DEPENDS CommonApiCommonLib_js YarnInstall
+            INSTALL_COMMAND ""
+            BUILD_ALWAYS 1
+        )
+    endif()
     set(${TARGET_NAME}_DEP ${TARGET_NAME} ${OUTPUT_FILEPATH})
 endforeach()
