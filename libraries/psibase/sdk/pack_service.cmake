@@ -427,6 +427,14 @@ function(cargo_psibase_package)
             --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/Cargo.toml)
     endif()
 
+    set(${TARGET_NAME}_DEP ${TARGET_NAME} ${ARG_OUTPUT} PARENT_SCOPE)
+
+    if(PSIBASE_PREBUILT_RS_PACKAGES)
+        message(STATUS "Using prebuilt ${TARGET_NAME}")
+        add_custom_target(${TARGET_NAME} ALL DEPENDS ${ARG_OUTPUT})
+        return()
+    endif()
+
     set(_ext_depends ${ARG_DEPENDS} cargo-psibase)
     if(NOT PSIBASE_PREBUILT_NATIVE)
         list(APPEND _ext_depends psitest)

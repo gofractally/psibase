@@ -280,6 +280,13 @@ add_manpage(psibase-create-snapshot)
 add_manpage(psibase-load-snapshot)
 
 # Cargo psibase
+# Nix copies prebuilt cargo-psibase .psi files and sets this. Default OFF so
+# local cmake / nix develop still runs cargo-psibase.
+option(PSIBASE_PREBUILT_RS_PACKAGES "Use prebuilt cargo-psibase .psi packages (Nix)" OFF)
+if(PSIBASE_PREBUILT_RS_PACKAGES)
+    message(STATUS "Using prebuilt cargo-psibase packages")
+    add_custom_target(cargo-psibase)
+else()
 ExternalProject_Add(
     cargo-psibase
     SOURCE_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/rust
@@ -289,6 +296,7 @@ ExternalProject_Add(
     BUILD_ALWAYS        1
     INSTALL_COMMAND     ""
 )
+endif()
 
 include(web-apps.cmake)
 

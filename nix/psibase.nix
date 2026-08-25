@@ -554,6 +554,19 @@ let
       ];
     };
   };
+
+  rsPackages = callPackage ./psibase-rs-packages.nix {
+    inherit
+      rustToolchain
+      cargoVendor
+      cargoComponent
+      wasmTools
+      version
+      llvmPackages
+      yarnUis
+      wasmServices
+      ;
+  };
 in
 stdenv.mkDerivation {
   pname = "psibase";
@@ -756,6 +769,7 @@ stdenv.mkDerivation {
       -DPSIBASE_PREBUILT_PLUGINS=ON \
       -DPSIBASE_PREBUILT_WASM_SERVICES=ON \
       -DPSIBASE_PREBUILT_NATIVE=ON \
+      -DPSIBASE_PREBUILT_RS_PACKAGES=ON \
       ..
 
     runHook postConfigure
@@ -764,9 +778,10 @@ stdenv.mkDerivation {
   buildPhase = ''
     runHook preBuild
     cd "$NIX_BUILD_TOP/$sourceRoot/build"
-    mkdir -p rust/release components share/psibase/wasm
+    mkdir -p rust/release components share/psibase/wasm share/psibase/packages
     cp ${psibaseCli}/bin/psibase rust/release/psibase
     cp ${psibasePlugins}/*.wasm components/
+    cp ${rsPackages}/*.psi share/psibase/packages/
     cp ${wasmServices}/bin/psinode psinode
     cp ${wasmServices}/bin/psitest psitest
     cp -a ${wasmServices}/service-wasm/. .
@@ -848,6 +863,7 @@ stdenv.mkDerivation {
       psibaseCli
       psibasePlugins
       wasmServices
+      rsPackages
       ;
   };
 
