@@ -21,6 +21,7 @@ endif()
 
 option(BUILD_RELEASE_WASM "Build release wasms" ON)
 option(BUILD_DEBUG_WASM "Build debug wasms" OFF)
+option(PSIBASE_PREBUILT_WASM_DEPS "Reuse prebuilt wasm/deps and boost extract (Nix)" OFF)
 
 # Point to psidk-config.cmake to allow documentation examples to build
 set(psidk_DIR ${CMAKE_SOURCE_DIR})

@@ -88,6 +88,8 @@ This compiles psibase from source (C++, Rust, WASM, Yarn UIs) and installs the r
 
 Yarn UIs (except XAdmin) are separate store paths (`nix build .#psibase-yarn-uis`). A C++-only change reuses those paths and skips Vite. XAdmin still builds inside the main derivation.
 
+Wasm third-party libs (Botan, OpenSSL, zlib, gmp) are `nix build .#psibase-wasm-deps`. A service-code change reuses that path and skips those WASI compiles.
+
 ```
 result/bin/{psinode,psibase,psitest}
 result/share/psibase/{config.in,packages,wasm}

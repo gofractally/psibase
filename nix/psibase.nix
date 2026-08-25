@@ -102,6 +102,18 @@ let
     '';
   };
 
+  wasmDeps = callPackage ./wasm-deps.nix {
+    inherit
+      wasiSdk
+      zlibTarball
+      gmpTarball
+      opensslTarball
+      botanTarball
+      sqliteTarball
+      boostTarball
+      ;
+  };
+
   # Git submodules are not part of flake `self`. Pin the same revs as .gitmodules.
   catch2Src = fetchFromGitHub {
     owner = "catchorg";
@@ -464,7 +476,11 @@ stdenv.mkDerivation {
       yarn install --immutable --immutable-cache --mode=skip-build
     )
 
-    mkdir -p build
+    mkdir -p build/wasm/deps build/wasm/boost
+    cp -a ${wasmDeps}/. build/wasm/deps/
+    rm -rf build/wasm/deps/boost
+    cp -a ${wasmDeps}/boost/. build/wasm/boost/
+    chmod -R u+w build/wasm/deps build/wasm/boost
     cd build
     cmake -G Ninja \
       -DCMAKE_BUILD_TYPE=Release \
@@ -480,6 +496,7 @@ stdenv.mkDerivation {
       -DCMAKE_SYSTEM_IGNORE_PATH=/usr/lib:/usr/lib64 \
       -DFORCE_COLORED_OUTPUT=OFF \
       -DPSIBASE_PREBUILT_UI=ON \
+      -DPSIBASE_PREBUILT_WASM_DEPS=ON \
       ..
 
     runHook postConfigure
@@ -552,7 +569,7 @@ stdenv.mkDerivation {
   '';
 
   passthru = {
-    inherit yarnOfflineCache cargoVendor wasmDepTarballs yarnUis;
+    inherit yarnOfflineCache cargoVendor wasmDepTarballs wasmDeps yarnUis;
   };
 
   meta = with lib; {
