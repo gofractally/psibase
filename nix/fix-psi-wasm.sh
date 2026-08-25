@@ -30,6 +30,7 @@ if [ -d "$out/share/psibase/packages" ]; then
   for psi in "$out/share/psibase/packages"/*.psi; do
     tmp=$(mktemp -d)
     unzip -q "$psi" -d "$tmp"
+    chmod -R u+w "$tmp"
     if [ -d "$tmp/service" ]; then
       changed=0
       while IFS= read -r -d '' f; do

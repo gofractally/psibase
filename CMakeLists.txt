@@ -28,6 +28,9 @@ file(WRITE ${CMAKE_BINARY_DIR}/CTestTestfile.cmake)
 
 option(BUILD_STATIC "Build static binaries" OFF)
 option(ENABLE_SSL "Build psinode with TLS support" ON)
+# Nix compile drv: psinode + WASI services only. Default OFF so local cmake
+# still configures packing, UIs, and plugins.
+option(PSIBASE_COMPILE_ONLY "Configure C++ compile without packing UIs/plugins (Nix)" OFF)
 
 set(USER_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/target)
 set(SYSTEM_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/target)
@@ -69,7 +72,8 @@ endif()
 if(DEFINED WASI_SDK_PREFIX)
     ProcessorCount(NUM_PROCS)
     # Nix copies prebuilt zlib/gmp/openssl/botan into build/wasm/deps.
-    option(PSIBASE_PREBUILT_WASM_DEPS "Reuse prebuilt wasm/deps (skip botan/catch2 compile)" OFF)
+    # Catch2 is not in that path; it still builds below for wasm tests.
+    option(PSIBASE_PREBUILT_WASM_DEPS "Reuse prebuilt wasm/deps (skip botan compile)" OFF)
 
     # This is used by the VerifySig service. The kinds of keys supported need to be configured
     # here.  We use a minimized build to keep the size of the service down. Static linking is
@@ -81,7 +85,6 @@ if(DEFINED WASI_SDK_PREFIX)
     #  -msimd128 is disabled because binaryen 105 doesn't fully support it
     if(PSIBASE_PREBUILT_WASM_DEPS)
         add_custom_target(wasm-botan)
-        add_custom_target(wasm-catch2)
     else()
         ExternalProject_Add(wasm-botan
             URL https://github.com/gofractally/psibase/releases/download/deps/Botan-3.1.1.tar.xz
@@ -93,44 +96,44 @@ if(DEFINED WASI_SDK_PREFIX)
             BUILD_COMMAND make -j${NUM_PROCS}
             INSTALL_COMMAND make install
         )
-        ExternalProject_Add(wasm-catch2
-            SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/Catch2
-            BINARY_DIR catch2
-            TEST_EXCLUDE_FROM_MAIN 1
-            EXCLUDE_FROM_ALL 1
-            DEPENDS ${wasm-deps}
-            PREFIX ${CMAKE_CURRENT_BINARY_DIR}/wasm/catch2
-            INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/wasm/deps
-            CMAKE_ARGS
-                -DCMAKE_BUILD_TYPE=Release
-                -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-                -DBUILD_TESTING=OFF
-                -DCATCH_INSTALL_DOCS=OFF
-                -DCATCH_INSTALL_EXTRAS=OFF
-                -DCATCH_CONFIG_NO_POSIX_SIGNALS=ON
-                -DCMAKE_C_COMPILER_LAUNCHER=${CMAKE_C_COMPILER_LAUNCHER}
-                -DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}
-                -DCMAKE_TOOLCHAIN_FILE=${CMAKE_CURRENT_SOURCE_DIR}/wasm/toolchain.cmake
-                -DWASI_SDK_PREFIX=${WASI_SDK_PREFIX}
-                -DWASM_CLANG_PREFIX=${WASM_CLANG_PREFIX}
-                -DWASM_CLANG_SUFFIX=${WASM_CLANG_SUFFIX}
-                -DCMAKE_SYSROOT=${WASI_SDK_PREFIX}/share/wasi-sysroot
-        )
-        install(
-            FILES ${CMAKE_CURRENT_BINARY_DIR}/wasm/deps/lib/libCatch2.a
-                  ${CMAKE_CURRENT_BINARY_DIR}/wasm/deps/lib/libCatch2Main.a
-            DESTINATION ${CMAKE_INSTALL_DATADIR}/wasi-sysroot/lib
-            COMPONENT libpsibase
-        )
-        install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/wasm/deps/lib/cmake/Catch2
-            DESTINATION ${CMAKE_INSTALL_DATADIR}/wasi-sysroot/lib/cmake
-            COMPONENT libpsibase
-        )
-        install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/wasm/deps/include/catch2
-            DESTINATION ${CMAKE_INSTALL_DATADIR}/wasi-sysroot/include
-            COMPONENT libpsibase
-        )
     endif()
+    ExternalProject_Add(wasm-catch2
+        SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/Catch2
+        BINARY_DIR catch2
+        TEST_EXCLUDE_FROM_MAIN 1
+        EXCLUDE_FROM_ALL 1
+        DEPENDS ${wasm-deps}
+        PREFIX ${CMAKE_CURRENT_BINARY_DIR}/wasm/catch2
+        INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/wasm/deps
+        CMAKE_ARGS
+            -DCMAKE_BUILD_TYPE=Release
+            -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+            -DBUILD_TESTING=OFF
+            -DCATCH_INSTALL_DOCS=OFF
+            -DCATCH_INSTALL_EXTRAS=OFF
+            -DCATCH_CONFIG_NO_POSIX_SIGNALS=ON
+            -DCMAKE_C_COMPILER_LAUNCHER=${CMAKE_C_COMPILER_LAUNCHER}
+            -DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}
+            -DCMAKE_TOOLCHAIN_FILE=${CMAKE_CURRENT_SOURCE_DIR}/wasm/toolchain.cmake
+            -DWASI_SDK_PREFIX=${WASI_SDK_PREFIX}
+            -DWASM_CLANG_PREFIX=${WASM_CLANG_PREFIX}
+            -DWASM_CLANG_SUFFIX=${WASM_CLANG_SUFFIX}
+            -DCMAKE_SYSROOT=${WASI_SDK_PREFIX}/share/wasi-sysroot
+    )
+    install(
+        FILES ${CMAKE_CURRENT_BINARY_DIR}/wasm/deps/lib/libCatch2.a
+              ${CMAKE_CURRENT_BINARY_DIR}/wasm/deps/lib/libCatch2Main.a
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/wasi-sysroot/lib
+        COMPONENT libpsibase
+    )
+    install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/wasm/deps/lib/cmake/Catch2
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/wasi-sysroot/lib/cmake
+        COMPONENT libpsibase
+    )
+    install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/wasm/deps/include/catch2
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/wasi-sysroot/include
+        COMPONENT libpsibase
+    )
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/wasm/deps/lib/libbotan-3.a
         DESTINATION ${CMAKE_INSTALL_DATADIR}/wasi-sysroot/lib
         COMPONENT libpsibase
@@ -156,6 +159,13 @@ if(DEFINED WASI_SDK_PREFIX)
         list(APPEND WASM_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${s}.wasm ${CMAKE_CURRENT_BINARY_DIR}/${s}-schema.json)
     endforeach()
 
+    # Nix copies prebuilt *.wasm / *-schema.json into the build dir and sets this.
+    # Default OFF so local cmake / nix develop still runs the wasm ExternalProject.
+    option(PSIBASE_PREBUILT_WASM_SERVICES "Use prebuilt C++ service wasm and schemas (Nix)" OFF)
+    if(PSIBASE_PREBUILT_WASM_SERVICES)
+        message(STATUS "Using prebuilt C++ wasm services")
+        add_custom_target(wasm)
+    else()
     ExternalProject_Add(wasm
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/wasm
         DEPENDS ${wasm-deps} wasm-botan wasm-catch2 psitest
@@ -186,15 +196,18 @@ if(DEFINED WASI_SDK_PREFIX)
             -DUSER_WORKSPACE_TARGET=${USER_WORKSPACE_TARGET}
             -DSYSTEM_WORKSPACE_TARGET=${SYSTEM_WORKSPACE_TARGET}
             -DPSIBASE_PREBUILT_WASM_DEPS=${PSIBASE_PREBUILT_WASM_DEPS}
+            -DBUILD_TESTING=${BUILD_TESTING}
         BUILD_BYPRODUCTS ${WASM_BYPRODUCTS}
     )
     file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"wasm\")\n")
     ExternalProject_Add_StepTargets(wasm test)
     install(CODE "include(${CMAKE_CURRENT_BINARY_DIR}/wasm/cmake_install.cmake)" COMPONENT libpsibase)
+    endif()
 else()
     message(WARNING "WASI_SDK_PREFIX isn't defined; skipping wasm")
 endif()
 
+if(NOT PSIBASE_COMPILE_ONLY)
 # Documentation
 option(BUILD_DOC "Build mdbook docs and Docs.psi" ON)
 if(BUILD_DOC)
@@ -319,6 +332,10 @@ add_rs_component_workspace(packages/:Plugins
 )
 
 include(GNUInstallDirs)
+
+# Nix copies prebuilt psinode/psitest into the build dir and sets this so
+# cargo-psibase packing does not rebuild native C++. Default OFF for local cmake.
+option(PSIBASE_PREBUILT_NATIVE "Use prebuilt psinode/psitest (Nix)" OFF)
 
 # Build service packages
 include(libraries/psibase/sdk/pack_service.cmake)
@@ -1597,6 +1614,7 @@ else()
     )
 endif()
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase TYPE BIN COMPONENT Client)
+endif()
 
 option(BUILD_EXAMPLES "Build examples" ON)
 if(BUILD_EXAMPLES)

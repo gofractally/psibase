@@ -96,6 +96,8 @@ The `psibase` CLI is `nix build .#psibase-cli`. A C++-only change reuses that bi
 
 Wasm plugins from the `packages/` cargo-component workspace (plus component-parser) are `nix build .#psibase-plugins`. A C++-only change reuses those `.wasm` files. Plugins packed by `cargo-psibase` (user/system workspaces) still build in the main derivation.
 
+C++ `psinode`/`psitest` and WASI service wasm are `nix build .#psibase-wasm-services`. A plugin or Yarn UI change reuses that path and only re-packs `.psi` files (`package-index`). `cargo-psibase` rust services still pack in the main derivation.
+
 ```
 result/bin/{psinode,psibase,psitest}
 result/share/psibase/{config.in,packages,wasm}

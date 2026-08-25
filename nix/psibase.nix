@@ -315,6 +315,245 @@ let
       && rel != "flake.lock"
       && !(lib.hasPrefix "nix/" rel);
   };
+
+  # C++ native + WASI services. Fileset drops Yarn UIs and cargo-component
+  # plugins so those changes do not rebuild psinode / service wasm.
+  collectPkgSubdir =
+    cat: sub:
+    let
+      dir = repoRoot + "/packages/${cat}";
+      ents = builtins.readDir dir;
+    in
+    lib.concatMap (
+      name:
+      let
+        p = dir + "/${name}/${sub}";
+      in
+      lib.optional (ents.${name} == "directory" && builtins.pathExists p) p
+    ) (builtins.attrNames ents);
+
+  compileSkip = fileset.unions (
+    collectPkgSubdir "system" "plugin"
+    ++ collectPkgSubdir "user" "plugin"
+    ++ collectPkgSubdir "local" "plugin"
+    ++ collectPkgSubdir "system" "ui"
+    ++ collectPkgSubdir "user" "ui"
+    ++ collectPkgSubdir "local" "ui"
+    ++ [
+      (repoRoot + "/packages/shared-ui")
+      (repoRoot + "/packages/user/CommonApi/common/packages/common-lib")
+      (repoRoot + "/packages/user/CommonApi/common/packages/plugin-tester")
+      (repoRoot + "/packages/user/CommonApi/common/packages/component-parser")
+      (fileset.maybeMissing (repoRoot + "/packages/target"))
+      (fileset.maybeMissing (repoRoot + "/packages/user/target"))
+      (fileset.maybeMissing (repoRoot + "/packages/system/target"))
+    ]
+  );
+
+  compileSrc = fileset.toSource {
+    root = repoRoot;
+    fileset = fileset.difference (fileset.unions [
+      (repoRoot + "/CMakeLists.txt")
+      (repoRoot + "/web-apps.cmake")
+      (repoRoot + "/LICENSE")
+      (repoRoot + "/make_package_index.sh")
+      (repoRoot + "/doc/book.toml.in")
+      (repoRoot + "/libraries")
+      (repoRoot + "/native")
+      (repoRoot + "/programs")
+      (repoRoot + "/wasm")
+      (repoRoot + "/external/CMakeLists.txt")
+      (repoRoot + "/rust/CMakeLists.txt")
+      (repoRoot + "/packages")
+    ]) compileSkip;
+  };
+
+  wasmServices = stdenv.mkDerivation {
+    pname = "psibase-wasm-services";
+    inherit version;
+
+    src = compileSrc;
+
+    nativeBuildInputs = [
+      cmake
+      ninja
+      gnumake
+      pkg-config
+      python3
+      perl
+      git
+      jq
+      xxd
+      unzip
+      zstd
+      binaryen
+      wabt
+    ];
+
+    buildInputs = [
+      boostForCMake
+      openssl
+      zlib
+      zstd
+      icu
+    ];
+
+    hardeningDisable = [ "all" ];
+    dontUseCmakeConfigure = true;
+    dontStrip = true;
+
+    WASI_SDK_PREFIX = wasiSdk;
+    ICU_ROOT = icu;
+
+    disallowedReferences = [ wasiSdk ];
+
+    postUnpack = ''
+      mkdir -p "$sourceRoot/external"
+      rm -rf "$sourceRoot/external/Catch2" "$sourceRoot/external/eos-vm" "$sourceRoot/external/rapidjson"
+      mkdir -p "$sourceRoot/external/Catch2" "$sourceRoot/external/eos-vm" "$sourceRoot/external/rapidjson"
+      cp -a ${catch2Src}/. "$sourceRoot/external/Catch2/"
+      cp -a ${eosVmSrc}/. "$sourceRoot/external/eos-vm/"
+      cp -a ${rapidjsonSrc}/. "$sourceRoot/external/rapidjson/"
+      chmod -R u+w "$sourceRoot/external"
+    '';
+
+    postPatch = ''
+      python3 ${./offline-wasm-deps.py}
+
+      substituteInPlace wasm/CMakeLists.txt \
+        --replace-fail \
+          "set(DEP_URL https://github.com/gofractally/psibase/releases/download/deps)" \
+          "set(DEP_URL ${wasmDepTarballs})"
+
+      substituteInPlace wasm/boost/CMakeLists.txt \
+        --replace-fail \
+          "https://github.com/gofractally/psibase/releases/download/deps/boost_1_81_0.tar.bz2" \
+          "${wasmDepTarballs}/boost_1_81_0.tar.bz2"
+
+      substituteInPlace CMakeLists.txt \
+        --replace-fail \
+          "URL https://github.com/gofractally/psibase/releases/download/deps/Botan-3.1.1.tar.xz" \
+          "URL ${botanTarball}"
+
+      substituteInPlace CMakeLists.txt \
+        --replace-fail \
+          "CONFIGURE_COMMAND <SOURCE_DIR>/configure.py" \
+          "CONFIGURE_COMMAND python3 <SOURCE_DIR>/configure.py"
+
+      substituteInPlace wasm/CMakeLists.txt \
+        --replace-fail \
+          "./Configure linux-generic32" \
+          "perl Configure linux-generic32"
+
+      substituteInPlace wasm/CMakeLists.txt \
+        --replace-fail \
+          "set(WASM_FEATURES -msign-ext -mnontrapping-fptoint -msimd128 -mbulk-memory)" \
+          "set(WASM_FEATURES -msign-ext -mnontrapping-fptoint -msimd128 -mbulk-memory -mno-reference-types)"
+
+      substituteInPlace CMakeLists.txt \
+        --replace-fail \
+          "-DBUILD_RELEASE_WASM=ON" \
+          "-DBUILD_RELEASE_WASM=ON -DCMAKE_CXX_SCAN_FOR_MODULES=OFF -DCMAKE_C_FLAGS= -DCMAKE_CXX_FLAGS="
+    '';
+
+    configurePhase = ''
+      runHook preConfigure
+      export HOME=$NIX_BUILD_TOP/home
+      export TMPDIR=$NIX_BUILD_TOP/tmp
+      mkdir -p "$HOME" "$TMPDIR"
+
+      unset NIX_LDFLAGS NIX_LDFLAGS_BEFORE NIX_CFLAGS_LINK LD_LIBRARY_PATH
+      unset NIX_CFLAGS_COMPILE NIX_CFLAGS_COMPILE_BEFORE CFLAGS CXXFLAGS LDFLAGS
+      export NIX_LDFLAGS="-L${icu}/lib -L${openssl.out}/lib -L${zlib}/lib -L${zstd}/lib"
+      export CMAKE_PREFIX_PATH="${boostForCMake}:${lib.getDev openssl}:${lib.getLib openssl}:${lib.getDev icu}:${icu}"
+      export CMAKE_IGNORE_PATH="/usr/lib:/usr/lib64"
+      export CMAKE_SYSTEM_IGNORE_PATH="/usr/lib:/usr/lib64"
+      export ICU_LIBRARY_DIR="${icu}/lib"
+      export BOOST_LIBRARYDIR="${boostForCMake}/lib"
+      export BOOST_INCLUDEDIR="${boostForCMake}/include"
+
+      mkdir -p build/wasm/deps build/wasm/boost
+      cp -a ${wasmDeps}/. build/wasm/deps/
+      chmod -R u+w build/wasm/deps
+      rm -rf build/wasm/deps/boost
+      cp -a ${wasmDeps}/boost/. build/wasm/boost/
+      chmod -R u+w build/wasm/boost
+      cd build
+      cmake -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=$NIX_BUILD_TOP/psidk \
+        -DBUILD_DEBUG_WASM=OFF \
+        -DBUILD_EXAMPLES=OFF \
+        -DBUILD_TESTING=OFF \
+        -DBUILD_DOC=OFF \
+        -DENABLE_SSL=ON \
+        -DWASI_SDK_PREFIX=${wasiSdk} \
+        -DICU_LIBRARY_DIR=${icu}/lib \
+        -DCMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH" \
+        -DCMAKE_IGNORE_PATH=/usr/lib:/usr/lib64 \
+        -DCMAKE_SYSTEM_IGNORE_PATH=/usr/lib:/usr/lib64 \
+        -DFORCE_COLORED_OUTPUT=OFF \
+        -DPSIBASE_PREBUILT_WASM_DEPS=ON \
+        -DPSIBASE_COMPILE_ONLY=ON \
+        ..
+      runHook postConfigure
+    '';
+
+    buildPhase = ''
+      runHook preBuild
+      cd "$NIX_BUILD_TOP/$sourceRoot/build"
+      ninja -j$NIX_BUILD_CORES wasm psinode
+      runHook postBuild
+    '';
+
+    installPhase = ''
+      runHook preInstall
+      cd "$NIX_BUILD_TOP/$sourceRoot/build"
+      install -Dm755 psinode "$out/bin/psinode"
+      install -Dm755 psitest "$out/bin/psitest"
+      mkdir -p "$out/service-wasm"
+      shopt -s nullglob
+      cp -a *.wasm *-schema.json "$out/service-wasm/"
+      if [ -f share/psibase/config.in ]; then
+        install -Dm644 share/psibase/config.in "$out/share/psibase/config.in"
+      fi
+      if [ -d share/psibase/wasm ]; then
+        mkdir -p "$out/share/psibase/wasm"
+        cp -a share/psibase/wasm/. "$out/share/psibase/wasm/"
+      fi
+      runHook postInstall
+    '';
+
+    doInstallCheck = true;
+    installCheckPhase = ''
+      runHook preInstallCheck
+      psinodeVersion=$($out/bin/psinode --version 2>&1 || true)
+      echo "psinode --version: $psinodeVersion"
+      case "$psinodeVersion" in
+        "psinode "*) ;;
+        *)
+          echo "unexpected psinode --version output" >&2
+          exit 1
+          ;;
+      esac
+      for f in Transact.wasm Accounts.wasm Transact-schema.json Accounts-schema.json; do
+        if [ ! -s "$out/service-wasm/$f" ]; then
+          echo "missing compiled service: $f" >&2
+          exit 1
+        fi
+      done
+      runHook postInstallCheck
+    '';
+
+    meta = {
+      description = "psibase C++ native node and WASI service wasm";
+      license = lib.licenses.mit;
+      platforms = [
+        "x86_64-linux"
+        "aarch64-linux"
+      ];
+    };
+  };
 in
 stdenv.mkDerivation {
   pname = "psibase";
@@ -492,9 +731,10 @@ stdenv.mkDerivation {
 
     mkdir -p build/wasm/deps build/wasm/boost
     cp -a ${wasmDeps}/. build/wasm/deps/
+    chmod -R u+w build/wasm/deps
     rm -rf build/wasm/deps/boost
     cp -a ${wasmDeps}/boost/. build/wasm/boost/
-    chmod -R u+w build/wasm/deps build/wasm/boost
+    chmod -R u+w build/wasm/boost
     cd build
     cmake -G Ninja \
       -DCMAKE_BUILD_TYPE=Release \
@@ -514,6 +754,8 @@ stdenv.mkDerivation {
       -DPSIBASE_PREBUILT_WASM_DEPS=ON \
       -DPSIBASE_PREBUILT_CLI=ON \
       -DPSIBASE_PREBUILT_PLUGINS=ON \
+      -DPSIBASE_PREBUILT_WASM_SERVICES=ON \
+      -DPSIBASE_PREBUILT_NATIVE=ON \
       ..
 
     runHook postConfigure
@@ -522,35 +764,41 @@ stdenv.mkDerivation {
   buildPhase = ''
     runHook preBuild
     cd "$NIX_BUILD_TOP/$sourceRoot/build"
-    mkdir -p rust/release components
+    mkdir -p rust/release components share/psibase/wasm
     cp ${psibaseCli}/bin/psibase rust/release/psibase
     cp ${psibasePlugins}/*.wasm components/
-    ninja -j$NIX_BUILD_CORES \
-      package-index psinode psitest \
-      psibase-create-snapshot psibase-load-snapshot
+    cp ${wasmServices}/bin/psinode psinode
+    cp ${wasmServices}/bin/psitest psitest
+    cp -a ${wasmServices}/service-wasm/. .
+    if [ -d ${wasmServices}/share/psibase/wasm ]; then
+      cp -a ${wasmServices}/share/psibase/wasm/. share/psibase/wasm/
+    fi
+    chmod -R u+w .
+    ninja -j$NIX_BUILD_CORES package-index
     runHook postBuild
   '';
 
   installPhase = ''
     runHook preInstall
     cd "$NIX_BUILD_TOP/$sourceRoot/build"
-    cmake --install . --prefix "$NIX_BUILD_TOP/psidk"
-    prefix=$NIX_BUILD_TOP/psidk
-
-    for prog in psinode psibase psitest; do
-      install -Dm755 "$prefix/bin/$prog" "$out/bin/$prog"
-    done
+    install -Dm755 ${wasmServices}/bin/psinode "$out/bin/psinode"
+    install -Dm755 ${wasmServices}/bin/psitest "$out/bin/psitest"
+    install -Dm755 ${psibaseCli}/bin/psibase "$out/bin/psibase"
 
     mkdir -p $out/share/psibase
-    install -Dm644 "$prefix/share/psibase/config.in" $out/share/psibase/config.in
-    cp -a "$prefix/share/psibase/packages" $out/share/psibase/packages
-    cp -a "$prefix/share/psibase/wasm" $out/share/psibase/wasm
-
-    if [ -d "$prefix/share/psibase/licenses" ]; then
-      cp -a "$prefix/share/psibase/licenses" $out/share/psibase/licenses
+    install -Dm644 ${wasmServices}/share/psibase/config.in $out/share/psibase/config.in
+    cp -a share/psibase/packages $out/share/psibase/packages
+    if [ -d ${wasmServices}/share/psibase/wasm ]; then
+      cp -a ${wasmServices}/share/psibase/wasm $out/share/psibase/wasm
+    elif [ -d share/psibase/wasm ]; then
+      cp -a share/psibase/wasm $out/share/psibase/wasm
     fi
-    if [ -d "$prefix/share/man" ]; then
-      cp -a "$prefix/share/man" $out/share/man
+
+    if [ -d share/psibase/licenses ]; then
+      cp -a share/psibase/licenses $out/share/psibase/licenses
+    fi
+    if [ -d share/man ]; then
+      cp -a share/man $out/share/man
     fi
 
     chmod -R u+w "$out"/bin
@@ -591,7 +839,16 @@ stdenv.mkDerivation {
   '';
 
   passthru = {
-    inherit yarnOfflineCache cargoVendor wasmDepTarballs wasmDeps yarnUis psibaseCli psibasePlugins;
+    inherit
+      yarnOfflineCache
+      cargoVendor
+      wasmDepTarballs
+      wasmDeps
+      yarnUis
+      psibaseCli
+      psibasePlugins
+      wasmServices
+      ;
   };
 
   meta = with lib; {

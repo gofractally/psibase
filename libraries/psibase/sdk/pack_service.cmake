@@ -427,6 +427,11 @@ function(cargo_psibase_package)
             --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/Cargo.toml)
     endif()
 
+    set(_ext_depends ${ARG_DEPENDS} cargo-psibase)
+    if(NOT PSIBASE_PREBUILT_NATIVE)
+        list(APPEND _ext_depends psitest)
+    endif()
+
     # Build the package if needed
     ExternalProject_Add(${TARGET_NAME}_ext
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}
@@ -435,7 +440,7 @@ function(cargo_psibase_package)
         BUILD_COMMAND ${BUILD_CMD}
         INSTALL_COMMAND ""
         BUILD_ALWAYS 1
-        DEPENDS ${ARG_DEPENDS} cargo-psibase psitest
+        DEPENDS ${_ext_depends}
     )
 
     add_custom_command(
