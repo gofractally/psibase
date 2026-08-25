@@ -1,11 +1,23 @@
 # A function that can be used to add a new target that builds a wasm component from rust
 set(COMPONENT_BIN_DIR ${CMAKE_CURRENT_BINARY_DIR}/components)
+# Nix copies prebuilt *.wasm into build/components/ and sets this. Default OFF
+# so local cmake / nix develop still runs cargo component.
+option(PSIBASE_PREBUILT_PLUGINS "Use prebuilt cargo-component wasm plugins (Nix)" OFF)
+
 function(add_rs_component TARGET_TUPLE OUTPUT_FILE TARGET_ARCH)
     cmake_parse_arguments(ARG "" "SHARED_TARGET_DIR" "" ${ARGN})
 
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${TARGET_TUPLE})
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 TARGET_NAME ${TARGET_TUPLE})
     set(OUTPUT_FILEPATH ${COMPONENT_BIN_DIR}/${OUTPUT_FILE})
+    set(${TARGET_NAME}_OUTPUT_FILE ${OUTPUT_FILE} PARENT_SCOPE)
+    set(${TARGET_NAME}_DEP ${TARGET_NAME} ${OUTPUT_FILEPATH} PARENT_SCOPE)
+
+    if(PSIBASE_PREBUILT_PLUGINS)
+        message(STATUS "Using prebuilt ${TARGET_NAME}")
+        add_custom_target(${TARGET_NAME})
+        return()
+    endif()
 
     if(ARG_SHARED_TARGET_DIR AND NOT ARG_SHARED_TARGET_DIR STREQUAL "false")
         set(TARGET_DIR ${CMAKE_CURRENT_BINARY_DIR}/plugins)
@@ -25,10 +37,6 @@ function(add_rs_component TARGET_TUPLE OUTPUT_FILE TARGET_ARCH)
         BUILD_ALWAYS 1
         INSTALL_COMMAND ""
     )
-
-    # Expose `${TARGET_NAME}` and its dependency to the parent scope for further use
-    set(${TARGET_NAME}_DEP ${TARGET_NAME} ${OUTPUT_FILEPATH} PARENT_SCOPE)
-    set(${TARGET_NAME}_OUTPUT_FILE ${OUTPUT_FILE} PARENT_SCOPE)
 endfunction()
 
 
@@ -52,6 +60,14 @@ function(add_rs_component_workspace TARGET_TUPLE)
         list(APPEND OUTPUT_FILEPATHS ${COMPONENT_BIN_DIR}/${FILENAME})
         list(APPEND OUTPUT_FILES ${FILENAME})
     endforeach()
+
+    set(${TARGET_NAME}_DEP ${TARGET_NAME} PARENT_SCOPE)
+
+    if(PSIBASE_PREBUILT_PLUGINS)
+        message(STATUS "Using prebuilt ${TARGET_NAME}")
+        add_custom_target(${TARGET_NAME})
+        return()
+    endif()
 
     set(TARGET_DIR ${CMAKE_CURRENT_BINARY_DIR}/plugin_workspaces/${TARGET_NAME})
     set(TARGET_ARCH wasm32-wasip1)
@@ -77,7 +93,4 @@ function(add_rs_component_workspace TARGET_TUPLE)
         BUILD_ALWAYS 1
         INSTALL_COMMAND ""
     )
-
-    # Expose the target name to the caller of this function
-    set(${TARGET_NAME}_DEP ${TARGET_NAME} PARENT_SCOPE)
 endfunction()

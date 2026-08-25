@@ -439,6 +439,7 @@
         packages.default = psibasePkg;
         packages.wasi-sdk = wasiSdk;
         packages.psibase-cli = psibaseUnfixed.passthru.psibaseCli;
+        packages.psibase-plugins = psibaseUnfixed.passthru.psibasePlugins;
         packages.psibase-wasm-deps = psibaseUnfixed.passthru.wasmDeps;
         packages.psibase-yarn-uis = pkgs.linkFarm "psibase-yarn-uis" (
           pkgs.lib.mapAttrsToList (name: drv: {

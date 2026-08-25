@@ -94,6 +94,8 @@ The Nix package builds `package-index` plus `psinode`/`psitest`/snapshot tools (
 
 The `psibase` CLI is `nix build .#psibase-cli`. A C++-only change reuses that binary.
 
+Wasm plugins from the `packages/` cargo-component workspace (plus component-parser) are `nix build .#psibase-plugins`. A C++-only change reuses those `.wasm` files. Plugins packed by `cargo-psibase` (user/system workspaces) still build in the main derivation.
+
 ```
 result/bin/{psinode,psibase,psitest}
 result/share/psibase/{config.in,packages,wasm}
