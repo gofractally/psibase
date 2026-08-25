@@ -488,6 +488,7 @@ stdenv.mkDerivation {
       -DBUILD_DEBUG_WASM=OFF \
       -DBUILD_EXAMPLES=OFF \
       -DBUILD_TESTING=OFF \
+      -DBUILD_DOC=OFF \
       -DENABLE_SSL=ON \
       -DWASI_SDK_PREFIX=${wasiSdk} \
       -DICU_LIBRARY_DIR=${icu}/lib \
@@ -505,7 +506,9 @@ stdenv.mkDerivation {
   buildPhase = ''
     runHook preBuild
     cd "$NIX_BUILD_TOP/$sourceRoot/build"
-    ninja -j$NIX_BUILD_CORES
+    ninja -j$NIX_BUILD_CORES \
+      package-index rust psinode psitest \
+      psibase-create-snapshot psibase-load-snapshot
     runHook postBuild
   '';
 

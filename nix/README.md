@@ -90,6 +90,8 @@ Yarn UIs (except XAdmin) are separate store paths (`nix build .#psibase-yarn-uis
 
 Wasm third-party libs (Botan, OpenSSL, zlib, gmp) are `nix build .#psibase-wasm-deps`. A service-code change reuses that path and skips those WASI compiles.
 
+The Nix package builds `package-index` plus `psinode`/`psitest`/`psibase`/snapshot tools (`-DBUILD_DOC=OFF`). It does not ninja `all`, so mdbook, gen-cpp-doc, man pages, and tester packages are skipped. `cargo-psibase` and `reserved-names` still run because the package index needs them.
+
 ```
 result/bin/{psinode,psibase,psitest}
 result/share/psibase/{config.in,packages,wasm}

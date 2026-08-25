@@ -196,6 +196,8 @@ else()
 endif()
 
 # Documentation
+option(BUILD_DOC "Build mdbook docs and Docs.psi" ON)
+if(BUILD_DOC)
 ExternalProject_Add(
     gen-cpp-doc
     DEPENDS             wasm
@@ -204,6 +206,7 @@ ExternalProject_Add(
     BUILD_COMMAND       cargo build -r --bin gen-cpp-doc --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
     INSTALL_COMMAND     ""
 )
+endif()
 ExternalProject_Add(
     md2man
     SOURCE_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/rust
@@ -232,6 +235,7 @@ file(GLOB_RECURSE doc-cpp ${CMAKE_CURRENT_SOURCE_DIR}/doc/src/development/servic
 file(GLOB_RECURSE doc-cmake doc/src/development/services/cpp-service/*/CMakeLists.txt)
 file(GLOB doc-headers libraries/psibase/common/include/psibase/*.hpp)
 file(GLOB doc-service-headers packages/*/*/include/services/*/*.hpp)
+if(BUILD_DOC)
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/book/html/index.html
     BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/book/html
@@ -245,6 +249,7 @@ add_custom_target(
     doc
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/book/html/index.html
 )
+endif()
 
 function(add_manpage name)
     add_custom_command(
@@ -253,7 +258,7 @@ function(add_manpage name)
         COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/md2man < ${CMAKE_CURRENT_SOURCE_DIR}/doc/src/run-infrastructure/cli/${name}.md > ${CMAKE_CURRENT_BINARY_DIR}/doc/${name}.1
     )
     add_custom_target(${name}.1 ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/doc/${name}.1)
-    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/doc/${name}.1 TYPE MAN COMPONENT Client)
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/doc/${name}.1 TYPE MAN COMPONENT Client OPTIONAL)
 endfunction()
 
 add_manpage(psinode)
@@ -737,6 +742,7 @@ psibase_package(
     DEPENDS wasm
 )
 
+if(BUILD_DOC)
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Docs.psi
     NAME Docs
@@ -747,6 +753,7 @@ psibase_package(
     PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
     DEPENDS doc ${CMAKE_CURRENT_BINARY_DIR}/book/html/index.html
 )
+endif()
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/DynLd.psi
@@ -1323,9 +1330,13 @@ function(write_package_index target dir reserve)
     add_custom_target(${target} ALL DEPENDS ${dir}/index.json)
 endfunction()
 
+set(_PSIBASE_DOC_PACKAGES)
+if(BUILD_DOC)
+    list(APPEND _PSIBASE_DOC_PACKAGES Docs)
+endif()
 write_package_index(package-index ${SERVICE_DIR} 1
     Accounts AccountsService Aes AuthAny AuthDyn AuthDelegate AuthDelegateService AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
-    Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry
+    ${_PSIBASE_DOC_PACKAGES} DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage VirtualServer WebCrypto Workshop Config
     XAdmin XBasic XDb XDefault XHttp XPackages XPeers XProxy XRun XSites XTimer XTransact)
 
@@ -1354,7 +1365,6 @@ install(
           ${SERVICE_DIR}/ProdWithFG.psi
           ${SERVICE_DIR}/CpuLimit.psi
           ${SERVICE_DIR}/Db.psi
-          ${SERVICE_DIR}/Docs.psi
           ${SERVICE_DIR}/DynLd.psi
           ${SERVICE_DIR}/Events.psi
           ${SERVICE_DIR}/EventsService.psi
@@ -1416,6 +1426,12 @@ install(
           ${SERVICE_DIR}/XTransact.psi
     DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/packages/
     COMPONENT ServerData)
+if(BUILD_DOC)
+    install(
+        FILES ${SERVICE_DIR}/Docs.psi
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/packages/
+        COMPONENT ServerData)
+endif()
 
 psibase_package(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/PSubjective.psi
