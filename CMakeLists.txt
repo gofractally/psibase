@@ -1582,15 +1582,20 @@ ExternalProject_Add(
     INSTALL_COMMAND ""
 )
 
-ExternalProject_Add(
-    rust
-    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/rust
-    BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase
-    CONFIGURE_COMMAND ""
-    BUILD_COMMAND   cargo build -r --bin psibase --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
-    BUILD_ALWAYS 1
-    INSTALL_COMMAND ""
-)
+option(PSIBASE_PREBUILT_CLI "Use a prebuilt rust/psibase CLI (Nix)" OFF)
+if(PSIBASE_PREBUILT_CLI)
+    add_custom_target(rust)
+else()
+    ExternalProject_Add(
+        rust
+        SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/rust
+        BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase
+        CONFIGURE_COMMAND ""
+        BUILD_COMMAND   cargo build -r --bin psibase --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+        BUILD_ALWAYS 1
+        INSTALL_COMMAND ""
+    )
+endif()
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase TYPE BIN COMPONENT Client)
 
 option(BUILD_EXAMPLES "Build examples" ON)

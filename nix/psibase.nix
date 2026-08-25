@@ -261,6 +261,10 @@ let
     dontFixup = true;
   };
 
+  psibaseCli = callPackage ./psibase-cli.nix {
+    inherit rustToolchain cargoVendor version llvmPackages;
+  };
+
   yarnUis = callPackage ./yarn-uis.nix {
     inherit
       yarnBerry
@@ -498,6 +502,7 @@ stdenv.mkDerivation {
       -DFORCE_COLORED_OUTPUT=OFF \
       -DPSIBASE_PREBUILT_UI=ON \
       -DPSIBASE_PREBUILT_WASM_DEPS=ON \
+      -DPSIBASE_PREBUILT_CLI=ON \
       ..
 
     runHook postConfigure
@@ -506,8 +511,10 @@ stdenv.mkDerivation {
   buildPhase = ''
     runHook preBuild
     cd "$NIX_BUILD_TOP/$sourceRoot/build"
+    mkdir -p rust/release
+    cp ${psibaseCli}/bin/psibase rust/release/psibase
     ninja -j$NIX_BUILD_CORES \
-      package-index rust psinode psitest \
+      package-index psinode psitest \
       psibase-create-snapshot psibase-load-snapshot
     runHook postBuild
   '';
@@ -572,7 +579,7 @@ stdenv.mkDerivation {
   '';
 
   passthru = {
-    inherit yarnOfflineCache cargoVendor wasmDepTarballs wasmDeps yarnUis;
+    inherit yarnOfflineCache cargoVendor wasmDepTarballs wasmDeps yarnUis psibaseCli;
   };
 
   meta = with lib; {
