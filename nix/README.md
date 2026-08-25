@@ -75,8 +75,41 @@ nix develop -c cursor /path/to/your.code-workspace
 
 Or use a wrapper script (see `~/repos/cursor-workspaces/cursor-psibase-via-nix.sh`).
 
-## 3. Build and Launch psibase
-Build or Launch with the tasks.json buttons or by running the same command at the nix shell
+## 3. Build a runtime package (`nix build`)
+
+From the repo root, with no extra tools beyond Nix:
+
+```bash
+nix build
+# or: nix build .#psibase
+```
+
+This compiles psibase from source (C++, Rust, WASM, Yarn UIs) and installs the runtime layout:
+
+```
+result/bin/{psinode,psibase,psitest}
+result/share/psibase/{config.in,packages,wasm}
+```
+
+That layout matches [psibase-nix](https://github.com/gofractally/psibase-nix) (`services.psibase.package`). First run vendors Cargo/Yarn into fixed-output derivations (network allowed only there); later builds are offline and sandboxed.
+
+`nix develop` is the contributor loop (edit, incremental `cmake --build` into `./build`). `nix build` is the reproducible package (`result/` → `/nix/store/…`). Do not mix them: Nix never writes the package into `./build`.
+
+## 4. Run a chain from the Nix package
+
+Launch/Continue (`launch.sh`) and `nix develop` use `build/psidk/bin` when that cmake tree exists, otherwise `result/bin` from `nix build`. Incremental edits therefore win over a stale package.
+
+```bash
+nix build
+.editor-shared/scripts/launch.sh          # needs HOST_IP; nix develop sets 127.0.0.1
+# or:
+nix run . -- /path/to/db -p myprod -l 8080
+```
+
+`nix run` always runs the store package (and will full-rebuild it if inputs changed). It does not use `./build`.
+
+## 5. Build and Launch (cmake, inside nix develop)
+Build or Launch with the tasks.json buttons or by running the same command at the nix shell. This uses `./build` and is the fast edit loop, not the packaged store path.
 
 # Environment variables set by the shell
 
@@ -91,7 +124,8 @@ Build or Launch with the tasks.json buttons or by running the same command at th
 
 # Troubleshooting
 
-- **First nix build fails**: Try wiping your build/ dir to regenerate caches
+- **Launch uses cmake instead of the Nix package**: `launch.sh` prefers `build/psidk/bin` when it exists. Use `./result/bin/psinode` or `nix run` to run the packaged node.
+- **psinode not found**: Run `nix build` (package) or `build.sh` inside `nix develop` (incremental cmake).
 - **"command not found"** at the cli: Ensure you're in a `nix develop` shell.
 - **Wrong cargo tool versions**: cargo tools are pinned and provided by the flake. If `which cargo-component` does not point at the right thing, a host-installed copy may be shadowing it on `PATH`
 - **ICU / ABI errors**: Ensure you're in the Nix shell and do a clean build (`rm -rf build && mkdir build`). The flake sets `ICU_ROOT` and `CMAKE_IGNORE_PATH` to avoid picking up system ICU from `/usr/lib`.
@@ -108,6 +142,7 @@ nix develop
 # Files
 
 - `flake.nix` / `flake.lock` — Nix flake at repo root
+- `nix/psibase.nix` — from-source `packages.psibase` / `packages.default`
 - `nix/rust-toolchain.toml` — Rust version and targets
 
 # Relationship to Docker

@@ -44,3 +44,5 @@ target/
 .clangd
 AGENTS.md
 .direnv
+/result
+/result-*

@@ -39,5 +39,8 @@ if [ -z "$HOST_IP" ]; then
 fi
 
 
+# shellcheck source=resolve-runtime.sh
+source "$SCRIPT_DIR/resolve-runtime.sh"
+
 rm -rf "$PROJECT_ROOT/db"
-PSIBASE_ADMIN_IP=$HOST_IP exec psinode "$PROJECT_ROOT/db" -p "$PRODUCER" -l "$PORT"
+PSIBASE_ADMIN_IP=$HOST_IP exec "$PSINODE" "$PROJECT_ROOT/db" -p "$PRODUCER" -l "$PORT"

@@ -39,4 +39,7 @@ if [ -z "$HOST_IP" ]; then
     exit 1
 fi
 
-PSIBASE_ADMIN_IP=$HOST_IP exec psinode "$PROJECT_ROOT/db" -p "$PRODUCER" -l "$PORT"
+# shellcheck source=resolve-runtime.sh
+source "$SCRIPT_DIR/resolve-runtime.sh"
+
+PSIBASE_ADMIN_IP=$HOST_IP exec "$PSINODE" "$PROJECT_ROOT/db" -p "$PRODUCER" -l "$PORT"

@@ -243,6 +243,97 @@
           gdb
         ];
 
+        psibaseUnfixed = pkgs.callPackage ./nix/psibase.nix {
+          inherit
+            rustToolchain
+            wasiSdk
+            yarnBerry
+            cargoComponent
+            wasmPack
+            wasmTools
+            mdbook
+            mdbookMermaid
+            mdbookPagetoc
+            mdbookPlugins
+            mdbookLinkcheck
+            boostForCMake
+            llvmPackages
+            nodejs20
+            ;
+          src = self;
+        };
+
+        # LLVM 21 emits call_indirect with a LEB table index; eos-vm requires a
+        # single 0x00 byte. Rewrite packed service wasm without a full rebuild.
+        psibasePkg = pkgs.stdenvNoCC.mkDerivation {
+          pname = "psibase";
+          inherit (psibaseUnfixed) version meta passthru;
+          dontUnpack = true;
+          nativeBuildInputs = [
+            pkgs.binaryen
+            pkgs.unzip
+            pkgs.zip
+          ];
+          # Keep runtime libs as inputs so copied ELF RPATHs stay live refs.
+          buildInputs = [
+            pkgs.openssl
+            pkgs.zlib
+            pkgs.stdenv.cc.cc
+          ];
+          disallowedReferences = [
+            rustToolchain
+            wasiSdk
+          ];
+          installPhase = ''
+            runHook preInstall
+            mkdir -p $out
+            cp -a ${psibaseUnfixed}/. $out/
+            chmod -R u+w $out
+            bash ${./nix/fix-psi-wasm.sh} "$out"
+            runHook postInstall
+          '';
+          doInstallCheck = true;
+          installCheckPhase = ''
+            runHook preInstallCheck
+            $out/bin/psibase --version
+            psinodeVersion=$($out/bin/psinode --version 2>&1 || true)
+            echo "psinode --version: $psinodeVersion"
+            case "$psinodeVersion" in
+              "psinode "*) ;;
+              *)
+                echo "unexpected psinode --version output" >&2
+                exit 1
+                ;;
+            esac
+            db=$TMPDIR/psinode-check-db
+            rm -rf "$db"
+            if $out/bin/psinode "$db" -p checkprod -l 18080 >$TMPDIR/psinode-check.log 2>&1 &
+            then
+              pid=$!
+              for i in 1 2 3 4 5 6 7 8; do
+                if ! kill -0 "$pid" 2>/dev/null; then
+                  break
+                fi
+                sleep 0.5
+              done
+              if kill -0 "$pid" 2>/dev/null; then
+                kill "$pid" 2>/dev/null || true
+                wait "$pid" || true
+              else
+                wait "$pid" || true
+                echo "psinode exited during package load:" >&2
+                cat $TMPDIR/psinode-check.log >&2
+                exit 1
+              fi
+            else
+              echo "psinode failed to start:" >&2
+              cat $TMPDIR/psinode-check.log >&2
+              exit 1
+            fi
+            runHook postInstallCheck
+          '';
+        };
+
       in
       {
         devShells.default = pkgs.mkShell {
@@ -292,7 +383,8 @@
               PSIBASE_ROOT="$(pwd)"
             fi
             export PSIBASE_ROOT
-            export PATH="$PSIBASE_ROOT/build/psidk/bin:$PATH"
+            # Incremental cmake first; `result/` (nix build) only if there is no local tree.
+            export PATH="$PSIBASE_ROOT/build/psidk/bin:$PSIBASE_ROOT/result/bin:$PATH"
             export PATH="$PSIBASE_ROOT/build/rust/release:$PATH"
             export PATH="$PSIBASE_ROOT/build:$PATH"
 
@@ -343,7 +435,26 @@
           '';
         };
 
+        packages.psibase = psibasePkg;
+        packages.default = psibasePkg;
         packages.wasi-sdk = wasiSdk;
+
+        apps.psinode = {
+          type = "app";
+          program = "${psibasePkg}/bin/psinode";
+        };
+        apps.psibase = {
+          type = "app";
+          program = "${psibasePkg}/bin/psibase";
+        };
+        apps.psitest = {
+          type = "app";
+          program = "${psibasePkg}/bin/psitest";
+        };
+        apps.default = {
+          type = "app";
+          program = "${psibasePkg}/bin/psinode";
+        };
       }
     );
 }

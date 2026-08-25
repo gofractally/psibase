@@ -41,5 +41,8 @@ if [ -z "$HOST_IP" ]; then
     exit 1
 fi
 
+# shellcheck source=resolve-runtime.sh
+source "$SCRIPT_DIR/resolve-runtime.sh"
+
 rm -rf "$PROJECT_ROOT/db"
-PSIBASE_ADMIN_IP=$HOST_IP exec psinode "$PROJECT_ROOT/db" -p "$PRODUCER" -l "$PORT" --pkcs11-module="$PKCS11_MODULE"
+PSIBASE_ADMIN_IP=$HOST_IP exec "$PSINODE" "$PROJECT_ROOT/db" -p "$PRODUCER" -l "$PORT" --pkcs11-module="$PKCS11_MODULE"
