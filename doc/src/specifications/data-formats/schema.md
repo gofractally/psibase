@@ -159,10 +159,6 @@ A String used where a type is expected will be treated as a named type. The actu
 
 A schema includes a map of named types. This is required to allow recursive type definitions. Type names that begin with "@" are internal to the schema and MAY be renamed any time the schema is processed.
 
-## TODO
-
-- tables
-
 ## Schema Schema
 
 The schema schema defines both the JSON format and the binary (fracpack) format of schemas.
