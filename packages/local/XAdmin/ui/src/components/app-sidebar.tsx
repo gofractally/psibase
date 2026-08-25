@@ -79,7 +79,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     </SidebarMenu>
                 </SidebarGroup>
                 <SidebarGroup>
-                    <SidebarGroupLabel>Network Admin</SidebarGroupLabel>
+                    <SidebarGroupLabel>Network Admin.</SidebarGroupLabel>
                     <SidebarMenu>
                         <SidebarMenuItem>
                             <Link
