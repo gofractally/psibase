@@ -150,6 +150,8 @@ These custom types are used by psibase
 | AccountNumber | u64                                                             | String            |
 | TimePointSec  | Any integer type representing seconds since the UNIX epoch      | ISO 8601 Extended |
 | TimePointUSec | Any integer type representing microseconds since the UNIX epoch | ISO 8601 Extended |
+| ServiceMethod | Object containing two u64 fields                                |                   |
+| Action        | sender, service, method, rawData                                | Unpacked data     |
 
 ### Named Type
 
