@@ -141,13 +141,24 @@ std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::in
    }
    else
    {
+      // Load any configured upstream first so bypass prefixes can short-circuit
+      // before we touch HttpServer (e.g. /common should fall through to the
+      // normal HttpServer/common-api path).
+      auto                           table = open<OriginServerTable>();
+      std::optional<OriginServerRow> originServer;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         originServer = table.get(subdomain);
+      }
+      if (originServer && originServer->bypassPrefixes &&
+          pathMatchesBypassPrefix(req.path(), *originServer->bypassPrefixes))
+         return {};
+
       // Try the server registered in HttpServer
       // This allows RPC calls to be handled by the registered server
-      if (auto registered = HttpServer::Tables(HttpServer::service, KvMode::read)
-                                .open<RegServTable>()
-                                .get(subdomain))
+      if (auto registered = to<HttpServer>().getServer(subdomain))
       {
-         to<XHttp>().giveSocket(*socket, registered->server, false);
+         to<XHttp>().giveSocket(*socket, *registered, false);
 
          auto user = to<RTransact>().getUser(req);
 
@@ -156,7 +167,7 @@ std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::in
          req.removeCookie("SESSION");
          std::erase_if(req.headers, [](auto& header) { return header.matches("authorization"); });
          auto reply = from(HttpServer::service)
-                          .to<ServerInterface>(registered->server)
+                          .to<ServerInterface>(*registered)
                           .serveSys(req, socket, user);
 
          if (!to<XHttp>().takeSocket(*socket, false))
@@ -164,49 +175,39 @@ std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::in
          if (reply)
             return reply;
       }
-   }
 
-   // Try the upstream server
-   auto                           table = open<OriginServerTable>();
-   std::optional<OriginServerRow> originServer;
-   PSIBASE_SUBJECTIVE_TX
-   {
-      originServer = table.get(subdomain);
-   }
-   if (originServer)
-   {
-      if (originServer->bypassPrefixes &&
-          pathMatchesBypassPrefix(req.path(), *originServer->bypassPrefixes))
-         return {};
-
-      if (auto originUrl = psibase::splitURL(originServer->host); !originUrl.scheme.empty())
+      // Try the upstream server
+      if (originServer)
       {
-         if (!originUrl.host.empty())
-            req.host = originUrl.host;
-         req.target = joinPath(originUrl.path, req.target);
-      }
-      else
-      {
-         req.host = originServer->host;
-      }
-      std::int32_t          upstream;
-      psibase::MethodNumber callback;
-      if (isWebSocketHandshake(req))
-      {
-         upstream = to<XHttp>().websocket(req, originServer->tls, originServer->endpoint);
-         callback = MethodNumber{"onAccept"};
-      }
-      else
-      {
-         upstream = to<XHttp>().sendRequest(req, originServer->tls, originServer->endpoint);
-         callback = MethodNumber{"onReply"};
-      }
-      auto requests = open<ProxyTable>();
-      PSIBASE_SUBJECTIVE_TX
-      {
-         to<XHttp>().autoClose(*socket, false);
-         to<XHttp>().setCallback(upstream, callback, MethodNumber{"onError"});
-         requests.put({upstream, *socket});
+         if (auto originUrl = psibase::splitURL(originServer->host); !originUrl.scheme.empty())
+         {
+            if (!originUrl.host.empty())
+               req.host = originUrl.host;
+            req.target = joinPath(originUrl.path, req.target);
+         }
+         else
+         {
+            req.host = originServer->host;
+         }
+         std::int32_t          upstream;
+         psibase::MethodNumber callback;
+         if (isWebSocketHandshake(req))
+         {
+            upstream = to<XHttp>().websocket(req, originServer->tls, originServer->endpoint);
+            callback = MethodNumber{"onAccept"};
+         }
+         else
+         {
+            upstream = to<XHttp>().sendRequest(req, originServer->tls, originServer->endpoint);
+            callback = MethodNumber{"onReply"};
+         }
+         auto requests = open<ProxyTable>();
+         PSIBASE_SUBJECTIVE_TX
+         {
+            to<XHttp>().autoClose(*socket, false);
+            to<XHttp>().setCallback(upstream, callback, MethodNumber{"onError"});
+            requests.put({upstream, *socket});
+         }
       }
    }
    return {};
