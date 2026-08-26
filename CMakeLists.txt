@@ -49,7 +49,7 @@ include(GNUInstallDirs)
 
 if(DEFINED WASI_SDK_PREFIX)
     install(DIRECTORY ${WASI_SDK_PREFIX}/ USE_SOURCE_PERMISSIONS DESTINATION . COMPONENT WASI EXCLUDE_FROM_ALL)
-elseif(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Linux")
+elseif(NOT PSIBASE_COMPILE_ONLY AND ${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Linux")
     if (${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "x86_64")
         set(WASI_SDK_URL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-29/wasi-sdk-29.0-x86_64-linux.tar.gz)
         set(WASI_SDK_SHA256 87d1d1a2879d139cdc624b968efad3d4a97b8078cdff95e63ac88ecafd1a0171)
