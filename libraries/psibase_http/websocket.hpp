@@ -239,7 +239,6 @@ namespace psibase::http
             std::lock_guard l{mutex};
             if (state == StateType::normal)
             {
-               state     = StateType::closing;
                needClose = true;
             }
          }
