@@ -30,13 +30,18 @@ option(BUILD_STATIC "Build static binaries" OFF)
 option(ENABLE_SSL "Build psinode with TLS support" ON)
 # Skip packing UIs/plugins. Default OFF.
 option(PSIBASE_COMPILE_ONLY "Configure C++ compile without packing UIs/plugins" OFF)
+# Skip compiling native psinode/psitest. Default OFF.
+option(PSIBASE_PREBUILT_NATIVE "Use prebuilt psinode/psitest" OFF)
 
 set(USER_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/target)
 set(SYSTEM_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/target)
 
-add_subdirectory(native)
+if(NOT PSIBASE_PREBUILT_NATIVE)
+    add_subdirectory(native)
+    file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"native\")\n")
+endif()
 add_subdirectory(rust)
-file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"native\" \"rust\")\n")
+file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"rust\")\n")
 
 option(BUILD_DEBUG_WASM "Build debug wasms" OFF)
 
@@ -164,9 +169,19 @@ if(DEFINED WASI_SDK_PREFIX)
         message(STATUS "Using prebuilt C++ wasm services")
         add_custom_target(wasm)
     else()
+    set(_wasm_depends ${wasm-deps} wasm-botan wasm-catch2)
+    if(PSIBASE_PREBUILT_NATIVE)
+        if(NOT PSITEST_EXECUTABLE)
+            message(FATAL_ERROR "PSIBASE_PREBUILT_NATIVE requires -DPSITEST_EXECUTABLE= when compiling wasm")
+        endif()
+        set(_psitest_for_wasm "${PSITEST_EXECUTABLE}")
+    else()
+        list(APPEND _wasm_depends psitest)
+        set(_psitest_for_wasm "$<TARGET_FILE:psitest>")
+    endif()
     ExternalProject_Add(wasm
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/wasm
-        DEPENDS ${wasm-deps} wasm-botan wasm-catch2 psitest
+        DEPENDS ${_wasm_depends}
         BINARY_DIR wasm
         INSTALL_COMMAND ""
         BUILD_ALWAYS 1
@@ -190,7 +205,7 @@ if(DEFINED WASI_SDK_PREFIX)
             -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}
             -DCMAKE_INSTALL_INCLUDEDIR=${CMAKE_INSTALL_DATADIR}/wasi-sysroot/include
             -DCMAKE_INSTALL_LIBDIR=${CMAKE_INSTALL_DATADIR}/wasi-sysroot/lib
-            -DPSITEST_EXECUTABLE=$<TARGET_FILE:psitest>
+            -DPSITEST_EXECUTABLE=${_psitest_for_wasm}
             -DUSER_WORKSPACE_TARGET=${USER_WORKSPACE_TARGET}
             -DSYSTEM_WORKSPACE_TARGET=${SYSTEM_WORKSPACE_TARGET}
             -DPSIBASE_PREBUILT_WASM_DEPS=${PSIBASE_PREBUILT_WASM_DEPS}
@@ -337,9 +352,6 @@ add_rs_component_workspace(packages/:Plugins
 )
 
 include(GNUInstallDirs)
-
-# Use existing psinode/psitest instead of rebuilding them for packing. Default OFF.
-option(PSIBASE_PREBUILT_NATIVE "Use prebuilt psinode/psitest" OFF)
 
 # Build service packages
 include(libraries/psibase/sdk/pack_service.cmake)

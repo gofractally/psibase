@@ -459,6 +459,7 @@
         packages.wasi-sdk = wasiSdk;
         packages.psibase-cli = psibaseUnfixed.passthru.psibaseCli;
         packages.psibase-plugins = psibaseUnfixed.passthru.psibasePlugins;
+        packages.psibase-native = psibaseUnfixed.passthru.psibaseNative;
         packages.psibase-wasm-services = psibaseUnfixed.passthru.wasmServices;
         packages.psibase-rs-packages = psibaseUnfixed.passthru.rsPackages;
         packages.psibase-wasm-deps = psibaseUnfixed.passthru.wasmDeps;

@@ -14,7 +14,7 @@
   unzip,
   zip,
   yarnUis,
-  wasmServices,
+  psibaseNative,
   version ? "0.27.0",
 }:
 
@@ -176,11 +176,11 @@ stdenv.mkDerivation {
     export PATH="$NIX_BUILD_TOP/cargo-psibase-target/release:$PATH"
 
     cargo-psibase package \
-      --psitest ${wasmServices}/bin/psitest \
+      --psitest ${psibaseNative}/bin/psitest \
       --manifest-path packages/system/Cargo.toml \
       --target-dir $NIX_BUILD_TOP/system-target
     cargo-psibase package \
-      --psitest ${wasmServices}/bin/psitest \
+      --psitest ${psibaseNative}/bin/psitest \
       --manifest-path packages/user/Cargo.toml \
       --target-dir $NIX_BUILD_TOP/user-target
     runHook postBuild

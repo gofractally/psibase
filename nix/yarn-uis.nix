@@ -1,17 +1,26 @@
 # Per-UI Yarn/Vite packages. Each has a tight fileset so a C++ change does not
-# rebuild Vite. XAdmin is omitted (cargo-component + jco in its yarn build).
+# rebuild Vite. XAdmin is included (cargo-component + jco in its yarn build).
 {
   lib,
+  stdenv,
   stdenvNoCC,
   yarnBerry,
   nodejs20,
   cacert,
   yarnOfflineCache,
+  rustToolchain,
+  cargoVendor,
+  cargoComponent,
+  wasmTools,
+  llvmPackages,
+  pkg-config,
+  openssl,
   version ? "0.27.0",
 }:
 
 let
   inherit (lib) fileset;
+  repoRoot = ../.;
   packagesDir = ../packages;
 
   workspaceMeta = fileset.unions [
@@ -194,5 +203,113 @@ in
     pname = "psibase-ui-xproxy";
     workspace = "@psibase/xproxy-ui";
     relPath = "local/XProxy/ui";
+  };
+
+  # cargo-component + jco + vite. Fileset includes rust/psibase (path dep).
+  xadmin = stdenv.mkDerivation {
+    pname = "psibase-ui-xadmin";
+    inherit version;
+    src = fileset.toSource {
+      root = repoRoot;
+      fileset = fileset.unions [
+        workspaceMeta
+        commonLibFiles
+        sharedUiFiles
+        (packagesDir + "/local/XAdmin/ui")
+        (fileset.difference (repoRoot + "/rust") (
+          fileset.maybeMissing (repoRoot + "/rust/target")
+        ))
+      ];
+    };
+
+    nativeBuildInputs = [
+      yarnBerry
+      nodejs20
+      cacert
+      rustToolchain
+      cargoComponent
+      wasmTools
+      pkg-config
+    ];
+
+    buildInputs = [
+      openssl
+    ];
+
+    dontConfigure = true;
+    dontFixup = true;
+    dontStrip = true;
+    hardeningDisable = [ "all" ];
+
+    LIBCLANG_PATH = "${llvmPackages.libclang.lib}/lib";
+    CARGO_TERM_COLOR = "always";
+    CARGO_NET_OFFLINE = "true";
+    OPENSSL_NO_VENDOR = "1";
+    RUSTFLAGS = "--remap-path-prefix ${rustToolchain}=/rustc";
+    YARN_ENABLE_TELEMETRY = "0";
+    YARN_ENABLE_NETWORK = "0";
+    YARN_ENABLE_OFFLINE_MODE = "true";
+    COREPACK_ENABLE_NETWORK = "0";
+    PSIREBUILD = "true";
+    SSL_CERT_FILE = "${cacert}/etc/ssl/certs/ca-bundle.crt";
+
+    buildPhase = ''
+      runHook preBuild
+      unset NIX_LDFLAGS NIX_LDFLAGS_BEFORE NIX_CFLAGS_LINK LD_LIBRARY_PATH
+      unset NIX_CFLAGS_COMPILE NIX_CFLAGS_COMPILE_BEFORE CFLAGS CXXFLAGS LDFLAGS
+
+      export HOME=$NIX_BUILD_TOP/home
+      export CARGO_HOME=$NIX_BUILD_TOP/cargo-home
+      export TMPDIR=$NIX_BUILD_TOP/tmp
+      export CARGO_COMPONENT_CACHE_DIR=$NIX_BUILD_TOP/cargo-component-cache
+      mkdir -p "$HOME" "$CARGO_HOME" "$TMPDIR" "$CARGO_COMPONENT_CACHE_DIR" \
+        .caches/yarn .cargo
+
+      cp -a ${yarnOfflineCache}/. .caches/yarn/
+      chmod -R u+w .caches/yarn
+
+      cp -a ${cargoVendor}/. $NIX_BUILD_TOP/cargo-vendor
+      chmod -R u+w $NIX_BUILD_TOP/cargo-vendor
+      cat > .cargo/config.toml <<EOF
+      [source.crates-io]
+      replace-with = "vendored-sources"
+
+      [source.vendored-sources]
+      directory = "$NIX_BUILD_TOP/cargo-vendor"
+
+      [net]
+      offline = true
+      EOF
+      cp .cargo/config.toml "$CARGO_HOME/config.toml"
+      mkdir -p packages/local/XAdmin/ui/wasm/.cargo rust/.cargo
+      cp .cargo/config.toml packages/local/XAdmin/ui/wasm/.cargo/config.toml
+      cp .cargo/config.toml rust/.cargo/config.toml
+
+      mkdir -p packages/user/CommonApi/common/packages/common-lib/dist
+      cp -a ${common-lib}/. packages/user/CommonApi/common/packages/common-lib/dist/
+      chmod -R u+w packages/user/CommonApi/common/packages/common-lib/dist
+
+      (
+        cd packages
+        yarn install --immutable --immutable-cache --mode=skip-build
+        export PATH="$PWD/node_modules/.bin:$PATH"
+        yarn workspace @psibase/xadmin-ui build
+      )
+      runHook postBuild
+    '';
+
+    installPhase = ''
+      runHook preInstall
+      mkdir -p "$out"
+      cp -a packages/local/XAdmin/ui/dist/. "$out/"
+      runHook postInstall
+    '';
+
+    doInstallCheck = true;
+    installCheckPhase = ''
+      runHook preInstallCheck
+      test -f "$out/index.html"
+      runHook postInstallCheck
+    '';
   };
 }

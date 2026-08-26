@@ -86,7 +86,7 @@ nix build
 
 This compiles psibase from source (C++, Rust, WASM, Yarn UIs) and installs the runtime layout.
 
-Yarn UIs (except XAdmin) are separate store paths (`nix build .#psibase-yarn-uis`). A C++-only change reuses those paths and skips Vite. XAdmin still builds inside the main derivation.
+Yarn UIs (including XAdmin) are separate store paths (`nix build .#psibase-yarn-uis`). A C++-only change reuses those paths and skips Vite. XAdmin’s yarn build runs cargo-component + jco in `#psibase-yarn-uis` (`xadmin`).
 
 Wasm third-party libs (Botan, OpenSSL, zlib, gmp) are `nix build .#psibase-wasm-deps`. A service-code change reuses that path and skips those WASI compiles.
 
@@ -96,9 +96,9 @@ The `psibase` CLI is `nix build .#psibase-cli`. A C++-only change reuses that bi
 
 Wasm plugins from the `packages/` cargo-component workspace (plus component-parser) are `nix build .#psibase-plugins`. A C++-only change reuses those `.wasm` files. User/system `cargo-psibase` packages (including their plugins) are built by `#psibase-rs-packages`.
 
-C++ `psinode`/`psitest` and WASI service wasm are `nix build .#psibase-wasm-services`. A plugin or Yarn UI change reuses that path and only re-packs `.psi` files (`package-index`).
+C++ `psinode`/`psitest` are `nix build .#psibase-native`. WASI service wasm and snapshot tools are `nix build .#psibase-wasm-services` (uses `psitest` from `#psibase-native` for schema generation). A psinode-only change does not rebuild C++ service wasm. A plugin or Yarn UI change reuses both and only re-packs `.psi` files (`package-index`).
 
-Rust services packed by `cargo-psibase` (Tokens, Fractals, Identity, …) are `nix build .#psibase-rs-packages`. Schema generation uses `psitest` from `#psibase-wasm-services`. XAdmin still builds inside the main derivation.
+Rust services packed by `cargo-psibase` (Tokens, Fractals, Identity, …) are `nix build .#psibase-rs-packages`. Schema generation uses `psitest` from `#psibase-native`.
 
 WASI SDK 29 / LLVM 21 emits `call_indirect` with a LEB table index; eos-vm requires a single `0x00` byte. `nix/fix-psi-wasm.sh` rewrites compiled `.wasm` (encoding-only, not `-O1`) in `#psibase-wasm-services` and `#psibase-rs-packages` so packing and `index.json` hashes see the final bytes.
 
@@ -106,13 +106,13 @@ WASI SDK 29 / LLVM 21 emits `call_indirect` with a LEB table index; eos-vm requi
 
 | Flag | Purpose |
 |------|---------|
-| `PSIBASE_COMPILE_ONLY` | C++ compile without packing UIs/plugins (`#psibase-wasm-services`) |
+| `PSIBASE_COMPILE_ONLY` | C++ compile without packing UIs/plugins (`#psibase-native`, `#psibase-wasm-services`) |
 | `PSIBASE_PREBUILT_WASM_DEPS` | Reuse `#psibase-wasm-deps` |
 | `PSIBASE_PREBUILT_WASM_SERVICES` | Reuse compiled C++ service wasm |
 | `PSIBASE_PREBUILT_UI` | Reuse Yarn `dist/` |
 | `PSIBASE_PREBUILT_PLUGINS` | Reuse cargo-component wasm |
 | `PSIBASE_PREBUILT_CLI` | Reuse `#psibase-cli` |
-| `PSIBASE_PREBUILT_NATIVE` | Reuse `psinode`/`psitest` while packing |
+| `PSIBASE_PREBUILT_NATIVE` | Reuse `#psibase-native` while packing or compiling C++ wasm |
 | `PSIBASE_PREBUILT_RS_PACKAGES` | Reuse `#psibase-rs-packages` |
 
 ```
@@ -172,6 +172,7 @@ nix develop
 
 - `flake.nix` / `flake.lock` — Nix flake at repo root
 - `nix/psibase.nix` — from-source `packages.psibase` / `packages.default`
+- `nix/yarn-uis.nix` — per-UI Yarn packages including XAdmin
 - `nix/rust-toolchain.toml` — Rust version and targets
 
 # Relationship to Docker

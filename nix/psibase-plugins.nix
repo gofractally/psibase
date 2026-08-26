@@ -1,6 +1,6 @@
 # cargo-component wasm plugins (`packages/` workspace) plus component-parser.
 # Separate from the CMake ninja so a C++ change does not rebuild them.
-# Other plugins still build in-tree via cargo-psibase (user/system workspaces).
+# User/system cargo-psibase plugins are packed by #psibase-rs-packages.
 {
   lib,
   stdenv,
