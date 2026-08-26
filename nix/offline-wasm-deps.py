@@ -4,6 +4,8 @@ from pathlib import Path
 
 
 def replace_once(path: Path, old: str, new: str) -> None:
+    if not path.is_file():
+        return
     text = path.read_text()
     if old not in text:
         raise SystemExit(f"{path}: expected block not found")
