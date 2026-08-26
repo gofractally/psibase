@@ -755,7 +755,7 @@ stdenv.mkDerivation {
       -DBUILD_DEBUG_WASM=OFF \
       -DBUILD_EXAMPLES=OFF \
       -DBUILD_TESTING=OFF \
-      -DBUILD_DOC=OFF \
+      -DBUILD_DOC=ON \
       -DENABLE_SSL=ON \
       -DWASI_SDK_PREFIX=${wasiSdk} \
       -DICU_LIBRARY_DIR=${icu}/lib \
@@ -840,6 +840,7 @@ stdenv.mkDerivation {
       share/psibase/packages \
       share/psibase/packages/index.json \
       share/psibase/packages/ProdDefault.psi \
+      share/psibase/packages/Docs.psi \
       share/psibase/wasm; do
       if [ ! -e "$out/$p" ]; then
         echo "missing from layout: $p" >&2
