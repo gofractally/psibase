@@ -10,6 +10,9 @@
   pkg-config,
   openssl,
   llvmPackages,
+  binaryen,
+  unzip,
+  zip,
   yarnUis,
   wasmServices,
   version ? "0.27.0",
@@ -105,6 +108,9 @@ stdenv.mkDerivation {
     cargoComponent
     wasmTools
     pkg-config
+    binaryen
+    unzip
+    zip
   ];
 
   buildInputs = [
@@ -185,6 +191,7 @@ stdenv.mkDerivation {
     mkdir -p "$out"
     cp -a $NIX_BUILD_TOP/system-target/wasm32-wasip1/release/packages/*.psi "$out/"
     cp -a $NIX_BUILD_TOP/user-target/wasm32-wasip1/release/packages/*.psi "$out/"
+    bash ${./fix-psi-wasm.sh} "$out"
     runHook postInstall
   '';
 

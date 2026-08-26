@@ -1,4 +1,5 @@
-# Resolve psinode. Nix package (`result/`) first; cmake install as fallback.
+# Resolve psinode. Incremental cmake (`build/psinode`, then installed
+# `build/psidk/bin`) first; leftover `result/` from `nix build` last.
 # Source after PROJECT_ROOT is set. Exports PSINODE.
 
 if [ -z "${PROJECT_ROOT:-}" ]; then
@@ -6,7 +7,9 @@ if [ -z "${PROJECT_ROOT:-}" ]; then
     return 1 2>/dev/null || exit 1
 fi
 
-if [ -x "$PROJECT_ROOT/build/psidk/bin/psinode" ]; then
+if [ -x "$PROJECT_ROOT/build/psinode" ]; then
+    PSINODE="$PROJECT_ROOT/build/psinode"
+elif [ -x "$PROJECT_ROOT/build/psidk/bin/psinode" ]; then
     PSINODE="$PROJECT_ROOT/build/psidk/bin/psinode"
 elif [ -x "$PROJECT_ROOT/result/bin/psinode" ]; then
     PSINODE="$PROJECT_ROOT/result/bin/psinode"
@@ -20,3 +23,4 @@ else
     return 1 2>/dev/null || exit 1
 fi
 export PSINODE
+echo "Using $PSINODE" >&2

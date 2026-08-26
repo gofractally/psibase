@@ -4,7 +4,7 @@ set(BOOST_EXTRACTED ${CMAKE_CURRENT_BINARY_DIR}/boost_1_81_0)
 set(BOOST_SHA256 71feeed900fbccca04a3b4f2f84a7c217186f28a940ed8b7ed4725986baf99fa)
 set(BOOST_BOOST ${CMAKE_CURRENT_BINARY_DIR}/boost)
 
-# Nix copies extracted headers + sources into this binary dir.
+# Skip download/extract when headers and sources are already in this binary dir.
 if(NOT PSIBASE_PREBUILT_WASM_DEPS)
 if(NOT EXISTS ${BOOST_ARCHIVE})
     message("Downloading ${BOOST_URL}")

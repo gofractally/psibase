@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Rewrite service wasm so eos-vm accepts call_indirect (MVP 0x00 table byte).
+# Rewrite wasm so eos-vm accepts call_indirect (MVP 0x00 table byte).
 # LLVM 21 / WASI SDK 29 emit a LEB table index; eos-vm requires a single 0x00.
+# Encoding-only (no -O1): do not reoptimize compiled service code.
 set -euo pipefail
 
-out=${1:?usage: fix-psi-wasm.sh <prefix>}
+root=${1:?usage: fix-psi-wasm.sh <dir>}
 WASM_OPT_FLAGS=(
-  -O1
   --disable-reference-types
   --enable-bulk-memory
   --enable-sign-ext
@@ -19,29 +19,26 @@ opt_wasm() {
   mv "$f.opt.wasm" "$f"
 }
 
-if [ -d "$out/share/psibase/wasm" ]; then
-  while IFS= read -r -d '' f; do
-    opt_wasm "$f"
-  done < <(find "$out/share/psibase/wasm" -name '*.wasm' -print0)
-fi
+chmod -R u+w "$root"
 
-if [ -d "$out/share/psibase/packages" ]; then
-  shopt -s nullglob
-  for psi in "$out/share/psibase/packages"/*.psi; do
-    tmp=$(mktemp -d)
-    unzip -q "$psi" -d "$tmp"
-    chmod -R u+w "$tmp"
-    if [ -d "$tmp/service" ]; then
-      changed=0
-      while IFS= read -r -d '' f; do
-        opt_wasm "$f"
-        changed=1
-      done < <(find "$tmp/service" -name '*.wasm' -print0)
-      if [ "$changed" = 1 ]; then
-        rm -f "$psi"
-        (cd "$tmp" && zip -r -X -q "$psi" .)
-      fi
-    fi
-    rm -rf "$tmp"
-  done
-fi
+while IFS= read -r -d '' f; do
+  opt_wasm "$f"
+done < <(find "$root" -name '*.wasm' -print0)
+
+while IFS= read -r -d '' psi; do
+  tmp=$(mktemp -d)
+  unzip -q "$psi" -d "$tmp"
+  chmod -R u+w "$tmp"
+  changed=0
+  if [ -d "$tmp/service" ]; then
+    while IFS= read -r -d '' f; do
+      opt_wasm "$f"
+      changed=1
+    done < <(find "$tmp/service" -name '*.wasm' -print0)
+  fi
+  if [ "$changed" = 1 ]; then
+    rm -f "$psi"
+    (cd "$tmp" && zip -r -X -q "$psi" .)
+  fi
+  rm -rf "$tmp"
+done < <(find "$root" -name '*.psi' -print0)

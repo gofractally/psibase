@@ -263,16 +263,16 @@
           src = self;
         };
 
-        # LLVM 21 emits call_indirect with a LEB table index; eos-vm requires a
-        # single 0x00 byte. Rewrite packed service wasm without a full rebuild.
+        # Re-wrap so copied ELF RPATHs stay live refs; boot-check the layout.
+        # Service wasm is rewritten in wasm-services / rs-packages before packing
+        # so index.json hashes match the shipped .psi files.
         psibasePkg = pkgs.stdenvNoCC.mkDerivation {
           pname = "psibase";
           inherit (psibaseUnfixed) version meta passthru;
           dontUnpack = true;
           nativeBuildInputs = [
-            pkgs.binaryen
-            pkgs.unzip
-            pkgs.zip
+            pkgs.curl
+            pkgs.jq
           ];
           # Keep runtime libs as inputs so copied ELF RPATHs stay live refs.
           buildInputs = [
@@ -289,7 +289,6 @@
             mkdir -p $out
             cp -a ${psibaseUnfixed}/. $out/
             chmod -R u+w $out
-            bash ${./nix/fix-psi-wasm.sh} "$out"
             runHook postInstall
           '';
           doInstallCheck = true;
@@ -305,31 +304,51 @@
                 exit 1
                 ;;
             esac
-            db=$TMPDIR/psinode-check-db
-            rm -rf "$db"
-            if $out/bin/psinode "$db" -p checkprod -l 18080 >$TMPDIR/psinode-check.log 2>&1 &
-            then
-              pid=$!
-              for i in 1 2 3 4 5 6 7 8; do
-                if ! kill -0 "$pid" 2>/dev/null; then
-                  break
-                fi
-                sleep 0.5
-              done
-              if kill -0 "$pid" 2>/dev/null; then
-                kill "$pid" 2>/dev/null || true
-                wait "$pid" || true
-              else
-                wait "$pid" || true
-                echo "psinode exited during package load:" >&2
-                cat $TMPDIR/psinode-check.log >&2
-                exit 1
-              fi
-            else
-              echo "psinode failed to start:" >&2
-              cat $TMPDIR/psinode-check.log >&2
+            index=$out/share/psibase/packages/index.json
+            jq empty "$index"
+            n=$(jq 'length' "$index")
+            if [ "$n" -lt 1 ]; then
+              echo "index.json has no packages" >&2
               exit 1
             fi
+            while IFS=$'\t' read -r file hash; do
+              actual=$(sha256sum "$out/share/psibase/packages/$file" | cut -c1-64)
+              if [ "$actual" != "$hash" ]; then
+                echo "index.json sha256 mismatch for $file:" >&2
+                echo "  index: $hash" >&2
+                echo "  file:  $actual" >&2
+                exit 1
+              fi
+            done < <(jq -r '.[] | [.file, .sha256] | @tsv' "$index")
+            db=$TMPDIR/psinode-check-db
+            log=$TMPDIR/psinode-check.log
+            rm -rf "$db"
+            $out/bin/psinode "$db" -p checkprod -l 18080 >"$log" 2>&1 &
+            pid=$!
+            ready=0
+            for i in $(seq 1 60); do
+              if ! kill -0 "$pid" 2>/dev/null; then
+                wait "$pid" || true
+                echo "psinode exited during package load:" >&2
+                cat "$log" >&2
+                exit 1
+              fi
+              code=$(curl -sS -o /dev/null --connect-timeout 1 --max-time 1 -w '%{http_code}' "http://127.0.0.1:18080/" || true)
+              if [ -n "$code" ] && [ "$code" != "000" ]; then
+                ready=1
+                break
+              fi
+              sleep 1
+            done
+            if [ "$ready" != 1 ]; then
+              kill "$pid" 2>/dev/null || true
+              wait "$pid" || true
+              echo "psinode did not become ready (HTTP :18080) within 60s:" >&2
+              cat "$log" >&2
+              exit 1
+            fi
+            kill "$pid" 2>/dev/null || true
+            wait "$pid" || true
             runHook postInstallCheck
           '';
         };
@@ -383,7 +402,7 @@
               PSIBASE_ROOT="$(pwd)"
             fi
             export PSIBASE_ROOT
-            # Incremental cmake first; `result/` (nix build) only if there is no local tree.
+            # Incremental cmake first (`build/`, then `build/psidk/bin`); `result/` last.
             export PATH="$PSIBASE_ROOT/build/psidk/bin:$PSIBASE_ROOT/result/bin:$PATH"
             export PATH="$PSIBASE_ROOT/build/rust/release:$PATH"
             export PATH="$PSIBASE_ROOT/build:$PATH"

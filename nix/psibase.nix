@@ -17,6 +17,7 @@
   jq,
   xxd,
   unzip,
+  zip,
   zstd,
   cacert,
   binaryen,
@@ -385,6 +386,7 @@ let
       jq
       xxd
       unzip
+      zip
       zstd
       binaryen
       wabt
@@ -398,7 +400,6 @@ let
       icu
     ];
 
-    hardeningDisable = [ "all" ];
     dontUseCmakeConfigure = true;
     dontStrip = true;
 
@@ -521,6 +522,7 @@ let
         mkdir -p "$out/share/psibase/wasm"
         cp -a share/psibase/wasm/. "$out/share/psibase/wasm/"
       fi
+      bash ${./fix-psi-wasm.sh} "$out"
       runHook postInstall
     '';
 
@@ -610,9 +612,6 @@ stdenv.mkDerivation {
     zstd
     icu
   ];
-
-  # Mixed native GCC + WASI clang; nix's extra link flags break wasm.
-  hardeningDisable = [ "all" ];
 
   # rustc embeds stdlib paths (`file!()` in panics) into bin/psibase. Remap so
   # those strings are not store paths; remove-references-to is the backstop.

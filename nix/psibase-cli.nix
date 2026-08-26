@@ -38,7 +38,6 @@ stdenv.mkDerivation {
   CARGO_NET_OFFLINE = "true";
   RUSTFLAGS = "--remap-path-prefix ${rustToolchain}=/rustc";
 
-  hardeningDisable = [ "all" ];
   dontConfigure = true;
 
   disallowedReferences = [ rustToolchain ];

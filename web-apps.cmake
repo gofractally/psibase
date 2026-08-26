@@ -1,14 +1,12 @@
 include(ExternalProject)
 
-# Nix copies prebuilt dist/ and sets this so leftover local dist/ does not
-# skip yarn in the incremental cmake loop.
+# Skip yarn when dist/ already exists. Default OFF so a leftover dist/ still runs yarn.
 option(PSIBASE_PREBUILT_UI "Skip yarn for UIs that already have dist/" OFF)
 
 # Static (not built) resource dependencies
 file(GLOB common-misc-resources LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/resources/*)
 
 if(PSIBASE_PREBUILT_UI)
-    # Yarn install already ran in the Nix configurePhase.
     add_custom_target(YarnInstall)
 else()
     add_custom_target(YarnInstall
@@ -60,7 +58,7 @@ set(UI_PROJECTS
 )
 
 message(STATUS "common-misc-resources: ${common-misc-resources}")
-# Create ExternalProject for each UI. A populated dist/ (Nix prebuild) skips yarn.
+# Create ExternalProject for each UI.
 foreach(UI ${UI_PROJECTS})
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${UI})
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 TARGET_NAME ${UI})

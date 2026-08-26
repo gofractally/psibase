@@ -90,15 +90,30 @@ Yarn UIs (except XAdmin) are separate store paths (`nix build .#psibase-yarn-uis
 
 Wasm third-party libs (Botan, OpenSSL, zlib, gmp) are `nix build .#psibase-wasm-deps`. A service-code change reuses that path and skips those WASI compiles.
 
-The Nix package builds `package-index` plus `psinode`/`psitest`/snapshot tools (`-DBUILD_DOC=ON`, so `Docs.psi` is in the index like every other default app). It does not ninja `all`, so tester packages and extra man-page work stay skipped. `cargo-psibase` and `reserved-names` still run because the package index needs them.
+The Nix package builds `package-index` plus `psinode`/`psitest`/snapshot tools (`-DBUILD_DOC=ON`, so `Docs.psi` is in the index like every other default app). It does not ninja `all`, so tester packages and extra man-page work stay skipped. `reserved-names` still runs in the main ninja because the package index needs it.
 
 The `psibase` CLI is `nix build .#psibase-cli`. A C++-only change reuses that binary.
 
-Wasm plugins from the `packages/` cargo-component workspace (plus component-parser) are `nix build .#psibase-plugins`. A C++-only change reuses those `.wasm` files. Plugins packed by `cargo-psibase` (user/system workspaces) still build in the main derivation.
+Wasm plugins from the `packages/` cargo-component workspace (plus component-parser) are `nix build .#psibase-plugins`. A C++-only change reuses those `.wasm` files. User/system `cargo-psibase` packages (including their plugins) are built by `#psibase-rs-packages`.
 
 C++ `psinode`/`psitest` and WASI service wasm are `nix build .#psibase-wasm-services`. A plugin or Yarn UI change reuses that path and only re-packs `.psi` files (`package-index`).
 
 Rust services packed by `cargo-psibase` (Tokens, Fractals, Identity, …) are `nix build .#psibase-rs-packages`. Schema generation uses `psitest` from `#psibase-wasm-services`. XAdmin still builds inside the main derivation.
+
+WASI SDK 29 / LLVM 21 emits `call_indirect` with a LEB table index; eos-vm requires a single `0x00` byte. `nix/fix-psi-wasm.sh` rewrites compiled `.wasm` (encoding-only, not `-O1`) in `#psibase-wasm-services` and `#psibase-rs-packages` so packing and `index.json` hashes see the final bytes.
+
+`nix build` turns on these CMake flags (all default OFF, so local cmake / `nix develop` still builds UIs, plugins, and packing) after copying prebuilt outputs into the build dir:
+
+| Flag | Purpose |
+|------|---------|
+| `PSIBASE_COMPILE_ONLY` | C++ compile without packing UIs/plugins (`#psibase-wasm-services`) |
+| `PSIBASE_PREBUILT_WASM_DEPS` | Reuse `#psibase-wasm-deps` |
+| `PSIBASE_PREBUILT_WASM_SERVICES` | Reuse compiled C++ service wasm |
+| `PSIBASE_PREBUILT_UI` | Reuse Yarn `dist/` |
+| `PSIBASE_PREBUILT_PLUGINS` | Reuse cargo-component wasm |
+| `PSIBASE_PREBUILT_CLI` | Reuse `#psibase-cli` |
+| `PSIBASE_PREBUILT_NATIVE` | Reuse `psinode`/`psitest` while packing |
+| `PSIBASE_PREBUILT_RS_PACKAGES` | Reuse `#psibase-rs-packages` |
 
 ```
 result/bin/{psinode,psibase,psitest}
@@ -111,7 +126,7 @@ That layout matches [psibase-nix](https://github.com/gofractally/psibase-nix) (`
 
 ## 4. Run a chain from the Nix package
 
-Launch/Continue (`launch.sh`) and `nix develop` use `build/psidk/bin` when that cmake tree exists, otherwise `result/bin` from `nix build`. Incremental edits therefore win over a stale package.
+Launch/Continue (`launch.sh`) resolves psinode in this order: `build/psinode` (uninstalled ninja), `build/psidk/bin/psinode` (cmake install), `result/bin/psinode` (`nix build`), then `PATH`. Incremental cmake therefore wins over a leftover package.
 
 ```bash
 nix build
@@ -138,7 +153,7 @@ Build or Launch with the tasks.json buttons or by running the same command at th
 
 # Troubleshooting
 
-- **Launch uses cmake instead of the Nix package**: `launch.sh` prefers `build/psidk/bin` when it exists. Use `./result/bin/psinode` or `nix run` to run the packaged node.
+- **Launch uses cmake instead of the Nix package**: `launch.sh` prefers `build/psinode`, then `build/psidk/bin`, when they exist. Use `./result/bin/psinode` or `nix run` to run the packaged node.
 - **psinode not found**: Run `nix build` (package) or `build.sh` inside `nix develop` (incremental cmake).
 - **"command not found"** at the cli: Ensure you're in a `nix develop` shell.
 - **Wrong cargo tool versions**: cargo tools are pinned and provided by the flake. If `which cargo-component` does not point at the right thing, a host-installed copy may be shadowing it on `PATH`

@@ -1,8 +1,7 @@
 # A function that can be used to add a new target that builds a wasm component from rust
 set(COMPONENT_BIN_DIR ${CMAKE_CURRENT_BINARY_DIR}/components)
-# Nix copies prebuilt *.wasm into build/components/ and sets this. Default OFF
-# so local cmake / nix develop still runs cargo component.
-option(PSIBASE_PREBUILT_PLUGINS "Use prebuilt cargo-component wasm plugins (Nix)" OFF)
+# Skip cargo-component. Default OFF.
+option(PSIBASE_PREBUILT_PLUGINS "Use prebuilt cargo-component wasm plugins" OFF)
 
 function(add_rs_component TARGET_TUPLE OUTPUT_FILE TARGET_ARCH)
     cmake_parse_arguments(ARG "" "SHARED_TARGET_DIR" "" ${ARGN})

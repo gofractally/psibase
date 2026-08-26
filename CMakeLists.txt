@@ -28,9 +28,8 @@ file(WRITE ${CMAKE_BINARY_DIR}/CTestTestfile.cmake)
 
 option(BUILD_STATIC "Build static binaries" OFF)
 option(ENABLE_SSL "Build psinode with TLS support" ON)
-# Nix compile drv: psinode + WASI services only. Default OFF so local cmake
-# still configures packing, UIs, and plugins.
-option(PSIBASE_COMPILE_ONLY "Configure C++ compile without packing UIs/plugins (Nix)" OFF)
+# Skip packing UIs/plugins. Default OFF.
+option(PSIBASE_COMPILE_ONLY "Configure C++ compile without packing UIs/plugins" OFF)
 
 set(USER_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/target)
 set(SYSTEM_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/target)
@@ -71,8 +70,8 @@ endif()
 
 if(DEFINED WASI_SDK_PREFIX)
     ProcessorCount(NUM_PROCS)
-    # Nix copies prebuilt zlib/gmp/openssl/botan into build/wasm/deps.
-    # Catch2 is not in that path; it still builds below for wasm tests.
+    # Skip compiling wasm third-party libs. Default OFF.
+    # Catch2 is not in that prebuilt set; it still builds below for wasm tests.
     option(PSIBASE_PREBUILT_WASM_DEPS "Reuse prebuilt wasm/deps (skip botan compile)" OFF)
 
     # This is used by the VerifySig service. The kinds of keys supported need to be configured
@@ -159,9 +158,8 @@ if(DEFINED WASI_SDK_PREFIX)
         list(APPEND WASM_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${s}.wasm ${CMAKE_CURRENT_BINARY_DIR}/${s}-schema.json)
     endforeach()
 
-    # Nix copies prebuilt *.wasm / *-schema.json into the build dir and sets this.
-    # Default OFF so local cmake / nix develop still runs the wasm ExternalProject.
-    option(PSIBASE_PREBUILT_WASM_SERVICES "Use prebuilt C++ service wasm and schemas (Nix)" OFF)
+    # Skip the wasm ExternalProject. Default OFF.
+    option(PSIBASE_PREBUILT_WASM_SERVICES "Use prebuilt C++ service wasm and schemas" OFF)
     if(PSIBASE_PREBUILT_WASM_SERVICES)
         message(STATUS "Using prebuilt C++ wasm services")
         add_custom_target(wasm)
@@ -280,9 +278,8 @@ add_manpage(psibase-create-snapshot)
 add_manpage(psibase-load-snapshot)
 
 # Cargo psibase
-# Nix copies prebuilt cargo-psibase .psi files and sets this. Default OFF so
-# local cmake / nix develop still runs cargo-psibase.
-option(PSIBASE_PREBUILT_RS_PACKAGES "Use prebuilt cargo-psibase .psi packages (Nix)" OFF)
+# Skip cargo-psibase packing. Default OFF.
+option(PSIBASE_PREBUILT_RS_PACKAGES "Use prebuilt cargo-psibase .psi packages" OFF)
 if(PSIBASE_PREBUILT_RS_PACKAGES)
     message(STATUS "Using prebuilt cargo-psibase packages")
     add_custom_target(cargo-psibase)
@@ -341,9 +338,8 @@ add_rs_component_workspace(packages/:Plugins
 
 include(GNUInstallDirs)
 
-# Nix copies prebuilt psinode/psitest into the build dir and sets this so
-# cargo-psibase packing does not rebuild native C++. Default OFF for local cmake.
-option(PSIBASE_PREBUILT_NATIVE "Use prebuilt psinode/psitest (Nix)" OFF)
+# Use existing psinode/psitest instead of rebuilding them for packing. Default OFF.
+option(PSIBASE_PREBUILT_NATIVE "Use prebuilt psinode/psitest" OFF)
 
 # Build service packages
 include(libraries/psibase/sdk/pack_service.cmake)
@@ -1607,7 +1603,8 @@ ExternalProject_Add(
     INSTALL_COMMAND ""
 )
 
-option(PSIBASE_PREBUILT_CLI "Use a prebuilt rust/psibase CLI (Nix)" OFF)
+# Skip building rust/psibase. Default OFF.
+option(PSIBASE_PREBUILT_CLI "Use a prebuilt rust/psibase CLI" OFF)
 if(PSIBASE_PREBUILT_CLI)
     add_custom_target(rust)
 else()
