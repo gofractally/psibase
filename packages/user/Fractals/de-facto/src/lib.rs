@@ -30,8 +30,8 @@ pub mod service {
             .is_some()
     }
 
-    fn two_thirds_plus_one(count: u8) -> u8 {
-        ((count as u16 * 2 + 3) / 3) as u8
+    fn two_thirds_plus_one(count: usize) -> u8 {
+        u8::try_from((count * 2 + 3) / 3).unwrap()
     }
 
     #[action]
@@ -43,7 +43,7 @@ pub mod service {
                 .map(|account| (account.account, 1))
                 .collect();
 
-        let threshold = two_thirds_plus_one(accounts.len() as u8);
+        let threshold = two_thirds_plus_one(accounts.len());
         DynamicAuthPolicy::from_weighted_authorizers(accounts, threshold)
     }
 }
