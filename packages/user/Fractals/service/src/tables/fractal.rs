@@ -1,7 +1,7 @@
 use async_graphql::connection::Connection;
 use async_graphql::ComplexObject;
 use psibase::services::sites;
-use psibase::services::tokens::{Precision, Quantity};
+use psibase::services::tokens::{Decimal, Precision, Quantity};
 
 use crate::constants::{token_distributions::TOKEN_SUPPLY, TOKEN_PRECISION};
 use crate::constants::{
@@ -11,7 +11,7 @@ use crate::constants::{
 use psibase::services::fractals::distribute::{allocations, combine_group_scores};
 use psibase::services::fractals::weighted_normalization::{
     curves::{get_curve, Curve},
-    weighted_normalization,
+    weighted_normalization, HasScore,
 };
 use psibase::services::fractals::FractalRole::{
     self, Executive, Judiciary, Legislature, Recruitment,
@@ -30,6 +30,17 @@ use psibase::services::fractals::{self, occu_wrapper};
 use psibase::services::tokens::Wrapper as Tokens;
 use psibase::services::transact::Wrapper as TransactSvc;
 use psibase::{get_sender, RawKey, TableQuery, TimePointSec};
+
+struct MemberScore {
+    account: AccountNumber,
+    score: u32,
+}
+
+impl HasScore for MemberScore {
+    fn get_score(&self) -> Decimal {
+        Decimal::new((self.score as u64).into(), Precision::new(0).unwrap())
+    }
+}
 
 impl Fractal {
     fn new(account: AccountNumber, name: String, mission: String) -> Self {
@@ -158,7 +169,7 @@ impl Fractal {
         }
 
         let mut dust = withdrawn.value;
-        allocations(self.member_reward_shares(), withdrawn.value).for_each(|(member, amount)| {
+        allocations(self.member_reward_ppm(), withdrawn.value).for_each(|(member, amount)| {
             dust -= amount;
             RewardStream::get_assert(self.account, member)
                 .deposit(amount.into(), "Fractal reward".into());
@@ -169,20 +180,31 @@ impl Fractal {
         }
     }
 
-    fn member_reward_shares(&self) -> std::collections::HashMap<AccountNumber, u32> {
+    fn member_reward_ppm(&self) -> std::collections::HashMap<AccountNumber, u32> {
         let members = FractalMember::get_all(self.account);
         let is_member = |acc: &AccountNumber| members.iter().any(|m| m.account == *acc);
 
-        let ranked_occ = Occupation::get_ordered(self.account);
-        let weights = weighted_normalization(ranked_occ.iter(), get_curve(self.dist_strat.into()));
+        let ranked_occupations = Occupation::get_ordered(self.account);
+        let weighted_occupations =
+            weighted_normalization(ranked_occupations.iter(), get_curve(self.dist_strat.into()));
 
-        let groups = ranked_occ.into_iter().zip(weights).map(|(occ, w)| {
-            let member_scores = occu_wrapper::call_to(occ.occupation)
-                .get_scores(self.account)
-                .into_iter()
-                .filter(|(m, _)| is_member(m));
-            (w, member_scores)
-        });
+        let groups = ranked_occupations
+            .into_iter()
+            .zip(weighted_occupations)
+            .map(|(occupation, weight)| {
+                let member_scores: Vec<MemberScore> = occu_wrapper::call_to(occupation.occupation)
+                    .get_scores(self.account)
+                    .into_iter()
+                    .filter(|(m, _)| is_member(m))
+                    .map(|(account, score)| MemberScore { account, score })
+                    .collect();
+                let member_ppm =
+                    weighted_normalization(member_scores.iter(), get_curve(Curve::Identity));
+                (
+                    weight,
+                    member_scores.into_iter().map(|m| m.account).zip(member_ppm),
+                )
+            });
 
         combine_group_scores(groups)
     }
