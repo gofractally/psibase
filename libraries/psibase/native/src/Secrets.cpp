@@ -50,9 +50,9 @@ namespace
       return result;
    }
 
-   void writeLE(std::uint32_t value, unsigned char*& out)
+   void writeLE(std::unsigned_integral auto value, unsigned char*& out)
    {
-      for (std::size_t i = 0; i < 4; ++i)
+      for (std::size_t i = 0; i < sizeof(value); ++i)
       {
          *out++ = value & 0xffu;
          value >>= 8;
@@ -127,7 +127,9 @@ namespace
    void writeEncryptedFile(const std::filesystem::path&       file,
                            std::span<const char>              data,
                            const SCryptParams                 params,
-                           std::span<const unsigned char, 32> master_key)
+                           std::span<const unsigned char, 32> master_key,
+                           std::uint32_t                      iv_fixed,
+                           std::uint64_t                      iv_invocation)
    {
       const std::size_t cyphertext_size = data.size();
       const std::size_t output_size =
@@ -147,10 +149,10 @@ namespace
 
          std::size_t additional_data_size = outp - additional_data;
 
-         if (RAND_bytes(outp, iv_size) != 1)
-            error();
+         static_assert(sizeof(iv_fixed) + sizeof(iv_invocation) == iv_size);
          const unsigned char* iv = outp;
-         outp += iv_size;
+         writeLE(iv_fixed, outp);
+         writeLE(iv_invocation, outp);
 
          const EVP_CIPHER* cipher = EVP_aes_256_gcm();
          assert(EVP_CIPHER_get_iv_length(cipher) == iv_size);
@@ -249,7 +251,10 @@ namespace
       }
       out += outl;
       assert(out - reinterpret_cast<const unsigned char*>(result.data()) == result.size());
-      return {master_key, params, std::move(result)};
+
+      SCryptParams new_params;
+      auto         new_key = deriveKey<32>(passphrase, new_params);
+      return {new_key, new_params, std::move(result)};
    }
 
    struct KeyValue
@@ -271,6 +276,7 @@ namespace
    {
       SCryptParams                  params;
       std::array<unsigned char, 32> key;
+      std::uint64_t                 iv_invocation;
       std::filesystem::path         filename;
    };
 }  // namespace
@@ -279,15 +285,18 @@ struct Secrets::Impl
 {
    Impl() = default;
    Impl(const std::filesystem::path& path, DecryptedFile&& contents)
-       : file{
-             {.params{std::move(contents.params)}, .key{std::move(contents.key)}, .filename{path}}},
+       : file{{.params{std::move(contents.params)},
+               .key{std::move(contents.key)},
+               .iv_invocation{0},
+               .filename{path}}},
          items(psio::from_frac<std::vector<KeyValue>>(contents.data))
    {
    }
    void flush()
    {
       if (file)
-         writeEncryptedFile(file->filename, psio::to_frac(items), file->params, file->key);
+         writeEncryptedFile(file->filename, psio::to_frac(items), file->params, file->key, 0,
+                            file->iv_invocation++);
    }
    std::optional<EncryptedFileInfo> file;
    std::vector<KeyValue>            items;
