@@ -350,13 +350,12 @@ namespace psibase::http
                    std::unique_lock l{self->mutex};
                    if (ec)
                    {
+                      auto outbox = std::move(self->outbox);
+                      l.unlock(); // `error()` locks the mutex
                       if (ec != make_error_code(boost::asio::error::operation_aborted))
                       {
-                         // FIXME: recursive lock
                          self->error(ec);
                       }
-                      auto outbox = std::move(self->outbox);
-                      l.unlock();
                       self->clearOutbox(std::move(outbox), ec);
                       return;
                    }
