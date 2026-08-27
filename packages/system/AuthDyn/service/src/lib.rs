@@ -172,7 +172,7 @@ pub mod service {
         let total_possible_weight = policy
             .authorizers
             .iter()
-            .fold(0, |acc, authorizer| acc + authorizer.weight);
+            .fold(0u8, |acc, authorizer| acc.checked_add(authorizer.weight).unwrap());
 
         if policy.threshold > total_possible_weight {
             return !is_approval;
@@ -188,7 +188,7 @@ pub mod service {
             .authorizers
             .into_iter()
             .filter(|authorizer| authorizers.contains(&authorizer.account))
-            .fold(0, |acc, authorizer| acc + authorizer.weight);
+            .fold(0u8, |acc, authorizer| acc.checked_add(authorizer.weight).unwrap());
 
         total_weight_approved >= required_weight
     }
