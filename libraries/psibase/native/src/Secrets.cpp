@@ -26,7 +26,7 @@ namespace
 
    constexpr std::size_t prefix_size = sizeof(prefix);
    constexpr std::size_t block_size  = 16;
-   constexpr std::size_t iv_size     = block_size;
+   constexpr std::size_t iv_size     = 12;
    constexpr std::size_t tag_size    = block_size;
 
    template <std::size_t N>
@@ -152,7 +152,9 @@ namespace
          const unsigned char* iv = outp;
          outp += iv_size;
 
-         if (!EVP_EncryptInit_ex2(ctx.get(), EVP_aes_256_gcm(), master_key.data(), iv, nullptr))
+         const EVP_CIPHER* cipher = EVP_aes_256_gcm();
+         assert(EVP_CIPHER_get_iv_length(cipher) == iv_size);
+         if (!EVP_EncryptInit_ex2(ctx.get(), cipher, master_key.data(), iv, nullptr))
          {
             error();
          }
@@ -218,7 +220,9 @@ namespace
       auto ctx        = std::unique_ptr<EVP_CIPHER_CTX, OpenSSLDeleter>(EVP_CIPHER_CTX_new());
       if (!ctx)
          error();
-      if (!EVP_DecryptInit_ex2(ctx.get(), EVP_aes_256_gcm(), master_key.data(), iv.data(), nullptr))
+      const EVP_CIPHER* cipher = EVP_aes_256_gcm();
+      assert(EVP_CIPHER_get_iv_length(cipher) == iv_size);
+      if (!EVP_DecryptInit_ex2(ctx.get(), cipher, master_key.data(), iv.data(), nullptr))
       {
          error();
       }
