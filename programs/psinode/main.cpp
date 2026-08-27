@@ -1918,8 +1918,11 @@ int main(int argc, char* argv[])
            {
               if (filename != "")
               {
-                 auto contents = readWholeFile(filename);
-                 passphrase    = std::string(contents.data(), contents.size());
+                 auto                       contents = readWholeFile(filename);
+                 constexpr std::string_view nl_chars{"\r\n"};
+                 while (!contents.empty() && nl_chars.contains(contents.back()))
+                    contents.pop_back();
+                 passphrase = std::string(contents.data(), contents.size());
               }
               else
               {
