@@ -697,7 +697,7 @@ let
     };
   };
 
-  rsPackages = callPackage ./psibase-rs-packages.nix {
+  rsPackageSet = callPackage ./psibase-rs-packages.nix {
     inherit
       rustToolchain
       cargoVendor
@@ -708,6 +708,18 @@ let
       yarnUis
       psibaseNative
       ;
+  };
+  rsPackagesSystem = rsPackageSet.system;
+  rsPackagesUser = rsPackageSet.user;
+  rsPackages = stdenvNoCC.mkDerivation {
+    name = "psibase-rs-packages-${version}";
+    dontUnpack = true;
+    dontFixup = true;
+    installPhase = ''
+      mkdir -p "$out"
+      cp -a ${rsPackagesSystem}/*.psi "$out/"
+      cp -a ${rsPackagesUser}/*.psi "$out/"
+    '';
   };
 in
 stdenv.mkDerivation {
@@ -920,7 +932,8 @@ stdenv.mkDerivation {
     mkdir -p rust/release components share/psibase/wasm share/psibase/packages
     cp ${psibaseCli}/bin/psibase rust/release/psibase
     cp ${psibasePlugins}/*.wasm components/
-    cp ${rsPackages}/*.psi share/psibase/packages/
+    cp ${rsPackagesSystem}/*.psi share/psibase/packages/
+    cp ${rsPackagesUser}/*.psi share/psibase/packages/
     cp ${psibaseNative}/bin/psinode psinode
     cp ${psibaseNative}/bin/psitest psitest
     cp -a ${wasmServices}/service-wasm/. .
@@ -1005,6 +1018,8 @@ stdenv.mkDerivation {
       psibaseNative
       wasmServices
       rsPackages
+      rsPackagesSystem
+      rsPackagesUser
       ;
   };
 

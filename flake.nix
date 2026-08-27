@@ -462,6 +462,8 @@
         packages.psibase-native = psibaseUnfixed.passthru.psibaseNative;
         packages.psibase-wasm-services = psibaseUnfixed.passthru.wasmServices;
         packages.psibase-rs-packages = psibaseUnfixed.passthru.rsPackages;
+        packages.psibase-rs-packages-system = psibaseUnfixed.passthru.rsPackagesSystem;
+        packages.psibase-rs-packages-user = psibaseUnfixed.passthru.rsPackagesUser;
         packages.psibase-wasm-deps = psibaseUnfixed.passthru.wasmDeps;
         packages.psibase-yarn-uis = pkgs.linkFarm "psibase-yarn-uis" (
           pkgs.lib.mapAttrsToList (name: drv: {

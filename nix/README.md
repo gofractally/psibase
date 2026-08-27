@@ -94,11 +94,11 @@ The Nix package builds `package-index` plus `psinode`/`psitest`/snapshot tools (
 
 The `psibase` CLI is `nix build .#psibase-cli`. A C++-only change reuses that binary.
 
-Wasm plugins from the `packages/` cargo-component workspace (plus component-parser) are `nix build .#psibase-plugins`. A C++-only change reuses those `.wasm` files. User/system `cargo-psibase` packages (including their plugins) are built by `#psibase-rs-packages`.
+Wasm plugins from the `packages/` cargo-component workspace (plus component-parser) are `nix build .#psibase-plugins`. A C++-only change reuses those `.wasm` files. System cargo-psibase packages (AuthDyn, …) are `#psibase-rs-packages-system`. User packages (Tokens, Fractals, …) are `#psibase-rs-packages-user` (needs Yarn dist for a few UIs). `#psibase-rs-packages` joins both.
 
 C++ `psinode`/`psitest` are `nix build .#psibase-native`. WASI service wasm and snapshot tools are `nix build .#psibase-wasm-services` (uses `psitest` from `#psibase-native` for schema generation). A psinode-only change does not rebuild C++ service wasm. A plugin or Yarn UI change reuses both and only re-packs `.psi` files (`package-index`).
 
-Rust services packed by `cargo-psibase` (Tokens, Fractals, Identity, …) are `nix build .#psibase-rs-packages`. Schema generation uses `psitest` from `#psibase-native`.
+Rust services packed by `cargo-psibase` are `#psibase-rs-packages-system` and `#psibase-rs-packages-user`. Schema generation uses `psitest` from `#psibase-native`. A Fractals/UI change does not rebuild AuthDyn.
 
 WASI SDK 29 / LLVM 21 emits `call_indirect` with a LEB table index; eos-vm requires a single `0x00` byte. `nix/fix-psi-wasm.sh` rewrites compiled `.wasm` (encoding-only, not `-O1`) in `#psibase-wasm-services` and `#psibase-rs-packages` so packing and `index.json` hashes see the final bytes.
 
