@@ -383,6 +383,17 @@ let
     || lib.hasSuffix ".c" n
   ) (repoRoot + "/packages");
 
+  # CMake configure_file / wasm-as (Nop.wat, Nop-schema.json, semver.json, …).
+  pkgCompileExtras = fileset.fileFilter (
+    file:
+    let
+      n = file.name;
+    in
+    lib.hasSuffix ".json" n
+    || lib.hasSuffix ".wat" n
+    || lib.hasSuffix ".in" n
+  ) (repoRoot + "/packages");
+
   unpackExternal = ''
     mkdir -p "$sourceRoot/external"
     rm -rf "$sourceRoot/external/Catch2" "$sourceRoot/external/eos-vm" "$sourceRoot/external/rapidjson"
@@ -422,6 +433,7 @@ let
       (repoRoot + "/rust/CMakeLists.txt")
       (fileset.difference pkgHeadersAndCmake pkgUiPluginSkip)
       (fileset.difference pkgCppSources pkgUiPluginSkip)
+      (fileset.difference pkgCompileExtras pkgUiPluginSkip)
     ];
   };
 
