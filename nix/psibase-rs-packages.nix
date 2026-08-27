@@ -145,7 +145,10 @@ let
             (packagesDir + "/${cat}/${cat}-workspace-hack")
           ]
           ++ map (pkgFileset cat) pkgNames
-          ++ map (dir: fileset.fileFilter (file: file.hasExt "wit") dir) (pluginDirs cat)
+          # WIT graphs cross user/system (e.g. auth-dyn-plugin -> permissions:plugin).
+          ++ map (dir: fileset.fileFilter (file: file.hasExt "wit") dir) (
+            pluginDirs "system" ++ pluginDirs "user"
+          )
           ++ extraFileset
         );
       };
