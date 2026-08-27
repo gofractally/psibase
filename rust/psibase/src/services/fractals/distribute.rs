@@ -15,34 +15,31 @@ where
 {
     let mut member_allocations: HashMap<Member, u32> = HashMap::new();
 
-    for (total, member_shares) in groups {
-        for (member, allocation) in allocations(member_shares, total as u64) {
+    for (total, member_ppm) in groups {
+        for (member, allocation) in allocations(member_ppm, total as u64) {
             *member_allocations.entry(member).or_insert(0u32) += allocation as u32;
         }
     }
     member_allocations
 }
 
-/// Yields `(element, amount)` pairs, where `amount = (share / PPM) * total`
+/// Yields `(element, amount)` pairs, where `amount = (ppm / PPM) * budget`
 /// (integer-floored). Elements whose computed amount is zero are skipped.
 ///
-/// Aborts if the cumulative shares exceed `PPM`.
-pub fn allocations<I, Element>(
-    element_shares: I,
-    total: u64,
-) -> impl Iterator<Item = (Element, u64)>
+/// Aborts if the cumulative ppm exceeds `PPM`.
+pub fn allocations<I, Element>(element_ppm: I, budget: u64) -> impl Iterator<Item = (Element, u64)>
 where
     I: IntoIterator<Item = (Element, u32)>,
 {
-    let mut total_shares = 0u64;
-    element_shares
+    let mut total_ppm = 0u64;
+    element_ppm
         .into_iter()
-        .filter_map(move |(element, share)| {
-            total_shares += share as u64;
-            if total_shares > PPM as u64 {
-                abort_message("provided shares exceed 100%");
+        .filter_map(move |(element, ppm)| {
+            total_ppm += ppm as u64;
+            if total_ppm > PPM as u64 {
+                abort_message("ppm sum exceeds 1,000,000 / 100%");
             }
-            let amount = ((share as u128 * total as u128) / PPM as u128) as u64;
+            let amount = ((ppm as u128 * budget as u128) / PPM as u128) as u64;
             (amount > 0).then_some((element, amount))
         })
 }
