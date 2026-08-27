@@ -45,12 +45,25 @@ impl FractalMember {
         account: AccountNumber,
         recruiter: Option<AccountNumber>,
     ) -> Self {
+        let fractal = fractal.base();
+        let account = account.base();
+        let recruiter = recruiter.map(|r| r.base());
+
+        assert!(account != fractal, "fractal cannot be a member of itself",);
         assert!(
             FractalExile::get(fractal, account).is_none(),
             "member has been exiled from this fractal",
         );
         if let Some(existing) = Self::get(fractal, account) {
             return existing;
+        }
+
+        if let Some(recruiter) = recruiter {
+            assert!(recruiter != account, "cannot recruit yourself",);
+            assert!(
+                Self::get(fractal, recruiter).is_some(),
+                "recruiter is not a member of this fractal",
+            );
         }
 
         let new_instance = Self::new(fractal, account);
