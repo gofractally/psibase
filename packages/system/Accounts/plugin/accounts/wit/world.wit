@@ -23,7 +23,7 @@ interface active-app {
     connect-account: func() -> result<_, error>;
 }
 
-/// Restricted API for setting the logged-in user's auth service.
+/// This is the typical API
 interface api {
     use host:types/types.{error};
 
