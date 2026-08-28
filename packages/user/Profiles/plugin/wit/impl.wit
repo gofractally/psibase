@@ -7,7 +7,7 @@ world impl {
 
     include host:db/imports;
     include accounts:chain-query/imports;
-    include accounts:client-query/imports;
+    include host:accounts/imports;
     include permissions:plugin/imports;
 
     export api;

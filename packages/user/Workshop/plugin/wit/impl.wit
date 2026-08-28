@@ -9,7 +9,7 @@ world impl {
     include chainmail:plugin/imports;
     include registry:plugin/imports;
     include auth-delegate:plugin/imports;
-    include accounts:client-query/imports;
+    include host:accounts/imports;
     include permissions:plugin/imports;
 
     export app;
