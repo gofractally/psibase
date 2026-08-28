@@ -1,3 +1,5 @@
+import { TriangleAlert, Unplug } from "lucide-react";
+
 import { Alert, AlertDescription, AlertTitle } from "@shared/shadcn/ui/alert";
 
 import { useConfig } from "../hooks/use-config";
@@ -57,12 +59,11 @@ export const StatusBanner = () => {
     }
 
     const disconnected = Boolean(peersError && configError && statusError);
-    const statusTitle = disconnected
-        ? "🔴 Node Connection Error"
-        : "⚠️ Warning";
+    const statusTitle = disconnected ? "Node connection error" : "Warning";
 
     return (
-        <Alert variant={disconnected ? "destructive" : "default"}>
+        <Alert variant={disconnected ? "destructive" : "warning"}>
+            {disconnected ? <Unplug /> : <TriangleAlert />}
             <AlertTitle>{statusTitle}</AlertTitle>
             {serverStatus.map((status, idx) => (
                 <AlertDescription key={idx}>{status}</AlertDescription>

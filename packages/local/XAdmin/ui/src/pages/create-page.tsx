@@ -362,22 +362,21 @@ export const CreatePage = () => {
                     started={currentState[1]}
                 />
             )}
-            <div className="relative flex h-full flex-col justify-between ">
-                <div></div>
-                <div className="flex flex-col">
-                    <div className="pb-20">
-                        <Steps
-                            currentStep={currentStepNum}
-                            numberOfSteps={maxSteps}
-                        />
-                    </div>
-                    {currentStep === Step.ChainType && (
-                        <div>
-                            <h1 className="mb-4 scroll-m-20 text-3xl font-extrabold tracking-tight lg:text-4xl">
-                                Boot template
-                            </h1>
-                            {devTemplate &&
-                                prodTemplate && (
+            <div className="relative flex min-h-0 flex-1 flex-col">
+                <div className="min-h-0 flex-1 overflow-y-auto px-4 sm:px-8">
+                    <div className="mx-auto flex max-w-3xl flex-col pb-6">
+                        <div className="mb-8">
+                            <Steps
+                                currentStep={currentStepNum}
+                                numberOfSteps={maxSteps}
+                            />
+                        </div>
+                        {currentStep === Step.ChainType && (
+                            <div>
+                                <h1 className="mb-6 text-2xl font-semibold tracking-tight">
+                                    Boot template
+                                </h1>
+                                {devTemplate && prodTemplate && (
                                     <ChainTypeForm
                                         form={chainTypeForm}
                                         next={next}
@@ -389,71 +388,79 @@ export const CreatePage = () => {
                                         }
                                     />
                                 )}
-                        </div>
-                    )}
-                    {currentStep === Step.BlockProducer && (
-                        <div>
-                            <h1 className="mb-4 scroll-m-20 text-3xl font-extrabold tracking-tight lg:text-4xl">
-                                Name yourself
-                            </h1>
-                            <BlockProducerForm
-                                form={blockProducerForm}
-                                next={next}
+                            </div>
+                        )}
+                        {currentStep === Step.BlockProducer && (
+                            <div>
+                                <h1 className="mb-6 text-2xl font-semibold tracking-tight">
+                                    Name yourself
+                                </h1>
+                                <BlockProducerForm
+                                    form={blockProducerForm}
+                                    next={next}
+                                />
+                            </div>
+                        )}
+                        {currentStep === Step.KeyDevice && (
+                            <div className="flex justify-center">
+                                <Card className="w-full max-w-md">
+                                    <CardHeader>
+                                        <CardTitle>
+                                            Select security device
+                                        </CardTitle>
+                                        <CardDescription>
+                                            Where do you want your block
+                                            producer server key to be stored?
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <KeyDeviceForm
+                                            form={keyDeviceForm}
+                                            next={next}
+                                            deviceNotFoundErrorMessage="No security devices were found. Please ensure one is available. Alternatively, you may boot in an insecure keyless mode by going back and selecting the Development boot template."
+                                        />
+                                    </CardContent>
+                                </Card>
+                            </div>
+                        )}
+                        {currentStep === Step.PreBootConfirmation && (
+                            <InstallationSummary
+                                isDev={isDev}
+                                bpName={bpName}
+                                keyDevice={keyDevice}
+                                rows={rows}
+                                setRows={setRows}
+                                packages={packages}
                             />
-                        </div>
-                    )}
-                    {currentStep === Step.KeyDevice && (
-                        <div className="flex justify-center">
-                            <Card className="min-w-[350px]">
-                                <CardHeader>
-                                    <CardTitle>
-                                        Select security device
-                                    </CardTitle>
-                                    <CardDescription>
-                                        Where do you want your block producer
-                                        server key to be stored?
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <KeyDeviceForm
-                                        form={keyDeviceForm}
-                                        next={next}
-                                        deviceNotFoundErrorMessage="No security devices were found. Please ensure one is available. Alternatively, you may boot in an insecure keyless mode by going back and selecting the Development boot template."
-                                    />
-                                </CardContent>
-                            </Card>
-                        </div>
-                    )}
-                    {currentStep === Step.PreBootConfirmation && (
-                        <InstallationSummary
-                            isDev={isDev}
-                            bpName={bpName}
-                            keyDevice={keyDevice}
-                            rows={rows}
-                            setRows={setRows}
-                            packages={packages}
-                        />
-                    )}
-                    {currentStep === Step.SaveKey && (
-                        <PromptSaveSigningKey
-                            account={bpName}
-                            privateKey={txSigningPrivateKey}
-                            didSaveKey={didSaveKey}
-                            setDidSaveKey={setDidSaveKey}
-                        />
-                    )}
-                    {currentStep === Step.ConfirmKey && (
-                        <PromptConfirmSigningKey form={importForm} />
-                    )}
+                        )}
+                        {currentStep === Step.SaveKey && (
+                            <PromptSaveSigningKey
+                                account={bpName}
+                                privateKey={txSigningPrivateKey}
+                                didSaveKey={didSaveKey}
+                                setDidSaveKey={setDidSaveKey}
+                            />
+                        )}
+                        {currentStep === Step.ConfirmKey && (
+                            <PromptConfirmSigningKey form={importForm} />
+                        )}
+                    </div>
                 </div>
-                <div className="py-4">
-                    <PrevNextButtons
-                        canNext={canNext}
-                        canPrev={canPrev}
-                        next={next}
-                        previous={previous}
-                    />
-                </div>
+                {currentStep !== Step.Boot && (
+                    <div className="bg-background/80 shrink-0 border-t px-4 py-4 backdrop-blur sm:pl-10 sm:pr-[28rem]">
+                        <PrevNextButtons
+                            canNext={canNext}
+                            canPrev={canPrev}
+                            next={next}
+                            previous={previous}
+                            nextLabel={
+                                currentStep === Step.PreBootConfirmation
+                                    ? "Boot"
+                                    : "Continue"
+                            }
+                        />
+                    </div>
+                )}
             </div>
         </SetupWrapper>
     );

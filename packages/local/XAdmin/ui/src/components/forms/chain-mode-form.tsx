@@ -34,7 +34,7 @@ export const ChainTypeForm = ({
                     name="type"
                     render={({ field }) => (
                         <FormItem>
-                            <div className="flex w-full justify-between gap-8">
+                            <div className="flex w-full flex-col justify-between gap-4 sm:flex-row sm:gap-6">
                                 <Button
                                     onClick={(event) => {
                                         event.preventDefault();
@@ -47,17 +47,17 @@ export const ChainTypeForm = ({
                                             : "outline"
                                     }
                                     className={cn(
-                                        "h-auto w-0 flex-1 select-none flex-col gap-1.5 whitespace-normal disabled:cursor-not-allowed",
+                                        "h-auto min-h-40 flex-1 basis-0 select-none flex-col gap-2 whitespace-normal p-6 disabled:cursor-not-allowed",
                                         {
                                             "border-primary border-2":
                                                 field.value === "dev",
                                         },
                                     )}
                                 >
-                                    <h2 className="text-2xl">
+                                    <h2 className="text-xl font-medium">
                                         Development
                                     </h2>
-                                    <p className="text-muted-foreground text-center text-sm max-w-[35ch] mx-auto">
+                                    <p className="text-muted-foreground mx-auto max-w-[35ch] text-center text-sm">
                                         {devTemplateDescription}
                                     </p>
                                 </Button>
@@ -74,7 +74,7 @@ export const ChainTypeForm = ({
                                                 : "outline"
                                         }
                                         className={cn(
-                                            "h-auto w-0 flex-1 select-none flex-col gap-1.5 whitespace-normal",
+                                            "h-auto min-h-40 w-full flex-1 basis-0 select-none flex-col gap-2 whitespace-normal p-6",
                                             {
                                                 "border-primary border-2":
                                                     field.value === "prod",
@@ -82,15 +82,15 @@ export const ChainTypeForm = ({
                                         )}
                                         disabled={!window.isSecureContext}
                                     >
-                                        <h2 className="text-2xl">
+                                        <h2 className="text-xl font-medium">
                                             Production
                                         </h2>
-                                        <p className="text-muted-foreground text-center text-sm max-w-[35ch] mx-auto">
+                                        <p className="text-muted-foreground mx-auto max-w-[35ch] text-center text-sm">
                                             {prodTemplateDescription}
                                         </p>
                                         {!window.isSecureContext ? (
                                             <p className="text-muted-foreground text-center text-sm">
-                                                ⚠️ Only available via HTTPS or
+                                                Only available via HTTPS or
                                                 localhost
                                             </p>
                                         ) : null}

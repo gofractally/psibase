@@ -18,35 +18,34 @@ export const SetupPage = () => {
 
     return (
         <EaseIn>
-            <div className="flex w-full flex-col justify-center sm:h-dvh ">
-                <div className="mx-auto">
-                    <div className="text-muted-foreground mx-auto mb-4 flex text-4xl font-normal ">
+            <div className="flex min-h-dvh w-full flex-col justify-center py-16">
+                <div className="mx-auto w-full max-w-3xl">
+                    <div className="text-muted-foreground mb-10 flex flex-wrap items-baseline justify-center text-3xl font-medium sm:text-4xl">
                         Let's get
                         <FlipWords words={words} />
                     </div>
-                    <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-                        <div className="relative mx-auto flex h-[30rem] max-w-sm flex-col items-start border  p-4 dark:border-white/[0.2]">
+                    <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
+                        <div className="bg-card relative flex h-full flex-col rounded-xl border p-4 shadow-sm">
                             <EvervaultCard
                                 onClick={() => navigate("/setup/join")}
                                 text="Join network"
                                 gradient="from-green-700 to-green-500"
                             />
-
-                            <h2 className="mt-4 text-sm font-light text-black dark:text-white">
+                            <p className="text-muted-foreground mt-4 min-h-[2.75rem] text-sm leading-relaxed">
                                 Join an existing network by URL.
-                            </h2>
+                            </p>
                         </div>
-                        <div className="relative mx-auto flex h-[30rem] max-w-sm flex-col items-start border  p-4 dark:border-white/[0.2]">
+                        <div className="bg-card relative flex h-full flex-col rounded-xl border p-4 shadow-sm">
                             <EvervaultCard
                                 onClick={() => navigate("/setup/create")}
                                 text="Create network"
-                                gradient="from-blue-700 to-blue-500 "
+                                gradient="from-blue-700 to-blue-500"
                                 chars="10"
                             />
-                            <h2 className="mt-4 text-sm font-light text-black dark:text-white">
+                            <p className="text-muted-foreground mt-4 min-h-[2.75rem] text-sm leading-relaxed">
                                 Create a new network and immediately become a
                                 block producing node.
-                            </h2>
+                            </p>
                         </div>
                     </div>
                 </div>

@@ -65,22 +65,16 @@ export function UrlForm({ onSubmit: handleSubmit, existingValues }: Props) {
                         </FormItem>
                     )}
                 />
-                <div className="flex w-full justify-between">
-                    <div>
-                        <FormRootError />
-                    </div>
+                <div className="flex w-full items-center justify-between gap-3">
+                    <FormRootError />
                     <Button
-                        className="w-40"
-                        size="lg"
                         type="submit"
                         disabled={form.formState.isSubmitting}
                     >
-                        <Unplug size={20} className="absolute mr-28" />
-                        <div>
-                            {form.formState.isSubmitting
-                                ? "Connecting.."
-                                : "Connect"}
-                        </div>
+                        <Unplug />
+                        {form.formState.isSubmitting
+                            ? "Connecting..."
+                            : "Connect"}
                     </Button>
                 </div>
             </form>
