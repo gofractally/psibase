@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { crypto } from "wasm-transpiled";
@@ -97,7 +97,6 @@ export const CreatePage = () => {
     const keyDeviceForm = useForm<z.infer<typeof KeyDeviceSchema>>();
 
     const isDev = chainTypeForm.watch("type") == "dev";
-    const bpName = blockProducerForm.watch("name");
     const keyDevice = keyDeviceForm.watch("id");
 
     const importForm = useAppForm({
@@ -112,7 +111,9 @@ export const CreatePage = () => {
             }),
             onSubmit: z.object({
                 account: zAccount.refine(
-                    (val) => val.trim() === bpName?.trim(),
+                    (val) =>
+                        val.trim() ===
+                        blockProducerForm.getValues("name")?.trim(),
                     {
                         message:
                             "Account name must match the block producer account name you just created",
@@ -198,11 +199,15 @@ export const CreatePage = () => {
 
     const { data: packages } = usePackages();
 
-    const suggestedSelection = getDefaultSelectedPackages(
-        {
-            dev: isDev,
-        },
-        packages,
+    const suggestedSelection = useMemo(
+        () =>
+            getDefaultSelectedPackages(
+                {
+                    dev: isDev,
+                },
+                packages,
+            ),
+        [isDev, packages],
     );
     const devTemplate = packages.find((pack) => pack.name === "DevDefault");
     const prodTemplate = packages.find((pack) => pack.name === "ProdWithFG");
@@ -271,7 +276,7 @@ export const CreatePage = () => {
                 );
                 bootChain({
                     packages: requiredPackages,
-                    producerName: bpName,
+                    producerName: blockProducerForm.getValues("name"),
                     blockSigningPubKey,
                     txSigningPubKeyPem: txSigningKeyPair?.[0],
                     compression: isDev ? 4 : 7,
@@ -324,7 +329,7 @@ export const CreatePage = () => {
                 installRan.current = false;
             }
         }
-    }, [currentStep, rows, bpName, config]);
+    }, [currentStep, rows, config]);
 
     if (currentStep === Step.BootComplete) {
         return (
@@ -422,7 +427,7 @@ export const CreatePage = () => {
                         {currentStep === Step.PreBootConfirmation && (
                             <InstallationSummary
                                 isDev={isDev}
-                                bpName={bpName}
+                                bpName={blockProducerForm.getValues("name")}
                                 keyDevice={keyDevice}
                                 rows={rows}
                                 setRows={setRows}
@@ -431,7 +436,7 @@ export const CreatePage = () => {
                         )}
                         {currentStep === Step.SaveKey && (
                             <PromptSaveSigningKey
-                                account={bpName}
+                                account={blockProducerForm.getValues("name")}
                                 privateKey={txSigningPrivateKey}
                                 didSaveKey={didSaveKey}
                                 setDidSaveKey={setDidSaveKey}
