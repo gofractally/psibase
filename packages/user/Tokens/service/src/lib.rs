@@ -266,9 +266,7 @@ pub mod service {
         memo: Memo,
         sub_account: Option<String>,
     ) {
-        let mut token = Token::get_assert(token_id);
-
-        token.recall(amount, from, sub_account);
+        Token::get_assert(token_id).recall(amount, from, sub_account);
         emit_recall(token_id, from, amount, memo);
     }
 
@@ -290,9 +288,7 @@ pub mod service {
         amount: Quantity,
         memo: Memo,
     ) {
-        let mut token = Token::get_assert(token_id);
-
-        token.recall_shared(amount, creditor, debitor);
+        Token::get_assert(token_id).recall_shared(amount, creditor, debitor);
         emit_recall(token_id, creditor, amount, memo);
     }
 
