@@ -42,6 +42,7 @@ if(DEFINED IS_WASM)
     add_usr_cargo_psibase_test(Tokens)
     add_usr_cargo_psibase_test(TokenStream)
     add_usr_cargo_psibase_test(Fractals)
+    add_usr_cargo_psibase_test(NameMarket)
 endif()
 
 if(DEFINED IS_WASM)
