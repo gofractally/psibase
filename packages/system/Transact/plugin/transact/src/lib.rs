@@ -97,7 +97,7 @@ fn get_action_sender(service: &str, method: &str) -> Result<String, HostTypes::E
             return Ok(s);
         }
     }
-    if let Some(sender) = accounts::client_query::api::get_current_user() {
+    if let Some(sender) = bindings::host::accounts::api::get_current_user() {
         return Ok(sender);
     }
 
@@ -166,7 +166,7 @@ fn flush_propose_latch() -> Result<(), HostTypes::Error> {
         return Ok(());
     }
 
-    let Some(proposer) = accounts::client_query::api::get_current_user() else {
+    let Some(proposer) = bindings::host::accounts::api::get_current_user() else {
         return Err(NotLoggedIn("flush_propose_latch").into());
     };
 

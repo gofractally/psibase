@@ -11,7 +11,7 @@ use host::http::api as Server;
 use host::client::api as Client;
 use host::types::types as HostTypes;
 
-use accounts::client_query::api as Accounts;
+use bindings::host::accounts::api as Accounts;
 use setcode::plugin::api as SetCode;
 use sites::plugin::api as Sites;
 use crate::bindings::transact::plugin::api::{add_action_to_transaction, propose};

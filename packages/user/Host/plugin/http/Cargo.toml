@@ -21,7 +21,7 @@ world = "impl"
 
 [package.metadata.component.target.dependencies]
 "supervisor:bridge" = { path = "./wit/deps/supervisor.wit" }
-"accounts:client-query" = { path = "../../../../system/Accounts/plugin/client-query/wit/world.wit" }
+"host:accounts" = { path = "../accounts/wit/world.wit" }
 "host:types" = { path = "../types/wit/world.wit" }
 "host:client" = { path = "../client/wit/world.wit" }
 "host:auth" = { path = "../auth/wit/world.wit" }
