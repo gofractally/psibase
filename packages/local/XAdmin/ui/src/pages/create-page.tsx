@@ -55,7 +55,7 @@ import { DependencyDialog } from "./dependency-dialog";
 import { SetupWrapper } from "./setup-wrapper";
 
 export const BlockProducerSchema = z.object({
-    name: z.string().min(1),
+    name: zAccount,
 });
 
 interface DependencyState {
