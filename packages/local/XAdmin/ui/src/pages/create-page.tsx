@@ -382,12 +382,6 @@ export const CreatePage = () => {
                                     <ChainTypeForm
                                         form={chainTypeForm}
                                         next={next}
-                                        devTemplateDescription={
-                                            devTemplate.description
-                                        }
-                                        prodTemplateDescription={
-                                            prodTemplate.description
-                                        }
                                     />
                                 )}
                             </div>
