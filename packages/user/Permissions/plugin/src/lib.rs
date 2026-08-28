@@ -6,7 +6,7 @@ use types::*;
 
 use bindings::*;
 
-use accounts::client_query::api as Accounts;
+use bindings::host::accounts::api as Accounts;
 use exports::permissions::plugin::{
     admin::{ApprovalDuration, Guest as PermsAdmin, PromptContext},
     api::Guest as Api,

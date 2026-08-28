@@ -37,7 +37,7 @@ world impl {
     include host:http/imports;
     include host:db/imports;
     include host:prompt/imports;
-    include accounts:client-query/imports;
+    include host:accounts/imports;
 
     export api;
     export admin;
