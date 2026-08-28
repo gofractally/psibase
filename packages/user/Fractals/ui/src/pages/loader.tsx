@@ -1,5 +1,5 @@
 import { Gavel } from "lucide-react";
-import { useState } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useConnectAccount } from "@shared/hooks/use-connect-account";
@@ -13,8 +13,6 @@ import {
     CardTitle,
 } from "@shared/shadcn/ui/card";
 
-import { CreateFractalModal } from "../components/create-fractal-modal";
-
 export const Loader = () => {
     const { mutate: login } = useConnectAccount();
     const { data: currentUser, isPending } = useCurrentUser();
@@ -23,20 +21,18 @@ export const Loader = () => {
 
     const navigate = useNavigate();
 
-    if (isLoggedIn) {
-        navigate("/browse");
-    }
+    useEffect(() => {
+        if (isLoggedIn) {
+            navigate("/browse", { replace: true });
+        }
+    }, [isLoggedIn, navigate]);
 
-    const [showModal, setShowModal] = useState<boolean>(false);
+    if (isPending || isLoggedIn) {
+        return null;
+    }
 
     return (
         <Card className="mx-auto mt-4 w-[350px]">
-            <CreateFractalModal
-                show={showModal}
-                openChange={(e) => {
-                    setShowModal(e);
-                }}
-            />
             <CardHeader>
                 <div className="mx-auto">
                     <Gavel className="h-12 w-12" />
@@ -46,27 +42,11 @@ export const Loader = () => {
                     The fractals app allows users to create fractals and
                     participate in fractal governance.
                 </CardDescription>
-                <CardDescription>
-                    {isLoggedIn
-                        ? "Add a fractal to continue"
-                        : "Log in to continue"}
-                </CardDescription>
-                <CardFooter className="flex justify-end">
-                    {isLoggedIn ? (
-                        <Button
-                            onClick={() => {
-                                setShowModal(true);
-                            }}
-                        >
-                            Add fractal
-                        </Button>
-                    ) : (
-                        <Button disabled={isPending} onClick={() => login()}>
-                            Login
-                        </Button>
-                    )}
-                </CardFooter>
+                <CardDescription>Log in to continue</CardDescription>
             </CardHeader>
+            <CardFooter className="flex justify-end">
+                <Button onClick={() => login()}>Login</Button>
+            </CardFooter>
         </Card>
     );
 };
