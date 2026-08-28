@@ -1,4 +1,5 @@
 #include <catch2/catch_all.hpp>
+#include <optional>
 #include <psibase/DefaultTestChain.hpp>
 #include <psibase/MethodNumber.hpp>
 #include <psibase/checkSchema.hpp>
@@ -226,7 +227,7 @@ SCENARIO("Recalling tokens")
       }
       THEN("Alice can recall Bob's tokens")
       {
-         auto recall = a.recall(tokenId, bob, 1'000e4, memo);
+         auto recall = a.recall(tokenId, bob, 1'000e4, memo, std::nullopt);
          CHECK(recall.succeeded());
 
          AND_THEN("Bob's token balance has decreased")
@@ -246,11 +247,55 @@ SCENARIO("Recalling tokens")
 
          AND_THEN("Alice may not recall Bob's tokens")
          {
-            CHECK(a.recall(tokenId, bob, 1'000e4, memo).failed(tokenUnrecallable));
+            CHECK(a.recall(tokenId, bob, 1'000e4, memo, std::nullopt).failed(tokenUnrecallable));
          }
          AND_THEN("The token issuer may not re-enable recallability")
          {
             CHECK(a.setTokenConf(tokenId, Tokens::unrecallable, false).failed(invalidConfigUpdate));
+         }
+      }
+      WHEN("Bob moves his tokens into a sub-account")
+      {
+         CHECK(b.toSub(tokenId, "savings", 1'000e4).succeeded());
+         CHECK(a.getBalance(tokenId, bob).returnVal().value == 0);
+
+         THEN("Alice cannot recall them from Bob's primary balance")
+         {
+            CHECK(a.recall(tokenId, bob, 1'000e4, memo, std::nullopt).failed(insufficientBalance));
+         }
+         THEN("Alice can recall them from the sub-account")
+         {
+            CHECK(a.recall(tokenId, bob, 1'000e4, memo, std::string{"savings"}).succeeded());
+            CHECK(a.getBalance(tokenId, bob).returnVal().value == 0);
+            CHECK(not b.getSubBal(tokenId, "savings").returnVal().has_value());
+         }
+         THEN("Bob may not burn tokens that sit only in a sub-account")
+         {
+            CHECK(b.burn(tokenId, 1e4, memo).failed(insufficientBalance));
+         }
+      }
+      WHEN("Bob credits Carol, who does not auto-debit")
+      {
+         auto carol = t.from(t.addAccount("carol"_a));
+         auto c     = carol.to<Tokens>();
+         CHECK(b.credit(tokenId, carol, 1'000e4, memo).succeeded());
+         CHECK(b.getSharedBal(tokenId, bob, carol).returnVal().value == 1'000e4);
+
+         THEN("Alice cannot recall them from Bob's primary balance")
+         {
+            CHECK(a.recall(tokenId, bob, 1'000e4, memo, std::nullopt).failed(insufficientBalance));
+         }
+         THEN("Alice can recall them from the shared balance")
+         {
+            CHECK(a.recallShared(tokenId, bob, carol, 1'000e4, memo).succeeded());
+            CHECK(a.getBalance(tokenId, bob).returnVal().value == 0);
+            CHECK(b.getSharedBal(tokenId, bob, carol).returnVal().value == 0);
+            CHECK(c.getBalance(tokenId, carol).returnVal().value == 0);
+         }
+         THEN("Alice recalling Carol as creditor does not take Bob's in-flight credit")
+         {
+            CHECK(a.recallShared(tokenId, carol, bob, 1'000e4, memo).failed(missingSharedBalance));
+            CHECK(b.getSharedBal(tokenId, bob, carol).returnVal().value == 1'000e4);
          }
       }
    }
@@ -308,14 +353,14 @@ SCENARIO("Interactions with the Issuer NFT")
          THEN("Alice may not recall Bob's tokens")
          {
             b.mint(tokenId, 1'000e4, memo);
-            CHECK(a.recall(tokenId, bob, 1'000e4, memo).failed(missingRequiredAuth));
+            CHECK(a.recall(tokenId, bob, 1'000e4, memo, std::nullopt).failed(missingRequiredAuth));
          }
          THEN("Bob may recall Alice's tokens")
          {
             Quantity q{1'000e4};
             b.mint(tokenId, q, memo);
             b.credit(tokenId, alice, q, memo);
-            CHECK(b.recall(tokenId, alice, q, memo).succeeded());
+            CHECK(b.recall(tokenId, alice, q, memo, std::nullopt).succeeded());
          }
       }
       WHEN("Alice burns the issuer NFT")
@@ -335,7 +380,7 @@ SCENARIO("Interactions with the Issuer NFT")
          }
          THEN("Alice may not recall Bob's tokens")
          {
-            CHECK(a.recall(tokenId, bob, quantity, memo).failed(nftBurned));
+            CHECK(a.recall(tokenId, bob, quantity, memo, std::nullopt).failed(nftBurned));
          }
          THEN("Alice may not update the token inflation")
          {  //

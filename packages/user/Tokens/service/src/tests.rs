@@ -2,8 +2,8 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::helpers::to_fixed;
     use crate::Wrapper;
+    use crate::helpers::to_fixed;
     use psibase::services::http_server;
     use psibase::services::tokens::{Decimal, Precision, Quantity, TokensError};
     use psibase::*;
@@ -139,6 +139,145 @@ mod tests {
         b.reject(tid, alice, memo.clone());
         assert_eq!(100, a.getBalance(tid, alice).get()?.value);
         assert_eq!(0, b.getBalance(tid, bob).get()?.value);
+
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Tokens"))]
+    fn test_recall(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init();
+
+        let alice = account!("alice");
+        chain.new_account(alice).unwrap();
+        let a = Wrapper::push_from(&chain, alice);
+
+        let bob = account!("bob");
+        chain.new_account(bob).unwrap();
+        let b = Wrapper::push_from(&chain, bob);
+
+        let carol = account!("carol");
+        chain.new_account(carol).unwrap();
+        let c = Wrapper::push_from(&chain, carol);
+
+        enable_nft_auto_debit(&chain, alice);
+
+        let memo = Memo::new("memo".to_string()).unwrap();
+        let savings = "savings".to_string();
+        let checking = "checking".to_string();
+
+        let issue = |amount: u64| -> Result<u32, psibase::Error> {
+            let tid = a.create(4.try_into().unwrap(), 1_000_0000.into()).get()?;
+            a.mint(tid, amount.into(), memo.clone()).get()?;
+            a.credit(tid, bob, amount.into(), memo.clone()).get()?;
+            b.debit(tid, alice, amount.into(), memo.clone()).get()?;
+            Ok(tid)
+        };
+
+        // Recall from primary balance
+        let tid = issue(100)?;
+        a.recall(tid, bob, 100.into(), memo.clone(), None).get()?;
+        assert_eq!(0, b.getBalance(tid, bob).get()?.value);
+
+        // Tokens in a sub-account are not recalled from the primary balance
+        let tid = issue(100)?;
+        b.toSub(tid, savings.clone(), 100.into()).get()?;
+        assert_error(
+            a.recall(tid, bob, 100.into(), memo.clone(), None),
+            "insufficient balance",
+        );
+        assert_eq!(
+            Some(Quantity::from(100u64)),
+            b.getSubBal(tid, savings.clone()).get()?
+        );
+
+        // Recall from a sub-account; auto-created sub-account is deleted
+        a.recall(tid, bob, 100.into(), memo.clone(), Some(savings.clone()))
+            .get()?;
+        assert_eq!(0, b.getBalance(tid, bob).get()?.value);
+        assert_eq!(None, b.getSubBal(tid, savings.clone()).get()?);
+
+        // Burn still uses primary only
+        let tid = issue(100)?;
+        b.toSub(tid, savings.clone(), 100.into()).get()?;
+        assert_error(b.burn(tid, 1.into(), memo.clone()), "insufficient balance");
+        a.recall(tid, bob, 100.into(), memo.clone(), Some(savings.clone()))
+            .get()?;
+
+        // Outstanding credits are not recalled from the primary balance
+        let tid = issue(100)?;
+        b.credit(tid, carol, 100.into(), memo.clone()).get()?;
+        assert_eq!(100, get_shared_balance(&chain, tid, bob, carol).value);
+        assert_error(
+            a.recall(tid, bob, 100.into(), memo.clone(), None),
+            "insufficient balance",
+        );
+
+        // Recall from a shared balance
+        a.recallShared(tid, bob, carol, 100.into(), memo.clone())
+            .get()?;
+        assert_eq!(0, b.getBalance(tid, bob).get()?.value);
+        assert_eq!(0, get_shared_balance(&chain, tid, bob, carol).value);
+        assert_eq!(0, c.getBalance(tid, carol).get()?.value);
+
+        // Incoming undebited credits are not the debitor's to recall
+        let tid = issue(100)?;
+        b.credit(tid, carol, 100.into(), memo.clone()).get()?;
+        assert_error(
+            a.recallShared(tid, carol, bob, 100.into(), memo.clone()),
+            "Shared balance does not exist",
+        );
+        assert_eq!(100, get_shared_balance(&chain, tid, bob, carol).value);
+
+        // Partial shared-balance recall
+        a.recallShared(tid, bob, carol, 40.into(), memo.clone())
+            .get()?;
+        assert_eq!(60, get_shared_balance(&chain, tid, bob, carol).value);
+        assert_error(
+            a.recallShared(tid, bob, carol, 61.into(), memo.clone()),
+            "Insufficient shared balance",
+        );
+
+        // Manual sub-account is kept after a full recall of its balance
+        let tid = issue(50)?;
+        b.createSub(savings.clone()).get()?;
+        b.toSub(tid, savings.clone(), 50.into()).get()?;
+        a.recall(tid, bob, 50.into(), memo.clone(), Some(savings.clone()))
+            .get()?;
+        assert_eq!(
+            Some(Quantity::from(0u64)),
+            b.getSubBal(tid, savings.clone()).get()?
+        );
+        b.deleteSub(savings.clone()).get()?;
+
+        // Other tokens in the same sub-account are left alone
+        let tid = issue(80)?;
+        let tid2 = issue(30)?;
+        b.toSub(tid, savings.clone(), 80.into()).get()?;
+        b.toSub(tid2, savings.clone(), 30.into()).get()?;
+        a.recall(tid, bob, 80.into(), memo.clone(), Some(savings.clone()))
+            .get()?;
+        assert_eq!(
+            Some(Quantity::from(0u64)),
+            b.getSubBal(tid, savings.clone()).get()?
+        );
+        assert_eq!(
+            Some(Quantity::from(30u64)),
+            b.getSubBal(tid2, savings.clone()).get()?
+        );
+        b.fromSub(tid2, savings.clone(), 30.into()).get()?;
+        assert_eq!(None, b.getSubBal(tid2, savings.clone()).get()?);
+
+        // Recalling one sub-account leaves another
+        let tid = issue(100)?;
+        b.toSub(tid, savings.clone(), 40.into()).get()?;
+        b.toSub(tid, checking.clone(), 60.into()).get()?;
+        a.recall(tid, bob, 40.into(), memo.clone(), Some(savings.clone()))
+            .get()?;
+        assert_eq!(None, b.getSubBal(tid, savings.clone()).get()?);
+        assert_eq!(
+            Some(Quantity::from(60u64)),
+            b.getSubBal(tid, checking.clone()).get()?
+        );
 
         Ok(())
     }

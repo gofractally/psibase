@@ -53,12 +53,40 @@ impl Issuer for TokensPlugin {
     }
 
     #[psibase_plugin::authorized(High)]
-    fn recall(token_id: u32, amount: String, memo: String, account: String) -> Result<(), Error> {
+    fn recall(
+        token_id: u32,
+        amount: String,
+        memo: String,
+        account: String,
+        sub_account: Option<String>,
+    ) -> Result<(), Error> {
         let amount = Self::non_zero(token_id, amount)?;
+        let sub_account = sub_account.filter(|s| !s.is_empty());
 
         Tokens::add_to_tx().recall(
             token_id,
             account.parse().unwrap(),
+            amount,
+            memo.as_str().into(),
+            sub_account,
+        );
+        Ok(())
+    }
+
+    #[psibase_plugin::authorized(High)]
+    fn recall_shared(
+        token_id: u32,
+        amount: String,
+        memo: String,
+        creditor: String,
+        debitor: String,
+    ) -> Result<(), Error> {
+        let amount = Self::non_zero(token_id, amount)?;
+
+        Tokens::add_to_tx().recallShared(
+            token_id,
+            creditor.parse().unwrap(),
+            debitor.parse().unwrap(),
             amount,
             memo.as_str().into(),
         );
