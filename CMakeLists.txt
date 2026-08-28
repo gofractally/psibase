@@ -276,7 +276,6 @@ add_dependencies(CommonApiCommonLib_js ComponentParser)
 
 add_rs_component_workspace(packages/:Plugins 
     accounts
-    accounts-client-query
     accounts-chain-query
     aes
     auth-any
@@ -292,6 +291,7 @@ add_rs_component_workspace(packages/:Plugins
     packages
     permissions
     sites
+    host-accounts
     host-client
     host-http
     host-db
@@ -375,7 +375,6 @@ psibase_package(
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Accounts/ui/dist/* /
         DATA ${Plugins_OUTPUT_FILE_accounts} /plugin.wasm
         DATA ${Plugins_OUTPUT_FILE_accounts_chain_query} /chain-query.wasm
-        DATA ${Plugins_OUTPUT_FILE_accounts_client_query} /client-query.wasm
         POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Accounts/postinstall-ui.json
     DEPENDS ${Accounts_js_DEP}
     DEPENDS ${Plugins_DEP}
@@ -465,6 +464,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     ACCOUNTS wasi # This name would be overshadowed
     SERVICE host
+        DATA ${Plugins_OUTPUT_FILE_host_accounts} /accounts.wasm
         DATA ${Plugins_OUTPUT_FILE_host_client} /client.wasm
         DATA ${Plugins_OUTPUT_FILE_host_http} /http.wasm
         DATA ${Plugins_OUTPUT_FILE_host_db} /db.wasm

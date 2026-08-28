@@ -9,7 +9,7 @@ world impl {
     include transact:plugin/imports;
     include permissions:plugin/imports;
     include accounts:chain-query/imports;
-    include accounts:client-query/imports;
+    include host:accounts/imports;
     include auth-sig:plugin/imports;
     include name-market:plugin/imports;
     include host:crypto/imports;
