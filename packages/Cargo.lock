@@ -37,14 +37,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "accounts-client-query"
-version = "0.27.0"
-dependencies = [
- "psibase-plugin-workspace-hack",
- "wit-bindgen-rt",
-]
-
-[[package]]
 name = "adler2"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1365,6 +1357,14 @@ dependencies = [
 
 [[package]]
 name = "homepage"
+version = "0.27.0"
+dependencies = [
+ "psibase-plugin-workspace-hack",
+ "wit-bindgen-rt",
+]
+
+[[package]]
+name = "host-accounts"
 version = "0.27.0"
 dependencies = [
  "psibase-plugin-workspace-hack",

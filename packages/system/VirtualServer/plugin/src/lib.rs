@@ -14,7 +14,7 @@ use Exports::{
     preflight::Guest as Preflight,
 };
 
-use bindings::accounts::client_query as AccountsQuery;
+use bindings::host::accounts as AccountsQuery;
 use bindings::tokens::plugin as TokensPlugin;
 use psibase::AccountNumber;
 use psibase_plugin::*;

@@ -1,4 +1,4 @@
-use crate::bindings::accounts::client_query::api::get_current_user;
+use crate::bindings::host::accounts::api::get_current_user;
 use crate::bindings::accounts::chain_query::api::get_account;
 use crate::bindings::host::http::api as Server;
 use crate::bindings::host::types::types::{self as HostTypes, BodyTypes, PluginRef};

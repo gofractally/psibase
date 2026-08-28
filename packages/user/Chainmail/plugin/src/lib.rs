@@ -9,7 +9,7 @@ mod queries;
 mod serde_structs;
 
 use crate::trust::*;
-use bindings::accounts::client_query as AccountPlugin;
+use bindings::host::accounts as AccountPlugin;
 use bindings::exports::chainmail::plugin::{
     api::{Error, Guest as Api},
     queries::{Guest as Query, Message},
