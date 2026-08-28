@@ -19,7 +19,7 @@ export const MenuContent = ({ condense = false }: { condense?: boolean }) => {
         <>
             {condense && (
                 <Button asChild variant="outline" size="icon">
-                    <Link to="/Configuration">
+                    <Link to="/configuration">
                         <Cog />
                         <span className="sr-only">Configuration</span>
                     </Link>
