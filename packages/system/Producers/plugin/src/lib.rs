@@ -8,7 +8,7 @@ use psibase::services::auth_sig::SubjectPublicKeyInfo;
 
 use host::http::api::post_graphql_get_json;
 use host::types::types::Error;
-use transact::actions::intf::add_action_to_transaction;
+use transact::plugin::api::add_action_to_transaction;
 
 use exports::producers::plugin::api::Guest as Api;
 use producers::plugin::types::*;

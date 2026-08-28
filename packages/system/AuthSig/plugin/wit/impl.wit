@@ -1,13 +1,13 @@
 package auth-sig:plugin;
 
 world impl {
-    include transact:actions/imports;
+    include transact:plugin/imports;
     include host:client/imports;
     include host:http/imports;
     include host:crypto/imports;
     include permissions:plugin/imports;
 
-    include transact:actions/hook-user-auth;
+    include transact:plugin/hook-user-auth;
 
     export keyvault;
     export actions;

@@ -29,5 +29,5 @@ world = "impl"
 "host:http" = { path = "../../../user/Host/plugin/http/wit/world.wit" }
 "host:types" = { path = "../../../user/Host/plugin/types/wit/world.wit" }
 "host:crypto" = { path = "../../../user/Host/plugin/crypto/wit/world.wit" }
-"transact:actions" = { path = "../../Transact/plugin/actions/wit/world.wit" }
+"transact:plugin" = { path = "../../Transact/plugin/transact/wit/world.wit" }
 "permissions:plugin" = { path = "../../../user/Permissions/plugin/wit/world.wit" }

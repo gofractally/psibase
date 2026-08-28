@@ -9,7 +9,7 @@ use host::types::types::Error;
 use psibase::fracpack::Pack;
 use psibase::Checksum256;
 use staged_tx::action_structs::*;
-use transact::actions::intf::add_action_to_transaction;
+use transact::plugin::api::add_action_to_transaction;
 
 use serde::{Deserialize, Serialize};
 

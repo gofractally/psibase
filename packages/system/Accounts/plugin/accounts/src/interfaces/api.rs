@@ -1,5 +1,5 @@
 use crate::bindings::exports::accounts::plugin::api::{Guest as API, *};
-use crate::bindings::transact::actions::intf as Transact;
+use crate::bindings::transact::plugin::api as Transact;
 use crate::errors::ErrorType::*;
 use crate::plugin::AccountsPlugin;
 

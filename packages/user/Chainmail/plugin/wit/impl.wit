@@ -3,7 +3,7 @@ package chainmail:plugin;
 world impl {
     include host:client/imports;
     include host:http/imports;
-    include transact:actions/imports;
+    include transact:plugin/imports;
     include accounts:query/imports;
     include permissions:plugin/imports;
     export api;
