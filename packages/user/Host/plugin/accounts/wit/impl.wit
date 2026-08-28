@@ -1,4 +1,4 @@
-package accounts:client-query;
+package host:accounts;
 
 world impl {
     include host:client/imports;

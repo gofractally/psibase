@@ -88,7 +88,7 @@ fn get_action_sender(service: &str, method: &str) -> Result<String, HostTypes::E
             return Ok(s);
         }
     }
-    if let Some(sender) = accounts::client_query::api::get_current_user() {
+    if let Some(sender) = bindings::host::accounts::api::get_current_user() {
         return Ok(sender);
     }
 
@@ -133,7 +133,7 @@ fn pack_staged_propose(actions: Vec<ImportAction>, auto_exec: bool) -> (String, 
 }
 
 fn flush_propose_latch() -> Result<(), HostTypes::Error> {
-    OpenTx::flush_latch(accounts::client_query::api::get_current_user().as_deref())
+    OpenTx::flush_latch(bindings::host::accounts::api::get_current_user().as_deref())
         .map_err(|_| NotLoggedIn("flush_propose_latch").into())
 }
 
