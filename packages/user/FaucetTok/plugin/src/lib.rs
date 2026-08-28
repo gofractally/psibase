@@ -2,7 +2,7 @@
 mod bindings;
 
 use bindings::exports::faucet_tok::plugin::faucet::Guest as Faucet;
-use bindings::transact::actions::intf::add_action_to_transaction;
+use bindings::transact::plugin::api::add_action_to_transaction;
 use faucet_tok::action_structs as Actions;
 use psibase::fracpack::Pack;
 

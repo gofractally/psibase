@@ -14,9 +14,7 @@ use host::types::types as HostTypes;
 use accounts::query::api as Accounts;
 use setcode::plugin::api as SetCode;
 use sites::plugin::api as Sites;
-use transact::plugin::admin as TransactAdmin;
-
-use crate::bindings::transact::actions::intf::add_action_to_transaction;
+use crate::bindings::transact::plugin::api::{add_action_to_transaction, propose};
 use crate::packages::plugin::types;
 use exports::packages::plugin::private_api::Guest as PrivateApi;
 use exports::packages::plugin::queries::Guest as Queries;
@@ -582,7 +580,7 @@ impl PrivateApi for PackagesPlugin {
         assert_caller_config_or_self("propose_install");
 
         let tx = <Vec<Action>>::unpacked(&tx).unwrap();
-        TransactAdmin::propose(&tx.into_iter().map(|a| a.into()).collect::<Vec<_>>(), true)
+        propose(&tx.into_iter().map(|a| a.into()).collect::<Vec<_>>(), true)
     }
 
     fn set_account_sources(accounts: Vec<String>) -> Result<(), HostTypes::Error> {
@@ -607,9 +605,9 @@ impl PrivateApi for PackagesPlugin {
     }
 }
 
-impl From<Action> for transact::actions::types::Action {
+impl From<Action> for transact::plugin::types::Action {
     fn from(action: Action) -> Self {
-        transact::actions::types::Action {
+        transact::plugin::types::Action {
             sender: action.sender.to_string(),
             service: action.service.to_string(),
             method: action.method.to_string(),

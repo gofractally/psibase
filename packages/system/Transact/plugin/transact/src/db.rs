@@ -1,5 +1,5 @@
 use crate::bindings::clientdata::plugin::keyvalue as Keyvalue;
-use crate::bindings::transact::actions::types::{Action, Claim};
+use crate::bindings::transact::plugin::types::{Action, Claim};
 use psibase::fracpack::{Pack, Unpack};
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;

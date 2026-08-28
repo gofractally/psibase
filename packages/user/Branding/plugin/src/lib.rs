@@ -7,7 +7,7 @@ use exports::branding::plugin::queries::Guest as Queries;
 use host::http::api as CommonServer;
 use host::types::types::Error;
 use sites::plugin::api::{upload, File};
-use transact::actions::intf::add_action_to_transaction;
+use transact::plugin::api::add_action_to_transaction;
 
 use branding::action_structs as Actions;
 use psibase::fracpack::Pack;

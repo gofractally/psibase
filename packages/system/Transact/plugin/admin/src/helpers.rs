@@ -1,9 +1,9 @@
 use crate::bindings::accounts::query::api::{get_account, get_current_user};
 use crate::bindings::host::http::api as Server;
 use crate::bindings::host::types::types::{self as HostTypes, BodyTypes, PluginRef};
-use crate::bindings::transact::actions::ledger as ActionsLedger;
-use crate::bindings::transact::actions::types::{Action, ActionClaims, Claim, Proof};
-use crate::bindings::transact::plugin::hook_handlers::*;
+use crate::bindings::transact::plugin::ledger as ActionsLedger;
+use crate::bindings::transact::plugin::types::{Action, ActionClaims, Claim, Proof};
+use crate::bindings::transact::admin::hook_handlers::*;
 use crate::types::FromExpirationTime;
 use psibase::fracpack::Pack;
 use psibase::{Hex, SignedTransaction, Tapos, Transaction};
@@ -46,20 +46,6 @@ fn user_auth_proof(user: &str, tx_hash: &[u8; 32]) -> Result<Option<Proof>, Host
     let auth_service_acc = get_account(&user.to_string())?.unwrap().auth_service;
     let plugin_ref = PluginRef::new(&auth_service_acc, "plugin", "transact-hook-user-auth");
     on_user_auth_proof(plugin_ref, user, tx_hash)
-}
-
-pub fn get_claims_for_user(user: &String) -> Result<Vec<Claim>, HostTypes::Error> {
-    Ok(user_auth_claim(user)?.into_iter().collect())
-}
-
-pub fn get_proofs_for_user(
-    tx_hash: &[u8; 32],
-    user: &String,
-) -> Result<Vec<Hex<Vec<u8>>>, HostTypes::Error> {
-    Ok(user_auth_proof(user, tx_hash)?
-        .into_iter()
-        .map(|proof| Hex::from(proof.signature))
-        .collect())
 }
 
 pub fn get_proofs(

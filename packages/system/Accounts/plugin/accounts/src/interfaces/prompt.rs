@@ -7,7 +7,7 @@ use crate::bindings::host::{
 };
 use crate::bindings::invite::plugin::redemption as Invites;
 use crate::bindings::name_market::plugin::api as NameMarket;
-use crate::bindings::transact::actions::intf as Transact;
+use crate::bindings::transact::plugin::api as Transact;
 use crate::db::{apps_table::AppsTable, user_table::UserTable};
 use crate::errors::ErrorType;
 use crate::plugin::AccountsPlugin;

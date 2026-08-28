@@ -1373,17 +1373,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "host-http"
-version = "0.27.0"
-dependencies = [
- "psibase",
- "psibase-plugin-workspace-hack",
- "serde",
- "serde_json",
- "wit-bindgen-rt",
-]
-
-[[package]]
 name = "host-client"
 version = "0.27.0"
 dependencies = [
@@ -1411,6 +1400,17 @@ dependencies = [
  "psibase",
  "psibase-plugin-workspace-hack",
  "regex",
+ "wit-bindgen-rt",
+]
+
+[[package]]
+name = "host-http"
+version = "0.27.0"
+dependencies = [
+ "psibase",
+ "psibase-plugin-workspace-hack",
+ "serde",
+ "serde_json",
  "wit-bindgen-rt",
 ]
 
@@ -3542,6 +3542,7 @@ dependencies = [
  "chrono",
  "psibase",
  "psibase-plugin-workspace-hack",
+ "regex",
  "serde",
  "serde_json",
  "sha2",
@@ -3549,14 +3550,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "transact-actions"
-version = "0.25.0"
+name = "transact-admin"
+version = "0.27.0"
 dependencies = [
+ "chrono",
  "psibase",
  "psibase-plugin-workspace-hack",
- "regex",
  "serde",
  "serde_json",
+ "sha2",
  "wit-bindgen-rt",
 ]
 
