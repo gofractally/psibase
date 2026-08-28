@@ -8,16 +8,19 @@ use crate::tables::tables::{Fractal, Levy, RewardStream, RewardStreamTable};
 use psibase::services::tokens::{Quantity, TID};
 use psibase::services::transact::Wrapper as TransactSvc;
 
+use psibase::services::nft::Wrapper as Nft;
 use psibase::services::token_stream::Wrapper as TokenStream;
 use psibase::services::tokens::Wrapper as Tokens;
 
 impl RewardStream {
     fn new(fractal: AccountNumber, owner: AccountNumber, token_id: TID, half_life: u32) -> Self {
         let now = TransactSvc::call().currentBlock().time.seconds();
+        let stream_id = TokenStream::call().create(half_life, token_id);
+        Nft::call().debit(stream_id, "Redeemer NFT of stream".into());
 
         Self {
             owner,
-            stream_id: TokenStream::call().create(half_life, token_id),
+            stream_id,
             last_distributed: now,
             fractal,
         }

@@ -1,5 +1,3 @@
-use std::u64;
-
 use psibase::{AccountNumber, ServiceWrapper, Table};
 
 use crate::{
@@ -36,7 +34,7 @@ impl FractalMember {
     pub fn get_all(fractal: AccountNumber) -> Vec<Self> {
         FractalMemberTable::read()
             .get_index_pk()
-            .range(&(fractal, AccountNumber::from(0))..&(fractal, AccountNumber::from(u64::MAX)))
+            .range((fractal, AccountNumber::MIN)..=(fractal, AccountNumber::MAX))
             .collect()
     }
 

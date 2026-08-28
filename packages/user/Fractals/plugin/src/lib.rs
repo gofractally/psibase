@@ -31,7 +31,10 @@ impl TrustConfig for FractallyPlugin {
                 "Creating a new fractal",
                 "Claiming accrued fractal token rewards",
             ],
-            high: &["Setting the occupation service for a fractal role"],
+            high: &[
+                "Setting the occupation service for a fractal role",
+                "Setting paid occupations for token distribution",
+            ],
         }
     }
 }
@@ -82,12 +85,25 @@ impl AdminFractal for FractallyPlugin {
         set_role_occ(Judiciary.into());
         set_role_occ(Executive.into());
         set_role_occ(Recruitment.into());
+
+        Fractals::add_to_tx().set_paid_occ(vec![account!("guilds")]);
         Ok(())
     }
 
     #[psibase_plugin::authorized(High)]
     fn set_role_occupation(role_id: u8, occupation: String) -> Result<(), Error> {
         Fractals::add_to_tx().set_r_occ(role_id, occupation.parse().unwrap());
+        Ok(())
+    }
+
+    #[psibase_plugin::authorized(High)]
+    fn set_paid_occupations(occupations: Vec<String>) -> Result<(), Error> {
+        Fractals::add_to_tx().set_paid_occ(
+            occupations
+                .into_iter()
+                .map(|occupation| occupation.parse().unwrap())
+                .collect(),
+        );
         Ok(())
     }
 
