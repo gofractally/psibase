@@ -6,7 +6,7 @@ use bindings::exports::sites::plugin::authorized::Guest as Authorized;
 use bindings::host::http::api as Server;
 use bindings::host::types::types::Error;
 use bindings::sites::plugin::types::File;
-use bindings::transact::actions::intf as Transact;
+use bindings::transact::plugin::api as Transact;
 use psibase::compress_content;
 use psibase::fracpack::Pack;
 use psibase::services::sites::action_structs as Actions;

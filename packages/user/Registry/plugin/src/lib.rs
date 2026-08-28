@@ -12,7 +12,7 @@ use exports::registry::plugin::developer::Guest as Developer;
 use host::http::api as Server;
 use host::types::types::Error;
 use psibase::fracpack::Pack;
-use transact::actions::intf as Transact;
+use transact::plugin::api as Transact;
 
 psibase::define_trust! {
     descriptions {

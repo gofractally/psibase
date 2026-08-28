@@ -15,7 +15,7 @@ impl Caller for AddToTxCaller {
     }
 
     fn call<Ret: UnpackOwned, Args: Pack>(&self, method: MethodNumber, args: Args) {
-        transact::actions::intf::add_action_to_transaction(&method.to_string(), &args.packed())
+        transact::plugin::api::add_action_to_transaction(&method.to_string(), &args.packed())
             .unwrap_or_else(|e| panic!("add_action_to_transaction failed: {e}"));
     }
 }
