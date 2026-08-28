@@ -32,7 +32,10 @@ export const JoinPage = () => {
                     Connect to a psibase compatible node to join a network.
                 </p>
                 <div className="mt-6">
-                    <UrlForm onSubmit={onSubmit} />
+                    <UrlForm
+                        onSubmit={onSubmit}
+                        onBack={() => navigate("/setup")}
+                    />
                 </div>
             </div>
         </SetupWrapper>

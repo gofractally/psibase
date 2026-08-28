@@ -1,6 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
+import { useNavigate } from "react-router-dom";
 import { crypto } from "wasm-transpiled";
 import { z } from "zod";
 
@@ -72,6 +73,7 @@ const isBootCompleteUpdate = (data: unknown): data is BootCompleteUpdate =>
     BootCompleteSchema.safeParse(data).success;
 
 export const CreatePage = () => {
+    const navigate = useNavigate();
     const [didSaveKey, setDidSaveKey] = useState(false);
     const [txSigningPrivateKey, setTxSigningPrivateKey] = useState<string>();
 
@@ -447,18 +449,28 @@ export const CreatePage = () => {
                     </div>
                 </div>
                 {currentStep !== Step.Boot && (
-                    <div className="bg-background/80 shrink-0 border-t px-4 py-4 backdrop-blur sm:pl-10 sm:pr-[28rem]">
-                        <PrevNextButtons
-                            canNext={canNext}
-                            canPrev={canPrev}
-                            next={next}
-                            previous={previous}
-                            nextLabel={
-                                currentStep === Step.PreBootConfirmation
-                                    ? "Boot"
-                                    : "Continue"
-                            }
-                        />
+                    <div className="bg-background/80 shrink-0 border-t px-4 py-4 backdrop-blur sm:px-8">
+                        <div className="mx-auto max-w-3xl">
+                            <PrevNextButtons
+                                canNext={canNext}
+                                canPrev={
+                                    canPrev || currentStep === Step.ChainType
+                                }
+                                next={next}
+                                previous={() => {
+                                    if (currentStep === Step.ChainType) {
+                                        navigate("/setup");
+                                        return;
+                                    }
+                                    previous();
+                                }}
+                                nextLabel={
+                                    currentStep === Step.PreBootConfirmation
+                                        ? "Boot"
+                                        : "Continue"
+                                }
+                            />
+                        </div>
                     </div>
                 )}
             </div>

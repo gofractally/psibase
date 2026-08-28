@@ -1,8 +1,9 @@
+import { Check, FlaskConical, ShieldCheck } from "lucide-react";
+import { type ReactNode } from "react";
 import { UseFormReturn } from "react-hook-form";
 import { z } from "zod";
 
 import { cn } from "@shared/lib/utils";
-import { Button } from "@shared/shadcn/ui/button";
 import { Form, FormField, FormItem, FormMessage } from "@shared/shadcn/ui/form";
 
 export const chainTypeSchema = z.object({
@@ -20,6 +21,67 @@ interface Props {
     prodTemplateDescription: string;
 }
 
+const devHighlights = [
+    "Keyless accounts (insecure AuthAny)",
+    "Identity app included",
+    "No security device required",
+];
+
+const prodHighlights = [
+    "Key-based account authentication",
+    "Fractal network governance",
+    "Producer keys on a security device",
+];
+
+const TemplateCard = ({
+    icon: Icon,
+    title,
+    description,
+    highlights,
+    selected,
+    disabled,
+    onSelect,
+    footer,
+}: {
+    icon: typeof FlaskConical;
+    title: string;
+    description: string;
+    highlights: string[];
+    selected: boolean;
+    disabled?: boolean;
+    onSelect: () => void;
+    footer?: ReactNode;
+}) => (
+    <button
+        type="button"
+        disabled={disabled}
+        onClick={onSelect}
+        className={cn(
+            "bg-card hover:bg-accent/40 focus-visible:ring-ring flex h-full min-h-0 flex-1 basis-0 flex-col items-start gap-4 rounded-xl border p-6 text-left shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60",
+            selected && "border-primary border-2",
+        )}
+    >
+        <div className="bg-muted flex size-10 items-center justify-center rounded-lg">
+            <Icon className="size-5" />
+        </div>
+        <div className="space-y-1">
+            <h2 className="text-lg font-medium">{title}</h2>
+            <p className="text-muted-foreground text-sm leading-relaxed">
+                {description}
+            </p>
+        </div>
+        <ul className="mt-auto space-y-2">
+            {highlights.map((item) => (
+                <li key={item} className="flex items-start gap-2 text-sm">
+                    <Check className="text-muted-foreground mt-0.5 size-4 shrink-0" />
+                    <span>{item}</span>
+                </li>
+            ))}
+        </ul>
+        {footer}
+    </button>
+);
+
 export const ChainTypeForm = ({
     form,
     next,
@@ -34,68 +96,38 @@ export const ChainTypeForm = ({
                     name="type"
                     render={({ field }) => (
                         <FormItem>
-                            <div className="flex w-full flex-col justify-between gap-4 sm:flex-row sm:gap-6">
-                                <Button
-                                    onClick={(event) => {
-                                        event.preventDefault();
+                            <div className="flex w-full flex-col gap-4 sm:flex-row sm:gap-6">
+                                <TemplateCard
+                                    icon={FlaskConical}
+                                    title="Development"
+                                    description={devTemplateDescription}
+                                    highlights={devHighlights}
+                                    selected={field.value === "dev"}
+                                    onSelect={() => {
                                         field.onChange("dev");
-                                        next();
+                                        void next();
                                     }}
-                                    variant={
-                                        field.value === "dev"
-                                            ? "secondary"
-                                            : "outline"
-                                    }
-                                    className={cn(
-                                        "h-auto min-h-40 flex-1 basis-0 select-none flex-col gap-2 whitespace-normal p-6 disabled:cursor-not-allowed",
-                                        {
-                                            "border-primary border-2":
-                                                field.value === "dev",
-                                        },
-                                    )}
-                                >
-                                    <h2 className="text-xl font-medium">
-                                        Development
-                                    </h2>
-                                    <p className="text-muted-foreground mx-auto max-w-[35ch] text-center text-sm">
-                                        {devTemplateDescription}
-                                    </p>
-                                </Button>
-                                <div className="flex flex-1 has-[:disabled]:cursor-not-allowed">
-                                    <Button
-                                        onClick={(event) => {
-                                            event.preventDefault();
-                                            field.onChange("prod");
-                                            next();
-                                        }}
-                                        variant={
-                                            field.value === "prod"
-                                                ? "secondary"
-                                                : "outline"
-                                        }
-                                        className={cn(
-                                            "h-auto min-h-40 w-full flex-1 basis-0 select-none flex-col gap-2 whitespace-normal p-6",
-                                            {
-                                                "border-primary border-2":
-                                                    field.value === "prod",
-                                            },
-                                        )}
-                                        disabled={!window.isSecureContext}
-                                    >
-                                        <h2 className="text-xl font-medium">
-                                            Production
-                                        </h2>
-                                        <p className="text-muted-foreground mx-auto max-w-[35ch] text-center text-sm">
-                                            {prodTemplateDescription}
-                                        </p>
-                                        {!window.isSecureContext ? (
-                                            <p className="text-muted-foreground text-center text-sm">
+                                />
+                                <TemplateCard
+                                    icon={ShieldCheck}
+                                    title="Production"
+                                    description={prodTemplateDescription}
+                                    highlights={prodHighlights}
+                                    selected={field.value === "prod"}
+                                    disabled={!window.isSecureContext}
+                                    onSelect={() => {
+                                        field.onChange("prod");
+                                        void next();
+                                    }}
+                                    footer={
+                                        !window.isSecureContext ? (
+                                            <p className="text-muted-foreground text-sm">
                                                 Only available via HTTPS or
                                                 localhost
                                             </p>
-                                        ) : null}
-                                    </Button>
-                                </div>
+                                        ) : null
+                                    }
+                                />
                             </div>
                             <div className="flex justify-center">
                                 <FormMessage />
