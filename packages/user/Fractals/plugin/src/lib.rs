@@ -5,7 +5,7 @@ use bindings::exports::fractals::plugin::admin_fractal::Guest as AdminFractal;
 use bindings::exports::fractals::plugin::queries::Guest as Queries;
 use bindings::exports::fractals::plugin::user_fractal::Guest as UserFractal;
 
-use psibase::account;
+use psibase::services::guilds::SERVICE as GUILDS_SERVICE;
 use psibase_plugin::{trust::*, *};
 
 use fractals::Wrapper as Fractals;
@@ -78,7 +78,7 @@ impl AdminFractal for FractallyPlugin {
         Guilds::admin_fractal::set_auto_join_fractal(true)?;
 
         let set_role_occ = |role_id: u8| {
-            Fractals::add_to_tx().set_r_occ(role_id, account!("guilds"));
+            Fractals::add_to_tx().set_r_occ(role_id, GUILDS_SERVICE);
         };
 
         set_role_occ(Legislature.into());
@@ -86,7 +86,7 @@ impl AdminFractal for FractallyPlugin {
         set_role_occ(Executive.into());
         set_role_occ(Recruitment.into());
 
-        Fractals::add_to_tx().set_paid_occ(vec![account!("guilds")]);
+        Fractals::add_to_tx().set_paid_occ(vec![GUILDS_SERVICE]);
         Ok(())
     }
 
