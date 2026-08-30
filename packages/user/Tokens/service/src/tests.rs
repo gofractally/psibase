@@ -219,7 +219,7 @@ mod tests {
         assert_eq!(0, get_shared_balance(&chain, tid, bob, carol).value);
         assert_eq!(0, c.getBalance(tid, carol).get()?.value);
 
-        // Incoming undebited credits are not the debitor's to recall
+        // Issuer cannot recall tokens from the reversed creditor/debitor pair
         let tid = issue(100)?;
         b.credit(tid, carol, 100.into(), memo.clone()).get()?;
         assert_error(

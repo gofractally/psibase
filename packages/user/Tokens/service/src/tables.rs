@@ -197,7 +197,11 @@ pub mod tables {
         }
 
         pub fn burn(&mut self, amount: Quantity) {
-            self.burn_supply(amount, get_sender());
+            assert!(amount.value > 0, "burn quantity must be greater than 0");
+
+            Balance::get_or_new(get_sender(), self.id).sub_balance(amount);
+            self.burned_supply = self.burned_supply + amount;
+            self.save();
         }
 
         fn check_can_recall(&self) {
@@ -238,14 +242,6 @@ pub mod tables {
 
             SharedBalance::get_assert(creditor, debitor, self.id).recall(amount);
 
-            self.burned_supply = self.burned_supply + amount;
-            self.save();
-        }
-
-        fn burn_supply(&mut self, amount: Quantity, from: AccountNumber) {
-            assert!(amount.value > 0, "burn quantity must be greater than 0");
-
-            Balance::get_or_new(from, self.id).sub_balance(amount);
             self.burned_supply = self.burned_supply + amount;
             self.save();
         }
