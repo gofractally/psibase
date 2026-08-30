@@ -69,8 +69,8 @@ const Stat = ({
 );
 
 export function DashboardPage() {
-    const { data, isLoading: isLoadingPerf } = usePerformance();
-    const { data: txStats, isLoading: isLoadingTx } = useTransactStats();
+    const { data, isPending: isLoadingPerf } = usePerformance();
+    const { data: txStats, isPending: isLoadingTx } = useTransactStats();
 
     const chartData = React.useMemo(
         () => [
