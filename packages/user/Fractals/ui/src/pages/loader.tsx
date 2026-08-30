@@ -45,7 +45,7 @@ export const Loader = () => {
                 <CardDescription>Log in to continue</CardDescription>
             </CardHeader>
             <CardFooter className="flex justify-end">
-                <Button onClick={() => login()}>Login</Button>
+                <Button onClick={() => login()}>Log in</Button>
             </CardFooter>
         </Card>
     );

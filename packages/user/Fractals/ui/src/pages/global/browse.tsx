@@ -23,7 +23,7 @@ import {
 } from "@shared/shadcn/ui/table";
 
 export const Browse = () => {
-    const { data: fractals, isLoading } = useFractals();
+    const { data: fractals, isPending } = useFractals();
 
     const navigate = useNavigate();
 
@@ -45,7 +45,7 @@ export const Browse = () => {
                     <span className="hidden lg:inline">New Fractal</span>
                 </Button>
             </div>
-            {isLoading ? (
+            {isPending ? (
                 <EmptyBlock isLoading title="No fractals" />
             ) : fractals?.length === 0 ? (
                 <EmptyBlock

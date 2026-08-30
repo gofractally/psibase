@@ -26,7 +26,7 @@ import { ModalCreateGuild } from "./components/modal-create-guild";
 export const Guilds = () => {
     const [showModal, setShowModal] = useState(false);
 
-    const { data: guilds, isLoading } = useGuilds();
+    const { data: guilds, isPending } = useGuilds();
 
     const navigate = useNavigate();
 
@@ -44,7 +44,7 @@ export const Guilds = () => {
                         <span className="hidden lg:inline">New Guild</span>
                     </Button>
                 </div>
-                {isLoading ? (
+                {isPending ? (
                     <EmptyBlock isLoading title="No guilds" />
                 ) : guilds?.length === 0 ? (
                     <EmptyBlock
