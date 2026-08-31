@@ -42,6 +42,10 @@ psinode - The psibase blockchain server
 
   Use this private key to sign blocks. Any number of keys may be provided, but only the one that matches the public key corresponding to the producer name will be used.
 
+- `--passphrase-file` *filename*
+
+  Provides a passphrase that will be used to encrypt secrets stored by the node. The passphrase can also be passed in the environment variable `PSIBASE_PASSPHRASE`. If no passphrase is provided, secrets will not be stored and will be discarded when the server exits.
+
 - `--pkcs11-module` *filename*
 
   Loads a PKCS #11 module from *filename*. The server will be able to sign blocks using keys from the module. The tokens that the module provides must be unlocked using the HTTP API before they can be used. This option can appear any number of times.
