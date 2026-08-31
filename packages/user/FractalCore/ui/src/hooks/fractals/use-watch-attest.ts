@@ -13,9 +13,16 @@ export const useWatchAttest = (status: EvaluationStatus | undefined) => {
     const mustSubmit = status?.type === "submission" && status.mustSubmit;
     const groupNumber =
         status?.type === "submission" ? status.groupNumber : undefined;
+    const evaluationId =
+        status?.type === "submission" ? status.evaluationId : undefined;
 
     useEffect(() => {
-        if (!mustSubmit || groupNumber == null || !guildAccount) {
+        if (
+            !mustSubmit ||
+            groupNumber == null ||
+            evaluationId == null ||
+            !guildAccount
+        ) {
             attemptedRef.current = false;
             return;
         }
@@ -28,10 +35,12 @@ export const useWatchAttest = (status: EvaluationStatus | undefined) => {
         attest({
             guildAccount,
             groupNumber,
+            evaluationId,
         });
     }, [
         mustSubmit,
         groupNumber,
+        evaluationId,
         guildAccount,
         isPending,
         isError,
