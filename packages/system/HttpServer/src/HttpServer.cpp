@@ -286,7 +286,8 @@ namespace SystemService
          auto loc  = getSiblingUrl(req, std::optional{sock}, subdomain, true);
          auto hdrs = allowCors();
          hdrs.push_back({"Location", loc});
-         HttpReply reply{.status      = HttpStatus::permanentRedirect,
+         hdrs.push_back({"Cache-Control", "private, max-age=60"});
+         HttpReply reply{.status      = HttpStatus::temporaryRedirect,
                          .contentType = "text/html",
                          .headers     = std::move(hdrs)};
          sendReplyImpl(HttpServer::service, sock, std::move(reply));
