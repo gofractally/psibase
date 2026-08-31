@@ -41,7 +41,7 @@ for dir in "${dirs[@]}"; do
             exit 1
         fi
     else
-        printf '%s\n' "$out"
+        printf '%s\n' "$out" >&2
     fi
     cd - > /dev/null
 done
