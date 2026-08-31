@@ -7,7 +7,7 @@ import { z } from "zod";
 import { PrivateRoomForm } from "@/components/private-room-form";
 import { meetPlugin } from "@/hooks/use-plugin";
 import { DISPLAY_NAME_KEY } from "@/lib/config";
-import { getMeeting, getUserKey } from "@/lib/graphql";
+import { getMeeting, userHasKey } from "@/lib/graphql";
 import { createRoomId, normalizeRoomId } from "@/lib/room-id";
 
 import { useAppForm } from "@shared/components/form/app-form";
@@ -49,7 +49,7 @@ export const Home = () => {
     const myKey = useQuery({
         queryKey: ["meet", "user-key", currentUser],
         enabled: loggedIn,
-        queryFn: () => getUserKey(currentUser as string),
+        queryFn: () => userHasKey(currentUser as string),
     });
 
     const persistName = () => {

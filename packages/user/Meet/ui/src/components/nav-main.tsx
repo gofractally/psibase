@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Lock, Video } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
-import { getMeetingsForAccount } from "@/lib/graphql";
+import { getMyMeetings } from "@/lib/graphql";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import {
@@ -24,7 +24,7 @@ export function NavMain() {
     const myMeetings = useQuery({
         queryKey: ["meet", "mine", currentUser],
         enabled: loggedIn,
-        queryFn: () => getMeetingsForAccount(currentUser as string),
+        queryFn: () => getMyMeetings(),
     });
 
     const rooms = myMeetings.data ?? [];

@@ -30,9 +30,7 @@ struct MeetingData {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MeetingNode {
-    #[allow(dead_code)]
     pub id: String,
-    #[allow(dead_code)]
     pub host: String,
     pub key_hash: String,
 }
@@ -44,6 +42,12 @@ struct MembersData {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MeetingsForAccountData {
+    meetings_for_account: Connection<MemberNode>,
+}
+
+#[derive(Debug, Deserialize)]
 struct Connection<T> {
     nodes: Vec<T>,
 }
@@ -51,10 +55,14 @@ struct Connection<T> {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MemberNode {
-    #[allow(dead_code)]
     pub meeting_id: String,
     pub account: String,
     pub wrap: Vec<u8>,
+}
+
+fn parse<T: for<'de> Deserialize<'de>>(json: String, ctx: &str) -> Result<T, Error> {
+    serde_json::from_str(&json)
+        .map_err(|e| ErrorType::QueryResponseParseError(format!("{ctx}: {e}")).into())
 }
 
 pub fn fetch_user_key(account: &str) -> Result<Option<Vec<u8>>, Error> {
@@ -63,22 +71,22 @@ pub fn fetch_user_key(account: &str) -> Result<Option<Vec<u8>>, Error> {
         account = account
     );
     let root: ResponseRoot<UserKeyData> =
-        serde_json::from_str(&CommonServer::post_graphql_get_json(&query)?)
-            .map_err(|e| ErrorType::QueryResponseParseError(e.to_string()))?;
+        parse(CommonServer::post_graphql_get_json(&query)?, "userKey")?;
     Ok(root.data.user_key.map(|node| node.key))
 }
 
-pub fn fetch_meeting(id: &str) -> Result<MeetingNode, Error> {
+pub fn fetch_meeting(id: &str) -> Result<Option<MeetingNode>, Error> {
     let query = format!(
         r#"query {{ meeting(id: "{id}") {{ id host keyHash }} }}"#,
         id = id
     );
     let root: ResponseRoot<MeetingData> =
-        serde_json::from_str(&CommonServer::post_graphql_get_json(&query)?)
-            .map_err(|e| ErrorType::QueryResponseParseError(e.to_string()))?;
-    root.data
-        .meeting
-        .ok_or_else(|| ErrorType::MeetingNotFound.into())
+        parse(CommonServer::post_graphql_get_json(&query)?, "meeting")?;
+    Ok(root.data.meeting)
+}
+
+pub fn require_meeting(id: &str) -> Result<MeetingNode, Error> {
+    fetch_meeting(id)?.ok_or_else(|| ErrorType::MeetingNotFound.into())
 }
 
 pub fn fetch_members(meeting_id: &str) -> Result<Vec<MemberNode>, Error> {
@@ -86,8 +94,21 @@ pub fn fetch_members(meeting_id: &str) -> Result<Vec<MemberNode>, Error> {
         r#"query {{ meetingMembers(meetingId: "{id}", first: 100) {{ nodes {{ meetingId account wrap }} }} }}"#,
         id = meeting_id
     );
-    let root: ResponseRoot<MembersData> =
-        serde_json::from_str(&CommonServer::post_graphql_get_json(&query)?)
-            .map_err(|e| ErrorType::QueryResponseParseError(e.to_string()))?;
+    let root: ResponseRoot<MembersData> = parse(
+        CommonServer::post_graphql_get_json(&query)?,
+        "meetingMembers",
+    )?;
     Ok(root.data.meeting_members.nodes)
+}
+
+pub fn fetch_meetings_for_account(account: &str) -> Result<Vec<MemberNode>, Error> {
+    let query = format!(
+        r#"query {{ meetingsForAccount(account: "{account}", first: 100) {{ nodes {{ meetingId account wrap }} }} }}"#,
+        account = account
+    );
+    let root: ResponseRoot<MeetingsForAccountData> = parse(
+        CommonServer::post_graphql_get_json(&query)?,
+        "meetingsForAccount",
+    )?;
+    Ok(root.data.meetings_for_account.nodes)
 }

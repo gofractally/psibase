@@ -1,5 +1,19 @@
 package meet:plugin;
 
+interface types {
+    record meeting {
+        id: string,
+        host: string,
+        key-hash: string,
+    }
+
+    record member {
+        meeting-id: string,
+        account: string,
+        wrap-ready: bool,
+    }
+}
+
 interface api {
     use host:types/types.{error};
 
@@ -29,6 +43,24 @@ interface api {
     delete-meeting: func(meeting-id: string) -> result<_, error>;
 }
 
+interface queries {
+    use host:types/types.{error};
+    use types.{meeting, member};
+
+    /// Whether `account` has published a meeting identity key.
+    user-has-key: func(account: string) -> result<bool, error>;
+
+    /// Load a meeting by account-number id, if it exists.
+    get-meeting: func(id: string) -> result<option<meeting>, error>;
+
+    /// Whitelist for a meeting. `wrap-ready` is true when that member can decrypt.
+    get-members: func(meeting-id: string) -> result<list<member>, error>;
+
+    /// Private meetings the current user is invited to.
+    get-my-meetings: func() -> result<list<member>, error>;
+}
+
 world imports {
     import api;
+    import queries;
 }

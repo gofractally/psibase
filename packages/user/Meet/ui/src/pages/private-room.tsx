@@ -53,12 +53,14 @@ export const PrivateRoom = () => {
     const [passwordError, setPasswordError] = useState<string | null>(null);
 
     const members = membersQuery.data ?? [];
-    const myWrapLen =
+    const myWrapReady =
         typeof currentUser === "string"
-            ? (members.find((member) => member.account === currentUser)?.wrap
-                  .length ?? 0)
-            : 0;
-    const missingWraps = members.filter((member) => member.wrap.length === 0);
+            ? Boolean(
+                  members.find((member) => member.account === currentUser)
+                      ?.wrapReady,
+              )
+            : false;
+    const missingWraps = members.filter((member) => !member.wrapReady);
     const keyHash = meetingQuery.data?.keyHash;
 
     useEffect(() => {
@@ -90,7 +92,7 @@ export const PrivateRoom = () => {
         return () => {
             cancelled = true;
         };
-    }, [currentUser, meetingId, keyHash, myWrapLen]);
+    }, [currentUser, meetingId, keyHash, myWrapReady]);
 
     const {
         localStream,

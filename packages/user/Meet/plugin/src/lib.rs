@@ -2,6 +2,7 @@
 mod bindings;
 
 use bindings::exports::meet::plugin::api::Guest as Api;
+use bindings::exports::meet::plugin::queries::{Guest as Queries, Meeting, Member};
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
@@ -33,6 +34,7 @@ define_trust! {
         ",
     }
     functions {
+        None => [user_has_key, get_meeting, get_members, get_my_meetings],
         Low => [meeting_password],
         Medium => [set_key, rotate_key, wrap_member],
         High => [set_meeting, add_members, remove_members, delete_meeting],
@@ -92,7 +94,7 @@ impl Api for MeetPlugin {
     fn wrap_member(meeting_id: String, account: String) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::wrap_member)?;
         let secret = unwrap_secret(&meeting_id)?;
-        let meeting = graphql::fetch_meeting(&meeting_id)?;
+        let meeting = graphql::require_meeting(&meeting_id)?;
         let pubkey = graphql::fetch_user_key(&account)?
             .ok_or_else(|| ErrorType::UserKeyNotFound(account.clone()))?;
         let wrap = wrap_for(&pubkey, &secret)?;
@@ -150,6 +152,49 @@ impl Api for MeetPlugin {
     }
 }
 
+fn to_member(node: graphql::MemberNode) -> Member {
+    Member {
+        meeting_id: node.meeting_id,
+        account: node.account,
+        wrap_ready: !node.wrap.is_empty(),
+    }
+}
+
+impl Queries for MeetPlugin {
+    fn user_has_key(account: String) -> Result<bool, Error> {
+        trust::assert_authorized(trust::FunctionName::user_has_key)?;
+        Ok(graphql::fetch_user_key(&account)?.is_some())
+    }
+
+    fn get_meeting(id: String) -> Result<Option<Meeting>, Error> {
+        trust::assert_authorized(trust::FunctionName::get_meeting)?;
+        Ok(graphql::fetch_meeting(&id)?.map(|meeting| Meeting {
+            id: meeting.id,
+            host: meeting.host,
+            key_hash: meeting.key_hash,
+        }))
+    }
+
+    fn get_members(meeting_id: String) -> Result<Vec<Member>, Error> {
+        trust::assert_authorized(trust::FunctionName::get_members)?;
+        Ok(graphql::fetch_members(&meeting_id)?
+            .into_iter()
+            .map(to_member)
+            .collect())
+    }
+
+    fn get_my_meetings() -> Result<Vec<Member>, Error> {
+        trust::assert_authorized(trust::FunctionName::get_my_meetings)?;
+        let Some(me) = bindings::accounts::plugin::api::get_current_user() else {
+            return Ok(Vec::new());
+        };
+        Ok(graphql::fetch_meetings_for_account(&me)?
+            .into_iter()
+            .map(to_member)
+            .collect())
+    }
+}
+
 fn queue_set_meeting(id: String, accounts: Vec<String>) -> Result<String, Error> {
     let me = current_user()?;
     let key = ensure_local_key()?;
@@ -195,7 +240,7 @@ fn queue_set_meeting(id: String, accounts: Vec<String>) -> Result<String, Error>
 
 fn unwrap_secret(meeting_id: &str) -> Result<Vec<u8>, Error> {
     let me = current_user()?;
-    let meeting = graphql::fetch_meeting(meeting_id)?;
+    let meeting = graphql::require_meeting(meeting_id)?;
     let members = graphql::fetch_members(meeting_id)?;
     let mine = members
         .iter()

@@ -20,7 +20,6 @@ import { toast } from "@shared/shadcn/ui/sonner";
 const uniqueMeetingId = async () => {
     for (let i = 0; i < 8; i++) {
         const id = createRoomId();
-        if (!zAccount.safeParse(id).success) continue;
         try {
             if (await getMeeting(id)) continue;
         } catch {
