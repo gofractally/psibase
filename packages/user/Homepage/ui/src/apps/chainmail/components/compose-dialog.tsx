@@ -1,14 +1,15 @@
 import type { DraftMessage, Message } from "@/apps/chainmail/types";
 import type { PluginId } from "@psibase/common-lib";
 
-import { zodResolver } from "@hookform/resolvers/zod";
 import { PencilIcon, Reply, Send, SquarePen, X } from "lucide-react";
 import { forwardRef, useEffect, useRef, useState } from "react";
-import { type UseFormReturn, useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { zDraftMessage } from "@/apps/chainmail/types";
 
+import { useAppForm } from "@shared/components/form/app-form";
+import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
+import { FieldErrors } from "@shared/components/form/internal/field-errors";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { zAccount } from "@shared/lib/schemas/account";
 import {
@@ -32,13 +33,6 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@shared/shadcn/ui/dialog";
-import {
-    Form,
-    FormControl,
-    FormField,
-    FormItem,
-    FormMessage,
-} from "@shared/shadcn/ui/form";
 import { Input } from "@shared/shadcn/ui/input";
 import { toast } from "@shared/shadcn/ui/sonner";
 import { Textarea } from "@shared/shadcn/ui/textarea";
@@ -66,6 +60,14 @@ export const zSendMessageSchema = z.object({
     message: z.string().min(1),
 });
 
+const defaultComposeValues = {
+    to: {
+        account: "",
+    },
+    subject: "",
+    message: "",
+};
+
 export function ComposeDialog({
     trigger,
     message,
@@ -80,40 +82,75 @@ export function ComposeDialog({
     const { mutateAsync } = useSendMessage();
     const invalidateMailboxQueries = useInvalidateMailboxQueries();
 
-    const form = useForm<z.infer<typeof zSendMessageSchema>>({
-        resolver: zodResolver(zSendMessageSchema),
+    const id = useRef<string>("");
+
+    const form = useAppForm({
+        defaultValues: defaultComposeValues,
+        validators: {
+            onSubmit: z.object({
+                to: z.object({
+                    account: z.string(),
+                }),
+                subject: z.string().min(1),
+                message: z.string().min(1),
+            }),
+        },
+        onSubmit: async ({ value }) => {
+            const loadingId = toast.loading("Sending message");
+
+            try {
+                // TODO: Improve error detection. This promise resolves with success before the transaction is pushed.
+                await mutateAsync({
+                    to: value.to.account,
+                    subject: value.subject,
+                    message: value.message,
+                });
+                if (!id.current) return;
+                deleteDraftById(id.current);
+                isSent.current = true;
+                form.reset();
+                toast.success("Your message has been sent");
+                setOpen(false);
+                invalidateMailboxQueries(["sent"]);
+            } catch (e: unknown) {
+                toast.error(`${(e as SupervisorError).message}`);
+                console.error(`${(e as SupervisorError).message}`);
+            } finally {
+                toast.dismiss(loadingId);
+            }
+        },
     });
 
     useEffect(() => {
         if (!message) {
-            return form.reset();
+            form.reset();
+            return;
         }
         if (message.isDraft) {
-            form.setValue("to", message.to);
-            form.setValue("subject", message.subject);
-            form.setValue("message", message.body);
+            form.setFieldValue("to", { account: message.to });
+            form.setFieldValue("subject", message.subject);
+            form.setFieldValue("message", message.body);
         } else {
-            form.setValue("to", message.from);
-            form.setValue("subject", `RE: ${message.subject}`);
+            form.setFieldValue("to", { account: message.from });
+            form.setFieldValue("subject", `RE: ${message.subject}`);
         }
     }, [message]);
 
-    const id = useRef<string>("");
-
     const createDraft = () => {
         if (!id.current || !user) return;
+        const values = form.state.values;
         const draft = zDraftMessage.parse({
             id: id.current,
             from: user,
-            to: form.getValues().to || "recipient",
+            to: values.to.account || "recipient",
             datetime: Date.now(),
             isDraft: true,
             type: "outgoing",
             read: true,
             saved: true,
             inReplyTo: null,
-            subject: form.getValues().subject || "subject here",
-            body: form.getValues().message ?? "",
+            subject: values.subject || "subject here",
+            body: values.message ?? "",
         });
         setDrafts([...(allDrafts ?? []), draft]);
     };
@@ -123,54 +160,30 @@ export function ComposeDialog({
         if (!draft) {
             createDraft();
         } else {
+            const values = form.state.values;
             draft.datetime = Date.now();
-            draft.to = form.getValues().to ?? "";
-            draft.subject = form.getValues().subject ?? "";
-            draft.body = form.getValues().message ?? "";
+            draft.to = values.to.account ?? "";
+            draft.subject = values.subject ?? "";
+            draft.body = values.message ?? "";
             setDrafts(allDrafts);
         }
     };
 
-    const sendMessage = async () => {
-        const draft = allDrafts.find((msg) => msg.id === id.current);
-        if (!draft) {
-            return console.error("No message found to send");
-        }
+    const validateComposeForm = async () => {
+        const errors = await form.validate("submit");
+        if (Object.keys(errors).length > 0) return false;
 
-        const loadingId = toast.loading("Sending message");
-
-        try {
-            // TODO: Improve error detection. This promise resolves with success before the transaction is pushed.
-            await mutateAsync({
-                to: draft.to,
-                subject: draft.subject,
-                message: draft.body,
-            });
-            if (!id.current) return;
-            deleteDraftById(id.current);
-            isSent.current = true;
-            form.reset();
-            toast.success("Your message has been sent");
-            setOpen(false);
-        } catch (e: unknown) {
-            toast.error(`${(e as SupervisorError).message}`);
-            console.error(`${(e as SupervisorError).message}`);
-        } finally {
-            toast.dismiss(loadingId);
-        }
+        const fieldErrors = await form.validateAllFields("submit");
+        return fieldErrors.length === 0;
     };
 
-    async function onSubmit() {
-        await sendMessage();
-        invalidateMailboxQueries(["sent"]);
-    }
-
-    const onOpenChange = (open: boolean) => {
-        setOpen(open);
-        if (!open) {
+    const onOpenChange = (nextOpen: boolean) => {
+        setOpen(nextOpen);
+        if (!nextOpen) {
             // if closing
             if (isSent.current) return;
-            if (form.getValues().message.length) {
+            updateDraft();
+            if (form.state.values.message.length) {
                 toast.success("Your draft has been saved");
             }
             form.reset();
@@ -196,9 +209,13 @@ export function ComposeDialog({
                     e.preventDefault();
                 }}
             >
-                <Form {...form}>
+                <form.AppForm>
                     <form
-                        onSubmit={form.handleSubmit(onSubmit)}
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            void form.handleSubmit();
+                        }}
                         className="flex h-full flex-col"
                     >
                         <DialogHeader>
@@ -211,62 +228,62 @@ export function ComposeDialog({
                             </DialogDescription>
                         </DialogHeader>
                         <div className="flex flex-grow flex-col gap-4 py-4 sm:grid">
-                            <FormField
-                                control={form.control}
-                                name="to"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormControl>
-                                            <Input
-                                                placeholder="Recipient account name"
-                                                {...field}
-                                                onChange={(e) => {
-                                                    field.onChange(e);
-                                                    updateDraft();
-                                                }}
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
+                            <FieldAccountExisting
+                                form={form}
+                                fields="to"
+                                label={undefined}
+                                description={undefined}
+                                placeholder="Recipient account name"
+                                disabled={false}
+                                onValidate={() => {
+                                    updateDraft();
+                                }}
                             />
-                            <FormField
-                                control={form.control}
+                            <form.AppField
                                 name="subject"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormControl>
-                                            <Input
-                                                placeholder="Subject"
-                                                {...field}
-                                                onChange={(e) => {
-                                                    field.onChange(e);
-                                                    updateDraft();
-                                                }}
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
+                                listeners={{
+                                    onChange: () => {
+                                        updateDraft();
+                                    },
+                                }}
+                                children={(field) => (
+                                    <div className="flex flex-col gap-2">
+                                        <Input
+                                            placeholder="Subject"
+                                            value={field.state.value}
+                                            onBlur={field.handleBlur}
+                                            onChange={(e) => {
+                                                field.handleChange(
+                                                    e.target.value,
+                                                );
+                                            }}
+                                        />
+                                        <FieldErrors meta={field.state.meta} />
+                                    </div>
                                 )}
                             />
-                            <FormField
-                                control={form.control}
+                            <form.AppField
                                 name="message"
-                                render={({ field }) => (
-                                    <FormItem className="flex flex-1 flex-col">
-                                        <FormControl>
-                                            <Textarea
-                                                placeholder="Message"
-                                                className="h-full resize-none text-sm sm:min-h-[200px]"
-                                                {...field}
-                                                onChange={(e) => {
-                                                    field.onChange(e);
-                                                    updateDraft();
-                                                }}
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
+                                listeners={{
+                                    onChange: () => {
+                                        updateDraft();
+                                    },
+                                }}
+                                children={(field) => (
+                                    <div className="flex flex-1 flex-col gap-2">
+                                        <Textarea
+                                            placeholder="Message"
+                                            className="h-full resize-none text-sm sm:min-h-[200px]"
+                                            value={field.state.value}
+                                            onBlur={field.handleBlur}
+                                            onChange={(e) => {
+                                                field.handleChange(
+                                                    e.target.value,
+                                                );
+                                            }}
+                                        />
+                                        <FieldErrors meta={field.state.meta} />
+                                    </div>
                                 )}
                             />
                         </div>
@@ -285,7 +302,9 @@ export function ComposeDialog({
                             </Button>
                             <AlertDialog>
                                 <AlertDialogTrigger asChild>
-                                    <SendTriggerButton formReturn={form} />
+                                    <SendTriggerButton
+                                        onValidate={validateComposeForm}
+                                    />
                                 </AlertDialogTrigger>
                                 <AlertDialogContent>
                                     <AlertDialogHeader>
@@ -305,9 +324,9 @@ export function ComposeDialog({
                                             Cancel
                                         </AlertDialogCancel>
                                         <AlertDialogAction
-                                            onClick={form.handleSubmit(
-                                                onSubmit,
-                                            )}
+                                            onClick={() => {
+                                                void form.handleSubmit();
+                                            }}
                                         >
                                             Send
                                         </AlertDialogAction>
@@ -316,7 +335,7 @@ export function ComposeDialog({
                             </AlertDialog>
                         </DialogFooter>
                     </form>
-                </Form>
+                </form.AppForm>
             </DialogContent>
         </Dialog>
     );
@@ -325,15 +344,15 @@ export function ComposeDialog({
 export default ComposeDialog;
 
 interface SendTriggerButtonProps extends ButtonProps {
-    formReturn: UseFormReturn<z.infer<typeof zSendMessageSchema>>;
+    onValidate: () => Promise<boolean>;
 }
 
 const SendTriggerButton = forwardRef<HTMLButtonElement, SendTriggerButtonProps>(
-    (props, ref) => {
-        const onClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
-            await props.formReturn.trigger();
-            if (props.formReturn.formState.isValid) {
-                props.onClick?.(e);
+    ({ onValidate, onClick, ...props }, ref) => {
+        const handleClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
+            const isValid = await onValidate();
+            if (isValid) {
+                onClick?.(e);
             }
         };
 
@@ -342,7 +361,7 @@ const SendTriggerButton = forwardRef<HTMLButtonElement, SendTriggerButtonProps>(
                 className="w-full sm:w-auto"
                 {...props}
                 ref={ref}
-                onClick={onClick}
+                onClick={handleClick}
             >
                 <Send className="mr-2 h-4 w-4" />
                 Send Message
