@@ -3,7 +3,8 @@ import { z } from "zod";
 
 import QueryKey from "@/lib/query-keys";
 
-import { graphql } from "@shared/lib/graphql";
+import { authorizedPluginGraphql } from "@shared/lib/graphql/authorized-plugin";
+import { tokens } from "@shared/lib/plugins";
 import { zAccount } from "@shared/lib/schemas/account";
 
 export const zToken = z.object({
@@ -12,7 +13,8 @@ export const zToken = z.object({
 });
 
 export const getToken = async (tokenId: number) => {
-    const token = await graphql(
+    const token = await authorizedPluginGraphql(
+        tokens.authorized.graphql,
         `
             {
                 token(tokenId: "${tokenId}") {
@@ -21,9 +23,6 @@ export const getToken = async (tokenId: number) => {
                 }
             }
         `,
-        {
-            service: "tokens",
-        },
     );
 
     const response = z

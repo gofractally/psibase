@@ -10,6 +10,7 @@ import { Plugin as Packages } from "./packages";
 import { Plugin as Profiles } from "./profiles";
 import { Plugin as TokenSwap } from "./token-swap";
 import { Plugin as Tokens } from "./tokens";
+import { Plugin as VirtualServer } from "./vserver";
 
 const accounts = new Accounts("accounts");
 const config = new Config("config");
@@ -19,6 +20,7 @@ const nameMarket = new NameMarket("namemarket");
 const tokenSwap = new TokenSwap("token-swap");
 const tokens = new Tokens("tokens");
 const profiles = new Profiles("profiles");
+const vserver = new VirtualServer("vserver");
 
 export {
     accounts,
@@ -29,6 +31,7 @@ export {
     tokenSwap,
     tokens,
     profiles,
+    vserver,
     callPluginFunction,
     usePluginFunctionMutation,
     usePluginFunctionQuery,

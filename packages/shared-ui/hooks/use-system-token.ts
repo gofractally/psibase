@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { GraphQLUrlOptions, graphql } from "@shared/lib/graphql";
+import { authorizedPluginGraphql } from "@shared/lib/graphql/authorized-plugin";
 import QueryKey from "@shared/lib/query-keys";
+import { tokens } from "@shared/lib/plugins";
 
 export interface SystemTokenInfo {
     id: string;
@@ -26,7 +27,7 @@ interface TokenResponse {
     } | null;
 }
 
-export const useSystemToken = (opts: GraphQLUrlOptions = {}) => {
+export const useSystemToken = () => {
     return useQuery<SystemTokenInfo | null>({
         queryKey: QueryKey.systemToken(),
         queryFn: async (): Promise<SystemTokenInfo | null> => {
@@ -38,10 +39,10 @@ export const useSystemToken = (opts: GraphQLUrlOptions = {}) => {
                     }
                 `;
 
-            const configRes = await graphql<ConfigResponse>(configQuery, {
-                service: "tokens",
-                ...opts,
-            });
+            const configRes = await authorizedPluginGraphql<ConfigResponse>(
+                tokens.authorized.graphql,
+                configQuery,
+            );
 
             if (!configRes.config?.sysTid) {
                 return null;
@@ -58,10 +59,10 @@ export const useSystemToken = (opts: GraphQLUrlOptions = {}) => {
                     }
                 `;
 
-            const tokenRes = await graphql<TokenResponse>(tokenQuery, {
-                service: "tokens",
-                ...opts,
-            });
+            const tokenRes = await authorizedPluginGraphql<TokenResponse>(
+                tokens.authorized.graphql,
+                tokenQuery,
+            );
 
             if (!tokenRes.token) {
                 return null;

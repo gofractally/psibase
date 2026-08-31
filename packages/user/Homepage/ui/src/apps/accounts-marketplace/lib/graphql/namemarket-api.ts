@@ -1,4 +1,5 @@
-import { callPluginFunction, nameMarket } from "@shared/lib/plugins";
+import { authorizedPluginGraphql } from "@shared/lib/graphql/authorized-plugin";
+import { nameMarket } from "@shared/lib/plugins";
 
 import {
     zNameEvent,
@@ -18,20 +19,7 @@ export type FetchNameEventsPageParams =
     | { last: number; before?: string };
 
 async function nameMarketAuthorizedGraphql<T>(query: string): Promise<T> {
-    const result = await callPluginFunction(nameMarket.authorized.graphql, [
-        query,
-    ]);
-
-    const response = JSON.parse(result) as {
-        data: T;
-        errors?: Array<{ message: string }>;
-    };
-
-    if (response.errors?.length) {
-        throw new Error(response.errors[0]?.message ?? "GraphQL query failed");
-    }
-
-    return response.data;
+    return authorizedPluginGraphql(nameMarket.authorized.graphql, query);
 }
 
 function mapNameEventEdges(edges: Array<{ cursor?: string; node?: unknown }>) {
