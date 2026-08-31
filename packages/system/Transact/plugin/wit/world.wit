@@ -3,6 +3,12 @@ package transact:plugin;
 interface types {
     use host:types/types.{claim};
 
+    /// The verify-service specified in the claim is the service that knows how to verify that
+    /// a proof actually proves the claim.
+    record proof {
+        signature: list<u8>,
+    }
+
     /// Action data from a transaction
     record action {
         /// The sender of this action
@@ -128,12 +134,7 @@ world imports {
 world hook-user-auth {
     export transact-hook-user-auth: interface {
         use host:types/types.{error, claim};
-
-        /// The verify-service specified in the claim is the service that knows how to verify that
-        /// a proof actually proves the claim.
-        record proof {
-            signature: list<u8>,
-        }
+        use types.{proof};
 
         /// Gets the claim needed to satisfy the authorization of the logged-in user
         on-user-auth-claim: func(account-name: string) -> result<option<claim>, error>;
