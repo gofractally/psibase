@@ -284,6 +284,14 @@ export class Supervisor implements AppInterface {
         );
     }
 
+    importKeyTransient(privateKey: string): string {
+        return this.supervisorCall(
+            getCallArgs("webcrypto", "plugin", "api", "import-key-transient", [
+                privateKey,
+            ]),
+        );
+    }
+
     signExplicit(msg: Uint8Array, privateKey: string): Uint8Array {
         // future: call out to SubtleCrypto
         return this.supervisorCall(

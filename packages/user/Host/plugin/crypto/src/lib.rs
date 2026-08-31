@@ -29,7 +29,7 @@ psibase::define_trust! {
         ",
     }
     functions {
-        None => [generate_unmanaged_keypair, pub_from_priv, to_der, sign_explicit],
+        None => [generate_unmanaged_keypair, pub_from_priv, to_der, sign_explicit, import_key_transient],
         Low => [import_key],
         High => [sign],
     }
@@ -95,6 +95,11 @@ impl KeyVault for HostCrypto {
         )?;
 
         Supervisor::import_key(&private_key)
+    }
+
+    fn import_key_transient(private_key: Pem) -> Result<Pem, HostTypes::Error> {
+        assert_authorized(FunctionName::import_key_transient)?;
+        Supervisor::import_key_transient(&private_key)
     }
 }
 
