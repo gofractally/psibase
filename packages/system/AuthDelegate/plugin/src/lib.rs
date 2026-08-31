@@ -7,7 +7,6 @@ mod errors;
 use errors::ErrorType::*;
 use exports::auth_delegate::plugin::api::{Error, Guest as Api};
 use exports::auth_delegate::plugin::session::Guest as Session;
-use exports::transact_hook_user_auth::{Claim, Guest as HookUserAuth, Proof};
 use transact::plugin::intf::add_action_to_transaction;
 
 use crate::trust::*;
@@ -40,20 +39,11 @@ fn get_account_number(name: &str) -> Result<AccountNumber, Error> {
     AccountNumber::from_str(name).map_err(|_| Error::from(InvalidAccountName))
 }
 
-impl HookUserAuth for AuthDelegate {
-    fn on_user_auth_claim(_account_name: String) -> Result<Option<Claim>, Error> {
-        Err(NotYetImplemented("get_claims"))?
-    }
-
-    fn on_user_auth_proof(
-        _account_name: String,
-        _transaction_hash: Vec<u8>,
-    ) -> Result<Option<Proof>, Error> {
-        Err(NotYetImplemented("get_proofs"))?
-    }
-}
-
 impl Session for AuthDelegate {
+    fn authorize(_account_name: String) -> Result<(), Error> {
+        Err(NotYetImplemented("session::authorize"))?
+    }
+
     fn login(_account_name: String) -> Result<(), Error> {
         Err(NotYetImplemented("session::login"))?
     }

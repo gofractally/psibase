@@ -11,14 +11,12 @@ mod db;
 mod types;
 use db::*;
 
-// Other plugins
 use host::common::{self as Host, server as Server};
 use host::db::store as Store;
 use host::types::types::{self as HostTypes, BodyTypes, Claim};
 use transact::plugin::types::Action;
 use virtual_server::plugin::transact as VirtualServer;
 
-// Exported interfaces/types
 use exports::transact::plugin::{
     admin::Guest as Admin, auth::Guest as Auth, hooks::Guest as Hooks, intf::Guest as Intf,
     network::Guest as Network,
@@ -26,7 +24,6 @@ use exports::transact::plugin::{
 
 use psibase::services::transact::action_structs::setSnapTime;
 
-// Third-party crates
 use crate::trust::*;
 use psibase::fracpack::Pack;
 use psibase::{Hex, SignedTransaction, Tapos, TimePointSec, Transaction, TransactionTrace};
@@ -50,24 +47,6 @@ psibase::define_trust! {
         Max => [set_propose_latch, propose, set_snapshot_time, start_tx, finish_tx, get_query_token],
     }
 }
-
-// The transaction construction cycle, including hooks, is as follows:
-//
-// 1. start-tx
-//
-// 2. add-action-to-transaction
-// 3.   on-actions-sender           - the propose-latch account (if any) is used;
-//                                    otherwise the hooked plugin can set the sender of the action;
-//                                    otherwise the logged-in user is used by default.
-// 4. add-signature                 - callers may append extra claims (e.g. invite credentials)
-//
-// 5. finish-tx
-// 6.   on-user-claim               - the user auth plugin adds the user claim
-// 7.   construct transaction       - includes any claims from add-signature
-// 8.   hash-transaction
-// 9.   on-user-auth-proof          - the user auth plugin adds the user proof
-// 10.  sign extra claims           - proofs for add-signature claims via host:crypto
-// 11.  publish transaction
 
 struct TransactPlugin {}
 
@@ -259,18 +238,18 @@ impl Admin for TransactPlugin {
 
         let tx = make_transaction(actions, 3);
 
+        let tx_hash = sha256(&tx.packed());
+        let proofs = build_proofs(&tx_hash)?;
+        TxSignatures::reset();
+
         let signed_tx = SignedTransaction {
             transaction: Hex::from(tx.packed()),
-            proofs: get_proofs(&sha256(&tx.packed()))?,
+            proofs,
             subjectiveData: None,
         };
         if signed_tx.proofs.len() != tx.claims.len() {
             return Err(ClaimProofMismatch.into());
         }
-
-        // TODO (idea): on_hook_pre_publish(signed_tx) -> bool
-        // Could allow a user to inspect a final transaction rather than publish
-        //   (Helpful for debugging, post-install scripts, offline msig, etc.)
 
         let body = signed_tx.publish()?;
         let trace = match body {
@@ -280,14 +259,10 @@ impl Admin for TransactPlugin {
             }
         };
 
-        // TODO (idea): on_hook_post_publish(trace)
-        // Could be for logging, or for other post-transaction client-side processing
-
         match trace.error {
             Some(err) => Err(TransactionError(err).into()),
             None => {
                 println!("Transaction executed successfully");
-                TxSignatures::reset();
                 Store::flush_transactional_data();
                 Ok(())
             }
@@ -319,10 +294,7 @@ impl Auth for TransactPlugin {
             raw_data: (root_host,).packed(),
         };
 
-        let tx_claim = claim.as_ref().map(|c| psibase::Claim {
-            service: c.verify_service.parse().unwrap(),
-            rawData: psibase::Hex::from(c.raw_data.clone()),
-        });
+        let tx_claim = claim.as_ref().map(|c| psibase::Claim::from(c.clone()));
 
         let expiration = TimePointSec::from(chrono::Utc::now() + chrono::Duration::seconds(3));
         let tapos = Tapos {
@@ -374,4 +346,3 @@ impl Auth for TransactPlugin {
 }
 
 bindings::export!(TransactPlugin with_types_in bindings);
-
