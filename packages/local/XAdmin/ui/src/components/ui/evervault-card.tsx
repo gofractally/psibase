@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useMotionValue } from "framer-motion";
 import { motion, useMotionTemplate } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { cn } from "@shared/lib/utils";
 
@@ -22,10 +22,16 @@ export const EvervaultCard = ({
     const mouseY = useMotionValue(0);
 
     const [randomString, setRandomString] = useState("");
+    const cardRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const str = generateRandomString(1500, chars);
         setRandomString(str);
+        const el = cardRef.current;
+        if (el) {
+            mouseX.set(el.clientWidth / 2);
+            mouseY.set(el.clientHeight / 2);
+        }
     }, []);
 
     function onMouseMove({ currentTarget, clientX, clientY }: any) {
@@ -41,11 +47,12 @@ export const EvervaultCard = ({
         <button
             onClick={() => onClick()}
             className={cn(
-                "group relative flex aspect-square  h-full w-full items-center justify-center bg-transparent p-0.5",
+                "group relative flex aspect-square w-full items-center justify-center bg-transparent p-0.5",
                 className,
             )}
         >
             <div
+                ref={cardRef}
                 onMouseMove={onMouseMove}
                 className="group/card relative flex h-full w-full items-center justify-center overflow-hidden rounded-3xl bg-transparent"
             >
@@ -71,9 +78,40 @@ export const EvervaultCard = ({
 export function CardPattern({ mouseX, mouseY, randomString, gradient }: any) {
     const maskImage = useMotionTemplate`radial-gradient(250px at ${mouseX}px ${mouseY}px, white, transparent)`;
     const style = { maskImage, WebkitMaskImage: maskImage };
+    const idleGlow = {
+        maskImage:
+            "radial-gradient(circle at 50% 50%, white 0%, transparent 62%)",
+        WebkitMaskImage:
+            "radial-gradient(circle at 50% 50%, white 0%, transparent 62%)",
+    };
 
     return (
         <div className="pointer-events-none">
+            <motion.div
+                className={cn(
+                    "absolute inset-0 rounded-2xl bg-gradient-to-r blur-2xl",
+                    gradient,
+                )}
+                style={idleGlow}
+                animate={{ opacity: [0, 0.4, 0] }}
+                transition={{
+                    duration: 4.5,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                }}
+            />
+            <motion.div
+                className={cn(
+                    "absolute left-1/2 top-1/2 size-36 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-r blur-3xl",
+                    gradient,
+                )}
+                animate={{ opacity: [0, 0.5, 0], scale: [0.92, 1, 0.92] }}
+                transition={{
+                    duration: 4.5,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                }}
+            />
             <div className="absolute inset-0 rounded-2xl  [mask-image:linear-gradient(white,transparent)] group-hover/card:opacity-50"></div>
             <motion.div
                 className={cn(
