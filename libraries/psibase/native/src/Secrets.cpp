@@ -15,10 +15,10 @@
 using namespace psibase;
 
 // AES-GCM
-// magic (4-bytes) || version (4-bytes) || KDF params || iv (16-bytes) || cyphertext || tag (16-bytes)
+// magic (4-bytes) || version (4-bytes) || KDF params || iv (12-bytes) || cyphertext || tag (16-bytes)
 
 // KDF uses scrypt
-// salt (16 bytes) || logn (4-bytes) || r (4-bytes) || p (4-bytes)
+// salt (16 bytes) || log n (4-bytes) || r (4-bytes) || p (4-bytes)
 
 namespace
 {
