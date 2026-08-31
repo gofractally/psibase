@@ -24,10 +24,7 @@ impl AuthSvc for AccountsPlugin {
         AppsTable::new(&app).login(&account);
         UserTable::new(&account).add_connected_app(&app);
 
-        let session_result = match HostAuth::use_session(&account, &app) {
-            Ok(()) => Ok(()),
-            Err(_) => HostAuth::new_session(&account, &app, claim.as_ref()),
-        };
+        let session_result = HostAuth::set_logged_in_user(&account, &app, claim.as_ref());
 
         if session_result.is_err() {
             AppsTable::new(&app).logout();

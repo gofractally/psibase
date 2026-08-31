@@ -19,10 +19,6 @@ impl HookUserAuth for AuthAny {
 }
 
 impl Session for AuthAny {
-    fn authorize(_account_name: String) -> Result<(), Error> {
-        Ok(())
-    }
-
     fn login(account_name: String) -> Result<(), Error> {
         AccountsAuthSvc::login(&account_name, None)
     }

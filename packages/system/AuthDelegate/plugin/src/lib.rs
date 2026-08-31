@@ -54,10 +54,6 @@ impl HookUserAuth for AuthDelegate {
 }
 
 impl Session for AuthDelegate {
-    fn authorize(_account_name: String) -> Result<(), Error> {
-        Err(NotYetImplemented("session::authorize"))?
-    }
-
     fn login(_account_name: String) -> Result<(), Error> {
         Err(NotYetImplemented("session::login"))?
     }

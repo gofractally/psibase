@@ -3,31 +3,22 @@ package host:auth;
 interface api {
     use host:types/types.{claim, error};
 
-    /// Install an existing query-token cookie for `(user, app)`.
+    /// Notify of new logged in user.
     ///
-    /// On cache miss, returns a `ReauthorizationRequired` error: the
-    /// account needs to be reconnected before authenticated queries
-    /// can be made.
-    ///
-    /// Only callable by `accounts`.
-    use-session: func(user: string, app: string) -> result<_, error>;
-
-    /// Mint a fresh query token for `(user, app)`, cache it, and
-    /// install it as the auth cookie. Always overwrites the cache for
-    /// `(user, app)`.
-    ///
-    /// The user's `claim` is used to prove authorization when generating
-    /// the query token.
+    /// If no query token is cached for `(user, app)`, mints one via
+    /// `get-query-token`. `claim` proves authorization when minting;
+    /// pass `none` when the auth service does not require a signed
+    /// login (e.g. `auth-any`).
     ///
     /// Only callable by `accounts`.
-    new-session: func(
+    set-logged-in-user: func(
         user: string,
         app: string,
         claim: option<claim>,
     ) -> result<_, error>;
 
-    /// End the cached session for `(user, app)`.
-    end-session: func(user: string, app: string);
+    /// Notify of user logout
+    log-out-user: func(user: string, app: string);
 
     /// Privileged apps can get the query token to make calls on user's behalf
     get-active-query-token: func(app: string, user: string) -> option<string>;

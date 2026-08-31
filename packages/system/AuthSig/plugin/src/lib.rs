@@ -90,11 +90,6 @@ impl HookUserAuth for AuthSig {
 }
 
 impl Session for AuthSig {
-    fn authorize(_account_name: String) -> Result<(), Error> {
-        // Wired up in a later change that authorizes at tx start.
-        Err(Unauthorized("session::authorize".to_string()).into())
-    }
-
     fn login(account_name: String) -> Result<(), Error> {
         if Client::get_sender() != "accounts" {
             return Err(Unauthorized("session::login".to_string()).into());

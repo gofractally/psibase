@@ -2,9 +2,6 @@
 mod bindings;
 use bindings::*;
 
-mod errors;
-use errors::ErrorType::*;
-
 mod helpers;
 use helpers::*;
 
@@ -61,26 +58,20 @@ fn remove_active_query_token(app: &str, user: &str) {
 }
 
 impl Api for HostAuth {
-    fn use_session(user: String, app: String) -> Result<(), Error> {
-        check_caller(&["accounts"], "use-session@host:auth/api");
+    fn set_logged_in_user(user: String, app: String, claim: Option<Claim>) -> Result<(), Error> {
+        check_caller(&["accounts"], "set-logged-in-user@host:auth/api");
 
-        let token =
-            cached_token(&app, &user).ok_or_else(|| Error::from(ReauthorizationRequired(user)))?;
-        install_cookie(&token, &app);
-        Ok(())
-    }
-
-    fn new_session(user: String, app: String, claim: Option<Claim>) -> Result<(), Error> {
-        check_caller(&["accounts"], "new-session@host:auth/api");
-
-        let token = Transact::get_query_token(&app, &user, claim.as_ref())?;
+        let token = match cached_token(&app, &user) {
+            Some(t) => t,
+            None => Transact::get_query_token(&app, &user, claim.as_ref())?,
+        };
         cache_token(&token, &app, &user);
         install_cookie(&token, &app);
         Ok(())
     }
 
-    fn end_session(user: String, app: String) {
-        check_caller(&["accounts"], "end-session@host:auth/api");
+    fn log_out_user(user: String, app: String) {
+        check_caller(&["accounts"], "log-out-user@host:auth/api");
         remove_active_query_token(&app, &user);
     }
 
