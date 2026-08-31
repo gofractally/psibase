@@ -11,6 +11,8 @@ plugin = "meet-plugin"
 data = [{ src = "../ui/dist", dst = "/" }]
 postinstall = [
     { sender = "meet", service = "meet", method = "init", data = {} },
+    { sender = "meet", service = "sites", method = "enablespa", data = { enable = true } },
+    { sender = "meet", service = "sites", method = "setcsp", data = { path = "*", csp = "default-src 'self';script-src 'self';style-src 'self' 'unsafe-inline';img-src 'self' data: blob: profiles.{{root}}/avatar/ branding.{{root}};font-src 'self';connect-src 'self' profiles.{{root}} tokens.{{root}} wss: stun: turn: turns:;media-src 'self' blob:;frame-src supervisor.{{root}};frame-ancestors 'self';base-uri 'none';form-action 'self';object-src 'none';" } },
 ]
 
 [dependencies]

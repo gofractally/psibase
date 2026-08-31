@@ -2440,6 +2440,15 @@ const RAW_RUNTIME_STATE =
         "linkType": "HARD"\
       }]\
     ]],\
+    ["@noble/secp256k1", [\
+      ["npm:3.2.0", {\
+        "packageLocation": "../.caches/yarn/@noble-secp256k1-npm-3.2.0-8301776dda-6c5bc92b61.zip/node_modules/@noble/secp256k1/",\
+        "packageDependencies": [\
+          ["@noble/secp256k1", "npm:3.2.0"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
     ["@nodelib/fs.scandir", [\
       ["npm:2.1.5", {\
         "packageLocation": "../.caches/yarn/@nodelib-fs.scandir-npm-2.1.5-89c67370dd-732c3b6d1b.zip/node_modules/@nodelib/fs.scandir/",\
@@ -7287,6 +7296,26 @@ const RAW_RUNTIME_STATE =
           "prettier-plugin-svelte",\
           "prettier",\
           "svelte"\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["@trystero-p2p/core", [\
+      ["npm:0.25.4", {\
+        "packageLocation": "../.caches/yarn/@trystero-p2p-core-npm-0.25.4-deaa71ecd3-2d7a27f28a.zip/node_modules/@trystero-p2p/core/",\
+        "packageDependencies": [\
+          ["@trystero-p2p/core", "npm:0.25.4"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["@trystero-p2p/nostr", [\
+      ["npm:0.25.4", {\
+        "packageLocation": "../.caches/yarn/@trystero-p2p-nostr-npm-0.25.4-b5e1432d01-e2970f9d83.zip/node_modules/@trystero-p2p/nostr/",\
+        "packageDependencies": [\
+          ["@noble/secp256k1", "npm:3.2.0"],\
+          ["@trystero-p2p/core", "npm:0.25.4"],\
+          ["@trystero-p2p/nostr", "npm:0.25.4"]\
         ],\
         "linkType": "HARD"\
       }]\
@@ -13806,6 +13835,7 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "./user/Meet/ui/",\
         "packageDependencies": [\
           ["@psibase/common-lib", "workspace:user/CommonApi/common/packages/common-lib"],\
+          ["@tanstack/react-form", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:1.33.0"],\
           ["@tanstack/react-query", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:5.101.0"],\
           ["@types/node", "npm:22.19.21"],\
           ["@types/react", "npm:19.2.17"],\
@@ -13816,6 +13846,7 @@ const RAW_RUNTIME_STATE =
           ["react", "npm:19.2.7"],\
           ["react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.2.7"],\
           ["react-router-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:6.30.4"],\
+          ["trystero", "npm:0.25.4"],\
           ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
           ["vite", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:5.4.21"],\
           ["zod", "npm:3.25.76"]\
@@ -17471,6 +17502,16 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "../.caches/yarn/treeify-npm-1.1.0-abf9292333-2f0dea9e89.zip/node_modules/treeify/",\
         "packageDependencies": [\
           ["treeify", "npm:1.1.0"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["trystero", [\
+      ["npm:0.25.4", {\
+        "packageLocation": "../.caches/yarn/trystero-npm-0.25.4-79f002a086-25739cf19b.zip/node_modules/trystero/",\
+        "packageDependencies": [\
+          ["@trystero-p2p/nostr", "npm:0.25.4"],\
+          ["trystero", "npm:0.25.4"]\
         ],\
         "linkType": "HARD"\
       }]\

@@ -1629,6 +1629,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@noble/secp256k1@npm:^3.1.0":
+  version: 3.2.0
+  resolution: "@noble/secp256k1@npm:3.2.0"
+  checksum: 10c0/6c5bc92b618b4a737f9e83d5d6da66bae4be029809b8f57314b984cc3202b00147dbbcf9e78d2d8fa93ca9fa368b5003423117d4dcae0a37bfd55e9358e95d68
+  languageName: node
+  linkType: hard
+
 "@nodelib/fs.scandir@npm:2.1.5":
   version: 2.1.5
   resolution: "@nodelib/fs.scandir@npm:2.1.5"
@@ -5164,6 +5171,23 @@ __metadata:
     svelte:
       optional: true
   checksum: 10c0/2a4f0464f1f5a294bcd34558fb053f8263f0c62c4a7fcdd3ce40c9822a68ac8b4d951700ab6d01eb3919efe0ed44e4191997edd494d59679b22db1c0db00474e
+  languageName: node
+  linkType: hard
+
+"@trystero-p2p/core@npm:0.25.4":
+  version: 0.25.4
+  resolution: "@trystero-p2p/core@npm:0.25.4"
+  checksum: 10c0/2d7a27f28acea2a5f4b8469ecd423d29fdfb872e8ae31e0c47cd785ee40e652d39711a82dcebf61e464dd0e1340b385b16a4ba9a0d4e6ca9d52f587ffb74df6e
+  languageName: node
+  linkType: hard
+
+"@trystero-p2p/nostr@npm:0.25.4":
+  version: 0.25.4
+  resolution: "@trystero-p2p/nostr@npm:0.25.4"
+  dependencies:
+    "@noble/secp256k1": "npm:^3.1.0"
+    "@trystero-p2p/core": "npm:0.25.4"
+  checksum: 10c0/e2970f9d83d9a4bd21873477cb327c782c83f501e18fe0949027f059e4be12a6035ba26597ee71e93d308cef25bca8c938fc289ff358eb8971de6535eda7648b
   languageName: node
   linkType: hard
 
@@ -10507,6 +10531,7 @@ __metadata:
   resolution: "meet@workspace:user/Meet/ui"
   dependencies:
     "@psibase/common-lib": "workspace:*"
+    "@tanstack/react-form": "npm:^1.19.3"
     "@tanstack/react-query": "npm:^5.90.6"
     "@types/node": "npm:^22.15.0"
     "@types/react": "npm:^19.1.0"
@@ -10516,6 +10541,7 @@ __metadata:
     react: "npm:^19.1.0"
     react-dom: "npm:^19.1.0"
     react-router-dom: "npm:^6.26.1"
+    trystero: "npm:^0.25.4"
     typescript: "npm:^5.7.3"
     vite: "npm:^5.4.1"
     zod: "npm:^3.24.2"
@@ -13406,6 +13432,15 @@ __metadata:
   version: 1.1.0
   resolution: "treeify@npm:1.1.0"
   checksum: 10c0/2f0dea9e89328b8a42296a3963d341ab19897a05b723d6b0bced6b28701a340d2a7b03241aef807844198e46009aaf3755139274eb082cfce6fdc1935cbd69dd
+  languageName: node
+  linkType: hard
+
+"trystero@npm:^0.25.4":
+  version: 0.25.4
+  resolution: "trystero@npm:0.25.4"
+  dependencies:
+    "@trystero-p2p/nostr": "npm:0.25.4"
+  checksum: 10c0/25739cf19b63480feed45616fc88b43bde6113167ee926e4d87b174cdfeb474de90542e60088ae63d36bd5adfeabc6f811564abaae55561f01d28c5f00031780
   languageName: node
   linkType: hard
 

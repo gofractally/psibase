@@ -107,7 +107,7 @@ pub mod impls {
                 owner,
                 last_used_id: 0,
             });
-            config.last_used_id += 1;
+            config.last_used_id = config.last_used_id.checked_add(1).unwrap();
             table.put(&config).unwrap();
             config.last_used_id
         }

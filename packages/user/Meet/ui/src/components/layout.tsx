@@ -1,4 +1,4 @@
-import { Link, Outlet } from "react-router-dom";
+import { Link, Outlet, useLocation } from "react-router-dom";
 
 import { AppSidebar } from "@/components/app-sidebar";
 
@@ -18,6 +18,11 @@ import {
 } from "@shared/shadcn/ui/sidebar";
 
 export const Layout = () => {
+    const location = useLocation();
+    const parts = location.pathname.split("/").filter(Boolean);
+    const inRoom = parts[0] === "room" || parts[0] === "private";
+    const roomId = inRoom ? parts[1] : undefined;
+
     return (
         <SidebarProvider>
             <AppSidebar variant="inset" />
@@ -33,15 +38,17 @@ export const Layout = () => {
                             <BreadcrumbList>
                                 <BreadcrumbItem className="hidden md:block">
                                     <BreadcrumbLink asChild>
-                                        <Link to="/">
-                                            {"meet"}
-                                        </Link>
+                                        <Link to="/">Meet</Link>
                                     </BreadcrumbLink>
                                 </BreadcrumbItem>
                                 <BreadcrumbSeparator className="hidden md:block" />
                                 <BreadcrumbItem>
                                     <BreadcrumbPage>
-                                        Example Thing Page
+                                        {inRoom
+                                            ? parts[0] === "private"
+                                                ? `Private ${roomId ?? ""}`
+                                                : (roomId ?? "Room")
+                                            : "Rooms"}
                                     </BreadcrumbPage>
                                 </BreadcrumbItem>
                             </BreadcrumbList>

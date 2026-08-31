@@ -2,15 +2,33 @@ package meet:plugin;
 
 interface api {
     use host:types/types.{error};
-    set-example-thing: func(thing: string) -> result<_, error>;
-}
 
-interface queries {
-    use host:types/types.{error};
-    get-example-thing: func() -> result<string, error>;
+    /// Generate a long-lived identity key if needed and publish the public key.
+    set-key: func() -> result<_, error>;
+
+    /// Generate a new identity key and publish it, replacing the previous one.
+    rotate-key: func() -> result<_, error>;
+
+    /// Create or update a private meeting. `id` is an account-number name.
+    /// Returns JSON `{ "id", "hash", "password" }`.
+    set-meeting: func(id: string, accounts: list<string>) -> result<string, error>;
+
+    /// Wrap the current meeting key for a whitelist member who has a public key.
+    wrap-member: func(meeting-id: string, account: string) -> result<_, error>;
+
+    /// Decrypt this user's wrap and return the Trystero password (hex).
+    meeting-password: func(meeting-id: string) -> result<string, error>;
+
+    /// Host-only: add accounts with empty wraps.
+    add-members: func(meeting-id: string, accounts: list<string>) -> result<_, error>;
+
+    /// Host-only: drop accounts by republishing the meeting without them.
+    remove-members: func(meeting-id: string, accounts: list<string>) -> result<_, error>;
+
+    /// Host-only: delete a meeting and free its id.
+    delete-meeting: func(meeting-id: string) -> result<_, error>;
 }
 
 world imports {
     import api;
-    import queries;
 }
