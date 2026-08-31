@@ -94,18 +94,6 @@ pub fn get_claims(actions: &[Action]) -> Result<Vec<Claim>, HostTypes::Error> {
     Ok(claims)
 }
 
-pub fn get_claims_for_user(user: &String) -> Result<Vec<Claim>, HostTypes::Error> {
-    let mut claims = vec![];
-
-    let auth_service_acc = get_account(user)?.unwrap().auth_service;
-    let plugin_ref = PluginRef::new(&auth_service_acc, "plugin", "transact-hook-user-auth");
-    if let Some(claim) = on_user_auth_claim(plugin_ref, &user)? {
-        claims.push(claim);
-    }
-
-    Ok(claims)
-}
-
 pub fn get_proofs(tx_hash: &[u8; 32]) -> Result<Vec<Hex<Vec<u8>>>, HostTypes::Error> {
     let mut proofs = vec![];
 
@@ -126,24 +114,6 @@ pub fn get_proofs(tx_hash: &[u8; 32]) -> Result<Vec<Hex<Vec<u8>>>, HostTypes::Er
     proofs.extend(extra_proofs);
 
     Ok(proofs)
-}
-
-pub fn get_proofs_for_user(
-    tx_hash: &[u8; 32],
-    user: &String,
-) -> Result<Vec<Hex<Vec<u8>>>, HostTypes::Error> {
-    let mut proofs = vec![];
-
-    let auth_service_acc = get_account(user)?.unwrap().auth_service;
-    let plugin_ref = PluginRef::new(&auth_service_acc, "plugin", "transact-hook-user-auth");
-    if let Some(proof) = on_user_auth_proof(plugin_ref, &user, tx_hash)? {
-        proofs.push(proof);
-    }
-
-    Ok(proofs
-        .into_iter()
-        .map(|proof| Hex::from(proof.signature))
-        .collect())
 }
 
 #[derive(Serialize)]
