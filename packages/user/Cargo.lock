@@ -2236,6 +2236,42 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 
 [[package]]
+name = "meet"
+version = "0.27.0"
+dependencies = [
+ "async-graphql",
+ "meet-pkg",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_macros",
+ "psibase_service",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "meet-pkg"
+version = "0.27.0"
+dependencies = [
+ "meet",
+ "meet-plugin",
+ "psibase-user-workspace-hack",
+ "r-meet",
+]
+
+[[package]]
+name = "meet-plugin"
+version = "0.27.0"
+dependencies = [
+ "meet",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "serde",
+ "serde_json",
+ "wit-bindgen-rt",
+]
+
+[[package]]
 name = "memchr"
 version = "2.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2995,6 +3031,19 @@ dependencies = [
  "psibase_service",
  "serde",
  "serde-aux",
+ "serde_json",
+]
+
+[[package]]
+name = "r-meet"
+version = "0.27.0"
+dependencies = [
+ "async-graphql",
+ "meet",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_service",
+ "serde",
  "serde_json",
 ]
 

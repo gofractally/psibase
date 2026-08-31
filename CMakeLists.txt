@@ -779,6 +779,13 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/Meet.psi
+    PATH packages/user/Meet
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
+    DEPENDS ${Meet_js_DEP}
+)
+
+cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/NameMarket.psi
     PATH packages/user/NameMarket
     TARGET_DIR ${USER_WORKSPACE_TARGET}
@@ -1247,7 +1254,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Network initializes with development-only apps, insecure authentication, and no governance."
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
-                    Docs DiffAdjust Evaluations Events Fractals FractalCore Guilds Explorer Homepage Host HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
+                    Docs DiffAdjust Evaluations Events Fractals FractalCore Guilds Explorer Homepage Host HttpServer Identity Invite Kdf Meet Nft Packages Permissions Producers Profiles Registry ReservedNames
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens NameMarket TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop
 )
 
@@ -1257,7 +1264,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Network initializes with production-ready apps, secure authentication, and no governance."
     PACKAGE_DEPENDS Accounts Aes AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
-                    Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Guilds Homepage Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
+                    Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Guilds Homepage Host HttpServer Invite Kdf Meet Nft Packages Permissions Producers Profiles Registry ReservedNames
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens NameMarket TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop
 )
 
@@ -1320,7 +1327,7 @@ endfunction()
 
 write_package_index(package-index ${SERVICE_DIR} 1
     Accounts AccountsService Aes AuthAny AuthDyn AuthDelegate AuthDelegateService AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
-    Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry
+    Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host Identity Invite InviteService Kdf Kvtests Meet Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage VirtualServer WebCrypto Workshop Config
     XAdmin XBasic XDb XDefault XHttp XPackages XPeers XProxy XRun XSites XTimer XTransact)
 
@@ -1369,6 +1376,7 @@ install(
           ${SERVICE_DIR}/InviteService.psi
           ${SERVICE_DIR}/Kdf.psi
           ${SERVICE_DIR}/Kvtests.psi
+          ${SERVICE_DIR}/Meet.psi
           ${SERVICE_DIR}/Minimal.psi
           ${SERVICE_DIR}/Nft.psi
           ${SERVICE_DIR}/Nop.psi

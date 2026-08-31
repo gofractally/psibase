@@ -22,6 +22,7 @@
             "user/TokenStream/ui",
             "user/Homepage/ui",
             "user/Identity/ui",
+            "user/Meet/ui",
             "user/Packages/ui",
             "user/Permissions/ui",
             "user/Workshop/ui",

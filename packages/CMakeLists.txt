@@ -37,6 +37,7 @@ if(DEFINED IS_WASM)
 
     add_usr_cargo_psibase_test(DiffAdjust)
     add_usr_cargo_psibase_test(Identity)
+    add_usr_cargo_psibase_test(Meet)
     add_usr_cargo_psibase_test(Registry)
     add_usr_cargo_psibase_test(Subgroups)
     add_usr_cargo_psibase_test(Tokens)

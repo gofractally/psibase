@@ -68,6 +68,10 @@ members = [
     "NameMarket/service",
     "NameMarket/query-service",
     "NameMarket/plugin",
+    "Meet",
+    "Meet/service",
+    "Meet/query-service",
+    "Meet/plugin",
 ]
 
 exclude = [

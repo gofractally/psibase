@@ -1,0 +1,16 @@
+[package]
+name = "r-meet"
+description = "RPC service for meet"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+psibase.workspace = true
+psibase_service.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+meet = { path = "../service", version = "0.27.0" }
+async-graphql.workspace = true
+psibase-user-workspace-hack.workspace = true

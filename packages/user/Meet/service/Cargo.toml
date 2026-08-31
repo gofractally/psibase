@@ -1,0 +1,26 @@
+[package]
+name = "meet"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[package.metadata.psibase]
+server = "r-meet"
+plugin = "meet-plugin"
+data = [{ src = "../ui/dist", dst = "/" }]
+postinstall = [
+    { sender = "meet", service = "meet", method = "init", data = {} },
+]
+
+[dependencies]
+psibase.workspace = true
+psibase_macros.workspace = true
+psibase_service.workspace = true
+async-graphql.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+psibase-user-workspace-hack.workspace = true
+
+[dev-dependencies]
+meet-pkg = { path = "..", version = "0.27.0" }

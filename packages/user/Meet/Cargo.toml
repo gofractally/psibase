@@ -1,0 +1,27 @@
+[package]
+name = "meet-pkg"                      # Crate name
+description = "P2P video / audio conferencing"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish.workspace = true
+
+[package.metadata.psibase]
+package-name = "Meet"
+services = ["meet"]
+
+[package.metadata.psibase.dependencies]
+HttpServer = "0.27.0"
+Sites = "0.27.0"
+Permissions = "0.27.0"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+meet = { path = "service", version = "0.27.0" }
+r-meet = { path = "query-service", version = "0.27.0" }
+meet-plugin = { path = "plugin", version = "0.27.0" }
+psibase-user-workspace-hack.workspace = true
