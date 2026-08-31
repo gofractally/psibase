@@ -78,27 +78,42 @@ export const Routing = () => {
                 <Route path="create" element={<CreatePage />} />
             </Route>
 
-            {isBootable ? (
-                <Route path="*" element={<Navigate to="/setup" replace />} />
-            ) : (
-                <Route path="" element={<Layout />}>
-                    <Route path="" element={<App />}>
-                        {routes.map((route) => (
+            <Route path="" element={<Layout />}>
+                <Route path="" element={<App />}>
+                    {isBootable ? (
+                        <>
                             <Route
-                                key={route.path}
-                                path={route.path}
-                                element={route.element}
+                                path="configuration"
+                                element={<ConfigurationPage />}
                             />
-                        ))}
-                        <Route
-                            path=""
-                            element={
-                                <Navigate to="/dashboard" replace={true} />
-                            }
-                        />
-                    </Route>
+                            <Route
+                                path=""
+                                element={<Navigate to="/setup" replace />}
+                            />
+                            <Route
+                                path="*"
+                                element={<Navigate to="/setup" replace />}
+                            />
+                        </>
+                    ) : (
+                        <>
+                            {routes.map((route) => (
+                                <Route
+                                    key={route.path}
+                                    path={route.path}
+                                    element={route.element}
+                                />
+                            ))}
+                            <Route
+                                path=""
+                                element={
+                                    <Navigate to="/dashboard" replace={true} />
+                                }
+                            />
+                        </>
+                    )}
                 </Route>
-            )}
+            </Route>
         </Routes>
     );
 };

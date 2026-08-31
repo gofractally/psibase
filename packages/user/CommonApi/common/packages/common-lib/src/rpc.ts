@@ -84,8 +84,14 @@ export async function getText(url: string) {
     return res.text();
 }
 
-export async function getJson<T = any>(url: string): Promise<T> {
-    const res = await get(url, { headers: { Accept: "application/json" } });
+export async function getJson<T = any>(
+    url: string,
+    options?: RequestInit,
+): Promise<T> {
+    const res = await get(url, {
+        ...options,
+        headers: { Accept: "application/json", ...options?.headers },
+    });
     return res.json();
 }
 
@@ -111,33 +117,29 @@ export async function postGraphQL(
     graphql: string,
     options?: RequestInit,
 ) {
-    if (!options) {
-        options = {};
-    }
     return throwIfError(
         await fetch(url, {
             method: "POST",
-            headers: {
-                "Content-Type": "application/graphql",
-            },
             body: graphql,
             ...options,
+            headers: {
+                "Content-Type": "application/graphql",
+                ...options?.headers,
+            },
         }),
     );
 }
 
 export async function postJson(url: string, json: any, options?: RequestInit) {
-    if (!options) {
-        options = {};
-    }
     return throwIfError(
         await fetch(url, {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
             body: JSON.stringify(json),
             ...options,
+            headers: {
+                "Content-Type": "application/json",
+                ...options?.headers,
+            },
         }),
     );
 }

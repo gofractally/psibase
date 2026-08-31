@@ -69,32 +69,51 @@ namespace SystemService
       }
 
       /*
-        script-src:
-          * `unsafe-eval` is needed for WebAssembly.compile()
-          * `unsafe-inline` is needed for inline <script> tags
-          * `blob:` for loading dynamically generated modules
-          * `https:` for dynamically loading libs from CDNs
-        font-src:
-          * `https:` for dynamically loading fonts from CDNs
-        frame-src:
-          * `*` is needed to allow embedding supervisor
-        connect-src:
-          * `blob:` for fetch-compiling blob urls
-          * `*` allows fetching plugins, as well as websocket connections
+        Strict baseline. Apps with additional needs (supervisor, prompt pages,
+        Explorer, Docs) override it via setCsp; see doc/src/default-apps/sites.md.
 
         CSP strings (default or user-defined via setCsp) may include the
         keyword `{{root}}`, which is replaced with the root domain including
         port when present (e.g. psibase.localhost:8080 or example.com).
-        See expandCspKeywords.
+        See expandCspKeywords. Host sources are written scheme-relative so
+        the same policy works over http (local dev) and https (production).
+
+        style-src:
+          * `unsafe-inline` is needed for runtime-injected <style> tags
+            (e.g. the shared chart component)
+        img-src:
+          * `data:` for generated identicons and inline app icons
+          * `profiles.{{root}}/avatar/` (prefix match) for user avatars,
+            served by the profiles service
+          * `branding.{{root}}` for the network logo
+        connect-src:
+          * `'self'` covers the app's own /graphql and RPC endpoints, the
+            same-origin /common endpoints, and same-origin websockets
+          * `profiles.{{root}}` and `tokens.{{root}}` are granted by default
+            because the shared UI hooks (useProfile, useSystemToken) fetch
+            them from nearly every app; both expose only public data and
+            writes require signed transactions.
+            Apps that fetch any other service's subdomain directly must opt
+            in via setCsp with an explicit host list (e.g. `invite.{{root}}`);
+            no subdomain wildcard is granted by default
+        frame-src:
+          * only the supervisor may be embedded (hidden iframe used by apps)
+        frame-ancestors:
+          * `'self'` blocks cross-origin embedding (clickjacking defense);
+            prompt pages override this to allow the supervisor
       */
-      const std::string DEFAULT_CSP_HEADER =                               //
-          "default-src 'self';"                                            //
-          "font-src 'self' https:;"                                        //
-          "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: https:;"  //
-          "img-src * data:;"                                               //
-          "style-src 'self' 'unsafe-inline';"                              //
-          "frame-src *;"                                                   //
-          "connect-src * blob:;"                                           //
+      const std::string DEFAULT_CSP_HEADER =                //
+          "default-src 'self';"                             //
+          "script-src 'self';"                              //
+          "style-src 'self' 'unsafe-inline';"               //
+          "img-src 'self' data: profiles.{{root}}/avatar/ branding.{{root}};"  //
+          "font-src 'self';"                                //
+          "connect-src 'self' profiles.{{root}} tokens.{{root}};"  //
+          "frame-src supervisor.{{root}};"                  //
+          "frame-ancestors 'self';"                         //
+          "base-uri 'none';"                                //
+          "form-action 'self';"                             //
+          "object-src 'none';"                              //
           ;
 
       // Root domain for CSP host sources: rootHost + optional port.

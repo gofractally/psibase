@@ -5,15 +5,15 @@ import QueryKey from "@/lib/query-keys";
 
 import { FRACTALS_SERVICE } from "@shared/domains/fractal/lib/constants";
 import { queryClient } from "@shared/lib/query-client";
-import { zAccount } from "@shared/lib/schemas/account";
+import { zAccountFree } from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 import { zAccountNameStatus } from "../use-account-status";
 
 export const zParams = z.object({
-    fractalAccount: zAccount,
-    guildAccount: zAccount,
+    fractalAccount: zAccountFree,
+    guildAccount: zAccountFree,
     name: z.string().min(1, { message: "Name is required." }),
     mission: z.string().min(1, { message: "Mission is required." }),
 });

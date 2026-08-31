@@ -25,13 +25,6 @@ namespace SystemService
                 && req.host[req.host.size() - rootHost.size() - 1] == '.';
       }
 
-      std::optional<RegisteredServiceRow> getServer(const AccountNumber& server)
-      {
-         return HttpServer::Tables(HttpServer::service, KvMode::read)
-             .open<RegServTable>()
-             .get(server);
-      }
-
       std::optional<AccountNumber> getRedirect(const AccountNumber& account)
       {
          auto row = HttpServer::Tables(HttpServer::service, KvMode::read)
@@ -60,6 +53,13 @@ namespace SystemService
           .service = sender,
           .server  = server,
       });
+   }
+
+   std::optional<AccountNumber> HttpServer::getServer(AccountNumber service)
+   {
+      if (auto row = Tables{getReceiver(), KvMode::read}.open<RegServTable>().get(service))
+         return row->server;
+      return std::nullopt;
    }
 
    static void checkRecvAuth(const Action& act)
@@ -341,7 +341,7 @@ namespace SystemService
 
       if (registered)
       {
-         result = checkServer(registered->server);
+         result = checkServer(*registered);
       }
 
       // Otherwise, check the sites service

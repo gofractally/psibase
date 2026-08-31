@@ -5,7 +5,7 @@ import { getJson } from "@psibase/common-lib";
 import { queryKeys } from "@/lib/query-keys";
 import { PackageInfo } from "@/types";
 
-import { graphql } from "@shared/lib/graphql";
+import { adminGraphql } from "@/lib/admin-graphql";
 
 export const usePackages = () =>
     useQuery<PackageInfo[]>({
@@ -30,7 +30,7 @@ export const useInstalledLocalPackages = () =>
     useQuery<InstalledLocalPackage[]>({
         queryKey: queryKeys.installedLocalPackages,
         queryFn: async () => {
-            const res = (await graphql(
+            const res = (await adminGraphql(
                 "{ installed(first: 100) { edges { node { name version } } } }",
                 { service: "x-packages" },
             )) as {

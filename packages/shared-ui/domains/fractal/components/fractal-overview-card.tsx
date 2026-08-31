@@ -26,11 +26,7 @@ export const OverviewCard = ({
     linksToFractal?: boolean;
 }) => {
     const isMember = membership != null;
-    const status = !isMember
-        ? "Not a member"
-        : membership
-          ? 'Member'
-          : "Loading...";
+    const status = isMember ? "Member" : "Not a member";
 
     const content = (
         <GlowingCard
@@ -70,12 +66,14 @@ export const OverviewCard = ({
                     {fractal?.fractal?.mission ?? "No mission available"}
                 </p>
             </CardContent>
-            <CardFooter className="justify-end">
-                <div className="text-muted-foreground text-xs font-normal italic">
-                    Member since{" "}
-                    {dayjs(membership?.createdAt).format("MMMM D, YYYY")}
-                </div>
-            </CardFooter>
+            {isMember && membership.createdAt ? (
+                <CardFooter className="justify-end">
+                    <div className="text-muted-foreground text-xs font-normal italic">
+                        Member since{" "}
+                        {dayjs(membership.createdAt).format("MMMM D, YYYY")}
+                    </div>
+                </CardFooter>
+            ) : null}
         </GlowingCard>
     );
 

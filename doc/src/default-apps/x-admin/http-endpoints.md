@@ -91,7 +91,7 @@ A typical boot sequence contains more configuration than is able to fit in a sin
 | `id`       | String  | An opaque string that uniquely identifies the device |
 | `unlocked` | Boolean | `true` if the device is currently unlocked           |
 
-`POST` to `/native/admin/keys/unlock` unlocks a cryptographic device.
+`POST` to `/native/admin/keys/unlock` unlocks a cryptographic device. If [persistent secrets](../../run-infrastructure/cli/psinode.md#general-options) are enabled, the device will remain unlocked when the server restarts.
 
 | Field    | Type   | Description                 |
 |----------|--------|-----------------------------|
