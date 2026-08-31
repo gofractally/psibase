@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { graphql } from "@shared/lib/graphql";
+import { authorizedPluginGraphql } from "@shared/lib/graphql/authorized-plugin";
+import { tokenSwap } from "@shared/lib/plugins";
 import { Account, zAccount } from "@shared/lib/schemas/account";
 
 const zInt = z.number().int();
@@ -47,7 +48,8 @@ export const usePools = (refetchInterval = 12000) => {
         queryKey: ["pools"],
         refetchInterval,
         queryFn: async () => {
-            const res = await graphql(
+            const res = await authorizedPluginGraphql(
+                tokenSwap.authorized.graphql,
                 `
                     {
                         allPools {
@@ -73,9 +75,6 @@ export const usePools = (refetchInterval = 12000) => {
                         }
                     }
                 `,
-                {
-                    service: "token-swap",
-                },
             );
 
             const rawPools = PoolsResponseSchema.parse(res).allPools.nodes;

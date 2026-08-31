@@ -20,8 +20,8 @@ use virtual_server::plugin::transact as VirtualServer;
 
 // Exported interfaces/types
 use exports::transact::plugin::{
-    admin::Guest as Admin, auth::Guest as Auth, hooks::Guest as Hooks, intf::Guest as Intf,
-    network::Guest as Network,
+    admin::Guest as Admin, auth::Guest as Auth, authorized::Guest as Authorized,
+    hooks::Guest as Hooks, intf::Guest as Intf, network::Guest as Network,
 };
 
 use psibase::services::transact::action_structs::setSnapTime;
@@ -44,7 +44,7 @@ psibase::define_trust! {
         ",
     }
     functions {
-        None => [add_signature, unhook_actions_sender, add_action_to_transaction],
+        None => [add_signature, unhook_actions_sender, add_action_to_transaction, graphql],
         Low => [],
         High => [hook_actions_sender],
         Max => [set_propose_latch, propose, set_snapshot_time, start_tx, finish_tx, get_query_token],
@@ -357,6 +357,13 @@ impl Auth for TransactPlugin {
             }
         };
         Ok(reply.access_token)
+    }
+}
+
+impl Authorized for TransactPlugin {
+    fn graphql(query: String) -> Result<String, HostTypes::Error> {
+        assert_authorized_with_whitelist(FunctionName::graphql, vec!["config".into()])?;
+        Server::post_graphql_get_json(&query)
     }
 }
 

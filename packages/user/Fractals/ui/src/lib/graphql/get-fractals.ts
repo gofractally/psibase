@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { FRACTALS_SERVICE } from "@shared/domains/fractal/lib/constants";
-import { graphql } from "@shared/lib/graphql";
+import { authorizedPluginGraphql } from "@shared/lib/graphql/authorized-plugin";
+import { fractals } from "@shared/lib/plugins";
 import { zAccount } from "@shared/lib/schemas/account";
 
 export const zFractaListInstance = z.object({
@@ -13,7 +13,8 @@ export const zFractaListInstance = z.object({
 export type FractalListInstance = z.infer<typeof zFractaListInstance>;
 
 export const getFractals = async () => {
-    const res = await graphql(
+    const res = await authorizedPluginGraphql(
+        fractals.authorized.graphql,
         `
             {
                 fractals(first: 99) {
@@ -25,7 +26,6 @@ export const getFractals = async () => {
                 }
             }
         `,
-        { service: FRACTALS_SERVICE },
     );
 
     return z

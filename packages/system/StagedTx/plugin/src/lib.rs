@@ -3,7 +3,9 @@ mod bindings;
 
 use bindings::*;
 
-use exports::staged_tx::plugin::{proposer::Guest as Proposer, respondent::Guest as Respondent};
+use exports::staged_tx::plugin::{
+    authorized::Guest as Authorized, proposer::Guest as Proposer, respondent::Guest as Respondent,
+};
 use host::common::server as Server;
 use host::types::types::Error;
 use psibase::fracpack::Pack;
@@ -27,7 +29,7 @@ psibase::define_trust! {
         ",
     }
     functions {
-        None => [execute],
+        None => [execute, graphql],
         Low => [],
         High => [accept, reject, remove],
         Max => [],
@@ -153,6 +155,16 @@ impl Respondent for StagedTxPlugin {
             }
             .packed(),
         )
+    }
+}
+
+impl Authorized for StagedTxPlugin {
+    fn graphql(query: String) -> Result<String, Error> {
+        assert_authorized_with_whitelist(
+            FunctionName::graphql,
+            vec!["config".into(), "fractal-cr".into()],
+        )?;
+        Server::post_graphql_get_json(&query)
     }
 }
 

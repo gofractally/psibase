@@ -8,6 +8,7 @@ use bindings::evaluations::plugin::{admin::close, user as EvaluationsUser};
 use bindings::exports::guilds::plugin::{
     admin_fractal::Guest as AdminFractal,
     admin_guild::Guest as AdminGuild,
+    authorized::Guest as Authorized,
     queries::{Guest as Queries, Guild as GuildWit},
     user_eval::Guest as UserEval,
     user_guild::Guest as UserGuild,
@@ -391,6 +392,13 @@ impl UserGuild for GuildsPlugin {
     fn set_guild_app_info(guild_account: String, extra_info: String) -> Result<(), Error> {
         Guilds::add_to_tx().set_g_app(guild_account.parse().unwrap(), extra_info);
         Ok(())
+    }
+}
+
+impl Authorized for GuildsPlugin {
+    #[psibase_plugin::authorized(None, whitelist = ["fractal-cr", "fractals"])]
+    fn graphql(query: String) -> Result<String, Error> {
+        host::server::post_graphql_get_json(&query)
     }
 }
 

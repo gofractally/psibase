@@ -1,6 +1,7 @@
 import z from "zod";
 
-import { graphql } from "@shared/lib/graphql";
+import { authorizedPluginGraphql } from "@shared/lib/graphql/authorized-plugin";
+import { stagedTx } from "@shared/lib/plugins";
 import { type Account, zAccount } from "@shared/lib/schemas/account";
 import { zDateTime } from "@shared/lib/schemas/date-time";
 
@@ -25,7 +26,8 @@ const response = z.object({
 });
 
 export const getActorHistory = async (account: Account) => {
-    const res = await graphql(
+    const res = await authorizedPluginGraphql(
+        stagedTx.authorized.graphql,
         `{ 
             actorHistory(actor: "${account}", last: 8) {
                 nodes {
@@ -36,7 +38,6 @@ export const getActorHistory = async (account: Account) => {
                 }
             }
         }`,
-        { service: "staged-tx" },
     );
 
     return response.parse(res).actorHistory.nodes;

@@ -1,23 +1,8 @@
 import { z } from "zod";
 
-import { EVALUATIONS_SERVICE } from "@shared/domains/fractal/lib/constants";
-import { graphql } from "@shared/lib/graphql";
+import { authorizedPluginGraphql } from "@shared/lib/graphql/authorized-plugin";
+import { evaluation } from "@shared/lib/plugins";
 import { Account } from "@shared/lib/schemas/account";
-
-const ErrorResponse = z.object({
-    errors: z.array(
-        z.object({
-            message: z.string(),
-            locations: z.array(
-                z.object({
-                    line: z.number(),
-                    column: z.number(),
-                }),
-            ),
-        }),
-    ),
-    data: z.null(),
-});
 
 export const zGroup = z.object({
     owner: z.string(),
@@ -32,23 +17,16 @@ const SuccessResponse = z.object({
     }),
 });
 
-const GraphqlResponse = ErrorResponse.or(SuccessResponse);
-
 export type Group = z.infer<typeof zGroup>;
 
 export const getGroups = async (
     owner: Account,
     evaluationId: number,
 ): Promise<Group[]> => {
-    const res = await graphql(
+    const res = await authorizedPluginGraphql(
+        evaluation.authorized.graphql,
         `{ getGroups(owner: "${owner}", evaluationId: ${evaluationId}) { nodes { owner number evaluationId keySubmitter result } } }`,
-        { service: EVALUATIONS_SERVICE },
     );
 
-    const response = GraphqlResponse.parse(res);
-
-    if ("getGroups" in response) {
-        return response.getGroups.nodes;
-    }
-    throw new Error(response.errors[0].message);
+    return SuccessResponse.parse(res).getGroups.nodes;
 };

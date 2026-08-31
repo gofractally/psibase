@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { FRACTALS_SERVICE } from "@shared/domains/fractal/lib/constants";
-import { graphql } from "@shared/lib/graphql";
+import { authorizedPluginGraphql } from "@shared/lib/graphql/authorized-plugin";
+import { fractals } from "@shared/lib/plugins";
 import { type Account, zAccount } from "@shared/lib/schemas/account";
 import { zDateTime } from "@shared/lib/schemas/date-time";
 
@@ -18,7 +18,8 @@ export const zMember = z
 export type Membership = z.infer<typeof zMember>;
 
 export const getMemberships = async (account: Account): Promise<Membership> => {
-    const res = await graphql(
+    const res = await authorizedPluginGraphql(
+        fractals.authorized.graphql,
         `
         {
             memberships(member: "${account}") {
@@ -32,7 +33,6 @@ export const getMemberships = async (account: Account): Promise<Membership> => {
             }
         }
     `,
-        { service: FRACTALS_SERVICE },
     );
 
     return z

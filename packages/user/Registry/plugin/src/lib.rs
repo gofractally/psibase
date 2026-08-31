@@ -7,7 +7,10 @@ mod types;
 use crate::trust::*;
 use bindings::registry::plugin::types::AppMetadata;
 use ::registry::action_structs::*;
+use exports::registry::plugin::authorized::Guest as Authorized;
 use exports::registry::plugin::developer::Guest as Developer;
+use host::common::server as Server;
+use host::types::types::Error;
 use psibase::fracpack::Pack;
 use transact::plugin::intf as Transact;
 
@@ -23,7 +26,7 @@ psibase::define_trust! {
         ",
     }
     functions {
-        None => [],
+        None => [graphql],
         Low => [],
         Medium => [set_metadata],
         High => [publish, unpublish],
@@ -57,6 +60,13 @@ impl Developer for RegistryPlugin {
 
         Transact::add_action_to_transaction(unpublish::ACTION_NAME, &unpublish {}.packed())
             .unwrap();
+    }
+}
+
+impl Authorized for RegistryPlugin {
+    fn graphql(query: String) -> Result<String, Error> {
+        assert_authorized_with_whitelist(FunctionName::graphql, vec!["workshop".to_string()])?;
+        Server::post_graphql_get_json(&query)
     }
 }
 

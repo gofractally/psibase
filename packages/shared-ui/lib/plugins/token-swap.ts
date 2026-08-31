@@ -99,18 +99,32 @@ class Liquidity extends PluginInterface {
     }
 }
 
+class Authorized extends PluginInterface {
+    protected override readonly _intf = "authorized" as const;
+
+    get graphql() {
+        return this._call<[query: string], string>("graphql");
+    }
+}
+
 export class Plugin {
     readonly swap: Swap;
     readonly liquidity: Liquidity;
+    readonly authorized: Authorized;
 
     constructor(readonly service: Account) {
         // Initialize all interfaces with the correct service
         this.swap = new Swap();
         this.liquidity = new Liquidity();
+        this.authorized = new Authorized();
 
         // Set the protected _service on each instance
         // This avoids the "used before initialization" error
-        const instances = [this.swap, this.liquidity] as PluginInterface[];
+        const instances = [
+            this.swap,
+            this.liquidity,
+            this.authorized,
+        ] as PluginInterface[];
 
         for (const instance of instances) {
             Object.assign(instance, { _service: service });

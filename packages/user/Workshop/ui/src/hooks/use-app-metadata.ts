@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { graphql } from "@shared/lib/graphql";
+import { authorizedPluginGraphql } from "@shared/lib/graphql/authorized-plugin";
+import { registry } from "@shared/lib/plugins";
 import { zAccount } from "@shared/lib/schemas/account";
 
 export const Status = z.enum(["draft", "published", "unpublished"]);
@@ -30,7 +31,8 @@ export const appMetadataQueryKey = (appName: string | undefined | null) => [
 export const fetchMetadata = async (account: string) => {
     const appName = zAccount.parse(account);
     try {
-        const res = await graphql(
+        const res = await authorizedPluginGraphql(
+            registry.authorized.graphql,
             `
         {
           appMetadata(accountId: "${appName}") {
@@ -46,7 +48,6 @@ export const fetchMetadata = async (account: string) => {
           }
         }
       `,
-            { service: "registry" },
         );
 
         const parsed = MetadataResponse.parse(res);

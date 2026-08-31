@@ -26,6 +26,7 @@ world impl {
     export admin;
     export intf;
     export auth;
+    export authorized;
     export network;
 
     import hook-handlers;

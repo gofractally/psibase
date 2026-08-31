@@ -11,6 +11,7 @@ use host::types::types::Error;
 use transact::plugin::intf::add_action_to_transaction;
 
 use exports::producers::plugin::api::Guest as Api;
+use exports::producers::plugin::authorized::Guest as Authorized;
 use producers::plugin::types::*;
 
 use psibase::account;
@@ -25,6 +26,16 @@ mod errors;
 use errors::ErrorType::*;
 
 struct ProducersPlugin;
+
+fn assert_caller(allowed: &[&str], context: &str) {
+    let sender = Client::get_sender();
+    assert!(
+        allowed.contains(&sender.as_str()),
+        "{} can only be called by {:?}",
+        context,
+        allowed
+    );
+}
 
 #[derive(Deserialize)]
 struct CandidateLookupClaim {
@@ -183,6 +194,13 @@ impl Api for ProducersPlugin {
             Actions::setMaxProds::ACTION_NAME,
             &Actions::setMaxProds { max_prods }.packed(),
         )
+    }
+}
+
+impl Authorized for ProducersPlugin {
+    fn graphql(query: String) -> Result<String, Error> {
+        assert_caller(&["homepage", "config"], "authorized::graphql");
+        post_graphql_get_json(&query)
     }
 }
 

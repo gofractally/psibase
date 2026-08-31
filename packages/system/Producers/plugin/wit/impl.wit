@@ -5,4 +5,5 @@ world impl {
     include host:common/imports;
 
     export api;
+    export authorized;
 }

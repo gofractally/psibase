@@ -1,29 +1,27 @@
 import z from "zod";
 
-import { postGraphQLGetJson, siblingUrl } from "@psibase/common-lib";
-
+import { authorizedPluginGraphql } from "@shared/lib/graphql/authorized-plugin";
+import { guilds } from "@shared/lib/plugins";
 import { zAccount } from "@shared/lib/schemas/account";
 import { zDateTime } from "@shared/lib/schemas/date-time";
 
 const zGuildInviteDetailsResponse = z.object({
-    data: z.object({
-        guildInvite: z
-            .object({
-                createdAt: zDateTime,
-                inviter: zAccount,
-                guild: z.object({
-                    account: zAccount,
-                    bio: z.string(),
-                    displayName: z.string(),
-                }),
-            })
-            .nullable(),
-    }),
+    guildInvite: z
+        .object({
+            createdAt: zDateTime,
+            inviter: zAccount,
+            guild: z.object({
+                account: zAccount,
+                bio: z.string(),
+                displayName: z.string(),
+            }),
+        })
+        .nullable(),
 });
 
 export const getGuildInvite = async (inviteId: number) => {
-    const response = await postGraphQLGetJson(
-        siblingUrl(undefined, "guilds", "graphql"),
+    const response = await authorizedPluginGraphql(
+        guilds.authorized.graphql,
         `
         {
             guildInvite(id: ${inviteId}) {
@@ -38,5 +36,5 @@ export const getGuildInvite = async (inviteId: number) => {
         }
         `,
     );
-    return zGuildInviteDetailsResponse.parse(response).data.guildInvite;
+    return zGuildInviteDetailsResponse.parse(response).guildInvite;
 };

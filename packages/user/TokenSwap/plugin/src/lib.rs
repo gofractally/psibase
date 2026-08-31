@@ -4,9 +4,11 @@ mod bindings;
 mod find_path;
 use std::str::FromStr;
 
+use bindings::exports::token_swap::plugin::authorized::Guest as Authorized;
 use bindings::exports::token_swap::plugin::liquidity::Guest as Liquidity;
 use bindings::exports::token_swap::plugin::swap::Guest as Swap;
 
+use bindings::host::common::server;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
@@ -45,7 +47,7 @@ define_trust! {
         ",
     }
     functions {
-        None => [quote, quote_remove_liquidity, quote_add_liquidity, quote_single_sided_remove],
+        None => [quote, quote_remove_liquidity, quote_add_liquidity, quote_single_sided_remove, graphql],
         High => [swap, new_pool, add_liquidity, remove_liquidity],
     }
 }
@@ -327,6 +329,13 @@ impl Liquidity for TokenSwapPlugin {
         let expected_balance = mul_div(quoting_amount, opposing_reserve, quoting_reserve);
 
         u64_to_decimal(opposing_token, expected_balance.value)
+    }
+}
+
+impl Authorized for TokenSwapPlugin {
+    fn graphql(query: String) -> Result<String, Error> {
+        assert_authorized_with_whitelist(FunctionName::graphql, vec!["homepage".into()])?;
+        server::post_graphql_get_json(&query)
     }
 }
 

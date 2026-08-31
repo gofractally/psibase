@@ -1,17 +1,17 @@
 import { z } from "zod";
 
-import { EVALUATIONS_SERVICE } from "@shared/domains/fractal/lib/constants";
-import { graphql } from "@shared/lib/graphql";
+import { authorizedPluginGraphql } from "@shared/lib/graphql/authorized-plugin";
+import { evaluation } from "@shared/lib/plugins";
 import { type Account, zAccount } from "@shared/lib/schemas/account";
 
 export const getLastCreatedEvaluationId = async (account: Account) => {
     const parsed = zAccount.parse(account);
-    const res = await graphql(
+    const res = await authorizedPluginGraphql(
+        evaluation.authorized.graphql,
         `{ getLastEvaluation(owner: "${parsed}") {
             id
             owner
         } }`,
-        { service: EVALUATIONS_SERVICE },
     );
 
     const response = z

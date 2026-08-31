@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { GUILDS_SERVICE } from "@shared/domains/fractal/lib/constants";
-import { graphql } from "@shared/lib/graphql";
+import { authorizedPluginGraphql } from "@shared/lib/graphql/authorized-plugin";
+import { guilds } from "@shared/lib/plugins";
 import { Account, zAccount } from "@shared/lib/schemas/account";
 import { zDateTime } from "@shared/lib/schemas/date-time";
 
@@ -33,7 +33,8 @@ const DataSchema = z.object({
 });
 
 export const getGuildMembership = async (guild: Account, member: Account) => {
-    const res = await graphql(
+    const res = await authorizedPluginGraphql(
+        guilds.authorized.graphql,
         `
         {
             guildMembership(guild:"${guild}", member:"${member}") {
@@ -54,7 +55,6 @@ export const getGuildMembership = async (guild: Account, member: Account) => {
             }
         }
     `,
-        { service: GUILDS_SERVICE },
     );
 
     return DataSchema.parse(res).guildMembership;

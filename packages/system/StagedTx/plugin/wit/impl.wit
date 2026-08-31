@@ -7,4 +7,5 @@ world impl {
 
     export proposer;
     export respondent;
+    export authorized;
 }

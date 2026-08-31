@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { GUILDS_SERVICE } from "@shared/domains/fractal/lib/constants";
-import { graphql } from "@shared/lib/graphql";
+import { authorizedPluginGraphql } from "@shared/lib/graphql/authorized-plugin";
+import { guilds } from "@shared/lib/plugins";
 import { Account, zAccount } from "@shared/lib/schemas/account";
 
 const zMapping = z.object({
@@ -12,7 +12,8 @@ const zMapping = z.object({
 export type Mapping = z.infer<typeof zMapping>;
 
 export const getRoleMap = async (fractalAccount: Account, roleId: number): Promise<Mapping> => {
-    const res = await graphql(
+    const res = await authorizedPluginGraphql(
+        guilds.authorized.graphql,
         `
         {
             roleMap(fractal: "${fractalAccount}", roleId: ${roleId}) {
@@ -26,7 +27,6 @@ export const getRoleMap = async (fractalAccount: Account, roleId: number): Promi
             }
         }
     `,
-        { service: GUILDS_SERVICE },
     );
 
     const parsed = z

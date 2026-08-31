@@ -23,6 +23,7 @@ use bindings::{
     tokens::plugin as tokens, transact::plugin as transact,
 };
 use invite::plugin::{
+    authorized::Guest as Authorized,
     invitee::Guest as Invitee,
     inviter::{Guest as Inviter, InviteDetails},
     redemption::Guest as Redemption,
@@ -277,6 +278,13 @@ impl HookActionsSender for InvitePlugin {
         }
 
         Ok(None)
+    }
+}
+
+impl Authorized for InvitePlugin {
+    #[psibase_plugin::authorized(None, whitelist = ["homepage", "fractal-cr", "guilds"])]
+    fn graphql(query: String) -> Result<String, Error> {
+        host::server::post_graphql_get_json(&query)
     }
 }
 

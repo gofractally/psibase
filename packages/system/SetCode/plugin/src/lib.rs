@@ -3,6 +3,9 @@ mod bindings;
 
 use bindings::*;
 use exports::setcode::plugin::api::Guest as Api;
+use exports::setcode::plugin::authorized::Guest as Authorized;
+use host::common::server as Server;
+use host::types::types::Error;
 use psibase::services::setcode::action_structs::{setCode, stageCode};
 use transact::plugin::intf::add_action_to_transaction;
 
@@ -21,7 +24,7 @@ psibase::define_trust! {
         ",
     }
     functions {
-        None => [],
+        None => [graphql],
         Low => [],
         High => [set_service_code, stage_service_code],
     }
@@ -67,4 +70,12 @@ impl Api for SetcodePlugin {
         .unwrap();
     }
 }
+
+impl Authorized for SetcodePlugin {
+    fn graphql(query: String) -> Result<String, Error> {
+        assert_authorized_with_whitelist(FunctionName::graphql, vec!["workshop".into()])?;
+        Server::post_graphql_get_json(&query)
+    }
+}
+
 bindings::export!(SetcodePlugin with_types_in bindings);

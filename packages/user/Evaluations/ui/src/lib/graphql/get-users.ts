@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { EVALUATIONS_SERVICE } from "@shared/domains/fractal/lib/constants";
-import { graphql } from "@shared/lib/graphql";
+import { authorizedPluginGraphql } from "@shared/lib/graphql/authorized-plugin";
+import { evaluation } from "@shared/lib/plugins";
 import { type Account, zAccount } from "@shared/lib/schemas/account";
 
 export const zUser = z.object({
@@ -37,7 +37,8 @@ export const getUsersAndGroups = async (
     owner: Account,
     evaluationId: number,
 ) => {
-    const res = await graphql(
+    const res = await authorizedPluginGraphql(
+        evaluation.authorized.graphql,
         `{ 
             getUsers(owner: "${owner}", evaluationId: ${evaluationId}) {
                 nodes { 
@@ -64,7 +65,6 @@ export const getUsersAndGroups = async (
                 }
             }
         }`,
-        { service: EVALUATIONS_SERVICE },
     );
 
     const response = z

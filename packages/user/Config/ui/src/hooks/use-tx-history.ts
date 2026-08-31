@@ -3,7 +3,8 @@ import { z } from "zod";
 
 import QueryKey from "@/lib/query-keys";
 
-import { graphql } from "@shared/lib/graphql";
+import { authorizedPluginGraphql } from "@shared/lib/graphql/authorized-plugin";
+import { stagedTx } from "@shared/lib/plugins";
 import { zAccount } from "@shared/lib/schemas/account";
 
 const zResponse = z.object({
@@ -30,7 +31,8 @@ export const useTxHistory = (txId: string | undefined | null) =>
         enabled: !!txId,
         queryKey: QueryKey.transactionHistory(txId),
         queryFn: async () => {
-            const res = await graphql(
+            const res = await authorizedPluginGraphql(
+                stagedTx.authorized.graphql,
                 `
                 {
                     txidHistory(
@@ -44,7 +46,6 @@ export const useTxHistory = (txId: string | undefined | null) =>
                     }
                 }
             `,
-                { service: "staged-tx" },
             );
 
             return zResponse.parse(res).txidHistory.nodes.reverse();
