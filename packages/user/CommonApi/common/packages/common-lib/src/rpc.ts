@@ -84,30 +84,13 @@ export async function getText(url: string) {
     return res.text();
 }
 
-function mergeRequestHeaders(
-    defaults: Record<string, string>,
-    callerHeaders?: HeadersInit,
-): Headers {
-    const headers = new Headers(defaults);
-    if (callerHeaders) {
-        new Headers(callerHeaders).forEach((value, key) => {
-            headers.set(key, value);
-        });
-    }
-    return headers;
-}
-
 export async function getJson<T = any>(
     url: string,
     options?: RequestInit,
 ): Promise<T> {
-    const { headers: callerHeaders, ...rest } = options ?? {};
     const res = await get(url, {
-        ...rest,
-        headers: mergeRequestHeaders(
-            { Accept: "application/json" },
-            callerHeaders,
-        ),
+        ...options,
+        headers: { Accept: "application/json", ...options?.headers },
     });
     return res.json();
 }
@@ -134,31 +117,29 @@ export async function postGraphQL(
     graphql: string,
     options?: RequestInit,
 ) {
-    const { headers: callerHeaders, ...rest } = options ?? {};
     return throwIfError(
         await fetch(url, {
             method: "POST",
             body: graphql,
-            ...rest,
-            headers: mergeRequestHeaders(
-                { "Content-Type": "application/graphql" },
-                callerHeaders,
-            ),
+            ...options,
+            headers: {
+                "Content-Type": "application/graphql",
+                ...options?.headers,
+            },
         }),
     );
 }
 
 export async function postJson(url: string, json: any, options?: RequestInit) {
-    const { headers: callerHeaders, ...rest } = options ?? {};
     return throwIfError(
         await fetch(url, {
             method: "POST",
             body: JSON.stringify(json),
-            ...rest,
-            headers: mergeRequestHeaders(
-                { "Content-Type": "application/json" },
-                callerHeaders,
-            ),
+            ...options,
+            headers: {
+                "Content-Type": "application/json",
+                ...options?.headers,
+            },
         }),
     );
 }
