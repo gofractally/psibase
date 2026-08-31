@@ -121,15 +121,17 @@ jobs:
           ./scripts/publish.sh --dry-run 2>&1 | tee /tmp/crates-dry-run.log || true
           ../.github/scripts/expect-crates-dry-run-errors.sh < /tmp/crates-dry-run.log
 
-      - name: Create and push tag
+      - name: Create tag
         id: tag
         if: steps.version.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ver="${{ steps.head_version.outputs.version }}"
           tag=$(.github/scripts/psibase-version.sh tag-name "$ver")
+          head_sha=$(git rev-parse HEAD)
           remote_commit=$(git ls-remote origin "refs/tags/$tag^{}" | awk 'NR==1 {print $1}')
           if [[ -n "$remote_commit" ]]; then
-            head_sha=$(git rev-parse HEAD)
             if [[ "$remote_commit" == "$head_sha" ]]; then
               echo "tag=$tag" >>"$GITHUB_OUTPUT"
               exit 0
@@ -142,17 +144,24 @@ jobs:
           else
             message="psibase version v$ver"
           fi
-          # 41898282+github-actions[bot]@users.noreply.github.com is
-          # GitHub's noreply identity for github-actions[bot] (user id 41898282).
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$tag" -m "$message"
-          git push origin "refs/tags/$tag"
+          tag_object_sha=$(gh api \
+            --method POST \
+            "repos/${{ github.repository }}/git/tags" \
+            -f tag="$tag" \
+            -f message="$message" \
+            -f object="$head_sha" \
+            -f type=commit \
+            --jq '.sha')
+          gh api \
+            --method POST \
+            "repos/${{ github.repository }}/git/refs" \
+            -f ref="refs/tags/$tag" \
+            -f sha="$tag_object_sha"
           echo "tag=$tag" >>"$GITHUB_OUTPUT"
 
   # Build and draft in this run: this workflow is the only path that cuts a
-  # release, and the tag push above uses GITHUB_TOKEN, so it starts no run of
-  # its own.
+  # release, and the Git API tag create above uses GITHUB_TOKEN, so it starts
+  # no run of on-tag.yml on its own.
   build-psibase:
     name: Run Builds
     needs: tag-release
