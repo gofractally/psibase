@@ -3552,7 +3552,7 @@ dependencies = [
 
 [[package]]
 name = "transact-admin"
-version = "0.27.0"
+version = "0.29.0"
 dependencies = [
  "chrono",
  "psibase",

@@ -1,6 +1,6 @@
 package virtual-server:plugin;
 
-interface preflight {
+interface transact {
     use host:types/types.{error};
 
     /// Fills the specified user's gas tank, if:

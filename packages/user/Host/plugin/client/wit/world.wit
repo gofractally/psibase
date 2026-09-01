@@ -1,7 +1,6 @@
 package host:client;
 
 /// Common calls related to client interactions
-/// Facts about the current plugin call, derived from the service call stack.
 interface api {
     /// Gets the account name of the caller app
     get-sender: func() -> string;

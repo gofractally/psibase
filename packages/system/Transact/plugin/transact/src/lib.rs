@@ -46,6 +46,24 @@ psibase::define_trust! {
     }
 }
 
+// The transaction construction cycle, including hooks, is as follows:
+//
+// 1. start-tx
+//
+// 2. add-action-to-transaction
+// 3.   on-actions-sender           - the propose-latch account (if any) is used;
+//                                    otherwise the hooked plugin can set the sender of the action;
+//                                    otherwise the logged-in user is used by default.
+// 4. add-signature                 - callers may append extra claims (e.g. invite credentials)
+//
+// 5. finish-tx
+// 6.   on-user-claim               - the user auth plugin adds the user claim
+// 7.   construct transaction       - includes any claims from add-signature
+// 8.   hash-transaction
+// 9.   on-user-auth-proof          - the user auth plugin adds the user proof
+// 10.  sign extra claims           - proofs for add-signature claims via host:crypto
+// 11.  publish transaction
+
 struct TransactPlugin {}
 
 fn assert_transact_driver(context: &str) {
@@ -162,12 +180,6 @@ fn flush_propose_latch() -> Result<(), HostTypes::Error> {
     Ok(())
 }
 
-fn sha256(data: &[u8]) -> [u8; 32] {
-    let mut hasher = Sha256::new();
-    hasher.update(data);
-    hasher.finalize().into()
-}
-
 fn user_auth_claim(user: &str) -> Result<Option<ImportClaim>, HostTypes::Error> {
     let auth_service_acc = accounts::query::api::get_account(&user.to_string())?
         .unwrap()
@@ -249,6 +261,7 @@ impl Api for TransactPlugin {
     }
 
     fn set_propose_latch(account: Option<String>) -> Result<(), HostTypes::Error> {
+        // Whitelisting accounts so that the accounts user prompts can stage transactions even when accounts is not the act
         assert_authorized_with_whitelist(
             FunctionName::set_propose_latch,
             vec![Client::get_active_app(), String::from("accounts")],
@@ -336,7 +349,7 @@ impl Auth for TransactPlugin {
             actions,
             claims,
         };
-        let proofs: Vec<Hex<Vec<u8>>> = user_auth_proof(&user, &sha256(&tx.packed()))?
+        let proofs: Vec<Hex<Vec<u8>>> = user_auth_proof(&user, &Sha256::digest(&tx.packed()).into())?
             .into_iter()
             .map(|proof| Hex::from(proof.signature))
             .collect();

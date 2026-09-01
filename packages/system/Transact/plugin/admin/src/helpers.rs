@@ -9,13 +9,6 @@ use crate::types::FromExpirationTime;
 use psibase::fracpack::Pack;
 use psibase::{Hex, SignedTransaction, Tapos, Transaction};
 use serde::Serialize;
-use sha2::{Digest, Sha256};
-
-pub fn sha256(data: &[u8]) -> [u8; 32] {
-    let mut hasher = Sha256::new();
-    hasher.update(data);
-    hasher.finalize().into()
-}
 
 fn sign_with_claim(claim: &Claim, tx_hash: &[u8]) -> Result<Vec<u8>, HostTypes::Error> {
     HostCrypto::sign(tx_hash, &claim.raw_data)
@@ -57,6 +50,8 @@ pub fn get_proofs(
     tx_hash: &[u8; 32],
     extra_claims: &[Claim],
 ) -> Result<Vec<Hex<Vec<u8>>>, HostTypes::Error> {
+    // User auth claims come from hook-user-auth. Extra signatures added via
+    // add-signature (e.g. invite credentials) are appended after.
     let mut proofs = vec![];
 
     if let Some(user) = get_current_user() {
