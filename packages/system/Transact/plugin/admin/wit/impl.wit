@@ -17,7 +17,7 @@ world impl {
     include permissions:plugin/imports;
 
     import transact:plugin/ledger;
-    import virtual-server:plugin/preflight;
+    import virtual-server:plugin/transact;
 
     import hook-handlers;
 

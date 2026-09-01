@@ -30,7 +30,6 @@ interface types {
     }
 }
 
-/// Hooks allow plugins to customize sender behavior while actions are appended.
 interface hooks {
     /// Allows the caller plugin to manage the sender of any subsequent actions added to this
     /// transaction.
@@ -56,8 +55,8 @@ interface api {
     /// * `packed-args`: The arguments for the action, packed into fracpack format
     add-action-to-transaction: func(method-name: string, packed-args: list<u8>) -> result<_, error>;
 
-    /// Append a `claim` to the current transaction. At finish-tx, Transact
-    /// produces the matching proof by calling `host:crypto/keyvault.sign`
+    /// Append a `claim` to the current transaction. At finish-tx, the transact
+    /// admin driver produces the matching proof by calling `host:crypto/keyvault.sign`
     /// with `claim.raw-data` (typically a DER-encoded public key); the host
     /// keystore (persistent or transient — see
     /// `host:crypto/keyvault.import-key-transient`) must contain the matching

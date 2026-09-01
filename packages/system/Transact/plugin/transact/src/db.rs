@@ -12,6 +12,7 @@ thread_local! {
 
 pub struct ProposeLatch {
     /// Account that subsequent actions added under this latch will use as their sender.
+    /// The actual sender for any particular action is stored in the action.
     pub subsequent_action_sender: String,
     pub actions: Vec<Action>,
 }

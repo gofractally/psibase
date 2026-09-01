@@ -11,7 +11,7 @@ use bindings::exports::virtual_server::plugin as Exports;
 use Exports::types::{CpuPricingParams, NetPricingParams, NetworkVariables, ServerSpecs};
 use Exports::{
     admin::Guest as Admin, authorized::Guest as Authorized, billing::Guest as Billing,
-    preflight::Guest as Preflight,
+    transact::Guest as TransactInterface,
 };
 
 use bindings::accounts::query as AccountsQuery;
@@ -211,7 +211,7 @@ impl Billing for VirtualServerPlugin {
     }
 }
 
-impl Preflight for VirtualServerPlugin {
+impl TransactInterface for VirtualServerPlugin {
     fn auto_fill_gas_tank(account: String) -> Result<(), Error> {
         assert_caller(&["transact"], "auto_fill_gas_tank");
 

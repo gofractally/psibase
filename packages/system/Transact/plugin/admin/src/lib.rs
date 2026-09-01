@@ -12,7 +12,7 @@ mod types;
 use host::db::store as Store;
 use host::types::types::{self as HostTypes, BodyTypes};
 use transact::plugin::ledger as ActionsLedger;
-use virtual_server::plugin::preflight as VirtualServer;
+use virtual_server::plugin::transact as VirtualServer;
 
 use exports::transact::admin::admin::Guest as Admin;
 
@@ -20,6 +20,7 @@ use crate::trust::*;
 use psibase::fracpack::Pack;
 use psibase::{Hex, SignedTransaction, TransactionTrace};
 use serde_json::from_str;
+use sha2::{Digest, Sha256};
 
 psibase::define_trust! {
     descriptions {
@@ -56,8 +57,9 @@ impl Admin for TransactAdmin {
             return Ok(());
         }
 
-        // Automatically add actions into the tx to refill the user's gas tank if
-        // it is below some threshold and the user is configured for auto-filling.
+        // This will automatically add the actions into the tx to
+        // refill the user's gas tank if it is below some threshold
+        // and the user is configured for auto-filling.
         VirtualServer::auto_fill_gas_tank(&actions[0].sender)?;
         actions.extend(ActionsLedger::take_actions()?);
 
@@ -65,12 +67,16 @@ impl Admin for TransactAdmin {
 
         let signed_tx = SignedTransaction {
             transaction: Hex::from(tx.packed()),
-            proofs: get_proofs(&sha256(&tx.packed()), &extra_claims)?,
+            proofs: get_proofs(&Sha256::digest(&tx.packed()).into(), &extra_claims)?,
             subjectiveData: None,
         };
         if signed_tx.proofs.len() != tx.claims.len() {
             return Err(ClaimProofMismatch.into());
         }
+
+        // TODO (idea): on_hook_pre_publish(signed_tx) -> bool
+        // Could allow a user to inspect a final transaction rather than publish
+        //   (Helpful for debugging, post-install scripts, offline msig, etc.)
 
         let body = signed_tx.publish()?;
         let trace = match body {
@@ -79,6 +85,9 @@ impl Admin for TransactAdmin {
                 return Err(TransactionError("Invalid response body".to_string()).into());
             }
         };
+
+        // TODO (idea): on_hook_post_publish(trace)
+        // Could be for logging, or for other post-transaction client-side processing
 
         match trace.error {
             Some(err) => Err(TransactionError(err).into()),
