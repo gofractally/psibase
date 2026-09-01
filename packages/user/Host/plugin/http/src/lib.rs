@@ -94,6 +94,7 @@ impl Api for HostHttp {
         let endpoint = normalize_endpoint(request.endpoint);
         let res = do_post(CallContext::get_sender(), endpoint, request.body)?;
 
+        // TODO: post should return Option<BodyTypes> because not all posts return a body
         match res.body {
             Some(body) => Ok(body.into()),
             None => Err(make_error("Http response body absent")),

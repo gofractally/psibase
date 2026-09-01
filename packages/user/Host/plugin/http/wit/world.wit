@@ -1,7 +1,6 @@
 package host:http;
 
 /// HTTP to an app's own server, with the current session attached when present.
-/// Session setup must not go through this plugin.
 interface api {
     use host:types/types.{error, post-request, body-types};
 

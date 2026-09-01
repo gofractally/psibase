@@ -33,7 +33,7 @@ fn bucket_id(user: &str) -> String {
     format!("query_tokens-{}", user)
 }
 
-fn cookie_request(app: &str, endpoint: &str, body: String) -> HttpRequest {
+fn post_to_app(app: &str, endpoint: &str, body: String) -> HttpRequest {
     HttpRequest {
         uri: format!("{}/{}", CallContext::get_app_url(app), endpoint.trim_start_matches('/')),
         method: "POST".to_string(),
@@ -46,7 +46,7 @@ fn cookie_request(app: &str, endpoint: &str, body: String) -> HttpRequest {
 }
 
 fn set_active_query_token(query_token: &str, app: &str, user: &str) {
-    let req = cookie_request(
+    let req = post_to_app(
         app,
         "/common/set-auth-cookie",
         format!("{{\"accessToken\": \"{}\"}}", query_token),
@@ -57,7 +57,7 @@ fn set_active_query_token(query_token: &str, app: &str, user: &str) {
 }
 
 fn remove_active_query_token(app: &str, user: &str) {
-    let req = cookie_request(app, "/common/remove-auth-cookie", "{}".to_string());
+    let req = post_to_app(app, "/common/remove-auth-cookie", "{}".to_string());
     Supervisor::send_request(&req, true).unwrap();
 
     Bucket::new(DB, &bucket_id(user)).delete(&&app);
