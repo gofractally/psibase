@@ -1,5 +1,5 @@
-use crate::bindings::accounts::plugin::api::get_account;
-use crate::bindings::accounts::plugin::api::get_current_user;
+use crate::bindings::accounts::query::api::get_account;
+use crate::bindings::accounts::query::api::get_current_user;
 use crate::bindings::host::common as Host;
 use crate::bindings::host::crypto::keyvault as HostCrypto;
 use crate::bindings::host::types::types::{self as HostTypes, BodyTypes, PluginRef};

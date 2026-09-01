@@ -18,10 +18,21 @@ version = "0.27.0"
 dependencies = [
  "psibase",
  "psibase-plugin-workspace-hack",
- "rand",
  "serde",
  "serde_json",
  "url",
+ "wit-bindgen-rt",
+]
+
+[[package]]
+name = "accounts-query"
+version = "0.27.0"
+dependencies = [
+ "psibase",
+ "psibase-plugin-workspace-hack",
+ "rand",
+ "serde",
+ "serde_json",
  "wit-bindgen-rt",
 ]
 

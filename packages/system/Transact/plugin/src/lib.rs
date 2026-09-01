@@ -191,7 +191,7 @@ fn flush_propose_latch() -> Result<(), HostTypes::Error> {
         return Ok(());
     }
 
-    let Some(proposer) = accounts::plugin::api::get_current_user() else {
+    let Some(proposer) = accounts::query::api::get_current_user() else {
         return Err(NotLoggedIn("flush_propose_latch").into());
     };
 
