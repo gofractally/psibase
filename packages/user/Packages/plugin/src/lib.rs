@@ -246,6 +246,116 @@ struct InstalledQuery {
 
 type InstalledRoot = QueryRoot<InstalledQuery>;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct PackageEdge {
+    node: types::PackageInfo,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct PackageConnection {
+    pageInfo: NextPageInfo,
+    edges: Vec<PackageEdge>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct PackageCatalogQuery {
+    packages: PackageConnection,
+}
+
+type PackageCatalogRoot = QueryRoot<PackageCatalogQuery>;
+
+fn resolve_file_url(base_url: &str, file: &str) -> String {
+    if file.starts_with("http://") || file.starts_with("https://") {
+        return file.to_string();
+    }
+    format!(
+        "{}/{}",
+        base_url.trim_end_matches('/'),
+        file.trim_start_matches('/')
+    )
+}
+
+fn read_account_packages(account: &str) -> Result<Vec<types::PackageInfo>, HostTypes::Error> {
+    let mut end_cursor: Option<String> = None;
+    let mut result = Vec::new();
+    loop {
+        let json = Server::post_graphql_get_json(&format!(
+            "query {{ packages(owner: {}, first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version scope description depends {{ name version }} accounts services exports {{ name service }} sha256 file }} }} }} }}",
+            serde_json::to_string(account).unwrap(),
+            serde_json::to_string(&end_cursor).unwrap(),
+        ))
+        .map_err(|e| ErrorType::QueryError(e.message))?;
+        let root: PackageCatalogRoot =
+            serde_json::from_str(&json).map_err(|e| ErrorType::QueryError(e.to_string()))?;
+        for edge in root.data.packages.edges {
+            if edge.node.scope != "local" {
+                result.push(edge.node);
+            }
+        }
+        if !root.data.packages.pageInfo.hasNextPage {
+            break;
+        }
+        end_cursor = Some(root.data.packages.pageInfo.endCursor);
+    }
+    let base = Client::get_app_url(account);
+    Ok(result
+        .into_iter()
+        .map(|mut info| {
+            info.file = resolve_file_url(&base, &info.file);
+            info
+        })
+        .collect())
+}
+
+fn read_url_packages(url: &str) -> Result<Vec<types::PackageInfo>, HostTypes::Error> {
+    let index_url = format!("{}/index.json", url.trim_end_matches('/'));
+    let json = Server::fetch_sibling_json(&index_url)
+        .map_err(|e| ErrorType::QueryError(e.message))?;
+    let index: Vec<types::PackageInfo> =
+        serde_json::from_str(&json).map_err(|e| ErrorType::JsonError(e.to_string()))?;
+    Ok(index
+        .into_iter()
+        .filter(|info| info.scope != "local")
+        .map(|mut info| {
+            info.file = resolve_file_url(&index_url, &info.file);
+            info
+        })
+        .collect())
+}
+
+fn fetch_sources(owner: String) -> Result<Vec<types::PackageSource>, HostTypes::Error> {
+    let owner: AccountNumber = owner.parse().unwrap();
+    let json = Server::post_graphql_get_json(&format!(
+        "query {{ sources(account: {}) {{ url account }} }}",
+        serde_json::to_string(&owner).unwrap(),
+    ))?;
+    let result: QueryRoot<SourcesQuery> =
+        serde_json::from_str(&json).map_err(|e| ErrorType::JsonError(e.to_string()))?;
+    Ok(result.data.sources)
+}
+
+fn fetch_available_packages(owner: String) -> Result<Vec<types::PackageInfo>, HostTypes::Error> {
+    let mut sources = fetch_sources(owner)?;
+    if sources.is_empty() {
+        sources.push(types::PackageSource {
+            url: Some(format!(
+                "{}/packages",
+                Client::get_app_url("x-admin").trim_end_matches('/')
+            )),
+            account: None,
+        });
+    }
+    let mut result = Vec::new();
+    for source in sources {
+        if let Some(account) = source.account {
+            result.extend(read_account_packages(&account)?);
+        } else if let Some(url) = source.url {
+            result.extend(read_url_packages(&url)?);
+        }
+    }
+    Ok(result)
+}
+
 fn get_installed_packages() -> Result<Vec<psibase::InstalledPackageInfo>, HostTypes::Error> {
     let mut end_cursor: Option<String> = None;
     let mut result = Vec::new();
@@ -415,14 +525,10 @@ impl Queries for PackagesPlugin {
             .collect())
     }
     fn get_sources(owner: String) -> Result<Vec<types::PackageSource>, HostTypes::Error> {
-        let owner: AccountNumber = owner.parse().unwrap();
-        let json = Server::post_graphql_get_json(&format!(
-            "query {{ sources(account: {}) {{ url account }} }}",
-            serde_json::to_string(&owner).unwrap(),
-        ))?;
-        let result: QueryRoot<SourcesQuery> =
-            serde_json::from_str(&json).map_err(|e| ErrorType::JsonError(e.to_string()))?;
-        Ok(result.data.sources)
+        fetch_sources(owner)
+    }
+    fn get_available_packages(owner: String) -> Result<Vec<types::PackageInfo>, HostTypes::Error> {
+        fetch_available_packages(owner)
     }
 }
 
@@ -603,6 +709,25 @@ impl PrivateApi for PackagesPlugin {
             &packed_args,
         )?;
         Ok(())
+    }
+
+    fn load_package_ops(
+        ops: Vec<types::PackageOpInfo>,
+    ) -> Result<Vec<types::PackageOpFull>, HostTypes::Error> {
+        assert_caller_config_or_self("load_package_ops");
+
+        ops.into_iter()
+            .map(|op| {
+                let new = op
+                    .new
+                    .map(|info| {
+                        Server::fetch_sibling_bytes(&info.file)
+                            .map_err(|e| ErrorType::QueryError(e.message))
+                    })
+                    .transpose()?;
+                Ok(types::PackageOpFull { old: op.old, new })
+            })
+            .collect()
     }
 }
 

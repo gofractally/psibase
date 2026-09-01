@@ -91,6 +91,65 @@ fn do_get(app: String, endpoint: String) -> Result<HttpResponse, Error> {
     .send()?)
 }
 
+fn do_get_bytes(app: String, endpoint: String) -> Result<HttpResponse, Error> {
+    let auth_token = get_auth_token();
+    let headers = if auth_token.is_none() {
+        make_headers(&[("Accept", "*/*")])
+    } else {
+        make_headers(&[
+            ("Accept", "*/*"),
+            ("Authorization", &format!("Bearer {}", auth_token.unwrap())),
+        ])
+    };
+    Ok(HttpRequest {
+        uri: format!("{}/{}", HostCommon::get_app_url(app), endpoint),
+        method: "GET".to_string(),
+        headers,
+        body: None,
+    }
+    .send()?)
+}
+
+fn parse_sibling_url(url: &str) -> Result<(String, String), Error> {
+    let parsed = Url::parse(url).map_err(|e| make_error(&e.to_string()))?;
+    let root = Url::parse(&Supervisor::get_root_domain()).map_err(|e| make_error(&e.to_string()))?;
+    let root_host = root
+        .host_str()
+        .ok_or_else(|| make_error("Invalid root domain"))?;
+
+    if parsed.scheme() != root.scheme() || parsed.port_or_known_default() != root.port_or_known_default()
+    {
+        return Err(make_error("URL is not on the current chain"));
+    }
+
+    let fetch_host = parsed
+        .host_str()
+        .ok_or_else(|| make_error("URL is missing a host"))?;
+    let app = if fetch_host == root_host {
+        return Err(make_error("URL must target a sibling service"));
+    } else if let Some(prefix) = fetch_host.strip_suffix(&format!(".{}", root_host)) {
+        prefix.to_string()
+    } else {
+        return Err(make_error("URL is not on the current chain"));
+    };
+
+    let mut endpoint = parsed.path().trim_start_matches('/').to_string();
+    if let Some(query) = parsed.query() {
+        endpoint.push('?');
+        endpoint.push_str(query);
+    }
+    Ok((app, endpoint))
+}
+
+fn fetch_sibling(url: &str, bytes: bool) -> Result<HttpResponse, Error> {
+    let (app, endpoint) = parse_sibling_url(url)?;
+    if bytes {
+        do_get_bytes(app, endpoint)
+    } else {
+        do_get(app, endpoint)
+    }
+}
+
 impl Admin for HostCommon {
     fn post(app: String, request: PostRequest) -> Result<Option<BodyTypes>, Error> {
         check_caller(&["host"], "post@host:common/admin");
@@ -150,6 +209,25 @@ impl Server for HostCommon {
 
         match res.body {
             Some(BridgeTypes::BodyTypes::Json(body)) => Ok(body),
+            _ => Err(make_error("Http response body absent or wrong type")),
+        }
+    }
+
+    fn fetch_sibling_json(url: String) -> Result<String, Error> {
+        let res = fetch_sibling(&url, false)?;
+
+        match res.body {
+            Some(BridgeTypes::BodyTypes::Json(body)) => Ok(body),
+            Some(BridgeTypes::BodyTypes::Text(body)) => Ok(body),
+            _ => Err(make_error("Http response body absent or wrong type")),
+        }
+    }
+
+    fn fetch_sibling_bytes(url: String) -> Result<Vec<u8>, Error> {
+        let res = fetch_sibling(&url, true)?;
+
+        match res.body {
+            Some(BridgeTypes::BodyTypes::Bytes(body)) => Ok(body),
             _ => Err(make_error("Http response body absent or wrong type")),
         }
     }

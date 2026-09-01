@@ -25,6 +25,18 @@ interface server {
     /// * `endpoint` - The subpath being requested (e.g. `/common/tapos/head` or `/api/some-request`)
     get-json: func(endpoint: string) -> result<string, error>;
 
+    /// Fetch JSON from another service on the current root domain.
+    ///
+    /// Parameters
+    /// * `url` - A full URL whose host is a sibling service on this chain
+    fetch-sibling-json: func(url: string) -> result<string, error>;
+
+    /// Fetch binary data from another service on the current root domain.
+    ///
+    /// Parameters
+    /// * `url` - A full URL whose host is a sibling service on this chain
+    fetch-sibling-bytes: func(url: string) -> result<list<u8>, error>;
+
     // Todo: Probably will need to implement most/all js library functionality:
     // https://docs.psibase.io/development/front-ends/reference/js-libraries.html
 }
