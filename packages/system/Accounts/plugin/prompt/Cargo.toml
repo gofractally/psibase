@@ -1,22 +1,20 @@
 [package]
-name = "accounts"
+name = "accounts-prompt"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
-url = "2.5.2"
 wit-bindgen-rt.workspace = true
 psibase.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 psibase-plugin-workspace-hack.workspace = true
-rand = "0.9.1"
 
 [lib]
 crate-type = ["cdylib"]
 
 [package.metadata.component]
-package = "accounts:plugin"
+package = "accounts:prompt"
 
 [package.metadata.component.target]
 world = "impl"
@@ -24,12 +22,13 @@ world = "impl"
 [package.metadata.component.target.dependencies]
 "host:common" = { path = "../../../../user/Host/plugin/common/wit/world.wit" }
 "host:types" = { path = "../../../../user/Host/plugin/types/wit/world.wit" }
-"host:auth" = { path = "../../../../user/Host/plugin/auth/wit/world.wit" }
-"host:prompt" = { path = "../../../../user/Host/plugin/prompt/wit/world.wit" }
-"transact:plugin" = { path = "../../../Transact/plugin/wit/world.wit" }
 "host:db" = { path = "../../../../user/Host/plugin/db/wit/world.wit" }
+"transact:plugin" = { path = "../../../Transact/plugin/wit/world.wit" }
 "permissions:plugin" = { path = "../../../../user/Permissions/plugin/wit/world.wit" }
 "invite:plugin" = { path = "../../../../user/Invite/plugin/wit/redemption.wit" }
+"auth-sig:plugin" = { path = "../../../AuthSig/plugin/wit/world.wit" }
+"name-market:plugin" = { path = "../../../../user/NameMarket/plugin/wit/world.wit" }
+"host:crypto" = { path = "../../../../user/Host/plugin/crypto/wit/world.wit" }
 
 [package.metadata.component.bindings]
 derives = ["serde::Deserialize"]

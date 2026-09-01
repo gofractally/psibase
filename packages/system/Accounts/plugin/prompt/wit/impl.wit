@@ -1,0 +1,15 @@
+package accounts:prompt;
+
+world impl {
+    include host:common/imports;
+    include host:db/imports;
+    include transact:plugin/imports;
+    include permissions:plugin/imports;
+    include auth-sig:plugin/imports;
+    include name-market:plugin/imports;
+    include host:crypto/imports;
+
+    import invite:plugin/redemption;
+
+    export prompt;
+}

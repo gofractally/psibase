@@ -1,26 +1,25 @@
+use crate::apps_table::AppsTable;
 use crate::bindings::auth_sig::plugin as AuthSig;
-use crate::bindings::exports::accounts::plugin::api::Guest;
-use crate::bindings::exports::accounts::plugin::prompt::{Credential, Guest as Prompt};
+use crate::bindings::exports::accounts::prompt::prompt::{Credential, Guest as Prompt};
 use crate::bindings::host::{
-    common::client as Client, crypto::keyvault as HostCrypto,
-    types::types::Error,
+    common::client as Client, crypto::keyvault as HostCrypto, types::types::Error,
 };
 use crate::bindings::invite::plugin::redemption as Invites;
 use crate::bindings::name_market::plugin::api as NameMarket;
 use crate::bindings::transact::plugin::intf as Transact;
-use crate::db::apps_table::AppsTable;
 use crate::errors::ErrorType;
-use crate::plugin::AccountsPlugin;
+use crate::helpers;
 use crate::trust::*;
+use crate::AccountsPrompt;
 use psibase::fracpack::Pack;
 use psibase::services::accounts as AccountsService;
 use psibase::services::auth_sig;
 
-impl Prompt for AccountsPlugin {
+impl Prompt for AccountsPrompt {
     fn can_create_account() -> bool {
         assert_eq!(Client::get_sender(), Client::get_receiver());
 
-        if Self::is_logged_in() {
+        if helpers::is_logged_in() {
             return true;
         }
 
@@ -37,7 +36,7 @@ impl Prompt for AccountsPlugin {
 
         let mut invalid_accounts = Vec::new();
         for credential in credentials {
-            match AccountsPlugin::get_account(credential.account.to_string()) {
+            match helpers::get_account(credential.account.to_string()) {
                 Ok(Some(account)) => match account.auth_service.as_str() {
                     "auth-any" => {
                         AppsTable::new(&Client::get_receiver()).connect(&credential.account);
@@ -90,7 +89,7 @@ impl Prompt for AccountsPlugin {
 
         let private_key;
 
-        if Self::is_logged_in() {
+        if helpers::is_logged_in() {
             private_key = AuthSig::actions::create_account(&account_name)?;
         } else if Invites::get_active_invite().unwrap_or(false) {
             private_key = Invites::create_new_account(&account_name);
