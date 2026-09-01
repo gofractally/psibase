@@ -8,6 +8,8 @@ import { getArrayBuffer } from "@psibase/common-lib";
 
 import { useToast } from "@/components/ui/use-toast";
 
+import { PageHeading } from "@/components/page-heading";
+
 import {
     useInstalledLocalPackages,
     useLocalPackages,
@@ -198,13 +200,14 @@ export const NodeLocalPackages = () => {
 
     return (
         <div className="space-y-4">
+            <PageHeading
+                title="Packages"
+                description="Install node-local services and data files on this node."
+            />
             <div>
-                <h3 className="text-lg font-medium">
-                    Install Node-local Package
-                </h3>
+                <h3 className="text-sm font-medium">Upload a package</h3>
                 <p className="text-muted-foreground text-sm">
-                    Upload a .psi package file to install node-local services
-                    and data files on this node.
+                    Select a .psi package file to install on this node.
                 </p>
             </div>
 

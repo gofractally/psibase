@@ -22,6 +22,7 @@ world impl {
     include permissions:plugin/imports;
     
     import virtual-server:plugin/transact;
+    include host:crypto/imports;
 
     export admin;
     export intf;

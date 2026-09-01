@@ -9,6 +9,7 @@ interface admin-fractal {
     init-token: func() -> result<_, error>;
 
     set-role-occupation: func(role-id: u8, occupation: string) -> result<_, error>;
+    set-paid-occupations: func(occupations: list<string>) -> result<_, error>;
 }
 
 

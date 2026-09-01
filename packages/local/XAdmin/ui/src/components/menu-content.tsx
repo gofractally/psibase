@@ -1,5 +1,4 @@
-import { Moon, Power, RotateCcw, Sun } from "lucide-react";
-import { Cog } from "lucide-react";
+import { Cog, Moon, Power, RotateCcw, Sun } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { chain } from "@/lib/chain-endpoints";
@@ -11,7 +10,6 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuSeparator,
-    DropdownMenuSub,
     DropdownMenuTrigger,
 } from "@shared/shadcn/ui/dropdown-menu";
 
@@ -20,50 +18,52 @@ export const MenuContent = ({ condense = false }: { condense?: boolean }) => {
     return (
         <>
             {condense && (
-                <Button asChild variant="outline">
-                    <Link to="/Configuration">
-                        <Cog size={20} />
+                <Button asChild variant="outline" size="icon">
+                    <Link to="/configuration">
+                        <Cog />
+                        <span className="sr-only">Configuration</span>
                     </Link>
                 </Button>
             )}
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button variant="outline">
-                        <Power className="h-4 w-4" />
+                    <Button variant="outline" size="icon">
+                        <Power />
+                        <span className="sr-only">Power</span>
                     </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56">
-                    <DropdownMenuSub>
-                        <DropdownMenuItem onClick={() => void chain.restart()}>
-                            <RotateCcw className="mr-2 h-4 w-4" />
-                            <span>Restart</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => void chain.shutdown()}>
-                            <Power className="mr-2 h-4 w-4" />
-                            <span>Shutdown</span>
-                        </DropdownMenuItem>
-                    </DropdownMenuSub>
+                <DropdownMenuContent className="w-56" align="end">
+                    <DropdownMenuItem onClick={() => void chain.restart()}>
+                        <RotateCcw />
+                        Restart
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => void chain.shutdown()}>
+                        <Power />
+                        Shutdown
+                    </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button variant="outline">
-                        <Moon className="h-4 w-4" />
+                    <Button variant="outline" size="icon" className="relative">
+                        <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                        <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+                        <span className="sr-only">Toggle theme</span>
                     </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56">
+                <DropdownMenuContent className="w-56" align="end">
                     <DropdownMenuItem onClick={() => setTheme("light")}>
-                        <Sun className="mr-2 h-4 w-4" />
-                        <span>Light</span>
+                        <Sun />
+                        Light
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setTheme("dark")}>
-                        <Moon className="mr-2 h-4 w-4" />
-                        <span>Dark</span>
+                        <Moon />
+                        Dark
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => setTheme("system")}>
-                        <Sun className="mr-2 h-4 w-4" />
-                        <span>System</span>
+                        <Sun />
+                        System
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>

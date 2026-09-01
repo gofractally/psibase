@@ -83,7 +83,7 @@ namespace psibase::net
       producer_id               producer;
       SequenceNumber            seqno;
       RouteMetric               metric;
-      std::optional<RouterId>   router;
+      RouterId                  router;
       std::string               to_string() const
       {
          return "route update: " + producer.str() + " seqno=" + std::to_string(seqno.value) +
@@ -495,7 +495,7 @@ namespace psibase::net
                 << "Ignoring route because " << msg.producer.str() << " is not an active producer";
             return;
          }
-         auto routeKey = RouteKey{msg.producer, msg.router.value_or(0), peer};
+         auto routeKey = RouteKey{msg.producer, msg.router, peer};
          auto iter     = routeTable.find(routeKey);
          if (iter == routeTable.end())
          {

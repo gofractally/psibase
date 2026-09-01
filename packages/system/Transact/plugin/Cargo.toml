@@ -31,6 +31,7 @@ world = "impl"
 "accounts:query" = { path = "../../Accounts/plugin/query/wit/world.wit" }
 "permissions:plugin" = { path = "../../../user/Permissions/plugin/wit/world.wit" }
 "virtual-server:plugin" = { path = "../../VirtualServer/plugin/wit/transact.wit" }
+"host:crypto" = { path = "../../../user/Host/plugin/crypto/wit/world.wit" }
 
 [package.metadata.component.bindings]
 derives = ["serde::Serialize", "serde::Deserialize"]
