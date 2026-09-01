@@ -27,6 +27,7 @@ world = "impl"
 "permissions:plugin" = { path = "../../../../user/Permissions/plugin/wit/world.wit" }
 "invite:plugin" = { path = "../../../../user/Invite/plugin/wit/redemption.wit" }
 "auth-sig:plugin" = { path = "../../../AuthSig/plugin/wit/world.wit" }
+"auth-any:plugin" = { path = "../../../AuthAny/plugin/wit/world.wit" }
 "name-market:plugin" = { path = "../../../../user/NameMarket/plugin/wit/world.wit" }
 "host:crypto" = { path = "../../../../user/Host/plugin/crypto/wit/world.wit" }
 

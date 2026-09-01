@@ -6,6 +6,7 @@ world impl {
     include transact:plugin/imports;
     include permissions:plugin/imports;
     include auth-sig:plugin/imports;
+    include auth-any:plugin/imports;
     include name-market:plugin/imports;
     include host:crypto/imports;
 

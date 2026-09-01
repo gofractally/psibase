@@ -46,4 +46,10 @@ interface prompt {
     ///
     /// The account is not imported onto this device.
     create-premium: func(account-name: string, max-cost: string) -> result<string, error>;
+
+    /// Logs `account` into the currently active app.
+    ///
+    /// Resolves the account's auth service and delegates to that service's
+    /// session login. Can only be called by the accounts app.
+    login: func(account: string) -> result<_, error>;
 }

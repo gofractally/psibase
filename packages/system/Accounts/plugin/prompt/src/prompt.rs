@@ -1,4 +1,5 @@
 use crate::apps_table::AppsTable;
+use crate::bindings::auth_any::plugin as AuthAny;
 use crate::bindings::auth_sig::plugin as AuthSig;
 use crate::bindings::exports::accounts::prompt::prompt::{Credential, Guest as Prompt};
 use crate::bindings::host::{
@@ -131,5 +132,19 @@ impl Prompt for AccountsPrompt {
         AuthSig::keyvault::import_key(&keypair.private_key)?;
 
         Ok(keypair.private_key)
+    }
+
+    fn login(account: String) -> Result<(), Error> {
+        assert_eq!(Client::get_sender(), Client::get_receiver());
+
+        let Some(account_info) = helpers::get_account(account.clone())? else {
+            return Err(ErrorType::AccountNotFound(account).into());
+        };
+
+        match account_info.auth_service.as_str() {
+            "auth-sig" => AuthSig::session::login(&account),
+            "auth-any" => AuthAny::session::login(&account),
+            service => Err(ErrorType::UnsupportedAuthService(service.to_string()).into()),
+        }
     }
 }
