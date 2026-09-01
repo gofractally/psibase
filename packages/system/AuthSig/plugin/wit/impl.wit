@@ -1,14 +1,5 @@
 package auth-sig:plugin;
 
-interface session {
-    use host:types/types.{error};
-
-    /// Log `account-name` into the currently active app.
-    ///
-    /// Can only be called by the `accounts` app.
-    login: func(account-name: string) -> result<_, error>;
-}
-
 world impl {
     import accounts:plugin/auth-svc;
     include transact:plugin/imports;

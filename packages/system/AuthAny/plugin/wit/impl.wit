@@ -1,14 +1,5 @@
 package auth-any:plugin;
 
-interface session {
-    use host:types/types.{error};
-
-    /// Log `account-name` into the currently active app.
-    ///
-    /// Can only be called by the `accounts` app.
-    login: func(account-name: string) -> result<_, error>;
-}
-
 world impl {
     include host:common/imports;
     include transact:plugin/hook-user-auth;
