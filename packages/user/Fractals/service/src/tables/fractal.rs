@@ -88,16 +88,15 @@ impl Fractal {
 
         let defacto_service = account!("fractals+2");
 
-        let create_role = |role: u8| {
-            Role::add(fractal, role, defacto_service);
-        };
-
-        create_role(Legislature.into());
-        create_role(Judiciary.into());
-        create_role(Executive.into());
-        create_role(Recruitment.into());
-
+        // Create the fractal account first so role subaccounts can be
+        // preapproved by the parent. Roles must exist before the AuthDyn
+        // switch because has_policy/auth_policy reads them.
         create_managed_account(fractal, || {
+            Role::add(fractal, Legislature.into(), defacto_service);
+            Role::add(fractal, Judiciary.into(), defacto_service);
+            Role::add(fractal, Executive.into(), defacto_service);
+            Role::add(fractal, Recruitment.into(), defacto_service);
+
             sites::Wrapper::call_as(fractal).setProxy(account!("fractal-cr"));
             // Proxy serves static content only; dyn-ld must be linked on the
             // fractal account so supervisor can resolve plugin deps

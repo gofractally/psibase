@@ -1,7 +1,8 @@
+use crate::helpers::create_managed_account;
 use crate::tables::tables::{Role, RoleTable};
-use psibase::services::{accounts, auth_any, auth_dyn};
-use psibase::{services::auth_dyn::policy::DynamicAuthPolicy, Subaccount};
-use psibase::{AccountNumber, ServiceWrapper, Table};
+use async_graphql::ComplexObject;
+use psibase::services::auth_dyn::policy::DynamicAuthPolicy;
+use psibase::{AccountNumber, ServiceWrapper, Subaccount, Table};
 
 impl Role {
     fn new(fractal: AccountNumber, role_id: u8, occupation: AccountNumber) -> Self {
@@ -47,15 +48,7 @@ impl Role {
 
         let new_instance = Self::new(fractal, role, occupation);
         new_instance.save();
-        let new_account = new_instance.account();
-
-        accounts::Wrapper::call_as(fractal).newAccount(
-            new_account,
-            auth_any::Wrapper::SERVICE,
-            true,
-        );
-        auth_dyn::Wrapper::call_as(new_account).set_mgmt(new_account, psibase::get_service());
-        accounts::Wrapper::call_as(new_account).setAuthServ(auth_dyn::Wrapper::SERVICE);
+        create_managed_account(new_instance.account(), || {});
 
         new_instance
     }
@@ -73,5 +66,13 @@ impl Role {
 
     fn save(&self) {
         RoleTable::read_write().put(&self).unwrap();
+    }
+}
+
+#[ComplexObject]
+impl Role {
+    #[graphql(name = "account")]
+    async fn role_account(&self) -> AccountNumber {
+        self.account()
     }
 }

@@ -104,6 +104,7 @@ pub mod tables {
 
     #[table(name = "RoleTable", index = 5)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[graphql(complex)]
     pub struct Role {
         pub fractal: AccountNumber,
         pub role_id: u8,

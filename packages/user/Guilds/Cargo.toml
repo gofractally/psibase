@@ -14,6 +14,7 @@ services = ["guilds"]
 
 [package.metadata.psibase.dependencies]
 Accounts = "0.25.0"
+AuthDelegate = "0.25.0"
 Evaluations = "0.25.0"
 Host = "0.25.0"
 HttpServer = "0.25.0"

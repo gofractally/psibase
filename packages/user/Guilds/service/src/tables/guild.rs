@@ -1,16 +1,12 @@
 use async_graphql::ComplexObject;
-use psibase::services::auth_any;
 use psibase::services::auth_dyn::policy::DynamicAuthPolicy;
-use psibase::services::auth_dyn::Wrapper as AuthDyn;
 
-use psibase::services::accounts::Wrapper as Accounts;
+use crate::helpers::create_managed_account;
 use psibase::services::fractals::weighted_normalization::{
     curves::{get_curve, Curve},
     weighted_normalization,
 };
-use psibase::{
-    get_sender, get_service, AccountNumber, Flags, Memo, ServiceWrapper, Subaccount, Table,
-};
+use psibase::{get_sender, AccountNumber, Flags, Memo, Subaccount, Table};
 
 use crate::constants::{
     COUNCIL_SEATS, DEFAULT_CANDIDACY_COOLDOWN, DEFAULT_RANK_ORDERING_THRESHOLD,
@@ -79,17 +75,11 @@ impl Guild {
 
         GuildMember::add(new_guild_instance.account, rep);
 
-        AuthDyn::call().newAccount(guild);
-
-        let create_sub_account = |subaccount: Subaccount| {
-            let new_account = guild.with_subaccount(subaccount);
-            Accounts::call_as(guild).newAccount(new_account, auth_any::SERVICE, true);
-            AuthDyn::call_as(new_account).set_mgmt(new_account, get_service());
-            Accounts::call_as(new_account).setAuthServ(AuthDyn::SERVICE);
-        };
-        for role in GuildRole::ALL {
-            create_sub_account(role.to_subaccount());
-        }
+        create_managed_account(guild, || {
+            for role in GuildRole::ALL {
+                create_managed_account(guild.with_subaccount(role.to_subaccount()), || {});
+            }
+        });
 
         new_guild_instance
     }
