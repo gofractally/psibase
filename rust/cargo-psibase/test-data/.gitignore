@@ -1,3 +1,4 @@
 !*.wasm
 !import.wat
 !reexport.wat
+!env-local-override.wat
