@@ -251,6 +251,7 @@ struct PackageEdge {
     node: types::PackageInfo,
 }
 
+#[allow(non_snake_case)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct PackageConnection {
     pageInfo: NextPageInfo,
