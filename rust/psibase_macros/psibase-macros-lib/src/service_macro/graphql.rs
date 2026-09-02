@@ -28,7 +28,7 @@ pub fn process_gql_union(
     psibase_mod: &proc_macro2::TokenStream,
     event_struct: &proc_macro2::TokenStream,
     enumerators: &proc_macro2::TokenStream,
-    dispatch: &proc_macro2::TokenStream,
+    _dispatch: &proc_macro2::TokenStream,
     db: &proc_macro2::TokenStream,
     out: &mut proc_macro2::TokenStream,
 ) {
@@ -38,17 +38,9 @@ pub fn process_gql_union(
         pub enum #event_struct {
             #enumerators
         }
-        impl #psibase_mod::DecodeEvent for #event_struct {
-            fn decode(gql_imp_type: #psibase_mod::MethodNumber, gql_imp_data: &[u8]) -> Result<#event_struct, #psibase_mod::anyhow::Error> {
-                match gql_imp_type.value {
-                    #dispatch
-                    _ => { Err(#psibase_mod::anyhow::anyhow!("Unknown event type")) }
-                }
-            }
-        }
-        impl #psibase_mod::EventDb for #event_struct {
-            fn db() -> #psibase_mod::DbId {
-                #psibase_mod::DbId::#db
+        impl #psibase_mod::GetEventDb for #event_struct {
+            fn db() -> #psibase_mod::EventDb {
+                #psibase_mod::EventDb::#db
             }
         }
     };

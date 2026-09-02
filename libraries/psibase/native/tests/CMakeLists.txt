@@ -1,8 +1,7 @@
 find_package(Threads REQUIRED)
 
-
-link_directories(WatchdogTests ${ICU_LIBRARY_DIR} )
 add_executable(WatchdogTests WatchdogTests.cpp)
+target_link_directories(WatchdogTests PUBLIC ${ICU_LIBRARY_DIR})
 target_link_libraries(WatchdogTests psibase Catch2::Catch2WithMain Threads::Threads)
 add_test(NAME WatchdogTests COMMAND WatchdogTests)
 
@@ -15,3 +14,8 @@ add_executable(MountTests MountTests.cpp)
 target_compile_definitions(MountTests PUBLIC -DCATCH_CONFIG_ENABLE_ALL_STRINGMAKERS=1)
 target_link_libraries(MountTests psibase Catch2::Catch2WithMain Threads::Threads)
 add_test(NAME MountTests COMMAND MountTests)
+
+add_executable(SecretsTests SecretsTests.cpp)
+target_compile_definitions(SecretsTests PUBLIC -DCATCH_CONFIG_ENABLE_ALL_STRINGMAKERS=1)
+target_link_libraries(SecretsTests psibase Catch2::Catch2WithMain Threads::Threads)
+add_test(NAME SecrestsTests COMMAND SecretsTests)

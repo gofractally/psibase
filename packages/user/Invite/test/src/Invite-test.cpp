@@ -73,8 +73,8 @@ auto createInvite = [](auto& user, const auto& pubKey)
    Checksum256 fingerprint     = psibase::sha256(pubKey.data.data(), pubKey.data.size());
    auto        fingerprint_vec = std::vector<uint8_t>{fingerprint.begin(), fingerprint.end()};
    auto        payload         = InvPayload{
-                      .fingerprint = fingerprint_vec,
-                      .secret      = "",
+       .fingerprint = fingerprint_vec,
+       .secret      = "",
    };
    auto                 packed = psio::to_frac(payload);
    std::vector<uint8_t> packed_payload(packed.begin(), packed.end());
@@ -374,7 +374,7 @@ SCENARIO("Accepting an invite")
          THEN("Accepting fails if it would attempt to create 2 accounts from the same invite")
          {
             i.createAccount("alexandria"_a, userPub);
-            CHECK(i.createAccount("christopher"_a, userPub).failed(outOfNewAccounts));
+            CHECK(i.createAccount("christophe"_a, userPub).failed(outOfNewAccounts));
          }
       }
    }

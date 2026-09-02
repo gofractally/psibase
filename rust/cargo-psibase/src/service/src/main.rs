@@ -77,11 +77,6 @@ mod psibase_tester_polyfill {
     }
 
     #[no_mangle]
-    pub unsafe extern "C" fn getSequential(db: DbId, id: u64) -> u32 {
-        tester::polyfill::getSequential(db, id)
-    }
-
-    #[no_mangle]
     pub unsafe extern "C" fn kvGreaterEqual(
         db: KvHandle,
         key: *const u8,
@@ -129,10 +124,6 @@ mod psibase_tester_polyfill {
     #[no_mangle]
     pub unsafe extern "C" fn call(_action: *const u8, _len: u32, _flags: u64) -> u32 {
         panic!("call not supported in tester");
-    }
-    #[no_mangle]
-    pub unsafe extern "C" fn putSequential(_db: DbId, _value: *const u8, _value_len: u32) -> u64 {
-        panic!("putSequential not supported in tester");
     }
     #[no_mangle]
     pub unsafe extern "C" fn getCurrentAction() -> u32 {

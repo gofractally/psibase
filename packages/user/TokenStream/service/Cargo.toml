@@ -7,8 +7,9 @@ publish.workspace = true
 
 [package.metadata.psibase]
 postinstall = [
-    { sender = "token-stream", service = "sites", method = "enablespa", data = { enable = true } },
-    { sender = "token-stream", service = "tokens", method = "setUserConf", data = { index = 0, enabled = true } },
+    { sender = "tok-stream", service = "sites", method = "enablespa", data = { enable = true } },
+    { sender = "tok-stream", service = "tokens", method = "setUserConf", data = { index = 0, enabled = false } },
+    { sender = "tok-stream", service = "sites", method = "setcsp", data = { path = "*", csp = "default-src 'self';script-src 'self';style-src 'self' 'unsafe-inline';img-src 'self' data: profiles.{{root}}/avatar/ branding.{{root}};font-src 'self';connect-src 'self' nft.{{root}} tokens.{{root}} profiles.{{root}};frame-src supervisor.{{root}};frame-ancestors 'self';base-uri 'none';form-action 'self';object-src 'none';" } },
 ]
 
 server = "r-token-stream"
@@ -25,4 +26,4 @@ serde_json.workspace = true
 psibase-user-workspace-hack.workspace = true
 
 [dev-dependencies]
-token-stream-pkg = { path = "..", version = "0.23.0" }
+token-stream-pkg = { path = "..", version = "0.27.0" }

@@ -1,13 +1,13 @@
 use crate::bindings::host::common as Host;
 use crate::bindings::transact::plugin::types::*;
-use psibase::{AccountNumber, Hex, Tapos, TimePointSec};
+use psibase::{Hex, Tapos, TimePointSec};
 use serde::Deserialize;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 impl From<Claim> for psibase::Claim {
     fn from(claim: Claim) -> Self {
         psibase::Claim {
-            service: AccountNumber::from(claim.verify_service.as_str()),
+            service: claim.verify_service.parse().unwrap(),
             rawData: Hex::from(claim.raw_data.clone()),
         }
     }
@@ -26,6 +26,12 @@ pub trait FromExpirationTime {
 
 impl FromExpirationTime for Tapos {
     fn from_expiration_time(seconds: u64) -> Self {
+        let tapos_str =
+            Host::server::get_json("/common/tapos/head").expect("[finish_tx] Failed to get TaPoS");
+
+        let partial_tapos: PartialTapos =
+            serde_json::from_str(&tapos_str).expect("[finish_tx] Failed to deserialize TaPoS");
+
         let expiration_time = SystemTime::now() + Duration::from_secs(seconds);
         let expiration = expiration_time
             .duration_since(UNIX_EPOCH)
@@ -33,11 +39,6 @@ impl FromExpirationTime for Tapos {
             .as_secs();
         assert!(expiration <= i64::MAX as u64, "expiration out of range");
         let expiration_timepoint = TimePointSec::from(expiration as i64);
-
-        let tapos_str =
-            Host::server::get_json("/common/tapos/head").expect("[finish_tx] Failed to get TaPoS");
-        let partial_tapos: PartialTapos =
-            serde_json::from_str(&tapos_str).expect("[finish_tx] Failed to deserialize TaPoS");
 
         Tapos {
             expiration: expiration_timepoint,

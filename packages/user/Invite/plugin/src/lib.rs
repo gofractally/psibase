@@ -162,13 +162,7 @@ impl Invitee for InvitePlugin {
 fn use_active_invite() {
     hook_actions_sender();
 
-    let cred_private_key = InviteTokensTable::active_credential_key().unwrap();
-    let cred_public_key = host::crypto::pub_from_priv(&cred_private_key).unwrap();
-
-    credentials::api::sign_latch(&credentials::types::Credential {
-        p256_pub: host::crypto::to_der(&cred_public_key).unwrap(),
-        p256_priv: host::crypto::to_der(&cred_private_key).unwrap(),
-    });
+    credentials::api::use_p256_credential(&InviteTokensTable::active_credential_key().unwrap());
 }
 
 impl Redemption for InvitePlugin {
@@ -250,7 +244,7 @@ impl Inviter for InvitePlugin {
         Ok(i.details.invite_token)
     }
 
-    #[psibase_plugin::authorized(Medium, whitelist=["fractals"])]
+    #[psibase_plugin::authorized(Medium, whitelist=["guilds"])]
     fn prepare_new_invite(num_accounts: u16, service_name: String) -> Result<InviteDetails, Error> {
         Ok(prepare_new_invite_impl(num_accounts, service_name)?.details)
     }

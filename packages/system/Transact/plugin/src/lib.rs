@@ -11,12 +11,11 @@ mod db;
 mod types;
 use db::*;
 
-use transact::plugin::hook_handlers::*;
-
 // Other plugins
 use host::common::{self as Host, server as Server};
 use host::db::store as Store;
 use host::types::types::{self as HostTypes, BodyTypes};
+use transact::plugin::types::{Action, Claim};
 use virtual_server::plugin::transact as VirtualServer;
 
 // Exported interfaces/types
@@ -45,7 +44,7 @@ psibase::define_trust! {
         ",
     }
     functions {
-        None => [hook_action_auth, unhook_actions_sender, add_action_to_transaction],
+        None => [add_signature, unhook_actions_sender, add_action_to_transaction],
         Low => [],
         High => [hook_actions_sender],
         Max => [set_propose_latch, propose, set_snapshot_time, start_tx, finish_tx, get_query_token],
@@ -60,23 +59,19 @@ psibase::define_trust! {
 // 3.   on-actions-sender           - the propose-latch account (if any) is used;
 //                                    otherwise the hooked plugin can set the sender of the action;
 //                                    otherwise the logged-in user is used by default.
-// 4.   on-action-auth-claims       - the hooked plugin can add claims for this action
+// 4. add-signature                 - callers may append extra claims (e.g. invite credentials)
 //
 // 5. finish-tx
 // 6.   on-user-claim               - the user auth plugin adds the user claim
-// 7.   construct transaction
+// 7.   construct transaction       - includes any claims from add-signature
 // 8.   hash-transaction
 // 9.   on-user-auth-proof          - the user auth plugin adds the user proof
-// 10.  on-action-auth-proofs       - the hooked plugin can add proofs for their action claims
+// 10.  sign extra claims           - proofs for add-signature claims via host:crypto
 // 11.  publish transaction
 
 struct TransactPlugin {}
 
 impl Hooks for TransactPlugin {
-    fn hook_action_auth() {
-        ActionAuthPlugins::set(Host::client::get_sender());
-    }
-
     fn hook_actions_sender() {
         assert_authorized_with_whitelist(FunctionName::hook_actions_sender, vec!["invite".into()])
             .unwrap();
@@ -116,13 +111,6 @@ fn schedule_action(
         raw_data: packed_args,
     };
 
-    if let Some(plugin) = ActionAuthPlugins::get() {
-        ActionAuthPlugins::clear();
-        let plugin_ref = HostTypes::PluginRef::new(&plugin, "plugin", "transact-hook-action-auth");
-        let claims = on_action_auth_claims(plugin_ref, &action)?;
-        ActionClaims::push(plugin, claims);
-    }
-
     if ProposeLatch::is_active() {
         ProposeLatch::add(action);
     } else {
@@ -140,19 +128,21 @@ impl Intf for TransactPlugin {
         schedule_action(Host::client::get_sender(), method_name, packed_args)
     }
 
+    fn add_signature(claim: Claim) -> Result<(), HostTypes::Error> {
+        TxSignatures::add(claim);
+        Ok(())
+    }
+
     fn set_propose_latch(account: Option<String>) -> Result<(), HostTypes::Error> {
+        // Whitelisting accounts so that the accounts user prompts can stage transactions even when accounts is not the act
         assert_authorized_with_whitelist(
             FunctionName::set_propose_latch,
-            vec![Host::client::get_active_app()],
+            vec![Host::client::get_active_app(), String::from("accounts")],
         )?;
 
         let Some(acct) = account else {
             return flush_propose_latch();
         };
-
-        if accounts::plugin::api::get_account(&acct)?.is_none() {
-            return Err(InvalidAccount(&acct).into());
-        }
 
         if let Some(existing) = ProposeLatch::subsequent_action_sender() {
             if existing == acct {
@@ -201,7 +191,7 @@ fn flush_propose_latch() -> Result<(), HostTypes::Error> {
         return Ok(());
     }
 
-    let Some(proposer) = accounts::plugin::api::get_current_user() else {
+    let Some(proposer) = accounts::query::api::get_current_user() else {
         return Err(NotLoggedIn("flush_propose_latch").into());
     };
 
@@ -229,17 +219,13 @@ impl Admin for TransactPlugin {
             println!("[Warning] Propose latch should already have been cleared.");
             ProposeLatch::clear();
         }
-        if ActionAuthPlugins::has() {
-            println!("[Warning] Auth plugins should already have been cleared.");
-            ActionAuthPlugins::clear();
-        }
         if ActionSenderHook::has() {
             println!("[Warning] Action sender hook should already have been cleared.");
             ActionSenderHook::clear();
         }
-        if ActionClaims::get_all().len() > 0 {
-            println!("[Warning] Action claims should already have been cleared.");
-            ActionClaims::clear();
+        if !TxSignatures::is_empty() {
+            println!("[Warning] Tx signatures should already have been cleared.");
+            TxSignatures::reset();
         }
     }
 
@@ -260,6 +246,7 @@ impl Admin for TransactPlugin {
         let mut actions = TxActions::take();
 
         if actions.len() == 0 {
+            TxSignatures::reset();
             Store::flush_transactional_data();
             return Ok(());
         }
@@ -274,7 +261,7 @@ impl Admin for TransactPlugin {
 
         let signed_tx = SignedTransaction {
             transaction: Hex::from(tx.packed()),
-            proofs: get_proofs(&sha256(&tx.packed()), true)?,
+            proofs: get_proofs(&sha256(&tx.packed()))?,
             subjectiveData: None,
         };
         if signed_tx.proofs.len() != tx.claims.len() {
@@ -300,6 +287,7 @@ impl Admin for TransactPlugin {
             Some(err) => Err(TransactionError(err).into()),
             None => {
                 println!("Transaction executed successfully");
+                TxSignatures::reset();
                 Store::flush_transactional_data();
                 Ok(())
             }

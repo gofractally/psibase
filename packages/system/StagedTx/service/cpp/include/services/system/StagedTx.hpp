@@ -26,6 +26,7 @@ namespace SystemService
    {
       uint32_t               id;
       psibase::AccountNumber account;
+      uint64_t               seq;
       bool                   accepted;
    };
    PSIO_REFLECT(Response, id, account, accepted)
@@ -117,7 +118,6 @@ namespace SystemService
       method(execute, id, txid),
       method(get_staged_tx, id),
    );
-   PSIBASE_REFLECT_EVENTS(StagedTxService);
    PSIBASE_REFLECT_HISTORY_EVENTS(StagedTxService,
       method(updated, txid, actor, datetime, event_type),
    );

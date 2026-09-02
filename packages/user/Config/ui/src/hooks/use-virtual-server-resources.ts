@@ -17,6 +17,7 @@ const zNetworkVariables = z.object({
     blockReplayFactor: z.number(),
     perBlockSysCpuNs: z.number(),
     objStorageBytes: z.number(),
+    subjStorageBytes: z.number(),
 });
 
 const zCpuPricing = z.object({
@@ -63,6 +64,7 @@ export const useVirtualServerResources = () => {
                         blockReplayFactor
                         perBlockSysCpuNs
                         objStorageBytes
+                        subjStorageBytes
                     }
                     networkPricing {
                         availableUnits
@@ -75,7 +77,7 @@ export const useVirtualServerResources = () => {
                 }
             `;
 
-            const res = await graphql(query, { service: "virtual-server" });
+            const res = await graphql(query, { service: "vserver" });
             const parsed = zResourcesResponse.parse(res);
             return {
                 serverSpecs: parsed.getServerSpecs,

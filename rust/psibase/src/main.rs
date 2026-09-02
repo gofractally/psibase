@@ -18,12 +18,13 @@ use psibase::{
     new_account_owned_action, preapprove_action, push_transaction, push_transaction_optimistic,
     push_transactions, reg_server, set_auth_service_action, set_code_action, set_key_action,
     set_owner_action, sign_transaction, AccountNumber, Action, ActionFormatter, AnyPrivateKey,
-    AnyPublicKey, ChainUrl, Checksum256, DirectoryRegistry, ExactAccountNumber, FileSetRegistry,
-    FilteredRegistry, HTTPRegistry, HttpSchemaFetcher, JointRegistry, Meta, NullSchemaFetcher,
-    PackageDataFile, PackageInfo, PackageList, PackageOp, PackageOpFull, PackageOrigin,
-    PackagePreference, PackageRef, PackageRegistry, PackagedService, PrettyAction, SchemaFetcher,
-    SchemaMap, Seconds, ServiceInfo, SignedTransaction, StagedUpload, Tapos, TaposRefBlock,
-    TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace, Version,
+    AnyPublicKey, ChainUrl, Checksum256, DirectoryRegistry, EssentialServices, ExactAccountNumber,
+    FileSetRegistry, FilteredRegistry, HTTPRegistry, HttpSchemaFetcher, JointRegistry, Meta,
+    NullSchemaFetcher, PackageDataFile, PackageInfo, PackageList, PackageOp, PackageOpFull,
+    PackageOrigin, PackagePreference, PackageRef, PackageRegistry, PackagedService, PrettyAction,
+    SchemaFetcher, SchemaMap, Seconds, ServiceInfo, ServiceWrapper, SignedTransaction,
+    StagedUpload, Tapos, TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder,
+    TransactionTrace, Version,
 };
 use regex::Regex;
 use reqwest::Url;
@@ -336,10 +337,6 @@ struct InstallArgs {
     #[clap(required = true)]
     packages: Vec<OsString>,
 
-    /// Set all accounts to authenticate using this key
-    #[clap(short = 'k', long, value_name = "KEY")]
-    key: Option<AnyPublicKey>,
-
     /// A URL or path to a package repository (repeatable)
     #[clap(long, value_name = "URL")]
     package_source: Vec<String>,
@@ -381,10 +378,6 @@ struct UpgradeArgs {
     /// Packages to update
     packages: Vec<OsString>,
 
-    /// Set all accounts to authenticate using this key
-    #[clap(short = 'k', long, value_name = "KEY")]
-    key: Option<AnyPublicKey>,
-
     /// A URL or path to a package repository (repeatable)
     #[clap(long, value_name = "URL")]
     package_source: Vec<String>,
@@ -401,6 +394,10 @@ struct UpgradeArgs {
     /// Instead of installing to the chain, install local packages to a single node
     #[clap(long)]
     local: bool,
+
+    /// Automatically accept install confirmation
+    #[clap(short = 'y', long)]
+    yes: bool,
 
     /// Configure compression level to use for uploaded files
     /// (1=fastest, 11=most compression)
@@ -757,9 +754,9 @@ async fn push(mut args: PushArgs) -> Result<(), anyhow::Error> {
     let mut schemas = SchemaMap::new();
 
     for action in &actions {
-        if !schemas.contains_key(&action.service) {
+        if !schemas.contains_key(&action.service.parse()?) {
             schemas.insert(
-                action.service,
+                action.service.parse()?,
                 crate::as_json(
                     client.get(
                         packages::SERVICE
@@ -1239,7 +1236,10 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
         &mut package_registry,
     )
     .await?;
-    let mut packages = package_registry.resolve(&package_names, false).await?;
+    let essential = EssentialServices::with_key(&args.block_key);
+    let mut packages = package_registry
+        .resolve(&package_names, false, &essential)
+        .await?;
     let (boot_transactions, groups) = create_boot_transactions(
         &args.block_key,
         &args.account_key,
@@ -1247,6 +1247,7 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
         true,
         expiration,
         &mut packages,
+        &essential,
         args.compression_level,
     )?;
 
@@ -1621,16 +1622,23 @@ async fn apply_packages<
     out: &mut TransactionBuilder<SignedTransaction, F>,
     files: &mut TransactionBuilder<SignedTransaction, G>,
     sender: AccountNumber,
-    key: &Option<AnyPublicKey>,
     compression_level: u32,
     existing: PackageList,
 ) -> Result<SchemaMap, anyhow::Error> {
-    let ops = fetch_packages(reg, ops, &existing).await?;
     let mut schemas = SchemaMap::new();
+    let ops = fetch_packages(
+        reg,
+        ops,
+        &existing,
+        &HttpSchemaFetcher { client, base_url },
+        &mut schemas,
+        &EssentialServices::empty(),
+    )
+    .await?;
+    let updated_packages = existing.into_updated(&ops, sender);
     for op in ops {
         match op {
             PackageOpFull::Install(mut package) => {
-                package.load_schemas(base_url, client, &mut schemas).await?;
                 out.set_label(format!(
                     "Installing {}-{}",
                     package.name(),
@@ -1642,7 +1650,7 @@ async fn apply_packages<
                     package.version()
                 ));
                 let mut account_actions = vec![];
-                package.install_accounts(&mut account_actions, Some(&mut uploader), sender, key)?;
+                package.install_accounts(&mut account_actions, Some(&mut uploader), sender)?;
                 out.push_all(account_actions)?;
                 let mut actions = vec![];
                 package.install(
@@ -1652,12 +1660,12 @@ async fn apply_packages<
                     true,
                     compression_level,
                     &mut schemas,
+                    &updated_packages,
                 )?;
                 out.push_all(actions)?;
                 files.push_all(std::mem::take(&mut uploader.actions))?;
             }
             PackageOpFull::Replace(meta, mut package) => {
-                package.load_schemas(base_url, client, &mut schemas).await?;
                 // TODO: skip unmodified files (?)
                 out.set_label(format!(
                     "Updating {}-{} -> {}-{}",
@@ -1673,10 +1681,10 @@ async fn apply_packages<
                 ));
                 let old_manifest =
                     get_installed_manifest(base_url, client, &meta.name, sender).await?;
-                old_manifest.upgrade(package.manifest(), out)?;
+                old_manifest.upgrade(package.manifest(), &meta.name, out)?;
                 // Install the new package
                 let mut account_actions = vec![];
-                package.install_accounts(&mut account_actions, Some(&mut uploader), sender, key)?;
+                package.install_accounts(&mut account_actions, Some(&mut uploader), sender)?;
                 out.push_all(account_actions)?;
                 let mut actions = vec![];
                 package.install(
@@ -1686,6 +1694,7 @@ async fn apply_packages<
                     true,
                     compression_level,
                     &mut schemas,
+                    &updated_packages,
                 )?;
                 out.push_all(actions)?;
                 files.push_all(std::mem::take(&mut uploader.actions))?;
@@ -1694,7 +1703,7 @@ async fn apply_packages<
                 out.set_label(format!("Removing {}", &meta.name));
                 let old_manifest =
                     get_installed_manifest(base_url, client, &meta.name, sender).await?;
-                old_manifest.remove(out)?;
+                old_manifest.remove(&meta.name, out)?;
             }
         }
     }
@@ -1709,7 +1718,6 @@ async fn do_install<T: Read + Seek>(
     node_args: &NodeArgs,
     sig_args: &SigArgs,
     tx_args: &TxArgs,
-    key: &Option<AnyPublicKey>,
     compression_level: u32,
     existing: PackageList,
 ) -> Result<(), anyhow::Error> {
@@ -1761,7 +1769,6 @@ async fn do_install<T: Read + Seek>(
         &mut trx_builder,
         &mut upload_builder,
         sender,
-        key,
         compression_level,
         existing,
     )
@@ -1851,6 +1858,44 @@ async fn do_install<T: Read + Seek>(
     Ok(())
 }
 
+fn confirm_install(yes: bool, to_install: &[PackageOp]) -> Result<bool, anyhow::Error> {
+    if to_install.is_empty() {
+        eprintln!("Nothing to install.");
+        return Ok(false);
+    } else {
+        eprintln!("The following changes will be applied:");
+        to_install
+            .iter()
+            .map(|op| match op {
+                PackageOp::Install(info) => format!("Install {}-{}", info.name, info.version),
+                PackageOp::Replace(old, new) => {
+                    if old.version == new.version {
+                        format!("Reinstall {} {}", old.name, old.version)
+                    } else {
+                        format!("Upgrade {} {} -> {}", old.name, old.version, new.version)
+                    }
+                }
+                PackageOp::Remove(meta) => format!("Remove {}-{}", meta.name, meta.version),
+            })
+            .for_each(|line| eprintln!("  {}", line));
+    }
+
+    if !yes {
+        let term = Term::stderr();
+        if term.is_term() {
+            let proceed = Confirm::new()
+                .with_prompt("Proceed?")
+                .default(true)
+                .interact_on(&term)?;
+            if !proceed {
+                eprintln!("Install aborted.");
+                return Ok(false);
+            }
+        }
+    }
+    Ok(true)
+}
+
 async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
     let mut client = build_client(&args.node_args.proxy).await?;
     let installed = if args.local {
@@ -1873,39 +1918,8 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
         .resolve_changes(&package_registry, &packages, args.reinstall, args.local)
         .await?;
 
-    if to_install.is_empty() {
-        println!("Nothing to install.");
+    if !confirm_install(args.yes, &to_install)? {
         return Ok(());
-    } else {
-        println!("The following changes will be applied:");
-        to_install
-            .iter()
-            .map(|op| match op {
-                PackageOp::Install(info) => format!("Install {}-{}", info.name, info.version),
-                PackageOp::Replace(old, new) => {
-                    if old.version == new.version {
-                        format!("Reinstall {} {}", old.name, old.version)
-                    } else {
-                        format!("Upgrade {} {} -> {}", old.name, old.version, new.version)
-                    }
-                }
-                PackageOp::Remove(meta) => format!("Remove {}-{}", meta.name, meta.version),
-            })
-            .for_each(|line| println!("  {}", line));
-    }
-
-    if !args.yes {
-        let term = Term::stderr();
-        if term.is_term() {
-            let proceed = Confirm::new()
-                .with_prompt("Proceed?")
-                .default(true)
-                .interact_on(&term)?;
-            if !proceed {
-                println!("Install aborted.");
-                return Ok(());
-            }
-        }
     }
 
     if args.local {
@@ -1927,7 +1941,6 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
             &args.node_args,
             &args.sig_args,
             &args.tx_args,
-            &args.key,
             args.compression_level,
             installed,
         )
@@ -2061,7 +2074,16 @@ async fn do_install_local<T: Read + Seek>(
     let progress = ProgressBar::new(to_install.len() as u64).with_style(
         ProgressStyle::with_template("{wide_bar} {pos}/{len}\n{msg}")?,
     );
-    let to_install = fetch_packages(&package_registry, to_install, &installed).await?;
+    let mut schemas = SchemaMap::new();
+    let to_install = fetch_packages(
+        &package_registry,
+        to_install,
+        &installed,
+        &NullSchemaFetcher,
+        &mut schemas,
+        &EssentialServices::empty(),
+    )
+    .await?;
     progress.set_message("Installing packages");
     let res: Result<(), anyhow::Error> = async {
         for op in to_install {
@@ -2210,6 +2232,10 @@ async fn upgrade(args: &UpgradeArgs) -> Result<(), anyhow::Error> {
         )
         .await?;
 
+    if !confirm_install(args.yes, &to_install)? {
+        return Ok(());
+    }
+
     if args.local {
         do_install_local(
             client,
@@ -2229,7 +2255,6 @@ async fn upgrade(args: &UpgradeArgs) -> Result<(), anyhow::Error> {
             &args.node_args,
             &args.sig_args,
             &args.tx_args,
-            &args.key,
             args.compression_level,
             installed,
         )

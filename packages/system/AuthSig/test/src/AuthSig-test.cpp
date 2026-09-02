@@ -208,6 +208,9 @@ SCENARIO("AuthSig")
                auto accept = bob.to<StagedTxService>().accept(id, txid);
                REQUIRE(accept.succeeded());
 
+               REQUIRE(alice.to<Nft>().debit(bobNftId, Memo{""}).succeeded());
+               REQUIRE(bob.to<Nft>().debit(aliceNftId, Memo{""}).succeeded());
+
                AND_THEN("The atomic swap is complete")
                {
                   REQUIRE(getNfts(t, alice.id) == std::vector{bobNftId});

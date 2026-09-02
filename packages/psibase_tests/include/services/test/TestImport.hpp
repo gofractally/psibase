@@ -7,7 +7,7 @@ namespace TestService
 {
    struct TestImport : psibase::Service
    {
-      static constexpr auto service = psibase::AccountNumber{"test-import"};
+      static constexpr auto service = psibase::AccountNumber{"testimport"};
       static constexpr auto flags   = std::uint64_t(0);
 
       void testPlain();

@@ -79,6 +79,9 @@ TEST_CASE("notify onTransaction")
    static constexpr auto notify2 = AccountNumber{"notify2"};
    t.addService(NotifyService::service, "NotifyService.wasm");
    t.addService(notify2, "NotifyService.wasm");
+   // startBlock causes an extra transaction that will
+   // throw our counts off.
+   t.setAutoBlockStart(false);
    for (auto service : {NotifyService::service, notify2})
    {
       t.from(Transact::service)
@@ -100,7 +103,7 @@ TEST_CASE("notify onTransaction")
       CHECK(row->count == 1);
    }
    fail.put({});
-   REQUIRE(t.from(Nop::service).to<Nop>().nop().succeeded());
+   REQUIRE(t.from(Nop::service).to<Nop>().withId(0).succeeded());
    {
       auto row = table1.get({});
       REQUIRE(row.has_value());
@@ -112,7 +115,7 @@ TEST_CASE("notify onTransaction")
       CHECK(row->count == 2);
    }
    fail.remove({});
-   REQUIRE(t.from(Nop::service).to<Nop>().nop().succeeded());
+   REQUIRE(t.from(Nop::service).to<Nop>().withId(1).succeeded());
    {
       auto row = table1.get({});
       REQUIRE(row.has_value());

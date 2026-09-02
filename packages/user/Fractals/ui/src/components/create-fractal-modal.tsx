@@ -11,11 +11,18 @@ import { isAccountAvailable } from "@/hooks/use-account-status";
 import { useAppForm } from "@shared/components/form/app-form";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import {
+    MAX_ACCOUNT_NAME_LENGTH,
+    MIN_FREE_ACCOUNT_NAME_LENGTH,
+} from "@shared/lib/schemas/account";
+import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogHeader,
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
+
+const accountNameHint = `${MIN_FREE_ACCOUNT_NAME_LENGTH}-${MAX_ACCOUNT_NAME_LENGTH} characters, lowercase letters, numbers, and hyphens`;
 
 export const CreateFractalModal = ({
     show,
@@ -60,6 +67,10 @@ export const CreateFractalModal = ({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Create a new fractal</DialogTitle>
+                    <DialogDescription>
+                        Choose a display name, mission, and free account names
+                        for the fractal and its genesis guild.
+                    </DialogDescription>
                     <form
                         onSubmit={(e) => {
                             e.preventDefault();
@@ -98,7 +109,7 @@ export const CreateFractalModal = ({
                             children={(field) => (
                                 <field.TextField
                                     label="Fractal account name"
-                                    description="Unique identifier"
+                                    description={accountNameHint}
                                 />
                             )}
                         />
@@ -122,7 +133,7 @@ export const CreateFractalModal = ({
                             children={(field) => (
                                 <field.TextField
                                     label="Genesis guild account name"
-                                    description="Unique identifier"
+                                    description={accountNameHint}
                                 />
                             )}
                         />

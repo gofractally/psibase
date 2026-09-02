@@ -25,13 +25,6 @@ namespace SystemService
                 && req.host[req.host.size() - rootHost.size() - 1] == '.';
       }
 
-      std::optional<RegisteredServiceRow> getServer(const AccountNumber& server)
-      {
-         return HttpServer::Tables(HttpServer::service, KvMode::read)
-             .open<RegServTable>()
-             .get(server);
-      }
-
       std::optional<AccountNumber> getRedirect(const AccountNumber& account)
       {
          auto row = HttpServer::Tables(HttpServer::service, KvMode::read)
@@ -50,28 +43,23 @@ namespace SystemService
 
          return AccountNumber(req.host.substr(0, req.host.size() - rootHost.size() - 1));
       }
-
-      std::string_view hostHeaderPortSuffix(const HttpRequest& req)
-      {
-         if (auto host = HttpHeader::get(req.headers, "host"))
-         {
-            std::string_view h = *host;
-            if (auto pos = h.rfind(':'); pos != std::string_view::npos)
-            {
-               if (h.find(']', pos) == std::string_view::npos)
-                  return h.substr(pos);
-            }
-         }
-         return {};
-      }
    }  // namespace
 
    void HttpServer::registerServer(AccountNumber server)
    {
+      auto sender = getSender();
+      check(!sender.subaccount(), "Subaccounts do not have domain names");
       Tables{getReceiver()}.open<RegServTable>().put(RegisteredServiceRow{
-          .service = getSender(),
+          .service = sender,
           .server  = server,
       });
+   }
+
+   std::optional<AccountNumber> HttpServer::getServer(AccountNumber service)
+   {
+      if (auto row = Tables{getReceiver(), KvMode::read}.open<RegServTable>().get(service))
+         return row->server;
+      return std::nullopt;
    }
 
    static void checkRecvAuth(const Action& act)
@@ -118,7 +106,8 @@ namespace SystemService
                                                      "Content-Security-Policy",
                                                      "ETag",
                                                      "Location",
-                                                     "Set-Cookie"};
+                                                     "Set-Cookie",
+                                                     "X-Content-Type-Options"};
 
       void sendReplyImpl(AccountNumber service, std::int32_t socket, HttpReply&& result)
       {
@@ -310,6 +299,20 @@ namespace SystemService
          return;
       }
 
+      // Subaccounts don't have domain names. This is a defensive check
+      // that should never be reached, because the subaccount separator
+      // is not allowed in a hostname.
+      if (service_opt->subaccount())
+      {
+         std::string msg = "The resource '" + req.target + "' was not found";
+         sendReplyImpl(HttpServer::service, sock,
+                       {.status      = HttpStatus::notFound,
+                        .contentType = "text/html",
+                        .body        = std::vector(msg.begin(), msg.end()),
+                        .headers     = allowCors()});
+         return;
+      }
+
       // If the subdomain has a redirect set, that takes precedence
       if (auto dest = getRedirect(*service_opt))
       {
@@ -338,7 +341,7 @@ namespace SystemService
 
       if (registered)
       {
-         result = checkServer(registered->server);
+         result = checkServer(*registered);
       }
 
       // Otherwise, check the sites service
@@ -408,6 +411,7 @@ namespace SystemService
    void HttpServer::setRedirect(AccountNumber destination)
    {
       auto sender = getSender();
+      check(!sender.subaccount(), "Subaccounts do not have domain names");
       check(destination != sender, "redirect destination must not be the sender");
       Tables{getReceiver()}.open<RedirectTable>().put(RedirectRow{
           .account     = sender,

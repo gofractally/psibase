@@ -2,8 +2,9 @@
 
 use crate::{
     AccountNumber, Action, BlockHeader, BlockInfo, BlockNum, Checksum256, Claim, DbId, Hex,
-    JointConsensus, MethodNumber, MicroSeconds, Pack, ToSchema, Unpack,
+    JointConsensus, MethodNumber, MicroSeconds, Pack, ToKey, ToSchema, Unpack,
 };
+use async_graphql::{InputObject, SimpleObject};
 use serde::{Deserialize, Serialize};
 
 pub type NativeTable = u16;
@@ -12,7 +13,7 @@ pub type NativeIndex = u8;
 pub const STATUS_TABLE: NativeTable = 1;
 pub const CODE_TABLE: NativeTable = 2;
 pub const CODE_BY_HASH_TABLE: NativeTable = 3;
-pub const DATABASE_STATUS_TABLE: NativeTable = 4;
+// pub const DATABASE_STATUS_TABLE: NativeTable = 4;
 pub const TRANSACTION_WASM_CONFIG_TABLE: NativeTable = 5;
 pub const PROOF_WASM_CONFIG_TABLE: NativeTable = 6; // Also for first auth
 pub const CONFIG_TABLE: NativeTable = 7;
@@ -131,23 +132,6 @@ impl CodeByHashRow {
             self.vmType,
             self.vmVersion,
         )
-    }
-}
-
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
-#[fracpack(fracpack_mod = "fracpack")]
-pub struct DatabaseStatusRow {
-    nextHistoryEventNumber: u64,
-    nextUIEventNumber: u64,
-    nextMerkleEventNumber: u64,
-
-    blockMerkleEventNumber: u64,
-}
-
-impl DatabaseStatusRow {
-    pub const DB: DbId = DbId::Native;
-    pub fn key(&self) -> (NativeTable, NativeIndex) {
-        (DATABASE_STATUS_TABLE, NATIVE_TABLE_PRIMARY_INDEX)
     }
 }
 
@@ -405,11 +389,32 @@ impl RunMode {
 
 pub type RunToken = Vec<u8>;
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
-#[fracpack(fracpack_mod = "fracpack")]
-pub struct BoundMethod {
-    service: AccountNumber,
-    method: MethodNumber,
+/// Identify a service and method
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    Pack,
+    Unpack,
+    ToKey,
+    ToSchema,
+    Serialize,
+    Deserialize,
+    SimpleObject,
+    InputObject,
+)]
+#[fracpack(fracpack_mod = "fracpack", custom = "ServiceMethod")]
+#[to_key(psibase_mod = "crate")]
+#[graphql(input_name = "ServiceMethodInput")]
+pub struct ServiceMethod {
+    pub service: AccountNumber,
+    pub method: MethodNumber,
+}
+
+impl ServiceMethod {
+    pub fn new(service: AccountNumber, method: MethodNumber) -> Self {
+        Self { service, method }
+    }
 }
 
 #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
@@ -419,7 +424,7 @@ pub struct RunRow {
     mode: RunMode,
     maxTime: MicroSeconds,
     action: Action,
-    continuation: BoundMethod,
+    continuation: ServiceMethod,
 }
 
 impl RunRow {

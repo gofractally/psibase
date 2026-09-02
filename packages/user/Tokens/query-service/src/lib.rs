@@ -1,11 +1,11 @@
 mod events;
 
-#[psibase::service]
+#[psibase::service(name = "tokens+1")]
 #[allow(non_snake_case)]
 mod service {
 
     use async_graphql::{connection::Connection, *};
-    use psibase::services::{nft::Wrapper as Nfts, tokens::TID};
+    use psibase::services::{http_server, nft::Wrapper as Nfts, tokens::TID};
 
     use psibase::*;
     use tokens::tables::tables::{UserPendingRecord, UserPendingTable};
@@ -410,8 +410,9 @@ mod service {
         _socket: Option<i32>,
         user: Option<AccountNumber>,
     ) -> Option<HttpReply> {
-        check(
-            get_sender() == AccountNumber::from("http-server"),
+        assert_eq!(
+            get_sender(),
+            http_server::SERVICE,
             "permission denied: tokens::serveSys only callable by 'http-server'",
         );
 

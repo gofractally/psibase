@@ -15,8 +15,8 @@ namespace UserService
      public:
       using Tables = psibase::ServiceTables<NftConfigTable, NftTable, NftHolderTable, CreditTable>;
 
-      static constexpr auto         service     = psibase::AccountNumber("nft");
-      static constexpr std::uint8_t manualDebit = 0;
+      static constexpr auto         service   = psibase::AccountNumber("nft");
+      static constexpr std::uint8_t autoDebit = 0;
 
       Nft(psio::shared_view_ptr<psibase::Action> action);
 
@@ -47,11 +47,6 @@ namespace UserService
             void userConfSet(Account account, std::uint8_t flag, bool enable) {}
          };
          // clang-format on
-
-         struct Ui
-         {
-         };
-
       };
    };
 
@@ -71,12 +66,10 @@ namespace UserService
       method(exists, nftId),
       method(getUserConf, account, flag)
    );
-   PSIBASE_REFLECT_EVENTS(Nft);
    PSIBASE_REFLECT_HISTORY_EVENTS(Nft,
       method(userConfSet, account, flag, enable),
       method(ownerChange, nftId, action, prev_owner, new_owner, memo),
    );
-   PSIBASE_REFLECT_UI_EVENTS(Nft);
 
    PSIBASE_REFLECT_TABLES(Nft, Nft::Tables)
    // clang-format on

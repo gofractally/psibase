@@ -10,7 +10,7 @@ wit-bindgen-rt.workspace = true
 psibase.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-identity = { path = "../service/", version = "0.23.0" }
+identity = { path = "../service/", version = "0.27.0" }
 psibase-user-workspace-hack.workspace = true
 
 [lib]
@@ -27,10 +27,9 @@ world = "impl"
 [package.metadata.component.target.dependencies]
 "host:common" = { path = "../../Host/plugin/common/wit/world.wit" }
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
-"accounts:plugin" = { path = "../../../system/Accounts/plugin/accounts/wit/world.wit" }
+"accounts:query" = { path = "../../../system/Accounts/plugin/query/wit/world.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
-"sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
 "permissions:plugin" = { path = "../../Permissions/plugin/wit/world.wit" }
 
 [dev-dependencies]
-identity-pkg = { path = "..", version = "0.23.0" }
+identity-pkg = { path = "..", version = "0.27.0" }

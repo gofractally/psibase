@@ -20,7 +20,7 @@ interface user {
     /// * `receiver` - Recipient account
     /// * `memo`     - Memo describing the credit
     ///
-    /// Places NFT in shared table when the debitor has manual debit enabled
+    /// Places NFT in shared table when the debitor has auto debit disabled
     credit: func(nft-id: u32, receiver: string, memo: string) -> result<_, error>;
 
     /// Cancel a pending shared-balance credit.
@@ -49,11 +49,11 @@ interface user {
 interface user-config {
     use host:types/types.{error};
 
-    /// Enable or disable manual debit globally for the caller.
+    /// Enable or disable auto debit globally for the caller.
     ///
     /// Arguments
-    /// * `enable` - `true` to require manual debit, `false` for automatic debit
-    enable-user-manual-debit: func(enable: bool) -> result<_, error>;
+    /// * `enable` - `true` to enable auto debit, `false` to disable auto debit
+    enable-user-auto-debit: func(enable: bool) -> result<_, error>;
 }
 
 

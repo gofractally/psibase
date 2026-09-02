@@ -39,6 +39,56 @@ namespace psio::schema_types
       types.insert(std::make_pair(std::move(name), std::move(type)));
    }
 
+   void Schema::checkType(const AnyType& type) const
+   {
+      struct TypeChecker
+      {
+         const Schema* self;
+         void          operator()(const Int& type) const {}
+         void          operator()(const Float& type) const {}
+         void          operator()(const Object& type) const
+         {
+            for (const auto& member : type.members)
+            {
+               (*this)(member.type);
+            }
+         }
+         void operator()(const Struct& type) const
+         {
+            for (const auto& member : type.members)
+            {
+               (*this)(member.type);
+            }
+         }
+         void operator()(const Option& type) const { (*this)(*type.type); }
+         void operator()(const List& type) const { (*this)(*type.type); }
+         void operator()(const Array& type) const { (*this)(*type.type); }
+         void operator()(const Variant& type) const
+         {
+            for (const auto& member : type.members)
+            {
+               (*this)(member.type);
+            }
+         }
+         void operator()(const Tuple& type) const
+         {
+            for (const auto& member : type.members)
+            {
+               (*this)(member);
+            }
+         }
+         void operator()(const FracPack& type) const { (*this)(*type.type); }
+         void operator()(const Custom& type) const { (*this)(*type.type); }
+         void operator()(const Type& type) const
+         {
+            if (self->types.find(type.type) == self->types.end())
+               check(false, "Undefined type: " + type.type);
+         }
+         void operator()(const AnyType& type) const { std::visit(*this, type.value); }
+      };
+      TypeChecker{this}(type);
+   }
+
    void CustomTypes::insert(std::string name, const CustomHandler& t)
    {
       std::size_t index = impl.size();

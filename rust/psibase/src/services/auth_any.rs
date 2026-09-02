@@ -11,12 +11,17 @@ mod service {
         action: ServiceMethod,
         allowedActions: Vec<ServiceMethod>,
         claims: Vec<Claim>,
-    ) {
+    ) -> bool {
         unimplemented!()
     }
 
     #[action]
     fn canAuthUserSys(user: AccountNumber) {
+        unimplemented!()
+    }
+
+    #[action]
+    fn getDlgsSys(sender: AccountNumber) -> Vec<AccountNumber> {
         unimplemented!()
     }
 

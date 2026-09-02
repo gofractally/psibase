@@ -5,13 +5,17 @@ mod tables;
 #[allow(non_snake_case)]
 pub mod service {
     pub use crate::tables::tables::*;
-    use async_graphql::*;
     use psibase::*;
     use services::events::Wrapper as EventsSvc;
 
     #[action]
     fn init() {
-        EventsSvc::call().addIndex(DbId::HistoryEvent, SERVICE, method!("appStatusChanged"), 0);
+        EventsSvc::call().addIndex(
+            EventDb::HistoryEvent,
+            SERVICE,
+            method!("appStatusChanged"),
+            0,
+        );
     }
 
     #[action]

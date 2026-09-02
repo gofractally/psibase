@@ -37,10 +37,29 @@ function getWasiImports(): PluginImports {
         "wasi:random/random": random.random,
     };
 }
+export interface ServiceMap {
+    [key: string]: string;
+}
+
+export function getPluginService(
+    services: ServiceMap | null,
+    namespace: string,
+): string {
+    if (services) {
+        if (namespace in services) {
+            return services[namespace];
+        } else {
+            throw new Error(`Cannot find service for ${namespace}`);
+        }
+    } else {
+        return namespace;
+    }
+}
 
 function buildProxiedImports(
     { interfaces: allInterfaces, funcs: freeFunctions }: Functions,
     host: HostInterface,
+    services: ServiceMap | null,
 ): PluginImports {
     assert(
         freeFunctions.length === 0,
@@ -57,7 +76,7 @@ function buildProxiedImports(
         if (intf.funcs.length === 0) {
             imports[key] = {};
         } else {
-            imports[key] = buildInterfaceProxy(intf, host);
+            imports[key] = buildInterfaceProxy(intf, host, services);
         }
     }
     return imports;
@@ -66,11 +85,12 @@ function buildProxiedImports(
 function buildInterfaceProxy(
     intf: Interface,
     host: HostInterface,
+    services: ServiceMap | null,
 ): Record<string, unknown> {
     const proxy: Record<string, unknown> = {};
     for (const func of intf.funcs) {
         if (isResourceMethod(func.name)) {
-            addResourceProxy(proxy, intf, func.name, func.dynamicLink, host);
+            addResourceProxy(proxy, intf, func.name, func.dynamicLink, host, services);
         } else if (func.dynamicLink) {
             proxy[kebabToCamel(func.name)] = (
                 pluginRef: { handle: number },
@@ -82,9 +102,10 @@ function buildInterfaceProxy(
                     params: args,
                 });
         } else {
+            const service = getPluginService(services, intf.namespace);
             proxy[kebabToCamel(func.name)] = (...args: unknown[]) =>
                 host.syncCall({
-                    service: intf.namespace,
+                    service,
                     plugin: intf.package,
                     intf: intf.name,
                     method: func.name,
@@ -109,6 +130,7 @@ function addResourceProxy(
     funcName: string,
     isDynamic: boolean,
     host: HostInterface,
+    services: ServiceMap | null,
 ): void {
     if (isDynamic) {
         throw new Error(`Dynamic resource methods are not supported`);
@@ -142,10 +164,11 @@ function addResourceProxy(
         throw new Error(`Invalid resource method name: ${funcName}`);
     }
     const jsMethodName = kebabToCamel(rawMethodName);
+    const service = getPluginService(services, intf.namespace);
 
     const callResource = (handle: number | undefined, ...args: unknown[]) =>
         host.syncCallResource({
-            service: intf.namespace,
+            service,
             plugin: intf.package,
             intf: intf.name,
             type: rawResourceName,
@@ -311,11 +334,12 @@ export async function compilePlugin(
     wasmBytes: Uint8Array,
     pluginHost: HostInterface,
     api: ComponentAPI,
+    services: ServiceMap | null,
 ): Promise<CompiledPlugin> {
     const imports: PluginImports = {
         ...getWasiImports(),
         ...(privileged ? pluginHost.bridge : {}),
-        ...buildProxiedImports(api.importedFuncs, pluginHost),
+        ...buildProxiedImports(api.importedFuncs, pluginHost, services),
     };
     assertSupervisorImportsSatisfied(
         service,

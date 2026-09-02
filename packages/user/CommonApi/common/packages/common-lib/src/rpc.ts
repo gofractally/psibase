@@ -1,9 +1,10 @@
+import hashJs from "hash.js";
+
 import {
     privateStringToKeyPair,
     publicKeyPairToDER,
     signatureToBin,
 } from "./key-conversions";
-import hashJs from "hash.js";
 
 export class RPCError extends Error {
     trace: any;
@@ -83,8 +84,14 @@ export async function getText(url: string) {
     return res.text();
 }
 
-export async function getJson<T = any>(url: string): Promise<T> {
-    const res = await get(url, { headers: { Accept: "application/json" } });
+export async function getJson<T = any>(
+    url: string,
+    options?: RequestInit,
+): Promise<T> {
+    const res = await get(url, {
+        ...options,
+        headers: { Accept: "application/json", ...options?.headers },
+    });
     return res.json();
 }
 
@@ -105,26 +112,34 @@ export async function postText(url: string, text: string) {
     );
 }
 
-export async function postGraphQL(url: string, graphql: string) {
+export async function postGraphQL(
+    url: string,
+    graphql: string,
+    options?: RequestInit,
+) {
     return throwIfError(
         await fetch(url, {
             method: "POST",
+            body: graphql,
+            ...options,
             headers: {
                 "Content-Type": "application/graphql",
+                ...options?.headers,
             },
-            body: graphql,
         }),
     );
 }
 
-export async function postJson(url: string, json: any) {
+export async function postJson(url: string, json: any, options?: RequestInit) {
     return throwIfError(
         await fetch(url, {
             method: "POST",
+            body: JSON.stringify(json),
+            ...options,
             headers: {
                 "Content-Type": "application/json",
+                ...options?.headers,
             },
-            body: JSON.stringify(json),
         }),
     );
 }
@@ -149,13 +164,18 @@ export async function postTextGetJson(url: string, text: string) {
 export async function postGraphQLGetJson<GqlResponse>(
     url: string,
     graphQL: string,
+    options?: RequestInit,
 ): Promise<GqlResponse> {
-    const res = await postGraphQL(url, graphQL);
+    const res = await postGraphQL(url, graphQL, options);
     return res.json();
 }
 
-export async function postJsonGetJson(url: string, json: any) {
-    const res = await postJson(url, json);
+export async function postJsonGetJson(
+    url: string,
+    json: any,
+    options?: RequestInit,
+) {
+    const res = await postJson(url, json, options);
     return res.json();
 }
 

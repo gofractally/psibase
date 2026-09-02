@@ -4,7 +4,7 @@
 
 ### Push transaction
 
-`POST /push_transaction` pushes a transaction. The user must pack the transaction using fracpack and pass in the binary as the request body. See [Pack transaction](../development/front-ends/reference/http-requests.md#pack-transaction) for an RPC request which packs transactions. The `Content-Type` of the request body should be `application/octet-stream`.
+`POST /push_transaction` pushes a transaction. The user must pack the transaction using fracpack and pass in the binary as the request body. The `Content-Type` of the request body should be `application/octet-stream`.
 
 #### Http response timing
 
@@ -42,5 +42,4 @@ Future psinode versions may trim the action traces when not in a developer mode.
 The token can be submitted either in an `Authorization` header or in a cookie named `__Host-SESSION`.
 
 {{#cpp-doc ::SystemService::Transact}}
-{{#cpp-doc ::SystemService::ServiceMethod}}
 {{#cpp-doc ::SystemService::AuthInterface}}

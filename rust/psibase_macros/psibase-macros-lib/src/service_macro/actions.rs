@@ -17,7 +17,6 @@ pub struct Options {
     pub wrapper: String,
     pub structs: String,
     pub history_events: String,
-    pub ui_events: String,
     pub merkle_events: String,
     pub event_structs: String,
     pub dispatch: Option<bool>,
@@ -37,7 +36,6 @@ impl Default for Options {
             wrapper: "Wrapper".into(),
             structs: "action_structs".into(),
             history_events: "HistoryEvents".into(),
-            ui_events: "UiEvents".into(),
             merkle_events: "MerkleEvents".into(),
             event_structs: "event_structs".into(),
             dispatch: None,
@@ -114,9 +112,9 @@ pub fn process_action_args(
     if let Some(db) = event_db {
         *new_items = quote! {
             #new_items
-            impl #psibase_mod::EventDb for #fn_name {
-                fn db() -> #psibase_mod::DbId {
-                    #psibase_mod::DbId::#db
+            impl #psibase_mod::GetEventDb for #fn_name {
+                fn db() -> #psibase_mod::EventDb {
+                    #psibase_mod::EventDb::#db
                 }
             }
         }

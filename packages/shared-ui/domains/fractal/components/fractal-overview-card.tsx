@@ -12,7 +12,6 @@ import { cn } from "@shared/lib/utils";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { CardContent, CardFooter, CardHeader } from "@shared/shadcn/ui/card";
 
-import { getMemberLabel } from "../lib/get-member-label";
 import { FractalGuildIdentifier } from "./fractal-guild-header-identifier";
 
 export const OverviewCard = ({
@@ -27,11 +26,7 @@ export const OverviewCard = ({
     linksToFractal?: boolean;
 }) => {
     const isMember = membership != null;
-    const status = !isMember
-        ? "Not a member"
-        : membership
-          ? getMemberLabel(membership.memberStatus)
-          : "Loading...";
+    const status = isMember ? "Member" : "Not a member";
 
     const content = (
         <GlowingCard
@@ -71,12 +66,14 @@ export const OverviewCard = ({
                     {fractal?.fractal?.mission ?? "No mission available"}
                 </p>
             </CardContent>
-            <CardFooter className="justify-end">
-                <div className="text-muted-foreground text-xs font-normal italic">
-                    Member since{" "}
-                    {dayjs(membership?.createdAt).format("MMMM D, YYYY")}
-                </div>
-            </CardFooter>
+            {isMember && membership.createdAt ? (
+                <CardFooter className="justify-end">
+                    <div className="text-muted-foreground text-xs font-normal italic">
+                        Member since{" "}
+                        {dayjs(membership.createdAt).format("MMMM D, YYYY")}
+                    </div>
+                </CardFooter>
+            ) : null}
         </GlowingCard>
     );
 

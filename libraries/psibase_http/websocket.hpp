@@ -75,6 +75,7 @@ namespace psibase::http
             self->impl  = std::move(impl);
             hasMessages = !self->outbox.empty();
          }
+         self->server.register_connection(self);
          if (hasMessages)
             ptr->writeLoop(std::shared_ptr{self});
          ptr->readLoop(std::move(self));
@@ -238,7 +239,6 @@ namespace psibase::http
             std::lock_guard l{mutex};
             if (state == StateType::normal)
             {
-               state     = StateType::closing;
                needClose = true;
             }
          }
@@ -247,6 +247,17 @@ namespace psibase::http
             // TODO: propagate code
             server.sharedState->sockets()->asyncClose(*this);
          }
+      }
+
+      static void close(std::shared_ptr<WebSocket>&& self, bool restart)
+      {
+         self->close(restart ? close_code::restart : close_code::shutdown);
+      }
+
+      void abandon() noexcept override
+      {
+         outbox.clear();
+         readCallback = nullptr;
       }
 
       using ChannelAttr = boost::log::attributes::mutable_constant<std::string>;
@@ -339,13 +350,12 @@ namespace psibase::http
                    std::unique_lock l{self->mutex};
                    if (ec)
                    {
+                      auto outbox = std::move(self->outbox);
+                      l.unlock(); // `error()` locks the mutex
                       if (ec != make_error_code(boost::asio::error::operation_aborted))
                       {
-                         // FIXME: recursive lock
                          self->error(ec);
                       }
-                      auto outbox = std::move(self->outbox);
-                      l.unlock();
                       self->clearOutbox(std::move(outbox), ec);
                       return;
                    }

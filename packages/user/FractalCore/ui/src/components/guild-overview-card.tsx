@@ -87,6 +87,7 @@ export const GuildOverviewCard = ({
                 )}
             </CardHeader>
             <SetGuildMetadataModal
+                guildAccount={guildAccount}
                 show={metadataModalOpen}
                 openChange={setMetadataModalOpen}
             />

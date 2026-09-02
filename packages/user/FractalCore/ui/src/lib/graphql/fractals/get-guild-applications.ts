@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { zGuildApplicationListInstance } from "@/lib/zod/attestations";
 
-import { FRACTALS_SERVICE } from "@shared/domains/fractal/lib/constants";
+import { GUILDS_SERVICE } from "@shared/domains/fractal/lib/constants";
 import { graphql } from "@shared/lib/graphql";
 import { Account } from "@shared/lib/schemas/account";
 
@@ -30,7 +30,7 @@ export const getGuildApplications = async (guildAccount: Account) => {
                 }
             }
         `,
-        { service: FRACTALS_SERVICE },
+        { service: GUILDS_SERVICE },
     );
 
     return z

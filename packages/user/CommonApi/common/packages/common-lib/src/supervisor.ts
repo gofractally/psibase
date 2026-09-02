@@ -258,22 +258,23 @@ export class Supervisor {
         });
     }
 
-    public async preLoadPlugins(plugins: PluginId[]) {
-        await this.onLoaded();
+    public preLoadPlugins(plugins: PluginId[]) {
         // Fully qualify any plugins with default values
         const fqPlugins: QualifiedPluginId[] = plugins.map((plugin) => ({
             ...plugin,
             plugin: plugin.plugin || "plugin",
         }));
 
-        const message = buildPreLoadPluginsRequest(fqPlugins);
-
-        const iframe = this.getSupervisorIframe();
-        if (!iframe.contentWindow)
-            throw new Error(
-                `Failed to get content window from supervisor iframe`,
-            );
-        iframe.contentWindow.postMessage(message, this.supervisorSrc);
+        const request = buildPreLoadPluginsRequest(fqPlugins);
+        const autoRedirectConfig: AutoRedirectConfig = {
+            enabled: false,
+            returnPath: "/",
+        };
+        return this.sendRequest(
+            `Preload plugins: ${fqPlugins.map((p) => `${p.service}:${p.plugin}`).join(", ")}`,
+            autoRedirectConfig,
+            request,
+        );
     }
 }
 

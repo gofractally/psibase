@@ -23,7 +23,7 @@ fn authorized_macro() {
     // Trust level with whitelist
     // Invocations:
     // - #[authorized(Medium, whitelist = ["homepage"])]
-    // - #[authorized(High, whitelist = ["homepage", "virtual-server", "invite"])]
+    // - #[authorized(High, whitelist = ["homepage", "vserver", "invite"])]
     t.pass("tests/authorized/with_whitelist.rs");
 
     // Result-returning fn (auth check uses ?)

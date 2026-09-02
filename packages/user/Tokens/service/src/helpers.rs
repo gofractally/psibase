@@ -11,7 +11,7 @@ pub fn identify_token_type(token_id: String) -> TokenType {
     if first_char.is_ascii_digit() {
         TokenType::Number(token_id.parse::<u32>().expect("invalid token ID number"))
     } else {
-        TokenType::Symbol(AccountNumber::from(token_id.as_str()))
+        TokenType::Symbol(token_id.parse().unwrap())
     }
 }
 

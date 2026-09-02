@@ -2,7 +2,7 @@ use crate::services::{
     accounts,
     transact::{auth_interface::auth_action_structs, ServiceMethod},
 };
-use crate::{get_service, AccountNumber, Caller, MethodNumber, ServiceCaller};
+use crate::{get_service, AccountNumber, Caller, MethodNumber, ServiceCaller, ServiceWrapper};
 
 /// Looks up the sender's auth service and checks if it would authorize the specified
 /// action by the sender given the specified authorizers.
@@ -29,7 +29,6 @@ pub fn is_auth(
             sender,
             authorizers,
             method: service_method,
-            authSet: None,
         },
     )
 }

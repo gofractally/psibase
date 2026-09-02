@@ -14,7 +14,7 @@ use Exports::{
     transact::Guest as TransactInterface,
 };
 
-use bindings::accounts::plugin as AccountsPlugin;
+use bindings::accounts::query as AccountsQuery;
 use bindings::tokens::plugin as TokensPlugin;
 use psibase::AccountNumber;
 use psibase_plugin::*;
@@ -57,7 +57,7 @@ impl Admin for VirtualServerPlugin {
     fn init_billing(fee_receiver: String) -> Result<(), Error> {
         assert_caller(&["config"], "init_billing");
 
-        VirtualServer::add_to_tx().init_billing(AccountNumber::from(fee_receiver.as_str()));
+        VirtualServer::add_to_tx().init_billing(fee_receiver.parse().unwrap());
         Ok(())
     }
 
@@ -77,14 +77,15 @@ impl Admin for VirtualServerPlugin {
             block_replay_factor: variables.block_replay_factor,
             per_block_sys_cpu_ns: variables.per_block_sys_cpu_ns,
             obj_storage_bytes: variables.obj_storage_bytes,
+            subj_storage_bytes: variables.subj_storage_bytes,
         });
         Ok(())
     }
 
-    fn enable_billing(enabled: bool) -> Result<(), Error> {
+    fn enable_billing() -> Result<(), Error> {
         assert_caller(&["config"], "enable_billing");
 
-        VirtualServer::add_to_tx().enable_billing(enabled);
+        VirtualServer::add_to_tx().enable_billing();
         Ok(())
     }
 
@@ -122,7 +123,7 @@ fn refill_to_capacity(capacity: Option<u64>, force: bool) -> Result<(), Error> {
     let sys_id = get_sys()?;
 
     // Calculate amount to refill
-    let user = AccountsPlugin::api::get_current_user()
+    let user = AccountsQuery::api::get_current_user()
         .ok_or_else(|| -> Error { ErrorType::NotLoggedIn.into() })?;
     let (balance, current_capacity, auto_fill_threshold) = query::get_user_resources(&user)?;
     let capacity = capacity.unwrap_or(current_capacity);
@@ -214,7 +215,7 @@ impl TransactInterface for VirtualServerPlugin {
     fn auto_fill_gas_tank(account: String) -> Result<(), Error> {
         assert_caller(&["transact"], "auto_fill_gas_tank");
 
-        let user = AccountsPlugin::api::get_current_user();
+        let user = AccountsQuery::api::get_current_user();
         if !query::billing_enabled()? || user.is_none() || user.unwrap() != account {
             return Ok(());
         }
@@ -226,7 +227,7 @@ impl TransactInterface for VirtualServerPlugin {
 impl Authorized for VirtualServerPlugin {
     fn graphql(query: String) -> Result<String, Error> {
         assert_caller(
-            &["homepage", "config", "virtual-server"],
+            &["homepage", "config", &virtual_server::SERVICE.to_string()],
             "authorized::graphql",
         );
 

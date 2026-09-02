@@ -2,8 +2,9 @@ import { Plus } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { useFractal } from "@/hooks/fractals/use-fractal";
+import { useGuilds } from "@/hooks/fractals/use-guilds";
 
+import { EmptyBlock } from "@shared/components/empty-block";
 import { GlowingCard } from "@shared/components/glowing-card";
 import { PageContainer } from "@shared/components/page-container";
 import { TableContact } from "@shared/components/tables/table-contact";
@@ -25,12 +26,9 @@ import { ModalCreateGuild } from "./components/modal-create-guild";
 export const Guilds = () => {
     const [showModal, setShowModal] = useState(false);
 
-    const { data: fractal } = useFractal();
+    const { data: guilds, isPending } = useGuilds();
 
     const navigate = useNavigate();
-    const guildsData = fractal?.guilds.nodes;
-
-    const guilds = guildsData || [];
 
     return (
         <>
@@ -46,55 +44,71 @@ export const Guilds = () => {
                         <span className="hidden lg:inline">New Guild</span>
                     </Button>
                 </div>
-                <GlowingCard>
-                    <CardHeader>
-                        <CardTitle>All Guilds</CardTitle>
-                    </CardHeader>
-                    <CardContent className="@container">
-                        <Table className="select-none">
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="w-48">
-                                        Guild
-                                    </TableHead>
-                                    <TableHead className="w-32 text-end">
-                                        Leadership
-                                    </TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {guilds?.map((guild) => (
-                                    <TableRow
-                                        key={guild.account}
-                                        onClick={() => {
-                                            navigate(`/guild/${guild.account}`);
-                                        }}
-                                    >
-                                        <TableCell className="font-medium">
-                                            <FractalGuildIdentifier
-                                                name={guild.displayName}
-                                                account={guild.account}
-                                                size="sm"
-                                            />
-                                        </TableCell>
-                                        <TableCell className="justify-items-end">
-                                            {guild.rep?.member ? (
-                                                <TableContact
-                                                    account={guild.rep.member}
-                                                />
-                                            ) : (
-                                                "Council"
-                                            )}
-                                        </TableCell>
+                {isPending ? (
+                    <EmptyBlock isLoading title="No guilds" />
+                ) : guilds?.length === 0 ? (
+                    <EmptyBlock
+                        title="No guilds"
+                        description="No guilds have been created in this fractal yet"
+                        buttonLabel="Create the first guild"
+                        onButtonClick={() => setShowModal(true)}
+                    />
+                ) : (
+                    <GlowingCard>
+                        <CardHeader>
+                            <CardTitle>All Guilds</CardTitle>
+                        </CardHeader>
+                        <CardContent className="@container">
+                            <Table className="select-none">
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead className="w-48">
+                                            Guild
+                                        </TableHead>
+                                        <TableHead className="w-32 text-end">
+                                            Leadership
+                                        </TableHead>
                                     </TableRow>
-                                ))}
-                            </TableBody>
-                            <TableCaption>
-                                A list of all guilds in this fractal.
-                            </TableCaption>
-                        </Table>
-                    </CardContent>
-                </GlowingCard>
+                                </TableHeader>
+                                <TableBody>
+                                    {guilds?.map((guild) => (
+                                        <TableRow
+                                            key={guild.account}
+                                            className="cursor-pointer"
+                                            onClick={() => {
+                                                navigate(
+                                                    `/guild/${guild.account}`,
+                                                );
+                                            }}
+                                        >
+                                            <TableCell className="font-medium">
+                                                <FractalGuildIdentifier
+                                                    name={guild.displayName}
+                                                    account={guild.account}
+                                                    size="sm"
+                                                />
+                                            </TableCell>
+                                            <TableCell className="justify-items-end">
+                                                {guild.rep?.member ? (
+                                                    <TableContact
+                                                        account={
+                                                            guild.rep.member
+                                                        }
+                                                    />
+                                                ) : (
+                                                    "Council"
+                                                )}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                                <TableCaption>
+                                    A list of all guilds in this fractal.
+                                </TableCaption>
+                            </Table>
+                        </CardContent>
+                    </GlowingCard>
+                )}
             </PageContainer>
         </>
     );

@@ -1,4 +1,4 @@
-import { AppConfigType } from "@/configured-apps";
+import { defineAppConfig } from "@/app-config";
 import { Inbox, Mail, PencilLine, Send } from "lucide-react";
 
 import { zAccount } from "@shared/lib/schemas/account";
@@ -7,7 +7,7 @@ import DraftsPage from "./drafts-page";
 import InboxPage from "./inbox-page";
 import SentPage from "./sent-page";
 
-export const chainMailConfig: AppConfigType = {
+export const chainMailConfig = defineAppConfig({
     service: zAccount.parse("chainmail"),
     name: "Chain mail",
     description: "Send mail between accounts.",
@@ -47,4 +47,4 @@ export const chainMailConfig: AppConfigType = {
         //     icon: <Archive className="h-6 w-6" />,
         // },
     ],
-};
+});

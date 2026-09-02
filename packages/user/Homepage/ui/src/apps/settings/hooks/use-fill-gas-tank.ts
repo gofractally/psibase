@@ -10,7 +10,7 @@ export const useFillGasTank = () => {
         mutationKey: ["fillGasTank"],
         mutationFn: async () => {
             await supervisor.functionCall({
-                service: "virtual-server",
+                service: "vserver",
                 plugin: "plugin",
                 intf: "billing",
                 method: "fillGasTank",
@@ -34,7 +34,7 @@ export const useResizeAndFillGasTank = () => {
         mutationKey: ["resizeAndFillGasTank"],
         mutationFn: async (newCapacity: string) => {
             await supervisor.functionCall({
-                service: "virtual-server",
+                service: "vserver",
                 plugin: "plugin",
                 intf: "billing",
                 method: "resizeAndFillGasTank",

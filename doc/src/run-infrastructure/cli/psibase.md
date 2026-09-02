@@ -10,7 +10,7 @@ psibase - The psibase blockchain command line client
 `psibase` `create` [`-a` *url*] [`-i` | `-k` *public-key* | `-o` *account*] [`-S` *sender*] *name*  
 `psibase` `deploy` [`-a` *url*] [`-p`] *account* *wasm* *schema*  
 `psibase` `info` [`-a` *url*] *packages*\.\.\.  
-`psibase` `install` [`-a` *url*] [`-k` *public-key*] *packages*\.\.\.  
+`psibase` `install` [`-a` *url*] [`-S` *sender*] *packages*\.\.\.  
 `psibase` `list` [`-a` *url*] [`--all` | `--available` | `--installed` | `--updates`]  
 `psibase` `login` [`-a` *url*] *account*  
 `psibase` `modify` [`-a` *url*] [`-i` | `-k` *public-key* | `-o` *account*] *account*  
@@ -183,19 +183,13 @@ Displays the contents of packages
 
 ### install
 
-`psibase` `install` [`-a` *url*] [`-k` *public-key*] *packages*\.\.\.  
+`psibase` `install` [`-a` *url*] [`-S` *sender*] *packages*\.\.\.  
 
 Install packages to the chain along with all dependencies. If any of the requested packages are already installed, they will be updated if a newer version is available.
 
 - *packages*
 
   Packages to install
-
-- `-k`, `--key` *public-key*
-
-  Set all accounts created by the new packages to authenticate using this key. The public key can be any of the following:
-  - A file containing a PEM or DER encoded public key
-  - A PKCS #11 URI
 
 - `--local`
 
@@ -340,12 +334,6 @@ Upgrade installed packages. This will not upgrade packages to a new major versio
 - *packages*
 
   The names of packages to upgrade. The default is to upgrade all packages that are currently installed.
-
-- `-k`, `--key` *public-key*
-
-  Set all accounts created by new packages to authenticate using this key. The public key can be any of the following:
-  - A file containing a PEM or DER encoded public key
-  - A PKCS #11 URI
 
 - `--latest`
 

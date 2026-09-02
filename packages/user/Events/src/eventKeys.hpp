@@ -14,7 +14,7 @@ namespace UserService
 
    struct EventIndexTable
    {
-      psibase::DbId          db;
+      EventDb                db;
       psibase::AccountNumber service;
       psibase::MethodNumber  event;
    };
@@ -31,7 +31,7 @@ namespace UserService
    struct EventIndexHandle
    {
       explicit EventIndexHandle(psibase::KvMode mode);
-      operator psibase::KvHandle() const { return value; }
+                              operator psibase::KvHandle() const { return value; }
       psibase::UniqueKvHandle value;
    };
 

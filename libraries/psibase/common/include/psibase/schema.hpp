@@ -64,6 +64,19 @@ namespace psibase
       return "unknown";
    }
 
+   struct EventType
+   {
+      psio::schema_types::AnyType type;
+      std::string                 access = "public";
+      PSIO_REFLECT(EventType, type, access)
+   };
+
+   template <auto T>
+   constexpr std::string_view eventAccess(void*, nt_wrap<T>*)
+   {
+      return "private";
+   }
+
    /// Represents the schema for a service
    struct ServiceSchema
    {
@@ -72,8 +85,7 @@ namespace psibase
       using ActionMap =
           std::map<std::string, psio::schema_types::FunctionType, CompareMethodNumber>;
       ActionMap actions;
-      using EventMap = std::map<std::string, psio::schema_types::AnyType, CompareMethodNumber>;
-      EventMap ui;
+      using EventMap = std::map<std::string, EventType, CompareMethodNumber>;
       EventMap history;
       EventMap merkle;
 
@@ -138,29 +150,48 @@ namespace psibase
                 ++i;
              });
       }
+
+      template <typename T, auto... E>
+      static std::span<const std::string_view> makeEventsAccess(T*, psio::MemberList<E...>*)
+      {
+         if constexpr (sizeof...(E) > 0)
+         {
+            static constexpr std::string_view result[] = {
+                eventAccess((T*)nullptr, static_cast<nt_wrap<E>*>(nullptr))...};
+            return result;
+         }
+         else
+         {
+            return {};
+         }
+      }
+
       template <typename T>
       static void makeEvents(psio::SchemaBuilder&                       builder,
                              EventMap&                                  out,
                              std::vector<psio::schema_types::AnyType*>& eventTypes)
       {
          std::size_t i = 0;
-         psio::for_each_member_type((typename psio::reflect<T>::member_functions*)nullptr,
-                                    [&](auto member)
-                                    {
-                                       std::span<const char* const> names =
-                                           psio::reflect<T>::member_function_names[i];
-                                       using m = psio::MemberPtrType<decltype(member)>;
-                                       if constexpr (m::isFunction)
-                                       {
-                                          auto [pos, inserted] = out.try_emplace(
-                                              names[0], makeParams<m>(builder, names.subspan(1)));
-                                          if (inserted)
-                                          {
-                                             eventTypes.push_back(&pos->second);
-                                          }
-                                       }
-                                       ++i;
-                                    });
+         auto        access =
+             makeEventsAccess((T*)nullptr, (typename psio::reflect<T>::member_functions*)nullptr);
+         psio::for_each_member_type(
+             (typename psio::reflect<T>::member_functions*)nullptr,
+             [&](auto member)
+             {
+                std::span<const char* const> names = psio::reflect<T>::member_function_names[i];
+                using m                            = psio::MemberPtrType<decltype(member)>;
+                if constexpr (m::isFunction)
+                {
+                   auto [pos, inserted] = out.try_emplace(
+                       names[0], EventType{.type   = makeParams<m>(builder, names.subspan(1)),
+                                           .access = std::string(access[i])});
+                   if (inserted)
+                   {
+                      eventTypes.push_back(&pos->second.type);
+                   }
+                }
+                ++i;
+             });
       }
 
       template <auto K, auto... M>
@@ -351,10 +382,6 @@ namespace psibase
          std::vector<psio::schema_types::AnyType*> typeRefs;
          psio::SchemaBuilder                       builder;
          makeActions<T>(builder, result.actions, typeRefs);
-         if constexpr (requires { typename T::Events::Ui; })
-         {
-            makeEvents<typename T::Events::Ui>(builder, result.ui, typeRefs);
-         }
          if constexpr (requires { typename T::Events::History; })
          {
             makeEvents<typename T::Events::History>(builder, result.history, typeRefs);
@@ -373,15 +400,13 @@ namespace psibase
       }
 
      private:
-      const EventMap* getDb(psibase::DbId db) const
+      const EventMap* getDb(psibase::EventDb db) const
       {
          switch (db)
          {
-            case psibase::DbId::uiEvent:
-               return &ui;
-            case psibase::DbId::merkleEvent:
+            case psibase::EventDb::merkleEvent:
                return &merkle;
-            case psibase::DbId::historyEvent:
+            case psibase::EventDb::historyEvent:
                return &history;
             default:
                return nullptr;
@@ -389,26 +414,31 @@ namespace psibase
       }
 
      public:
-      const psio::schema_types::AnyType* getType(psibase::DbId db, MethodNumber event)
+      const psio::schema_types::AnyType* getType(bool             canReadPrivate,
+                                                 psibase::EventDb db,
+                                                 MethodNumber     event)
       {
          if (const auto* dbTypes = getDb(db))
-            if (auto pos = dbTypes->find(event); pos != dbTypes->end())
-               return pos->second.resolve(types);
+            if (auto pos = dbTypes->find(event);
+                pos != dbTypes->end() && (canReadPrivate || pos->second.access == "public"))
+               return pos->second.type.resolve(types);
          return nullptr;
       }
       std::vector<const psio::schema_types::AnyType*> eventTypes() const
       {
          std::vector<const psio::schema_types::AnyType*> result;
-         for (const auto* m : {&ui, &history, &merkle})
+         for (const auto* m : {&history, &merkle})
          {
             for (const auto& [_, type] : *m)
             {
-               result.push_back(&type);
+               result.push_back(&type.type);
             }
          }
          return result;
       }
-      PSIO_REFLECT(ServiceSchema, service, types, actions, ui, history, merkle, database)
+      // checks that all names and indexes are valid
+      void checkValid() const;
+      PSIO_REFLECT(ServiceSchema, service, types, actions, history, merkle, database)
    };
 
    psio::schema_types::CustomTypes psibase_types();

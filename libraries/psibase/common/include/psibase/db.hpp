@@ -45,85 +45,19 @@ namespace psibase
       /// Transactions don't have access to this, but RPC does.
       blockLog,
 
-      /// Long-term history event storage
-      ///
-      /// Write-only during transactions, and read-only during RPC.
-      /// Individual nodes may modify this database, expire data from this
-      /// database, or wipe it entirely at will.
-      ///
-      /// TODO: this policy may eventually change to allow time-limited
-      /// read access during transactions.
-      ///
-      /// Key is an auto-incremented, 64-bit unsigned number.
-      ///
-      /// Value must begin with:
-      /// * 32 bit: block number
-      /// * 64 bit: service
-      ///
-      /// Only usable with these native functions:
-      /// * [putSequential]
-      /// * [getSequential]
-      ///
-      /// TODO: right now the value must begin with the service. Revisit
-      /// whether beginning with the block number is useful.
-      historyEvent,
-
-      /// Short-term history event storage
-      ///
-      /// These events are erased once the block that produced them becomes final.
-      /// They notify user interfaces which subscribe to activity.
-      ///
-      /// Write-only during transactions, and read-only during RPC.
-      /// Individual nodes may modify this database, expire data from this
-      /// database, or wipe it entirely at will.
-      ///
-      /// Key is an auto-incremented, 64-bit unsigned number.
-      ///
-      /// Value must begin with:
-      /// * 32 bit: block number
-      /// * 64 bit: service
-      ///
-      /// Only usable with these native functions:
-      /// * [putSequential]
-      /// * [getSequential]
-      ///
-      /// TODO: right now the value must begin with the service. Revisit
-      /// whether beginning with the block number is useful.
-      /// TODO: consider removing UI events
-      uiEvent,
-
-      /// Events which go into the merkle tree
-      ///
-      /// TODO: read support; right now only RPC mode can read
-      ///
-      /// Services may produce these events during transactions and may read them
-      /// up to 1 hour (configurable) after they were produced, or they reach finality,
-      /// which ever is longer.
-      ///
-      /// Key is an auto-incremented, 64-bit unsigned number.
-      ///
-      /// Value must begin with:
-      /// * 32 bit: block number
-      /// * 64 bit: service
-      ///
-      /// Only usable with these native functions:
-      /// * [putSequential]
-      /// * [getSequential]
-      ///
-      /// TODO: right now the value must begin with the service. Revisit
-      /// whether beginning with the block number is useful.
-      merkleEvent,
-
       /// block signatures
       blockProof,
 
+      /// [[doc(hidden)]]
       /// Not accessible to WASM. During joint consensus, this holds a
       /// subset of native as of the last irreversible block. Outside
       /// joint consensus, it is empty.
       prevAuthServices,
 
+      /// [[doc(hidden)]]
       numChainDatabases,
 
+      /// [[doc(hidden)]]
       beginIndependent = 64,
 
       /// Data that is not part of consensus
@@ -145,6 +79,7 @@ namespace psibase
       /// blocks.
       nativeSubjective,
 
+      /// [[doc(hidden)]]
       endPersistent,
 
       /// Data that is not part of consensus and is not preserved when the server exits
@@ -153,10 +88,11 @@ namespace psibase
       /// Native subjective tables that are not preserved when the server exits
       nativeSession,
 
+      /// [[doc(hidden)]]
       endIndependent,
 
       /// Subjective tables that are local to the transaction/query/callback
-      /// context.
+      /// context
       temporary = endIndependent,
    };
 
@@ -204,5 +140,11 @@ namespace psibase
       KvResourcePair() = default;
       KvResourcePair(KvResourceKey first, KvResourceDelta second) : first{first}, second{second} {}
       PSIO_REFLECT(KvResourcePair, definitionWillNotChange(), first, second)
+   };
+
+   enum class EventDb : std::uint8_t
+   {
+      historyEvent,
+      merkleEvent,
    };
 }  // namespace psibase

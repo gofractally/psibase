@@ -128,6 +128,10 @@ struct InstallCommand {
     /// Reinstall the package
     #[clap(short = 'r', long)]
     reinstall: bool,
+
+    /// Automatically accept install confirmation
+    #[clap(short = 'y', long)]
+    yes: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -650,7 +654,7 @@ fn write_service_crate(root: &Path) -> Result<PathBuf, Error> {
     write!(
         &mut File::create(&manifest)?,
         "{}",
-        include_str!("service/Cargo.toml")
+        include_str!("service/Cargo.toml.in")
     )?;
     std::fs::create_dir(root.join("src"))?;
     write!(
@@ -1146,6 +1150,10 @@ async fn install(
 
     if opts.reinstall {
         command.args(["--reinstall"]);
+    }
+
+    if opts.yes {
+        command.args(["--yes"]);
     }
 
     if let Some(compression_level) = opts.compression_level {

@@ -2,8 +2,6 @@ import { Scale } from "lucide-react";
 import { useState } from "react";
 
 import { GuildOverviewCard } from "@/components/guild-overview-card";
-import { SetMinScorersModal } from "@/components/modals/set-min-scorers-modal";
-import { SetRankedGuildSlots } from "@/components/modals/set-ranked-guild-slots-modal";
 import { SetRankedGuilds } from "@/components/modals/set-ranked-guilds-modal";
 
 import { useFractal } from "@/hooks/fractals/use-fractal";
@@ -28,27 +26,32 @@ import {
     ItemDescription,
     ItemTitle,
 } from "@shared/shadcn/ui/item";
+import { InitTokenModal } from "@/components/modals/init-token-modal";
+import { useRoleGuild } from "@/hooks/use-role-guild";
 
 export const Legislative = () => {
     const { data: fractal, error: fractalError } = useFractal();
 
-    const awaitingConsensusReward = !fractal?.fractal?.consensusReward;
+    const awaitingConsensusReward = !fractal?.fractal?.stream;
 
-    const focusedGuild = fractal?.fractal?.legislature.account;
-    const { data, error: guildError } = useGuild(focusedGuild);
+    const roleId = fractal?.fractal?.legislature.roleId;
+    const { data: role, error: roleError } = useRoleGuild(roleId);
 
-    const [showMinScorersModal, setShowMinScorers] = useState(false);
-    const [showRankedGuildsModal, setShowRankedGuildsModal] = useState(false);
+    const { data: guild, error: guildError } = useGuild(role?.guild);
+
     const [showRankGuildsModal, setShowRankGuildsModal] = useState(false);
+    const [showTokenModal, setShowTokenModal] = useState(false);
 
-    const error = fractalError || guildError;
+    const error = fractalError || guildError || roleError;
 
     const { data: currentUser } = useCurrentUser();
 
     const isAdministrativeUser =
-        currentUser == data?.rep?.member ||
+        currentUser == guild?.rep?.member ||
         (typeof currentUser == "string" &&
-            data?.council?.includes(currentUser));
+            guild?.council?.includes(currentUser));
+
+
 
     if (error) {
         return <ErrorCard error={error} />;
@@ -56,17 +59,15 @@ export const Legislative = () => {
 
     return (
         <PageContainer className="space-y-6">
-            <SetMinScorersModal
-                openChange={setShowMinScorers}
-                show={showMinScorersModal}
-            />
-            <SetRankedGuildSlots
-                openChange={setShowRankedGuildsModal}
-                show={showRankedGuildsModal}
-            />
+
+
             <SetRankedGuilds
                 openChange={setShowRankGuildsModal}
                 show={showRankGuildsModal}
+            />
+            <InitTokenModal
+                openChange={setShowTokenModal}
+                show={showTokenModal}
             />
 
             <GlowingCard>
@@ -94,14 +95,14 @@ export const Legislative = () => {
                     <p className="text-muted-foreground text-sm">
                         The{" "}
                         <span className="text-primary font-medium">
-                            {data?.account}
+                            {guild?.account}
                         </span>{" "}
                         guild is selected to act as the legislature led by{" "}
-                        {data?.rep ? (
+                        {guild?.rep ? (
                             <>
                                 its representative{" "}
                                 <span className="text-primary font-medium">
-                                    {data.rep.member}
+                                    {guild.rep.member}
                                 </span>
                                 .
                             </>
@@ -112,7 +113,7 @@ export const Legislative = () => {
                 </CardFooter>
             </GlowingCard>
 
-            <GuildOverviewCard guildAccount={data?.account} />
+            <GuildOverviewCard guildAccount={guild?.account} />
 
             {isAdministrativeUser && (
                 <GlowingCard>
@@ -123,20 +124,18 @@ export const Legislative = () => {
                         {awaitingConsensusReward && (
                             <Item variant="muted">
                                 <ItemContent>
-                                    <ItemTitle>Set minimum scorers</ItemTitle>
+                                    <ItemTitle>Init token</ItemTitle>
                                     <ItemDescription>
-                                        Set the minimum amount of users in an
-                                        evaluation required to initialise the
-                                        Fractal token and consensus rewards.
+                                        Mint the tokens supply and send to the fractal stream.
                                     </ItemDescription>
                                 </ItemContent>
                                 <ItemActions>
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        onClick={() => setShowMinScorers(true)}
+                                        onClick={() => setShowTokenModal(true)}
                                     >
-                                        Set minimum scorers
+                                        Initialise token
                                     </Button>
                                 </ItemActions>
                             </Item>
@@ -156,7 +155,7 @@ export const Legislative = () => {
                                             variant="outline"
                                             size="sm"
                                             onClick={() =>
-                                                setShowMinScorers(true)
+                                                setShowRankGuildsModal(true)
                                             }
                                         >
                                             Rank guilds
@@ -164,28 +163,7 @@ export const Legislative = () => {
                                     </ItemActions>
                                 </Item>
 
-                                <Item variant="muted">
-                                    <ItemContent>
-                                        <ItemTitle>
-                                            Set ranked guild slots
-                                        </ItemTitle>
-                                        <ItemDescription>
-                                            Adjust how many guilds to pay
-                                            consensus rewards.
-                                        </ItemDescription>
-                                    </ItemContent>
-                                    <ItemActions>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() =>
-                                                setShowMinScorers(true)
-                                            }
-                                        >
-                                            Set ranked guild slots
-                                        </Button>
-                                    </ItemActions>
-                                </Item>
+
                             </>
                         )}
                     </CardContent>

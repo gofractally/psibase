@@ -5,7 +5,6 @@ use bindings::exports::faucet_tok::plugin::faucet::Guest as Faucet;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 use faucet_tok::action_structs as Actions;
 use psibase::fracpack::Pack;
-use psibase::AccountNumber;
 
 struct FaucetPlugin;
 
@@ -14,7 +13,7 @@ impl Faucet for FaucetPlugin {
         add_action_to_transaction(
             Actions::dispense::ACTION_NAME,
             &Actions::dispense {
-                account: AccountNumber::from(account.as_str()),
+                account: account.parse().unwrap(),
             }
             .packed(),
         )

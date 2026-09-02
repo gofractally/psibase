@@ -21,13 +21,13 @@ pub mod service {
         if InitRow::get().is_none() {
             InitRow::init();
 
-            Tokens::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
-            Nft::call().setUserConf(NftHolderFlags::MANUAL_DEBIT.index(), true);
+            Tokens::call().setUserConf(BalanceFlags::AUTO_DEBIT.index(), false);
+            Nft::call().setUserConf(NftHolderFlags::AUTO_DEBIT.index(), false);
         };
         let add_index = |method: &str, columns: Vec<u8>| {
             for column in columns {
                 events::Wrapper::call().addIndex(
-                    DbId::HistoryEvent,
+                    EventDb::HistoryEvent,
                     Wrapper::SERVICE,
                     MethodNumber::from(method),
                     column,
@@ -42,7 +42,7 @@ pub mod service {
 
     #[pre_action(exclude(init))]
     fn check_init() {
-        check_some(InitRow::get(), "service not initialized");
+        InitRow::get().expect("service not initialized");
     }
 
     /// Creates a new pool.
@@ -161,9 +161,9 @@ pub mod service {
     /// * `min_return`  - Minimum acceptable output amount (reverts if result is lower)
     #[action]
     fn swap(pools: Vec<TID>, token_in: TID, amount_in: Quantity, min_return: Quantity) {
-        check(pools.len() > 0, "pools length must be at least 1");
-        check(amount_in.value > 0, "amount in must be non-zero");
-        check(min_return.value > 0, "min return must be non-zero");
+        assert!(pools.len() > 0, "pools length must be at least 1");
+        assert!(amount_in.value > 0, "amount in must be non-zero");
+        assert!(min_return.value > 0, "min return must be non-zero");
 
         let sender = get_sender();
         let tokens_service = psibase::services::tokens::Wrapper::call();
@@ -187,7 +187,7 @@ pub mod service {
             current_amount = amount_out;
         }
 
-        check(current_amount >= min_return, "does not meet minimum return");
+        assert!(current_amount >= min_return, "does not meet minimum return");
         tokens_service.credit(
             current_token,
             sender,

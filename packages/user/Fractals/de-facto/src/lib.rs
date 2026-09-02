@@ -1,0 +1,61 @@
+#[psibase::service(name = "fractals+2")]
+pub mod service {
+    use psibase::{
+        services::{
+            auth_dyn::{self, policy::DynamicAuthPolicy},
+            fractals::constants::PPM,
+        },
+        *,
+    };
+
+    #[action]
+    fn get_scores(fractal: AccountNumber) -> Vec<(AccountNumber, u32)> {
+        let members: Vec<_> = ::fractals::tables::tables::FractalMemberTable::read()
+            .get_index_pk()
+            .range((fractal, AccountNumber::MIN)..=(fractal, AccountNumber::MAX))
+            .collect();
+
+        if members.is_empty() {
+            return vec![];
+        }
+
+        let share = PPM / members.len() as u32;
+        members
+            .into_iter()
+            .map(|member| (member.account, share))
+            .collect()
+    }
+
+    #[action]
+    fn is_active(fractal: AccountNumber, member: AccountNumber) -> bool {
+        ::fractals::tables::tables::FractalMemberTable::read()
+            .get_index_pk()
+            .get(&(fractal, member))
+            .is_some()
+    }
+
+    #[action]
+    fn is_role_ok(fractal: AccountNumber, _role_id: u8) -> bool {
+        ::fractals::tables::tables::FractalTable::read()
+            .get_index_pk()
+            .get(&fractal)
+            .is_some()
+    }
+
+    fn two_thirds_plus_one(count: usize) -> u8 {
+        u8::try_from((count * 2 + 3) / 3).unwrap()
+    }
+
+    #[action]
+    fn role_policy(fractal: AccountNumber, _role_id: u8) -> auth_dyn::policy::DynamicAuthPolicy {
+        let accounts: Vec<(AccountNumber, u8)> =
+            ::fractals::tables::tables::FractalMemberTable::read()
+                .get_index_pk()
+                .range((fractal, AccountNumber::new(0))..=(fractal, AccountNumber::new(u64::MAX)))
+                .map(|account| (account.account, 1))
+                .collect();
+
+        let threshold = two_thirds_plus_one(accounts.len());
+        DynamicAuthPolicy::from_weighted_authorizers(accounts, threshold)
+    }
+}

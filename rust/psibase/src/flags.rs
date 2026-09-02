@@ -1,5 +1,3 @@
-use crate::check;
-
 pub trait FlagsType {
     type BitsetType: Copy
         + std::ops::BitOr<Output = Self::BitsetType>
@@ -38,9 +36,9 @@ impl<F: FlagsType> Flags<F> {
     }
 
     fn validate_index(index: u8) {
-        check(
+        assert!(
             index < std::mem::size_of::<F::BitsetType>() as u8 * 8,
-            format!("invalid index of {}", index).as_str(),
+            "invalid index of {index}"
         );
     }
 
