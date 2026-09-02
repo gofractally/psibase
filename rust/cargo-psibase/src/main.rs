@@ -27,7 +27,7 @@ use walrus::{ExportItem, Module};
 use wasm_opt::OptimizationOptions;
 
 mod link;
-use link::link_module;
+use link::{bind_env, link_module};
 mod package;
 use package::*;
 
@@ -327,6 +327,7 @@ fn process(
         let polyfill_source_module = config.parse(polyfill)?;
         link_module(&polyfill_source_module, &mut dest_module)?;
     }
+    bind_env(&mut dest_module)?;
 
     strip(&mut dest_module, exports)?;
 

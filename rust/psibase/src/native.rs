@@ -143,6 +143,7 @@ pub struct KvHandle(native_raw::KvHandle);
 pub use native_raw::KvMode;
 
 // The tester needs a different implementation from services
+#[link(wasm_import_module = "env")]
 extern "C" {
     pub fn psibase_proxy_kv_open(
         db: DbId,
