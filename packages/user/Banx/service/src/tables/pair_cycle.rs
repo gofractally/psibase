@@ -66,26 +66,27 @@ impl PairCycle {
             .unwrap_or(false)
     }
 
-    /// Open a cycle on 0→positive (if posted grace > 0); close when
-    /// principal returns to 0. No-op when there is no row.
+    /// Open a cycle when the pair goes empty → occupied (if posted grace > 0);
+    /// close when it is empty again. Occupied = any principal or stored
+    /// interest. No-op when there is no row.
     pub fn sync_cycle(
         creditor: AccountNumber,
         debtor: AccountNumber,
         asset_id: u16,
-        before_principal: u64,
-        after_principal: u64,
+        before_clear: bool,
+        after_clear: bool,
     ) {
         let Some(mut c) = Self::get(creditor, debtor, asset_id) else {
             return;
         };
-        if before_principal == 0 && after_principal > 0 && c.cycle_started_at.seconds == 0 {
+        if before_clear && !after_clear && c.cycle_started_at.seconds == 0 {
             if c.grace_seconds == 0 {
                 return;
             }
             c.cycle_started_at = Obligation::now();
             c.cycle_grace_seconds = c.grace_seconds;
             c.save();
-        } else if after_principal == 0 && c.cycle_started_at.seconds != 0 {
+        } else if after_clear && c.cycle_started_at.seconds != 0 {
             c.cycle_started_at = TimePointSec { seconds: 0 };
             c.cycle_grace_seconds = 0;
             if c.grace_seconds == 0 {
@@ -108,12 +109,12 @@ impl PairCycle {
         debtor: AccountNumber,
         asset_id: u16,
         src: Option<&Self>,
-        dest_before_principal: u64,
+        dest_occupied: bool,
         now: TimePointSec,
     ) {
         let src_in_grace = src.map(|c| c.in_grace_at(now)).unwrap_or(false);
 
-        if dest_before_principal > 0 {
+        if dest_occupied {
             if !src_in_grace {
                 return;
             }

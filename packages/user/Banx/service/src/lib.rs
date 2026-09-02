@@ -544,7 +544,8 @@ pub mod service {
     /// [`Obligation::apply_reduction`]). Debtor does not sign.
     ///
     /// Capped at live exposure. Same waterfall as net. Partial does **not**
-    /// reset an open grace cycle; reducing principal to 0 closes it.
+    /// reset an open grace cycle; emptying the pair (principal and interest)
+    /// closes it.
     #[action]
     fn forgive(debtor: AccountNumber, asset_id: u16, amount: Quantity) {
         let creditor = get_sender();

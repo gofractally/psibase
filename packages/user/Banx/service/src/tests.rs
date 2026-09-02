@@ -2932,6 +2932,111 @@ mod tests {
             "debtor exposure must include transferred interest"
         );
 
+        Wrapper::push_from(&chain, peter)
+            .forgive(bob, usd, Quantity::new(1))
+            .get()?;
+        let dest = Obligation::get_by_interest_rate(peter, bob, usd, RATE).expect("dest claim");
+        assert_eq!(dest.accrued_interest.value, src_interest - 1);
+        let cycle = PairCycle::get(peter, bob, usd).expect("dest cycle");
+        assert!(
+            cycle.cycle_started_at.seconds != 0,
+            "forgiving transferred interest must not close dest grace"
+        );
+        assert_eq!(cycle.cycle_grace_seconds, WEEK_SECS);
+
+        Ok(())
+    }
+
+    /// Interest-only sale onto an empty dest must not start the buyer's posted
+    /// grace. A later draw on that dest must not open it either.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_sell_interest_only_does_not_open_dest_grace(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        let peter = account!("peter");
+        for a in [alice, bob, peter] {
+            chain.new_account(a).unwrap();
+        }
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        const RATE: u32 = 100_000;
+        const SRC_PRINCIPAL: u64 = 1_000_000;
+
+        Wrapper::push_from(&chain, alice)
+            .st_crd_lne(
+                bob,
+                usd,
+                Quantity::new(10_000_000),
+                false,
+                RATE,
+                WEEK_SECS,
+            )
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .path_pay(
+                vec![hop(alice, usd)],
+                Quantity::new(SRC_PRINCIPAL),
+                Quantity::new(SRC_PRINCIPAL),
+                0,
+            )
+            .get()?;
+
+        chain.start_block_after(Seconds::new(i64::from(WEEK_SECS) + 86_400).into());
+        let src_face = exp(&chain, alice, bob, usd);
+        let src_interest = src_face - SRC_PRINCIPAL;
+        assert!(src_interest > 0, "source already past grace");
+
+        Wrapper::push_from(&chain, peter)
+            .st_crd_lne(
+                bob,
+                usd,
+                Quantity::new(10_000_000),
+                false,
+                RATE,
+                WEEK_SECS,
+            )
+            .get()?;
+        Wrapper::push_from(&chain, peter)
+            .st_glb_buy(usd, Quantity::new(0), 0, never())
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(peter, usd, Quantity::new(0), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .sell_claim(peter, bob, usd, Quantity::new(src_interest))
+            .get()?;
+
+        let dest = Obligation::get_by_interest_rate(peter, bob, usd, RATE).expect("dest claim");
+        assert_eq!(dest.remaining_principal.value, 0);
+        assert_eq!(dest.accrued_interest.value, src_interest);
+        let cycle = PairCycle::get(peter, bob, usd).expect("posted grace row");
+        assert_eq!(
+            cycle.cycle_started_at.seconds, 0,
+            "interest-only aged sale must not open dest posted grace"
+        );
+
+        Wrapper::push_from(&chain, bob)
+            .path_pay(
+                vec![hop(peter, usd)],
+                Quantity::new(500_000),
+                Quantity::new(500_000),
+                0,
+            )
+            .get()?;
+        let cycle = PairCycle::get(peter, bob, usd).expect("posted grace row");
+        assert_eq!(
+            cycle.cycle_started_at.seconds, 0,
+            "draw onto interest-only dest must not open posted grace"
+        );
+
+        let face = exp(&chain, peter, bob, usd);
+        chain.start_block_after(Seconds::new(86_400).into());
+        assert!(
+            exp(&chain, peter, bob, usd) > face,
+            "dest must compound; posted grace must not have started"
+        );
         Ok(())
     }
 
@@ -3695,6 +3800,40 @@ mod tests {
             CreditLine::get_assert(bob, alice, usd).remaining.value,
             40,
             "test_want_deplete_edit_does_not_refill_remaining: raising the limit refilled remaining"
+        );
+        Ok(())
+    }
+
+    /// Toggle deplete off then on must not restore spent remaining.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_deplete_toggle_does_not_refill_remaining(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, usd, Quantity::new(100), true, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .path_pay(vec![hop(bob, usd)], Quantity::new(60), Quantity::new(60), 0)
+            .get()?;
+        assert_eq!(CreditLine::get_assert(bob, alice, usd).remaining.value, 40);
+
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, usd, Quantity::new(100), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, usd, Quantity::new(100), true, 0, 0)
+            .get()?;
+        assert_eq!(
+            CreditLine::get_assert(bob, alice, usd).remaining.value,
+            40,
+            "toggling deplete off then on refilled remaining to the limit"
         );
         Ok(())
     }

@@ -151,15 +151,10 @@ impl Obligation {
         }
     }
 
-    pub fn directed_principal(
-        creditor: AccountNumber,
-        debtor: AccountNumber,
-        asset_id: u16,
-    ) -> u64 {
+    fn pair_clear(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) -> bool {
         Self::obligations(creditor, debtor, asset_id)
-            .into_iter()
-            .map(|o| o.remaining_principal.value)
-            .sum()
+            .iter()
+            .all(|o| o.is_clear())
     }
 
     /// Accrue every obligation on this directed pair/asset.
@@ -192,7 +187,7 @@ impl Obligation {
         if amount == 0 {
             return;
         }
-        let before = Self::directed_principal(creditor, debtor, asset_id);
+        let before_clear = Self::pair_clear(creditor, debtor, asset_id);
         let mut obs = Self::obligations(creditor, debtor, asset_id);
         if obs.is_empty() {
             return;
@@ -204,8 +199,8 @@ impl Obligation {
         for o in &obs {
             o.persist_or_delete();
         }
-        let after = Self::directed_principal(creditor, debtor, asset_id);
-        PairCycle::sync_cycle(creditor, debtor, asset_id, before, after);
+        let after_clear = Self::pair_clear(creditor, debtor, asset_id);
+        PairCycle::sync_cycle(creditor, debtor, asset_id, before_clear, after_clear);
     }
 
     /// Interest first (globally, highest-rate order), then principal.
@@ -247,8 +242,8 @@ impl Obligation {
         Self::accrue_pair(from_creditor, debtor, asset_id);
         let now = Self::now();
         let src_cycle = PairCycle::get(from_creditor, debtor, asset_id);
-        let dest_before = Self::directed_principal(to_creditor, debtor, asset_id);
-        let before_from = Self::directed_principal(from_creditor, debtor, asset_id);
+        let dest_occupied = !Self::pair_clear(to_creditor, debtor, asset_id);
+        let before_from_clear = Self::pair_clear(from_creditor, debtor, asset_id);
         let available = Self::exposure(from_creditor, debtor, asset_id).value;
         assert!(
             available >= amount,
@@ -258,6 +253,7 @@ impl Obligation {
         let mut obs = Self::obligations(from_creditor, debtor, asset_id);
         Self::sort_for_net(&mut obs);
         let mut left = amount;
+        let mut dest_delta: Vec<(u32, u64, u64)> = Vec::new();
 
         for o in obs.iter_mut() {
             if left == 0 {
@@ -266,16 +262,7 @@ impl Obligation {
             let take_i = left.min(o.accrued_interest.value);
             if take_i > 0 {
                 o.accrued_interest = (o.accrued_interest.value - take_i).into();
-                let mut dest =
-                    Self::get_existing_or_new(to_creditor, debtor, asset_id, o.interest_rate);
-                dest.accrue();
-                dest.accrued_interest = dest
-                    .accrued_interest
-                    .value
-                    .checked_add(take_i)
-                    .expect("accrued overflow")
-                    .into();
-                dest.save();
+                Self::add_rate_delta(&mut dest_delta, o.interest_rate, take_i, 0);
                 left -= take_i;
             }
         }
@@ -286,30 +273,77 @@ impl Obligation {
             let take_p = left.min(o.remaining_principal.value);
             if take_p > 0 {
                 o.remaining_principal = (o.remaining_principal.value - take_p).into();
-                Self::credit_pair(
-                    to_creditor,
-                    debtor,
-                    asset_id,
-                    Quantity::new(take_p),
-                    o.interest_rate,
-                );
+                Self::add_rate_delta(&mut dest_delta, o.interest_rate, 0, take_p);
                 left -= take_p;
             }
         }
         assert!(left == 0, "transfer claims underflow");
+        for &(rate, interest, principal) in &dest_delta {
+            Self::apply_claim_delta(to_creditor, debtor, asset_id, rate, interest, principal);
+        }
         for o in &obs {
             o.persist_or_delete();
         }
-        let after_from = Self::directed_principal(from_creditor, debtor, asset_id);
-        PairCycle::sync_cycle(from_creditor, debtor, asset_id, before_from, after_from);
+        let after_from_clear = Self::pair_clear(from_creditor, debtor, asset_id);
+        PairCycle::sync_cycle(
+            from_creditor,
+            debtor,
+            asset_id,
+            before_from_clear,
+            after_from_clear,
+        );
         PairCycle::inherit_on_transfer(
             to_creditor,
             debtor,
             asset_id,
             src_cycle.as_ref(),
-            dest_before,
+            dest_occupied,
             now,
         );
+    }
+
+    fn add_rate_delta(deltas: &mut Vec<(u32, u64, u64)>, rate: u32, interest: u64, principal: u64) {
+        if interest == 0 && principal == 0 {
+            return;
+        }
+        if let Some((_, i, p)) = deltas.iter_mut().find(|(r, _, _)| *r == rate) {
+            *i = i.checked_add(interest).expect("accrued overflow");
+            *p = p
+                .checked_add(principal)
+                .expect("obligation principal overflow");
+        } else {
+            deltas.push((rate, interest, principal));
+        }
+    }
+
+    /// Add transferred interest and principal. Does not open a dest cycle.
+    fn apply_claim_delta(
+        creditor: AccountNumber,
+        debtor: AccountNumber,
+        asset_id: u16,
+        rate: u32,
+        interest: u64,
+        principal: u64,
+    ) {
+        let mut dest = Self::get_existing_or_new(creditor, debtor, asset_id, rate);
+        dest.accrue();
+        if interest > 0 {
+            dest.accrued_interest = dest
+                .accrued_interest
+                .value
+                .checked_add(interest)
+                .expect("accrued overflow")
+                .into();
+        }
+        if principal > 0 {
+            dest.remaining_principal = dest
+                .remaining_principal
+                .value
+                .checked_add(principal)
+                .expect("obligation principal overflow")
+                .into();
+        }
+        dest.save();
     }
 
     /// Net mutual obligations between `a` and `b` for `asset_id`.
@@ -348,7 +382,7 @@ impl Obligation {
     /// `min(amount, exposure)`. Does not touch the reverse direction.
     ///
     /// Same waterfall as net (interest, then principal, highest APR).
-    /// Partial leaves an open grace snapshot; principal → 0 closes the cycle
+    /// Partial leaves an open grace snapshot; pair empty closes the cycle
     /// via [`apply_reduction`] → [`PairCycle::sync_cycle`].
     pub fn forgive_pair(
         creditor: AccountNumber,
@@ -371,8 +405,8 @@ impl Obligation {
     /// Grow principal on this claim (shared by deposit and line draws).
     /// Accrues first so interest is finalized on the prior principal balance.
     fn credit(&mut self, amount: Quantity) {
-        let before = Self::directed_principal(self.creditor, self.debtor, self.asset_id);
         self.accrue();
+        let before_clear = Self::pair_clear(self.creditor, self.debtor, self.asset_id);
         self.remaining_principal = self
             .remaining_principal
             .value
@@ -380,8 +414,14 @@ impl Obligation {
             .expect("obligation principal overflow")
             .into();
         self.save();
-        let after = Self::directed_principal(self.creditor, self.debtor, self.asset_id);
-        PairCycle::sync_cycle(self.creditor, self.debtor, self.asset_id, before, after);
+        let after_clear = Self::pair_clear(self.creditor, self.debtor, self.asset_id);
+        PairCycle::sync_cycle(
+            self.creditor,
+            self.debtor,
+            self.asset_id,
+            before_clear,
+            after_clear,
+        );
     }
 
     /// Credit the (creditor, debtor, rate) bucket, creating it if needed.

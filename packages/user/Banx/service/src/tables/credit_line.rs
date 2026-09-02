@@ -76,11 +76,9 @@ impl CreditLine {
             line.limit = amount;
             line.deplete_on_debit = deplete_on_debit;
             line.interest_rate = interest_rate;
-            if !deplete_on_debit {
-                line.remaining = 0.into();
-            } else if !was_depleting {
+            if line.remaining.value > amount.value {
                 line.remaining = amount;
-            } else if line.remaining.value > amount.value {
+            } else if deplete_on_debit && !was_depleting && line.remaining.value == 0 {
                 line.remaining = amount;
             }
             line.save();

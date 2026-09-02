@@ -246,7 +246,7 @@ pub mod tables {
 
     /// Posted grace + open-cycle snapshot for a directed pair/asset.
     ///
-    /// Creditor writes `grace_seconds` via `st_crd_lne`. Principal-changing
+    /// Creditor writes `grace_seconds` via `st_crd_lne`. Occupied-changing
     /// actions write the cycle clock via [`PairCycle::sync_cycle`]. Same key as
     /// [`CreditLine`]; separate row so a line upsert cannot clobber the clock.
     #[table(name = "PairCycleTab", index = 7)]
