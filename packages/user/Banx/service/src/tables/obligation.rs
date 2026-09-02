@@ -107,7 +107,9 @@ impl Obligation {
 
     pub fn live_accrued_at(&self, now: TimePointSec) -> Quantity {
         if PairCycle::pair_in_grace(self.creditor, self.debtor, self.asset_id, now) {
-            return Quantity::new(0);
+            // No new compounding. Keep finalized interest already on the row
+            // (e.g. transferred from an aged claim).
+            return self.accrued_interest;
         }
         let base = self
             .remaining_principal
@@ -124,17 +126,17 @@ impl Obligation {
 
     /// Write live interest and start a new epoch. Only for principal/rate
     /// changes — not for a lone accrue, so 5s vs 5y stays identical.
-    /// During grace, interest stays 0 and the epoch moves to now so
+    /// During grace, skip new compounding and move the epoch to now so
     /// post-grace compound runs from this principal change, not origination.
+    /// Keep already-finalized interest (transferred aged claims).
     pub fn accrue(&mut self) {
         let now = Self::now();
         if PairCycle::pair_in_grace(self.creditor, self.debtor, self.asset_id, now) {
-            let dirty = self.accrued_interest.value != 0
-                || now.seconds != self.last_interest_accrual.seconds;
-            self.accrued_interest = Quantity::new(0);
-            self.last_interest_accrual = now;
-            if dirty && !self.is_clear() {
-                self.save();
+            if now.seconds != self.last_interest_accrual.seconds {
+                self.last_interest_accrual = now;
+                if !self.is_clear() {
+                    self.save();
+                }
             }
             return;
         }

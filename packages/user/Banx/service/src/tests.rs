@@ -2836,6 +2836,105 @@ mod tests {
         Ok(())
     }
 
+    /// Aged-claim sale onto a buyer who already holds an in-grace claim on
+    /// the same debtor must keep transferred finalized interest. Dest grace
+    /// suppresses new compounding; it must not erase the source's interest.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_sell_claim_keeps_interest_on_in_grace_dest(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        let peter = account!("peter");
+        for a in [alice, bob, peter] {
+            chain.new_account(a).unwrap();
+        }
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        const RATE: u32 = 100_000;
+        const SRC_PRINCIPAL: u64 = 1_000_000;
+        const DEST_PRINCIPAL: u64 = 500_000;
+
+        Wrapper::push_from(&chain, alice)
+            .st_crd_lne(
+                bob,
+                usd,
+                Quantity::new(10_000_000),
+                false,
+                RATE,
+                WEEK_SECS,
+            )
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .path_pay(
+                vec![hop(alice, usd)],
+                Quantity::new(SRC_PRINCIPAL),
+                Quantity::new(SRC_PRINCIPAL),
+                0,
+            )
+            .get()?;
+
+        chain.start_block_after(Seconds::new(i64::from(WEEK_SECS) + 86_400).into());
+        let src_face = exp(&chain, alice, bob, usd);
+        assert!(src_face > SRC_PRINCIPAL, "source already past grace");
+        let src_interest = src_face - SRC_PRINCIPAL;
+
+        Wrapper::push_from(&chain, peter)
+            .st_crd_lne(
+                bob,
+                usd,
+                Quantity::new(10_000_000),
+                false,
+                RATE,
+                WEEK_SECS,
+            )
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .path_pay(
+                vec![hop(peter, usd)],
+                Quantity::new(DEST_PRINCIPAL),
+                Quantity::new(DEST_PRINCIPAL),
+                0,
+            )
+            .get()?;
+        let dest_before = exp(&chain, peter, bob, usd);
+        assert_eq!(dest_before, DEST_PRINCIPAL, "dest still in grace");
+
+        Wrapper::push_from(&chain, peter)
+            .st_glb_buy(usd, Quantity::new(0), 0, never())
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(peter, usd, Quantity::new(0), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .sell_claim(peter, bob, usd, Quantity::new(src_face))
+            .get()?;
+
+        assert_eq!(exp(&chain, alice, bob, usd), 0);
+        assert_eq!(
+            exp(&chain, alice, peter, usd),
+            src_face,
+            "seller is paid on full face (principal + interest)"
+        );
+
+        let dest = Obligation::get_by_interest_rate(peter, bob, usd, RATE).expect("dest claim");
+        assert_eq!(
+            dest.remaining_principal.value,
+            DEST_PRINCIPAL + SRC_PRINCIPAL
+        );
+        assert_eq!(
+            dest.accrued_interest.value, src_interest,
+            "transferred finalized interest must not be zeroed by dest grace"
+        );
+        assert_eq!(
+            exp(&chain, peter, bob, usd),
+            dest_before + src_face,
+            "debtor exposure must include transferred interest"
+        );
+
+        Ok(())
+    }
+
     /// Same poster/asset: 5% path hop, 0% buy-claim. Each action uses its own row.
     #[psibase::test_case(packages("Banx"))]
     fn test_forward_and_buy_claim_fees_independent(
