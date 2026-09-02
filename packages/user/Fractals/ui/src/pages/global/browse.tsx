@@ -23,7 +23,7 @@ import {
 } from "@shared/shadcn/ui/table";
 
 export const Browse = () => {
-    const { data: fractals } = useFractals();
+    const { data: fractals, isPending } = useFractals();
 
     const navigate = useNavigate();
 
@@ -45,7 +45,9 @@ export const Browse = () => {
                     <span className="hidden lg:inline">New Fractal</span>
                 </Button>
             </div>
-            {fractals?.length == 0 ? (
+            {isPending ? (
+                <EmptyBlock isLoading title="No fractals" />
+            ) : fractals?.length === 0 ? (
                 <EmptyBlock
                     title="No fractals"
                     description="No fractals have been created yet"
@@ -60,8 +62,7 @@ export const Browse = () => {
                         <CardTitle>All Fractals</CardTitle>
                     </CardHeader>
                     <CardContent className="@container">
-                        {fractals && fractals.length > 0 && (
-                            <Table>
+                        <Table>
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead className="w-48 whitespace-nowrap">
@@ -98,7 +99,6 @@ export const Browse = () => {
                                     A list of all fractals.
                                 </TableCaption>
                             </Table>
-                        )}
                     </CardContent>
                 </GlowingCard>
             )}

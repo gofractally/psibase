@@ -1,0 +1,26 @@
+[package]
+name = "accounts-query"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+wit-bindgen-rt.workspace = true
+psibase.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+psibase-plugin-workspace-hack.workspace = true
+rand = "0.9.1"
+
+[lib]
+crate-type = ["cdylib"]
+
+[package.metadata.component]
+package = "accounts:query"
+
+[package.metadata.component.target]
+world = "impl"
+
+[package.metadata.component.target.dependencies]
+"host:common" = { path = "../../../../user/Host/plugin/common/wit/world.wit" }
+"host:types" = { path = "../../../../user/Host/plugin/types/wit/world.wit" }
+"host:db" = { path = "../../../../user/Host/plugin/db/wit/world.wit" }

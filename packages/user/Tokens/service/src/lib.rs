@@ -388,18 +388,7 @@ pub mod service {
     /// * `memo`     - Memo
     #[action]
     fn uncredit(token_id: TID, debitor: AccountNumber, amount: Quantity, memo: Memo) {
-        let creditor = get_sender();
-
-        SharedBalance::get_assert(creditor, debitor, token_id).uncredit(amount);
-
-        Wrapper::emit().history().balChanged(
-            token_id,
-            creditor,
-            debitor,
-            "uncredited".to_string(),
-            fmt_amount(token_id, amount),
-            memo,
-        );
+        SharedBalance::get_assert(get_sender(), debitor, token_id).uncredit(amount, memo);
     }
 
     /// Debit tokens that were credited into a shared balance

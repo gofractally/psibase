@@ -1,10 +1,12 @@
 import * as React from "react";
 import { Label, Pie, PieChart } from "recharts";
 
+import { PageHeading } from "@/components/page-heading";
+
 import {
     Card,
     CardContent,
-    CardFooter,
+    CardDescription,
     CardHeader,
     CardTitle,
 } from "@shared/shadcn/ui/card";
@@ -14,7 +16,7 @@ import {
     ChartTooltip,
     ChartTooltipContent,
 } from "@shared/shadcn/ui/chart";
-import { Separator } from "@shared/shadcn/ui/separator";
+import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 import { usePerformance } from "../hooks/use-performance";
 import { useTransactStats } from "../hooks/use-transact-stats";
@@ -48,9 +50,27 @@ const chartConfig = {
 
 const bytesToMb = (bytes: number): number => Math.ceil(bytes / 1024 / 1024);
 
+const Stat = ({
+    label,
+    value,
+}: {
+    label: string;
+    value: number | undefined;
+}) => (
+    <div className="bg-muted/40 rounded-lg border p-4">
+        <div className="text-muted-foreground text-xs">{label}</div>
+        <div className="mt-1 flex items-baseline gap-1.5 text-2xl font-semibold tabular-nums">
+            {value ?? "—"}
+            <span className="text-muted-foreground text-sm font-normal">
+                transactions
+            </span>
+        </div>
+    </div>
+);
+
 export function DashboardPage() {
-    const { data } = usePerformance();
-    const { data: txStats } = useTransactStats();
+    const { data, isPending: isLoadingPerf } = usePerformance();
+    const { data: txStats, isPending: isLoadingTx } = useTransactStats();
 
     const chartData = React.useMemo(
         () => [
@@ -88,136 +108,121 @@ export function DashboardPage() {
         [data],
     );
 
-    const totalVisitorsBytes = React.useMemo(() => {
-        return chartData.reduce((acc, curr) => acc + curr.usage, 0);
-    }, [chartData]);
+    const totalMb = React.useMemo(
+        () => chartData.reduce((acc, curr) => acc + curr.usage, 0),
+        [chartData],
+    );
 
-    if (!chartData) return <div>Loading...</div>;
+    if (isLoadingPerf && isLoadingTx) {
+        return (
+            <div>
+                <PageHeading
+                    title="Dashboard"
+                    description="Node memory use and transaction activity."
+                />
+                <div className="grid gap-4 lg:grid-cols-2">
+                    <Skeleton className="h-80" />
+                    <Skeleton className="h-80" />
+                </div>
+            </div>
+        );
+    }
 
     return (
-        <Card className="flex flex-col">
-            <CardHeader className="items-center pb-0">
-                <CardTitle>RAM Usage</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-1 items-center justify-center pb-0">
-                <ChartContainer
-                    config={chartConfig}
-                    style={{ width: "250px", height: "250px" }}
-                >
-                    <PieChart>
-                        <ChartTooltip
-                            content={
-                                <ChartTooltipContent
-                                    hideLabel
-                                    indicator="dashed"
-                                />
-                            }
-                        />
-                        <Pie
-                            data={chartData}
-                            dataKey="usage"
-                            nameKey="memType"
-                            innerRadius={60}
-                            strokeWidth={5}
+        <div>
+            <PageHeading
+                title="Dashboard"
+                description="Node memory use and transaction activity."
+            />
+            <div className="grid gap-4 lg:grid-cols-2">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>RAM usage</CardTitle>
+                        <CardDescription>
+                            Memory consumed by this node process.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex items-center justify-center">
+                        <ChartContainer
+                            config={chartConfig}
+                            className="aspect-square h-[250px] w-[250px]"
                         >
-                            <Label
-                                content={({ viewBox }) => {
-                                    if (
-                                        viewBox &&
-                                        "cx" in viewBox &&
-                                        "cy" in viewBox
-                                    ) {
-                                        return (
-                                            <text
-                                                x={viewBox.cx}
-                                                y={viewBox.cy}
-                                                textAnchor="middle"
-                                                dominantBaseline="middle"
-                                            >
-                                                <tspan
-                                                    x={viewBox.cx}
-                                                    y={viewBox.cy}
-                                                    className="fill-foreground text-3xl font-bold"
-                                                >
-                                                    {totalVisitorsBytes.toLocaleString()}
-                                                </tspan>
-                                                <tspan
-                                                    x={viewBox.cx}
-                                                    y={(viewBox.cy || 0) + 24}
-                                                    className="fill-muted-foreground"
-                                                >
-                                                    MB
-                                                </tspan>
-                                            </text>
-                                        );
+                            <PieChart>
+                                <ChartTooltip
+                                    content={
+                                        <ChartTooltipContent
+                                            hideLabel
+                                            indicator="dashed"
+                                        />
                                     }
-                                }}
-                            />
-                        </Pie>
-                    </PieChart>
-                </ChartContainer>
-            </CardContent>
-            <CardFooter className="flex flex-row border-t p-4">
-                <div className="flex w-full items-center gap-2">
-                    <div className="grid flex-1 auto-rows-min gap-0.5">
-                        <div className="text-muted-foreground text-xs">
-                            Failed
-                        </div>
-                        <div className="flex items-baseline gap-1 text-2xl font-bold tabular-nums leading-none">
-                            {txStats?.failed}
-                            <span className="text-muted-foreground text-sm font-normal">
-                                transactions
-                            </span>
-                        </div>
-                    </div>
-                    <Separator
-                        orientation="vertical"
-                        className="mx-2 h-10 w-px"
-                    />
-                    <div className="grid flex-1 auto-rows-min gap-0.5">
-                        <div className="text-muted-foreground text-xs">
-                            Expired
-                        </div>
-                        <div className="flex items-baseline gap-1 text-2xl font-bold tabular-nums leading-none">
-                            {txStats?.expired}
-                            <span className="text-muted-foreground text-sm font-normal">
-                                transactions
-                            </span>
-                        </div>
-                    </div>
-                    <Separator
-                        orientation="vertical"
-                        className="mx-2 h-10 w-px"
-                    />
-                    <div className="grid flex-1 auto-rows-min gap-0.5">
-                        <div className="text-muted-foreground text-xs">
-                            Unprocessed
-                        </div>
-                        <div className="flex items-baseline gap-1 text-2xl font-bold tabular-nums leading-none">
-                            {txStats?.unprocessed}
-                            <span className="text-muted-foreground text-sm font-normal">
-                                transactions
-                            </span>
-                        </div>
-                    </div>
-                    <Separator
-                        orientation="vertical"
-                        className="mx-2 h-10 w-px"
-                    />
-                    <div className="grid flex-1 auto-rows-min gap-0.5">
-                        <div className="text-muted-foreground text-xs">
-                            Succeeded
-                        </div>
-                        <div className="flex items-baseline gap-1 text-2xl font-bold tabular-nums leading-none">
-                            {txStats?.succeeded}
-                            <span className="text-muted-foreground text-sm font-normal">
-                                transactions
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </CardFooter>
-        </Card>
+                                />
+                                <Pie
+                                    data={chartData}
+                                    dataKey="usage"
+                                    nameKey="memType"
+                                    innerRadius={60}
+                                    strokeWidth={5}
+                                >
+                                    <Label
+                                        content={({ viewBox }) => {
+                                            if (
+                                                viewBox &&
+                                                "cx" in viewBox &&
+                                                "cy" in viewBox
+                                            ) {
+                                                return (
+                                                    <text
+                                                        x={viewBox.cx}
+                                                        y={viewBox.cy}
+                                                        textAnchor="middle"
+                                                        dominantBaseline="middle"
+                                                    >
+                                                        <tspan
+                                                            x={viewBox.cx}
+                                                            y={viewBox.cy}
+                                                            className="fill-foreground text-3xl font-bold"
+                                                        >
+                                                            {totalMb.toLocaleString()}
+                                                        </tspan>
+                                                        <tspan
+                                                            x={viewBox.cx}
+                                                            y={
+                                                                (viewBox.cy ||
+                                                                    0) + 24
+                                                            }
+                                                            className="fill-muted-foreground"
+                                                        >
+                                                            MB
+                                                        </tspan>
+                                                    </text>
+                                                );
+                                            }
+                                        }}
+                                    />
+                                </Pie>
+                            </PieChart>
+                        </ChartContainer>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Transactions</CardTitle>
+                        <CardDescription>
+                            Counts reported by the transact service.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid grid-cols-2 gap-3">
+                        <Stat label="Succeeded" value={txStats?.succeeded} />
+                        <Stat label="Failed" value={txStats?.failed} />
+                        <Stat label="Expired" value={txStats?.expired} />
+                        <Stat
+                            label="Unprocessed"
+                            value={txStats?.unprocessed}
+                        />
+                    </CardContent>
+                </Card>
+            </div>
+        </div>
     );
 }
 

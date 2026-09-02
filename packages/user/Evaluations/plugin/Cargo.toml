@@ -27,7 +27,7 @@ package = "evaluations:plugin"
 world = "impl"
 
 [package.metadata.component.target.dependencies]
-"accounts:plugin" = { path = "../../../system/Accounts/plugin/accounts/wit/world.wit" }
+"accounts:query" = { path = "../../../system/Accounts/plugin/query/wit/world.wit" }
 "host:common" = { path = "../../Host/plugin/common/wit/world.wit" }
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
 "host:db" = { path = "../../Host/plugin/db/wit/world.wit" }

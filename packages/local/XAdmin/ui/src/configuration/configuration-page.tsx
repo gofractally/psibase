@@ -6,6 +6,8 @@ import {
     useForm,
 } from "react-hook-form";
 
+import { PageHeading } from "@/components/page-heading";
+
 import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
@@ -120,8 +122,28 @@ export const ConfigurationPage = () => {
         return config;
     };
 
-    if (isLoading) return <div>Loading..</div>;
-    if (!config || isError) return <div>Error loading config</div>;
+    if (isLoading) {
+        return (
+            <div className="space-y-4">
+                <PageHeading
+                    title="Setup"
+                    description="Node identity, listeners, and logging."
+                />
+                <Skeleton className="h-8 w-72" />
+                <Skeleton className="h-40 w-full" />
+            </div>
+        );
+    }
+    if (!config || isError) {
+        return (
+            <div>
+                <PageHeading title="Setup" />
+                <p className="text-muted-foreground text-sm">
+                    Error loading config.
+                </p>
+            </div>
+        );
+    }
 
     return <ConfigurationForm config={config} onSubmit={handleSubmit} />;
 };
@@ -135,8 +157,6 @@ export const ConfigurationForm = ({
     const configForm = useForm<PsinodeConfigUI>({
         defaultValues: config,
     });
-
-    console.log(configForm.formState, "is state.");
 
     const listeners = useFieldArray({
         control: configForm.control,
@@ -219,11 +239,12 @@ export const ConfigurationForm = ({
             {!config ? (
                 <p>Unable to load config</p>
             ) : (
-                <form
-                    onSubmit={configForm.handleSubmit(onConfig)}
-                    className="px-2"
-                >
-                    <Tabs defaultValue="connections" className="">
+                <form onSubmit={configForm.handleSubmit(onConfig)}>
+                    <PageHeading
+                        title="Setup"
+                        description="Node identity, listeners, and logging."
+                    />
+                    <Tabs defaultValue="connections">
                         <TabsList>
                             <TabsTrigger value="connections">
                                 Connections
@@ -233,178 +254,167 @@ export const ConfigurationForm = ({
                                 Node Specs
                             </TabsTrigger>
                         </TabsList>
-                        <TabsContent value="connections">
-                            <div className="flex justify-between gap-4">
-                                <div className="grid w-full items-center gap-1.5">
-                                    <Label htmlFor="blockProducerName">
-                                        Block producer name
-                                    </Label>
-                                    <Input
-                                        id="blockProducerName"
-                                        {...configForm.register("producer")}
-                                    />
+                        <TabsContent value="connections" className="space-y-6">
+                            <div className="grid w-full max-w-md items-center gap-1.5">
+                                <Label htmlFor="blockProducerName">
+                                    Block producer name
+                                </Label>
+                                <Input
+                                    id="blockProducerName"
+                                    {...configForm.register("producer")}
+                                />
+                            </div>
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between gap-3">
+                                    <h4 className="text-sm font-medium">
+                                        Hosts
+                                    </h4>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={onAddNewHostClick}
+                                    >
+                                        <Plus />
+                                        Add host
+                                    </Button>
                                 </div>
-                            </div>
-                            <div>
-                                <h4 className="my-4 scroll-m-20 text-xl font-semibold tracking-tight">
-                                    Hosts
-                                </h4>
-
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th className="flex flex-row-reverse ">
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        onAddNewHostClick();
-                                                    }}
-                                                >
-                                                    +
-                                                </Button>
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
+                                {hosts.fields.length === 0 ? (
+                                    <p className="text-muted-foreground text-sm">
+                                        No hosts configured.
+                                    </p>
+                                ) : (
+                                    <div className="space-y-2">
                                         {hosts.fields.map((h, idx: number) => (
-                                            <tr key={h.key}>
-                                                <td>
-                                                    <Input
-                                                        type="text"
-                                                        {...configForm.register(
-                                                            `hosts.${idx}.host`,
-                                                        )}
-                                                    />
-                                                </td>
-                                                <td>
-                                                    <Button
-                                                        variant="secondary"
-                                                        onClick={() =>
-                                                            hosts.remove(idx)
-                                                        }
-                                                    >
-                                                        <Trash size={16} />
-                                                    </Button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                            <div>
-                                <h4 className="my-4 scroll-m-20 text-xl font-semibold tracking-tight">
-                                    Ports
-                                </h4>
-
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th colSpan={2}>
-                                                <Label>Requires restart</Label>
-                                            </th>
-                                            <th className="flex flex-row-reverse ">
+                                            <div
+                                                key={h.key}
+                                                className="flex gap-2"
+                                            >
+                                                <Input
+                                                    type="text"
+                                                    {...configForm.register(
+                                                        `hosts.${idx}.host`,
+                                                    )}
+                                                />
                                                 <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        onAddNewListenerClick();
-                                                    }}
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() =>
+                                                        hosts.remove(idx)
+                                                    }
+                                                    aria-label="Remove host"
                                                 >
-                                                    +
+                                                    <Trash />
                                                 </Button>
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div>
+                                        <h4 className="text-sm font-medium">
+                                            Ports
+                                        </h4>
+                                        <p className="text-muted-foreground text-xs">
+                                            Changing ports requires a restart.
+                                        </p>
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={onAddNewListenerClick}
+                                    >
+                                        <Plus />
+                                        Add port
+                                    </Button>
+                                </div>
+                                {listeners.fields.length === 0 ? (
+                                    <p className="text-muted-foreground text-sm">
+                                        No ports configured.
+                                    </p>
+                                ) : (
+                                    <div className="space-y-2">
                                         {listeners.fields.map(
                                             (l, idx: number) => (
-                                                <tr key={l.key}>
-                                                    <td>
-                                                        <Input
-                                                            type="number"
-                                                            {...configForm.register(
-                                                                `listen.${idx}.port`,
-                                                            )}
-                                                        />
-                                                    </td>
-                                                    <td>
-                                                        <Controller
-                                                            name={`listen.${idx}.protocol`}
-                                                            control={
-                                                                configForm.control
-                                                            }
-                                                            render={({
-                                                                field,
-                                                            }) => (
-                                                                <Select
-                                                                    value={
-                                                                        field.value
-                                                                    }
-                                                                    onValueChange={(
-                                                                        value,
-                                                                    ) =>
-                                                                        field.onChange(
-                                                                            value,
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    <SelectTrigger className="w-[180px]">
-                                                                        <SelectValue placeholder="Theme" />
-                                                                    </SelectTrigger>
-                                                                    <SelectContent>
-                                                                        <SelectItem value="http">
-                                                                            HTTP
-                                                                        </SelectItem>
-                                                                        <SelectItem value="https">
-                                                                            HTTPS
-                                                                        </SelectItem>
-                                                                        <SelectItem value="socket">
-                                                                            Local
-                                                                            socket
-                                                                        </SelectItem>
-                                                                    </SelectContent>
-                                                                </Select>
-                                                            )}
-                                                        />
-                                                    </td>
-                                                    <td>
-                                                        <Button
-                                                            variant="secondary"
-                                                            onClick={() =>
-                                                                listeners.remove(
-                                                                    idx,
-                                                                )
-                                                            }
-                                                        >
-                                                            <Trash size={16} />
-                                                        </Button>
-                                                    </td>
-                                                </tr>
+                                                <div
+                                                    key={l.key}
+                                                    className="flex flex-wrap gap-2"
+                                                >
+                                                    <Input
+                                                        type="number"
+                                                        className="min-w-28 flex-1"
+                                                        {...configForm.register(
+                                                            `listen.${idx}.port`,
+                                                        )}
+                                                    />
+                                                    <Controller
+                                                        name={`listen.${idx}.protocol`}
+                                                        control={
+                                                            configForm.control
+                                                        }
+                                                        render={({ field }) => (
+                                                            <Select
+                                                                value={
+                                                                    field.value
+                                                                }
+                                                                onValueChange={
+                                                                    field.onChange
+                                                                }
+                                                            >
+                                                                <SelectTrigger className="w-[180px]">
+                                                                    <SelectValue placeholder="Protocol" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="http">
+                                                                        HTTP
+                                                                    </SelectItem>
+                                                                    <SelectItem value="https">
+                                                                        HTTPS
+                                                                    </SelectItem>
+                                                                    <SelectItem value="socket">
+                                                                        Local
+                                                                        socket
+                                                                    </SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
+                                                        )}
+                                                    />
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() =>
+                                                            listeners.remove(
+                                                                idx,
+                                                            )
+                                                        }
+                                                        aria-label="Remove port"
+                                                    >
+                                                        <Trash />
+                                                    </Button>
+                                                </div>
                                             ),
                                         )}
-                                    </tbody>
-                                </table>
+                                    </div>
+                                )}
                             </div>
                         </TabsContent>
                         <TabsContent value="logs">
-                            <div className="flex justify-between">
-                                <h2 className="my-3 scroll-m-20 pb-2 text-3xl font-semibold tracking-tight first:mt-0">
-                                    Loggers
-                                </h2>
-                                <div>
-                                    <Button
-                                        variant="secondary"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            onAddNewLoggerClick();
-                                        }}
-                                    >
-                                        <Plus size={20} className="" />
-                                    </Button>
-                                </div>
+                            <div className="mb-4 flex items-center justify-between gap-3">
+                                <h2 className="text-sm font-medium">Loggers</h2>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={onAddNewLoggerClick}
+                                >
+                                    <Plus />
+                                    Add logger
+                                </Button>
                             </div>
                             {loggers && (
                                 <div className="flex flex-col gap-4">

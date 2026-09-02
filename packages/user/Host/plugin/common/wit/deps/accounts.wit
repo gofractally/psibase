@@ -1,5 +1,0 @@
-package accounts:plugin;
-
-interface api {
-    get-current-user: func() -> option<string>;
-}

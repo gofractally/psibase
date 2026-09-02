@@ -9,7 +9,6 @@ world impl {
     include name-market:plugin/imports;
     include virtual-server:plugin/imports;
     include tokens:plugin/imports;
-    include accounts:plugin/imports;
     include sites:plugin/imports;
 
     import accounts:plugin/admin;

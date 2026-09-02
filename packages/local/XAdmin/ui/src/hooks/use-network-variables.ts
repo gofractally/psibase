@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { queryKeys } from "@/lib/query-keys";
 
-import { graphql } from "@shared/lib/graphql";
+import { adminGraphql } from "@/lib/admin-graphql";
 
 interface NetworkVariables {
     blockReplayFactor: number;
@@ -33,7 +33,7 @@ export const useNetworkVariables = () => {
                     subjStorageBytes
                 }
             }`;
-            const res = await graphql(query, { service: "vserver" });
+            const res = await adminGraphql(query, { service: "vserver" });
 
             const response = zNetworkVariablesResponse.parse(res);
 

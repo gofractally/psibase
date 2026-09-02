@@ -1,5 +1,3 @@
-use std::u64;
-
 use psibase::{AccountNumber, ServiceWrapper, Table};
 
 use crate::{
@@ -36,7 +34,7 @@ impl FractalMember {
     pub fn get_all(fractal: AccountNumber) -> Vec<Self> {
         FractalMemberTable::read()
             .get_index_pk()
-            .range(&(fractal, AccountNumber::from(0))..&(fractal, AccountNumber::from(u64::MAX)))
+            .range((fractal, AccountNumber::MIN)..=(fractal, AccountNumber::MAX))
             .collect()
     }
 
@@ -45,12 +43,25 @@ impl FractalMember {
         account: AccountNumber,
         recruiter: Option<AccountNumber>,
     ) -> Self {
+        let fractal = fractal.base();
+        let account = account.base();
+        let recruiter = recruiter.map(|r| r.base());
+
+        assert!(account != fractal, "fractal cannot be a member of itself",);
         assert!(
             FractalExile::get(fractal, account).is_none(),
             "member has been exiled from this fractal",
         );
         if let Some(existing) = Self::get(fractal, account) {
             return existing;
+        }
+
+        if let Some(recruiter) = recruiter {
+            assert!(recruiter != account, "cannot recruit yourself",);
+            assert!(
+                Self::get(fractal, recruiter).is_some(),
+                "recruiter is not a member of this fractal",
+            );
         }
 
         let new_instance = Self::new(fractal, account);

@@ -1,9 +1,11 @@
+import { CircleAlert } from "lucide-react";
 import { UseFormReturn } from "react-hook-form";
 import { z } from "zod";
 
 import { getErrorMessage } from "@/lib/utils";
 import { KeyDeviceSchema } from "@/types";
 
+import { Alert, AlertDescription } from "@shared/shadcn/ui/alert";
 import {
     Form,
     FormControl,
@@ -53,19 +55,21 @@ export const KeyDeviceForm = ({
     return (
         <>
             {isSuccess && !keyDevices.length ? (
-                <div className="mb-4 flex max-w-[450px] items-center gap-3">
-                    <p className="text-2xl">⚠️</p>
-                    <p>{deviceNotFoundErrorMessage}</p>
-                </div>
+                <Alert variant="warning" className="mb-4">
+                    <CircleAlert />
+                    <AlertDescription>
+                        {deviceNotFoundErrorMessage}
+                    </AlertDescription>
+                </Alert>
             ) : null}
             {isError ? (
-                <div className="mb-4 flex max-w-[450px] items-center gap-3">
-                    <p className="text-2xl">⚠️</p>
-                    <p>
+                <Alert variant="destructive" className="mb-4">
+                    <CircleAlert />
+                    <AlertDescription>
                         There was an error fetching security devices. See the
                         console for more information.
-                    </p>
-                </div>
+                    </AlertDescription>
+                </Alert>
             ) : null}
             <Form {...form}>
                 <form className="space-y-6" onSubmit={onSubmit}>

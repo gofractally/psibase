@@ -14,6 +14,7 @@ import { updateAttestation } from "./use-users-and-groups";
 export const zParams = z.object({
     guildAccount: zGuildAccount,
     groupNumber: z.number(),
+    evaluationId: z.number(),
 });
 
 export const useAttest = () => {
@@ -22,7 +23,8 @@ export const useAttest = () => {
 
     return useMutation({
         mutationFn: async (params: z.infer<typeof zParams>) => {
-            const { guildAccount, groupNumber } = zParams.parse(params);
+            const { guildAccount, groupNumber, evaluationId } =
+                zParams.parse(params);
             await supervisor.functionCall({
                 method: "attest",
                 service: fractal,
@@ -35,7 +37,7 @@ export const useAttest = () => {
             // The UI doesn't know what the attestation is nor does it care, merely that one has been made by the current user
             // so the rest of the app knows that the user has done his duty in attesting the group results and doesn't need to render a
             // the real attestation will be over-written by the next graphql query
-            updateAttestation(999999999999, [1, 2, 3, 4, 5, 6]);
+            updateAttestation(evaluationId, [1, 2, 3, 4, 5, 6]);
         },
         onSuccess: (_data, { guildAccount }) => {
             navigate(paths.guild.evaluations(guildAccount));

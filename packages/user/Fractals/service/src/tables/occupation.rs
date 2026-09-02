@@ -3,6 +3,7 @@ use psibase::{
     AccountNumber, Table,
 };
 
+use crate::constants::MAX_PAID_OCCUPATIONS;
 use crate::tables::tables::{Occupation, OccupationTable};
 use psibase::services::fractals::weighted_normalization::HasScore;
 
@@ -39,7 +40,7 @@ impl Occupation {
         let occupations_length = new_occupations.len();
 
         assert!(
-            occupations_length <= u8::MAX as usize,
+            occupations_length <= MAX_PAID_OCCUPATIONS as usize,
             "too many occupations",
         );
 

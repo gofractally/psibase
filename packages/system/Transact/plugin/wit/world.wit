@@ -6,7 +6,8 @@ interface types {
     record claim {
         /// The name of the service used to verify the claim is valid
         verify-service: string,
-        /// The raw claim data
+        /// The raw claim data (typically the DER-encoded public key
+        /// whose matching private key produces the proof)
         raw-data: list<u8>,
     }
 
@@ -29,13 +30,7 @@ interface types {
     }
 }
 
-/// Hooks allow plugins to hook into the transact plugin and customize its behavior
-/// during transaction construction and authorization.
 interface hooks {
-    /// Allows the the caller plugin to add transaction authorization claims and proofs
-    /// based on the next action added to this transaction.
-    hook-action-auth: func();
-
     /// Allows the caller plugin to manage the sender of any subsequent actions added to this
     /// transaction.
     hook-actions-sender: func();
@@ -68,6 +63,7 @@ interface admin {
 
 interface intf {
     use host:types/types.{error};
+    use types.{claim};
 
     /// Adds the specified service action to the current transaction.
     ///
@@ -79,6 +75,16 @@ interface intf {
     /// * `method-name`: The method name of the action being called
     /// * `packed-args`: The arguments for the action, packed into fracpack format
     add-action-to-transaction: func(method-name: string, packed-args: list<u8>) -> result<_, error>;
+
+    /// Append a `claim` to the current transaction. At finish-tx, Transact
+    /// produces the matching proof by calling `host:crypto/keyvault.sign`
+    /// with `claim.raw-data` (typically a DER-encoded public key); the host
+    /// keystore (persistent or transient — see
+    /// `host:crypto/keyvault.import-key-transient`) must contain the matching
+    /// private key.
+    ///
+    /// May be called any number of times during transaction construction.
+    add-signature: func(claim: claim) -> result<_, error>;
 
     /// Set or clear the propose-latch.
     ///
@@ -144,29 +150,6 @@ interface network {
 
     /// Set snapshot interval period network wide
     set-snapshot-time: func(seconds: u32) -> result<_, error>;
-}
-
-world hook-action-auth {
-    import hooks;
-    export transact-hook-action-auth: interface {
-        use host:types/types.{error};
-        use types.{claim, proof, action};
-
-        /// Gets the claim(s) needed to satisfy the authorization of the sender of this transaction
-        ///
-        /// Parameters
-        /// * `action`: The action being added to the current transaction context
-        on-action-auth-claims: func(action: action) -> result<list<claim>, error>;
-
-        /// Provides proof(s) of the claim(s).
-        /// If there are multiple claims, the returned list of proofs must be in the same order as the
-        /// claims were specified.
-        ///
-        /// Parameters
-        /// * `claims`: The claims this transaction is attempting to satisfy
-        /// * `transaction-hash`: A hash of the current transaction. Often signed to generate a proof.
-        on-action-auth-proofs: func(claims: list<claim>, transaction-hash: list<u8>) -> result<list<proof>, error>;
-    }
 }
 
 world hook-actions-sender {

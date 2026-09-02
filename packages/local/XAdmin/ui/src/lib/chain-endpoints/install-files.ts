@@ -3,6 +3,8 @@ import { lookup } from "mrmime";
 
 import { siblingUrl } from "@psibase/common-lib";
 
+import { adminBearerAuthHeaders } from "../admin-login-jwt";
+
 function parseFlags(flags: string[] | undefined): string {
     if (flags === undefined || flags.length == 0) {
         return "";
@@ -62,6 +64,7 @@ export async function installService(
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
+                    ...(await adminBearerAuthHeaders()),
                 },
                 body: JSON.stringify({
                     service: serviceName,
@@ -141,6 +144,7 @@ export async function installDataFiles(zip: JSZip): Promise<void> {
                 method: "PUT",
                 headers: {
                     "Content-Type": contentType,
+                    ...(await adminBearerAuthHeaders()),
                 },
                 body: data,
             });

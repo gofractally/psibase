@@ -9,9 +9,31 @@ mod tests {
 
     use crate::Wrapper as NameMarket;
     use psibase::services::nft::Wrapper as Nfts;
-    use psibase::services::tokens::{Precision, Quantity, Wrapper as Tokens, TID};
+    use psibase::services::tokens::{BalanceFlags, Precision, Quantity, Wrapper as Tokens, TID};
     use psibase::*;
     use psibase::{MAX_ACCOUNT_NAME_LENGTH, MIN_ACCOUNT_NAME_LENGTH};
+
+
+
+    /// NameMarket `buy` debits a shared balance where the buyer credited the service.
+    fn credit_namemarket(
+        chain: &psibase::Chain,
+        buyer: AccountNumber,
+        sys: TID,
+        amount: Quantity,
+    ) -> Result<(), psibase::Error> {
+        Tokens::push_from(chain, buyer)
+            .credit(sys, NameMarket::SERVICE, amount, "".into())
+            .get()?;
+        Ok(())
+    }
+
+    fn enable_token_auto_debit(chain: &psibase::Chain, account: AccountNumber) {
+        Tokens::push_from(chain, account)
+            .setUserConf(BalanceFlags::AUTO_DEBIT.index(), true)
+            .get()
+            .unwrap();
+    }
 
     fn initial_setup(chain: &psibase::Chain) -> Result<TID, psibase::Error> {
         let tokens_service = Tokens::SERVICE;
@@ -38,6 +60,9 @@ mod tests {
         Tokens::push_from(chain, symbol)
             .mint(sys, Quantity::from(supply), "".into())
             .get()?;
+
+        enable_token_auto_debit(chain, alice);
+        enable_token_auto_debit(chain, bob);
 
         Tokens::push_from(chain, symbol)
             .credit(sys, alice, 100_000_0000u64.into(), "".into())
@@ -94,7 +119,7 @@ mod tests {
         let alice = account!("alice");
 
         // --- setup_tokens ---
-        setup_tokens(&chain)?;
+        let sys = setup_tokens(&chain)?;
 
         bootstrap_markets_1_7(&chain)?;
 
@@ -109,9 +134,7 @@ mod tests {
         assert_eq!(listed.len(), 7);
 
         // --- disable + buy rules + claim ---
-        Tokens::push_from(&chain, alice)
-            .credit(1, NameMarket::SERVICE, 1000_0000u64.into(), "".into())
-            .get()?;
+        credit_namemarket(&chain, alice, sys, 1000_0000u64.into())?;
 
         NameMarket::push_from(&chain, alice)
             .buy(account!("test"))
@@ -148,7 +171,7 @@ mod tests {
         );
 
         let (pub_pem, _priv_pem) = generate_keypair()?;
-        let der = pem::parse(pub_pem.trim())
+        let _der = pem::parse(pub_pem.trim())
             .map_err(|e| anyhow::anyhow!(e))?
             .into_contents();
 
@@ -287,9 +310,7 @@ mod tests {
         }
 
         // --- buy on max allowed account length (7) ---
-        Tokens::push_from(&chain, alice)
-            .credit(1, NameMarket::SERVICE, 1000_0000u64.into(), "".into())
-            .get()?;
+        credit_namemarket(&chain, alice, sys, 1000_0000u64.into())?;
 
         NameMarket::push_from(&chain, alice)
             .buy(account!("abcdefg"))

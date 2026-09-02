@@ -50,6 +50,7 @@ define_trust! {
             - Creating a new guild
             - Mapping a governance role to a guild
             - Setting a role's occupation service
+            - Setting paid occupations for token distribution
             - Setting the guild evaluation schedule
             - Setting guild display name, bio, and description
             - Setting ranked guilds and rank ordering threshold
@@ -61,7 +62,7 @@ define_trust! {
         None => [get_group_users],
         Low => [close_eval, dist_token, start_eval],
         Medium => [apply_guild, claim_rewards, join_fractal, delete_guild_invite, invite_member, attest_membership_app, get_proposal, register, register_candidacy, unregister],
-        High => [attest, set_role_mapping, create_guild, set_role_occupation, exile_member, init_token, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_dist_interval, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guilds, set_schedule],
+        High => [attest, set_role_mapping, create_guild, set_role_occupation, set_paid_occupations, exile_member, init_token, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_dist_interval, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guilds, set_schedule],
     }
 }
 
@@ -101,6 +102,13 @@ impl AdminFractal for FractalCorePlugin {
         propose::fractal()?;
 
         FractalsPlugin::admin_fractal::set_role_occupation(role_id, &occupation)
+    }
+
+    fn set_paid_occupations(occupations: Vec<String>) -> Result<(), Error> {
+        assert_authorized(FunctionName::set_paid_occupations)?;
+        propose::fractal()?;
+
+        FractalsPlugin::admin_fractal::set_paid_occupations(occupations.as_slice())
     }
 
     fn init_token() -> Result<(), Error> {

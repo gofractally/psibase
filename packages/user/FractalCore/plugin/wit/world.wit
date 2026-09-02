@@ -10,6 +10,7 @@ interface admin-fractal {
     set-ranked-guilds: func(guilds: list<string>) -> result<_, error>;
 
     set-role-occupation: func(role-id: u8, occupation: string) -> result<_, error>;
+    set-paid-occupations: func(occupations: list<string>) -> result<_, error>;
 
     set-role-mapping: func(role-id: u8, guild: string) -> result<_, error>;
 

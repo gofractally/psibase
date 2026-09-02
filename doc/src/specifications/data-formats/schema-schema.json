@@ -1,0 +1,94 @@
+{
+  "ServiceSchema": {
+    "Object": {
+      "service": "@AccountNumber",
+      "types": "@types",
+      "actions": "@actions",
+      "history": "@events",
+      "merkle": "@events",
+      "database": {"Option": "@databases"}
+    }
+  },
+  "@types": {
+    "Custom": {
+      "id": "map",
+      "type": {"List":{"Object": {"name": "@string", "type": "@type"}}}
+    }
+  },
+  "@actions": {
+    "Custom": {
+      "id": "map",
+      "type": {"List": {"Object": {"name":"@string", "type": "@fn"}}}
+    }
+  },
+  "@events": {
+    "Custom": {
+      "id": "map",
+      "type": {"List": {"Object": {"name":"@string", "type": "@event"}}}
+    }
+  },
+  "@fn": {
+    "Object": {
+      "params": "@type",
+      "result": {"Option": "@type"}
+    }
+  },
+  "@event": {
+    "Object": {
+      "type": "@type",
+      "access": "@string"
+    }
+  },
+  "@type": {
+    "Variant": {
+      "Struct": "@members",
+      "Object": "@members",
+      "Array": {"Object": {"type": "@type", "len": "@u64"}},
+      "List": "@type",
+      "Option": "@type",
+      "Variant": "@members",
+      "Tuple": {"List": "@type"},
+      "Int": {"Object": {"bits": "@u32", "isSigned": "@bool"}},
+      "Float": {"Object": {"exp": "@u32", "mantissa": "@u32"}},
+      "FracPack": "@type",
+      "Custom": {"Object": {"type": "@type", "id": "@string"}},
+      "@Type": "@string"
+    }
+  },
+  "@members": {
+    "Custom": {
+      "id": "map",
+      "type": {"List":{"Object": {"name": "@string", "type": "@type"}}}
+    }
+  },
+  "@u8": {"Int": {"bits": 8, "isSigned": false}},
+  "@u16": {"Int": {"bits": 16, "isSigned": false}},
+  "@u32": {"Int": {"bits": 32, "isSigned": false}},
+  "@u64": {"Int": {"bits": 64, "isSigned": false}},
+  "@bool": {"Custom": {"id": "bool", "type": {"Int": {"bits": 1, "isSigned": false}}}},
+  "@string": {"Custom": {"id": "string", "type": {"List": "@u8"}}},
+  "@AccountNumber": {"Custom": {"id": "AccountNumber", "type": "@u64"}},
+  "@databases": {
+    "Custom": {
+      "id": "map",
+      "type": {"List": {"Object": {"name": "@string", "value": "@database"}}}
+    }
+  },
+  "@database": {"List": "@table"},
+  "@table": {
+    "Object": {
+      "name": {"Option": "@string"},
+      "table": "@u16",
+      "type": "@type",
+      "indexes": {"List": "@index"}
+    }
+  },
+  "@index": {"List": "@field"},
+  "@field": {
+    "Object": {
+      "path": {"List": "@u32"},
+      "transform": {"Option": "@string"},
+      "type": {"Option": "@type"}
+    }
+  }
+}

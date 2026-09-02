@@ -1,10 +1,4 @@
-import {
-    Clipboard,
-    MoreHorizontal,
-    Plus,
-    Trash,
-    Unplug,
-} from "lucide-react";
+import { Clipboard, MoreHorizontal, Plus, Trash, Unplug } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -12,6 +6,7 @@ import { z } from "zod";
 import { useToast } from "@/components/ui/use-toast";
 
 import { SmartConnectForm } from "@/components/forms/smart-connect-form";
+import { PageHeading } from "@/components/page-heading";
 import { Pulse } from "@/components/pulse";
 
 import {
@@ -48,6 +43,7 @@ import { RadioGroup, RadioGroupItem } from "@shared/shadcn/ui/radio-group";
 import {
     Table,
     TableBody,
+    TableCell,
     TableHead,
     TableHeader,
     TableRow,
@@ -60,10 +56,7 @@ import {
 } from "@shared/shadcn/ui/tabs";
 
 import { useConfig, useConfigUpdate } from "../hooks/use-config";
-import {
-    usePeerUsers,
-    useSetPeerUser,
-} from "../hooks/use-peer-users";
+import { usePeerUsers, useSetPeerUser } from "../hooks/use-peer-users";
 import { usePeers } from "../hooks/use-peers";
 
 const randomIntFromInterval = (min: number, max: number) =>
@@ -302,7 +295,9 @@ export const PeersPage = () => {
                             </DialogDescription>
                         </DialogHeader>
                         <div className="grid gap-2 py-4">
-                            <Label htmlFor="peer-user-account">Account name</Label>
+                            <Label htmlFor="peer-user-account">
+                                Account name
+                            </Label>
                             <Input
                                 id="peer-user-account"
                                 autoComplete="off"
@@ -319,10 +314,7 @@ export const PeersPage = () => {
                             )}
                         </div>
                         <DialogFooter>
-                            <Button
-                                type="submit"
-                                disabled={isUpdatingPeerUser}
-                            >
+                            <Button type="submit" disabled={isUpdatingPeerUser}>
                                 Add
                             </Button>
                         </DialogFooter>
@@ -330,20 +322,25 @@ export const PeersPage = () => {
                 </DialogContent>
             </Dialog>
 
-            <Tabs defaultValue="connections" className="px-2">
+            <PageHeading
+                title="Peers"
+                description="Manage connections to other nodes."
+            />
+            <Tabs defaultValue="connections">
                 <TabsList>
                     <TabsTrigger value="connections">Connections</TabsTrigger>
                     <TabsTrigger value="settings">Settings</TabsTrigger>
                 </TabsList>
                 <TabsContent value="connections">
-                    <div className="flex items-center justify-between py-2">
-                        <div />
+                    <div className="flex items-center justify-end py-2">
                         {combinedPeers.length !== 0 && (
                             <Button
                                 variant="outline"
+                                size="sm"
                                 onClick={() => setShowModalConnection(true)}
                             >
-                                <Plus size={20} />
+                                <Plus />
+                                Add connection
                             </Button>
                         )}
                     </div>
@@ -361,13 +358,15 @@ export const PeersPage = () => {
                                     <TableHead>URL</TableHead>
                                     <TableHead>Address</TableHead>
                                     <TableHead>Status</TableHead>
-                                    <TableHead>Status</TableHead>
+                                    <TableHead className="w-12">
+                                        <span className="sr-only">Actions</span>
+                                    </TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {combinedPeers.map((peer) => (
                                     <TableRow key={peer.id}>
-                                        <TableHead>
+                                        <TableCell>
                                             <span
                                                 className={cn({
                                                     italic: !peer.url,
@@ -375,22 +374,22 @@ export const PeersPage = () => {
                                             >
                                                 {peer.url ?? "Unknown"}
                                             </span>
-                                        </TableHead>
-                                        <TableHead>{peer.endpoint}</TableHead>
-                                        <TableHead>
+                                        </TableCell>
+                                        <TableCell>{peer.endpoint}</TableCell>
+                                        <TableCell>
                                             <Status state={peer.state} />
-                                        </TableHead>
-                                        <TableHead>
+                                        </TableCell>
+                                        <TableCell>
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
                                                     <Button
                                                         variant="ghost"
-                                                        className="my-auto h-full w-8 p-0"
+                                                        size="icon"
                                                     >
                                                         <span className="sr-only">
                                                             Open menu
                                                         </span>
-                                                        <MoreHorizontal className="h-8 w-8" />
+                                                        <MoreHorizontal />
                                                     </Button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end">
@@ -439,7 +438,7 @@ export const PeersPage = () => {
                                                     )}
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
-                                        </TableHead>
+                                        </TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
@@ -460,9 +459,7 @@ export const PeersPage = () => {
                         className="mb-6 mt-3 gap-3"
                         value={p2pEnabled ? "all" : "whitelist"}
                         disabled={isUpdatingConfig || config === undefined}
-                        onValueChange={(value) =>
-                            onP2pChange(value === "all")
-                        }
+                        onValueChange={(value) => onP2pChange(value === "all")}
                     >
                         <div className="flex items-center space-x-2">
                             <RadioGroupItem value="all" id="p2p-all" />
@@ -476,8 +473,8 @@ export const PeersPage = () => {
                                 id="p2p-whitelist"
                             />
                             <Label htmlFor="p2p-whitelist">
-                                Accept incoming P2P connections from
-                                whitelisted accounts only
+                                Accept incoming P2P connections from whitelisted
+                                accounts only
                             </Label>
                         </div>
                     </RadioGroup>
@@ -497,11 +494,11 @@ export const PeersPage = () => {
                                 {peerUsers.length !== 0 && (
                                     <Button
                                         variant="outline"
-                                        onClick={() =>
-                                            setShowAddPeerUser(true)
-                                        }
+                                        size="sm"
+                                        onClick={() => setShowAddPeerUser(true)}
                                     >
-                                        <Plus size={20} />
+                                        <Plus />
+                                        Add
                                     </Button>
                                 )}
                             </div>
@@ -525,13 +522,11 @@ export const PeersPage = () => {
                                     <TableBody>
                                         {peerUsers.map((account) => (
                                             <TableRow key={account}>
-                                                <TableHead>
-                                                    {account}
-                                                </TableHead>
-                                                <TableHead>
+                                                <TableCell>{account}</TableCell>
+                                                <TableCell>
                                                     <Button
                                                         variant="ghost"
-                                                        className="h-8 w-8 p-0"
+                                                        size="icon"
                                                         disabled={
                                                             isUpdatingPeerUser
                                                         }
@@ -544,9 +539,9 @@ export const PeersPage = () => {
                                                         <span className="sr-only">
                                                             Remove {account}
                                                         </span>
-                                                        <Trash className="h-4 w-4" />
+                                                        <Trash />
                                                     </Button>
-                                                </TableHead>
+                                                </TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>

@@ -24,15 +24,18 @@ export const JoinPage = () => {
 
     return (
         <SetupWrapper>
-            <div className="mx-auto h-full w-full  max-w-screen-lg  flex-col gap-3">
-                <h1 className="scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">
-                    Join
-                </h1>{" "}
-                <p className="text-muted-foreground mt-3 leading-7">
+            <div className="mx-auto w-full max-w-xl px-4">
+                <h1 className="text-2xl font-semibold tracking-tight">
+                    Join a network
+                </h1>
+                <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
                     Connect to a psibase compatible node to join a network.
                 </p>
-                <div>
-                    <UrlForm onSubmit={onSubmit} />
+                <div className="mt-6">
+                    <UrlForm
+                        onSubmit={onSubmit}
+                        onBack={() => navigate("/setup")}
+                    />
                 </div>
             </div>
         </SetupWrapper>

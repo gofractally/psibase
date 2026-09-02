@@ -36,6 +36,10 @@ class AdminFractal extends PluginInterface {
         return this._call<[roleId: number, occupation: string]>("setRoleOccupation")
     }
 
+    get setPaidOccupations() {
+        return this._call<[occupations: string[]]>("setPaidOccupations");
+    }
+
 
 
     get migrateGuilds() {

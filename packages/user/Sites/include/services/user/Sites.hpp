@@ -130,12 +130,17 @@ namespace SystemService
 
       /// Sets the Content Security Policy for the specified path (or "*" for a global CSP).
       /// If a specific CSP is set, it takes precedence over the global CSP.
-      /// If no specific or global CSP is set, a default CSP is used.
+      /// If no specific or global CSP is set, a strict default CSP is used.
+      ///
+      /// A custom CSP completely replaces the default for the content it covers —
+      /// policies are not merged — so it must be a complete policy, not just the
+      /// directives being loosened. Prefer enumerating hosts (e.g. `invite.{{root}}`)
+      /// over wildcards.
       ///
       /// The CSP string may include the keyword `{{root}}`, which is replaced
       /// with the root domain (including port when present),
       /// e.g. `psibase.localhost:8080` or `example.com`. Use this for
-      /// subdomain-scoped sources such as `connect-src 'self' {{root}} *.{{root}}`
+      /// subdomain-scoped sources such as `connect-src 'self' {{root}} tokens.{{root}}`
       /// so the same policy works wherever the app is served, without
       /// hardcoding hosts.
       void setCsp(std::string path, std::string csp);
