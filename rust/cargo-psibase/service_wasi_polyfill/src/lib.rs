@@ -1,7 +1,8 @@
 use std::ptr::{null, null_mut};
 use wasi::{
-    Ciovec, Exitcode, Fd, Fdflags, Filedelta, Filesize, Lookupflags, Oflags, Prestat, Rights, Size,
-    ERRNO_BADF, ERRNO_INVAL, PREOPENTYPE_DIR,
+    Ciovec, Exitcode, Fd, Fdflags, Fdstat, Filedelta, Filesize, Lookupflags, Oflags, Prestat,
+    Rights, Size, ERRNO_BADF, ERRNO_INVAL, FDFLAGS_APPEND, FILETYPE_CHARACTER_DEVICE,
+    PREOPENTYPE_DIR, RIGHTS_FD_READ, RIGHTS_FD_WRITE,
 };
 
 type Errno = u16;
@@ -68,6 +69,17 @@ pub unsafe extern "C" fn fd_prestat_dir_name(fd: Fd, path: *mut u8, path_len: Si
         return 0;
     }
     ERRNO_BADF.raw()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn fd_fdstat_get(_fd: Fd, stat: *mut Fdstat) -> Errno {
+    *stat = Fdstat {
+        fs_filetype: FILETYPE_CHARACTER_DEVICE,
+        fs_flags: FDFLAGS_APPEND,
+        fs_rights_base: RIGHTS_FD_READ | RIGHTS_FD_WRITE,
+        fs_rights_inheriting: 0,
+    };
+    0
 }
 
 #[no_mangle]
