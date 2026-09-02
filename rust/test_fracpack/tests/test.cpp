@@ -258,8 +258,7 @@ void check_same(const auto& rust, const auto& cpp)
 {
    printf("        rust: %s\n",
           psio::convert_to_json(
-              psio::bytes{std::vector<char>((const char*)rust.data(),
-                                            (const char*)(rust.data() + rust.size()))})
+              std::vector<char>((const char*)rust.data(), (const char*)(rust.data() + rust.size())))
               .c_str());
    printf("        cpp:  %s\n", psio::convert_to_json(cpp).c_str());
    if (rust.size() == cpp.size() && !memcmp(rust.data(), cpp.data(), rust.size()))
