@@ -14,8 +14,8 @@ use db::*;
 // Other plugins
 use host::common::{self as Host, server as Server};
 use host::db::store as Store;
-use host::types::types::{self as HostTypes, BodyTypes};
-use transact::plugin::types::{Action, Claim};
+use host::types::types::{self as HostTypes, BodyTypes, Claim};
+use transact::plugin::types::Action;
 use virtual_server::plugin::transact as VirtualServer;
 
 // Exported interfaces/types
@@ -303,27 +303,30 @@ struct LoginReply {
 }
 
 impl Auth for TransactPlugin {
-    fn get_query_token(app: String, user: String) -> Result<String, HostTypes::Error> {
+    fn get_query_token(
+        app: String,
+        user: String,
+        claim: Option<Claim>,
+    ) -> Result<String, HostTypes::Error> {
         assert_authorized_with_whitelist(FunctionName::get_query_token, vec!["host".into()])?;
 
         let root_host: String = serde_json::from_str(&Server::get_json("/common/rootdomain")?)
             .expect("Failed to deserialize rootdomain");
-        let actions = vec![Action {
+        let action = Action {
             sender: user.clone(),
             service: app,
             method: "loginSys".to_string(),
             raw_data: (root_host,).packed(),
-        }];
+        };
 
-        let claims =
-            get_claims_for_user(&user).expect("Failed to retrieve claims from auth plugin");
-
-        let claims: Vec<psibase::Claim> = claims.into_iter().map(Into::into).collect();
-        let actions: Vec<psibase::Action> = actions.into_iter().map(Into::into).collect();
+        let tx_claim = claim.as_ref().map(|c| psibase::Claim {
+            service: c.verify_service.parse().unwrap(),
+            rawData: psibase::Hex::from(c.raw_data.clone()),
+        });
 
         let expiration = TimePointSec::from(chrono::Utc::now() + chrono::Duration::seconds(3));
         let tapos = Tapos {
-            expiration: expiration,
+            expiration,
             refBlockSuffix: 0,
             flags: Tapos::DO_NOT_BROADCAST_FLAG,
             refBlockIndex: 0,
@@ -331,12 +334,22 @@ impl Auth for TransactPlugin {
 
         let tx = Transaction {
             tapos,
-            actions,
-            claims,
+            actions: vec![action.into()],
+            claims: match tx_claim {
+                Some(claim) => vec![claim],
+                None => vec![],
+            },
         };
+        let tx_hash = sha256(&tx.packed());
+
+        let proofs: Vec<Hex<Vec<u8>>> = match claim.as_ref() {
+            Some(c) => vec![Hex::from(sign_with_claim(c, &tx_hash)?)],
+            None => Vec::new(),
+        };
+
         let signed_tx = SignedTransaction {
             transaction: Hex::from(tx.packed()),
-            proofs: get_proofs_for_user(&sha256(&tx.packed()), &user)?,
+            proofs,
             subjectiveData: None,
         };
         if signed_tx.proofs.len() != tx.claims.len() {
@@ -361,3 +374,4 @@ impl Auth for TransactPlugin {
 }
 
 bindings::export!(TransactPlugin with_types_in bindings);
+

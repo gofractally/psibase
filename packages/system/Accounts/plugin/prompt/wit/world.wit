@@ -1,0 +1,5 @@
+package accounts:prompt;
+
+world imports {
+    import prompt;
+}

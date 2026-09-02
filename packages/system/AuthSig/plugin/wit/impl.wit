@@ -1,6 +1,7 @@
 package auth-sig:plugin;
 
 world impl {
+    import accounts:plugin/auth-svc;
     include transact:plugin/imports;
     include host:common/imports;
     include host:crypto/imports;
@@ -8,6 +9,7 @@ world impl {
 
     include transact:plugin/hook-user-auth;
 
+    export session;
     export keyvault;
     export actions;
     export api;

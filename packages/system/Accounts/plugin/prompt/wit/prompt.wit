@@ -1,4 +1,4 @@
-package accounts:plugin;
+package accounts:prompt;
 
 interface prompt {
     use host:types/types.{error, pem};
@@ -47,8 +47,9 @@ interface prompt {
     /// The account is not imported onto this device.
     create-premium: func(account-name: string, max-cost: string) -> result<string, error>;
 
-    /// Will connect the specified account with the active app, if not already
-    ///   connected, and login.
-    /// If there is currently an active invite, calling this will automatically accept it.
-    connect-account: func(account: string);
+    /// Logs `account` into the currently active app.
+    ///
+    /// Resolves the account's auth service and delegates to that service's
+    /// session login. Can only be called by the accounts app.
+    login: func(account: string) -> result<_, error>;
 }

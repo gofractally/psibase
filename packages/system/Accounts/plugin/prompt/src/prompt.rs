@@ -1,22 +1,22 @@
+use crate::apps_table::AppsTable;
 use crate::bindings::accounts::query::api as AccountsQuery;
+use crate::bindings::auth_any::plugin as AuthAny;
 use crate::bindings::auth_sig::plugin as AuthSig;
-use crate::bindings::exports::accounts::plugin::prompt::{Credential, Guest as Prompt};
+use crate::bindings::exports::accounts::prompt::prompt::{Credential, Guest as Prompt};
 use crate::bindings::host::{
-    auth::api as HostAuth, common::client as Client, crypto::keyvault as HostCrypto,
-    types::types::Error,
+    common::client as Client, crypto::keyvault as HostCrypto, types::types::Error,
 };
 use crate::bindings::invite::plugin::redemption as Invites;
 use crate::bindings::name_market::plugin::api as NameMarket;
 use crate::bindings::transact::plugin::intf as Transact;
-use crate::db::{apps_table::AppsTable, user_table::UserTable};
 use crate::errors::ErrorType;
-use crate::plugin::AccountsPlugin;
 use crate::trust::*;
+use crate::AccountsPrompt;
 use psibase::fracpack::Pack;
 use psibase::services::accounts as AccountsService;
 use psibase::services::auth_sig;
 
-impl Prompt for AccountsPlugin {
+impl Prompt for AccountsPrompt {
     fn can_create_account() -> bool {
         assert_eq!(Client::get_sender(), Client::get_receiver());
 
@@ -134,25 +134,17 @@ impl Prompt for AccountsPlugin {
         Ok(keypair.private_key)
     }
 
-    fn connect_account(account: String) {
+    fn login(account: String) -> Result<(), Error> {
         assert_eq!(Client::get_sender(), Client::get_receiver());
 
-        // The account must already have been imported
-        assert!(AppsTable::new(&Client::get_receiver())
-            .get_connected_accounts()
-            .contains(&account));
+        let Some(account_info) = AccountsQuery::get_account(&account)? else {
+            return Err(ErrorType::AccountNotFound(account).into());
+        };
 
-        let app = Client::get_active_app();
-        AppsTable::new(&app).login(&account);
-        UserTable::new(&account).add_connected_app(&app);
-
-        if HostAuth::set_logged_in_user(&account, &app).is_err() {
-            AppsTable::new(&app).logout();
-            UserTable::new(&account).remove_connected_app(&app);
-        }
-
-        if let Some(_) = Invites::get_active_invite() {
-            Invites::accept();
+        match account_info.auth_service.as_str() {
+            "auth-sig" => AuthSig::session::login(&account),
+            "auth-any" => AuthAny::session::login(&account),
+            service => Err(ErrorType::UnsupportedAuthService(service.to_string()).into()),
         }
     }
 }

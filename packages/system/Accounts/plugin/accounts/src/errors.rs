@@ -8,11 +8,8 @@ plugin_error! {
     QueryError(msg: String) => "Graphql query error: {msg}",
     DeserializationError(msg: String) => "Deserialization error: {msg}",
     NotConnected(user: String) => "User {user} is not connected to this app",
-    CannotCreateAccount() => "Cannot create account",
     MaxGenerationAttemptsExceeded() => "Max generation attempts exceeded",
     InvalidPrefix() => "Prefix must be a-z, 1 - 9 chars in length",
     AccountNotFound(account: String) => "Account not found: {account}",
-    UnsupportedAuthService(service: String) => "Account uses unsupported auth service: {service}",
-    AuthorizationFailed(account: String) => "Key cannot authorize account: {account}",
     NameLengthUnavailable() => "Account names of this length are not currently available.",
 }

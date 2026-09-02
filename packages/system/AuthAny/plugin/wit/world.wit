@@ -1,4 +1,4 @@
-package auth-delegate:plugin;
+package auth-any:plugin;
 
 interface session {
     use host:types/types.{error};
@@ -9,12 +9,6 @@ interface session {
     login: func(account-name: string) -> result<_, error>;
 }
 
-world impl {
-    include host:common/imports;
-    include transact:plugin/hook-user-auth;
-    include transact:plugin/imports;
-    include permissions:plugin/imports;
-
-    export session;
-    export api;
+world imports {
+    import session;
 }

@@ -3,6 +3,7 @@ import { Account } from "@shared/lib/schemas/account";
 
 class Prompt extends PluginInterface {
     protected override readonly _intf = "prompt" as const;
+    protected override readonly _plugin = "prompt" as const;
 
     get purchaseAccount() {
         return this._call<[accountName: string, maxCost: string], string>(

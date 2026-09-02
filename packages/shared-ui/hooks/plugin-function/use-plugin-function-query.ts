@@ -19,13 +19,13 @@ export function usePluginFunctionQuery<
         "queryKey" | "queryFn"
     > = {},
 ) {
-    const { intf, method, service } = call;
+    const { intf, method, service, plugin } = call;
 
     type Result = ExtractResult<TCall>;
 
     return useQuery<Result, Error, TData>({
         ...options,
-        queryKey: [service, intf, method, params] as const,
+        queryKey: [service, plugin ?? "plugin", intf, method, params] as const,
         queryFn: () => callPluginFunction(call, params),
     });
 }

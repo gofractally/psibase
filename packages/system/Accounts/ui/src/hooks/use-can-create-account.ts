@@ -12,7 +12,7 @@ export const queryCanCreateAccount = queryOptions({
     queryFn: async () => {
         const res = await supervisor.functionCall({
             service: "accounts",
-            plugin: "plugin",
+            plugin: "prompt",
             intf: "prompt",
             method: "canCreateAccount",
             params: [],

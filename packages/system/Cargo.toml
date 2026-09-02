@@ -19,6 +19,7 @@ members = [
 
 exclude = [
     "Accounts/plugin/accounts",
+    "Accounts/plugin/prompt",
     "AuthAny/plugin/",
     "AuthDelegate/plugin/",
     "AuthSig/plugin/",
