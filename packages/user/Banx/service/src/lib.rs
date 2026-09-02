@@ -506,7 +506,8 @@ pub mod service {
         } else {
             String::new()
         };
-        let netted = Connection::get(depositor, receiver, asset_id).deposit(amount, interest_rate);
+        let netted =
+            Connection::get_live(depositor, receiver, asset_id).deposit(amount, interest_rate);
         emit_pair_activity(
             depositor, receiver, asset_id, "deposit", amount, netted, asset_id, request_id,
             &req_memo,
@@ -655,7 +656,7 @@ pub mod service {
         let debtor = get_sender();
         let (take, memo, creditor, asset_id) =
             PayRequest::fulfill_settle(request_id, debtor, amount);
-        let netted = Connection::get(debtor, creditor, asset_id).deposit(take, 0);
+        let netted = Connection::get_live(debtor, creditor, asset_id).deposit(take, 0);
         emit_pair_activity(
             debtor, creditor, asset_id, "deposit", take, netted, asset_id, request_id, &memo,
         );

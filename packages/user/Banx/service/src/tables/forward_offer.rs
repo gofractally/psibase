@@ -124,7 +124,7 @@ impl ForwardOffer {
             );
             self.next_hop
         };
-        let conn = Connection::get(creditor, self.poster, self.asset_id);
+        let conn = Connection::get_live(creditor, self.poster, self.asset_id);
         let draw = self.apply_fees(amount_in);
         let new_draw = conn.new_draw(draw);
         self.assert_known(creditor, new_draw);

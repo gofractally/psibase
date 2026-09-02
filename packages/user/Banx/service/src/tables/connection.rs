@@ -23,14 +23,7 @@ pub struct Connection {
 }
 
 impl Connection {
-    /// Accrue both claims, then snapshot.
-    pub fn get(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) -> Self {
-        Obligation::accrue_pair(creditor, debtor, asset_id);
-        Obligation::accrue_pair(debtor, creditor, asset_id);
-        Self::get_live(creditor, debtor, asset_id)
-    }
-
-    /// Snapshot without locking interest (queries, `knows`).
+    /// Snapshot line + live exposures. Does not persist interest.
     pub fn get_live(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) -> Self {
         Self {
             creditor,

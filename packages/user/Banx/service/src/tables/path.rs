@@ -43,7 +43,7 @@ pub(crate) fn execute_path(
         assert!(next_creditor != path_debtor, "path cannot draw on self");
 
         if i == 0 {
-            Connection::get(next_creditor, path_debtor, asset_id).draw(forward);
+            Connection::get_live(next_creditor, path_debtor, asset_id).draw(forward);
             prev_edge_creditor = next_creditor;
             prev_asset = asset_id;
             path_debtor = next_creditor;

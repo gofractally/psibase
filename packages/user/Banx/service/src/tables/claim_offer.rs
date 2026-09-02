@@ -137,9 +137,9 @@ impl ClaimOffer {
             );
         }
 
-        Connection::get(buyer, debtor, self.asset_id).accept_claim(seller, amount);
+        Connection::get_live(buyer, debtor, self.asset_id).accept_claim(seller, amount);
         let proceeds = self.apply_fees(amount);
-        Connection::get(seller, buyer, self.asset_id).deposit(proceeds, 0);
+        Connection::get_live(seller, buyer, self.asset_id).deposit(proceeds, 0);
 
         emit_pair_activity(
             seller,

@@ -521,7 +521,7 @@ mod tests {
             )
             .get()?;
 
-        assert_eq!(PayRequest::get_assert(id).remaining.value, 0);
+        assert!(PayRequest::get(id).is_none());
         assert_eq!(exp(&chain, john, cafe, aud), 95_0000);
         assert_eq!(exp(&chain, john, mitchell, aud), 5_0506);
         assert_eq!(exp(&chain, mitchell, cafe, aud), 0);
@@ -3087,7 +3087,7 @@ mod tests {
                 id,
             )
             .get()?;
-        assert_eq!(PayRequest::get_assert(id).remaining.value, 0);
+        assert!(PayRequest::get(id).is_none());
         assert_eq!(exp(&chain, steve, gary, usd), 400);
         Ok(())
     }
@@ -3132,7 +3132,7 @@ mod tests {
             .pay_inv(vec![hop(john, aud), hop(cafe, aud)], 20_0000.into(), id)
             .get()?;
 
-        assert_eq!(PayRequest::get_assert(id).remaining.value, 0);
+        assert!(PayRequest::get(id).is_none());
         assert_eq!(exp(&chain, john, mitchell, aud), 5_0000);
         assert_eq!(exp(&chain, cafe, john, aud), 5_0000);
         assert_eq!(exp(&chain, cafe, mitchell, aud), 0);
@@ -3187,7 +3187,7 @@ mod tests {
             .pay_inv(vec![hop(john, aud), hop(cafe, aud)], 20_0000.into(), id)
             .get()?;
 
-        assert_eq!(PayRequest::get_assert(id).remaining.value, 0);
+        assert!(PayRequest::get(id).is_none());
         assert_eq!(exp(&chain, john, mitchell, aud), 5_0506);
         assert_eq!(exp(&chain, cafe, john, aud), 5_0000);
         Ok(())
@@ -3366,7 +3366,7 @@ mod tests {
                 id,
             )
             .get()?;
-        assert_eq!(PayRequest::get_assert(id).remaining.value, 0);
+        assert!(PayRequest::get(id).is_none());
         Ok(())
     }
 
@@ -3402,7 +3402,7 @@ mod tests {
                 id,
             )
             .get()?;
-        assert_eq!(PayRequest::get_assert(id).remaining.value, 0);
+        assert!(PayRequest::get(id).is_none());
         Ok(())
     }
 
@@ -3474,7 +3474,7 @@ mod tests {
             .deposit(alice, usd, Quantity::new(1_000), 0, id)
             .get()?;
         assert_eq!(exp(&chain, bob, alice, usd), 0);
-        assert_eq!(PayRequest::get_assert(id).remaining.value, 0);
+        assert!(PayRequest::get(id).is_none());
         Ok(())
     }
 

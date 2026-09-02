@@ -12,6 +12,14 @@ impl PayRequest {
         RequestTab::read_write().put(self).unwrap();
     }
 
+    fn persist_or_erase(&self) {
+        if self.remaining.value == 0 {
+            RequestTab::read_write().erase(&self.id);
+        } else {
+            self.save();
+        }
+    }
+
     pub fn get(id: u32) -> Option<Self> {
         RequestTab::read().get_index_pk().get(&id)
     }
@@ -145,7 +153,7 @@ impl PayRequest {
         assert!(delivered.value > 0, "invoice fulfill delivered is zero");
         let take = Quantity::new(row.remaining.value.min(delivered.value));
         row.remaining = (row.remaining.value - take.value).into();
-        row.save();
+        row.persist_or_erase();
         emit_pair_activity(
             row.poster,
             payer,
@@ -187,7 +195,7 @@ impl PayRequest {
             "please-book amount exceeds remaining"
         );
         row.remaining = (row.remaining.value - amount.value).into();
-        row.save();
+        row.persist_or_erase();
         row.memo.to_string()
     }
 
@@ -213,7 +221,7 @@ impl PayRequest {
         let take = amount.value.min(row.remaining.value).min(exposure);
         assert!(take > 0, "nothing to settle (no exposure on this pair)");
         row.remaining = (row.remaining.value - take).into();
-        row.save();
+        row.persist_or_erase();
         (take.into(), row.memo.to_string(), row.poster, row.asset_id)
     }
 }

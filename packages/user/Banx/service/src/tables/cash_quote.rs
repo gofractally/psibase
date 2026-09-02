@@ -117,7 +117,7 @@ impl CashQuote {
         let creditor = self.poster;
         let debtor = taker;
         let asset_id = self.asset_id;
-        let netted = Connection::get(creditor, debtor, asset_id).apply_draw(amount_banx);
+        let netted = Connection::get_live(creditor, debtor, asset_id).apply_draw(amount_banx);
         Self::pay_tokens(creditor, taker, self.token_id, tokens, "cash_out");
         emit_pair_activity(
             creditor,
@@ -149,7 +149,7 @@ impl CashQuote {
         );
         Self::from_sub(taker, self.token_id, amount_tokens);
         Self::to_sub(self.poster, self.token_id, amount_tokens);
-        let netted = Connection::get(taker, self.poster, self.asset_id).deposit(banx_amt, 0);
+        let netted = Connection::get_live(taker, self.poster, self.asset_id).deposit(banx_amt, 0);
         emit_pair_activity(
             taker,
             self.poster,
