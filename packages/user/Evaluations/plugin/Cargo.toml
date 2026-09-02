@@ -28,7 +28,8 @@ world = "impl"
 
 [package.metadata.component.target.dependencies]
 "accounts:query" = { path = "../../../system/Accounts/plugin/query/wit/world.wit" }
-"host:common" = { path = "../../Host/plugin/common/wit/world.wit" }
+"host:client" = { path = "../../Host/plugin/client/wit/world.wit" }
+"host:http" = { path = "../../Host/plugin/http/wit/world.wit" }
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
 "host:db" = { path = "../../Host/plugin/db/wit/world.wit" }
 "aes:plugin" = { path = "../../Aes/plugin/wit/world.wit" }

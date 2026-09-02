@@ -5,7 +5,7 @@ use bindings::exports::name_market::plugin::api::Guest as Api;
 use bindings::exports::name_market::plugin::authorized::Guest as Authorized;
 use bindings::exports::name_market::plugin::market_admin::Guest as MarketAdmin;
 use bindings::exports::name_market::plugin::market_admin::MarketConfig;
-use bindings::host::common::server as CommonServer;
+use bindings::host::http::api as CommonServer;
 use bindings::tokens::plugin::helpers as TokensHelpers;
 use bindings::tokens::plugin::user as TokensUser;
 

@@ -55,15 +55,7 @@ impl BodyTypes {
 }
 
 impl HttpRequest {
-    fn do_send(&self, with_credentials: bool) -> Result<HttpResponse, Error> {
-        Ok(Supervisor::send_request(self, with_credentials).map_err(|e| Error::from(e))?)
-    }
-
     pub fn send(&self) -> Result<HttpResponse, Error> {
-        self.do_send(false)
-    }
-
-    pub fn send_with_credentials(&self) -> Result<HttpResponse, Error> {
-        self.do_send(true)
+        Ok(Supervisor::send_request(self, false).map_err(Error::from)?)
     }
 }
