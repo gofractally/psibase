@@ -43,8 +43,7 @@ namespace UserService
          // clang-format off
          struct History
          {
-            void ownerChange(NID nftId, std::string action, Account prev_owner, Account new_owner, MemoView memo) {}
-            void userConfSet(Account account, std::uint8_t flag, bool enable) {}
+            void ownerChange(NID nftId, std::uint8_t action, Account account, Account counter_party, MemoView memo) {}
          };
          // clang-format on
       };
@@ -67,8 +66,7 @@ namespace UserService
       method(getUserConf, account, flag)
    );
    PSIBASE_REFLECT_HISTORY_EVENTS(Nft,
-      method(userConfSet, account, flag, enable),
-      method(ownerChange, nftId, action, prev_owner, new_owner, memo),
+      method(ownerChange, nftId, action, account, counter_party, memo),
    );
 
    PSIBASE_REFLECT_TABLES(Nft, Nft::Tables)

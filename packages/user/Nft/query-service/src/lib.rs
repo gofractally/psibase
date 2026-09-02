@@ -11,9 +11,10 @@ mod service {
             UserPendingTable,
         },
     };
-    use psibase::{services::accounts::Account, *};
+    use psibase::services::{accounts::Account, http_server};
+    use psibase::*;
 
-    use crate::events::{OwnerChangeEvent, UserConfEvent};
+    use crate::events::OwnerChangeEvent;
 
     #[derive(Fracpack, ToSchema, Debug, Clone, SimpleObject)]
     struct UserDetail {
@@ -37,37 +38,48 @@ mod service {
         issuer: UserDetail,
     }
 
-    struct Query;
+    struct Query {
+        user: Option<AccountNumber>,
+    }
+
+    impl Query {
+        fn check_user_auth(&self, user: AccountNumber) -> async_graphql::Result<()> {
+            if self.user != Some(user) {
+                return Err(async_graphql::Error::new(format!(
+                    "permission denied: '{}' must authorize your app to make this query. Send it through `nft:plugin/authorized::graphql`.",
+                    user
+                )));
+            }
+            Ok(())
+        }
+    }
 
     #[Object]
     impl Query {
+        /// Paginated history of ownership changes for `account`.
+        ///
+        /// Requires the queried account to authorize the request through
+        /// `nft:plugin/authorized::graphql`.
         async fn ownerChanges(
             &self,
-            nft_id: NID,
+            account: AccountNumber,
+            nft_id: Option<NID>,
             first: Option<i32>,
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<EventConnection<OwnerChangeEvent>> {
-            EventQuery::new("history.nft.ownerChange")
-                .condition(format!("nftId = {}", nft_id))
-                .first(first)
-                .last(last)
-                .before(before)
-                .after(after)
-                .query()
-        }
+            self.check_user_auth(account)?;
 
-        async fn userConfChanges(
-            &self,
-            account: AccountNumber,
-            first: Option<i32>,
-            last: Option<i32>,
-            before: Option<String>,
-            after: Option<String>,
-        ) -> async_graphql::Result<EventConnection<UserConfEvent>> {
-            EventQuery::new("history.nft.userConfSet")
-                .condition(format!("account = {}", account))
+            let mut conditions = vec!["account = ?".to_string()];
+            let mut params = vec![account.to_string()];
+            if let Some(nft_id) = nft_id {
+                conditions.push("nftId = ?".to_string());
+                params.push(nft_id.to_string());
+            }
+
+            EventQuery::new("history.nft.ownerChange")
+                .condition_with_params(conditions.join(" AND "), params)
                 .first(first)
                 .last(last)
                 .before(before)
@@ -94,6 +106,7 @@ mod service {
             .await
         }
 
+        /// Current NFT holder settings for `user` (no history).
         async fn userConf(&self, user: AccountNumber) -> NftHolder {
             NftHolderTable::with_service(psibase::services::nft::SERVICE)
                 .get_index_pk()
@@ -124,6 +137,10 @@ mod service {
             .await
         }
 
+        /// Pending NFT credits/debits for `user`.
+        ///
+        /// Requires the queried account to authorize the request through
+        /// `nft:plugin/authorized::graphql`.
         async fn user_pending(
             &self,
             user: AccountNumber,
@@ -133,6 +150,8 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, UserPending>> {
+            self.check_user_auth(user)?;
+
             if let Some(nft_id) = nft_id {
                 TableQuery::subindex::<NID>(
                     UserPendingTable::with_service(psibase::services::nft::SERVICE).get_index_pk(),
@@ -190,6 +209,10 @@ mod service {
             }
         }
 
+        /// NFTs `user` has credited and not yet debited or uncredited.
+        ///
+        /// Requires the queried account to authorize the request through
+        /// `nft:plugin/authorized::graphql`.
         async fn userCredits(
             &self,
             user: AccountNumber,
@@ -198,6 +221,8 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, CreditRecord>> {
+            self.check_user_auth(user)?;
+
             TableQuery::subindex::<NID>(
                 CreditTable::with_service(psibase::services::nft::SERVICE).get_index_by_creditor(),
                 &(user),
@@ -210,6 +235,10 @@ mod service {
             .await
         }
 
+        /// NFTs credited to `user` that have not yet been debited or uncredited.
+        ///
+        /// Requires the queried account to authorize the request through
+        /// `nft:plugin/authorized::graphql`.
         async fn userDebits(
             &self,
             user: AccountNumber,
@@ -218,6 +247,8 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, CreditRecord>> {
+            self.check_user_auth(user)?;
+
             TableQuery::subindex::<NID>(
                 CreditTable::with_service(psibase::services::nft::SERVICE).get_index_by_debitor(),
                 &(user),
@@ -233,10 +264,18 @@ mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-        // Services graphql queries
-        None.or_else(|| serve_graphql(&request, Query))
-            // Serves a GraphiQL UI interface at the /graphiql endpoint
+    fn serveSys(
+        request: HttpRequest,
+        _socket: Option<i32>,
+        user: Option<AccountNumber>,
+    ) -> Option<HttpReply> {
+        assert_eq!(
+            get_sender(),
+            http_server::SERVICE,
+            "permission denied: nft::serveSys only callable by 'http-server'",
+        );
+
+        None.or_else(|| serve_graphql(&request, Query { user }))
             .or_else(|| serve_graphiql(&request))
     }
 }

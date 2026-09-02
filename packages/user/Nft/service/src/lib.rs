@@ -3,14 +3,20 @@
 pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::{
-        abort_message, define_flags, get_sender, AccountNumber, FlagsType, Fracpack, Memo,
-        ServiceWrapper, Table, ToSchema,
+        abort_message, define_flags, get_sender, AccountNumber, Fracpack, Memo, ServiceWrapper,
+        Table, ToSchema,
     };
     use serde::{Deserialize, Serialize};
 
     use async_graphql::ComplexObject;
 
     pub type NID = u32;
+
+    pub const MINTED: u8 = 0;
+    pub const BURNED: u8 = 1;
+    pub const CREDITED: u8 = 2;
+    pub const DEBITED: u8 = 3;
+    pub const UNCREDITED: u8 = 4;
 
     define_flags!(NftHolderFlags, u8, {
         auto_debit,
@@ -108,9 +114,9 @@ pub mod tables {
 
             super::Wrapper::emit().history().ownerChange(
                 new_instance.id,
-                "minted".to_string(),
-                0.into(),
+                MINTED,
                 sender,
+                0.into(),
                 "Minted".into(),
             );
 
@@ -124,7 +130,7 @@ pub mod tables {
             );
             super::Wrapper::emit().history().ownerChange(
                 self.id,
-                "burned".to_string(),
+                BURNED,
                 self.owner,
                 0.into(),
                 "Burned".into(),
@@ -215,7 +221,7 @@ pub mod tables {
 
             super::Wrapper::emit().history().ownerChange(
                 new_instance.nftId,
-                "credited".to_string(),
+                CREDITED,
                 creditor,
                 debitor,
                 memo,
@@ -231,9 +237,9 @@ pub mod tables {
 
             super::Wrapper::emit().history().ownerChange(
                 self.nftId,
-                "debited".to_string(),
-                self.creditor,
+                DEBITED,
                 self.debitor,
+                self.creditor,
                 memo,
             );
 
@@ -249,12 +255,13 @@ pub mod tables {
 
             super::Wrapper::emit().history().ownerChange(
                 self.nftId,
-                "uncredited".to_string(),
-                self.debitor,
+                UNCREDITED,
                 self.creditor,
+                self.debitor,
                 memo,
             );
 
+            UserPending::remove(self.creditor, self.debitor, self.nftId);
             self.erase();
         }
 
@@ -327,9 +334,6 @@ pub mod tables {
         pub fn set_flag(&mut self, flag: NftHolderFlags, enable: bool) {
             self.config = psibase::Flags::new(self.config).set(flag, enable).value();
             self.save();
-            super::Wrapper::emit()
-                .history()
-                .userConfSet(self.account, flag.index(), enable);
         }
 
         pub fn save(&self) {
@@ -354,25 +358,25 @@ pub mod service {
 
     pub type NID = u32;
 
+    pub use crate::tables::{BURNED, CREDITED, DEBITED, MINTED, UNCREDITED};
+
     #[action]
     fn init() {
         if ConfigRow::get().is_none() {
             ConfigRow::add();
 
-            let add_index = |method: &str, column: u8, db_id: EventDb| {
+            let add_index = |column: u8| {
                 events::Wrapper::call().addIndex(
-                    db_id,
+                    EventDb::HistoryEvent,
                     Wrapper::SERVICE,
-                    MethodNumber::from(method),
+                    MethodNumber::from("ownerChange"),
                     column,
                 );
             };
 
-            add_index("ownerChange", 0, EventDb::HistoryEvent);
-            add_index("ownerChange", 1, EventDb::HistoryEvent);
-            add_index("ownerChange", 2, EventDb::HistoryEvent);
-            add_index("ownerChange", 3, EventDb::HistoryEvent);
-            add_index("userConfSet", 0, EventDb::HistoryEvent);
+            add_index(0); // nftId
+            add_index(2); // account
+            add_index(3); // counter_party
         }
     }
 
@@ -462,13 +466,10 @@ pub mod service {
     #[event(history)]
     pub fn ownerChange(
         nftId: NID,
-        action: String,
-        prev_owner: AccountNumber,
-        new_owner: AccountNumber,
+        action: u8,
+        account: AccountNumber,
+        counter_party: AccountNumber,
         memo: Memo,
     ) {
     }
-
-    #[event(history)]
-    pub fn userConfSet(account: AccountNumber, index: u8, enable: bool) {}
 }

@@ -111,16 +111,11 @@ mod service {
     #[event(history)]
     pub fn ownerChange(
         nftId: NID,
-        action: String,
-        prev_owner: AccountNumber,
-        new_owner: AccountNumber,
+        action: u8,
+        account: AccountNumber,
+        counter_party: AccountNumber,
         memo: Memo,
     ) {
-        unimplemented!()
-    }
-
-    #[event(history)]
-    fn userConfSet(account: AccountNumber, index: u8, enable: bool) {
         unimplemented!()
     }
 }

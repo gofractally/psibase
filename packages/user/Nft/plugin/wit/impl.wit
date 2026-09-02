@@ -8,5 +8,6 @@ world impl {
     export issuer;
     export user;
     export user-config;
+    export authorized;
 
 }
