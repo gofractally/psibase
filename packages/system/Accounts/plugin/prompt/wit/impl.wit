@@ -3,6 +3,7 @@ package accounts:prompt;
 world impl {
     include host:common/imports;
     include host:db/imports;
+    include accounts:query/imports;
     include transact:plugin/imports;
     include permissions:plugin/imports;
     include auth-sig:plugin/imports;

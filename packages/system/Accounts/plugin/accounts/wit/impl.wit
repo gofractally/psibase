@@ -8,6 +8,7 @@ world impl {
     include host:db/imports;
     include transact:plugin/imports;
     include permissions:plugin/imports;
+    include accounts:query/imports;
     import invite:plugin/redemption;
 
     export api;

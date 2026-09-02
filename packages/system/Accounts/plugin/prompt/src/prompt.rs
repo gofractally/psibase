@@ -1,4 +1,5 @@
 use crate::apps_table::AppsTable;
+use crate::bindings::accounts::query::api as AccountsQuery;
 use crate::bindings::auth_any::plugin as AuthAny;
 use crate::bindings::auth_sig::plugin as AuthSig;
 use crate::bindings::exports::accounts::prompt::prompt::{Credential, Guest as Prompt};
@@ -9,7 +10,6 @@ use crate::bindings::invite::plugin::redemption as Invites;
 use crate::bindings::name_market::plugin::api as NameMarket;
 use crate::bindings::transact::plugin::intf as Transact;
 use crate::errors::ErrorType;
-use crate::helpers;
 use crate::trust::*;
 use crate::AccountsPrompt;
 use psibase::fracpack::Pack;
@@ -20,7 +20,7 @@ impl Prompt for AccountsPrompt {
     fn can_create_account() -> bool {
         assert_eq!(Client::get_sender(), Client::get_receiver());
 
-        if helpers::is_logged_in() {
+        if AccountsQuery::is_logged_in() {
             return true;
         }
 
@@ -37,7 +37,7 @@ impl Prompt for AccountsPrompt {
 
         let mut invalid_accounts = Vec::new();
         for credential in credentials {
-            match helpers::get_account(credential.account.to_string()) {
+            match AccountsQuery::get_account(&credential.account) {
                 Ok(Some(account)) => match account.auth_service.as_str() {
                     "auth-any" => {
                         AppsTable::new(&Client::get_receiver()).connect(&credential.account);
@@ -90,7 +90,7 @@ impl Prompt for AccountsPrompt {
 
         let private_key;
 
-        if helpers::is_logged_in() {
+        if AccountsQuery::is_logged_in() {
             private_key = AuthSig::actions::create_account(&account_name)?;
         } else if Invites::get_active_invite().unwrap_or(false) {
             private_key = Invites::create_new_account(&account_name);
@@ -137,7 +137,7 @@ impl Prompt for AccountsPrompt {
     fn login(account: String) -> Result<(), Error> {
         assert_eq!(Client::get_sender(), Client::get_receiver());
 
-        let Some(account_info) = helpers::get_account(account.clone())? else {
+        let Some(account_info) = AccountsQuery::get_account(&account)? else {
             return Err(ErrorType::AccountNotFound(account).into());
         };
 

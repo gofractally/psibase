@@ -1,4 +1,4 @@
-use crate::bindings::exports::accounts::plugin::api::Guest as Api;
+use crate::bindings::accounts::query::api as AccountsQuery;
 use crate::bindings::exports::accounts::plugin::auth_svc::Guest as AuthSvc;
 use crate::bindings::host::auth::api as HostAuth;
 use crate::bindings::host::common::client as Client;
@@ -10,7 +10,7 @@ use crate::plugin::AccountsPlugin;
 
 impl AuthSvc for AccountsPlugin {
     fn login(account: String, claim: Option<Claim>) -> Result<(), Error> {
-        let auth_service = AccountsPlugin::get_account(account.clone())?
+        let auth_service = AccountsQuery::get_account(&account)?
             .ok_or_else(|| AccountNotFound(account.clone()))?
             .auth_service;
         assert!(Client::get_sender() == auth_service);

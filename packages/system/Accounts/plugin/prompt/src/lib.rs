@@ -2,7 +2,6 @@
 mod bindings;
 mod apps_table;
 mod errors;
-mod helpers;
 mod prompt;
 
 pub struct AccountsPrompt;
