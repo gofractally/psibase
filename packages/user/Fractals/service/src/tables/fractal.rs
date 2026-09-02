@@ -100,9 +100,6 @@ impl Fractal {
             Role::add(fractal, Recruitment.into(), defacto_service);
 
             sites::Wrapper::call_as(fractal).setProxy(account!("fractal-cr"));
-            // Proxy serves static content only; dyn-ld must be linked on the
-            // fractal account so supervisor can resolve plugin deps
-            // (e.g. permissions → perms) for core-fract:plugin calls.
             link_fractal_core_plugin_deps(fractal);
         });
 
