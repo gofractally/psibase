@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { authorizedPluginGraphql } from "@shared/lib/graphql/authorized-plugin";
+import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
 import { tokens } from "@shared/lib/plugins";
 import { zAccount } from "@shared/lib/schemas/account";
 
@@ -35,7 +35,7 @@ export type UserTokenBalanceNode = z.infer<typeof zUserTokenBalanceNodeSchema>;
 export const fetchUserTokenBalances = async (username: string) => {
     const parsedUsername = zAccount.parse(username);
     const query = `{${userTokenBalancesQuery(parsedUsername)}}`;
-    const data = await authorizedPluginGraphql<
+    const data = await callGraphqlViaPlugin<
         z.infer<typeof zUserTokenBalanceSchema>
     >(tokens.authorized.graphql, query);
     const parsed = zUserTokenBalanceSchema.parse(data);

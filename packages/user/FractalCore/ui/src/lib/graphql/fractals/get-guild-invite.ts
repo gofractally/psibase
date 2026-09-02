@@ -1,6 +1,6 @@
 import z from "zod";
 
-import { authorizedPluginGraphql } from "@shared/lib/graphql/authorized-plugin";
+import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
 import { guilds } from "@shared/lib/plugins";
 import { zAccount } from "@shared/lib/schemas/account";
 import { zDateTime } from "@shared/lib/schemas/date-time";
@@ -20,7 +20,7 @@ const zGuildInviteDetailsResponse = z.object({
 });
 
 export const getGuildInvite = async (inviteId: number) => {
-    const response = await authorizedPluginGraphql(
+    const response = await callGraphqlViaPlugin(
         guilds.authorized.graphql,
         `
         {

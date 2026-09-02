@@ -24,7 +24,7 @@ psibase::define_trust! {
         ",
     }
     functions {
-        None => [graphql],
+        None => [],
         Low => [],
         High => [set_service_code, stage_service_code],
     }
@@ -73,7 +73,6 @@ impl Api for SetcodePlugin {
 
 impl Authorized for SetcodePlugin {
     fn graphql(query: String) -> Result<String, Error> {
-        assert_authorized_with_whitelist(FunctionName::graphql, vec!["workshop".into()])?;
         Server::post_graphql_get_json(&query)
     }
 }

@@ -4,7 +4,6 @@ mod bindings;
 use bindings::exports::evaluations::plugin::admin::Guest as Admin;
 use bindings::exports::evaluations::plugin::authorized::Guest as Authorized;
 use bindings::exports::evaluations::plugin::user::Guest as User;
-use bindings::host::common::client as Client;
 use bindings::host::common::server as CommonServer;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
@@ -27,16 +26,6 @@ use helpers::{
 use std::collections::HashSet;
 
 struct EvaluationsPlugin;
-
-fn assert_caller(allowed: &[&str], context: &str) {
-    let sender = Client::get_sender();
-    assert!(
-        allowed.contains(&sender.as_str()),
-        "{} can only be called by {:?}",
-        context,
-        allowed
-    );
-}
 
 impl Admin for EvaluationsPlugin {
     fn create(
@@ -281,7 +270,6 @@ impl User for EvaluationsPlugin {
 
 impl Authorized for EvaluationsPlugin {
     fn graphql(query: String) -> Result<String, Error> {
-        assert_caller(&["fractal-cr", "guilds", "evaluation"], "authorized::graphql");
         CommonServer::post_graphql_get_json(&query)
     }
 }

@@ -29,7 +29,7 @@ psibase::define_trust! {
         ",
     }
     functions {
-        None => [execute, graphql],
+        None => [execute],
         Low => [],
         High => [accept, reject, remove],
         Max => [],
@@ -160,10 +160,6 @@ impl Respondent for StagedTxPlugin {
 
 impl Authorized for StagedTxPlugin {
     fn graphql(query: String) -> Result<String, Error> {
-        assert_authorized_with_whitelist(
-            FunctionName::graphql,
-            vec!["config".into(), "fractal-cr".into()],
-        )?;
         Server::post_graphql_get_json(&query)
     }
 }

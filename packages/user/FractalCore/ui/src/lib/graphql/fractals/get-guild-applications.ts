@@ -2,12 +2,12 @@ import { z } from "zod";
 
 import { zGuildApplicationListInstance } from "@/lib/zod/attestations";
 
-import { authorizedPluginGraphql } from "@shared/lib/graphql/authorized-plugin";
+import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
 import { guilds } from "@shared/lib/plugins";
 import { Account } from "@shared/lib/schemas/account";
 
 export const getGuildApplications = async (guildAccount: Account) => {
-    const res = await authorizedPluginGraphql(
+    const res = await callGraphqlViaPlugin(
         guilds.authorized.graphql,
         `
             {

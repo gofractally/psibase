@@ -214,6 +214,8 @@ impl Server for HostCommon {
     }
 
     fn fetch_sibling_json(url: String) -> Result<String, Error> {
+        check_caller(&["packages"], "fetch-sibling-json@host:common/server");
+
         let res = fetch_sibling(&url, false)?;
 
         match res.body {
@@ -224,6 +226,8 @@ impl Server for HostCommon {
     }
 
     fn fetch_sibling_bytes(url: String) -> Result<Vec<u8>, Error> {
+        check_caller(&["packages"], "fetch-sibling-bytes@host:common/server");
+
         let res = fetch_sibling(&url, true)?;
 
         match res.body {

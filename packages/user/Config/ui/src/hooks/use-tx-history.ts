@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import QueryKey from "@/lib/query-keys";
 
-import { authorizedPluginGraphql } from "@shared/lib/graphql/authorized-plugin";
+import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
 import { stagedTx } from "@shared/lib/plugins";
 import { zAccount } from "@shared/lib/schemas/account";
 
@@ -31,7 +31,7 @@ export const useTxHistory = (txId: string | undefined | null) =>
         enabled: !!txId,
         queryKey: QueryKey.transactionHistory(txId),
         queryFn: async () => {
-            const res = await authorizedPluginGraphql(
+            const res = await callGraphqlViaPlugin(
                 stagedTx.authorized.graphql,
                 `
                 {

@@ -1,4 +1,4 @@
-import { authorizedPluginGraphql } from "@shared/lib/graphql/authorized-plugin";
+import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
 import { nameMarket } from "@shared/lib/plugins";
 
 import {
@@ -19,7 +19,7 @@ export type FetchNameEventsPageParams =
     | { last: number; before?: string };
 
 async function nameMarketAuthorizedGraphql<T>(query: string): Promise<T> {
-    return authorizedPluginGraphql(nameMarket.authorized.graphql, query);
+    return callGraphqlViaPlugin(nameMarket.authorized.graphql, query);
 }
 
 function mapNameEventEdges(edges: Array<{ cursor?: string; node?: unknown }>) {

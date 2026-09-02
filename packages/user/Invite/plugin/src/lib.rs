@@ -282,7 +282,7 @@ impl HookActionsSender for InvitePlugin {
 }
 
 impl Authorized for InvitePlugin {
-    #[psibase_plugin::authorized(None, whitelist = ["homepage", "fractal-cr", "guilds"])]
+    #[psibase_plugin::authorized(None)]
     fn graphql(query: String) -> Result<String, Error> {
         host::server::post_graphql_get_json(&query)
     }

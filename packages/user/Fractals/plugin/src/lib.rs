@@ -154,7 +154,7 @@ impl Queries for FractallyPlugin {
 }
 
 impl Authorized for FractallyPlugin {
-    #[psibase_plugin::authorized(None, whitelist = ["fractal-cr", "fractals"])]
+    #[psibase_plugin::authorized(None)]
     fn graphql(query: String) -> Result<String, Error> {
         host::server::post_graphql_get_json(&query)
     }

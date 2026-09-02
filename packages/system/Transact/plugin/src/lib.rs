@@ -44,7 +44,7 @@ psibase::define_trust! {
         ",
     }
     functions {
-        None => [add_signature, unhook_actions_sender, add_action_to_transaction, graphql],
+        None => [add_signature, unhook_actions_sender, add_action_to_transaction],
         Low => [],
         High => [hook_actions_sender],
         Max => [set_propose_latch, propose, set_snapshot_time, start_tx, finish_tx, get_query_token],
@@ -362,7 +362,6 @@ impl Auth for TransactPlugin {
 
 impl Authorized for TransactPlugin {
     fn graphql(query: String) -> Result<String, HostTypes::Error> {
-        assert_authorized_with_whitelist(FunctionName::graphql, vec!["config".into()])?;
         Server::post_graphql_get_json(&query)
     }
 }

@@ -26,12 +26,14 @@ interface server {
     get-json: func(endpoint: string) -> result<string, error>;
 
     /// Fetch JSON from another service on the current root domain.
+    /// Only callable by the `packages` plugin.
     ///
     /// Parameters
     /// * `url` - A full URL whose host is a sibling service on this chain
     fetch-sibling-json: func(url: string) -> result<string, error>;
 
     /// Fetch binary data from another service on the current root domain.
+    /// Only callable by the `packages` plugin.
     ///
     /// Parameters
     /// * `url` - A full URL whose host is a sibling service on this chain

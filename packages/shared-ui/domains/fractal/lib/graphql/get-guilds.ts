@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { authorizedPluginGraphql } from "@shared/lib/graphql/authorized-plugin";
+import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
 import { guilds } from "@shared/lib/plugins";
 import { Account, zAccount } from "@shared/lib/schemas/account";
 
@@ -30,7 +30,7 @@ export const zGuildsRes = z.object({
 export type GuildsRes = z.infer<typeof zGuildsRes>;
 
 export const getGuilds = async (fractal: Account): Promise<GuildsRes> => {
-    const data = await authorizedPluginGraphql(
+    const data = await callGraphqlViaPlugin(
         guilds.authorized.graphql,
         `
     {

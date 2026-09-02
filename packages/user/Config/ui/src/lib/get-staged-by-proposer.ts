@@ -2,7 +2,7 @@ import type { Account } from "@shared/lib/schemas/account";
 
 import { z } from "zod";
 
-import { authorizedPluginGraphql } from "@shared/lib/graphql/authorized-plugin";
+import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
 import { stagedTx } from "@shared/lib/plugins";
 
 const zRes = z.object({
@@ -17,7 +17,7 @@ const zRes = z.object({
 });
 
 export const getStagedByProposer = async (account: Account) => {
-    const res = await authorizedPluginGraphql(
+    const res = await callGraphqlViaPlugin(
         stagedTx.authorized.graphql,
         ` { 
         getStagedByProposer(proposer: "${account}") {

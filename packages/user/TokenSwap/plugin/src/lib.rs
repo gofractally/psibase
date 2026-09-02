@@ -47,7 +47,7 @@ define_trust! {
         ",
     }
     functions {
-        None => [quote, quote_remove_liquidity, quote_add_liquidity, quote_single_sided_remove, graphql],
+        None => [quote, quote_remove_liquidity, quote_add_liquidity, quote_single_sided_remove],
         High => [swap, new_pool, add_liquidity, remove_liquidity],
     }
 }
@@ -334,7 +334,6 @@ impl Liquidity for TokenSwapPlugin {
 
 impl Authorized for TokenSwapPlugin {
     fn graphql(query: String) -> Result<String, Error> {
-        assert_authorized_with_whitelist(FunctionName::graphql, vec!["homepage".into()])?;
         server::post_graphql_get_json(&query)
     }
 }

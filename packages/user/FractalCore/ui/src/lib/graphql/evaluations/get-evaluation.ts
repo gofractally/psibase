@@ -3,7 +3,7 @@ import { z } from "zod";
 import { zUnix } from "@shared/lib/schemas/unix";
 
 import { GUILDS_SERVICE } from "@shared/domains/fractal/lib/constants";
-import { authorizedPluginGraphql } from "@shared/lib/graphql/authorized-plugin";
+import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
 import { evaluation as evaluationPlugin } from "@shared/lib/plugins";
 import { zAccount } from "@shared/lib/schemas/account";
 
@@ -23,7 +23,7 @@ export const zEvaluation = z.object({
 export type Evaluation = z.infer<typeof zEvaluation>;
 
 export const getEvaluation = async (id: number) => {
-    const evaluation = await authorizedPluginGraphql(
+    const evaluation = await callGraphqlViaPlugin(
         evaluationPlugin.authorized.graphql,
         `
     {

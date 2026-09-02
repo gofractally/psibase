@@ -27,16 +27,6 @@ use errors::ErrorType::*;
 
 struct ProducersPlugin;
 
-fn assert_caller(allowed: &[&str], context: &str) {
-    let sender = Client::get_sender();
-    assert!(
-        allowed.contains(&sender.as_str()),
-        "{} can only be called by {:?}",
-        context,
-        allowed
-    );
-}
-
 #[derive(Deserialize)]
 struct CandidateLookupClaim {
     service: String,
@@ -199,7 +189,6 @@ impl Api for ProducersPlugin {
 
 impl Authorized for ProducersPlugin {
     fn graphql(query: String) -> Result<String, Error> {
-        assert_caller(&["homepage", "config"], "authorized::graphql");
         post_graphql_get_json(&query)
     }
 }

@@ -1,4 +1,4 @@
-import { authorizedPluginGraphql } from "@shared/lib/graphql/authorized-plugin";
+import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
 import { nameMarket } from "@shared/lib/plugins";
 import {
     type AccountMarketOverviewRow,
@@ -8,7 +8,7 @@ import {
 } from "@shared/lib/schemas/account-markets";
 
 export async function fetchCurrentPrices() {
-    const raw = await authorizedPluginGraphql(
+    const raw = await callGraphqlViaPlugin(
         nameMarket.authorized.graphql,
         `
             query {
@@ -32,7 +32,7 @@ export const fetchCurrentPriceForLength = async (length: number) => {
 export async function fetchAccountMarketsOverview(): Promise<
     AccountMarketOverviewRow[]
 > {
-    const raw = await authorizedPluginGraphql(
+    const raw = await callGraphqlViaPlugin(
         nameMarket.authorized.graphql,
         `
             query {

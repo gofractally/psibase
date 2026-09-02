@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { authorizedPluginGraphql } from "@shared/lib/graphql/authorized-plugin";
+import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
 import { setcode } from "@shared/lib/plugins";
 import { zAccount } from "@shared/lib/schemas/account";
 
@@ -24,7 +24,7 @@ export const useCodeHash = (
         queryKey: codeHashQueryKey(account),
         enabled: !!account,
         queryFn: async () => {
-            const res = await authorizedPluginGraphql(
+            const res = await callGraphqlViaPlugin(
                 setcode.authorized.graphql,
                 `
         {

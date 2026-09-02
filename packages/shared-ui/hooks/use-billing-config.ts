@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { authorizedPluginGraphql } from "@shared/lib/graphql/authorized-plugin";
+import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
 import QueryKey from "@shared/lib/query-keys";
 import { vserver } from "@shared/lib/plugins";
 
@@ -23,7 +23,7 @@ export const useBillingConfig = () => {
                     }
                 }
             `;
-            const res = await authorizedPluginGraphql<BillingConfigResponse>(
+            const res = await callGraphqlViaPlugin<BillingConfigResponse>(
                 vserver.authorized.graphql,
                 query,
             );

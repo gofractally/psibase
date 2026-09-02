@@ -29,7 +29,7 @@ psibase::define_trust! {
         ",
     }
     functions {
-        None => [graphql],
+        None => [],
         Low => [],
         Medium => [set_cache_mode],
         High => [upload, upload_encoded, upload_tree, remove, enable_spa, set_csp, delete_csp, set_proxy, clear_proxy],
@@ -207,10 +207,6 @@ impl Sites for SitesPlugin {
 
 impl Authorized for SitesPlugin {
     fn graphql(query: String) -> Result<String, Error> {
-        assert_authorized_with_whitelist(
-            FunctionName::graphql,
-            vec!["workshop".into(), "config".into()],
-        )?;
         Server::post_graphql_get_json(&query)
     }
 }

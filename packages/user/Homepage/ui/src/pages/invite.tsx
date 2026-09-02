@@ -10,7 +10,7 @@ import {
 import { useSearchParams } from "react-router-dom";
 import { z } from "zod";
 
-import { authorizedPluginGraphql } from "@shared/lib/graphql/authorized-plugin";
+import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
 import { invite as invitePlugin } from "@shared/lib/plugins";
 import { supervisor } from "@shared/lib/supervisor";
 import { Button } from "@shared/shadcn/ui/button";
@@ -41,7 +41,7 @@ const fetchInvite = async (token: string) => {
         params: [token],
     });
 
-    const response = await authorizedPluginGraphql(
+    const response = await callGraphqlViaPlugin(
         invitePlugin.authorized.graphql,
         `
             query InviteById {

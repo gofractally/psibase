@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import QueryKey from "@/lib/query-keys";
 
-import { authorizedPluginGraphql } from "@shared/lib/graphql/authorized-plugin";
+import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
 import { tokens } from "@shared/lib/plugins";
 import { zAccount } from "@shared/lib/schemas/account";
 
@@ -13,7 +13,7 @@ export const zToken = z.object({
 });
 
 export const getToken = async (tokenId: number) => {
-    const token = await authorizedPluginGraphql(
+    const token = await callGraphqlViaPlugin(
         tokens.authorized.graphql,
         `
             {

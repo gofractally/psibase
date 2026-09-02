@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import QueryKey from "@/lib/query-keys";
 
-import { authorizedPluginGraphql } from "@shared/lib/graphql/authorized-plugin";
+import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
 import { vserver } from "@shared/lib/plugins";
 
 const zThresholds = z.object({
@@ -71,7 +71,7 @@ export const useResourcePricing = () => {
                 }
             `;
 
-            const res = await authorizedPluginGraphql(
+            const res = await callGraphqlViaPlugin(
                 vserver.authorized.graphql,
                 query,
             );

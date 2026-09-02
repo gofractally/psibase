@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { authorizedPluginGraphql } from "@shared/lib/graphql/authorized-plugin";
+import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
 import { producers } from "@shared/lib/plugins";
 import { zAccount } from "@shared/lib/schemas/account";
 
@@ -15,7 +15,7 @@ const zProducerReturn = z.object({
 export type Producer = z.infer<typeof zProducerReturn>;
 
 export const getProducers = async (): Promise<Producer[]> => {
-    const data = await authorizedPluginGraphql(
+    const data = await callGraphqlViaPlugin(
         producers.authorized.graphql,
         `
             {

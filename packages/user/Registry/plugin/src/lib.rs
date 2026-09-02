@@ -26,7 +26,7 @@ psibase::define_trust! {
         ",
     }
     functions {
-        None => [graphql],
+        None => [],
         Low => [],
         Medium => [set_metadata],
         High => [publish, unpublish],
@@ -65,7 +65,6 @@ impl Developer for RegistryPlugin {
 
 impl Authorized for RegistryPlugin {
     fn graphql(query: String) -> Result<String, Error> {
-        assert_authorized_with_whitelist(FunctionName::graphql, vec!["workshop".to_string()])?;
         Server::post_graphql_get_json(&query)
     }
 }
