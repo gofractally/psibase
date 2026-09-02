@@ -646,6 +646,19 @@ export function useSetCurrencyPolicy() {
     });
 }
 
+export function useRemoveCurrencyPolicy() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: { fromAsset: number; toAsset: number }) =>
+            banxCall("removeCurrencyPolicy", [p.fromAsset, p.toAsset]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Currency policy removed");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
 export function useSetCashQuote() {
     const invalidate = useInvalidateBanx();
     return useMutation({

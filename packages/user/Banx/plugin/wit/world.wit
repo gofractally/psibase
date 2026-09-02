@@ -194,6 +194,9 @@ interface api {
         expires-at-seconds: u32,
     ) -> result<_, error>;
 
+    /// Remove a from→to FX offer.
+    remove-currency-policy: func(from-asset: u16, to-asset: u16) -> result<_, error>;
+
     /// Invoice (`kind` = 1): you are the payee; `counterparty` is who was
     /// billed (empty / `"0"` = anyone with a path may pay). Please-book
     /// (`kind` = 2): you ask `counterparty` (creditor) to deposit you.

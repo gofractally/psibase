@@ -7,7 +7,11 @@ import {
     useForwardOffers,
     useBuyClaimOffers,
 } from "@/hooks/use-banx-data";
-import { useConvert, useSetCurrencyPolicy } from "@/hooks/use-banx-mutations";
+import {
+    useConvert,
+    useRemoveCurrencyPolicy,
+    useSetCurrencyPolicy,
+} from "@/hooks/use-banx-mutations";
 import {
     amountPlaceholder,
     displayAmount,
@@ -24,6 +28,7 @@ import {
     useAppForm,
 } from "@/lib/form";
 
+import { Button } from "@shared/shadcn/ui/button";
 import {
     Table,
     TableBody,
@@ -39,6 +44,7 @@ export function PoliciesPage() {
     const { data: buyClaimOffers = [] } = useBuyClaimOffers();
     const { data: currency = [] } = useCurrencyPolicies();
     const setCurrency = useSetCurrencyPolicy();
+    const removeCurrency = useRemoveCurrencyPolicy();
     const convert = useConvert();
 
     const currencyForm = useAppForm({
@@ -499,6 +505,7 @@ export function PoliciesPage() {
                                     <TableHead className="text-right">
                                         Expires
                                     </TableHead>
+                                    <TableHead />
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -526,6 +533,24 @@ export function PoliciesPage() {
                                         </TableCell>
                                         <TableCell className="text-right text-sm">
                                             {formatExpiresAt(p.expiresAt)}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                disabled={
+                                                    removeCurrency.isPending
+                                                }
+                                                onClick={() =>
+                                                    removeCurrency.mutate({
+                                                        fromAsset: p.fromAsset,
+                                                        toAsset: p.toAsset,
+                                                    })
+                                                }
+                                            >
+                                                Remove
+                                            </Button>
                                         </TableCell>
                                     </TableRow>
                                 ))}

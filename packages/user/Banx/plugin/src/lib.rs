@@ -62,6 +62,7 @@ define_trust! {
             remove_sell_claim_offer,
             remove_global_sell_claim_offer,
             set_currency_policy,
+            remove_currency_policy,
             create_request,
             cancel_request,
             fulfill_settle,
@@ -472,6 +473,16 @@ impl Api for BanxPlugin {
         }
         .packed();
         add_action_to_transaction(banx::action_structs::st_cur_pol::ACTION_NAME, &packed)
+    }
+
+    fn remove_currency_policy(from_asset: u16, to_asset: u16) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::remove_currency_policy)?;
+        let packed = banx::action_structs::rm_cur_pol {
+            from_asset,
+            to_asset,
+        }
+        .packed();
+        add_action_to_transaction(banx::action_structs::rm_cur_pol::ACTION_NAME, &packed)
     }
 
     fn create_request(

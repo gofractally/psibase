@@ -23,10 +23,6 @@ impl ClaimOffer {
         expires_live(self.expires_at)
     }
 
-    pub fn is_buy(&self) -> bool {
-        self.side == Self::BUY
-    }
-
     pub fn is_sell(&self) -> bool {
         self.side == Self::SELL
     }

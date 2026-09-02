@@ -374,6 +374,12 @@ pub mod service {
         );
     }
 
+    /// Remove a from→to FX offer.
+    #[action]
+    fn rm_cur_pol(from_asset: u16, to_asset: u16) {
+        CurrencyPolicy::get_assert(get_sender(), from_asset, to_asset).remove();
+    }
+
     /// Post a cash quote: Banx `asset_id` ↔ Tokens `token_id`.
     ///
     /// `is_out` true: taker draws Banx, receives tokens. False: taker sends

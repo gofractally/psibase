@@ -169,7 +169,7 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 | `fl_stl` | Debtor fulfills a settle-auth |
 | `net` | Explicit bilateral net (no UI; writers already auto-net) |
 | `forgive` | Creditor write-off of claims they hold (one-sided; UI on savings rows) |
-| `st_cur_pol` | Post a from→to FX offer |
+| `st_cur_pol` / `rm_cur_pol` | Post / remove a from→to FX offer |
 | `convert` | Take the counterparty’s FX offer and rebook |
 | `st_csh_qte` / `rm_csh_qte` | Post / remove a Banx↔Tokens cash quote (`is_out` true = out) |
 | `csh_fund` / `csh_wd` | Fund / withdraw Tokens sub-account `{poster}/{token_id}` on Banx |

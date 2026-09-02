@@ -66,6 +66,10 @@ impl CurrencyPolicy {
         .save();
     }
 
+    pub fn remove(&self) {
+        CurrencyPolicyTab::read_write().erase(&(self.poster, self.from_asset, self.to_asset));
+    }
+
     /// Rebook leftover `from_asset` between the two parties into
     /// `to_asset` at this poster's rate. Poster must be a party.
     /// Nets `from_asset` once, then auto-nets `to_asset`.

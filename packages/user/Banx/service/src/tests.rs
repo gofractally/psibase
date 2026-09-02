@@ -5,7 +5,8 @@ mod tests {
     use crate::Wrapper;
     use crate::interest::{SECONDS_PER_DAY, SECONDS_PER_YEAR, compound_amount, interest_for};
     use crate::tables::{
-        Asset, CreditLine, Obligation, PPM_SCALE, PairCycle, PathHop, PayRequest, RATE_SCALE,
+        Asset, CreditLine, CurrencyPolicy, Obligation, PPM_SCALE, PairCycle, PathHop, PayRequest,
+        RATE_SCALE,
     };
     use psibase::services::tokens::{Precision, Quantity};
     use psibase::*;
@@ -684,6 +685,51 @@ mod tests {
         assert_eq!(exp(&chain, gary, alice, aud), 0);
         assert_eq!(exp(&chain, gary, alice, usd), 50);
 
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_rm_cur_pol_removes_offer(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let gary = account!("gary");
+        chain.new_account(alice).unwrap();
+        chain.new_account(gary).unwrap();
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, gary)
+            .st_crd_lne(alice, aud, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(gary, aud)],
+                Quantity::new(100),
+                Quantity::new(100),
+                0,
+            )
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .st_cur_pol(aud, usd, Quantity::new(0), RATE_SCALE, 0, never())
+            .get()?;
+        assert!(CurrencyPolicy::get(gary, aud, usd).is_some());
+
+        Wrapper::push_from(&chain, gary)
+            .rm_cur_pol(aud, usd)
+            .get()?;
+        assert!(CurrencyPolicy::get(gary, aud, usd).is_none());
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .convert(gary, aud, usd, Quantity::new(100), Quantity::new(100))
+                .get()
+                .is_err()
+        );
+        assert!(
+            Wrapper::push_from(&chain, gary)
+                .rm_cur_pol(aud, usd)
+                .get()
+                .is_err()
+        );
         Ok(())
     }
 

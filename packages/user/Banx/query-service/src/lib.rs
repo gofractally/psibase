@@ -215,7 +215,7 @@ mod service {
                 feePercentPpm: p.fee_percent,
                 expiresAt: time_sec(p.expires_at),
                 isGlobal: p.is_global(),
-                isBuy: p.is_buy(),
+                isBuy: p.side == ClaimOffer::BUY,
                 isSell: p.is_sell(),
             }
         }
