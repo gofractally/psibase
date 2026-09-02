@@ -1554,7 +1554,6 @@ void run(const std::string&              db_path,
       http_config->status           = http::http_status{
           .slow = system->sharedDatabase.isSlow(), .startup = 1, .needgenesis = 1};
 
-      // TODO: speculative execution on non-producers
       http_config->push_boot_async =
           [&chainContext, &node](std::vector<char>               packed_signed_transactions,
                                  http::push_transaction_callback callback)
