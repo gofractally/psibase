@@ -40,8 +40,8 @@
     #   mdbook-pagetoc 0.2.0 — DIVERGES from psibase-contributor (0.2.2): no nixpkgs rev
     #   ships 0.2.2 while keeping mdbook 0.4.x compatibility (0.3.0 breaks mdbook 0.4.x).
     nixpkgs-mdbook-pagetoc.url = "github:NixOS/nixpkgs/ac62194c3917d5f474c1a844b6fd6da2db95077d";
-    #   nodejs 20.11.0
-    nixpkgs-nodejs.url = "github:NixOS/nixpkgs/fea57dc5b57285d33918813d2f3695024d8fc9e8";
+    #   nodejs 24.20.0
+    nixpkgs-nodejs.url = "github:NixOS/nixpkgs/aefbfa796e0203f83584422979d2a7e7558fa820";
   };
 
   outputs = { self, nixpkgs, flake-utils, fenix, nixpkgs-cargo-component, nixpkgs-cargo-generate, nixpkgs-cursor-cli, nixpkgs-mdbook, nixpkgs-mdbook-mermaid, nixpkgs-mdbook-plugins, nixpkgs-mdbook-linkcheck, nixpkgs-mdbook-pagetoc, nixpkgs-nodejs }:
@@ -69,7 +69,7 @@
         mdbookLinkcheck = (import nixpkgs-mdbook-linkcheck { inherit system; }).mdbook-linkcheck;
         mdbookPagetoc = (import nixpkgs-mdbook-pagetoc { inherit system; }).mdbook-pagetoc;
         wasmPack = (import nixpkgs-mdbook { inherit system; }).wasm-pack;
-        nodejs20 = (import nixpkgs-nodejs { inherit system; }).nodejs_20;
+        nodejs24 = (import nixpkgs-nodejs { inherit system; }).nodejs_24;
 
         # Rust 1.86.0 toolchain with WASM targets (see nix/rust-toolchain.toml)
         rustToolchain = fenix.packages.${system}.fromToolchainFile {
@@ -150,13 +150,13 @@
 
         yarnBerry = pkgs.stdenv.mkDerivation rec {
           pname = "yarn-berry";
-          version = "4.9.1";
+          version = "4.18.0";
 
           src = pkgs.fetchFromGitHub {
             owner = "yarnpkg";
             repo = "berry";
             rev = "@yarnpkg/cli/${version}";
-            sha256 = "sha256-znxB827TFLAEfCeHrwBsmRlkZz1LVWsBFhjZANiIW/4=";
+            sha256 = "sha256-pO89wh17cW9/RGKjo70yiefr+9nlJAQs4ZEdUnzdgQM=";
           };
 
           nativeBuildInputs = [ pkgs.makeWrapper ];
@@ -168,7 +168,7 @@
             runHook preInstall
             mkdir -p $out/lib/yarn $out/bin
             cp -r . $out/lib/yarn/
-            makeWrapper ${nodejs20}/bin/node $out/bin/yarn \
+            makeWrapper ${nodejs24}/bin/node $out/bin/yarn \
               --add-flags "$out/lib/yarn/packages/yarnpkg-cli/bin/yarn.js"
             runHook postInstall
           '';
@@ -205,7 +205,7 @@
           wabt
           wasmPack
           wasmTools
-          nodejs20
+          nodejs24
           yarnBerry
           eslint
           prettier
