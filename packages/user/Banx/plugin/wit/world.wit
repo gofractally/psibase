@@ -32,6 +32,12 @@ interface types {
         /// Suggested min-return for `path-pay` (human decimal in last hop asset).
         min-return: string,
     }
+
+    /// Token + id from `create-invite` (token is the claim-URL secret).
+    record created-invite {
+        invite-token: string,
+        invite-id: u32,
+    }
 }
 
 interface helpers {
@@ -48,7 +54,7 @@ interface helpers {
 
 interface api {
     use host:types/types.{error};
-    use types.{path-hop, path-hop-quote, path-quote};
+    use types.{path-hop, path-hop-quote, path-quote, created-invite};
 
     /// Creditor posts/updates a credit line to `debtor` in `asset-id`.
     /// `limit` is a human decimal string (e.g. `"100.00"`).
@@ -341,6 +347,19 @@ interface api {
         max-hops: u8,
         exact-out: bool,
     ) -> result<path-quote, error>;
+
+    /// Create a network+Banx invite that extends a credit line to the claimee.
+    /// `limit` is a human decimal. Returns the invite token for the claim URL.
+    create-invite: func(
+        asset-id: u16,
+        limit: string,
+        deplete-on-debit: bool,
+        interest-rate-ppm: u32,
+        grace-seconds: u32,
+    ) -> result<created-invite, error>;
+
+    /// Revoke a Banx invite. Inviter only.
+    delete-invite: func(invite-id: u32) -> result<_, error>;
 }
 
 world imports {

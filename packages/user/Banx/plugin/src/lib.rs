@@ -2,7 +2,9 @@
 mod bindings;
 
 use bindings::banx::plugin::types::PathHopQuote as WitPathHopQuote;
-use bindings::exports::banx::plugin::api::{Guest as Api, PathHop as WitPathHop, PathQuote};
+use bindings::exports::banx::plugin::api::{
+    CreatedInvite, Guest as Api, PathHop as WitPathHop, PathQuote,
+};
 use bindings::exports::banx::plugin::helpers::Guest as Helpers;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
@@ -35,6 +37,7 @@ define_trust! {
             - Convert debt between assets
             - Buy or sell claims under a posted claim offer
             - Post cash quotes, fund/withdraw the cash vault, cash_in (from your vault)
+            - Create or revoke Banx invites (onboard + extend a credit line)
         ",
         High => "
             - Path-pay (draw on others' credit along a path)
@@ -77,6 +80,8 @@ define_trust! {
             cash_fund,
             cash_withdraw,
             cash_in,
+            create_invite,
+            delete_invite,
         ],
         High => [path_pay, pay_inv, cash_out],
     }
@@ -863,6 +868,44 @@ impl Api for BanxPlugin {
         }
         .packed();
         add_action_to_transaction(banx::action_structs::cash_in::ACTION_NAME, &packed)
+    }
+
+    fn create_invite(
+        asset_id: u16,
+        limit: String,
+        deplete_on_debit: bool,
+        interest_rate_ppm: u32,
+        grace_seconds: u32,
+    ) -> Result<CreatedInvite, Error> {
+        trust::assert_authorized(trust::FunctionName::create_invite)?;
+        const NUM_ACCOUNTS: u16 = 1;
+        let amount = parse_amount_nonzero(asset_id, &limit)?;
+        let details = bindings::invite::plugin::inviter::prepare_new_invite(
+            NUM_ACCOUNTS,
+            &banx::SERVICE.to_string(),
+        )?;
+        let packed = banx::action_structs::cr_invite {
+            invite_id: details.invite_id,
+            invite_payload: details.payload,
+            num_accounts: NUM_ACCOUNTS,
+            asset_id,
+            amount,
+            deplete_on_debit,
+            interest_rate: interest_rate_ppm,
+            grace_seconds,
+        }
+        .packed();
+        add_action_to_transaction(banx::action_structs::cr_invite::ACTION_NAME, &packed)?;
+        Ok(CreatedInvite {
+            invite_token: details.invite_token,
+            invite_id: details.invite_id,
+        })
+    }
+
+    fn delete_invite(invite_id: u32) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::delete_invite)?;
+        let packed = banx::action_structs::rm_invite { invite_id }.packed();
+        add_action_to_transaction(banx::action_structs::rm_invite::ACTION_NAME, &packed)
     }
 }
 

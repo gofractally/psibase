@@ -5,9 +5,10 @@ mod tests {
     use crate::Wrapper;
     use crate::interest::{SECONDS_PER_DAY, SECONDS_PER_YEAR, compound_amount, interest_for};
     use crate::tables::{
-        Asset, CreditLine, CurrencyPolicy, Obligation, PPM_SCALE, PairCycle, PathHop, PayRequest,
-        RATE_SCALE,
+        Asset, BanxInvite, BanxInviteTable, CreditLine, CurrencyPolicy, Obligation, PPM_SCALE,
+        PairCycle, PathHop, PayRequest, RATE_SCALE,
     };
+    use psibase::fracpack::Pack;
     use psibase::services::tokens::{Precision, Quantity};
     use psibase::*;
 
@@ -4394,6 +4395,191 @@ mod tests {
         assert_eq!(vault_bal(&chain, bob, gas), 0);
         assert_eq!(vault_bal(&chain, james, gas), 400_000);
         assert_eq!(exp(&chain, james, bob, usd), 500);
+
+        Ok(())
+    }
+
+    fn invite_payload(seed: u8) -> Vec<u8> {
+        psibase::services::invite::InvPayload {
+            fingerprint: vec![seed; 32],
+            secret: String::new(),
+        }
+        .packed()
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_invite_claim_extends_credit_line(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+
+        let alice = account!("alice");
+        let bob = account!("bob");
+        let carol = account!("carol");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        chain.new_account(carol).unwrap();
+
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        let invite_id = 42u32;
+        let limit = Quantity::new(10_000);
+        let grace = 7 * SECONDS_PER_DAY as u32;
+
+        Wrapper::push_from(&chain, alice)
+            .cr_invite(invite_id, invite_payload(1), 1, usd, limit, false, 0, grace)
+            .get()?;
+
+        let stored = BanxInvite::get_assert(invite_id);
+        assert_eq!(stored.inviter, alice);
+        assert_eq!(stored.asset_id, usd);
+        assert_eq!(stored.limit.value, limit.value);
+        assert_eq!(BanxInvite::list_by_inviter(alice).len(), 1);
+        assert!(CreditLine::get(alice, bob, usd).is_none());
+
+        Wrapper::push_from(&chain, psibase::services::invite::Wrapper::SERVICE)
+            .onInvAccept(invite_id, bob)
+            .get()?;
+
+        let line = CreditLine::get_assert(alice, bob, usd);
+        assert_eq!(line.limit.value, limit.value);
+        assert!(!line.deplete_on_debit);
+        assert_eq!(line.interest_rate, 0);
+
+        // Same accepter again: existing line is left alone.
+        Wrapper::push_from(&chain, psibase::services::invite::Wrapper::SERVICE)
+            .onInvAccept(invite_id, bob)
+            .get()?;
+        assert_eq!(
+            CreditLine::get_assert(alice, bob, usd).limit.value,
+            limit.value
+        );
+
+        // A different existing account still gets a line.
+        Wrapper::push_from(&chain, psibase::services::invite::Wrapper::SERVICE)
+            .onInvAccept(invite_id, carol)
+            .get()?;
+        assert_eq!(
+            CreditLine::get_assert(alice, carol, usd).limit.value,
+            limit.value
+        );
+
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_invite_claim_skips_existing_credit_line(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        Wrapper::push_from(&chain, alice)
+            .st_crd_lne(bob, usd, Quantity::new(1), true, 12_000, 0)
+            .get()?;
+
+        let invite_id = 7u32;
+        Wrapper::push_from(&chain, alice)
+            .cr_invite(
+                invite_id,
+                invite_payload(2),
+                1,
+                usd,
+                Quantity::new(99_000),
+                false,
+                0,
+                0,
+            )
+            .get()?;
+
+        Wrapper::push_from(&chain, psibase::services::invite::Wrapper::SERVICE)
+            .onInvAccept(invite_id, bob)
+            .get()?;
+
+        let line = CreditLine::get_assert(alice, bob, usd);
+        assert_eq!(line.limit.value, 1);
+        assert!(line.deplete_on_debit);
+        assert_eq!(line.interest_rate, 12_000);
+
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_invite_hook_rejects_non_invite_sender(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        let invite_id = 9u32;
+        Wrapper::push_from(&chain, alice)
+            .cr_invite(
+                invite_id,
+                invite_payload(3),
+                1,
+                usd,
+                Quantity::new(5_000),
+                false,
+                0,
+                0,
+            )
+            .get()?;
+
+        let result = Wrapper::push_from(&chain, alice)
+            .onInvAccept(invite_id, bob)
+            .get();
+        assert!(result.is_err());
+        assert!(CreditLine::get(alice, bob, usd).is_none());
+
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_invite_revoke(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        let invite_id = 11u32;
+        Wrapper::push_from(&chain, alice)
+            .cr_invite(
+                invite_id,
+                invite_payload(4),
+                1,
+                usd,
+                Quantity::new(5_000),
+                false,
+                0,
+                0,
+            )
+            .get()?;
+
+        let result = Wrapper::push_from(&chain, bob).rm_invite(invite_id).get();
+        assert!(result.is_err());
+
+        Wrapper::push_from(&chain, alice)
+            .rm_invite(invite_id)
+            .get()?;
+        assert!(BanxInviteTable::read()
+            .get_index_pk()
+            .get(&invite_id)
+            .is_none());
+
+        let result = Wrapper::push_from(&chain, psibase::services::invite::Wrapper::SERVICE)
+            .onInvAccept(invite_id, bob)
+            .get();
+        assert!(result.is_err());
 
         Ok(())
     }

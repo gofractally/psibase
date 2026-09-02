@@ -4,6 +4,8 @@ import { Layout } from "@/components/layout";
 import { LoginGate } from "@/components/login-gate";
 import { AssetsPage } from "@/pages/assets";
 import { CashPage } from "@/pages/cash";
+import { InvitePage } from "@/pages/invite";
+import { InvitesPage } from "@/pages/invites";
 import { ObligationsPage } from "@/pages/obligations";
 import { PathPayPage } from "@/pages/path-pay";
 import { PayeesPage } from "@/pages/payees";
@@ -22,6 +24,8 @@ export const router = createBrowserRouter([
             { index: true, element: <Navigate to="/accounts" replace /> },
             { path: "accounts", element: withGate(<ObligationsPage />) },
             { path: "payees", element: withGate(<PayeesPage />) },
+            { path: "invites", element: withGate(<InvitesPage />) },
+            { path: "invite", element: <InvitePage /> },
             { path: "path-pay", element: withGate(<PathPayPage />) },
             { path: "requests", element: withGate(<RequestsPage />) },
             { path: "cash", element: withGate(<CashPage />) },

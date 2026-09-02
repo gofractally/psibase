@@ -23,6 +23,8 @@ const titles: Record<string, string> = {
     "/cash": "Cash",
     "/policies": "Policies",
     "/assets": "Assets",
+    "/invites": "Invites",
+    "/invite": "Invite",
 };
 
 export const Layout = () => {

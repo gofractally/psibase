@@ -11,8 +11,10 @@ import {
     fetchForwardOffers,
     fetchRequests,
     fetchClaimOffers,
+    fetchInvites,
     fetchTokenPrecision,
     type ActivityEvent,
+    type BanxInvite,
     type CashQuote,
     type CashVault,
     type ClaimOffer,
@@ -77,6 +79,15 @@ export function useClaimOffers(): UseQueryResult<ClaimOffer[], Error> {
 
 export function useBuyClaimOffers() {
     return useClaimOffers();
+}
+
+export function useInvites(): UseQueryResult<BanxInvite[], Error> {
+    const { data: user } = useCurrentUser();
+    return useQuery({
+        queryKey: QueryKey.invites(user),
+        queryFn: () => fetchInvites(user!),
+        enabled: !!user,
+    });
 }
 
 export function useRequests(): UseQueryResult<PayRequest[], Error> {

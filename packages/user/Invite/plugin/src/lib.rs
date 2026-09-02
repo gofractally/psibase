@@ -244,7 +244,7 @@ impl Inviter for InvitePlugin {
         Ok(i.details.invite_token)
     }
 
-    #[psibase_plugin::authorized(Medium, whitelist=["guilds"])]
+    #[psibase_plugin::authorized(Medium, whitelist=["guilds", "banx-app", "banx"])]
     fn prepare_new_invite(num_accounts: u16, service_name: String) -> Result<InviteDetails, Error> {
         Ok(prepare_new_invite_impl(num_accounts, service_name)?.details)
     }

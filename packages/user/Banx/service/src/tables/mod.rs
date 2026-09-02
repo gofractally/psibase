@@ -7,6 +7,7 @@ mod currency_policy;
 mod forward_offer;
 mod helpers;
 mod init;
+mod invite;
 mod obligation;
 mod pair_cycle;
 mod path;
@@ -330,6 +331,29 @@ pub mod tables {
         #[primary_key]
         fn pk(&self) -> (AccountNumber, u16, u32, bool) {
             (self.poster, self.asset_id, self.token_id, self.is_out)
+        }
+    }
+
+    /// Invite created through Banx: on accept, the inviter extends a credit
+    /// line to the claimee (skipped if a line already exists for this pair).
+    #[table(name = "BanxInviteTable", index = 10)]
+    #[derive(Default, Clone, Fracpack, ToSchema, Serialize, Deserialize, Debug)]
+    pub struct BanxInvite {
+        #[primary_key]
+        pub id: u32,
+        pub inviter: AccountNumber,
+        pub asset_id: u16,
+        pub limit: Quantity,
+        pub deplete_on_debit: bool,
+        pub interest_rate: u32,
+        pub grace_seconds: u32,
+        pub created_at: TimePointSec,
+    }
+
+    impl BanxInvite {
+        #[secondary_key(1)]
+        fn by_inviter(&self) -> (AccountNumber, u32) {
+            (self.inviter, self.id)
         }
     }
 }

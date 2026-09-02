@@ -16,6 +16,7 @@ services = ["banx"]
 Accounts = "0.27.0"
 Host = "0.27.0"
 HttpServer = "0.27.0"
+Invite = "0.27.0"
 Sites = "0.27.0"
 Transact = "0.27.0"
 Permissions = "0.27.0"

@@ -110,6 +110,18 @@ export const REQUEST_INVOICE = 1;
 export const REQUEST_PLEASE_BOOK = 2;
 export const REQUEST_SETTLE_AUTH = 3;
 
+const zBanxInvite = z.object({
+    id: z.number(),
+    inviter: z.string(),
+    assetId: z.number(),
+    limit: z.string(),
+    depleteOnDebit: z.boolean(),
+    interestRatePpm: z.number(),
+    graceSeconds: z.number(),
+    createdAt: z.number(),
+    expiry: z.number(),
+});
+
 const zActivity = z.object({
     account: z.string(),
     counterparty: z.string(),
@@ -135,6 +147,7 @@ export type CashQuote = z.infer<typeof zCashQuote>;
 export type CashVault = z.infer<typeof zCashVault>;
 export type CurrencyPolicy = z.infer<typeof zCurrencyPolicy>;
 export type PayRequest = z.infer<typeof zPayRequest>;
+export type BanxInvite = z.infer<typeof zBanxInvite>;
 export type ActivityEvent = z.infer<typeof zActivity>;
 
 const gql = <T>(query: string) =>
@@ -197,6 +210,24 @@ export async function fetchBuyClaimOffers(
 ): Promise<ClaimOffer[]> {
     const all = await fetchClaimOffers(account);
     return all.filter((o) => o.isBuy);
+}
+
+const inviteFields = `id inviter assetId limit depleteOnDebit interestRatePpm graceSeconds createdAt expiry`;
+
+export async function fetchInvites(inviter: string): Promise<BanxInvite[]> {
+    const data = await gql<{ invites: BanxInvite[] }>(
+        `{ invites(inviter: "${inviter}") { ${inviteFields} } }`,
+    );
+    return zBanxInvite.array().parse(data.invites);
+}
+
+export async function fetchInvite(id: number): Promise<BanxInvite | null> {
+    const data = await gql<{ invite: BanxInvite | null }>(
+        `{ invite(id: ${id}) { ${inviteFields} } }`,
+    );
+    return data.invite === null || data.invite === undefined
+        ? null
+        : zBanxInvite.parse(data.invite);
 }
 
 export async function fetchRequests(account: string): Promise<PayRequest[]> {

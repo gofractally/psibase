@@ -3,10 +3,10 @@
 mod service {
     use async_graphql::*;
     use banx::tables::{
-        Asset, AssetTable, CashQuote, CashQuoteTab, ClaimOffer, ClaimOfferTab, Connection,
-        CreditLine, CreditLineTable, CurrencyPolicy, CurrencyPolicyTab, ForwardOffer,
-        ForwardOfferTab, Obligation, ObligationTable, PPM_SCALE, PairCycle, PayRequest, RATE_SCALE,
-        RequestTab,
+        Asset, AssetTable, BanxInvite, BanxInviteTable, CashQuote, CashQuoteTab, ClaimOffer,
+        ClaimOfferTab, Connection, CreditLine, CreditLineTable, CurrencyPolicy, CurrencyPolicyTab,
+        ForwardOffer, ForwardOfferTab, Obligation, ObligationTable, PairCycle, PayRequest,
+        RequestTab, PPM_SCALE, RATE_SCALE,
     };
     use psibase::services::tokens::{Decimal, Precision, Wrapper as Tokens};
     use psibase::*;
@@ -363,6 +363,38 @@ mod service {
         }
     }
 
+    #[derive(SimpleObject)]
+    struct InviteView {
+        id: u32,
+        inviter: AccountNumber,
+        assetId: u16,
+        limit: Decimal,
+        depleteOnDebit: bool,
+        interestRatePpm: u32,
+        graceSeconds: u32,
+        createdAt: i64,
+        /// Invite-service expiry (`0` if the invite record is gone).
+        expiry: i64,
+    }
+
+    impl InviteView {
+        fn from_row(row: BanxInvite) -> Self {
+            let p = asset_precision(row.asset_id);
+            let expiry = psibase::services::invite::Wrapper::call().getExpDate(row.id);
+            Self {
+                id: row.id,
+                inviter: row.inviter,
+                assetId: row.asset_id,
+                limit: Decimal::new(row.limit, p),
+                depleteOnDebit: row.deplete_on_debit,
+                interestRatePpm: row.interest_rate,
+                graceSeconds: row.grace_seconds,
+                createdAt: time_sec(row.created_at),
+                expiry: time_sec(expiry),
+            }
+        }
+    }
+
     struct Query;
 
     #[Object]
@@ -390,6 +422,23 @@ mod service {
 
         async fn assetBySymbol(&self, symbol: AccountNumber) -> Option<AssetView> {
             Asset::get_by_symbol(symbol).map(AssetView::from)
+        }
+
+        /// Credit-line invite posted by `inviter`.
+        async fn invite(&self, id: u32) -> Option<InviteView> {
+            BanxInviteTable::with_service(banx::SERVICE)
+                .get_index_pk()
+                .get(&id)
+                .map(InviteView::from_row)
+        }
+
+        /// Invites created by `inviter`, newest id last.
+        async fn invites(&self, inviter: AccountNumber) -> Vec<InviteView> {
+            BanxInviteTable::with_service(banx::SERVICE)
+                .get_index_by_inviter()
+                .range((inviter, 0)..=(inviter, u32::MAX))
+                .map(InviteView::from_row)
+                .collect()
         }
 
         /// Credit lines where `account` is creditor and/or debtor.

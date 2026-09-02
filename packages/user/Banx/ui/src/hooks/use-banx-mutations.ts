@@ -27,6 +27,7 @@ function useInvalidateBanx() {
             void qc.invalidateQueries({
                 queryKey: QueryKey.requests(user),
             });
+            void qc.invalidateQueries({ queryKey: QueryKey.invites(user) });
             void qc.invalidateQueries({ queryKey: ["banx", "cashQuotes"] });
             void qc.invalidateQueries({
                 queryKey: QueryKey.cashVault(user),
@@ -784,6 +785,58 @@ export function useCashIn() {
         onSuccess: () => {
             invalidate();
             toast.success("Cashed in");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useCreateInvite() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            assetId: number;
+            limit: string;
+            depleteOnDebit: boolean;
+            interestRatePpm: number;
+            graceSeconds: number;
+        }): Promise<{ inviteId: number; inviteToken: string }> => {
+            const res = (await supervisor.functionCall({
+                service: BANX_SERVICE,
+                intf: "api",
+                method: "createInvite",
+                params: [
+                    p.assetId,
+                    p.limit,
+                    p.depleteOnDebit,
+                    p.interestRatePpm,
+                    p.graceSeconds,
+                ],
+            })) as Record<string, unknown>;
+            const inviteId = Number(res.inviteId ?? res.invite_id);
+            const inviteToken = String(
+                res.inviteToken ?? res.invite_token ?? "",
+            );
+            if (!Number.isFinite(inviteId) || !inviteToken) {
+                throw new Error("Invite plugin returned an empty token");
+            }
+            return { inviteId, inviteToken };
+        },
+        onSuccess: () => {
+            invalidate();
+            toast.success("Invite created");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useDeleteInvite() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: { inviteId: number }) =>
+            banxCall("deleteInvite", [p.inviteId]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Invite revoked");
         },
         onError: (e: Error) => toast.error(e.message),
     });

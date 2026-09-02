@@ -6,6 +6,7 @@ import {
     GitBranch,
     Inbox,
     ScrollText,
+    UserPlus,
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
@@ -27,6 +28,7 @@ const items: {
     { to: "/path-pay", label: "Transfer", icon: GitBranch },
     { to: "/requests", label: "Requests", icon: Inbox },
     { to: "/payees", label: "Payees", icon: Contact },
+    { to: "/invites", label: "Invites", icon: UserPlus },
     { to: "/cash", label: "Cash", icon: Banknote },
     { to: "/policies", label: "Policies", icon: ArrowLeftRight },
     { to: "/assets", label: "Assets", icon: Coins },

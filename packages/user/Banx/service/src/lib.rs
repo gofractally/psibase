@@ -9,9 +9,9 @@ pub mod tables;
 #[psibase::service(name = "banx-app", tables = "tables::tables")]
 pub mod service {
     use crate::tables::{
-        assert_account_exists, emit_pair_activity, path_required_send, run_path, Asset, CashQuote,
-        ClaimOffer, Connection, CreditLine, CurrencyPolicy, ForwardOffer, InitRow, InitTable,
-        Obligation, PathHop, PayRequest,
+        assert_account_exists, emit_pair_activity, path_required_send, run_path, Asset, BanxInvite,
+        CashQuote, ClaimOffer, Connection, CreditLine, CurrencyPolicy, ForwardOffer, InitRow,
+        InitTable, Obligation, PathHop, PayRequest,
     };
     use psibase::{
         services::events,
@@ -127,6 +127,51 @@ pub mod service {
             0,
             "",
         );
+    }
+
+    /// Create a Banx invite. Caller is the inviter; `invite_id` / `invite_payload`
+    /// come from `invite:plugin` `prepare-new-invite`. The invite service is
+    /// created with hooks so [`onInvAccept`] extends a credit line to the
+    /// claimee (no-op if a line already exists).
+    #[action]
+    fn cr_invite(
+        invite_id: u32,
+        invite_payload: Vec<u8>,
+        num_accounts: u16,
+        asset_id: u16,
+        amount: Quantity,
+        deplete_on_debit: bool,
+        interest_rate: u32,
+        grace_seconds: u32,
+    ) {
+        BanxInvite::add(
+            invite_id,
+            invite_payload,
+            num_accounts,
+            asset_id,
+            amount,
+            deplete_on_debit,
+            interest_rate,
+            grace_seconds,
+        );
+    }
+
+    /// Delete a Banx invite. Inviter only. Refunds unused invite resources.
+    #[action]
+    fn rm_invite(invite_id: u32) {
+        BanxInvite::get_assert(invite_id).delete();
+    }
+
+    /// Invite hook: apply the stored credit line to `accepter` if none exists.
+    #[action]
+    #[allow(non_snake_case)]
+    fn onInvAccept(invite_id: u32, accepter: AccountNumber) {
+        assert_eq!(
+            get_sender(),
+            psibase::services::invite::Wrapper::SERVICE,
+            "sender must be invite"
+        );
+        BanxInvite::get_assert(invite_id).accept(accepter);
     }
 
     /// Remove the sender's credit line to `debitor`. Limit 0 still counts as
