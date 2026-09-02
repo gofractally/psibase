@@ -2,9 +2,7 @@ package fractals:plugin;
 
 world impl {
     include transact:plugin/imports;
-    include sites:plugin/imports;
-    include accounts:plugin/imports;
-    include base64:plugin/imports;
+    include accounts:query/imports;
     include guilds:plugin/imports;
 
 

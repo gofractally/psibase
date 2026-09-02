@@ -1,3 +1,4 @@
+import { Lock } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { useServerKeys } from "@/hooks/use-key-devices";
@@ -21,7 +22,8 @@ export const ProducerKeyLockedBanner = () => {
 
     return (
         <Alert variant="destructive">
-            <AlertTitle>🔐 Key Device Locked</AlertTitle>
+            <Lock />
+            <AlertTitle>Key device locked</AlertTitle>
             <AlertDescription>
                 <p>
                     Unlock your block signing key device on the{" "}

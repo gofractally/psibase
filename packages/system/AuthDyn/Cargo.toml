@@ -13,17 +13,17 @@ package-name = "AuthDyn"
 services = ["auth-dyn"]
 
 [package.metadata.psibase.dependencies]
-Host = "0.25.0"
-HttpServer = "0.25.0"
-Sites = "0.25.0"
-Permissions = "0.25.0"
-Transact = "0.25.0"
+Host = "0.27.0"
+HttpServer = "0.27.0"
+Sites = "0.27.0"
+Permissions = "0.27.0"
+Transact = "0.27.0"
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-auth-dyn = { path = "service", version = "0.25.0" }
-r-auth-dyn = { path = "query-service", version = "0.25.0" }
-auth-dyn-plugin = { path = "plugin", version = "0.25.0" }
+auth-dyn = { path = "service", version = "0.27.0" }
+r-auth-dyn = { path = "query-service", version = "0.27.0" }
+auth-dyn-plugin = { path = "plugin", version = "0.27.0" }
 psibase-system-workspace-hack.workspace = true

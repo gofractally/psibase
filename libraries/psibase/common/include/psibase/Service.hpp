@@ -179,10 +179,6 @@ namespace psibase
    };  // Service
 };  // namespace psibase
 
-#define PSIBASE_REFLECT_EVENTS(SERVICE)       \
-   using SERVICE##_Events = SERVICE ::Events; \
-   PSIO_REFLECT(SERVICE##_Events)
-
 #define PSIBASE_REFLECT_HISTORY_EVENTS(SERVICE, ...)          \
    using SERVICE##_EventsHistory = SERVICE ::Events::History; \
    PSIO_REFLECT(SERVICE##_EventsHistory, __VA_ARGS__)

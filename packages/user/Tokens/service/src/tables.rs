@@ -500,14 +500,25 @@ pub mod tables {
             }
         }
 
-        pub fn uncredit(&mut self, quantity: Quantity) {
+        pub fn uncredit(&mut self, quantity: Quantity, memo: Memo) {
             assert!(
                 quantity.value > 0,
                 "uncredit quantity must be greater than 0"
             );
             let quantity = quantity.min(self.balance);
+            if quantity.value == 0 {
+                return;
+            }
             self.sub_balance(quantity);
             Balance::get_or_new(self.creditor, self.token_id).add_balance(quantity);
+            crate::Wrapper::emit().history().balChanged(
+                self.token_id,
+                self.creditor,
+                self.debitor,
+                "uncredited".to_string(),
+                fmt_amount(self.token_id, quantity),
+                memo,
+            );
         }
 
         pub fn debit(&mut self, quantity: Quantity, memo: Memo) {

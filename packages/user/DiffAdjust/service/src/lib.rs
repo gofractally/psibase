@@ -343,6 +343,18 @@ pub mod service {
         .nft_id
     }
 
+    /// Get RateLimit record
+    ///
+    /// # Arguments
+    /// * `nft_id` - RateLimit / NFT ID
+    ///
+    /// # Returns
+    /// The RateLimit if it exists
+    #[action]
+    fn get(nft_id: u32) -> Option<RateLimit> {
+        RateLimit::get(nft_id)
+    }
+
     /// Get RateLimit difficulty
     ///
     /// # Arguments

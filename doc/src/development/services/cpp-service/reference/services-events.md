@@ -4,32 +4,14 @@
 
 To define a service:
 
-- Make a struct or class. It may optionally publicly inherit from [psibase::Service] to gain the [psibase::Service::emit] and [psibase::Service::events] convenience methods.
+- Make a struct or class. It may optionally publicly inherit from [psibase::Service] to gain several convenience methods.
 - Define or declare the set of methods
 - Reflect the methods using `PSIO_REFLECT`. Only reflected methods become actions; these are available for transactions and for other services to call using [psibase::Actor] or [psibase::call].
-
-### Example without convenience base class:
-
-```c++
-struct MyService
-{
-   // The account this service is normally installed on. This definition
-   // is optional.
-   static constexpr auto service = psibase::AccountNumber("myservice");
-
-   void        doSomething(std::string_view str);
-   std::string somethingElse(uint32_t x, psibase::AccountNumber y);
-};
-
-PSIO_REFLECT(MyService,
-             method(doSomething, str),
-             method(somethingElse, x, y))
-```
 
 ### Example with convenience base class:
 
 ```c++
-struct MyService: psibase::Service<MyService>
+struct MyService: psibase::Service
 {
    // The account this service is normally installed on. This definition
    // is optional.
@@ -66,12 +48,12 @@ auto result =
 
 ## Defining events
 
-To define events for a service, declare the event functions as below, then reflect them using the 3 macros below. Each of the `History` and `Merkle` structs must be present and reflected, even when they don't have any events declared within.
+To define events for a service, declare the event functions as below, then reflect them using the 2 macros below.
 
 After you have defined your events, use [psibase::Service::emit] to emit them and [psibase::Service::events] to read them.
 
 ```c++
-struct MyService: psibase::Service<MyService> {
+struct MyService: psibase::Service {
    struct Events {
       // Events which live a long time
       struct History {
@@ -90,8 +72,6 @@ struct MyService: psibase::Service<MyService> {
       };
    };
 };
-
-PSIBASE_REFLECT_EVENTS(MyService)
 
 PSIBASE_REFLECT_HISTORY_EVENTS(
    MyService,

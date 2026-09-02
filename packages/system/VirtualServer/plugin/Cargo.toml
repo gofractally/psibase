@@ -6,11 +6,11 @@ edition.workspace = true
 publish.workspace = true
 
 [build-dependencies]
-virtual-server = { path = "../service/", version = "0.25.0" }
+virtual-server = { path = "../service/", version = "0.27.0" }
 async-graphql.workspace = true
 
 [dependencies]
-virtual-server = { path = "../service/", version = "0.25.0" }
+virtual-server = { path = "../service/", version = "0.27.0" }
 psibase.workspace = true
 psibase_plugin.workspace = true
 serde.workspace = true
@@ -32,7 +32,7 @@ world = "impl"
 [package.metadata.component.target.dependencies]
 "host:types" = { path = "../../../user/Host/plugin/types/wit/world.wit" }
 "tokens:plugin" = { path = "../../../user/Tokens/plugin/wit/world.wit" }
-"accounts:plugin" = { path = "../../Accounts/plugin/accounts/wit/world.wit" }
+"accounts:query" = { path = "../../Accounts/plugin/query/wit/world.wit" }
 
 [package.metadata.component.bindings.with]
 "host:types/types" = "psibase_plugin::types"

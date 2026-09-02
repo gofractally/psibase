@@ -28,10 +28,13 @@ def websocket_url(node, path='/', service=None):
     return urllib3.util.Url('ws', url.auth, host, url.port, path).url
 
 async def echo(connection):
-    async for msg in connection:
-        await connection.send(msg)
+    try:
+        async for msg in connection:
+            await connection.send(msg)
+    except websockets.exceptions.ConnectionClosedError:
+        pass
 
-class TestExceptionExit(unittest.TestCase):
+class TestShutdown(unittest.TestCase):
     @testutil.psinode_test
     def test_incoming_request(self, cluster):
         (a,) = cluster.complete('a', env=ENV)
@@ -47,7 +50,7 @@ class TestExceptionExit(unittest.TestCase):
 
         t = Thread(target=long_query, args=(a.new_api(),))
         t.start()
-        self.cause_exception(a)
+        self.do_shutdown(a)
         t.join()
 
     @testutil.psinode_test
@@ -60,12 +63,15 @@ class TestExceptionExit(unittest.TestCase):
         class RequestHandler(BaseHTTPRequestHandler):
             def do_GET(self):
                 sem.acquire()
-                body = expected.encode('utf-8')
-                self.send_response(200)
-                self.send_header('Content-Type', 'text/plain')
-                self.send_header('Content-Length', str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
+                try:
+                    body = expected.encode('utf-8')
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'text/plain')
+                    self.send_header('Content-Length', str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                except BrokenPipeError:
+                    pass
 
         server = HTTPServer(('', 0), RequestHandler)
         t = Thread(target=server.serve_forever)
@@ -83,10 +89,10 @@ class TestExceptionExit(unittest.TestCase):
             t2 = Thread(target=long_query, args=(a.new_api(),))
             t2.start()
             time.sleep(0.5)
-            self.cause_exception(a)
+            self.do_shutdown(a)
             t2.join()
-            sem.release()
         finally:
+            sem.release()
             server.shutdown()
             t.join()
             server.server_close()
@@ -109,7 +115,7 @@ class TestExceptionExit(unittest.TestCase):
                     await websocket.send(expected)
                     self.assertEqual(await websocket.recv(), expected)
 
-                    self.cause_exception(a)
+                    self.do_shutdown(a)
             except websockets.exceptions.ConnectionClosedError:
                 # the connection is closed abnormally when the node exits
                 pass
@@ -120,7 +126,7 @@ class TestExceptionExit(unittest.TestCase):
         a.boot(packages=['Minimal', 'Explorer'])
         b.connect(a)
         b.wait(new_block())
-        self.cause_exception(a)
+        self.do_shutdown(a)
 
     @testutil.psinode_test
     def test_outgoing_p2p(self, cluster):
@@ -128,9 +134,16 @@ class TestExceptionExit(unittest.TestCase):
         a.boot(packages=['Minimal', 'Explorer'])
         a.connect(b)
         b.wait(new_block())
-        self.cause_exception(a)
+        self.do_shutdown(a)
 
-    def cause_exception(self, node):
+    def do_shutdown(self, node):
+        with node.post('/shutdown', service='x-admin', json={"force":False}):
+            pass
+        code = node.child.wait(timeout=20)
+        self.assertEqual(code, 0)
+
+class TestExceptionExit(TestShutdown):
+    def do_shutdown(self, node):
         try:
             node.push_action('transact', 'setcode', 'setcode', {"service":"transact","vmType":0, "vmVersion":0, "code": "DEADBEEF"})
         except ConnectionError:

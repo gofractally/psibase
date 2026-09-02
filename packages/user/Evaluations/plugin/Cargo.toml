@@ -6,7 +6,7 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-evaluations = { path = "../service/", version = "0.25.0" }
+evaluations = { path = "../service/", version = "0.27.0" }
 psibase.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -27,7 +27,7 @@ package = "evaluations:plugin"
 world = "impl"
 
 [package.metadata.component.target.dependencies]
-"accounts:plugin" = { path = "../../../system/Accounts/plugin/accounts/wit/world.wit" }
+"accounts:query" = { path = "../../../system/Accounts/plugin/query/wit/world.wit" }
 "host:common" = { path = "../../Host/plugin/common/wit/world.wit" }
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
 "host:db" = { path = "../../Host/plugin/db/wit/world.wit" }

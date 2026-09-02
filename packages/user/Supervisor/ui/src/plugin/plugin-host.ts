@@ -1,5 +1,3 @@
-import { REDIRECT_ERROR_CODE } from "@/constants";
-
 import {
     QualifiedDynCallArgs,
     QualifiedFunctionCallArgs,
@@ -14,7 +12,7 @@ import {
     HttpResponse,
 } from "../host-interface";
 import { Supervisor } from "../supervisor";
-import { chainId, isEmbedded, networkName } from "../utils";
+import { chainId, networkName } from "../utils";
 import { RecoverableErrorPayload } from "./errors";
 
 function convert(
@@ -221,6 +219,8 @@ export class PluginHost implements HostInterface {
                     this.supervisor.signExplicit(msg, privateKey),
                 importKey: (privateKey) =>
                     this.supervisor.importKey(privateKey),
+                importKeyTransient: (privateKey) =>
+                    this.supervisor.importKeyTransient(privateKey),
             },
             "supervisor:bridge/database": {
                 get: (duration, key) => this.dbGet(duration, key),
@@ -228,16 +228,7 @@ export class PluginHost implements HostInterface {
                 remove: (duration, key) => this.dbRemove(duration, key),
             },
             "supervisor:bridge/prompt": {
-                requestPrompt: () => {
-                    if (isEmbedded) {
-                        throw this.recoverableError(
-                            "Cannot prompt in embedded mode",
-                        );
-                    }
-                    const err = this.recoverableError("user_prompt_request");
-                    err.code = REDIRECT_ERROR_CODE;
-                    throw err;
-                },
+                requestPrompt: () => this.supervisor.requestPrompt(),
             },
         };
     }

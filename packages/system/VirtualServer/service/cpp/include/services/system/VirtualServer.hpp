@@ -450,7 +450,6 @@ namespace SystemService
                 method(setBillableAcc, account),
                 method(serveSys, request, socket, user))
 
-   PSIBASE_REFLECT_EVENTS(VirtualServer);
    PSIBASE_REFLECT_HISTORY_EVENTS(
        VirtualServer,
        allowHashedMethods(),

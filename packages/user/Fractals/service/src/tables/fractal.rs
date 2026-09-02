@@ -88,6 +88,8 @@ impl Fractal {
 
         let defacto_service = account!("fractals+2");
 
+        Occupation::set_ordered_occupations(fractal, vec![defacto_service]);
+
         // Create the fractal account first so role subaccounts can be
         // preapproved by the parent. Roles must exist before the AuthDyn
         // switch because has_policy/auth_policy reads them.

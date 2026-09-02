@@ -25,13 +25,6 @@ namespace SystemService
                 && req.host[req.host.size() - rootHost.size() - 1] == '.';
       }
 
-      std::optional<RegisteredServiceRow> getServer(const AccountNumber& server)
-      {
-         return HttpServer::Tables(HttpServer::service, KvMode::read)
-             .open<RegServTable>()
-             .get(server);
-      }
-
       std::optional<AccountNumber> getRedirect(const AccountNumber& account)
       {
          auto row = HttpServer::Tables(HttpServer::service, KvMode::read)
@@ -50,20 +43,6 @@ namespace SystemService
 
          return AccountNumber(req.host.substr(0, req.host.size() - rootHost.size() - 1));
       }
-
-      std::string_view hostHeaderPortSuffix(const HttpRequest& req)
-      {
-         if (auto host = HttpHeader::get(req.headers, "host"))
-         {
-            std::string_view h = *host;
-            if (auto pos = h.rfind(':'); pos != std::string_view::npos)
-            {
-               if (h.find(']', pos) == std::string_view::npos)
-                  return h.substr(pos);
-            }
-         }
-         return {};
-      }
    }  // namespace
 
    void HttpServer::registerServer(AccountNumber server)
@@ -74,6 +53,13 @@ namespace SystemService
           .service = sender,
           .server  = server,
       });
+   }
+
+   std::optional<AccountNumber> HttpServer::getServer(AccountNumber service)
+   {
+      if (auto row = Tables{getReceiver(), KvMode::read}.open<RegServTable>().get(service))
+         return row->server;
+      return std::nullopt;
    }
 
    static void checkRecvAuth(const Action& act)
@@ -120,7 +106,8 @@ namespace SystemService
                                                      "Content-Security-Policy",
                                                      "ETag",
                                                      "Location",
-                                                     "Set-Cookie"};
+                                                     "Set-Cookie",
+                                                     "X-Content-Type-Options"};
 
       void sendReplyImpl(AccountNumber service, std::int32_t socket, HttpReply&& result)
       {
@@ -354,7 +341,7 @@ namespace SystemService
 
       if (registered)
       {
-         result = checkServer(registered->server);
+         result = checkServer(*registered);
       }
 
       // Otherwise, check the sites service

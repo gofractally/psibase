@@ -47,14 +47,22 @@ jobs:
       - name: Download build artifacts
         uses: actions/download-artifact@v4
 
+      - name: Build release files list
+        id: release-files
+        run: |
+          versions='${{ needs.build-psibase.outputs.ubuntu-versions }}'
+          {
+            echo 'files<<EOF'
+            echo "$versions" | jq -r '.[] | "psidk-ubuntu-\(.)/psidk-ubuntu-\(.).tar.gz"'
+            echo 'psidk-book/psidk-book.tar.gz'
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
       - name: Create new Github Release
         id: create_release
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            psidk-ubuntu-2204/psidk-ubuntu-2204.tar.gz
-            psidk-ubuntu-2404/psidk-ubuntu-2404.tar.gz
-            psidk-book/psidk-book.tar.gz
+          files: ${{ steps.release-files.outputs.files }}
           fail_on_unmatched_files: true
           draft: true
           prerelease: ${{needs.prerelease-check.outputs.prerelease}}

@@ -1,6 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
+import { useNavigate } from "react-router-dom";
 import { crypto } from "wasm-transpiled";
 import { z } from "zod";
 
@@ -54,7 +55,7 @@ import { DependencyDialog } from "./dependency-dialog";
 import { SetupWrapper } from "./setup-wrapper";
 
 export const BlockProducerSchema = z.object({
-    name: z.string().min(1),
+    name: zAccount,
 });
 
 interface DependencyState {
@@ -72,6 +73,7 @@ const isBootCompleteUpdate = (data: unknown): data is BootCompleteUpdate =>
     BootCompleteSchema.safeParse(data).success;
 
 export const CreatePage = () => {
+    const navigate = useNavigate();
     const [didSaveKey, setDidSaveKey] = useState(false);
     const [txSigningPrivateKey, setTxSigningPrivateKey] = useState<string>();
 
@@ -95,7 +97,6 @@ export const CreatePage = () => {
     const keyDeviceForm = useForm<z.infer<typeof KeyDeviceSchema>>();
 
     const isDev = chainTypeForm.watch("type") == "dev";
-    const bpName = blockProducerForm.watch("name");
     const keyDevice = keyDeviceForm.watch("id");
 
     const importForm = useAppForm({
@@ -110,7 +111,9 @@ export const CreatePage = () => {
             }),
             onSubmit: z.object({
                 account: zAccount.refine(
-                    (val) => val.trim() === bpName?.trim(),
+                    (val) =>
+                        val.trim() ===
+                        blockProducerForm.getValues("name")?.trim(),
                     {
                         message:
                             "Account name must match the block producer account name you just created",
@@ -196,11 +199,15 @@ export const CreatePage = () => {
 
     const { data: packages } = usePackages();
 
-    const suggestedSelection = getDefaultSelectedPackages(
-        {
-            dev: isDev,
-        },
-        packages,
+    const suggestedSelection = useMemo(
+        () =>
+            getDefaultSelectedPackages(
+                {
+                    dev: isDev,
+                },
+                packages,
+            ),
+        [isDev, packages],
     );
     const devTemplate = packages.find((pack) => pack.name === "DevDefault");
     const prodTemplate = packages.find((pack) => pack.name === "ProdWithFG");
@@ -269,7 +276,7 @@ export const CreatePage = () => {
                 );
                 bootChain({
                     packages: requiredPackages,
-                    producerName: bpName,
+                    producerName: blockProducerForm.getValues("name"),
                     blockSigningPubKey,
                     txSigningPubKeyPem: txSigningKeyPair?.[0],
                     compression: isDev ? 4 : 7,
@@ -322,7 +329,7 @@ export const CreatePage = () => {
                 installRan.current = false;
             }
         }
-    }, [currentStep, rows, bpName, config]);
+    }, [currentStep, rows, config]);
 
     if (currentStep === Step.BootComplete) {
         return (
@@ -362,98 +369,109 @@ export const CreatePage = () => {
                     started={currentState[1]}
                 />
             )}
-            <div className="relative flex h-full flex-col justify-between ">
-                <div></div>
-                <div className="flex flex-col">
-                    <div className="pb-20">
-                        <Steps
-                            currentStep={currentStepNum}
-                            numberOfSteps={maxSteps}
-                        />
-                    </div>
-                    {currentStep === Step.ChainType && (
-                        <div>
-                            <h1 className="mb-4 scroll-m-20 text-3xl font-extrabold tracking-tight lg:text-4xl">
-                                Boot template
-                            </h1>
-                            {devTemplate &&
-                                prodTemplate && (
+            <div className="relative flex min-h-0 flex-1 flex-col">
+                <div className="min-h-0 flex-1 overflow-y-auto px-4 sm:px-8">
+                    <div className="mx-auto flex max-w-3xl flex-col pb-6">
+                        <div className="mb-8">
+                            <Steps
+                                currentStep={currentStepNum}
+                                numberOfSteps={maxSteps}
+                            />
+                        </div>
+                        {currentStep === Step.ChainType && (
+                            <div>
+                                <h1 className="mb-6 text-2xl font-semibold tracking-tight">
+                                    Boot template
+                                </h1>
+                                {devTemplate && prodTemplate && (
                                     <ChainTypeForm
                                         form={chainTypeForm}
                                         next={next}
-                                        devTemplateDescription={
-                                            devTemplate.description
-                                        }
-                                        prodTemplateDescription={
-                                            prodTemplate.description
-                                        }
                                     />
                                 )}
-                        </div>
-                    )}
-                    {currentStep === Step.BlockProducer && (
-                        <div>
-                            <h1 className="mb-4 scroll-m-20 text-3xl font-extrabold tracking-tight lg:text-4xl">
-                                Name yourself
-                            </h1>
-                            <BlockProducerForm
-                                form={blockProducerForm}
+                            </div>
+                        )}
+                        {currentStep === Step.BlockProducer && (
+                            <div>
+                                <h1 className="mb-6 text-2xl font-semibold tracking-tight">
+                                    Name yourself
+                                </h1>
+                                <BlockProducerForm
+                                    form={blockProducerForm}
+                                    next={next}
+                                />
+                            </div>
+                        )}
+                        {currentStep === Step.KeyDevice && (
+                            <div className="flex justify-center">
+                                <Card className="w-full max-w-md">
+                                    <CardHeader>
+                                        <CardTitle>
+                                            Select security device
+                                        </CardTitle>
+                                        <CardDescription>
+                                            Where do you want your block
+                                            producer server key to be stored?
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <KeyDeviceForm
+                                            form={keyDeviceForm}
+                                            next={next}
+                                            deviceNotFoundErrorMessage="No security devices were found. Please ensure one is available. Alternatively, you may boot in an insecure keyless mode by going back and selecting the Development boot template."
+                                        />
+                                    </CardContent>
+                                </Card>
+                            </div>
+                        )}
+                        {currentStep === Step.PreBootConfirmation && (
+                            <InstallationSummary
+                                isDev={isDev}
+                                bpName={blockProducerForm.getValues("name")}
+                                keyDevice={keyDevice}
+                                rows={rows}
+                                setRows={setRows}
+                                packages={packages}
+                            />
+                        )}
+                        {currentStep === Step.SaveKey && (
+                            <PromptSaveSigningKey
+                                account={blockProducerForm.getValues("name")}
+                                privateKey={txSigningPrivateKey}
+                                didSaveKey={didSaveKey}
+                                setDidSaveKey={setDidSaveKey}
+                            />
+                        )}
+                        {currentStep === Step.ConfirmKey && (
+                            <PromptConfirmSigningKey form={importForm} />
+                        )}
+                    </div>
+                </div>
+                {currentStep !== Step.Boot && (
+                    <div className="bg-background/80 shrink-0 border-t px-4 py-4 backdrop-blur sm:px-8">
+                        <div className="mx-auto max-w-3xl">
+                            <PrevNextButtons
+                                canNext={canNext}
+                                canPrev={
+                                    canPrev || currentStep === Step.ChainType
+                                }
                                 next={next}
+                                previous={() => {
+                                    if (currentStep === Step.ChainType) {
+                                        navigate("/setup");
+                                        return;
+                                    }
+                                    previous();
+                                }}
+                                nextLabel={
+                                    currentStep === Step.PreBootConfirmation
+                                        ? "Boot"
+                                        : "Continue"
+                                }
                             />
                         </div>
-                    )}
-                    {currentStep === Step.KeyDevice && (
-                        <div className="flex justify-center">
-                            <Card className="min-w-[350px]">
-                                <CardHeader>
-                                    <CardTitle>
-                                        Select security device
-                                    </CardTitle>
-                                    <CardDescription>
-                                        Where do you want your block producer
-                                        server key to be stored?
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <KeyDeviceForm
-                                        form={keyDeviceForm}
-                                        next={next}
-                                        deviceNotFoundErrorMessage="No security devices were found. Please ensure one is available. Alternatively, you may boot in an insecure keyless mode by going back and selecting the Development boot template."
-                                    />
-                                </CardContent>
-                            </Card>
-                        </div>
-                    )}
-                    {currentStep === Step.PreBootConfirmation && (
-                        <InstallationSummary
-                            isDev={isDev}
-                            bpName={bpName}
-                            keyDevice={keyDevice}
-                            rows={rows}
-                            setRows={setRows}
-                            packages={packages}
-                        />
-                    )}
-                    {currentStep === Step.SaveKey && (
-                        <PromptSaveSigningKey
-                            account={bpName}
-                            privateKey={txSigningPrivateKey}
-                            didSaveKey={didSaveKey}
-                            setDidSaveKey={setDidSaveKey}
-                        />
-                    )}
-                    {currentStep === Step.ConfirmKey && (
-                        <PromptConfirmSigningKey form={importForm} />
-                    )}
-                </div>
-                <div className="py-4">
-                    <PrevNextButtons
-                        canNext={canNext}
-                        canPrev={canPrev}
-                        next={next}
-                        previous={previous}
-                    />
-                </div>
+                    </div>
+                )}
             </div>
         </SetupWrapper>
     );

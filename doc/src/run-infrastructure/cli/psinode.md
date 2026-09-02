@@ -42,13 +42,17 @@ psinode - The psibase blockchain server
 
   Use this private key to sign blocks. Any number of keys may be provided, but only the one that matches the public key corresponding to the producer name will be used.
 
+- `--passphrase-file` *filename*
+
+  Provides a passphrase that will be used to encrypt secrets stored by the node. The passphrase can also be passed in the environment variable `PSIBASE_PASSPHRASE`. If no passphrase is provided, secrets will not be stored and will be discarded when the server exits.
+
 - `--pkcs11-module` *filename*
 
   Loads a PKCS #11 module from *filename*. The server will be able to sign blocks using keys from the module. The tokens that the module provides must be unlocked using the HTTP API before they can be used. This option can appear any number of times.
 
 - `--mount` *directory*[:*mountpoint*]
 
-  Allows privileged node-local services to read files from a directory. If a mountpoint is provided, it determines the path that services use to access it. Otherwise the service paths will be the same as the host paths. The mountpoint must be an absolute path. This option may be specified any number of times. This option is not available over the [HTTP API](../administration.md#server-configuration).
+  Allows privileged node-local services to read files from a directory. If a mountpoint is provided, it determines the path that services use to access it. Otherwise the service paths will be the same as the host paths. The mountpoint must be an absolute path. This option may be specified any number of times. This option is not available over the [HTTP API](../../default-apps/x-admin/http-endpoints.md#server-configuration).
 
 - `--service-threads` *num*
 
@@ -92,7 +96,7 @@ psinode - The psibase blockchain server
 
 Options can also be specified in a configuration file loaded from *database*`/config`. If an option is specified on both the command line and the config file, the command line takes precedence. When a new database is created, a default config file will be created.
 
-The configuration file also controls [logging](../configuration/logging.md).
+The configuration file also controls [logging](../administration/logging.md).
 
 Environmental variables, double quotes, and backslash escapes can be used in the value of most options. `psinode` adds some variables to its environment:
 - `PSIBASE_DATADIR`

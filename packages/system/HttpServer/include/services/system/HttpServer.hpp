@@ -96,6 +96,9 @@ namespace SystemService
       /// * Respond to GraphQL requests
       void registerServer(psibase::AccountNumber server);
 
+      /// Returns the server registered for `service`, if any
+      std::optional<psibase::AccountNumber> getServer(psibase::AccountNumber service);
+
       // Entry point for messages
       void recv(std::int32_t socket, psio::view<const std::vector<char>> data, std::uint32_t flags);
 
@@ -136,6 +139,7 @@ namespace SystemService
                 method(giveSocket, socket, service),
                 method(takeSocket, socket),
                 method(registerServer, server),
+                method(getServer, service),
                 method(recv, socket, data, flags),
                 method(serve, socket, req),
                 method(rootHost, host),
