@@ -18,17 +18,14 @@ export const zFractal = z
         genesisTime: zDateTime,
         mission: z.string(),
         judiciary: z.object({
-            account: zAccount,
             occupation: zAccount,
             roleId: z.number().int()
         }),
         legislature: z.object({
-            account: zAccount,
             occupation: zAccount,
             roleId: z.number().int()
         }),
         executive: z.object({
-            account: zAccount,
             occupation: zAccount,
             roleId: z.number().int()
         })
@@ -56,17 +53,14 @@ export const getFractal = async (owner: Account): Promise<FractalRes> => {
             distIntervalSecs
             genesisTime
             judiciary { 
-                account
                 occupation
                 roleId
             }
             legislature { 
-                account
                 occupation
                 roleId
             }
             executive { 
-                account
                 occupation
                 roleId
             }

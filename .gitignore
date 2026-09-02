@@ -28,7 +28,8 @@ Makefile
 node_modules
 temp
 dist
-vite.config.*.timestamp-*.mjs
+.direnv
+vite.config.ts.timestamp-*.mjs
 .pnpm-store
 .env
 .envrc
@@ -43,4 +44,3 @@ target/
 **/install-state.gz
 .clangd
 AGENTS.md
-.direnv

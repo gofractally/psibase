@@ -104,9 +104,9 @@ pub mod tables {
 
     #[table(name = "RoleTable", index = 5)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[graphql(complex)]
     pub struct Role {
         pub fractal: AccountNumber,
-        pub account: AccountNumber,
         pub role_id: u8,
         pub occupation: AccountNumber,
     }
@@ -115,11 +115,6 @@ pub mod tables {
         #[primary_key]
         fn pk(&self) -> (AccountNumber, u8) {
             (self.fractal, self.role_id)
-        }
-
-        #[secondary_key(1)]
-        fn by_role_account(&self) -> AccountNumber {
-            self.account
         }
     }
 
