@@ -125,6 +125,7 @@ export class Plugin {
         const privileged = this.id.service === "host";
         this.compiledPlugin = await compilePlugin(
             this.id.service,
+            this.id.plugin,
             privileged,
             this.bytes!,
             this.host,
