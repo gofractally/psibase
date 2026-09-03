@@ -72,13 +72,12 @@ impl CreditLine {
             "interest_rate exceeds 100% (PPM_SCALE)"
         );
         if let Some(mut line) = Self::get(creditor, debtor, asset_id) {
-            let was_depleting = line.deplete_on_debit;
             line.limit = amount;
             line.deplete_on_debit = deplete_on_debit;
             line.interest_rate = interest_rate;
+            // Remaining is initialized only on insert. Upsert never refills:
+            // remaining==0 after a full deplete is not "first enable".
             if line.remaining.value > amount.value {
-                line.remaining = amount;
-            } else if deplete_on_debit && !was_depleting && line.remaining.value == 0 {
                 line.remaining = amount;
             }
             line.save();

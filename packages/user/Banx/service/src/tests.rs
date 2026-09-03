@@ -3807,6 +3807,49 @@ mod tests {
         Ok(())
     }
 
+    /// Fully spent remaining (0) then revolving → depleting must not restore
+    /// the budget. The upsert used to treat remaining==0 as first enable.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_deplete_toggle_does_not_refill_zero_remaining(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, usd, Quantity::new(100), true, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .path_pay(vec![hop(bob, usd)], Quantity::new(100), Quantity::new(100), 0)
+            .get()?;
+        assert_eq!(CreditLine::get_assert(bob, alice, usd).remaining.value, 0);
+
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, usd, Quantity::new(100), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, usd, Quantity::new(100), true, 0, 0)
+            .get()?;
+        assert_eq!(
+            CreditLine::get_assert(bob, alice, usd).remaining.value,
+            0,
+            "toggling deplete off then on refilled a fully spent remaining"
+        );
+
+        Wrapper::push_from(&chain, bob)
+            .deposit(alice, usd, Quantity::new(100), 0, 0)
+            .get()?;
+        let over = Wrapper::push_from(&chain, alice)
+            .path_pay(vec![hop(bob, usd)], Quantity::new(1), Quantity::new(1), 0)
+            .get();
+        assert!(over.is_err());
+        Ok(())
+    }
+
     /// Full unwind on hop 0 is not an unfinished path: FX still forwards the
     /// hop notional (min_return 0 must not look like a prefix-only settlement).
     #[psibase::test_case(packages("Banx"))]
