@@ -1,0 +1,71 @@
+name: Create draft release
+
+# The caller must have built the psidk artifacts in the same run (this workflow
+# attaches them to the draft release) and must grant `contents: write`.
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Tag to draft a release for (e.g. "vX.Y.Z")'
+        required: true
+        type: string
+      ubuntu-versions:
+        description: JSON array of Ubuntu version suffixes (e.g. ["2204","2404","2604"])
+        required: true
+        type: string
+
+jobs:
+  generate-changelog:
+    name: Generate changelog
+    uses: ./.github/workflows/generate-changelog.yml
+    with:
+      endtag: ${{ inputs.tag }}
+
+  create-psibase-release:
+    name: Release draft - ${{ inputs.tag }}
+    runs-on: ubuntu-latest
+    needs: generate-changelog
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Compose release notes
+        id: notes
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          : >release-notes.md
+          if [[ $TAG == v0.* ]]; then
+              printf '%s\n' \
+                  '# Disclaimer' \
+                  '' \
+                  'This is a prerelease, and therefore there are no security or backwards compatibility guarantees.' \
+                  'It is not recommended to use this in a production environment - use at your own risk.' \
+                  '' \
+                  >>release-notes.md
+          fi
+          cat changelog.md/changelog.md >>release-notes.md
+
+      - name: Build release files list
+        id: release-files
+        env:
+          VERSIONS: ${{ inputs.ubuntu-versions }}
+        run: |
+          {
+            echo 'files<<EOF'
+            echo "$VERSIONS" | jq -r '.[] | "psidk-ubuntu-\(.)/psidk-ubuntu-\(.).tar.gz"'
+            echo 'psidk-book/psidk-book.tar.gz'
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create new Github Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ steps.release-files.outputs.files }}
+          fail_on_unmatched_files: true
+          draft: true
+          prerelease: ${{ contains(inputs.tag, '-') }}
+          name: ${{ inputs.tag }}
+          tag_name: ${{ inputs.tag }}
+          body_path: release-notes.md

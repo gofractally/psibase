@@ -1,0 +1,33 @@
+name: Detect version bump
+description: Compare version.hpp macros between two git refs
+inputs:
+  ref-a:
+    description: First git ref
+    required: true
+  ref-b:
+    description: Second git ref
+    required: true
+outputs:
+  changed:
+    description: Whether version.hpp macros differ between the refs
+    value: ${{ steps.detect.outputs.changed }}
+runs:
+  using: composite
+  steps:
+    - name: Detect version bump
+      id: detect
+      shell: bash
+      run: |
+        set +e
+        .github/scripts/psibase-version.sh changed \
+            "${{ inputs.ref-a }}" \
+            "${{ inputs.ref-b }}"
+        code=$?
+        set -e
+        if (( code == 0 )); then
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+        elif (( code == 1 )); then
+          echo "changed=false" >> "$GITHUB_OUTPUT"
+        else
+          exit "$code"
+        fi

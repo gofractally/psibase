@@ -28,3 +28,22 @@ jobs:
           message: |
             🎉 New Psibase release 🎉
             [${{ github.ref_name }}](https://github.com/${{ github.repository }}/releases/tag/${{ github.event.release.name }})
+
+  publish-crates:
+    name: Publish crates to crates.io
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - uses: dtolnay/rust-toolchain@1.86.0
+      - name: Publish crates to crates.io
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          if [[ -z "$CARGO_REGISTRY_TOKEN" ]]; then
+            echo "CARGO_REGISTRY_TOKEN secret is not set" >&2
+            exit 1
+          fi
+          cd rust
+          ./scripts/publish.sh
