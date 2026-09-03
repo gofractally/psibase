@@ -137,7 +137,7 @@ namespace psio
    concept SimplePackableWrapper =
        Reflected<T> && PackableWrapper<T> &&
        is_simple_packable_wrapper<
-           std::remove_cvref_t<decltype(clio_unwrap_packable(std::declval<T&>()))>,
+           std::remove_cvref_t<decltype(psio_unwrap_packable(std::declval<T&>()))>,
            typename reflect<T>::data_members>;
 
    template <typename Ch>

@@ -57,21 +57,21 @@ namespace psibase
       to_json(s.contents, stream);
    }
 
-   inline std::string& clio_unwrap_packable(Memo& s)
+   inline std::string& psio_unwrap_packable(Memo& s)
    {
       return s.contents;
    }
-   inline const std::string& clio_unwrap_packable(const Memo& s)
+   inline const std::string& psio_unwrap_packable(const Memo& s)
    {
       return s.contents;
    }
 
-   inline bool clio_validate_packable(const Memo& str)
+   inline bool psio_validate_packable(const Memo& str)
    {
       return Memo::validate(str.contents);
    }
 
-   inline bool clio_validate_packable(psio::view<const Memo> str)
+   inline bool psio_validate_packable(psio::view<const Memo> str)
    {
       return Memo::validate(str.contents());
    }
