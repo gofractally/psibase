@@ -6,7 +6,7 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-guilds = { path = "../service/", version = "0.27.0" }
+guilds = { path = "../service/", version = "0.28.0" }
 psibase.workspace = true
 psibase_plugin.workspace = true
 serde.workspace = true
@@ -31,4 +31,4 @@ world = "impl"
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
 "invite:plugin" = { path = "../../Invite/plugin/wit/world.wit" }
 "evaluations:plugin" = { path = "../../Evaluations/plugin/wit/world.wit" }
-"accounts:plugin" = { path = "../../../system/Accounts/plugin/accounts/wit/world.wit" }
+"accounts:query" = { path = "../../../system/Accounts/plugin/query/wit/world.wit" }

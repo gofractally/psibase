@@ -10,7 +10,7 @@ use db::*;
 
 use exports::host::prompt::admin::PromptDetails;
 use exports::host::prompt::{admin::Guest as Admin, api::Guest as Api};
-use host::common::client::get_sender;
+use host::client::api::get_sender;
 use host::types::types::Error;
 use supervisor::bridge::prompt::request_prompt;
 struct HostPrompt;

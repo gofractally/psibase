@@ -41,6 +41,7 @@ const rootDomain = siblingUrl();
 //   in a given call context.
 const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("accounts", "plugin"),
+    pluginId("accounts", "query"),
     pluginId("host", "auth"),
     pluginId("host", "prompt"),
     pluginId("transact", "plugin"),
@@ -233,7 +234,7 @@ export class Supervisor implements AppInterface {
         assertTruthy(this.parentOrigination.app, "Root app unrecognized");
 
         const user = this.supervisorCall(
-            getCallArgs("accounts", "plugin", "api", "get-current-user", []),
+            getCallArgs("accounts", "query", "api", "get-current-user", []),
         );
 
         if (!user) {
@@ -279,6 +280,14 @@ export class Supervisor implements AppInterface {
         // future: store privateKey, indexed by pubKey
         return this.supervisorCall(
             getCallArgs("webcrypto", "plugin", "api", "import-key", [
+                privateKey,
+            ]),
+        );
+    }
+
+    importKeyTransient(privateKey: string): string {
+        return this.supervisorCall(
+            getCallArgs("webcrypto", "plugin", "api", "import-key-transient", [
                 privateKey,
             ]),
         );

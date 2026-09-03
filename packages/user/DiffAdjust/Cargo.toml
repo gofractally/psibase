@@ -13,13 +13,13 @@ package-name = "DiffAdjust"
 services = ["diff-adjust"]
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.27.0"
-Sites = "0.27.0"
+HttpServer = "0.28.0"
+Sites = "0.28.0"
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-diff-adjust = { path = "service", version = "0.27.0" }
-r-diff-adjust = { path = "query-service", version = "0.27.0" }
+diff-adjust = { path = "service", version = "0.28.0" }
+r-diff-adjust = { path = "query-service", version = "0.28.0" }
 psibase-user-workspace-hack.workspace = true

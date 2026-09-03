@@ -297,8 +297,6 @@ pub fn fracpack_macro_impl(input: TokenStream, impl_pack: bool, impl_unpack: boo
     }
 }
 
-// TODO: compile time: verify no non-optionals are after an optional
-// TODO: unpack: check optionals not in heap
 fn process_struct(
     fracpack_mod: &proc_macro2::TokenStream,
     input: &DeriveInput,
@@ -461,8 +459,6 @@ fn process_struct(
         })
         .fold(quote! {}, |acc, new| quote! {#acc #new});
 
-    // TODO: skip unknown members
-    // TODO: option to verify no unknown members
     let verify = fields
         .iter()
         .filter(use_field)
@@ -834,7 +830,6 @@ fn process_enum(
                     src.finish()?;
                     Ok(result)
                 }
-                // TODO: option to error on unknown index
                 fn verify(outer: &mut #fracpack_mod::FracInputStream) -> #fracpack_mod::Result<()> {
                     let index = <u8 as #fracpack_mod::Unpack>::unpack(outer)?;
                     let size = <u32 as #fracpack_mod::Unpack>::unpack(outer)?;

@@ -6,7 +6,7 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-fractals = { path = "../service/", version = "0.27.0" }
+fractals = { path = "../service/", version = "0.28.0" }
 psibase.workspace = true
 psibase_plugin.workspace = true
 serde.workspace = true
@@ -31,8 +31,8 @@ world = "impl"
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
 "guilds:plugin" = { path = "../../Guilds/plugin/wit/world.wit" }
-"accounts:plugin" = { path = "../../../system/Accounts/plugin/accounts/wit/world.wit" }
+"accounts:query" = { path = "../../../system/Accounts/plugin/query/wit/world.wit" }
 
 
 [dev-dependencies]
-fractals-pkg = { path = "..", version = "0.27.0" }
+fractals-pkg = { path = "..", version = "0.28.0" }

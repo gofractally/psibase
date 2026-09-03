@@ -5,7 +5,7 @@ use crate::bindings::transact::plugin::intf::add_action_to_transaction;
 use crate::errors::ErrorType;
 use crate::key_table;
 use crate::types;
-use bindings::host::common::client as Client;
+use bindings::host::client::api as Client;
 use ecies::{decrypt, encrypt};
 use psibase::{fracpack::Pack, AccountNumber};
 
@@ -17,7 +17,7 @@ pub fn parse_account_number(s: &str) -> Result<AccountNumber, Error> {
 }
 
 pub fn current_user() -> Result<AccountNumber, Error> {
-    let current_user = bindings::accounts::plugin::api::get_current_user();
+    let current_user = bindings::accounts::query::api::get_current_user();
     let current_user = current_user.ok_or(ErrorType::NotLoggedIn)?;
     let account_number =
         AccountNumber::from_exact(&current_user).map_err(|_| ErrorType::InvalidAccountNumber)?;

@@ -3,7 +3,7 @@ mod bindings;
 
 use bindings::exports::{{project-name | snake_case}}::plugin::api::Guest as Api;
 use bindings::exports::{{project-name | snake_case}}::plugin::queries::Guest as Queries;
-use bindings::host::common::server as CommonServer;
+use bindings::host::http::api as CommonServer;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 

@@ -1,15 +1,17 @@
-use crate::bindings::accounts::plugin::api::get_account;
-use crate::bindings::accounts::plugin::api::get_current_user;
-use crate::bindings::host::common as Host;
+use crate::bindings::accounts::query::api::get_account;
+use crate::bindings::accounts::query::api::get_current_user;
+use crate::bindings::host::http as Host;
+use crate::bindings::host::crypto::keyvault as HostCrypto;
 use crate::bindings::host::types::types::{self as HostTypes, BodyTypes, PluginRef};
 use crate::bindings::transact::plugin::hook_handlers::*;
+use crate::bindings::transact::plugin::types::{Action, Claim};
 use crate::errors::ErrorType::*;
 use crate::types::FromExpirationTime;
-use crate::{ActionAuthPlugins, ActionClaims, ActionSenderHook, ProposeLatch};
+use crate::{ActionSenderHook, ProposeLatch, TxSignatures};
 use psibase::fracpack::Pack;
 use psibase::{Hex, MethodNumber, SignedTransaction, Tapos, Transaction};
 use serde::Serialize;
-use Host::server as Server;
+use Host::api as Server;
 
 use regex::Regex;
 use sha2::{Digest, Sha256};
@@ -59,18 +61,19 @@ pub fn sha256(data: &[u8]) -> [u8; 32] {
     hasher.finalize().into()
 }
 
-// The auth service can parameterize what claims to add to a transaction by both the sender
-//   and the actions in the transaction.
-// The auth service is therefore the only service other than transact that gets to see
-//   in full what actions are being taken by a user.
-pub fn get_claims(actions: &[Action], use_hooks: bool) -> Result<Vec<Claim>, HostTypes::Error> {
+pub fn sign_with_claim(claim: &Claim, tx_hash: &[u8]) -> Result<Vec<u8>, HostTypes::Error> {
+    HostCrypto::sign(tx_hash, &claim.raw_data)
+}
+
+// User auth claims come from hook-user-auth. Extra signatures added via
+// add-signature (e.g. invite credentials) are appended after.
+pub fn get_claims(actions: &[Action]) -> Result<Vec<Claim>, HostTypes::Error> {
     if actions.is_empty() {
         return Ok(vec![]);
     }
 
     let mut claims = vec![];
 
-    // Add claims for the logged-in user if there are any
     if let Some(user) = get_current_user() {
         let auth_service_acc = get_account(&user)?.unwrap().auth_service;
         let plugin_ref = PluginRef::new(&auth_service_acc, "plugin", "transact-hook-user-auth");
@@ -79,10 +82,14 @@ pub fn get_claims(actions: &[Action], use_hooks: bool) -> Result<Vec<Claim>, Hos
         }
     }
 
-    if use_hooks {
-        // Add additional claims from action hooks
-        claims.extend(ActionClaims::get_all_flat());
-    }
+    TxSignatures::with(|extra| {
+        for c in extra {
+            claims.push(Claim {
+                verify_service: c.verify_service.clone(),
+                raw_data: c.raw_data.clone(),
+            });
+        }
+    });
 
     Ok(claims)
 }
@@ -99,35 +106,26 @@ pub fn get_claims_for_user(user: &String) -> Result<Vec<Claim>, HostTypes::Error
     Ok(claims)
 }
 
-pub fn get_proofs(
-    tx_hash: &[u8; 32],
-    use_hooks: bool,
-) -> Result<Vec<Hex<Vec<u8>>>, HostTypes::Error> {
+pub fn get_proofs(tx_hash: &[u8; 32]) -> Result<Vec<Hex<Vec<u8>>>, HostTypes::Error> {
     let mut proofs = vec![];
 
     if let Some(user) = get_current_user() {
         let auth_service_acc = get_account(&user)?.unwrap().auth_service;
         let plugin_ref = PluginRef::new(&auth_service_acc, "plugin", "transact-hook-user-auth");
         if let Some(proof) = on_user_auth_proof(plugin_ref, &user, tx_hash)? {
-            proofs.push(proof);
+            proofs.push(Hex::from(proof.signature));
         }
     }
 
-    if use_hooks {
-        for claims in ActionClaims::get_all() {
-            let plugin_ref =
-                PluginRef::new(&claims.claimant, "plugin", "transact-hook-action-auth");
-            proofs.extend(on_action_auth_proofs(plugin_ref, &claims.claims, tx_hash)?);
-        }
+    let extra_proofs = TxSignatures::with(|extra| -> Result<Vec<Hex<Vec<u8>>>, HostTypes::Error> {
+        extra
+            .iter()
+            .map(|claim| sign_with_claim(claim, tx_hash).map(Hex::from))
+            .collect()
+    })?;
+    proofs.extend(extra_proofs);
 
-        ActionAuthPlugins::clear();
-        ActionClaims::clear();
-    }
-
-    Ok(proofs
-        .into_iter()
-        .map(|proof| Hex::from(proof.signature))
-        .collect())
+    Ok(proofs)
 }
 
 pub fn get_proofs_for_user(
@@ -194,12 +192,10 @@ impl From<Transaction> for SimpleTx {
 }
 
 pub fn make_transaction(actions: Vec<Action>, expiration_seconds: u64) -> Transaction {
-    let claims = get_claims(&actions, true).expect("Failed to retrieve claims from auth plugin");
+    let claims = get_claims(&actions).expect("Failed to retrieve claims from auth plugin");
     let claims: Vec<psibase::Claim> = claims.into_iter().map(Into::into).collect();
 
     let actions: Vec<psibase::Action> = actions.into_iter().map(Into::into).collect();
-
-    // TODO: hook_tapos?
 
     let tapos = Tapos::from_expiration_time(expiration_seconds);
 

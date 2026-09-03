@@ -51,7 +51,7 @@ export const getEvaluationResults = async (evaluationId: number) => {
         .map((group) => ({
             ...group,
             result: response.groupFinishes.nodes.find(
-                (group) => group.groupNumber === group.groupNumber,
+                (finish) => finish.groupNumber === group.groupNumber,
             )?.result,
         }))
         .sort((a, b) => a.groupNumber - b.groupNumber);

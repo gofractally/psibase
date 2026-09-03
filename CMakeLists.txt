@@ -276,6 +276,7 @@ add_dependencies(CommonApiCommonLib_js ComponentParser)
 
 add_rs_component_workspace(packages/:Plugins 
     accounts
+    accounts-query
     aes
     auth-any
     auth-delegate
@@ -290,7 +291,8 @@ add_rs_component_workspace(packages/:Plugins
     packages
     permissions
     sites
-    host-common
+    host-client
+    host-http
     host-db
     host-prompt
     host-types
@@ -312,7 +314,7 @@ include(libraries/psibase/sdk/pack_service.cmake)
 
 set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/packages)
 
-set(PSIBASE_VERSION 0.27)
+set(PSIBASE_VERSION 0.28)
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/TransactService.psi
@@ -369,6 +371,7 @@ psibase_package(
     SERVICE accounts
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Accounts/ui/dist/* /
         DATA ${Plugins_OUTPUT_FILE_accounts} /plugin.wasm
+        DATA ${Plugins_OUTPUT_FILE_accounts_query} /query.wasm
         POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Accounts/postinstall-ui.json
     DEPENDS ${Accounts_js_DEP}
     DEPENDS ${Plugins_DEP}
@@ -458,7 +461,8 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     ACCOUNTS wasi # This name would be overshadowed
     SERVICE host
-        DATA ${Plugins_OUTPUT_FILE_host_common} /common.wasm
+        DATA ${Plugins_OUTPUT_FILE_host_client} /client.wasm
+        DATA ${Plugins_OUTPUT_FILE_host_http} /http.wasm
         DATA ${Plugins_OUTPUT_FILE_host_db} /db.wasm
         DATA ${Plugins_OUTPUT_FILE_host_prompt} /prompt.wasm
         DATA ${Plugins_OUTPUT_FILE_host_types} /types.wasm
@@ -734,6 +738,7 @@ psibase_package(
     NAME Docs
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Psibase documentation"
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/doc/postinstall.json
     SERVICE docs
         DATA ${CMAKE_CURRENT_BINARY_DIR}/book/html /
     PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
@@ -904,6 +909,7 @@ psibase_package(
     NAME Explorer
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Block explorer"
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Explorer/postinstall.json
     SERVICE explorer
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Explorer.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Explorer-schema.json
@@ -947,6 +953,7 @@ psibase_package(
     NAME Supervisor
     VERSION ${PSIBASE_VERSION}.0
     PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "CommonApi(^${PSIBASE_VERSION}.0)" "DynLd(^${PSIBASE_VERSION}.0)"
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Supervisor/postinstall.json
     SERVICE supervisor
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Supervisor/ui/dist/* /
     DEPENDS ${Supervisor_js_DEP}
@@ -1253,7 +1260,7 @@ psibase_package(
     NAME ProdDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Network initializes with production-ready apps, secure authentication, and no governance."
-    PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
+    PACKAGE_DEPENDS Accounts Aes AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
                     Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Guilds Homepage Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens NameMarket TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop
 )
