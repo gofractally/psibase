@@ -344,10 +344,6 @@ namespace psibase::pkcs11
       domain_parameters = 0x6,
       mechanism         = 0x7,
       vendor_defined    = 0x8000000,
-      // gnome keyring
-      g_collection = 0xc74e4db3,
-      g_search     = 0xc74e4db4,
-      g_credential = 0xc74e4da9,
    };
    std::ostream& operator<<(std::ostream& os, object_class c);
 
@@ -388,8 +384,6 @@ namespace psibase::pkcs11
       sha512_256_hmac = 0x28,
       sha512_t_hmac   = 0x29,
       vendor_defined  = 0x80000000,
-      // gnome keyring
-      g_secret_item = 0xc74e4daa,
    };
    std::ostream& operator<<(std::ostream& os, key_type t);
 
@@ -483,13 +477,6 @@ namespace psibase::pkcs11
       supported_cms_attributes   = 0x503,
       allowed_mechanisms         = 0x40000600,
       vendor_defined             = 0x80000000,
-      // gnome keyring
-      g_locked     = 0xc74e4e17,
-      g_created    = 0xc74e4e18,
-      g_modified   = 0xc74e4e19,
-      g_fields     = 0xc74e4e1a,
-      g_collection = 0xc74e4e1b,
-      g_schema     = 0xc74e4e1d,
    };
 
    struct attribute
@@ -582,12 +569,6 @@ namespace psibase::pkcs11
       using value     = basic_attribute<attribute_type::value, std::vector<unsigned char>>;
       using allowed_mechanisms =
           basic_attribute<attribute_type::allowed_mechanisms, std::vector<mechanism_type>>;
-      // gnome keyring
-      using g_collection = basic_attribute<attribute_type::g_collection, std::string>;
-      using g_locked     = basic_attribute<attribute_type::g_locked, bool>;
-      // TODO: This is actually a series of null terminated strings, alternating keys and values
-      using g_fields = basic_attribute<attribute_type::g_fields, std::string>;
-      using g_schema = basic_attribute<attribute_type::g_schema, std::string>;
    }  // namespace attributes
 
    using unused_func_t = void (*)(void);
