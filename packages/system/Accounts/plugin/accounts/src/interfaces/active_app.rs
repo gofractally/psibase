@@ -4,7 +4,7 @@ use crate::db::{apps_table::*, user_table::*};
 use crate::errors::ErrorType::*;
 use crate::helpers::*;
 use crate::plugin::AccountsPlugin;
-use accounts::query::api as AccountsQuery;
+use accounts::chain_query::api as AccountsQuery;
 use bindings::*;
 use exports::accounts::plugin::active_app::{Guest as ActiveApp, *};
 use host::client::api as client;
