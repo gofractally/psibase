@@ -24,4 +24,4 @@ pem = { version = "3.0.4" }
 psibase-system-workspace-hack.workspace = true
 
 [dev-dependencies]
-staged-tx-pkg = { path = "..", version = "0.27.0" }
+staged-tx-pkg = { path = "..", version = "0.28.0" }
