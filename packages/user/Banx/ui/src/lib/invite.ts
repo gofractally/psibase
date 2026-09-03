@@ -3,6 +3,26 @@ import { z } from "zod";
 import { supervisor } from "@shared/lib/supervisor";
 
 const TOKEN_KEY = (id: number) => `banx.invite.token.${id}`;
+const RECIPROCAL_KEY = "banx.invite.reciprocal";
+
+/** Terms of the line just received, used to prefill "line them back". */
+export type PendingReciprocal = {
+    inviter: string;
+    assetId: number;
+    limit: string;
+    depleteOnDebit: boolean;
+    interestRatePpm: number;
+    graceSeconds: number;
+};
+
+const zPendingReciprocal = z.object({
+    inviter: z.string().min(1),
+    assetId: z.number().int().nonnegative(),
+    limit: z.string().min(1),
+    depleteOnDebit: z.boolean(),
+    interestRatePpm: z.number().int().nonnegative(),
+    graceSeconds: z.number().int().nonnegative(),
+});
 
 export function inviteClaimUrl(token: string): string {
     return new URL(
@@ -53,4 +73,31 @@ export async function rejectActiveInvite() {
         method: "rejectActiveInvite",
         params: [],
     });
+}
+
+export function rememberPendingReciprocal(terms: PendingReciprocal) {
+    try {
+        sessionStorage.setItem(RECIPROCAL_KEY, JSON.stringify(terms));
+    } catch {
+        // private mode / quota
+    }
+}
+
+export function peekPendingReciprocal(): PendingReciprocal | null {
+    try {
+        const raw = sessionStorage.getItem(RECIPROCAL_KEY);
+        if (!raw) return null;
+        const parsed = zPendingReciprocal.safeParse(JSON.parse(raw));
+        return parsed.success ? parsed.data : null;
+    } catch {
+        return null;
+    }
+}
+
+export function forgetPendingReciprocal() {
+    try {
+        sessionStorage.removeItem(RECIPROCAL_KEY);
+    } catch {
+        // ignore
+    }
 }
