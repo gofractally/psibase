@@ -9,25 +9,15 @@ impl BookAuth {
         BookAuthTab::read_write().put(self).unwrap();
     }
 
-    pub fn get(
-        debtor: AccountNumber,
-        creditor: AccountNumber,
-        asset_id: u16,
-    ) -> Option<Self> {
+    pub fn get(debtor: AccountNumber, creditor: AccountNumber, asset_id: u16) -> Option<Self> {
         BookAuthTab::read()
             .get_index_pk()
             .get(&(debtor, creditor, asset_id))
     }
 
-    pub fn get_assert(
-        debtor: AccountNumber,
-        creditor: AccountNumber,
-        asset_id: u16,
-    ) -> Self {
+    pub fn get_assert(debtor: AccountNumber, creditor: AccountNumber, asset_id: u16) -> Self {
         Self::get(debtor, creditor, asset_id).unwrap_or_else(|| {
-            panic!(
-                "book-auth not found: debtor={debtor}, creditor={creditor}, asset_id={asset_id}"
-            )
+            panic!("book-auth not found: debtor={debtor}, creditor={creditor}, asset_id={asset_id}")
         })
     }
 

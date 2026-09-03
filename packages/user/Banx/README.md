@@ -9,7 +9,7 @@ A payment does not move coins. It **creates or shrinks obligations** along a pat
 - **Credit line** — B is willing to be owed by A, up to a limit, at an APR. A can *draw* on B: A becomes debtor, B creditor.
 - **Obligation** — the actual debt. One pair/asset can have several rows (different rates). **Exposure** is principal + live interest.
 - **Path-forward offer** — B’s standing terms for *sitting in the middle* of a `path_pay`. Specific next hop, or **global** (any next hop).
-- **Claim offer** — standing **buy** (`sell_claim` hits it) or **sell** (`buy_claim` hits it) terms for transferring a claim on a debtor. Specific debtor, or **global**.
+- **Claim offer** — standing **buy** (`sell_claim` hits it) or **sell** (`buy_claim` hits it) **rate** for transferring a claim on a debtor. Specific debtor, or **global**. Who and how much come from the buyer’s credit line to that debtor.
 - **Currency policy** — a posted from→to FX offer. Others take it with `convert`. Path pay uses it to size a hop when the poster is in the middle.
 
 Alice paying Carol $1 via Bob:
@@ -85,7 +85,7 @@ Posted by the **poster** (`st_fwd_ofr` / `st_glb_fwd`): poster is an intermediat
 
 ## Claim offers
 
-One table, `side` in the primary key (`1` buy, `2` sell). Spread ppm is signed (`10_000` = 1%). **Buy:** positive haircuts the seller, negative is a premium the buyer pays. **Sell:** positive is the seller’s profit (`+10_000` = 1% over face), negative is a discount. The debtor must know the buyer (a line to them, or a live claim). A buyer line to the debtor is optional: if present it caps size like a path hop (reverse claim + headroom) and `remaining` is spent only on **new_draw**.
+One table, `side` in the primary key (`1` buy, `2` sell). Spread ppm is signed (`10_000` = 1%). **Buy:** positive haircuts the seller, negative is a premium the buyer pays. **Sell:** positive is the seller’s profit (`+10_000` = 1% over face), negative is a discount. The debtor must know the buyer (a line to them, or a live claim). New exposure requires the buyer’s credit line to the debtor and is capped like a path hop (reverse claim + headroom); `remaining` is spent only on **new_draw**. A take that only unwinds a reverse claim needs no buyer line. The offer is the rate; the line is who and how much.
 
 - **Buy** (`st_buy_clm` / `st_glb_buy`): poster’s bid. Taker calls `sell_claim`.
 - **Sell** (`st_sell_clm` / `st_glb_sell`): poster’s ask. Taker calls `buy_claim`.

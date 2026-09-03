@@ -372,7 +372,8 @@ pub mod service {
         );
     }
 
-    /// Post/update a **global** buy offer (`debtor = 0`).
+    /// Post/update a **global** buy offer (`debtor = 0`). Spread only;
+    /// who and how much come from the buyer's credit lines at take.
     #[action]
     fn st_glb_buy(asset_id: u16, fee_fixed: Quantity, fee_percent: i32, expires_at: TimePointSec) {
         ClaimOffer::upsert(
@@ -462,7 +463,8 @@ pub mod service {
     /// Seller (sender) sells claims on `debtor` to `buyer` under the buyer's
     /// **buy** offer. Buyer becomes creditor of `debtor`; seller receives face
     /// after the offer spread. The debtor must know the buyer (line or
-    /// live claim). A buyer line to the debtor is optional (cap only).
+    /// live claim). New exposure requires the buyer's credit line to the
+    /// debtor and is capped by that line's capacity.
     #[action]
     fn sell_claim(buyer: AccountNumber, debtor: AccountNumber, asset_id: u16, amount: Quantity) {
         let seller = get_sender();

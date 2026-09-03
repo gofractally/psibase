@@ -493,12 +493,12 @@ export function BuyClaimOfferDialog({
                                 </>
                             ) : (
                                 <>
-                                    Buy claims on <strong>{debtor}</strong>.
-                                    Spread is signed: positive haircuts the
-                                    seller, negative is a premium you pay.
-                                    At take they must know you (a line to
-                                    you, or a live claim). Your line to them
-                                    is optional and only caps size.
+                                    Buy claims on <strong>{debtor}</strong>
+                                    at this rate. Spread is signed: positive
+                                    haircuts the seller, negative is a
+                                    premium you pay. At take they must know
+                                    you, and new exposure needs your credit
+                                    line to them with enough capacity.
                                 </>
                             )}
                         </DialogDescription>
@@ -616,7 +616,7 @@ export function BuyClaimOfferDialog({
                     <DialogDescription>
                         {isSell
                             ? "Sell claims you hold in this asset. Positive spread is your profit (1 = 1% over face); negative is a discount. Buyers hit this offer."
-                            : "Buy claims in this asset. Spread is signed: positive haircuts the seller, negative is a premium. At take the debtor must know you (a line to you, or a live claim). Your line to them is optional and only caps size."}
+                            : "Buy claims in this asset at this rate. Spread is signed: positive haircuts the seller, negative is a premium. At take the debtor must know you, and new exposure needs your credit line to them with enough capacity."}
                     </DialogDescription>
                 </DialogHeader>
                 <form

@@ -61,12 +61,7 @@ impl CashQuote {
     }
 
     pub fn remove(&self) {
-        CashQuoteTab::read_write().erase(&(
-            self.poster,
-            self.asset_id,
-            self.token_id,
-            self.is_out,
-        ));
+        CashQuoteTab::read_write().erase(&(self.poster, self.asset_id, self.token_id, self.is_out));
     }
 
     pub fn apply(&self, amount_from: Quantity) -> Quantity {

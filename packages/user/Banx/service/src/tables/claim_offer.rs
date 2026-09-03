@@ -1,8 +1,8 @@
 use psibase::{services::tokens::Quantity, AccountNumber, Table, TimePointSec};
 
 use super::{
-    apply_spread, assert_account_exists, emit_pair_activity, expires_live,
-    live_specific_or_global, Connection, GLOBAL,
+    apply_spread, assert_account_exists, emit_pair_activity, expires_live, live_specific_or_global,
+    Connection, GLOBAL,
 };
 use crate::math::PPM_SCALE;
 use crate::tables::tables::{Asset, ClaimOffer, ClaimOfferTab};
@@ -29,8 +29,7 @@ impl ClaimOffer {
         side: u8,
     ) -> Self {
         Self::assert_side(side);
-        Self::get(poster, debtor, asset_id, side)
-            .unwrap_or_else(|| panic!("claim offer not found"))
+        Self::get(poster, debtor, asset_id, side).unwrap_or_else(|| panic!("claim offer not found"))
     }
 
     pub fn is_live(&self) -> bool {
@@ -42,12 +41,7 @@ impl ClaimOffer {
     }
 
     /// Live specific offer, else live global, same `side`.
-    pub fn get_live(
-        poster: AccountNumber,
-        debtor: AccountNumber,
-        asset_id: u16,
-        side: u8,
-    ) -> Self {
+    pub fn get_live(poster: AccountNumber, debtor: AccountNumber, asset_id: u16, side: u8) -> Self {
         Self::assert_side(side);
         let specific = Self::get(poster, debtor, asset_id, side);
         let global = if debtor == GLOBAL {

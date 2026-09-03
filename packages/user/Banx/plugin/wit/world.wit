@@ -142,7 +142,8 @@ interface api {
         expires-at-seconds: u32,
     ) -> result<_, error>;
 
-    /// Global buy-claim offer for this asset (any lined debtor).
+    /// Global buy-claim offer for this asset. Spread only; who and how
+    /// much come from the poster's credit lines to each debtor at take.
     set-global-buy-claim-offer: func(
         asset-id: u16,
         fee-fixed: string,
@@ -194,7 +195,8 @@ interface api {
 
     /// Sell claims on `debtor` to `buyer` under buyer's **buy** offer.
     /// `amount` is face (human decimal); seller receives face after fees as a
-    /// claim on the buyer.
+    /// claim on the buyer. New exposure needs the buyer's credit line to
+    /// `debtor` and is capped by that line.
     sell-claim: func(
         buyer: string,
         debtor: string,
@@ -203,6 +205,8 @@ interface api {
     ) -> result<_, error>;
 
     /// Buy claims on `debtor` from `seller` under seller's **sell** offer.
+    /// New exposure needs your credit line to `debtor` and is capped by
+    /// that line.
     buy-claim: func(
         seller: string,
         debtor: string,

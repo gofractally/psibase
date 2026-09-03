@@ -294,7 +294,7 @@ One table, `side` in the primary key (`1` buy, `2` sell). `debtor = 0` is global
 
 `out = in × (1 − spread) − fee_fixed` after flipping sell so positive is the poster’s profit.
 
-The **debtor must know the buyer** (line to them, or a live claim). A buyer line to the debtor is optional: if present it **caps size** with the same capacity as a path hop (reverse claim + headroom) and `remaining` is spent only on **new_draw**. Checks run at **take**, not at post.
+The **debtor must know the buyer** (line to them, or a live claim). New exposure requires the **buyer’s credit line** to the debtor and is **capped** with the same capacity as a path hop (reverse claim + headroom); `remaining` is spent only on **new_draw**. A take that only unwinds a reverse claim needs no buyer line. The offer is the rate; the line is who and how much. Checks run at **take**, not at post.
 
 Sell / convert / path_pay are **not** a grace payoff. They lock whatever is owed (zero during grace) and move or rebook. A sold claim keeps the source cycle’s remaining window (same end). It does not start the buyer’s posted grace.
 

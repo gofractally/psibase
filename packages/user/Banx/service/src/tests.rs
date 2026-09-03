@@ -2,12 +2,12 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::Wrapper;
-    use crate::interest::{SECONDS_PER_DAY, SECONDS_PER_YEAR, compound_amount, interest_for};
+    use crate::interest::{compound_amount, interest_for, SECONDS_PER_DAY, SECONDS_PER_YEAR};
     use crate::tables::{
         Asset, BanxInvite, BanxInviteTable, BookAuth, CreditLine, CurrencyPolicy, Obligation,
-        PPM_SCALE, PairCycle, PathHop, PayRequest, RATE_SCALE,
+        PairCycle, PathHop, PayRequest, PPM_SCALE, RATE_SCALE,
     };
+    use crate::Wrapper;
     use psibase::fracpack::Pack;
     use psibase::services::tokens::{Precision, Quantity};
     use psibase::*;
@@ -120,7 +120,7 @@ mod tests {
     fn test_interest_path_independence(_chain: psibase::Chain) -> Result<(), psibase::Error> {
         let year = SECONDS_PER_YEAR as u64;
         let p = 1_000_000u64; // $100.0000 at 4 dp
-        // Daily 10%: ~10.52% effective over 365 days (not exact +10%).
+                              // Daily 10%: ~10.52% effective over 365 days (not exact +10%).
         assert_eq!(compound_amount(p, 100_000, year), 1_104_964);
         assert_eq!(compound_amount(p, 100_000, year * 2), 1_220_966);
         assert_eq!(interest_for(p, 100_000, year * 2), 220_966);
@@ -227,12 +227,10 @@ mod tests {
             .st_fwd_ofr(bluey, aud, Quantity::new(0), 0, PPM_SCALE, never(), true)
             .get()?;
 
-        assert!(
-            Wrapper::push_from(&chain, bluey)
-                .path_pay(vec![hop(bingo, aud)], popper, popper, 0)
-                .get()
-                .is_err()
-        );
+        assert!(Wrapper::push_from(&chain, bluey)
+            .path_pay(vec![hop(bingo, aud)], popper, popper, 0)
+            .get()
+            .is_err());
 
         Wrapper::push_from(&chain, bluey)
             .path_pay(vec![hop(bandit, aud), hop(bingo, aud)], popper, popper, 0)
@@ -244,17 +242,15 @@ mod tests {
         assert_eq!(exp(&chain, bingo, bluey, aud), 0);
         assert_eq!(exp(&chain, bluey, bingo, aud), 0);
 
-        assert!(
-            Wrapper::push_from(&chain, bluey)
-                .path_pay(
-                    vec![hop(bandit, aud), hop(bingo, aud)],
-                    Quantity::new(leftover.value + 1),
-                    Quantity::new(leftover.value + 1),
-                    0,
-                )
-                .get()
-                .is_err()
-        );
+        assert!(Wrapper::push_from(&chain, bluey)
+            .path_pay(
+                vec![hop(bandit, aud), hop(bingo, aud)],
+                Quantity::new(leftover.value + 1),
+                Quantity::new(leftover.value + 1),
+                0,
+            )
+            .get()
+            .is_err());
 
         Wrapper::push_from(&chain, bluey)
             .path_pay(
@@ -542,6 +538,9 @@ mod tests {
             .st_crd_lne(pippa, aud, Quantity::new(0), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, pippa)
+            .st_crd_lne(cafe, aud, 90_0000.into(), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, pippa)
             .buy_claim(john, cafe, aud, 90_0000.into())
             .get()?;
 
@@ -719,18 +718,14 @@ mod tests {
             .rm_cur_pol(aud, usd)
             .get()?;
         assert!(CurrencyPolicy::get(gary, aud, usd).is_none());
-        assert!(
-            Wrapper::push_from(&chain, alice)
-                .convert(gary, aud, usd, Quantity::new(100), Quantity::new(100))
-                .get()
-                .is_err()
-        );
-        assert!(
-            Wrapper::push_from(&chain, gary)
-                .rm_cur_pol(aud, usd)
-                .get()
-                .is_err()
-        );
+        assert!(Wrapper::push_from(&chain, alice)
+            .convert(gary, aud, usd, Quantity::new(100), Quantity::new(100))
+            .get()
+            .is_err());
+        assert!(Wrapper::push_from(&chain, gary)
+            .rm_cur_pol(aud, usd)
+            .get()
+            .is_err());
         Ok(())
     }
 
@@ -1417,12 +1412,10 @@ mod tests {
             .st_glb_buy(usd, Quantity::new(0), 0, never())
             .get()?;
 
-        assert!(
-            Wrapper::push_from(&chain, alice)
-                .sell_claim(peter, bob, usd, Quantity::new(1_000))
-                .get()
-                .is_err()
-        );
+        assert!(Wrapper::push_from(&chain, alice)
+            .sell_claim(peter, bob, usd, Quantity::new(1_000))
+            .get()
+            .is_err());
 
         Wrapper::push_from(&chain, bob)
             .st_crd_lne(peter, usd, Quantity::new(0), false, 0, 0)
@@ -1431,6 +1424,92 @@ mod tests {
             .sell_claim(peter, bob, usd, Quantity::new(1_000))
             .get()?;
         assert_eq!(exp(&chain, peter, bob, usd), 1_000);
+        Ok(())
+    }
+
+    /// Global buy is the rate. New exposure needs the buyer's line to the
+    /// debtor and is capped by that line. Steve cannot dump $2,000 of
+    /// Carol onto Peter when Peter's empty line to her is $500.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_sell_claim_requires_buyer_line_and_caps_size(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let peter = account!("peter");
+        let steve = account!("steve");
+        let carol = account!("carol");
+        for a in [peter, steve, carol] {
+            chain.new_account(a).unwrap();
+        }
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        Wrapper::push_from(&chain, carol)
+            .deposit(steve, usd, Quantity::new(2_000), 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, peter)
+            .st_glb_buy(usd, Quantity::new(0), 0, never())
+            .get()?;
+        Wrapper::push_from(&chain, carol)
+            .st_crd_lne(peter, usd, Quantity::new(0), false, 0, 0)
+            .get()?;
+
+        assert!(
+            Wrapper::push_from(&chain, steve)
+                .sell_claim(peter, carol, usd, Quantity::new(500))
+                .get()
+                .is_err(),
+            "global buy without a buyer line must not take new exposure"
+        );
+
+        Wrapper::push_from(&chain, peter)
+            .st_crd_lne(carol, usd, Quantity::new(500), false, 0, 0)
+            .get()?;
+        assert!(
+            Wrapper::push_from(&chain, steve)
+                .sell_claim(peter, carol, usd, Quantity::new(2_000))
+                .get()
+                .is_err(),
+            "cannot dump more than the buyer's empty line"
+        );
+        Wrapper::push_from(&chain, steve)
+            .sell_claim(peter, carol, usd, Quantity::new(500))
+            .get()?;
+        assert_eq!(exp(&chain, peter, carol, usd), 500);
+        assert_eq!(exp(&chain, steve, carol, usd), 1_500);
+        assert_eq!(exp(&chain, steve, peter, usd), 500);
+        Ok(())
+    }
+
+    /// Unwind-only take: Peter already owes Carol 500. Steve's 500 claim
+    /// nets that away. No new exposure, so no buyer line required.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_sell_claim_unwind_needs_no_buyer_line(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let peter = account!("peter");
+        let steve = account!("steve");
+        let carol = account!("carol");
+        for a in [peter, steve, carol] {
+            chain.new_account(a).unwrap();
+        }
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        Wrapper::push_from(&chain, carol)
+            .deposit(steve, usd, Quantity::new(500), 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, peter)
+            .deposit(carol, usd, Quantity::new(500), 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, peter)
+            .st_glb_buy(usd, Quantity::new(0), 0, never())
+            .get()?;
+
+        Wrapper::push_from(&chain, steve)
+            .sell_claim(peter, carol, usd, Quantity::new(500))
+            .get()?;
+        assert_eq!(exp(&chain, peter, carol, usd), 0);
+        assert_eq!(exp(&chain, carol, peter, usd), 0);
+        assert_eq!(exp(&chain, steve, carol, usd), 0);
+        assert_eq!(exp(&chain, steve, peter, usd), 500);
         Ok(())
     }
 
@@ -1494,17 +1573,15 @@ mod tests {
             .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never(), false)
             .get()?;
 
-        assert!(
-            Wrapper::push_from(&chain, alice)
-                .path_pay(
-                    vec![hop(gary, usd), hop(steve, usd)],
-                    Quantity::new(100),
-                    Quantity::new(100),
-                    0,
-                )
-                .get()
-                .is_err()
-        );
+        assert!(Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(gary, usd), hop(steve, usd)],
+                Quantity::new(100),
+                Quantity::new(100),
+                0,
+            )
+            .get()
+            .is_err());
 
         Wrapper::push_from(&chain, gary)
             .st_crd_lne(steve, usd, Quantity::new(0), false, 0, 0)
@@ -1620,17 +1697,15 @@ mod tests {
             .st_fwd_ofr(steve, usd, Quantity::new(0), 0, PPM_SCALE, never(), true)
             .get()?;
 
-        assert!(
-            Wrapper::push_from(&chain, alice)
-                .path_pay(
-                    vec![hop(gary, usd), hop(steve, usd)],
-                    Quantity::new(100),
-                    Quantity::new(100),
-                    0,
-                )
-                .get()
-                .is_err()
-        );
+        assert!(Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(gary, usd), hop(steve, usd)],
+                Quantity::new(100),
+                Quantity::new(100),
+                0,
+            )
+            .get()
+            .is_err());
 
         Wrapper::push_from(&chain, steve)
             .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0, 0)
@@ -1666,17 +1741,15 @@ mod tests {
         Wrapper::push_from(&chain, gary)
             .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never(), false)
             .get()?;
-        assert!(
-            Wrapper::push_from(&chain, alice)
-                .path_pay(
-                    vec![hop(gary, usd), hop(steve, usd)],
-                    Quantity::new(100),
-                    Quantity::new(100),
-                    0,
-                )
-                .get()
-                .is_err()
-        );
+        assert!(Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(gary, usd), hop(steve, usd)],
+                Quantity::new(100),
+                Quantity::new(100),
+                0,
+            )
+            .get()
+            .is_err());
 
         Wrapper::push_from(&chain, gary)
             .st_fwd_unk(AccountNumber::new(0), usd, true)
@@ -1718,17 +1791,15 @@ mod tests {
         Wrapper::push_from(&chain, gary)
             .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never(), false)
             .get()?;
-        assert!(
-            Wrapper::push_from(&chain, alice)
-                .path_pay(
-                    vec![hop(gary, usd), hop(steve, usd)],
-                    Quantity::new(100),
-                    Quantity::new(100),
-                    0,
-                )
-                .get()
-                .is_err()
-        );
+        assert!(Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(gary, usd), hop(steve, usd)],
+                Quantity::new(100),
+                Quantity::new(100),
+                0,
+            )
+            .get()
+            .is_err());
 
         Wrapper::push_from(&chain, gary)
             .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never(), true)
@@ -1775,12 +1846,10 @@ mod tests {
             .rm_crd_lne(peter, usd)
             .get()?;
         assert!(CreditLine::get(bob, peter, usd).is_none());
-        assert!(
-            Wrapper::push_from(&chain, alice)
-                .sell_claim(peter, bob, usd, Quantity::new(1_000))
-                .get()
-                .is_err()
-        );
+        assert!(Wrapper::push_from(&chain, alice)
+            .sell_claim(peter, bob, usd, Quantity::new(1_000))
+            .get()
+            .is_err());
         assert_eq!(exp(&chain, alice, bob, usd), 1_000);
         Ok(())
     }
@@ -2198,38 +2267,28 @@ mod tests {
         chain.new_account(alice).unwrap();
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
 
-        assert!(
-            Wrapper::push_from(&chain, alice)
-                .st_crd_lne(alice, usd, Quantity::new(100), false, 0, 0)
-                .get()
-                .is_err()
-        );
+        assert!(Wrapper::push_from(&chain, alice)
+            .st_crd_lne(alice, usd, Quantity::new(100), false, 0, 0)
+            .get()
+            .is_err());
         let bob = account!("bob");
         chain.new_account(bob).unwrap();
-        assert!(
-            Wrapper::push_from(&chain, alice)
-                .st_crd_lne(bob, 99, Quantity::new(100), false, 0, 0)
-                .get()
-                .is_err()
-        );
-        assert!(
-            Wrapper::push_from(&chain, alice)
-                .st_crd_lne(bob, usd, Quantity::new(100), false, PPM_SCALE + 1, 0)
-                .get()
-                .is_err()
-        );
-        assert!(
-            Wrapper::push_from(&chain, alice)
-                .deposit(alice, usd, Quantity::new(1), 0, 0)
-                .get()
-                .is_err()
-        );
-        assert!(
-            Wrapper::push_from(&chain, alice)
-                .deposit(bob, usd, Quantity::new(0), 0, 0)
-                .get()
-                .is_err()
-        );
+        assert!(Wrapper::push_from(&chain, alice)
+            .st_crd_lne(bob, 99, Quantity::new(100), false, 0, 0)
+            .get()
+            .is_err());
+        assert!(Wrapper::push_from(&chain, alice)
+            .st_crd_lne(bob, usd, Quantity::new(100), false, PPM_SCALE + 1, 0)
+            .get()
+            .is_err());
+        assert!(Wrapper::push_from(&chain, alice)
+            .deposit(alice, usd, Quantity::new(1), 0, 0)
+            .get()
+            .is_err());
+        assert!(Wrapper::push_from(&chain, alice)
+            .deposit(bob, usd, Quantity::new(0), 0, 0)
+            .get()
+            .is_err());
         Ok(())
     }
 
@@ -2241,55 +2300,41 @@ mod tests {
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
         let ghost = account!("nobody");
 
-        assert!(
-            Wrapper::push_from(&chain, alice)
-                .st_crd_lne(ghost, usd, Quantity::new(100), false, 0, 0)
-                .get()
-                .is_err()
-        );
-        assert!(
-            Wrapper::push_from(&chain, alice)
-                .st_fwd_ofr(ghost, usd, Quantity::new(0), 0, PPM_SCALE, never(), true)
-                .get()
-                .is_err()
-        );
-        assert!(
-            Wrapper::push_from(&chain, alice)
-                .st_buy_clm(ghost, usd, Quantity::new(0), 0, never())
-                .get()
-                .is_err()
-        );
-        assert!(
-            Wrapper::push_from(&chain, alice)
-                .st_sell_clm(ghost, usd, Quantity::new(0), 0, never())
-                .get()
-                .is_err()
-        );
-        assert!(
-            Wrapper::push_from(&chain, alice)
-                .st_req(
-                    PayRequest::INVOICE,
-                    ghost,
-                    usd,
-                    Quantity::new(1),
-                    "".into(),
-                    never(),
-                )
-                .get()
-                .is_err()
-        );
-        assert!(
-            Wrapper::push_from(&chain, alice)
-                .deposit(ghost, usd, Quantity::new(1), 0, 0)
-                .get()
-                .is_err()
-        );
-        assert!(
-            Wrapper::push_from(&chain, alice)
-                .forgive(ghost, usd, Quantity::new(1))
-                .get()
-                .is_err()
-        );
+        assert!(Wrapper::push_from(&chain, alice)
+            .st_crd_lne(ghost, usd, Quantity::new(100), false, 0, 0)
+            .get()
+            .is_err());
+        assert!(Wrapper::push_from(&chain, alice)
+            .st_fwd_ofr(ghost, usd, Quantity::new(0), 0, PPM_SCALE, never(), true)
+            .get()
+            .is_err());
+        assert!(Wrapper::push_from(&chain, alice)
+            .st_buy_clm(ghost, usd, Quantity::new(0), 0, never())
+            .get()
+            .is_err());
+        assert!(Wrapper::push_from(&chain, alice)
+            .st_sell_clm(ghost, usd, Quantity::new(0), 0, never())
+            .get()
+            .is_err());
+        assert!(Wrapper::push_from(&chain, alice)
+            .st_req(
+                PayRequest::INVOICE,
+                ghost,
+                usd,
+                Quantity::new(1),
+                "".into(),
+                never(),
+            )
+            .get()
+            .is_err());
+        assert!(Wrapper::push_from(&chain, alice)
+            .deposit(ghost, usd, Quantity::new(1), 0, 0)
+            .get()
+            .is_err());
+        assert!(Wrapper::push_from(&chain, alice)
+            .forgive(ghost, usd, Quantity::new(1))
+            .get()
+            .is_err());
         Ok(())
     }
 
@@ -2534,18 +2579,14 @@ mod tests {
         assert_eq!(exp(&chain, alice, bob, usd), 0);
         assert_eq!(exp(&chain, bob, alice, usd), 0);
 
-        assert!(
-            Wrapper::push_from(&chain, alice)
-                .forgive(alice, usd, Quantity::new(1))
-                .get()
-                .is_err()
-        );
-        assert!(
-            Wrapper::push_from(&chain, alice)
-                .forgive(bob, usd, Quantity::new(0))
-                .get()
-                .is_err()
-        );
+        assert!(Wrapper::push_from(&chain, alice)
+            .forgive(alice, usd, Quantity::new(1))
+            .get()
+            .is_err());
+        assert!(Wrapper::push_from(&chain, alice)
+            .forgive(bob, usd, Quantity::new(0))
+            .get()
+            .is_err());
         assert!(
             Wrapper::push_from(&chain, alice)
                 .forgive(bob, usd, Quantity::new(1))
@@ -2557,9 +2598,7 @@ mod tests {
     }
 
     #[psibase::test_case(packages("Banx"))]
-    fn test_forgive_interest_first_waterfall(
-        chain: psibase::Chain,
-    ) -> Result<(), psibase::Error> {
+    fn test_forgive_interest_first_waterfall(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
         let bob = account!("bob");
@@ -2796,6 +2835,9 @@ mod tests {
         assert_eq!(exp(&chain, alice, bob, usd), 1_000_000);
 
         Wrapper::push_from(&chain, peter)
+            .st_crd_lne(bob, usd, Quantity::new(10_000_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, peter)
             .st_glb_buy(usd, Quantity::new(0), 0, never())
             .get()?;
         Wrapper::push_from(&chain, bob)
@@ -2903,14 +2945,7 @@ mod tests {
         const DEST_PRINCIPAL: u64 = 500_000;
 
         Wrapper::push_from(&chain, alice)
-            .st_crd_lne(
-                bob,
-                usd,
-                Quantity::new(10_000_000),
-                false,
-                RATE,
-                WEEK_SECS,
-            )
+            .st_crd_lne(bob, usd, Quantity::new(10_000_000), false, RATE, WEEK_SECS)
             .get()?;
         Wrapper::push_from(&chain, bob)
             .path_pay(
@@ -2927,14 +2962,7 @@ mod tests {
         let src_interest = src_face - SRC_PRINCIPAL;
 
         Wrapper::push_from(&chain, peter)
-            .st_crd_lne(
-                bob,
-                usd,
-                Quantity::new(10_000_000),
-                false,
-                RATE,
-                WEEK_SECS,
-            )
+            .st_crd_lne(bob, usd, Quantity::new(10_000_000), false, RATE, WEEK_SECS)
             .get()?;
         Wrapper::push_from(&chain, bob)
             .path_pay(
@@ -3012,14 +3040,7 @@ mod tests {
         const SRC_PRINCIPAL: u64 = 1_000_000;
 
         Wrapper::push_from(&chain, alice)
-            .st_crd_lne(
-                bob,
-                usd,
-                Quantity::new(10_000_000),
-                false,
-                RATE,
-                WEEK_SECS,
-            )
+            .st_crd_lne(bob, usd, Quantity::new(10_000_000), false, RATE, WEEK_SECS)
             .get()?;
         Wrapper::push_from(&chain, bob)
             .path_pay(
@@ -3036,14 +3057,7 @@ mod tests {
         assert!(src_interest > 0, "source already past grace");
 
         Wrapper::push_from(&chain, peter)
-            .st_crd_lne(
-                bob,
-                usd,
-                Quantity::new(10_000_000),
-                false,
-                RATE,
-                WEEK_SECS,
-            )
+            .st_crd_lne(bob, usd, Quantity::new(10_000_000), false, RATE, WEEK_SECS)
             .get()?;
         Wrapper::push_from(&chain, peter)
             .st_glb_buy(usd, Quantity::new(0), 0, never())
@@ -3496,17 +3510,15 @@ mod tests {
             .get()?;
 
         // Ends at Gary, not Steve.
-        assert!(
-            Wrapper::push_from(&chain, alice)
-                .path_pay(
-                    vec![hop(gary, usd)],
-                    Quantity::new(100),
-                    Quantity::new(100),
-                    id,
-                )
-                .get()
-                .is_err()
-        );
+        assert!(Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(gary, usd)],
+                Quantity::new(100),
+                Quantity::new(100),
+                id,
+            )
+            .get()
+            .is_err());
         assert_eq!(PayRequest::get_assert(id).remaining.value, 100);
 
         // Named counterparty is who was billed; anyone with a path may pay.
@@ -3566,12 +3578,10 @@ mod tests {
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
-        assert!(
-            Wrapper::push_from(&chain, alice)
-                .st_req(3, bob, usd, Quantity::new(100), "".into(), never())
-                .get()
-                .is_err()
-        );
+        assert!(Wrapper::push_from(&chain, alice)
+            .st_req(3, bob, usd, Quantity::new(100), "".into(), never())
+            .get()
+            .is_err());
         Ok(())
     }
 
@@ -3583,19 +3593,17 @@ mod tests {
         let alice = account!("alice");
         chain.new_account(alice).unwrap();
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
-        assert!(
-            Wrapper::push_from(&chain, alice)
-                .st_req(
-                    PayRequest::PLEASE_BOOK,
-                    AccountNumber::new(0),
-                    usd,
-                    Quantity::new(100),
-                    "".into(),
-                    never(),
-                )
-                .get()
-                .is_err()
-        );
+        assert!(Wrapper::push_from(&chain, alice)
+            .st_req(
+                PayRequest::PLEASE_BOOK,
+                AccountNumber::new(0),
+                usd,
+                Quantity::new(100),
+                "".into(),
+                never(),
+            )
+            .get()
+            .is_err());
         Ok(())
     }
 
@@ -3632,12 +3640,10 @@ mod tests {
             .get()?;
 
         // Debtor cannot book their own please-book.
-        assert!(
-            Wrapper::push_from(&chain, alice)
-                .deposit(alice, usd, Quantity::new(1_000), 0, id)
-                .get()
-                .is_err()
-        );
+        assert!(Wrapper::push_from(&chain, alice)
+            .deposit(alice, usd, Quantity::new(1_000), 0, id)
+            .get()
+            .is_err());
 
         Wrapper::push_from(&chain, bob)
             .deposit(alice, usd, Quantity::new(1_000), 0, id)
@@ -3667,12 +3673,10 @@ mod tests {
             .get()?;
         Wrapper::push_from(&chain, alice).rm_req(id).get()?;
         assert!(PayRequest::get(id).is_none());
-        assert!(
-            Wrapper::push_from(&chain, bob)
-                .deposit(alice, usd, Quantity::new(50), 0, id)
-                .get()
-                .is_err()
-        );
+        assert!(Wrapper::push_from(&chain, bob)
+            .deposit(alice, usd, Quantity::new(50), 0, id)
+            .get()
+            .is_err());
         Ok(())
     }
 
@@ -3824,7 +3828,12 @@ mod tests {
             .st_crd_lne(alice, usd, Quantity::new(100), true, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .path_pay(vec![hop(bob, usd)], Quantity::new(100), Quantity::new(100), 0)
+            .path_pay(
+                vec![hop(bob, usd)],
+                Quantity::new(100),
+                Quantity::new(100),
+                0,
+            )
             .get()?;
         assert_eq!(CreditLine::get_assert(bob, alice, usd).remaining.value, 0);
 
@@ -4592,9 +4601,7 @@ mod tests {
     }
 
     #[psibase::test_case(packages("Banx"))]
-    fn test_book_auth_creditor_books_deposit(
-        chain: psibase::Chain,
-    ) -> Result<(), psibase::Error> {
+    fn test_book_auth_creditor_books_deposit(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
         let bob = account!("bob");
@@ -4631,24 +4638,18 @@ mod tests {
             .st_bk_ath(bob, usd, Quantity::new(1_000), 0, never())
             .get()?;
 
-        assert!(
-            Wrapper::push_from(&chain, bob)
-                .book(alice, usd, Quantity::new(1_001), 0, "".into())
-                .get()
-                .is_err()
-        );
-        assert!(
-            Wrapper::push_from(&chain, bob)
-                .book(alice, usd, Quantity::new(100), 1, "".into())
-                .get()
-                .is_err()
-        );
-        assert!(
-            Wrapper::push_from(&chain, alice)
-                .book(alice, usd, Quantity::new(100), 0, "".into())
-                .get()
-                .is_err()
-        );
+        assert!(Wrapper::push_from(&chain, bob)
+            .book(alice, usd, Quantity::new(1_001), 0, "".into())
+            .get()
+            .is_err());
+        assert!(Wrapper::push_from(&chain, bob)
+            .book(alice, usd, Quantity::new(100), 1, "".into())
+            .get()
+            .is_err());
+        assert!(Wrapper::push_from(&chain, alice)
+            .book(alice, usd, Quantity::new(100), 0, "".into())
+            .get()
+            .is_err());
 
         Wrapper::push_from(&chain, bob)
             .book(alice, usd, Quantity::new(1_000), 0, "".into())
@@ -4685,12 +4686,10 @@ mod tests {
             .rm_bk_ath(bob, usd)
             .get()?;
         assert!(BookAuth::get(alice, bob, usd).is_none());
-        assert!(
-            Wrapper::push_from(&chain, bob)
-                .book(alice, usd, Quantity::new(100), 0, "".into())
-                .get()
-                .is_err()
-        );
+        assert!(Wrapper::push_from(&chain, bob)
+            .book(alice, usd, Quantity::new(100), 0, "".into())
+            .get()
+            .is_err());
 
         Wrapper::push_from(&chain, alice)
             .st_bk_ath(
@@ -4701,12 +4700,10 @@ mod tests {
                 TimePointSec { seconds: 1 },
             )
             .get()?;
-        assert!(
-            Wrapper::push_from(&chain, bob)
-                .book(alice, usd, Quantity::new(100), 0, "".into())
-                .get()
-                .is_err()
-        );
+        assert!(Wrapper::push_from(&chain, bob)
+            .book(alice, usd, Quantity::new(100), 0, "".into())
+            .get()
+            .is_err());
 
         Ok(())
     }

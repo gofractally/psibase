@@ -140,23 +140,23 @@ impl Connection {
     }
 
     /// Buyer (this creditor) taking `amount` of `seller`'s claim on this
-    /// debtor. No buyer line: no cap. With a line: same capacity as
-    /// [`Self::draw`], remaining only on [`Self::new_draw`]. Then transfer
-    /// and auto-net this pair.
+    /// debtor. Offers set the rate; this line is the facility. New exposure
+    /// needs a buyer line and is capped like [`Self::draw`] (`capacity` =
+    /// reverse + headroom). Remaining is consumed only on [`Self::new_draw`].
+    /// A take that only unwinds a reverse claim needs no line.
     pub fn accept_claim(mut self, seller: AccountNumber, amount: Quantity) {
         assert!(amount.value > 0, "claim transfer amount must be positive");
-        if self.line.is_some() {
+        let new_draw = self.new_draw(amount);
+        if new_draw > 0 {
+            assert!(self.line.is_some(), "buyer has no credit line to debtor");
             assert!(
                 amount.value <= self.capacity(),
                 "buyer credit line capacity insufficient for claim"
             );
-            let new_draw = self.new_draw(amount);
-            if new_draw > 0 {
-                self.line
-                    .as_mut()
-                    .unwrap()
-                    .consume_remaining(new_draw.into());
-            }
+            self.line
+                .as_mut()
+                .unwrap()
+                .consume_remaining(new_draw.into());
         }
         Obligation::transfer_claims(
             seller,

@@ -1,8 +1,7 @@
 use psibase::{services::tokens::Quantity, AccountNumber, Table, TimePointSec};
 
 use super::{
-    apply_hop_fee, assert_account_exists, expires_live, live_specific_or_global, Connection,
-    GLOBAL,
+    apply_hop_fee, assert_account_exists, expires_live, live_specific_or_global, Connection, GLOBAL,
 };
 use crate::math::PPM_SCALE;
 use crate::tables::tables::{Asset, ForwardOffer, ForwardOfferTab};
@@ -21,8 +20,7 @@ impl ForwardOffer {
     }
 
     pub fn get_assert(poster: AccountNumber, next_hop: AccountNumber, asset_id: u16) -> Self {
-        Self::get(poster, next_hop, asset_id)
-            .unwrap_or_else(|| panic!("forward offer not found"))
+        Self::get(poster, next_hop, asset_id).unwrap_or_else(|| panic!("forward offer not found"))
     }
 
     pub fn is_live(&self) -> bool {
