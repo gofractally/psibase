@@ -769,7 +769,6 @@ namespace psibase::pkcs11
       template <typename... T>
       std::tuple<T...> GetAttributeValues(object_handle obj)
       {
-         // TODO: combine attributes into a single call
          return {GetAttributeValue<T>(obj)...};
       }
       // Returns nullopt if the attribute is not present or not extractable
