@@ -4442,24 +4442,26 @@ mod tests {
         assert_eq!(line.limit.value, limit.value);
         assert!(!line.deplete_on_debit);
         assert_eq!(line.interest_rate, 0);
+        assert!(BanxInviteTable::read()
+            .get_index_pk()
+            .get(&invite_id)
+            .is_none());
+        assert!(BanxInvite::list_by_inviter(alice).is_empty());
 
-        // Same accepter again: existing line is left alone.
-        Wrapper::push_from(&chain, psibase::services::invite::Wrapper::SERVICE)
+        let again = Wrapper::push_from(&chain, psibase::services::invite::Wrapper::SERVICE)
             .onInvAccept(invite_id, bob)
-            .get()?;
+            .get();
+        assert!(again.is_err());
         assert_eq!(
             CreditLine::get_assert(alice, bob, usd).limit.value,
             limit.value
         );
 
-        // A different existing account still gets a line.
-        Wrapper::push_from(&chain, psibase::services::invite::Wrapper::SERVICE)
+        let other = Wrapper::push_from(&chain, psibase::services::invite::Wrapper::SERVICE)
             .onInvAccept(invite_id, carol)
-            .get()?;
-        assert_eq!(
-            CreditLine::get_assert(alice, carol, usd).limit.value,
-            limit.value
-        );
+            .get();
+        assert!(other.is_err());
+        assert!(CreditLine::get(alice, carol, usd).is_none());
 
         Ok(())
     }
@@ -4472,8 +4474,10 @@ mod tests {
 
         let alice = account!("alice");
         let bob = account!("bob");
+        let carol = account!("carol");
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
+        chain.new_account(carol).unwrap();
 
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
         Wrapper::push_from(&chain, alice)
@@ -4502,6 +4506,44 @@ mod tests {
         assert_eq!(line.limit.value, 1);
         assert!(line.deplete_on_debit);
         assert_eq!(line.interest_rate, 12_000);
+        assert!(BanxInviteTable::read()
+            .get_index_pk()
+            .get(&invite_id)
+            .is_none());
+
+        let other = Wrapper::push_from(&chain, psibase::services::invite::Wrapper::SERVICE)
+            .onInvAccept(invite_id, carol)
+            .get();
+        assert!(other.is_err());
+        assert!(CreditLine::get(alice, carol, usd).is_none());
+
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_invite_rejects_num_accounts_other_than_one(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+
+        let alice = account!("alice");
+        chain.new_account(alice).unwrap();
+
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        let result = Wrapper::push_from(&chain, alice)
+            .cr_invite(
+                1,
+                invite_payload(5),
+                2,
+                usd,
+                Quantity::new(5_000),
+                false,
+                0,
+                0,
+            )
+            .get();
+        assert!(result.is_err());
+        assert!(BanxInvite::list_by_inviter(alice).is_empty());
 
         Ok(())
     }

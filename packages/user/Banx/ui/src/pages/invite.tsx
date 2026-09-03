@@ -127,8 +127,8 @@ export function InvitePage() {
                     </div>
                     <CardTitle>Invite not found</CardTitle>
                     <CardDescription>
-                        This Banx invite was revoked or never existed. Ask the
-                        sender for a new one.
+                        This Banx invite was already claimed, revoked, or never
+                        existed. Ask the sender for a new one.
                     </CardDescription>
                 </CardHeader>
             </Card>

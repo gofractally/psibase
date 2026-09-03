@@ -130,9 +130,9 @@ pub mod service {
     }
 
     /// Create a Banx invite. Caller is the inviter; `invite_id` / `invite_payload`
-    /// come from `invite:plugin` `prepare-new-invite`. The invite service is
-    /// created with hooks so [`onInvAccept`] extends a credit line to the
-    /// claimee (no-op if a line already exists).
+    /// come from `invite:plugin` `prepare-new-invite`. `num_accounts` must be 1.
+    /// The first [`onInvAccept`] extends a credit line to that claimee (no-op if
+    /// a line already exists) and consumes the invite.
     #[action]
     fn cr_invite(
         invite_id: u32,
@@ -162,7 +162,8 @@ pub mod service {
         BanxInvite::get_assert(invite_id).delete();
     }
 
-    /// Invite hook: apply the stored credit line to `accepter` if none exists.
+    /// Invite hook: apply the stored credit line to `accepter` if none exists,
+    /// then consume the invite. Further accepts fail.
     #[action]
     #[allow(non_snake_case)]
     fn onInvAccept(invite_id: u32, accepter: AccountNumber) {

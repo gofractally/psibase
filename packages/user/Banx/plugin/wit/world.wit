@@ -348,7 +348,7 @@ interface api {
         exact-out: bool,
     ) -> result<path-quote, error>;
 
-    /// Create a network+Banx invite that extends a credit line to the claimee.
+    /// Create a single-use network+Banx invite that extends a credit line to the claimee.
     /// `limit` is a human decimal. Returns the invite token for the claim URL.
     create-invite: func(
         asset-id: u16,

@@ -37,7 +37,7 @@ define_trust! {
             - Convert debt between assets
             - Buy or sell claims under a posted claim offer
             - Post cash quotes, fund/withdraw the cash vault, cash_in (from your vault)
-            - Create or revoke Banx invites (onboard + extend a credit line)
+            - Create or revoke Banx invites (onboard + extend a credit line, one claimee)
         ",
         High => "
             - Path-pay (draw on others' credit along a path)

@@ -50,7 +50,10 @@ impl BanxInvite {
             Self::get(invite_id).is_none(),
             "banx invite {invite_id} already exists"
         );
-        assert!(num_accounts > 0, "num_accounts must be greater than zero");
+        assert!(
+            num_accounts == 1,
+            "banx invites are single-use (num_accounts must be 1)"
+        );
         assert!(
             amount.value > 0,
             "invite credit limit must be greater than zero"
@@ -95,7 +98,9 @@ impl BanxInvite {
     }
 
     /// Extend the stored credit line to `accepter` if this inviter has not
-    /// already lined them in this asset. Existing lines are left untouched.
+    /// already lined them in this asset, then consume the invite (one claimee).
+    /// Existing lines are left untouched. Inviter and unknown accounts are
+    /// skipped and do not consume the seat.
     pub fn accept(&self, accepter: AccountNumber) {
         if accepter == self.inviter {
             return;
@@ -103,29 +108,29 @@ impl BanxInvite {
         if !psibase::services::accounts::Wrapper::call().exists(accepter) {
             return;
         }
-        if CreditLine::get(self.inviter, accepter, self.asset_id).is_some() {
-            return;
+        if CreditLine::get(self.inviter, accepter, self.asset_id).is_none() {
+            CreditLine::upsert_credit_line(
+                self.inviter,
+                accepter,
+                self.asset_id,
+                self.limit,
+                self.deplete_on_debit,
+                self.interest_rate,
+                self.grace_seconds,
+            );
+            emit_pair_activity(
+                self.inviter,
+                accepter,
+                self.asset_id,
+                "credit_line",
+                self.limit,
+                0.into(),
+                self.asset_id,
+                0,
+                "",
+            );
         }
-        CreditLine::upsert_credit_line(
-            self.inviter,
-            accepter,
-            self.asset_id,
-            self.limit,
-            self.deplete_on_debit,
-            self.interest_rate,
-            self.grace_seconds,
-        );
-        emit_pair_activity(
-            self.inviter,
-            accepter,
-            self.asset_id,
-            "credit_line",
-            self.limit,
-            0.into(),
-            self.asset_id,
-            0,
-            "",
-        );
+        self.consume();
     }
 
     pub fn delete(&self) {
@@ -134,6 +139,10 @@ impl BanxInvite {
             self.inviter,
             "only inviter can delete invites"
         );
+        self.consume();
+    }
+
+    fn consume(&self) {
         let refund = psibase::services::invite::Wrapper::call().delInvite(self.id);
         Self::debit_then_credit(
             (psibase::services::invite::SERVICE, Memo::empty()),
