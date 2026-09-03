@@ -45,6 +45,7 @@ const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("host", "auth"),
     pluginId("host", "prompt"),
     pluginId("transact", "plugin"),
+    pluginId("transact", "admin"),
     pluginId("clientdata", "plugin"),
     pluginId("webcrypto", "plugin"),
 ];
@@ -460,7 +461,7 @@ export class Supervisor implements AppInterface {
 
             // Starts the tx context.
             this.supervisorCall(
-                getCallArgs("transact", "plugin", "admin", "start-tx", []),
+                getCallArgs("transact", "admin", "admin", "start-tx", []),
             );
 
             // Make a *synchronous* call into the plugin. It can be fully synchronous since everything was
@@ -469,7 +470,7 @@ export class Supervisor implements AppInterface {
 
             // Closes the current tx context. If actions were added, tx is submitted.
             const txResult = this.supervisorCall(
-                getCallArgs("transact", "plugin", "admin", "finish-tx", []),
+                getCallArgs("transact", "admin", "admin", "finish-tx", []),
             );
             if (txResult !== null && txResult !== undefined) {
                 console.warn(txResult);

@@ -40,30 +40,9 @@ interface hooks {
     unhook-actions-sender: func();
 }
 
-interface admin {
+interface api {
     use host:types/types.{error};
-    use types.{action};
-
-    /// Opens a new tx context. Adding actions using add-action-to-transaction will
-    /// refer to this open context.
-    start-tx: func();
-
-    /// Closes the current transaction context, constructs and submits the final
-    /// signed transaction.
-    finish-tx: func() -> result<_, error>;
-
-    /// Submit the given actions as a single staged transaction proposed by the
-    /// logged-in user. Only callable by the `packages` plugin.
-    ///
-    /// * `actions`: The actions to propose.
-    /// * `auto-exec`: If true, the staged transaction will execute as soon as it
-    ///                has enough approvals.
-    propose: func(actions: list<action>, auto-exec: bool) -> result<_, error>;
-}
-
-interface intf {
-    use host:types/types.{error};
-    use types.{claim};
+    use types.{action, claim};
 
     /// Adds the specified service action to the current transaction.
     ///
@@ -76,8 +55,8 @@ interface intf {
     /// * `packed-args`: The arguments for the action, packed into fracpack format
     add-action-to-transaction: func(method-name: string, packed-args: list<u8>) -> result<_, error>;
 
-    /// Append a `claim` to the current transaction. At finish-tx, Transact
-    /// produces the matching proof by calling `host:crypto/keyvault.sign`
+    /// Append a `claim` to the current transaction. At finish-tx, the transact
+    /// admin driver produces the matching proof by calling `host:crypto/keyvault.sign`
     /// with `claim.raw-data` (typically a DER-encoded public key); the host
     /// keystore (persistent or transient — see
     /// `host:crypto/keyvault.import-key-transient`) must contain the matching
@@ -104,6 +83,34 @@ interface intf {
     ///             proposing transactions. Pass `none` to flush the current latch
     ///             without starting a new one.
     set-propose-latch: func(account: option<string>) -> result<_, error>;
+
+    /// Submit the given actions as a single staged transaction proposed by the
+    /// logged-in user. Only callable by the `packages` plugin.
+    ///
+    /// * `actions`: The actions to propose.
+    /// * `auto-exec`: If true, the staged transaction will execute as soon as it
+    ///                has enough approvals.
+    propose: func(actions: list<action>, auto-exec: bool) -> result<_, error>;
+}
+
+/// Driver-only open-tx ledger. Callable only by service `transact` (the tx admin driver).
+interface ledger {
+    use host:types/types.{error};
+    use types.{action, claim};
+
+    /// Reset open-tx state (actions, latch, hooks, extra signatures).
+    clear: func();
+
+    /// Append an action for an arbitrary service. Runs sender resolution like
+    /// `add-action-to-transaction`.
+    schedule: func(service: string, method-name: string, packed-args: list<u8>) -> result<_, error>;
+
+    /// Flush the propose latch into the action list, clear the sender hook, then
+    /// take and clear all accumulated actions.
+    take-actions: func() -> result<list<action>, error>;
+
+    /// Take and clear claims appended via `add-signature` (for finish-tx).
+    take-signatures: func() -> list<claim>;
 }
 
 interface auth {
@@ -113,12 +120,16 @@ interface auth {
     get-query-token: func(app: string, user: string) -> result<string, error>;
 }
 
-// Include this world to import the most common transact:plugin imports
+interface network {
+    use host:types/types.{error};
+
+    /// Set snapshot interval period network wide
+    set-snapshot-time: func(seconds: u32) -> result<_, error>;
+}
+
+/// Import this world to append actions / set the propose latch / propose.
 world imports {
-    import intf;
-    import auth;
-    import network;
-    import admin;
+    import api;
 }
 
 //      HOOK WORLDS
@@ -143,13 +154,6 @@ world hook-user-auth {
         /// Provides proof of the user claim.
         on-user-auth-proof: func(account-name: string, transaction-hash: list<u8>) -> result<option<proof>, error>;
     }
-}
-
-interface network {
-    use host:types/types.{error};
-
-    /// Set snapshot interval period network wide
-    set-snapshot-time: func(seconds: u32) -> result<_, error>;
 }
 
 world hook-actions-sender {

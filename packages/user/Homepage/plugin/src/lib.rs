@@ -15,10 +15,10 @@ impl NameMarketApi for HomepagePlugin {
 
         let keypair = host::crypto::keyvault::generate_unmanaged_keypair()?;
 
-        transact::plugin::intf::set_propose_latch(Some(&account))?;
+        transact::plugin::api::set_propose_latch(Some(&account))?;
         auth_sig::plugin::actions::set_key(&keypair.public_key)?;
         accounts::plugin::api::set_auth_service(AUTH_SIG_SERVICE)?;
-        transact::plugin::intf::set_propose_latch(None)?;
+        transact::plugin::api::set_propose_latch(None)?;
 
         auth_sig::plugin::keyvault::import_key(&keypair.private_key)?;
 
