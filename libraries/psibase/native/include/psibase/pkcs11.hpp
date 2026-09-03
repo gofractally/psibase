@@ -506,13 +506,6 @@ namespace psibase::pkcs11
       T                               value;
    };
 
-   template <attribute_type N>
-   struct basic_attribute<N, std::string>
-   {
-      static constexpr attribute_type type = N;
-      std::string                     value;
-   };
-
    template <attribute_type N, typename T>
    attribute make_attribute(basic_attribute<N, T>* attr)
    {
