@@ -357,11 +357,11 @@ Multiple tokens per Banx asset: one quote row per `(poster, asset, token, is_out
 
 Each writer emits a bilateral `history.banx-app.activity` event: one row per party as `account`, the other as `counterparty`. Amounts are **human decimals** at emit (asset precision; convert’s `netted` uses the destination asset).
 
-Kinds include `path_draw`, `deposit`, `book`, `net`, `forgive`, `convert`, `cash_out`, `cash_in`, `credit_line`, `rm_credit_line`, `book_auth`, `rm_book_auth`, `sell_claim` / `buy_claim`, `invoice`, `please_book`, `fulfill`, `req_cancel`.
+Kinds include `path_draw`, `path_pay`, `deposit`, `book`, `net`, `forgive`, `convert`, `cash_out`, `cash_in`, `credit_line`, `rm_credit_line`, `book_auth`, `rm_book_auth`, `sell_claim` / `buy_claim`, `invoice`, `please_book`, `fulfill`, `req_cancel`.
 
 Hop draws write the adjacent pairs (Alice↔Bob, Bob↔Carol). A **multi-hop** `path_pay` / `pay_inv` also writes **sender↔payee** (`kind: path_pay`): `amount` is what was sent (`asset_id` = first hop), `netted` is what was delivered (`other_asset_id` = last hop). Direct (1-hop) pays are only `path_draw` on that pair — same two people.
 
-GraphQL `activity(account, counterparty, assetId)` matches `asset_id` **or** `other_asset_id`, so a USD delivery still shows on an AUD pair view. `asset_id` is interpolated as an integer in SQL (`?` would bind as text and miss).
+GraphQL `activity(account, counterparty?, assetId?)` is the pair view when both filters are set (matches `asset_id` **or** `other_asset_id`, so a USD delivery still shows on an AUD pair view). Omit them for the account feed (`/history`). `asset_id` is interpolated as an integer in SQL (`?` would bind as text and miss). Claim-transfer `memo` is the **debtor**.
 
 ---
 
@@ -370,7 +370,7 @@ GraphQL `activity(account, counterparty, assetId)` matches `asset_id` **or** `ot
 | Layer | Role |
 |-------|------|
 | **service** (`banx`) | Tables and actions. Source of truth. |
-| **r-banx** | GraphQL: assets, lines, obligations, offers, FX, requests, scoped `pathGraph`, `activity`. |
+| **r-banx** | GraphQL: assets, lines, obligations, offers, FX, requests, scoped `pathGraph`, pair or account `activity`. |
 | **plugin** | WIT `api` for the Supervisor (`setCreditLine`, `pathPay`, `quotePath`, …). Human decimals in, raw out. |
 | **ui** | React app on the `banx` subdomain. |
 
@@ -379,6 +379,7 @@ Off-chain path search lives in the service crate (`path_find`) and is called fro
 ### UI surfaces
 
 - `/accounts` — claims you hold and liabilities you owe; offer/edit lines
+- `/history` — activity feed: payments, claim takes, booked expenses, invoices
 - `/payees` — contacts
 - `/path-pay` — Transfer: find a path and execute
 - `/requests` — invoices, deposit requests

@@ -477,8 +477,7 @@ mod service {
                 .get_index_pk()
                 .iter()
                 .filter(|a| {
-                    (want_debtor && a.debtor == account)
-                        || (want_creditor && a.creditor == account)
+                    (want_debtor && a.debtor == account) || (want_creditor && a.creditor == account)
                 })
                 .map(BookAuthView::from)
                 .collect()
@@ -757,13 +756,14 @@ mod service {
             }
         }
 
-        /// Activity history for `account` with a given `counterparty` and `assetId`.
-        /// `last` is Relay-style (chronological page). Amounts are human decimals.
+        /// Activity history for `account`. Omit `counterparty` / `assetId` for
+        /// the full feed (inbox). `last` is Relay-style (chronological page).
+        /// Amounts are human decimals.
         async fn activity(
             &self,
             account: AccountNumber,
-            counterparty: AccountNumber,
-            assetId: u16,
+            counterparty: Option<AccountNumber>,
+            assetId: Option<u16>,
             first: Option<i32>,
             last: Option<i32>,
             before: Option<String>,
@@ -771,15 +771,24 @@ mod service {
         ) -> async_graphql::Result<EventConnection<ActivityEvent>> {
             // `?` params are bound as TEXT. asset_id is an integer column, so
             // `asset_id = ?` with "1" matches nothing; interpolate like Tokens.
+            let mut cond = "account = ?".to_string();
+            let mut params = vec![account.to_string()];
+            if let Some(who) = counterparty {
+                cond.push_str(" AND counterparty = ?");
+                params.push(who.to_string());
+            }
+            if let Some(id) = assetId {
+                cond.push_str(&format!(" AND (asset_id = {id} OR other_asset_id = {id})"));
+            }
+            let default_last = if counterparty.is_some() && assetId.is_some() {
+                50
+            } else {
+                200
+            };
             EventQuery::new("history.banx-app.activity")
-                .condition_with_params(
-                    format!(
-                        "account = ? AND counterparty = ? AND (asset_id = {assetId} OR other_asset_id = {assetId})"
-                    ),
-                    vec![account.to_string(), counterparty.to_string()],
-                )
+                .condition_with_params(cond, params)
                 .first(first)
-                .last(last.or(Some(50)))
+                .last(last.or(Some(default_last)))
                 .before(before)
                 .after(after)
                 .query()

@@ -795,7 +795,8 @@ pub mod service {
     /// - `netted`: auto-net cancelled; convert/`path_pay` output at `other_asset_id`
     /// - `other_asset_id`: convert/`path_pay` destination asset; else same as `asset_id`
     /// - `request_id`: linked request (`0` = none)
-    /// - `memo`: request memo when linked
+    /// - `memo`: request memo when linked; debtor account on `sell_claim` /
+    ///   `buy_claim`
     #[event(history)]
     pub fn activity(
         account: AccountNumber,

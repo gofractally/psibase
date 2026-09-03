@@ -142,6 +142,7 @@ impl ClaimOffer {
         let proceeds = self.apply_fees(amount);
         Connection::get_live(seller, buyer, self.asset_id).deposit(proceeds, 0);
 
+        // Memo is the debtor so the buyer's feed can name whose debt moved.
         emit_pair_activity(
             seller,
             buyer,
@@ -151,7 +152,7 @@ impl ClaimOffer {
             proceeds,
             self.asset_id,
             0,
-            "",
+            &debtor.to_string(),
         );
     }
 }

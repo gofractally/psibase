@@ -179,6 +179,7 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 ## UI
 
 - `/accounts` — claims you hold and liabilities you owe; offer/edit lines
+- `/history` — activity feed (path pays, invoices paid, claim takes, books)
 - `/payees` — contacts; deposit or draw
 - `/path-pay` — Transfer: find a path and execute
 - `/requests` — invoices and please-book
