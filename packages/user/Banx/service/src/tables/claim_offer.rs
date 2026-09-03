@@ -19,6 +19,17 @@ impl ClaimOffer {
             .get(&(poster, debtor, asset_id, side))
     }
 
+    pub fn get_assert(
+        poster: AccountNumber,
+        debtor: AccountNumber,
+        asset_id: u16,
+        side: u8,
+    ) -> Self {
+        Self::assert_side(side);
+        Self::get(poster, debtor, asset_id, side)
+            .unwrap_or_else(|| panic!("claim offer not found"))
+    }
+
     pub fn is_live(&self) -> bool {
         expires_live(self.expires_at)
     }
@@ -28,12 +39,13 @@ impl ClaimOffer {
     }
 
     /// Live specific offer, else live global, same `side`.
-    pub fn get_assert(
+    pub fn get_live(
         poster: AccountNumber,
         debtor: AccountNumber,
         asset_id: u16,
         side: u8,
     ) -> Self {
+        Self::assert_side(side);
         if let Some(p) = Self::get(poster, debtor, asset_id, side) {
             if p.is_live() {
                 return p;
@@ -89,13 +101,8 @@ impl ClaimOffer {
         .save();
     }
 
-    pub fn remove(poster: AccountNumber, debtor: AccountNumber, asset_id: u16, side: u8) {
-        Self::assert_side(side);
-        assert!(
-            Self::get(poster, debtor, asset_id, side).is_some(),
-            "claim offer not found"
-        );
-        ClaimOfferTab::read_write().erase(&(poster, debtor, asset_id, side));
+    pub fn remove(&self) {
+        ClaimOfferTab::read_write().erase(&(self.poster, self.debtor, self.asset_id, self.side));
     }
 
     /// Seller proceeds. Buy posts use the raw spread (positive haircuts

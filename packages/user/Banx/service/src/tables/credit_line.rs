@@ -98,12 +98,8 @@ impl CreditLine {
 
     /// Erase the line. Posted grace is cleared if no cycle is open.
     /// Outstanding obligations are untouched.
-    pub fn remove(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) {
-        assert!(
-            Self::get(creditor, debtor, asset_id).is_some(),
-            "credit line not found"
-        );
-        CreditLineTable::read_write().erase(&(creditor, debtor, asset_id));
-        PairCycle::set_posted_grace(creditor, debtor, asset_id, 0);
+    pub fn remove(&self) {
+        CreditLineTable::read_write().erase(&(self.creditor, self.debtor, self.asset_id));
+        PairCycle::set_posted_grace(self.creditor, self.debtor, self.asset_id, 0);
     }
 }

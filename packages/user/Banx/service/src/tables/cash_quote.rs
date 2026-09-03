@@ -26,7 +26,12 @@ impl CashQuote {
     }
 
     pub fn get_assert(poster: AccountNumber, asset_id: u16, token_id: u32, is_out: bool) -> Self {
-        let q = Self::get(poster, asset_id, token_id, is_out).expect("cash quote not found");
+        Self::get(poster, asset_id, token_id, is_out).expect("cash quote not found")
+    }
+
+    /// Exact row, and it must still be live. For takes (`cash_in` / `cash_out`).
+    pub fn get_live(poster: AccountNumber, asset_id: u16, token_id: u32, is_out: bool) -> Self {
+        let q = Self::get_assert(poster, asset_id, token_id, is_out);
         q.assert_live();
         q
     }
@@ -55,12 +60,13 @@ impl CashQuote {
         .save();
     }
 
-    pub fn remove(poster: AccountNumber, asset_id: u16, token_id: u32, is_out: bool) {
-        assert!(
-            Self::get(poster, asset_id, token_id, is_out).is_some(),
-            "cash quote not found"
-        );
-        CashQuoteTab::read_write().erase(&(poster, asset_id, token_id, is_out));
+    pub fn remove(&self) {
+        CashQuoteTab::read_write().erase(&(
+            self.poster,
+            self.asset_id,
+            self.token_id,
+            self.is_out,
+        ));
     }
 
     pub fn apply(&self, amount_from: Quantity) -> Quantity {

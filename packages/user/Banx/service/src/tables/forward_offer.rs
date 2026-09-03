@@ -17,6 +17,11 @@ impl ForwardOffer {
             .get(&(poster, next_hop, asset_id))
     }
 
+    pub fn get_assert(poster: AccountNumber, next_hop: AccountNumber, asset_id: u16) -> Self {
+        Self::get(poster, next_hop, asset_id)
+            .unwrap_or_else(|| panic!("forward offer not found"))
+    }
+
     pub fn is_live(&self) -> bool {
         expires_live(self.expires_at)
     }
@@ -38,7 +43,7 @@ impl ForwardOffer {
     }
 
     /// Live specific offer, else live global. Panics if neither is live.
-    pub fn get_assert(poster: AccountNumber, next_hop: AccountNumber, asset_id: u16) -> Self {
+    pub fn get_live(poster: AccountNumber, next_hop: AccountNumber, asset_id: u16) -> Self {
         if let Some(p) = Self::get(poster, next_hop, asset_id) {
             if p.is_live() {
                 return p;
@@ -94,18 +99,13 @@ impl ForwardOffer {
         asset_id: u16,
         allow_unknown: bool,
     ) {
-        let mut row = Self::get(poster, next_hop, asset_id)
-            .unwrap_or_else(|| panic!("forward offer not found"));
+        let mut row = Self::get_assert(poster, next_hop, asset_id);
         row.allow_unknown = allow_unknown;
         row.save();
     }
 
-    pub fn remove(poster: AccountNumber, next_hop: AccountNumber, asset_id: u16) {
-        assert!(
-            Self::get(poster, next_hop, asset_id).is_some(),
-            "forward offer not found"
-        );
-        ForwardOfferTab::read_write().erase(&(poster, next_hop, asset_id));
+    pub fn remove(&self) {
+        ForwardOfferTab::read_write().erase(&(self.poster, self.next_hop, self.asset_id));
     }
 
     pub fn apply_fees(&self, amount_in: Quantity) -> Quantity {

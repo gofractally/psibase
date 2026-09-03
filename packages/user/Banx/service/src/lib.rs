@@ -259,7 +259,7 @@ pub mod service {
     #[action]
     fn rm_crd_lne(debitor: AccountNumber, asset_id: u16) {
         let creditor = get_sender();
-        CreditLine::remove(creditor, debitor, asset_id);
+        CreditLine::get_assert(creditor, debitor, asset_id).remove();
         emit_pair_activity(
             creditor,
             debitor,
@@ -332,13 +332,13 @@ pub mod service {
             next_hop != ForwardOffer::GLOBAL,
             "use rm_glb_fwd for global forward offer"
         );
-        ForwardOffer::remove(get_sender(), next_hop, asset_id);
+        ForwardOffer::get_assert(get_sender(), next_hop, asset_id).remove();
     }
 
     /// Remove a **global** path-forward offer.
     #[action]
     fn rm_glb_fwd(asset_id: u16) {
-        ForwardOffer::remove(get_sender(), ForwardOffer::GLOBAL, asset_id);
+        ForwardOffer::get_assert(get_sender(), ForwardOffer::GLOBAL, asset_id).remove();
     }
 
     /// Set `allow_unknown` on a posted path-forward offer (`next_hop` 0 = global).
@@ -393,13 +393,14 @@ pub mod service {
             debtor != ClaimOffer::GLOBAL,
             "use rm_glb_buy for global buy offer"
         );
-        ClaimOffer::remove(get_sender(), debtor, asset_id, ClaimOffer::BUY);
+        ClaimOffer::get_assert(get_sender(), debtor, asset_id, ClaimOffer::BUY).remove();
     }
 
     /// Remove a **global** buy offer.
     #[action]
     fn rm_glb_buy(asset_id: u16) {
-        ClaimOffer::remove(get_sender(), ClaimOffer::GLOBAL, asset_id, ClaimOffer::BUY);
+        ClaimOffer::get_assert(get_sender(), ClaimOffer::GLOBAL, asset_id, ClaimOffer::BUY)
+            .remove();
     }
 
     /// Post/update a **specific** sell offer (`debtor` ≠ 0). Takers call
@@ -448,13 +449,14 @@ pub mod service {
             debtor != ClaimOffer::GLOBAL,
             "use rm_glb_sell for global sell offer"
         );
-        ClaimOffer::remove(get_sender(), debtor, asset_id, ClaimOffer::SELL);
+        ClaimOffer::get_assert(get_sender(), debtor, asset_id, ClaimOffer::SELL).remove();
     }
 
     /// Remove a **global** sell offer.
     #[action]
     fn rm_glb_sell(asset_id: u16) {
-        ClaimOffer::remove(get_sender(), ClaimOffer::GLOBAL, asset_id, ClaimOffer::SELL);
+        ClaimOffer::get_assert(get_sender(), ClaimOffer::GLOBAL, asset_id, ClaimOffer::SELL)
+            .remove();
     }
 
     /// Seller (sender) sells claims on `debtor` to `buyer` under the buyer's
@@ -464,7 +466,7 @@ pub mod service {
     #[action]
     fn sell_claim(buyer: AccountNumber, debtor: AccountNumber, asset_id: u16, amount: Quantity) {
         let seller = get_sender();
-        let offer = ClaimOffer::get_assert(buyer, debtor, asset_id, ClaimOffer::BUY);
+        let offer = ClaimOffer::get_live(buyer, debtor, asset_id, ClaimOffer::BUY);
         offer.execute(seller, buyer, debtor, amount, "sell_claim");
     }
 
@@ -473,7 +475,7 @@ pub mod service {
     #[action]
     fn buy_claim(seller: AccountNumber, debtor: AccountNumber, asset_id: u16, amount: Quantity) {
         let buyer = get_sender();
-        let offer = ClaimOffer::get_assert(seller, debtor, asset_id, ClaimOffer::SELL);
+        let offer = ClaimOffer::get_live(seller, debtor, asset_id, ClaimOffer::SELL);
         offer.execute(seller, buyer, debtor, amount, "buy_claim");
     }
 
@@ -534,7 +536,7 @@ pub mod service {
     /// Remove a cash quote.
     #[action]
     fn rm_csh_qte(asset_id: u16, token_id: u32, is_out: bool) {
-        CashQuote::remove(get_sender(), asset_id, token_id, is_out);
+        CashQuote::get_assert(get_sender(), asset_id, token_id, is_out).remove();
     }
 
     /// Move tokens from shared(sender, Banx) into Banx's Tokens sub-account
@@ -563,7 +565,7 @@ pub mod service {
         amount_banx: Quantity,
         min_tokens: Quantity,
     ) {
-        CashQuote::get_assert(cashier, asset_id, token_id, true).cash_out(
+        CashQuote::get_live(cashier, asset_id, token_id, true).cash_out(
             get_sender(),
             amount_banx,
             min_tokens,
@@ -581,7 +583,7 @@ pub mod service {
         amount_tokens: Quantity,
         min_banx: Quantity,
     ) {
-        CashQuote::get_assert(cashier, asset_id, token_id, false).cash_in(
+        CashQuote::get_live(cashier, asset_id, token_id, false).cash_in(
             get_sender(),
             amount_tokens,
             min_banx,

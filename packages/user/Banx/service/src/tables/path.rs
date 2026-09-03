@@ -11,7 +11,7 @@ pub fn path_required_send(hops: &[PathHop], target_out: Quantity) -> Quantity {
     for i in (1..hops.len()).rev() {
         let prev = hops[i - 1];
         let hop = hops[i];
-        let offer = ForwardOffer::get_assert(prev.account, hop.account, hop.asset_id);
+        let offer = ForwardOffer::get_live(prev.account, hop.account, hop.asset_id);
         need = invert_hop_fee(need, offer.fee_fixed, offer.fee_percent);
         if hop.asset_id != prev.asset_id {
             let pol = CurrencyPolicy::get_assert(prev.account, prev.asset_id, hop.asset_id);
@@ -55,7 +55,7 @@ pub(crate) fn execute_path(
                 CurrencyPolicy::get_assert(prev_edge_creditor, prev_asset, asset_id).apply(forward);
         }
         assert!(forward.value > 0, "path hop produced nothing to forward");
-        forward = ForwardOffer::get_assert(path_debtor, next_creditor, asset_id)
+        forward = ForwardOffer::get_live(path_debtor, next_creditor, asset_id)
             .path_draw(next_creditor, forward);
         prev_edge_creditor = next_creditor;
         prev_asset = asset_id;
