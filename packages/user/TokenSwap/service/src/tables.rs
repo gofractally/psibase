@@ -179,11 +179,6 @@ pub mod tables {
     }
 
     impl Pool {
-        #[secondary_key(1)]
-        fn by_admin_nft(&self) -> NID {
-            self.admin_nft
-        }
-
         pub fn get(id: u32) -> Option<Self> {
             PoolTable::read().get_index_pk().get(&id)
         }
@@ -193,19 +188,9 @@ pub mod tables {
                 .expect(format!("pool does not exist, liquidity id: {}", liquidity_token).as_str())
         }
 
-        fn get_by_admin_nft(nft_id: NID) -> Option<Self> {
-            PoolTable::read().get_index_by_admin_nft().get(&nft_id)
-        }
-
-        fn assert_usable_admin_nft(nft_id: NID, current_pool: Option<TID>) {
+        fn assert_usable_admin_nft(nft_id: NID) {
             let record = psibase::services::nft::Wrapper::call().getNft(nft_id);
             assert_eq!(record.owner, get_sender(), "Must own administration NFT");
-            if let Some(existing) = Self::get_by_admin_nft(nft_id) {
-                assert!(
-                    Some(existing.liquidity_token) == current_pool,
-                    "NFT already administers a pool",
-                );
-            }
         }
 
         pub fn administration_nft_owner(&self) -> AccountNumber {
@@ -220,7 +205,7 @@ pub mod tables {
                 self.administration_nft_owner(),
                 "Must own administration NFT to set new administration NFT",
             );
-            Self::assert_usable_admin_nft(nft_id, Some(self.liquidity_token));
+            Self::assert_usable_admin_nft(nft_id);
             self.admin_nft = nft_id;
             self.save();
         }
@@ -245,7 +230,7 @@ pub mod tables {
             tokens.getToken(token_b_id);
 
             if let Some(id) = nft_id {
-                Self::assert_usable_admin_nft(id, None);
+                Self::assert_usable_admin_nft(id);
             }
 
             let nft = psibase::services::nft::Wrapper::call();
