@@ -3,10 +3,10 @@ pub mod tables {
 
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::services::nft::NID;
-    use psibase::services::token_swap::{swap, Wrapper as TokenSwap, PPM};
-    use psibase::services::tokens::{Decimal, Quantity, TokenRecord, Wrapper as Tokens, TID};
+    use psibase::services::token_swap::{PPM, Wrapper as TokenSwap, swap};
+    use psibase::services::tokens::{Decimal, Quantity, TID, TokenRecord, Wrapper as Tokens};
     use psibase::{
-        abort_message, get_sender, AccountNumber, Fracpack, Memo, ServiceWrapper, Table, ToSchema,
+        AccountNumber, Fracpack, Memo, ServiceWrapper, Table, ToSchema, abort_message, get_sender,
     };
 
     use crate::helpers::{mul_div, sqrt};
@@ -179,6 +179,11 @@ pub mod tables {
     }
 
     impl Pool {
+        #[secondary_key(1)]
+        fn by_admin_nft(&self) -> NID {
+            self.admin_nft
+        }
+
         pub fn get(id: u32) -> Option<Self> {
             PoolTable::read().get_index_pk().get(&id)
         }
@@ -186,6 +191,21 @@ pub mod tables {
         pub fn get_assert(liquidity_token: u32) -> Self {
             Self::get(liquidity_token)
                 .expect(format!("pool does not exist, liquidity id: {}", liquidity_token).as_str())
+        }
+
+        fn get_by_admin_nft(nft_id: NID) -> Option<Self> {
+            PoolTable::read().get_index_by_admin_nft().get(&nft_id)
+        }
+
+        fn assert_usable_admin_nft(nft_id: NID, current_pool: Option<TID>) {
+            let record = psibase::services::nft::Wrapper::call().getNft(nft_id);
+            assert_eq!(record.owner, get_sender(), "Must own administration NFT");
+            if let Some(existing) = Self::get_by_admin_nft(nft_id) {
+                assert!(
+                    Some(existing.liquidity_token) == current_pool,
+                    "NFT already administers a pool",
+                );
+            }
         }
 
         pub fn administration_nft_owner(&self) -> AccountNumber {
@@ -200,10 +220,7 @@ pub mod tables {
                 self.administration_nft_owner(),
                 "Must own administration NFT to set new administration NFT",
             );
-            assert!(
-                psibase::services::nft::Wrapper::call().exists(nft_id),
-                "new NFT does not exist",
-            );
+            Self::assert_usable_admin_nft(nft_id, Some(self.liquidity_token));
             self.admin_nft = nft_id;
             self.save();
         }
@@ -226,6 +243,10 @@ pub mod tables {
             let tokens = psibase::services::tokens::Wrapper::call();
             tokens.getToken(token_a_id);
             tokens.getToken(token_b_id);
+
+            if let Some(id) = nft_id {
+                Self::assert_usable_admin_nft(id, None);
+            }
 
             let nft = psibase::services::nft::Wrapper::call();
             let sender = get_sender();
@@ -490,7 +511,7 @@ pub mod tables {
             PoolTable::read_write().put(&self).unwrap();
         }
 
-        pub fn swap(&mut self, incoming_token: TID, incoming_amount: Quantity) -> (TID, Quantity) {
+        pub fn swap(&self, incoming_token: TID, incoming_amount: Quantity) -> (TID, Quantity) {
             let (incoming_reserve, outgoing_reserve) = self.reserves_with_first(incoming_token);
 
             let outgoing_amount = swap(
@@ -503,7 +524,6 @@ pub mod tables {
 
             incoming_reserve.deposit_into_reserve(incoming_amount);
             outgoing_reserve.withdraw_from_reserve(outgoing_amount);
-            self.save();
             (outgoing_reserve.token_id, outgoing_amount)
         }
     }

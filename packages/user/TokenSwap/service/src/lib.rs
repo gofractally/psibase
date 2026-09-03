@@ -55,7 +55,7 @@ pub mod service {
     /// * `token_b` - Token ID of the second deposit.
     /// * `token_a_amount` - Amount of the first deposit.
     /// * `token_b_amount` - Amount of the second deposit.
-    /// * `nft_id`  - Optional administration NFT ID for the pool. If not provided, a new NFT is minted and credited to the sender.
+    /// * `nft_id`  - Optional administration NFT ID for the pool. If not provided, a new NFT is minted and credited to the sender. If provided, the caller must own it and it must not already administer another pool.
     ///
     /// # Returns
     /// (TID of Liquidity token / Pool ID, Administration NFT ID of pool)
@@ -74,6 +74,7 @@ pub mod service {
     /// Set the administration NFT ID for an existing pool.
     ///
     /// Only the current owner of the existing administration NFT is allowed to change it.
+    /// The caller must also own the new NFT, and it must not already administer another pool.
     ///
     /// # Arguments
     /// * `pool_id` - Liquidity token ID that identifies the pool
