@@ -1,10 +1,12 @@
 #[allow(warnings)]
 mod bindings;
 
+use bindings::exports::nft::plugin::authorized::Guest as Authorized;
 use bindings::exports::nft::plugin::issuer::Guest as Issuer;
 use bindings::exports::nft::plugin::user::Guest as User;
 use bindings::exports::nft::plugin::user_config::Guest as UserConfig;
 
+use bindings::host::common::server::post_graphql_get_json;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
@@ -23,11 +25,12 @@ define_trust! {
             - Credit, Debit and uncredit.
             - Auto debit toggle
             - Burning
+            - Read your NFT transfer history and pending transfers
         ",
     }
     functions {
         Medium => [mint],
-        High => [uncredit, debit, enable_user_auto_debit, credit, burn],
+        High => [uncredit, debit, enable_user_auto_debit, credit, burn, graphql],
     }
 }
 
@@ -101,6 +104,17 @@ impl UserConfig for NftPlugin {
         .packed();
 
         add_action_to_transaction(Nft::action_structs::setUserConf::ACTION_NAME, &packed_args)
+    }
+}
+
+impl Authorized for NftPlugin {
+    fn graphql(query: String) -> Result<String, Error> {
+        trust::assert_authorized_with_whitelist(
+            trust::FunctionName::graphql,
+            vec!["homepage".into(), "accounts".into()],
+        )?;
+
+        post_graphql_get_json(&query)
     }
 }
 
