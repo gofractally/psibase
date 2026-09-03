@@ -116,7 +116,7 @@ pub mod tables {
                 new_instance.id,
                 MINTED,
                 sender,
-                0.into(),
+                super::Wrapper::SERVICE,
                 "Minted".into(),
             );
 
@@ -132,7 +132,7 @@ pub mod tables {
                 self.id,
                 BURNED,
                 self.owner,
-                0.into(),
+                super::Wrapper::SERVICE,
                 "Burned".into(),
             );
             self.erase();

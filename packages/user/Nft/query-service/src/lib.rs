@@ -64,6 +64,7 @@ mod service {
             &self,
             account: AccountNumber,
             nft_id: Option<NID>,
+            counter_party: Option<AccountNumber>,
             first: Option<i32>,
             last: Option<i32>,
             before: Option<String>,
@@ -76,6 +77,10 @@ mod service {
             if let Some(nft_id) = nft_id {
                 conditions.push("nftId = ?".to_string());
                 params.push(nft_id.to_string());
+            }
+            if let Some(counter_party) = counter_party {
+                conditions.push("counter_party = ?".to_string());
+                params.push(counter_party.to_string());
             }
 
             EventQuery::new("history.nft.ownerChange")
