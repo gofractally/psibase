@@ -1,4 +1,5 @@
 #include <catch2/catch_all.hpp>
+#include <optional>
 #include <psibase/DefaultTestChain.hpp>
 #include <psibase/MethodNumber.hpp>
 #include <psibase/checkSchema.hpp>
@@ -226,7 +227,7 @@ SCENARIO("Recalling tokens")
       }
       THEN("Alice can recall Bob's tokens")
       {
-         auto recall = a.recall(tokenId, bob, 1'000e4, memo);
+         auto recall = a.recall(tokenId, bob, 1'000e4, memo, std::nullopt);
          CHECK(recall.succeeded());
 
          AND_THEN("Bob's token balance has decreased")
@@ -246,7 +247,7 @@ SCENARIO("Recalling tokens")
 
          AND_THEN("Alice may not recall Bob's tokens")
          {
-            CHECK(a.recall(tokenId, bob, 1'000e4, memo).failed(tokenUnrecallable));
+            CHECK(a.recall(tokenId, bob, 1'000e4, memo, std::nullopt).failed(tokenUnrecallable));
          }
          AND_THEN("The token issuer may not re-enable recallability")
          {
@@ -308,14 +309,14 @@ SCENARIO("Interactions with the Issuer NFT")
          THEN("Alice may not recall Bob's tokens")
          {
             b.mint(tokenId, 1'000e4, memo);
-            CHECK(a.recall(tokenId, bob, 1'000e4, memo).failed(missingRequiredAuth));
+            CHECK(a.recall(tokenId, bob, 1'000e4, memo, std::nullopt).failed(missingRequiredAuth));
          }
          THEN("Bob may recall Alice's tokens")
          {
             Quantity q{1'000e4};
             b.mint(tokenId, q, memo);
             b.credit(tokenId, alice, q, memo);
-            CHECK(b.recall(tokenId, alice, q, memo).succeeded());
+            CHECK(b.recall(tokenId, alice, q, memo, std::nullopt).succeeded());
          }
       }
       WHEN("Alice burns the issuer NFT")
@@ -335,7 +336,7 @@ SCENARIO("Interactions with the Issuer NFT")
          }
          THEN("Alice may not recall Bob's tokens")
          {
-            CHECK(a.recall(tokenId, bob, quantity, memo).failed(nftBurned));
+            CHECK(a.recall(tokenId, bob, quantity, memo, std::nullopt).failed(nftBurned));
          }
          THEN("Alice may not update the token inflation")
          {  //
