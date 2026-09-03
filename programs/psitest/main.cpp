@@ -1240,15 +1240,6 @@ struct callbacks
       }
    }
 
-   // TODO: may not be useful anymore; remove?
-   void testerShutdownChain(uint32_t chain)
-   {
-      auto& c = assert_chain(chain);
-      c.blockContext.reset();
-      c.sys.reset();
-      c.db = {};
-   }
-
    void testerStartBlock(uint32_t          chain_index,
                          int64_t           time_us,
                          uint64_t          producer,
@@ -1705,7 +1696,6 @@ void register_callbacks()
    rhf_t::add<&callbacks::testerCloneChain>("psibase", "cloneChain");
    rhf_t::add<&callbacks::testerGetFork>("psibase", "getFork");
    rhf_t::add<&callbacks::testerDestroyChain>("psibase", "destroyChain");
-   rhf_t::add<&callbacks::testerShutdownChain>("psibase", "shutdownChain");
    rhf_t::add<&callbacks::testerStartBlock>("psibase", "startBlock");
    rhf_t::add<&callbacks::testerFinishBlock>("psibase", "finishBlock");
    rhf_t::add<&callbacks::checkoutSubjective>("psibase", "checkoutSubjective");
