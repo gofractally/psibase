@@ -74,6 +74,30 @@ interface api {
     /// (known counterparty); this deletes the row.
     remove-credit-line: func(debtor: string, asset-id: u16) -> result<_, error>;
 
+    /// Debtor (sender) lets `creditor` book deposits onto them, up to
+    /// `remaining` (human decimal). `max-interest-rate-ppm` 0 = interest-free
+    /// only. `expires-at-seconds` 0 = never.
+    set-book-auth: func(
+        creditor: string,
+        asset-id: u16,
+        remaining: string,
+        max-interest-rate-ppm: u32,
+        expires-at-seconds: u32,
+    ) -> result<_, error>;
+
+    /// Revoke the sender's book-auth to `creditor`.
+    remove-book-auth: func(creditor: string, asset-id: u16) -> result<_, error>;
+
+    /// Creditor (sender) books `amount` onto `debtor` under their live
+    /// book-auth. Same book as deposit. `memo` max 80 bytes.
+    book: func(
+        debtor: string,
+        asset-id: u16,
+        amount: string,
+        interest-rate-ppm: u32,
+        memo: string,
+    ) -> result<_, error>;
+
     /// Post a path-forward offer toward a **specific** next hop. Prefer global
     /// when possible. `fee-fixed` is a human decimal in `asset-id` units.
     /// `fee-percent-ppm` is ppm (`10_000` = 1%).

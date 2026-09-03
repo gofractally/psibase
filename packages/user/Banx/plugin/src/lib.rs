@@ -30,8 +30,8 @@ define_trust! {
             - Quote multi-hop paths (read-only GraphQL + search)
         ",
         Medium => "
-            - Post or remove credit lines, forward offers, claim offers, and currency policies
-            - Deposit, net, and forgive (write off) obligations
+            - Post or remove credit lines, book-auths, forward offers, claim offers, and currency policies
+            - Deposit, book an authorized expense, net, and forgive (write off) obligations
             - Create or cancel invoices, please-book, and settle-auth
             - Fulfill a settle-auth on a loan you owe
             - Convert debt between assets
@@ -51,6 +51,9 @@ define_trust! {
         Medium => [
             set_credit_line,
             remove_credit_line,
+            set_book_auth,
+            remove_book_auth,
+            book,
             set_forward_offer,
             set_global_forward_offer,
             remove_forward_offer,
@@ -230,6 +233,58 @@ impl Api for BanxPlugin {
         }
         .packed();
         add_action_to_transaction(banx::action_structs::rm_crd_lne::ACTION_NAME, &packed)
+    }
+
+    fn set_book_auth(
+        creditor: String,
+        asset_id: u16,
+        remaining: String,
+        max_interest_rate_ppm: u32,
+        expires_at_seconds: u32,
+    ) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::set_book_auth)?;
+        let remaining = parse_amount_nonzero(asset_id, &remaining)?;
+        let packed = banx::action_structs::st_bk_ath {
+            creditor: parse_account(&creditor)?,
+            asset_id,
+            remaining,
+            max_interest_rate: max_interest_rate_ppm,
+            expires_at: time_point(expires_at_seconds),
+        }
+        .packed();
+        add_action_to_transaction(banx::action_structs::st_bk_ath::ACTION_NAME, &packed)
+    }
+
+    fn remove_book_auth(creditor: String, asset_id: u16) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::remove_book_auth)?;
+        let packed = banx::action_structs::rm_bk_ath {
+            creditor: parse_account(&creditor)?,
+            asset_id,
+        }
+        .packed();
+        add_action_to_transaction(banx::action_structs::rm_bk_ath::ACTION_NAME, &packed)
+    }
+
+    fn book(
+        debtor: String,
+        asset_id: u16,
+        amount: String,
+        interest_rate_ppm: u32,
+        memo: String,
+    ) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::book)?;
+        let amount = parse_amount_nonzero(asset_id, &amount)?;
+        let packed = banx::action_structs::book {
+            debtor: parse_account(&debtor)?,
+            asset_id,
+            amount,
+            interest_rate: interest_rate_ppm,
+            memo: memo
+                .parse()
+                .map_err(|_| ErrorType::ConversionError("memo too long (max 80 bytes)".into()))?,
+        }
+        .packed();
+        add_action_to_transaction(banx::action_structs::book::ACTION_NAME, &packed)
     }
 
     fn set_forward_offer(

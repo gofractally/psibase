@@ -3,7 +3,7 @@ import { Handshake } from "lucide-react";
 
 import { GracePeriodField } from "@/components/form-fields";
 import { useAssetMap } from "@/hooks/use-assets";
-import { useSetCreditLine } from "@/hooks/use-banx-mutations";
+import { useSetBookAuth, useSetCreditLine } from "@/hooks/use-banx-mutations";
 import { displayAmount } from "@/lib/amount";
 import {
     daysToGraceSeconds,
@@ -42,6 +42,7 @@ export function ReciprocateLineForm({
 }) {
     const { symbolOf, precisionOf } = useAssetMap();
     const setLine = useSetCreditLine();
+    const setBookAuth = useSetBookAuth();
     const symbol = symbolOf(terms.assetId);
     const received = displayAmount(terms.limit);
     const grace = graceSecondsToPreset(terms.graceSeconds);
@@ -53,6 +54,7 @@ export function ReciprocateLineForm({
             deplete: terms.depleteOnDebit,
             gracePreset: grace.preset,
             graceDays: grace.days,
+            allowBook: true,
         },
         onSubmit: async ({ value }) => {
             await setLine.mutateAsync({
@@ -73,6 +75,15 @@ export function ReciprocateLineForm({
                                   : Number(value.gracePreset),
                           ),
             });
+            if (value.allowBook) {
+                await setBookAuth.mutateAsync({
+                    creditor: terms.inviter,
+                    assetId: terms.assetId,
+                    remaining: displayAmount(terms.limit),
+                    maxInterestRatePpm: terms.interestRatePpm,
+                    expiresAtSeconds: 0,
+                });
+            }
             onDone();
         },
     });
@@ -85,6 +96,7 @@ export function ReciprocateLineForm({
             deplete: terms.depleteOnDebit,
             gracePreset: next.preset,
             graceDays: next.days,
+            allowBook: true,
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [terms]);
@@ -201,11 +213,17 @@ export function ReciprocateLineForm({
                             <field.CheckboxField label="Deplete limit on each draw (non-revolving)" />
                         )}
                     />
+                    <form.AppField
+                        name="allowBook"
+                        children={(field) => (
+                            <field.CheckboxField label={`Let ${terms.inviter} book expenses onto you (same ${received} ${symbol} remaining)`} />
+                        )}
+                    />
                     <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                         <Button
                             type="button"
                             variant="outline"
-                            disabled={setLine.isPending}
+                            disabled={setLine.isPending || setBookAuth.isPending}
                             onClick={onDone}
                         >
                             Skip
@@ -216,7 +234,9 @@ export function ReciprocateLineForm({
                                     `Line ${terms.inviter}`,
                                     "Saving…",
                                 ]}
-                                loading={setLine.isPending}
+                                loading={
+                                    setLine.isPending || setBookAuth.isPending
+                                }
                             />
                         </form.AppForm>
                     </div>

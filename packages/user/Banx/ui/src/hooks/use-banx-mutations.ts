@@ -14,6 +14,7 @@ function useInvalidateBanx() {
         void qc.invalidateQueries({ queryKey: QueryKey.assets() });
         if (user) {
             void qc.invalidateQueries({ queryKey: QueryKey.creditLines(user) });
+            void qc.invalidateQueries({ queryKey: QueryKey.bookAuths(user) });
             void qc.invalidateQueries({ queryKey: QueryKey.obligations(user) });
             void qc.invalidateQueries({
                 queryKey: QueryKey.forwardOffers(user),
@@ -82,6 +83,69 @@ export function useRemoveCreditLine() {
         onSuccess: () => {
             invalidate();
             toast.success("Credit line removed");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useSetBookAuth() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            creditor: string;
+            assetId: number;
+            remaining: string;
+            maxInterestRatePpm: number;
+            expiresAtSeconds: number;
+        }) =>
+            banxCall("setBookAuth", [
+                p.creditor,
+                p.assetId,
+                p.remaining,
+                p.maxInterestRatePpm,
+                p.expiresAtSeconds,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Book-auth saved");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useRemoveBookAuth() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: { creditor: string; assetId: number }) =>
+            banxCall("removeBookAuth", [p.creditor, p.assetId]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Book-auth removed");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useBook() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            debtor: string;
+            assetId: number;
+            amount: string;
+            interestRatePpm: number;
+            memo: string;
+        }) =>
+            banxCall("book", [
+                p.debtor,
+                p.assetId,
+                p.amount,
+                p.interestRatePpm,
+                p.memo,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Expense booked");
         },
         onError: (e: Error) => toast.error(e.message),
     });

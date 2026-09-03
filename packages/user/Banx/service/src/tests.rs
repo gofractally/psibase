@@ -5,8 +5,8 @@ mod tests {
     use crate::Wrapper;
     use crate::interest::{SECONDS_PER_DAY, SECONDS_PER_YEAR, compound_amount, interest_for};
     use crate::tables::{
-        Asset, BanxInvite, BanxInviteTable, CreditLine, CurrencyPolicy, Obligation, PPM_SCALE,
-        PairCycle, PathHop, PayRequest, RATE_SCALE,
+        Asset, BanxInvite, BanxInviteTable, BookAuth, CreditLine, CurrencyPolicy, Obligation,
+        PPM_SCALE, PairCycle, PathHop, PayRequest, RATE_SCALE,
     };
     use psibase::fracpack::Pack;
     use psibase::services::tokens::{Precision, Quantity};
@@ -4622,6 +4622,152 @@ mod tests {
             .onInvAccept(invite_id, bob)
             .get();
         assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_book_auth_creditor_books_deposit(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, alice)
+            .st_bk_ath(bob, usd, Quantity::new(10_000), 0, never())
+            .get()?;
+        let auth = BookAuth::get_assert(alice, bob, usd);
+        assert_eq!(auth.remaining.value, 10_000);
+        assert_eq!(auth.max_interest_rate, 0);
+
+        Wrapper::push_from(&chain, bob)
+            .book(alice, usd, Quantity::new(3_000), 0, "dinner".into())
+            .get()?;
+        assert_eq!(exp(&chain, bob, alice, usd), 3_000);
+        assert_eq!(BookAuth::get_assert(alice, bob, usd).remaining.value, 7_000);
+
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_book_auth_caps_amount_and_apr(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, alice)
+            .st_bk_ath(bob, usd, Quantity::new(1_000), 0, never())
+            .get()?;
+
+        assert!(
+            Wrapper::push_from(&chain, bob)
+                .book(alice, usd, Quantity::new(1_001), 0, "".into())
+                .get()
+                .is_err()
+        );
+        assert!(
+            Wrapper::push_from(&chain, bob)
+                .book(alice, usd, Quantity::new(100), 1, "".into())
+                .get()
+                .is_err()
+        );
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .book(alice, usd, Quantity::new(100), 0, "".into())
+                .get()
+                .is_err()
+        );
+
+        Wrapper::push_from(&chain, bob)
+            .book(alice, usd, Quantity::new(1_000), 0, "".into())
+            .get()?;
+        assert_eq!(exp(&chain, bob, alice, usd), 1_000);
+        assert_eq!(BookAuth::get_assert(alice, bob, usd).remaining.value, 0);
+
+        Wrapper::push_from(&chain, alice)
+            .st_bk_ath(bob, usd, Quantity::new(500), 0, never())
+            .get()?;
+        assert_eq!(BookAuth::get_assert(alice, bob, usd).remaining.value, 500);
+
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_book_auth_revoke_and_expiry(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, alice)
+            .st_bk_ath(bob, usd, Quantity::new(5_000), 12_000, never())
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .book(alice, usd, Quantity::new(100), 12_000, "".into())
+            .get()?;
+        assert_eq!(exp(&chain, bob, alice, usd), 100);
+
+        Wrapper::push_from(&chain, alice)
+            .rm_bk_ath(bob, usd)
+            .get()?;
+        assert!(BookAuth::get(alice, bob, usd).is_none());
+        assert!(
+            Wrapper::push_from(&chain, bob)
+                .book(alice, usd, Quantity::new(100), 0, "".into())
+                .get()
+                .is_err()
+        );
+
+        Wrapper::push_from(&chain, alice)
+            .st_bk_ath(
+                bob,
+                usd,
+                Quantity::new(5_000),
+                0,
+                TimePointSec { seconds: 1 },
+            )
+            .get()?;
+        assert!(
+            Wrapper::push_from(&chain, bob)
+                .book(alice, usd, Quantity::new(100), 0, "".into())
+                .get()
+                .is_err()
+        );
+
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_book_auth_nets_reverse(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, bob)
+            .deposit(alice, usd, Quantity::new(2_000), 0, 0)
+            .get()?;
+        assert_eq!(exp(&chain, alice, bob, usd), 2_000);
+
+        Wrapper::push_from(&chain, alice)
+            .st_bk_ath(bob, usd, Quantity::new(5_000), 0, never())
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .book(alice, usd, Quantity::new(2_000), 0, "tab".into())
+            .get()?;
+        assert_eq!(exp(&chain, alice, bob, usd), 0);
+        assert_eq!(exp(&chain, bob, alice, usd), 0);
 
         Ok(())
     }

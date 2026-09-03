@@ -1,10 +1,13 @@
 import { useMemo, useState } from "react";
 
-import { Contact, ExternalLink, HandCoins, Search } from "lucide-react";
+import { Contact, ExternalLink, HandCoins, Receipt, Search } from "lucide-react";
 
+import { BookExpenseDialog } from "@/components/book-expense-dialog";
 import { NewDepositLoanDialog } from "@/components/new-deposit-loan-dialog";
 import { PageHeader } from "@/components/page-header";
 import { useAssetMap } from "@/hooks/use-assets";
+import { useBookAuths } from "@/hooks/use-banx-data";
+import type { BookAuth } from "@/lib/graphql";
 
 import { siblingUrl } from "@psibase/common-lib";
 
@@ -25,12 +28,22 @@ function contactLabel(c: LocalContact): string {
     return (c.nickname?.trim() || c.account).toLowerCase();
 }
 
+function bookAuthLive(auth: BookAuth): boolean {
+    return !auth.expiresAt || auth.expiresAt * 1000 >= Date.now();
+}
+
+function bookAuthSpendable(auth: BookAuth): boolean {
+    return bookAuthLive(auth) && Number(auth.remaining) > 0;
+}
+
 function PayeeRow({
     contact,
     onPay,
+    onBook,
 }: {
     contact: LocalContact;
     onPay: () => void;
+    onBook?: () => void;
 }) {
     const nickname = contact.nickname?.trim();
     return (
@@ -46,6 +59,18 @@ function PayeeRow({
                     </p>
                 ) : null}
             </div>
+            {onBook ? (
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0 gap-1.5"
+                    onClick={onBook}
+                >
+                    <Receipt className="size-4" />
+                    Book
+                </Button>
+            ) : null}
             <Button
                 type="button"
                 size="sm"
@@ -62,7 +87,8 @@ function PayeeRow({
 export function PayeesPage() {
     const { data: user } = useCurrentUser();
     const { data: networkName } = useBranding();
-    const { assets, precisionOf } = useAssetMap();
+    const { assets, precisionOf, symbolOf } = useAssetMap();
+    const { data: bookAuths = [] } = useBookAuths();
 
     const { data: hasPermission, isPending: permissionPending } =
         useHasProfilesReadPermission({ enabled: !!user });
@@ -81,6 +107,7 @@ export function PayeesPage() {
     const [search, setSearch] = useState("");
     const [dialogOpen, setDialogOpen] = useState(false);
     const [selectedAccount, setSelectedAccount] = useState<string | undefined>();
+    const [bookAuth, setBookAuth] = useState<BookAuth | null>(null);
 
     const contactsUrl = useMemo(
         () => siblingUrl(null, networkName, "contacts"),
@@ -115,7 +142,7 @@ export function PayeesPage() {
         <div className="space-y-8">
             <PageHeader
                 title="Payees"
-                description="Common recipients from your Contacts app — like a banking payee list. Start a deposit or loan draw against someone you already know."
+                description="Common recipients from your Contacts app — like a banking payee list. Start a deposit or loan, or book an expense if they authorized you."
                 action={
                     <div className="flex flex-wrap items-center gap-2">
                         <ShowContactsButton returnPath="/payees" />
@@ -130,6 +157,18 @@ export function PayeesPage() {
                             </a>
                         </Button>
                     </div>
+                }
+            />
+
+            <BookExpenseDialog
+                open={!!bookAuth}
+                onOpenChange={(open) => {
+                    if (!open) setBookAuth(null);
+                }}
+                auth={bookAuth}
+                symbol={bookAuth ? symbolOf(bookAuth.assetId) : ""}
+                precision={
+                    bookAuth ? precisionOf(bookAuth.assetId) : 0
                 }
             />
 
@@ -223,13 +262,28 @@ export function PayeesPage() {
                         </div>
                     ) : (
                         <div className="divide-y overflow-hidden rounded-xl border">
-                            {payees.map((c) => (
-                                <PayeeRow
-                                    key={c.account}
-                                    contact={c}
-                                    onPay={() => openPay(c.account)}
-                                />
-                            ))}
+                            {payees.map((c) => {
+                                const inbound = user
+                                    ? bookAuths.find(
+                                          (a) =>
+                                              a.creditor === user &&
+                                              a.debtor === c.account &&
+                                              bookAuthSpendable(a),
+                                      )
+                                    : undefined;
+                                return (
+                                    <PayeeRow
+                                        key={c.account}
+                                        contact={c}
+                                        onPay={() => openPay(c.account)}
+                                        onBook={
+                                            inbound
+                                                ? () => setBookAuth(inbound)
+                                                : undefined
+                                        }
+                                    />
+                                );
+                            })}
                         </div>
                     )}
 

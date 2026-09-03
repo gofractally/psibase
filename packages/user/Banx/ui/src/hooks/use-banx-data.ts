@@ -3,6 +3,7 @@ import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query
 
 import {
     fetchActivity,
+    fetchBookAuths,
     fetchCashQuotes,
     fetchCashVault,
     fetchCreditLines,
@@ -15,6 +16,7 @@ import {
     fetchTokenPrecision,
     type ActivityEvent,
     type BanxInvite,
+    type BookAuth,
     type CashQuote,
     type CashVault,
     type ClaimOffer,
@@ -27,6 +29,15 @@ import {
 import { QueryKey } from "@/lib/query-keys";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
+
+export function useBookAuths(): UseQueryResult<BookAuth[], Error> {
+    const { data: user } = useCurrentUser();
+    return useQuery({
+        queryKey: QueryKey.bookAuths(user),
+        queryFn: () => fetchBookAuths(user!),
+        enabled: !!user,
+    });
+}
 
 export function useCreditLines(): UseQueryResult<CreditLine[], Error> {
     const { data: user } = useCurrentUser();

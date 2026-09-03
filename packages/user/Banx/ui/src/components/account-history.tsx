@@ -31,6 +31,18 @@ function kindLabel(kind: string): string {
             return "Cash in";
         case "credit_line":
             return "Credit line";
+        case "book":
+            return "Booked expense";
+        case "book_auth":
+            return "Book-auth";
+        case "rm_book_auth":
+            return "Revoke book-auth";
+        case "rm_credit_line":
+            return "Remove credit line";
+        case "buy_claim":
+            return "Buy claim";
+        case "sell_claim":
+            return "Sell claim";
         case "invoice":
             return "Invoice";
         case "please_book":
@@ -156,6 +168,34 @@ function describeEvent(
                         ? `You set credit line limit to ${amt} ${sym}`
                         : `Credit line limit set to ${amt} ${sym}`,
                 detail: `Facility with ${e.counterparty} · actor ${e.actor}`,
+            };
+        case "book": {
+            const memo = e.memo?.trim() ? ` · ${e.memo}` : "";
+            const title =
+                e.actor === viewer
+                    ? `You booked ${amt} ${sym} onto ${e.counterparty}`
+                    : `${e.actor} booked ${amt} ${sym} onto you`;
+            const detail =
+                nettedRaw > 0n
+                    ? `Auto-netted ${netted} ${sym}${memo}`
+                    : `Authorized expense${memo}`;
+            return { title, detail };
+        }
+        case "book_auth":
+            return {
+                title:
+                    e.actor === viewer
+                        ? `You allowed ${e.counterparty} to book up to ${amt} ${sym}`
+                        : `${e.actor} allowed you to book up to ${amt} ${sym}`,
+                detail: `Standing book-auth · actor ${e.actor}`,
+            };
+        case "rm_book_auth":
+            return {
+                title:
+                    e.actor === viewer
+                        ? `You revoked book-auth for ${e.counterparty}`
+                        : `${e.actor} revoked your book-auth`,
+                detail: `Standing book-auth removed`,
             };
         default:
             return {

@@ -1,4 +1,5 @@
 mod asset;
+mod book_auth;
 mod cash_quote;
 mod claim_offer;
 mod connection;
@@ -354,6 +355,30 @@ pub mod tables {
         #[secondary_key(1)]
         fn by_inviter(&self) -> (AccountNumber, u32) {
             (self.inviter, self.id)
+        }
+    }
+
+    /// Standing book-auth: `debtor` lets `creditor` `book` deposits onto them
+    /// in `asset_id`, spending [`Self::remaining`]. Dual of a credit line
+    /// (who may *write* that I owe them, not who may *draw*).
+    #[table(name = "BookAuthTab", index = 11)]
+    #[derive(Default, Clone, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    pub struct BookAuth {
+        pub debtor: AccountNumber,
+        pub creditor: AccountNumber,
+        pub asset_id: u16,
+        /// Live budget the creditor may still book. 0 means spent; row stays so it can be topped up.
+        pub remaining: Quantity,
+        /// Max APR ppm the creditor may apply on a book (`0` = interest-free only).
+        pub max_interest_rate: u32,
+        /// Absolute expiry (`seconds == 0` → never).
+        pub expires_at: TimePointSec,
+    }
+
+    impl BookAuth {
+        #[primary_key]
+        fn pk(&self) -> (AccountNumber, AccountNumber, u16) {
+            (self.debtor, self.creditor, self.asset_id)
         }
     }
 }

@@ -11,6 +11,15 @@ const zAsset = z.object({
     description: z.string(),
 });
 
+const zBookAuth = z.object({
+    debtor: z.string(),
+    creditor: z.string(),
+    assetId: z.number(),
+    remaining: z.string(),
+    maxInterestRatePpm: z.number(),
+    expiresAt: z.number(),
+});
+
 const zCreditLine = z.object({
     creditor: z.string(),
     debtor: z.string(),
@@ -137,6 +146,7 @@ const zActivity = z.object({
 });
 
 export type Asset = z.infer<typeof zAsset>;
+export type BookAuth = z.infer<typeof zBookAuth>;
 export type CreditLine = z.infer<typeof zCreditLine>;
 export type Obligation = z.infer<typeof zObligation>;
 export type ForwardOffer = z.infer<typeof zForwardOffer>;
@@ -159,6 +169,15 @@ export async function fetchAssets(): Promise<Asset[]> {
         ...a,
         symbol: a.symbol.toUpperCase(),
     }));
+}
+
+const bookAuthFields = `debtor creditor assetId remaining maxInterestRatePpm expiresAt`;
+
+export async function fetchBookAuths(account: string): Promise<BookAuth[]> {
+    const data = await gql<{ bookAuths: BookAuth[] }>(
+        `{ bookAuths(account: "${account}") { ${bookAuthFields} } }`,
+    );
+    return zBookAuth.array().parse(data.bookAuths);
 }
 
 export async function fetchCreditLines(account: string): Promise<CreditLine[]> {

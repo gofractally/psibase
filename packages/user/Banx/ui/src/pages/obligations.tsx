@@ -10,6 +10,8 @@ import {
     PiggyBank,
     Handshake,
     Inbox,
+    KeyRound,
+    Receipt,
     ShoppingCart,
     Store,
     Plus,
@@ -17,6 +19,8 @@ import {
 } from "lucide-react";
 
 import { AccountHistoryDialog } from "@/components/account-history";
+import { BookAuthDialog } from "@/components/book-auth-dialog";
+import { BookExpenseDialog } from "@/components/book-expense-dialog";
 import {
     ForgiveDialog,
     type ForgiveTarget,
@@ -42,6 +46,7 @@ import {
 } from "@/components/request-dialog";
 import { useAssetMap } from "@/hooks/use-assets";
 import {
+    useBookAuths,
     useCreditLines,
     useForwardOffers,
     useObligations,
@@ -74,7 +79,7 @@ import {
     percentStringToPpm,
     useAppForm,
 } from "@/lib/form";
-import type { Asset, CreditLine, Obligation } from "@/lib/graphql";
+import type { Asset, BookAuth, CreditLine, Obligation } from "@/lib/graphql";
 import {
     REQUEST_INVOICE,
     REQUEST_PLEASE_BOOK,
@@ -240,12 +245,39 @@ function mergeCreditLines(
     return sortGroups([...groups.values()]);
 }
 
+function liveBookAuth(
+    auths: BookAuth[],
+    debtor: string,
+    creditor: string,
+    assetId: number,
+): BookAuth | undefined {
+    const now = Date.now();
+    return auths.find(
+        (a) =>
+            a.debtor === debtor &&
+            a.creditor === creditor &&
+            a.assetId === assetId &&
+            (!a.expiresAt || a.expiresAt * 1000 >= now),
+    );
+}
+
+function spendableBookAuth(
+    auths: BookAuth[],
+    debtor: string,
+    creditor: string,
+    assetId: number,
+): BookAuth | undefined {
+    const auth = liveBookAuth(auths, debtor, creditor, assetId);
+    return auth && Number(auth.remaining) > 0 ? auth : undefined;
+}
+
 export function ObligationsPage() {
     const { data: user } = useCurrentUser();
     const { data: obs = [], isLoading: obsLoading } = useObligations();
     const { data: lines = [], isLoading: linesLoading } = useCreditLines();
     const { data: forwardOffers = [] } = useForwardOffers();
     const { data: buyClaimOffers = [] } = useBuyClaimOffers();
+    const { data: bookAuths = [] } = useBookAuths();
     const { assets, symbolOf, precisionOf } = useAssetMap();
     const isLoading = obsLoading || linesLoading;
 
@@ -283,6 +315,17 @@ export function ObligationsPage() {
         useState<RequestPrefill | null>(null);
     const [forgiveOpen, setForgiveOpen] = useState(false);
     const [forgiveTarget, setForgiveTarget] = useState<ForgiveTarget | null>(
+        null,
+    );
+    const [bookAuthOpen, setBookAuthOpen] = useState(false);
+    const [bookAuthPrefill, setBookAuthPrefill] = useState<{
+        creditor?: string;
+        assetId?: number;
+    } | null>(null);
+    const [editingBookAuth, setEditingBookAuth] = useState<BookAuth | null>(
+        null,
+    );
+    const [bookExpenseAuth, setBookExpenseAuth] = useState<BookAuth | null>(
         null,
     );
     const [hideEmptySavings, setHideEmptySavings] = useState(false);
@@ -602,6 +645,24 @@ export function ObligationsPage() {
                                     });
                                     setSellOpen(true);
                                 }}
+                                onBookExpense={
+                                    user
+                                        ? (() => {
+                                              const auth = spendableBookAuth(
+                                                  bookAuths,
+                                                  g.counterparty,
+                                                  user,
+                                                  g.assetId,
+                                              );
+                                              return auth
+                                                  ? () =>
+                                                        setBookExpenseAuth(
+                                                            auth,
+                                                        )
+                                                  : undefined;
+                                          })()
+                                        : undefined
+                                }
                             />
                         ))}
                     </div>
@@ -648,6 +709,20 @@ export function ObligationsPage() {
                             />
                             <Button
                                 type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-9 gap-1.5"
+                                onClick={() => {
+                                    setEditingBookAuth(null);
+                                    setBookAuthPrefill(null);
+                                    setBookAuthOpen(true);
+                                }}
+                            >
+                                <KeyRound className="size-4" />
+                                Allow booking
+                            </Button>
+                            <Button
+                                type="button"
                                 size="icon"
                                 className="size-9 shrink-0 rounded-full bg-amber-800 text-white hover:bg-amber-900 dark:bg-amber-600 dark:hover:bg-amber-500"
                                 aria-label="Create deposit or loan"
@@ -656,6 +731,38 @@ export function ObligationsPage() {
                                 <Plus className="size-5" />
                             </Button>
                         </>
+                    }
+                />
+
+                <BookAuthDialog
+                    open={bookAuthOpen}
+                    onOpenChange={(open) => {
+                        setBookAuthOpen(open);
+                        if (!open) {
+                            setEditingBookAuth(null);
+                            setBookAuthPrefill(null);
+                        }
+                    }}
+                    assets={assets}
+                    precisionOf={precisionOf}
+                    prefill={bookAuthPrefill ?? undefined}
+                    existing={editingBookAuth}
+                />
+                <BookExpenseDialog
+                    open={!!bookExpenseAuth}
+                    onOpenChange={(open) => {
+                        if (!open) setBookExpenseAuth(null);
+                    }}
+                    auth={bookExpenseAuth}
+                    symbol={
+                        bookExpenseAuth
+                            ? symbolOf(bookExpenseAuth.assetId)
+                            : ""
+                    }
+                    precision={
+                        bookExpenseAuth
+                            ? precisionOf(bookExpenseAuth.assetId)
+                            : 0
                     }
                 />
 
@@ -712,6 +819,22 @@ export function ObligationsPage() {
                                                 : undefined,
                                     })
                                 }
+                                onEditBookAuth={() => {
+                                    const existing = user
+                                        ? liveBookAuth(
+                                              bookAuths,
+                                              user,
+                                              g.counterparty,
+                                              g.assetId,
+                                          )
+                                        : undefined;
+                                    setEditingBookAuth(existing ?? null);
+                                    setBookAuthPrefill({
+                                        creditor: g.counterparty,
+                                        assetId: g.assetId,
+                                    });
+                                    setBookAuthOpen(true);
+                                }}
                             />
                         ))}
                     </div>
@@ -1187,6 +1310,8 @@ function AccountGroupRow({
     onSellClaim,
     onForgive,
     onBuyPostedClaim,
+    onBookExpense,
+    onEditBookAuth,
 }: {
     tone: "savings" | "loan";
     title: string;
@@ -1213,6 +1338,10 @@ function AccountGroupRow({
     onSellClaim?: () => void;
     /** Write off a claim on this counterparty (savings / you are creditor). */
     onForgive?: () => void;
+    /** Book an expense onto this counterparty (they granted you book-auth). */
+    onBookExpense?: () => void;
+    /** Grant or edit book-auth to this counterparty (you are debtor). */
+    onEditBookAuth?: () => void;
 }) {
     const [open, setOpen] = useState(false);
     const [historyOpen, setHistoryOpen] = useState(false);
@@ -1273,6 +1402,10 @@ function AccountGroupRow({
         "Sell-claim offer — post an ask so others can buy this claim";
     const buyPostedTip =
         "Buy posted claim — hit someone's sell-claim ask on this party";
+    const bookExpenseTip =
+        "Book expense — they let you record that they owe you, up to their remaining cap";
+    const bookAuthTip =
+        "Allow booking — let them record expenses onto you, up to a remaining cap";
 
     return (
         <Collapsible open={open} onOpenChange={setOpen}>
@@ -1441,6 +1574,51 @@ function AccountGroupRow({
                                 </TooltipTrigger>
                                 <TooltipContent side="top">
                                     {buyClaimTip}
+                                </TooltipContent>
+                            </Tooltip>
+                        ) : null}
+                        {onBookExpense ? (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-8 shrink-0 gap-1 px-2 text-xs"
+                                        aria-label={bookExpenseTip}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onBookExpense();
+                                        }}
+                                    >
+                                        <Receipt className="size-3.5" />
+                                        Book
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">
+                                    {bookExpenseTip}
+                                </TooltipContent>
+                            </Tooltip>
+                        ) : null}
+                        {onEditBookAuth ? (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        type="button"
+                                        size="icon"
+                                        variant="outline"
+                                        className="size-8 shrink-0"
+                                        aria-label={bookAuthTip}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onEditBookAuth();
+                                        }}
+                                    >
+                                        <KeyRound className="size-3.5" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">
+                                    {bookAuthTip}
                                 </TooltipContent>
                             </Tooltip>
                         ) : null}

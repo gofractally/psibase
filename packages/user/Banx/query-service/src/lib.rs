@@ -3,10 +3,10 @@
 mod service {
     use async_graphql::*;
     use banx::tables::{
-        Asset, AssetTable, BanxInvite, BanxInviteTable, CashQuote, CashQuoteTab, ClaimOffer,
-        ClaimOfferTab, Connection, CreditLine, CreditLineTable, CurrencyPolicy, CurrencyPolicyTab,
-        ForwardOffer, ForwardOfferTab, Obligation, ObligationTable, PairCycle, PayRequest,
-        RequestTab, PPM_SCALE, RATE_SCALE,
+        Asset, AssetTable, BanxInvite, BanxInviteTable, BookAuth, BookAuthTab, CashQuote,
+        CashQuoteTab, ClaimOffer, ClaimOfferTab, Connection, CreditLine, CreditLineTable,
+        CurrencyPolicy, CurrencyPolicyTab, ForwardOffer, ForwardOfferTab, Obligation,
+        ObligationTable, PairCycle, PayRequest, RequestTab, PPM_SCALE, RATE_SCALE,
     };
     use psibase::services::tokens::{Decimal, Precision, Wrapper as Tokens};
     use psibase::*;
@@ -377,6 +377,29 @@ mod service {
         expiry: i64,
     }
 
+    #[derive(SimpleObject)]
+    struct BookAuthView {
+        debtor: AccountNumber,
+        creditor: AccountNumber,
+        assetId: u16,
+        remaining: Decimal,
+        maxInterestRatePpm: u32,
+        expiresAt: i64,
+    }
+
+    impl From<BookAuth> for BookAuthView {
+        fn from(row: BookAuth) -> Self {
+            Self {
+                debtor: row.debtor,
+                creditor: row.creditor,
+                assetId: row.asset_id,
+                remaining: Decimal::new(row.remaining, asset_precision(row.asset_id)),
+                maxInterestRatePpm: row.max_interest_rate,
+                expiresAt: time_sec(row.expires_at),
+            }
+        }
+    }
+
     impl InviteView {
         fn from_row(row: BanxInvite) -> Self {
             let p = asset_precision(row.asset_id);
@@ -438,6 +461,26 @@ mod service {
                 .get_index_by_inviter()
                 .range((inviter, 0)..=(inviter, u32::MAX))
                 .map(InviteView::from_row)
+                .collect()
+        }
+
+        /// Book-auths where `account` is debtor (granted) and/or creditor (received).
+        async fn bookAuths(
+            &self,
+            account: AccountNumber,
+            asDebtor: Option<bool>,
+            asCreditor: Option<bool>,
+        ) -> Vec<BookAuthView> {
+            let want_debtor = asDebtor.unwrap_or(true);
+            let want_creditor = asCreditor.unwrap_or(true);
+            BookAuthTab::with_service(banx::SERVICE)
+                .get_index_pk()
+                .iter()
+                .filter(|a| {
+                    (want_debtor && a.debtor == account)
+                        || (want_creditor && a.creditor == account)
+                })
+                .map(BookAuthView::from)
                 .collect()
         }
 

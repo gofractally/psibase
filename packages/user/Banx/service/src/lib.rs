@@ -10,8 +10,8 @@ pub mod tables;
 pub mod service {
     use crate::tables::{
         assert_account_exists, emit_pair_activity, path_required_send, run_path, Asset, BanxInvite,
-        CashQuote, ClaimOffer, Connection, CreditLine, CurrencyPolicy, ForwardOffer, InitRow,
-        InitTable, Obligation, PathHop, PayRequest,
+        BookAuth, CashQuote, ClaimOffer, Connection, CreditLine, CurrencyPolicy, ForwardOffer,
+        InitRow, InitTable, Obligation, PathHop, PayRequest,
     };
     use psibase::{
         services::events,
@@ -173,6 +173,85 @@ pub mod service {
             "sender must be invite"
         );
         BanxInvite::get_assert(invite_id).accept(accepter);
+    }
+
+    /// Debtor (sender) lets `creditor` book deposits onto them in `asset_id`,
+    /// up to `remaining`. Dual of a credit line: they may *write* that you
+    /// owe them. `max_interest_rate` 0 = interest-free only. `expires_at`
+    /// 0 = never. Replaces any existing row for this pair/asset.
+    #[action]
+    fn st_bk_ath(
+        creditor: AccountNumber,
+        asset_id: u16,
+        remaining: Quantity,
+        max_interest_rate: u32,
+        expires_at: TimePointSec,
+    ) {
+        let debtor = get_sender();
+        BookAuth::upsert(
+            debtor,
+            creditor,
+            asset_id,
+            remaining,
+            max_interest_rate,
+            expires_at,
+        );
+        emit_pair_activity(
+            debtor,
+            creditor,
+            asset_id,
+            "book_auth",
+            remaining,
+            0.into(),
+            asset_id,
+            0,
+            "",
+        );
+    }
+
+    /// Revoke the sender's book-auth to `creditor` in `asset_id`.
+    #[action]
+    fn rm_bk_ath(creditor: AccountNumber, asset_id: u16) {
+        let debtor = get_sender();
+        BookAuth::get_assert(debtor, creditor, asset_id).remove();
+        emit_pair_activity(
+            debtor,
+            creditor,
+            asset_id,
+            "rm_book_auth",
+            Quantity::new(0),
+            Quantity::new(0),
+            asset_id,
+            0,
+            "",
+        );
+    }
+
+    /// Creditor (sender) books `amount` onto `debtor` under their live
+    /// book-auth. Same ledger as [`deposit`], spends remaining (row stays at
+    /// 0 so it can be topped up), auto-nets. `interest_rate` must be ≤ the
+    /// auth's max. Memo is stored on activity.
+    #[action]
+    fn book(
+        debtor: AccountNumber,
+        asset_id: u16,
+        amount: Quantity,
+        interest_rate: u32,
+        memo: Memo,
+    ) {
+        let creditor = get_sender();
+        let netted = BookAuth::get_assert(debtor, creditor, asset_id).book(amount, interest_rate);
+        emit_pair_activity(
+            creditor,
+            debtor,
+            asset_id,
+            "book",
+            amount,
+            netted,
+            asset_id,
+            0,
+            &memo.to_string(),
+        );
     }
 
     /// Remove the sender's credit line to `debitor`. Limit 0 still counts as
@@ -717,10 +796,11 @@ pub mod service {
 
     /// Bilateral activity history (emitted once per party as `account`).
     ///
-    /// - `kind`: `path_draw` | `path_pay` | `deposit` | `net` | `convert` |
-    ///   `credit_line` | `rm_credit_line` | `sell_claim` | `invoice` |
+    /// - `kind`: `path_draw` | `path_pay` | `deposit` | `book` | `net` |
+    ///   `convert` | `credit_line` | `rm_credit_line` | `book_auth` |
+    ///   `rm_book_auth` | `sell_claim` | `buy_claim` | `invoice` |
     ///   `please_book` | `settle_auth` | `fulfill` | `req_cancel` |
-    ///   `cash_out` | `cash_in`
+    ///   `forgive` | `cash_out` | `cash_in`
     /// - `amount`: primary quantity (human decimal at `asset_id` precision)
     /// - `netted`: auto-net cancelled; convert/`path_pay` output at `other_asset_id`
     /// - `other_asset_id`: convert/`path_pay` destination asset; else same as `asset_id`
