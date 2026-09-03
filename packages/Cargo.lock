@@ -30,8 +30,10 @@ version = "0.27.0"
 dependencies = [
  "psibase",
  "psibase-plugin-workspace-hack",
+ "psibase_plugin",
  "serde",
  "serde_json",
+ "thiserror 2.0.18",
  "wit-bindgen-rt",
 ]
 

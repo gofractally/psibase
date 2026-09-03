@@ -1,6 +1,6 @@
+mod apps_table;
 #[allow(warnings)]
 mod bindings;
-mod apps_table;
 mod errors;
 mod prompt;
 

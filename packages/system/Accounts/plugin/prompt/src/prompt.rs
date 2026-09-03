@@ -9,17 +9,33 @@ use crate::bindings::host::{
 use crate::bindings::invite::plugin::redemption as Invites;
 use crate::bindings::name_market::plugin::api as NameMarket;
 use crate::bindings::transact::plugin::intf as Transact;
-use crate::errors::ErrorType;
+use crate::errors::ErrorTypes::{self, *};
+use crate::errors::ImportExistingError;
+use crate::errors::ImportExistingError;
 use crate::trust::*;
 use crate::AccountsPrompt;
 use psibase::fracpack::Pack;
 use psibase::services::accounts as AccountsService;
 use psibase::services::auth_sig;
 
-impl Prompt for AccountsPrompt {
-    fn can_create_account() -> bool {
-        assert_eq!(Client::get_sender(), Client::get_receiver());
+use psibase_plugin::{
+    trust::{self, *},
+    *,
+};
 
+impl TrustConfig for AccountsPrompt {
+    fn capabilities() -> Capabilities {
+        Capabilities {
+            low: &[""],
+            medium: &[""],
+            high: &[""],
+        }
+    }
+}
+
+impl Prompt for AccountsPrompt {
+    #[psibase_plugin::authorized(Max)]
+    fn can_create_account() -> bool {
         if AccountsQuery::is_logged_in() {
             return true;
         }
@@ -31,10 +47,8 @@ impl Prompt for AccountsPrompt {
         false
     }
 
-    fn import_existing(credentials: Vec<Credential>) -> Result<(), Vec<(String, Error)>> {
-        assert_authorized_with_whitelist(FunctionName::import_existing, vec!["homepage".into()])
-            .unwrap();
-
+    #[psibase_plugin::authorized(Max, whitelist = ["homepage"])]
+    fn import_existing(credentials: Vec<Credential>) -> Result<(), ImportExistingError> {
         let mut invalid_accounts = Vec::new();
         for credential in credentials {
             match AccountsQuery::get_account(&credential.account) {
@@ -47,13 +61,13 @@ impl Prompt for AccountsPrompt {
                         if !AuthSig::api::can_authorize(&credential.key, &account_str) {
                             invalid_accounts.push((
                                 credential.account,
-                                ErrorType::AuthorizationFailed(account_str).into(),
+                                ErrorTypes::AuthorizationFailed(account_str),
                             ));
                             continue;
                         }
 
                         if let Err(e) = AuthSig::keyvault::import_key(&credential.key) {
-                            invalid_accounts.push((credential.account, e));
+                            invalid_accounts.push((credential.account, e.into()));
                         } else {
                             AppsTable::new(&Client::get_receiver()).connect(&credential.account);
                         }
@@ -81,7 +95,7 @@ impl Prompt for AccountsPrompt {
         if invalid_accounts.is_empty() {
             Ok(())
         } else {
-            Err(invalid_accounts)
+            Err(ImportExistingError(invalid_accounts))
         }
     }
 

@@ -1,11 +1,22 @@
-use psibase::plugin_error;
+impl From<psibase_plugin::Error> for ImportExistingError {
+    fn from(error: psibase_plugin::Error) -> Self {
+        Self(vec![(String::new(), error)])
+    }
+}
 
-plugin_error! {
-    pub ErrorType
-    InvalidAccountName(msg: String) => "Invalid account name: {msg}",
-    QueryError(msg: String) => "Graphql query error: {msg}",
-    CannotCreateAccount() => "Cannot create account",
-    AccountNotFound(account: String) => "Account not found: {account}",
-    UnsupportedAuthService(service: String) => "Account uses unsupported auth service: {service}",
-    AuthorizationFailed(account: String) => "Key cannot authorize account: {account}",
+#[derive(Debug, psibase_plugin::ErrorEnum, thiserror::Error)]
+#[repr(u32)]
+pub enum ErrorTypes {
+    #[error("Invalid account name: {0}")]
+    InvalidAccountName(String),
+    #[error("Graphql query error: {0}")]
+    QueryError(String),
+    #[error("Cannot create account")]
+    CannotCreateAccount,
+    #[error("Account not found: {0}")]
+    AccountNotFound(String),
+    #[error("Account uses unsupported auth service: {0}")]
+    UnsupportedAuthService(String),
+    #[error("Key cannot authorize account: {0}")]
+    AuthorizationFailed(String),
 }
