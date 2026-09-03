@@ -203,23 +203,6 @@ export function useCreateRequest() {
     });
 }
 
-export function useFulfillSettle() {
-    const invalidate = useInvalidateBanx();
-    return useMutation({
-        mutationFn: async (p: {
-            requestId: number;
-            assetId: number;
-            amount: string;
-        }) =>
-            banxCall("fulfillSettle", [p.requestId, p.assetId, p.amount]),
-        onSuccess: () => {
-            invalidate();
-            toast.success("Settled against authorization");
-        },
-        onError: (e: Error) => toast.error(e.message),
-    });
-}
-
 export function useCancelRequest() {
     const invalidate = useInvalidateBanx();
     return useMutation({

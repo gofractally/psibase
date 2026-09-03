@@ -12,7 +12,6 @@ import {
 import {
     REQUEST_INVOICE,
     REQUEST_PLEASE_BOOK,
-    REQUEST_SETTLE_AUTH,
     type Asset,
     type PayRequest,
 } from "@/lib/graphql";
@@ -37,11 +36,7 @@ export type RequestPrefill = {
 };
 
 function isKnownKind(kind: number | undefined): kind is number {
-    return (
-        kind === REQUEST_INVOICE ||
-        kind === REQUEST_PLEASE_BOOK ||
-        kind === REQUEST_SETTLE_AUTH
-    );
+    return kind === REQUEST_INVOICE || kind === REQUEST_PLEASE_BOOK;
 }
 
 function kindHelp(kind: number, lockedParty?: string): string {
@@ -50,11 +45,6 @@ function kindHelp(kind: number, lockedParty?: string): string {
             ? `Ask ${lockedParty} to book a deposit from you (they received value off-graph). Only they can book it.`
             : "Ask someone to book a deposit from you (they received value off-graph). Only they can book it.";
     }
-    if (kind === REQUEST_SETTLE_AUTH) {
-        return lockedParty
-            ? `Authorize ${lockedParty} to record a repayment of what they already owe you. This only shrinks that debt — it is not a path payment, and they cannot go past zero.`
-            : "Authorize a debtor to record a repayment of what they already owe you. This only shrinks that debt — it is not a path payment, and they cannot go past zero.";
-    }
     return lockedParty
         ? `Ask ${lockedParty} to path-pay you. Last hop must be you.`
         : "Ask someone to path-pay you. Last hop must be you. Leave payer empty so anyone with a path can pay.";
@@ -62,12 +52,11 @@ function kindHelp(kind: number, lockedParty?: string): string {
 
 function partyLabel(kind: number): string {
     if (kind === REQUEST_PLEASE_BOOK) return "Creditor";
-    if (kind === REQUEST_SETTLE_AUTH) return "Debtor";
     return "Payer (optional)";
 }
 
 /**
- * Post an invoice, please-book, or settle-auth. Same form from Requests
+ * Post an invoice or please-book. Same form from Requests
  * Plus and from an Accounts row (row omits the party field).
  */
 export function RequestDialog({
@@ -183,7 +172,7 @@ export function RequestDialog({
                     <DialogHeader>
                         <DialogTitle>New request</DialogTitle>
                         <DialogDescription className="sr-only">
-                            Post an invoice, deposit request, or settle-auth.
+                            Post an invoice or deposit request.
                         </DialogDescription>
                     </DialogHeader>
                     <form
@@ -235,23 +224,6 @@ export function RequestDialog({
                                             }
                                         >
                                             Invoice
-                                        </Button>
-                                        <Button
-                                            type="button"
-                                            size="sm"
-                                            variant={
-                                                field.state.value ===
-                                                REQUEST_SETTLE_AUTH
-                                                    ? "default"
-                                                    : "outline"
-                                            }
-                                            onClick={() =>
-                                                field.handleChange(
-                                                    REQUEST_SETTLE_AUTH,
-                                                )
-                                            }
-                                        >
-                                            Settle auth
                                         </Button>
                                     </div>
                                     <p className="text-muted-foreground text-xs">

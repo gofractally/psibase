@@ -155,15 +155,11 @@ pub mod tables {
     /// Please-book (`PLEASE_BOOK`): poster asked the counterparty (creditor)
     /// to `deposit` them — off-graph value received. Only the creditor can
     /// fulfill; the poster cannot clear their own debt.
-    ///
-    /// Settle-auth (`SETTLE_AUTH`): poster is the creditor; counterparty
-    /// (debtor) may pull a deposit-equivalent up to remaining, capped by live
-    /// exposure. Does not create a claim on the creditor.
     #[table(name = "RequestTab", index = 8)]
     #[derive(Default, Clone, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct PayRequest {
         pub id: u32,
-        /// [`Self::INVOICE`], [`Self::PLEASE_BOOK`], or [`Self::SETTLE_AUTH`].
+        /// [`Self::INVOICE`] or [`Self::PLEASE_BOOK`].
         pub kind: u8,
         pub poster: AccountNumber,
         pub counterparty: AccountNumber,

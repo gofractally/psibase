@@ -25,7 +25,7 @@ The rest of Banx is machinery around that:
 | **Path-forward offer** | “I will sit in the middle of a path.” Specific next hop, or **global**. |
 | **Claim offer** | Standing bid or ask to **transfer** a claim on a debtor (not a path payment). |
 | **Currency policy** | Posted from→to FX quote. Path pay uses it only to **size** the next hop. `convert` actually rebooks. |
-| **Request** | Invoice, please-book, or settle-auth. Consent around who may write or pull. |
+| **Request** | Invoice or please-book. Consent around who may write or pull. |
 
 Alice paying Carol $1 via Bob:
 
@@ -270,7 +270,7 @@ Off-graph value enters here: cash, dinner, groceries. The **receiver** (signer) 
 
 Optional `interest_rate` on the new bucket. Optional `request_id` to fulfill a please-book.
 
-### Three request kinds (`st_req`)
+### Two request kinds (`st_req`)
 
 Counterparty, amount, memo (80 bytes), optional expiry. Fulfillment is partial (`remaining` declines). Poster can `rm_req` while still open. Cancel erases the row; a fully paid request stays with `remaining = 0`.
 
@@ -278,9 +278,8 @@ Counterparty, amount, memo (80 bytes), optional expiry. Fulfillment is partial (
 |------|--------|----------------|--------|
 | **Invoice** (`1`) | Payee | Anyone with a path to the poster (`pay_inv`). `counterparty` is who was billed; `0` = anyone | Last hop must be the poster. Does not shrink a prior loan to that payee. |
 | **Please-book** (`2`) | Person who sent value off-graph | **Only** the named creditor, via `deposit` | Opposite claim + auto-net. The poster cannot book this themselves. |
-| **Settle-auth** (`3`) | **Creditor** | **Only** the named debtor, via `fl_stl` | Same book as the creditor depositing them. Capped by `min(amount, remaining, live exposure)` — cannot flip the book or mint a claim on the creditor. |
 
-Invoice `counterparty` may be 0. Please-book and settle-auth require a named, existing account.
+Invoice `counterparty` may be 0. Please-book requires a named, existing account.
 
 ---
 
@@ -358,7 +357,7 @@ Multiple tokens per Banx asset: one quote row per `(poster, asset, token, is_out
 
 Each writer emits a bilateral `history.banx-app.activity` event: one row per party as `account`, the other as `counterparty`. Amounts are **human decimals** at emit (asset precision; convert’s `netted` uses the destination asset).
 
-Kinds include `path_draw`, `deposit`, `net`, `forgive`, `convert`, `cash_out`, `cash_in`, `credit_line`, `rm_credit_line`, `sell_claim` / `buy_claim`, `invoice`, `please_book`, `settle_auth`, `fulfill`, `req_cancel`.
+Kinds include `path_draw`, `deposit`, `book`, `net`, `forgive`, `convert`, `cash_out`, `cash_in`, `credit_line`, `rm_credit_line`, `book_auth`, `rm_book_auth`, `sell_claim` / `buy_claim`, `invoice`, `please_book`, `fulfill`, `req_cancel`.
 
 Hop draws write the adjacent pairs (Alice↔Bob, Bob↔Carol). A **multi-hop** `path_pay` / `pay_inv` also writes **sender↔payee** (`kind: path_pay`): `amount` is what was sent (`asset_id` = first hop), `netted` is what was delivered (`other_asset_id` = last hop). Direct (1-hop) pays are only `path_draw` on that pair — same two people.
 
@@ -382,7 +381,7 @@ Off-chain path search lives in the service crate (`path_find`) and is called fro
 - `/accounts` — claims you hold and liabilities you owe; offer/edit lines
 - `/payees` — contacts
 - `/path-pay` — Transfer: find a path and execute
-- `/requests` — invoices, deposit requests, settle-auth
+- `/requests` — invoices, deposit requests
 - `/policies` — path-forward, claim offers, currency
 - `/assets` — registered assets
 

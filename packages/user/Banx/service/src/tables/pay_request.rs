@@ -6,7 +6,6 @@ use crate::tables::tables::{Asset, InitRow, Obligation, PayRequest, RequestTab};
 impl PayRequest {
     pub const INVOICE: u8 = 1;
     pub const PLEASE_BOOK: u8 = 2;
-    pub const SETTLE_AUTH: u8 = 3;
 
     fn save(&self) {
         RequestTab::read_write().put(self).unwrap();
@@ -47,8 +46,8 @@ impl PayRequest {
         expires_at: TimePointSec,
     ) -> u32 {
         assert!(
-            kind == Self::INVOICE || kind == Self::PLEASE_BOOK || kind == Self::SETTLE_AUTH,
-            "request kind must be invoice (1), please-book (2), or settle-auth (3)"
+            kind == Self::INVOICE || kind == Self::PLEASE_BOOK,
+            "request kind must be invoice (1) or please-book (2)"
         );
         assert!(poster != counterparty, "cannot request to self");
         if kind != Self::INVOICE {
@@ -76,10 +75,10 @@ impl PayRequest {
             created_at: Obligation::now(),
         };
         row.save();
-        let kind_s = match kind {
-            Self::INVOICE => "invoice",
-            Self::PLEASE_BOOK => "please_book",
-            _ => "settle_auth",
+        let kind_s = if kind == Self::INVOICE {
+            "invoice"
+        } else {
+            "please_book"
         };
         emit_pair_activity(
             poster,
@@ -197,31 +196,5 @@ impl PayRequest {
         row.remaining = (row.remaining.value - amount.value).into();
         row.persist_or_erase();
         row.memo.to_string()
-    }
-
-    /// Debtor pulls a deposit-equivalent the creditor already authorized.
-    /// `take` = min(amount, remaining, live exposure). Never flips the book.
-    pub fn fulfill_settle(
-        id: u32,
-        debtor: AccountNumber,
-        amount: Quantity,
-    ) -> (Quantity, String, AccountNumber, u16) {
-        let mut row = Self::get_assert(id);
-        assert!(
-            row.kind == Self::SETTLE_AUTH,
-            "request is not a settle-auth"
-        );
-        row.assert_live();
-        assert!(
-            debtor == row.counterparty,
-            "only the named debtor can fulfill this settle-auth"
-        );
-        assert!(amount.value > 0, "settle amount must be positive");
-        let exposure = Obligation::exposure(row.poster, row.counterparty, row.asset_id).value;
-        let take = amount.value.min(row.remaining.value).min(exposure);
-        assert!(take > 0, "nothing to settle (no exposure on this pair)");
-        row.remaining = (row.remaining.value - take).into();
-        row.persist_or_erase();
-        (take.into(), row.memo.to_string(), row.poster, row.asset_id)
     }
 }

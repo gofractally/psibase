@@ -32,8 +32,7 @@ define_trust! {
         Medium => "
             - Post or remove credit lines, book-auths, forward offers, claim offers, and currency policies
             - Deposit, book an authorized expense, net, and forgive (write off) obligations
-            - Create or cancel invoices, please-book, and settle-auth
-            - Fulfill a settle-auth on a loan you owe
+            - Create or cancel invoices and please-book requests
             - Convert debt between assets
             - Buy or sell claims under a posted claim offer
             - Post cash quotes, fund/withdraw the cash vault, cash_in (from your vault)
@@ -71,7 +70,6 @@ define_trust! {
             remove_currency_policy,
             create_request,
             cancel_request,
-            fulfill_settle,
             deposit,
             net,
             forgive,
@@ -573,13 +571,6 @@ impl Api for BanxPlugin {
         trust::assert_authorized(trust::FunctionName::cancel_request)?;
         let packed = banx::action_structs::rm_req { id }.packed();
         add_action_to_transaction(banx::action_structs::rm_req::ACTION_NAME, &packed)
-    }
-
-    fn fulfill_settle(request_id: u32, asset_id: u16, amount: String) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::fulfill_settle)?;
-        let amount = parse_amount_nonzero(asset_id, &amount)?;
-        let packed = banx::action_structs::fl_stl { request_id, amount }.packed();
-        add_action_to_transaction(banx::action_structs::fl_stl::ACTION_NAME, &packed)
     }
 
     fn deposit(

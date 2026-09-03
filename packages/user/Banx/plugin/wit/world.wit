@@ -230,8 +230,6 @@ interface api {
     /// Invoice (`kind` = 1): you are the payee; `counterparty` is who was
     /// billed (empty / `"0"` = anyone with a path may pay). Please-book
     /// (`kind` = 2): you ask `counterparty` (creditor) to deposit you.
-    /// Settle-auth (`kind` = 3): you are the creditor; the named debtor may
-    /// pull a deposit-equivalent up to this amount (capped by exposure).
     /// `amount` is a human decimal. `memo` max 80 bytes.
     create-request: func(
         kind: u8,
@@ -244,15 +242,6 @@ interface api {
 
     /// Cancel an open request. Poster only.
     cancel-request: func(id: u32) -> result<_, error>;
-
-    /// Debtor fulfills a settle-auth (creditor already posted it). `amount` is
-    /// a human decimal in `asset-id`; on chain it is capped by remaining and
-    /// live exposure.
-    fulfill-settle: func(
-        request-id: u32,
-        asset-id: u16,
-        amount: string,
-    ) -> result<_, error>;
 
     /// Book a deposit: sender receives value and credits `depositor`, then auto-nets.
     /// `amount` is a human decimal string.

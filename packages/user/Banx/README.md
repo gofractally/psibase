@@ -54,17 +54,16 @@ A **deposit** is how off-graph value enters: the receiver books a liability to t
 
 ## Requests
 
-Three kinds (`st_req` / `createRequest`). Counterparty, amount, memo (80 bytes), optional expiry. Invoice `counterparty` may be `0` (anyone). Please-book and settle-auth still require a named party.
+Two kinds (`st_req` / `createRequest`). Counterparty, amount, memo (80 bytes), optional expiry. Invoice `counterparty` may be `0` (anyone). Please-book requires a named party.
 
 | Kind | Poster | Fulfiller | Effect |
 |------|--------|-----------|--------|
 | **Invoice** (`1`) | Payee | Anyone with a path to the poster, via `pay_inv` (`counterparty` is who was billed; `0` = open) | Walks hops backward from remaining; `max_spend` is the send budget. Does **not** shrink an existing loan to that payee. |
 | **Please-book** (`2`) | Debtor (or whoever sent value off-graph) | **Only** the named creditor, via `deposit` with `request_id` | Opposite claim + auto-net. The poster cannot book this themselves. |
-| **Settle-auth** (`3`) | **Creditor** | **Only** the named debtor, via `fl_stl` | Same book as the creditor depositing them. Capped by `min(amount, remaining, live exposure)` — cannot flip the book or mint a claim on the creditor. |
 
 Fulfillment is partial (`remaining` declines). Poster can `rm_req` while still open. Activity records `request_id` and memo on create / cancel / fulfill (and on the deposit that books a please-book).
 
-UI: `/requests` (Plus to create). An account-row Request button opens the same modal with the party filled in (payer field omitted). Kinds in the UI: invoice, deposit request (please-book), settle-auth. Incoming invoices open Transfer with the invoice id.
+UI: `/requests` (Plus to create). An account-row Request button opens the same modal with the party filled in (payer field omitted). Kinds in the UI: invoice, deposit request (please-book). Incoming invoices open Transfer with the invoice id.
 
 ## Path pay
 
@@ -165,8 +164,7 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 | `sell_claim` | Sell a claim into a buyer’s offer |
 | `buy_claim` | Buy a claim from a seller’s offer |
 | `deposit` | Book a deposit and auto-net (`request_id` 0 or please-book) |
-| `st_req` / `rm_req` | Create / cancel invoice, please-book, or settle-auth |
-| `fl_stl` | Debtor fulfills a settle-auth |
+| `st_req` / `rm_req` | Create / cancel invoice or please-book |
 | `net` | Explicit bilateral net (no UI; writers already auto-net) |
 | `forgive` | Creditor write-off of claims they hold (one-sided; UI on savings rows) |
 | `st_cur_pol` / `rm_cur_pol` | Post / remove a from→to FX offer |

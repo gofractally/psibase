@@ -750,11 +750,10 @@ pub mod service {
         run_path(get_sender(), hops, required, remaining, request_id);
     }
 
-    /// Post an invoice (`1`), please-book (`2`), or settle-auth (`3`).
+    /// Post an invoice (`1`) or please-book (`2`).
     ///
     /// Invoice: poster is payee; `counterparty` is who was billed (`0` = anyone).
     /// Please-book: poster asks `counterparty` (creditor) to deposit them.
-    /// Settle-auth: poster is creditor; named debtor may pull a deposit-equivalent.
     #[action]
     fn st_req(
         kind: u8,
@@ -781,25 +780,12 @@ pub mod service {
         PayRequest::cancel(id, get_sender());
     }
 
-    /// Debtor fulfills a settle-auth: same book as the creditor depositing
-    /// them, capped by request remaining and live exposure (no flip).
-    #[action]
-    fn fl_stl(request_id: u32, amount: Quantity) {
-        let debtor = get_sender();
-        let (take, memo, creditor, asset_id) =
-            PayRequest::fulfill_settle(request_id, debtor, amount);
-        let netted = Connection::get_live(debtor, creditor, asset_id).deposit(take, 0);
-        emit_pair_activity(
-            debtor, creditor, asset_id, "deposit", take, netted, asset_id, request_id, &memo,
-        );
-    }
-
     /// Bilateral activity history (emitted once per party as `account`).
     ///
     /// - `kind`: `path_draw` | `path_pay` | `deposit` | `book` | `net` |
     ///   `convert` | `credit_line` | `rm_credit_line` | `book_auth` |
     ///   `rm_book_auth` | `sell_claim` | `buy_claim` | `invoice` |
-    ///   `please_book` | `settle_auth` | `fulfill` | `req_cancel` |
+    ///   `please_book` | `fulfill` | `req_cancel` |
     ///   `forgive` | `cash_out` | `cash_in`
     /// - `amount`: primary quantity (human decimal at `asset_id` precision)
     /// - `netted`: auto-net cancelled; convert/`path_pay` output at `other_asset_id`

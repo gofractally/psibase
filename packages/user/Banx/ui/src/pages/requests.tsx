@@ -9,16 +9,11 @@ import { PageHeader } from "@/components/page-header";
 import { RequestDialog } from "@/components/request-dialog";
 import { useAssetMap } from "@/hooks/use-assets";
 import { useRequests } from "@/hooks/use-banx-data";
-import {
-    useCancelRequest,
-    useDeposit,
-    useFulfillSettle,
-} from "@/hooks/use-banx-mutations";
+import { useCancelRequest, useDeposit } from "@/hooks/use-banx-mutations";
 import { displayAmount } from "@/lib/amount";
 import {
     REQUEST_INVOICE,
     REQUEST_PLEASE_BOOK,
-    REQUEST_SETTLE_AUTH,
     type PayRequest,
 } from "@/lib/graphql";
 import { invoicePaySearch } from "@/lib/invoice-url";
@@ -37,7 +32,6 @@ import {
 function kindLabel(kind: number): string {
     if (kind === REQUEST_INVOICE) return "Invoice";
     if (kind === REQUEST_PLEASE_BOOK) return "Deposit request";
-    if (kind === REQUEST_SETTLE_AUTH) return "Settle auth";
     return `Kind ${kind}`;
 }
 
@@ -55,7 +49,6 @@ export function RequestsPage() {
     const { data: requests = [], isLoading } = useRequests();
     const cancel = useCancelRequest();
     const deposit = useDeposit();
-    const settle = useFulfillSettle();
     const navigate = useNavigate();
     const nowSec = Math.floor(Date.now() / 1000);
     const [bookingId, setBookingId] = useState<number | null>(null);
@@ -76,27 +69,6 @@ export function RequestsPage() {
 
     const fulfillInvoice = (r: PayRequest) => {
         navigate(`/path-pay?${invoicePaySearch(r).toString()}`);
-    };
-
-    const fulfillSettle = async (r: PayRequest) => {
-        setBookingId(r.id);
-        try {
-            await new Promise<void>((resolve, reject) => {
-                settle.mutate(
-                    {
-                        requestId: r.id,
-                        assetId: r.assetId,
-                        amount: displayAmount(r.remaining),
-                    },
-                    {
-                        onSuccess: () => resolve(),
-                        onError: (e: Error) => reject(e),
-                    },
-                );
-            });
-        } finally {
-            setBookingId(null);
-        }
     };
 
     const fulfillBook = async (r: PayRequest) => {
@@ -183,21 +155,6 @@ export function RequestsPage() {
                                         </Button>
                                     ) : null}
                                     {role === "in" &&
-                                    r.kind === REQUEST_SETTLE_AUTH ? (
-                                        <Button
-                                            type="button"
-                                            size="sm"
-                                            disabled={bookingId === r.id}
-                                            onClick={() =>
-                                                void fulfillSettle(r)
-                                            }
-                                        >
-                                            {bookingId === r.id
-                                                ? "Settling…"
-                                                : "Settle"}
-                                        </Button>
-                                    ) : null}
-                                    {role === "in" &&
                                     r.kind === REQUEST_PLEASE_BOOK ? (
                                         <Button
                                             type="button"
@@ -245,7 +202,7 @@ export function RequestsPage() {
         <div className="space-y-10">
             <PageHeader
                 title="Requests"
-                description="Invoices ask someone to path-pay you (they do not clear an existing loan). A deposit request asks them to book value they received off-graph — only they can book it. Settle-auth lets them record a repayment of an existing debt to you, capped by what they owe."
+                description="Invoices ask someone to path-pay you (they do not clear an existing loan). A deposit request asks them to book value they received off-graph — only they can book it."
                 action={
                     <Button
                         type="button"
@@ -274,7 +231,7 @@ export function RequestsPage() {
                     renderRows(
                         incoming,
                         "in",
-                        "None — invoices to pay or deposits to book.",
+                        "None — invoices to path-pay or deposits to book.",
                     )
                 )}
             </section>

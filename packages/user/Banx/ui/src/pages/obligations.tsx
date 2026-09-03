@@ -1393,7 +1393,7 @@ function AccountGroupRow({
         "Path-forward offer — let others hop through you to this party";
     const buyClaimTip =
         "Buy-claim offer — buy others' claims on this party";
-    const requestTip = "Request — invoice, deposit request, or settle-auth";
+    const requestTip = "Request — invoice or deposit request";
     const sellTip =
         "Sell claim — transfer this debt to a buyer under their buy-claim offer";
     const forgiveTip =

@@ -3559,6 +3559,23 @@ mod tests {
     }
 
     #[psibase::test_case(packages("Banx"))]
+    fn test_st_req_rejects_unknown_kind(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        assert!(
+            Wrapper::push_from(&chain, alice)
+                .st_req(3, bob, usd, Quantity::new(100), "".into(), never())
+                .get()
+                .is_err()
+        );
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
     fn test_please_book_rejects_zero_counterparty(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
@@ -3656,101 +3673,6 @@ mod tests {
                 .get()
                 .is_err()
         );
-        Ok(())
-    }
-
-    #[psibase::test_case(packages("Banx"))]
-    fn test_settle_auth_debtor_pulls_capped(chain: psibase::Chain) -> Result<(), psibase::Error> {
-        Wrapper::push(&chain).init().get()?;
-        let alice = account!("alice");
-        let bob = account!("bob");
-        chain.new_account(alice).unwrap();
-        chain.new_account(bob).unwrap();
-        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
-        Wrapper::push_from(&chain, bob)
-            .st_crd_lne(alice, usd, Quantity::new(10_000), false, 0, 0)
-            .get()?;
-        Wrapper::push_from(&chain, alice)
-            .path_pay(
-                vec![hop(bob, usd)],
-                Quantity::new(1_000),
-                Quantity::new(1_000),
-                0,
-            )
-            .get()?;
-
-        let id = Wrapper::push_from(&chain, bob)
-            .st_req(
-                PayRequest::SETTLE_AUTH,
-                alice,
-                usd,
-                Quantity::new(2_000),
-                "settle".into(),
-                never(),
-            )
-            .get()?;
-
-        // Creditor cannot pull their own settle-auth.
-        assert!(
-            Wrapper::push_from(&chain, bob)
-                .fl_stl(id, Quantity::new(100))
-                .get()
-                .is_err()
-        );
-
-        Wrapper::push_from(&chain, alice)
-            .fl_stl(id, Quantity::new(2_000))
-            .get()?;
-        // Capped at live exposure 1000, not the 2000 auth.
-        assert_eq!(exp(&chain, bob, alice, usd), 0);
-        assert_eq!(exp(&chain, alice, bob, usd), 0);
-        assert_eq!(PayRequest::get_assert(id).remaining.value, 1_000);
-
-        // Nothing left to settle; leftover auth cannot mint a claim on Bob.
-        assert!(
-            Wrapper::push_from(&chain, alice)
-                .fl_stl(id, Quantity::new(1_000))
-                .get()
-                .is_err()
-        );
-        assert_eq!(exp(&chain, alice, bob, usd), 0);
-        Ok(())
-    }
-
-    #[psibase::test_case(packages("Banx"))]
-    fn test_settle_auth_partial(chain: psibase::Chain) -> Result<(), psibase::Error> {
-        Wrapper::push(&chain).init().get()?;
-        let alice = account!("alice");
-        let bob = account!("bob");
-        chain.new_account(alice).unwrap();
-        chain.new_account(bob).unwrap();
-        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
-        Wrapper::push_from(&chain, bob)
-            .st_crd_lne(alice, usd, Quantity::new(10_000), false, 0, 0)
-            .get()?;
-        Wrapper::push_from(&chain, alice)
-            .path_pay(
-                vec![hop(bob, usd)],
-                Quantity::new(1_000),
-                Quantity::new(1_000),
-                0,
-            )
-            .get()?;
-        let id = Wrapper::push_from(&chain, bob)
-            .st_req(
-                PayRequest::SETTLE_AUTH,
-                alice,
-                usd,
-                Quantity::new(1_000),
-                "".into(),
-                never(),
-            )
-            .get()?;
-        Wrapper::push_from(&chain, alice)
-            .fl_stl(id, Quantity::new(400))
-            .get()?;
-        assert_eq!(exp(&chain, bob, alice, usd), 600);
-        assert_eq!(PayRequest::get_assert(id).remaining.value, 600);
         Ok(())
     }
 
