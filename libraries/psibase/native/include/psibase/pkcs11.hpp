@@ -546,7 +546,8 @@ namespace psibase::pkcs11
    attribute make_attribute(basic_attribute<N, std::vector<mechanism_type>>* attr,
                             unsigned long                                    size)
    {
-      // TODO: validate %==0
+      if (size % sizeof(mechanism_type) != 0)
+         handle_error(attribute_value_invalid);
       attr->value.resize(size / sizeof(mechanism_type));
       return {N, attr->value.data(), size};
    }
@@ -780,6 +781,8 @@ namespace psibase::pkcs11
             template_[0] = make_attribute(&result);
          }
          handle_error(lib->functions->C_GetAttributeValue(handle, obj, template_, 1));
+         if (template_[0].valueLen != make_attribute(&result).valueLen)
+            handle_error(attribute_value_invalid);
          return result;
       };
       template <typename... T>
@@ -811,6 +814,8 @@ namespace psibase::pkcs11
          if (err == error::attribute_sensitive || err == error::attribute_type_invalid)
             return {};
          handle_error(err);
+         if (template_[0].valueLen != make_attribute(&result).valueLen)
+            handle_error(attribute_value_invalid);
          return result;
       }
       std::vector<char> Sign(const mechanism&               m,
