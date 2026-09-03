@@ -1,11 +1,14 @@
 use psibase::{services::tokens::Quantity, AccountNumber, Table, TimePointSec};
 
-use super::{apply_spread, assert_account_exists, emit_pair_activity, expires_live, Connection};
+use super::{
+    apply_spread, assert_account_exists, emit_pair_activity, expires_live,
+    live_specific_or_global, Connection, GLOBAL,
+};
 use crate::math::PPM_SCALE;
 use crate::tables::tables::{Asset, ClaimOffer, ClaimOfferTab};
 
 impl ClaimOffer {
-    pub const GLOBAL: AccountNumber = AccountNumber::new(0);
+    pub const GLOBAL: AccountNumber = GLOBAL;
     pub const BUY: u8 = 1;
     pub const SELL: u8 = 2;
 
@@ -46,17 +49,18 @@ impl ClaimOffer {
         side: u8,
     ) -> Self {
         Self::assert_side(side);
-        if let Some(p) = Self::get(poster, debtor, asset_id, side) {
-            if p.is_live() {
-                return p;
-            }
-        }
-        if let Some(g) = Self::get(poster, Self::GLOBAL, asset_id, side) {
-            if g.is_live() {
-                return g;
-            }
-        }
-        panic!("ClaimOffer not found (no live specific or global offer on this side)");
+        let specific = Self::get(poster, debtor, asset_id, side);
+        let global = if debtor == GLOBAL {
+            None
+        } else {
+            Self::get(poster, GLOBAL, asset_id, side)
+        };
+        live_specific_or_global(
+            specific,
+            global,
+            Self::is_live,
+            "ClaimOffer not found (no live specific or global offer on this side)",
+        )
     }
 
     pub fn is_global(&self) -> bool {

@@ -17,8 +17,9 @@ mod pay_request;
 pub use connection::Connection;
 pub(crate) use helpers::{
     apply_hop_fee, apply_rate, apply_spread, expires_live, invert_hop_fee, invert_rate,
+    live_specific_or_global,
 };
-pub use helpers::{assert_account_exists, cash_sub, emit_pair_activity};
+pub use helpers::{assert_account_exists, cash_sub, emit_pair_activity, GLOBAL};
 pub use path::{path_required_send, run_path};
 
 #[psibase::service_tables]

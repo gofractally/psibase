@@ -6,9 +6,32 @@ use psibase::{
     AccountNumber, ServiceWrapper, TimePointSec,
 };
 
+/// AccountNumber 0: global next-hop / debtor on standing offers.
+pub const GLOBAL: AccountNumber = AccountNumber::new(0);
+
 /// Abort unless `who` is a live chain account (not the reserved 0).
 pub fn assert_account_exists(who: AccountNumber) {
     assert!(Accounts::call().exists(who), "account {who} does not exist");
+}
+
+/// Live specific row, else live global. Panics with `missing` if neither is live.
+pub(crate) fn live_specific_or_global<T>(
+    specific: Option<T>,
+    global: Option<T>,
+    is_live: impl Fn(&T) -> bool,
+    missing: &str,
+) -> T {
+    if let Some(row) = specific {
+        if is_live(&row) {
+            return row;
+        }
+    }
+    if let Some(row) = global {
+        if is_live(&row) {
+            return row;
+        }
+    }
+    panic!("{missing}");
 }
 
 pub(crate) fn expires_live(expires_at: TimePointSec) -> bool {

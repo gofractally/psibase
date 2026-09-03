@@ -1,11 +1,14 @@
 use psibase::{services::tokens::Quantity, AccountNumber, Table, TimePointSec};
 
-use super::{apply_hop_fee, assert_account_exists, expires_live, Connection};
+use super::{
+    apply_hop_fee, assert_account_exists, expires_live, live_specific_or_global, Connection,
+    GLOBAL,
+};
 use crate::math::PPM_SCALE;
 use crate::tables::tables::{Asset, ForwardOffer, ForwardOfferTab};
 
 impl ForwardOffer {
-    pub const GLOBAL: AccountNumber = AccountNumber::new(0);
+    pub const GLOBAL: AccountNumber = GLOBAL;
 
     fn save(&self) {
         ForwardOfferTab::read_write().put(self).unwrap();
@@ -44,17 +47,18 @@ impl ForwardOffer {
 
     /// Live specific offer, else live global. Panics if neither is live.
     pub fn get_live(poster: AccountNumber, next_hop: AccountNumber, asset_id: u16) -> Self {
-        if let Some(p) = Self::get(poster, next_hop, asset_id) {
-            if p.is_live() {
-                return p;
-            }
-        }
-        if let Some(g) = Self::get(poster, Self::GLOBAL, asset_id) {
-            if g.is_live() {
-                return g;
-            }
-        }
-        panic!("ForwardOffer not found (no specific or global forward for this asset)");
+        let specific = Self::get(poster, next_hop, asset_id);
+        let global = if next_hop == GLOBAL {
+            None
+        } else {
+            Self::get(poster, GLOBAL, asset_id)
+        };
+        live_specific_or_global(
+            specific,
+            global,
+            Self::is_live,
+            "ForwardOffer not found (no specific or global forward for this asset)",
+        )
     }
 
     pub fn is_global(&self) -> bool {
