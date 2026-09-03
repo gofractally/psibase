@@ -55,6 +55,7 @@ import {
 import {
     useRemoveCreditLine,
     useSetCreditLine,
+    useSetGlobalForwardOffer,
 } from "@/hooks/use-banx-mutations";
 import {
     formatRawAmount,
@@ -79,7 +80,13 @@ import {
     percentStringToPpm,
     useAppForm,
 } from "@/lib/form";
-import type { Asset, BookAuth, CreditLine, Obligation } from "@/lib/graphql";
+import type {
+    Asset,
+    BookAuth,
+    CreditLine,
+    ForwardOffer,
+    Obligation,
+} from "@/lib/graphql";
 import {
     REQUEST_INVOICE,
     REQUEST_PLEASE_BOOK,
@@ -261,6 +268,20 @@ function liveBookAuth(
     );
 }
 
+function liveGlobalForward(
+    offers: ForwardOffer[],
+    assetId: number | undefined,
+    nowSec: number,
+): boolean {
+    if (assetId === undefined) return false;
+    return offers.some(
+        (p) =>
+            p.isGlobal &&
+            p.assetId === assetId &&
+            (p.expiresAt === 0 || p.expiresAt >= nowSec),
+    );
+}
+
 function spendableBookAuth(
     auths: BookAuth[],
     debtor: string,
@@ -423,8 +444,8 @@ export function ObligationsPage() {
                             </TooltipTrigger>
                             <TooltipContent side="bottom" className="max-w-xs">
                                 {globalForwardOn
-                                    ? "Global path-forward on — others can hop through you. Click to edit."
-                                    : "No global path-forward — post one so others can hop through you."}
+                                    ? "Path-forward on — friends can pay through you. Click to edit."
+                                    : "Path-forward is off. Friends cannot pay through you until you enable it (route icon). Closed, 0% fee."}
                             </TooltipContent>
                         </Tooltip>
                         <Tooltip>
@@ -958,6 +979,9 @@ function CreditLineDialog({
 }) {
     const setLine = useSetCreditLine();
     const removeLine = useRemoveCreditLine();
+    const setForward = useSetGlobalForwardOffer();
+    const { data: forwardOffers = [] } = useForwardOffers();
+    const nowSec = Math.floor(Date.now() / 1000);
     const isEdit = !!editing;
 
     const form = useAppForm({
@@ -969,6 +993,7 @@ function CreditLineDialog({
             deplete: false,
             gracePreset: "7" as GracePreset,
             graceDays: "7",
+            allowForward: true,
         },
         onSubmit: async ({ value }) => {
             const debtor = isEdit
@@ -978,35 +1003,38 @@ function CreditLineDialog({
                 ? editing!.assetId
                 : value.assetId;
             if (assetId === undefined || !debtor) return;
-            await new Promise<void>((resolve, reject) => {
-                setLine.mutate(
-                    {
-                        debtor,
-                        assetId,
-                        limit: value.limit.trim(),
-                        depleteOnDebit: value.deplete,
-                        interestRatePpm: percentStringToPpm(
-                            value.interestPct,
-                            PPM_SCALE,
-                        ),
-                        graceSeconds:
-                            value.gracePreset === "none"
-                                ? 0
-                                : daysToGraceSeconds(
-                                      value.gracePreset === "custom"
-                                          ? Number(value.graceDays.trim())
-                                          : Number(value.gracePreset),
-                                  ),
-                    },
-                    {
-                        onSuccess: () => {
-                            onOpenChange(false);
-                            resolve();
-                        },
-                        onError: (e: Error) => reject(e),
-                    },
-                );
+            await setLine.mutateAsync({
+                debtor,
+                assetId,
+                limit: value.limit.trim(),
+                depleteOnDebit: value.deplete,
+                interestRatePpm: percentStringToPpm(
+                    value.interestPct,
+                    PPM_SCALE,
+                ),
+                graceSeconds:
+                    value.gracePreset === "none"
+                        ? 0
+                        : daysToGraceSeconds(
+                              value.gracePreset === "custom"
+                                  ? Number(value.graceDays.trim())
+                                  : Number(value.gracePreset),
+                          ),
             });
+            if (
+                value.allowForward &&
+                !liveGlobalForward(forwardOffers, assetId, nowSec)
+            ) {
+                await setForward.mutateAsync({
+                    assetId,
+                    feeFixed: "0",
+                    feePercentPpm: 0,
+                    maxLineAprPpm: 0,
+                    expiresAtSeconds: 0,
+                    allowUnknown: false,
+                });
+            }
+            onOpenChange(false);
         },
     });
 
@@ -1027,6 +1055,11 @@ function CreditLineDialog({
                 deplete: editing.depleteOnDebit,
                 gracePreset: grace.preset,
                 graceDays: grace.days,
+                allowForward: !liveGlobalForward(
+                    forwardOffers,
+                    editing.assetId,
+                    nowSec,
+                ),
             });
         } else {
             form.reset({
@@ -1037,6 +1070,7 @@ function CreditLineDialog({
                 deplete: false,
                 gracePreset: "7",
                 graceDays: "7",
+                allowForward: true,
             });
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1193,6 +1227,34 @@ function CreditLineDialog({
                             <field.CheckboxField label="Deplete limit on each draw (non-revolving)" />
                         )}
                     />
+                    <form.Subscribe
+                        selector={(s) =>
+                            isEdit ? editing!.assetId : s.values.assetId
+                        }
+                        children={(assetId) => {
+                            const already = liveGlobalForward(
+                                forwardOffers,
+                                assetId,
+                                nowSec,
+                            );
+                            if (already) {
+                                return (
+                                    <p className="text-muted-foreground text-xs">
+                                        Path-forward is already on for this
+                                        asset — friends can pay through you.
+                                    </p>
+                                );
+                            }
+                            return (
+                                <form.AppField
+                                    name="allowForward"
+                                    children={(field) => (
+                                        <field.CheckboxField label="Let friends path-pay through you in this asset (closed, 0% fee, 0% max APR)" />
+                                    )}
+                                />
+                            );
+                        }}
+                    />
                     {isEdit && editing ? (
                         <p className="text-muted-foreground text-xs">
                             Current line exposure:{" "}
@@ -1272,7 +1334,10 @@ function CreditLineDialog({
                                                           "Saving…",
                                                       ]
                                             }
-                                            loading={setLine.isPending}
+                                            loading={
+                                                setLine.isPending ||
+                                                setForward.isPending
+                                            }
                                             disabled={
                                                 assetId === undefined ||
                                                 !debtorOk

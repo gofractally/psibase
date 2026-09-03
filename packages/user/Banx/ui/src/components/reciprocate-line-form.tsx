@@ -3,7 +3,12 @@ import { Handshake } from "lucide-react";
 
 import { GracePeriodField } from "@/components/form-fields";
 import { useAssetMap } from "@/hooks/use-assets";
-import { useSetBookAuth, useSetCreditLine } from "@/hooks/use-banx-mutations";
+import { useForwardOffers } from "@/hooks/use-banx-data";
+import {
+    useSetBookAuth,
+    useSetCreditLine,
+    useSetGlobalForwardOffer,
+} from "@/hooks/use-banx-mutations";
 import { displayAmount } from "@/lib/amount";
 import {
     daysToGraceSeconds,
@@ -43,6 +48,15 @@ export function ReciprocateLineForm({
     const { symbolOf, precisionOf } = useAssetMap();
     const setLine = useSetCreditLine();
     const setBookAuth = useSetBookAuth();
+    const setForward = useSetGlobalForwardOffer();
+    const { data: forwardOffers = [] } = useForwardOffers();
+    const nowSec = Math.floor(Date.now() / 1000);
+    const forwardAlreadyOn = forwardOffers.some(
+        (p) =>
+            p.isGlobal &&
+            p.assetId === terms.assetId &&
+            (p.expiresAt === 0 || p.expiresAt >= nowSec),
+    );
     const symbol = symbolOf(terms.assetId);
     const received = displayAmount(terms.limit);
     const grace = graceSecondsToPreset(terms.graceSeconds);
@@ -55,6 +69,7 @@ export function ReciprocateLineForm({
             gracePreset: grace.preset,
             graceDays: grace.days,
             allowBook: true,
+            allowForward: true,
         },
         onSubmit: async ({ value }) => {
             await setLine.mutateAsync({
@@ -84,6 +99,16 @@ export function ReciprocateLineForm({
                     expiresAtSeconds: 0,
                 });
             }
+            if (value.allowForward && !forwardAlreadyOn) {
+                await setForward.mutateAsync({
+                    assetId: terms.assetId,
+                    feeFixed: "0",
+                    feePercentPpm: 0,
+                    maxLineAprPpm: 0,
+                    expiresAtSeconds: 0,
+                    allowUnknown: false,
+                });
+            }
             onDone();
         },
     });
@@ -97,6 +122,7 @@ export function ReciprocateLineForm({
             gracePreset: next.preset,
             graceDays: next.days,
             allowBook: true,
+            allowForward: true,
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [terms]);
@@ -219,11 +245,28 @@ export function ReciprocateLineForm({
                             <field.CheckboxField label={`Let ${terms.inviter} book expenses onto you (same ${received} ${symbol} remaining)`} />
                         )}
                     />
+                    {forwardAlreadyOn ? (
+                        <p className="text-muted-foreground text-xs">
+                            Path-forward is already on for {symbol} — friends
+                            can pay through you.
+                        </p>
+                    ) : (
+                        <form.AppField
+                            name="allowForward"
+                            children={(field) => (
+                                <field.CheckboxField label={`Let friends path-pay through you in ${symbol} (closed, 0% fee, 0% max APR)`} />
+                            )}
+                        />
+                    )}
                     <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                         <Button
                             type="button"
                             variant="outline"
-                            disabled={setLine.isPending || setBookAuth.isPending}
+                            disabled={
+                                setLine.isPending ||
+                                setBookAuth.isPending ||
+                                setForward.isPending
+                            }
                             onClick={onDone}
                         >
                             Skip
@@ -235,7 +278,9 @@ export function ReciprocateLineForm({
                                     "Saving…",
                                 ]}
                                 loading={
-                                    setLine.isPending || setBookAuth.isPending
+                                    setLine.isPending ||
+                                    setBookAuth.isPending ||
+                                    setForward.isPending
                                 }
                             />
                         </form.AppForm>
