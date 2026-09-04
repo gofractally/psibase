@@ -11,7 +11,6 @@
 #include <psibase/ActionContext.hpp>
 #include <psibase/db.hpp>
 #include <psio/finally.hpp>
-#include <psio/from_bin.hpp>
 
 namespace bmi = boost::multi_index;
 

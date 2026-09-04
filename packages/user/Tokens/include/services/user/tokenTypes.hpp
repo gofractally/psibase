@@ -4,7 +4,6 @@
 #include <charconv>
 #include <compare>
 #include <limits>
-#include <psibase/Bitset.hpp>
 #include <psibase/check.hpp>
 #include <psio/fracpack.hpp>
 #include <psio/from_json.hpp>

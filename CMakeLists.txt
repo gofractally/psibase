@@ -276,6 +276,7 @@ add_dependencies(CommonApiCommonLib_js ComponentParser)
 
 add_rs_component_workspace(packages/:Plugins 
     accounts
+    accounts-query
     aes
     auth-any
     auth-delegate
@@ -290,7 +291,8 @@ add_rs_component_workspace(packages/:Plugins
     packages
     permissions
     sites
-    host-common
+    host-client
+    host-http
     host-db
     host-prompt
     host-types
@@ -312,7 +314,7 @@ include(libraries/psibase/sdk/pack_service.cmake)
 
 set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/packages)
 
-set(PSIBASE_VERSION 0.27)
+set(PSIBASE_VERSION 0.28)
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/TransactService.psi
@@ -369,6 +371,7 @@ psibase_package(
     SERVICE accounts
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Accounts/ui/dist/* /
         DATA ${Plugins_OUTPUT_FILE_accounts} /plugin.wasm
+        DATA ${Plugins_OUTPUT_FILE_accounts_query} /query.wasm
         POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Accounts/postinstall-ui.json
     DEPENDS ${Accounts_js_DEP}
     DEPENDS ${Plugins_DEP}
@@ -458,7 +461,8 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     ACCOUNTS wasi # This name would be overshadowed
     SERVICE host
-        DATA ${Plugins_OUTPUT_FILE_host_common} /common.wasm
+        DATA ${Plugins_OUTPUT_FILE_host_client} /client.wasm
+        DATA ${Plugins_OUTPUT_FILE_host_http} /http.wasm
         DATA ${Plugins_OUTPUT_FILE_host_db} /db.wasm
         DATA ${Plugins_OUTPUT_FILE_host_prompt} /prompt.wasm
         DATA ${Plugins_OUTPUT_FILE_host_types} /types.wasm

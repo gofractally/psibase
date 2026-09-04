@@ -3,7 +3,6 @@
 #include <psibase/check.hpp>
 #include <psio/fracpack.hpp>
 #include <psio/from_json.hpp>
-#include <psio/to_bin.hpp>
 
 namespace psibase
 {

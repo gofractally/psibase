@@ -2,7 +2,7 @@
 mod bindings;
 
 use bindings::{
-    accounts::plugin::api::{get_account, get_current_user},
+    accounts::query::api::{get_account, get_current_user},
     exports::profiles::plugin::{
         api::Guest as Api, contacts::Contact, contacts::Guest as Contacts,
     },
@@ -138,7 +138,7 @@ impl Api for ProfilesPlugin {
 
     fn has_read_permission() -> bool {
         permissions::plugin::api::has_auth(
-            &host::common::client::get_sender(),
+            &host::client::api::get_sender(),
             permissions::plugin::types::TrustLevel::High,
             &["homepage".into()],
         )

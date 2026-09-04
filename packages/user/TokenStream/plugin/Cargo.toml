@@ -6,7 +6,7 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-token-stream = { path = "../service/", version = "0.27.0" }
+token-stream = { path = "../service/", version = "0.28.0" }
 psibase.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -24,7 +24,8 @@ world = "impl"
 
 [package.metadata.component.target.dependencies]
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
-"host:common" = { path = "../../Host/plugin/common/wit/world.wit" }
+"host:client" = { path = "../../Host/plugin/client/wit/world.wit" }
+"host:http" = { path = "../../Host/plugin/http/wit/world.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
 "permissions:plugin" = { path = "../../Permissions/plugin/wit/world.wit" }
 "tokens:plugin" = { path = "../../Tokens/plugin/wit/world.wit" }

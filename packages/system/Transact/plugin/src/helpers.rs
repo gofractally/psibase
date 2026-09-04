@@ -1,6 +1,6 @@
-use crate::bindings::accounts::plugin::api::get_account;
-use crate::bindings::accounts::plugin::api::get_current_user;
-use crate::bindings::host::common as Host;
+use crate::bindings::accounts::query::api::get_account;
+use crate::bindings::accounts::query::api::get_current_user;
+use crate::bindings::host::http as Host;
 use crate::bindings::host::crypto::keyvault as HostCrypto;
 use crate::bindings::host::types::types::{self as HostTypes, BodyTypes, PluginRef};
 use crate::bindings::transact::plugin::hook_handlers::*;
@@ -11,7 +11,7 @@ use crate::{ActionSenderHook, ProposeLatch, TxSignatures};
 use psibase::fracpack::Pack;
 use psibase::{Hex, MethodNumber, SignedTransaction, Tapos, Transaction};
 use serde::Serialize;
-use Host::server as Server;
+use Host::api as Server;
 
 use regex::Regex;
 use sha2::{Digest, Sha256};

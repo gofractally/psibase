@@ -15,7 +15,7 @@ mod errors;
 mod graphql;
 mod helpers;
 
-use crate::bindings::accounts::plugin::api::gen_rand_account;
+use crate::bindings::accounts::query::api::gen_rand_account;
 use crate::bindings::exports::fractals::plugin::types;
 use crate::bindings::guilds::plugin as Guilds;
 use crate::bindings::transact::plugin::intf::set_propose_latch;

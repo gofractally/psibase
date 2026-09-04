@@ -20,16 +20,16 @@ psibase-user-workspace-hack.workspace = true
 serde.workspace = true
 
 [package.metadata.psibase.dependencies]
-Sites = "0.27.0"
-HttpServer = "0.27.0"
-Tokens = "0.27.0"
-Symbol = "0.27.0"
-Transact = "0.27.0"
-Nft = "0.27.0"
-VirtualServer = "0.27.0"
-Fractals = "0.27.0"
-AuthDelegate = "0.27.0"
-Producers = "0.27.0"
+Sites = "0.28.0"
+HttpServer = "0.28.0"
+Tokens = "0.28.0"
+Symbol = "0.28.0"
+Transact = "0.28.0"
+Nft = "0.28.0"
+VirtualServer = "0.28.0"
+Fractals = "0.28.0"
+AuthDelegate = "0.28.0"
+Producers = "0.28.0"
 
 [dev-dependencies]
-fractal-gen-pkg = { path = "..", version = "0.27.0" }
+fractal-gen-pkg = { path = "..", version = "0.28.0" }

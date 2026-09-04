@@ -1,12 +1,11 @@
 use serde::Deserialize;
 
-use crate::bindings::host::common::server::post_graphql_get_json;
+use crate::bindings::host::http::api::post_graphql_get_json;
 use crate::errors::ErrorType::*;
 use crate::plugin::AccountsPlugin;
 
-use crate::bindings::exports::accounts::plugin::admin::Guest as Admin;
-use crate::bindings::exports::accounts::plugin::api::*;
-use crate::bindings::host::common::client as Client;
+use crate::bindings::exports::accounts::plugin::admin::{Error, Guest as Admin};
+use crate::bindings::host::client::api as Client;
 use crate::bindings::transact::plugin::intf as Transact;
 use crate::db::apps_table::*;
 use crate::db::user_table::*;

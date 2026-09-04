@@ -33,10 +33,11 @@ interface admin {
 }
 
 world impl {
-    include host:common/imports;
+    include host:client/imports;
+    include host:http/imports;
     include host:db/imports;
     include host:prompt/imports;
-    include accounts:plugin/imports;
+    include accounts:query/imports;
 
     export api;
     export admin;

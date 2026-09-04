@@ -6,9 +6,6 @@
 #include <psio/schema.hpp>
 #include <psio/shared_view_ptr.hpp>
 #include <psio/stream.hpp>
-// Prevent clang-format from munging the header order
-#include <psio/to_json.hpp>  // FIXME: needed by to_hex
-//
 #include <psio/to_hex.hpp>
 
 #include <boost/core/demangle.hpp>

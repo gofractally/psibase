@@ -1,14 +1,15 @@
 package workshop:plugin;
 
 world impl {
-    include host:common/imports;
+    include host:client/imports;
+    include host:http/imports;
     include sites:plugin/imports;
     include transact:plugin/imports;
     include setcode:plugin/imports;
     include chainmail:plugin/imports;
     include registry:plugin/imports;
     include auth-delegate:plugin/imports;
-    include accounts:plugin/imports;
+    include accounts:query/imports;
     include permissions:plugin/imports;
 
     export app;

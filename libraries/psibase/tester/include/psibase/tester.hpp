@@ -504,12 +504,6 @@ namespace psibase
       void boot(const std::vector<std::string>& names, bool installUI);
 
       /**
-       * Shuts down the chain to allow copying its state file. The chain's temporary path will
-       * live until this object destructs.
-       */
-      void shutdown();
-
-      /**
        * By default, the TestChain will automatically advance blocks.
        * When autoBlockStart is disabled, the the chain will only advance blocks manually.
        * To manually advance a block, you must call startBlock.

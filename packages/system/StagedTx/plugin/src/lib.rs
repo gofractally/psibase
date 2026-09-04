@@ -6,7 +6,7 @@ use bindings::*;
 use exports::staged_tx::plugin::{
     authorized::Guest as Authorized, proposer::Guest as Proposer, respondent::Guest as Respondent,
 };
-use host::common::server as Server;
+use host::http::api as Server;
 use host::types::types::Error;
 use psibase::fracpack::Pack;
 use psibase::Checksum256;

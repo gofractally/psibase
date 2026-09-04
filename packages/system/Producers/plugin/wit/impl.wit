@@ -2,8 +2,8 @@ package producers:plugin;
 
 world impl {
     include transact:plugin/imports;
-    include host:common/imports;
-
+    include host:client/imports;
+    include host:http/imports;
     export api;
     export authorized;
 }

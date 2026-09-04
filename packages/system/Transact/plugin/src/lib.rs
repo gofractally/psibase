@@ -12,7 +12,8 @@ mod types;
 use db::*;
 
 // Other plugins
-use host::common::{self as Host, server as Server};
+use host::http::api as Server;
+use host::client::api as HostClient;
 use host::db::store as Store;
 use host::types::types::{self as HostTypes, BodyTypes};
 use transact::plugin::types::{Action, Claim};
@@ -76,7 +77,7 @@ impl Hooks for TransactPlugin {
         assert_authorized_with_whitelist(FunctionName::hook_actions_sender, vec!["invite".into()])
             .unwrap();
 
-        let sender_app = Host::client::get_sender();
+        let sender_app = HostClient::get_sender();
 
         if let Some(hooked) = ActionSenderHook::get() {
             if hooked != sender_app {
@@ -89,7 +90,7 @@ impl Hooks for TransactPlugin {
 
     fn unhook_actions_sender() {
         if let Some(sender) = ActionSenderHook::get() {
-            if sender == Host::client::get_sender() {
+            if sender == HostClient::get_sender() {
                 ActionSenderHook::clear();
             }
         }
@@ -125,7 +126,7 @@ impl Intf for TransactPlugin {
         method_name: String,
         packed_args: Vec<u8>,
     ) -> Result<(), HostTypes::Error> {
-        schedule_action(Host::client::get_sender(), method_name, packed_args)
+        schedule_action(HostClient::get_sender(), method_name, packed_args)
     }
 
     fn add_signature(claim: Claim) -> Result<(), HostTypes::Error> {
@@ -137,7 +138,7 @@ impl Intf for TransactPlugin {
         // Whitelisting accounts so that the accounts user prompts can stage transactions even when accounts is not the act
         assert_authorized_with_whitelist(
             FunctionName::set_propose_latch,
-            vec![Host::client::get_active_app(), String::from("accounts")],
+            vec![HostClient::get_active_app(), String::from("accounts")],
         )?;
 
         let Some(acct) = account else {
@@ -191,7 +192,7 @@ fn flush_propose_latch() -> Result<(), HostTypes::Error> {
         return Ok(());
     }
 
-    let Some(proposer) = accounts::plugin::api::get_current_user() else {
+    let Some(proposer) = accounts::query::api::get_current_user() else {
         return Err(NotLoggedIn("flush_propose_latch").into());
     };
 

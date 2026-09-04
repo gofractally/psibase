@@ -1,12 +1,12 @@
 #[psibase::service_tables]
 pub mod tables {
-    use crate::service::{fmt_amount, TID};
+    use crate::service::{TID, fmt_amount};
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::services::accounts::Wrapper as Accounts;
-    use psibase::services::nft::{Wrapper as Nfts, NID};
+    use psibase::services::nft::{NID, Wrapper as Nfts};
     use psibase::services::tokens::{Decimal, Precision, Quantity};
-    use psibase::{abort_message, get_sender, AccountNumber, Memo, ServiceWrapper, TableRecord};
-    use psibase::{define_flags, Flags};
+    use psibase::{AccountNumber, Memo, ServiceWrapper, TableRecord, abort_message, get_sender};
+    use psibase::{Flags, define_flags};
     use psibase::{Fracpack, Table, ToSchema};
     use serde::{Deserialize, Serialize};
 
@@ -197,24 +197,51 @@ pub mod tables {
         }
 
         pub fn burn(&mut self, amount: Quantity) {
-            self.burn_supply(amount, get_sender());
+            assert!(amount.value > 0, "burn quantity must be greater than 0");
+
+            Balance::get_or_new(get_sender(), self.id).sub_balance(amount);
+            self.burned_supply = self.burned_supply + amount;
+            self.save();
         }
 
-        pub fn recall(&mut self, amount: Quantity, from: AccountNumber) {
+        fn check_can_recall(&self) {
             self.check_is_owner(get_sender());
-
             assert!(
                 !self.get_flag(TokenFlags::UNRECALLABLE),
                 "Token unrecallable",
             );
-
-            self.burn_supply(amount, from);
         }
 
-        fn burn_supply(&mut self, amount: Quantity, from: AccountNumber) {
+        pub fn recall(
+            &mut self,
+            amount: Quantity,
+            from: AccountNumber,
+            sub_account: Option<String>,
+        ) {
+            self.check_can_recall();
             assert!(amount.value > 0, "burn quantity must be greater than 0");
 
-            Balance::get_or_new(from, self.id).sub_balance(amount);
+            if let Some(sub) = sub_account {
+                SubAccount::get_assert(from, sub).recall_balance(self.id, amount);
+            } else {
+                Balance::get_or_new(from, self.id).sub_balance(amount);
+            }
+
+            self.burned_supply = self.burned_supply + amount;
+            self.save();
+        }
+
+        pub fn recall_shared(
+            &mut self,
+            amount: Quantity,
+            creditor: AccountNumber,
+            debitor: AccountNumber,
+        ) {
+            self.check_can_recall();
+            assert!(amount.value > 0, "burn quantity must be greater than 0");
+
+            SharedBalance::get_assert(creditor, debitor, self.id).recall(amount);
+
             self.burned_supply = self.burned_supply + amount;
             self.save();
         }
@@ -535,6 +562,10 @@ pub mod tables {
 
             self.sub_balance(quantity);
             Balance::get_or_new(self.debitor, self.token_id).add_balance(quantity);
+        }
+
+        pub fn recall(&mut self, quantity: Quantity) {
+            self.sub_balance(quantity);
         }
 
         pub fn reject(&mut self, memo: Memo) {
@@ -913,8 +944,16 @@ pub mod tables {
         pub fn sub_balance(&mut self, token_id: TID, quantity: Quantity) {
             let remaining = SubAccountBalance::get_assert(self.id, token_id).sub_balance(quantity);
             Balance::get_or_new(self.account, token_id).add_balance(quantity);
+            self.maybe_autodelete(remaining);
+        }
 
-            if remaining.value == 0 && !self.manual_deletion {
+        pub fn recall_balance(&mut self, token_id: TID, quantity: Quantity) {
+            let remaining = SubAccountBalance::get_assert(self.id, token_id).sub_balance(quantity);
+            self.maybe_autodelete(remaining);
+        }
+
+        fn maybe_autodelete(&mut self, remaining_for_token: Quantity) {
+            if remaining_for_token.value == 0 && !self.manual_deletion {
                 let keep = SubAccountBalanceTable::read()
                     .get_index_pk()
                     .range((self.id, 0)..(self.id, u32::MAX))
