@@ -3,8 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { PeersType, chain } from "@/lib/chain-endpoints";
 import { queryKeys } from "@/lib/query-keys";
 
-export const usePeers = () =>
-    useQuery<PeersType, string>({
+import { useStatuses } from "./use-statuses";
+
+export const usePeers = () => {
+    const { data: status } = useStatuses();
+    const needgenesis = Boolean(status?.includes("needgenesis"));
+
+    return useQuery<PeersType, string>({
         queryKey: queryKeys.peers,
         queryFn: async () => {
             try {
@@ -16,4 +21,6 @@ export const usePeers = () =>
         },
         initialData: [],
         refetchInterval: 10000,
+        enabled: !needgenesis,
     });
+};
