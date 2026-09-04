@@ -32,7 +32,7 @@ export const EvervaultCard = ({
             mouseX.set(el.clientWidth / 2);
             mouseY.set(el.clientHeight / 2);
         }
-    }, []);
+    }, [chars, mouseX, mouseY]);
 
     function onMouseMove({ currentTarget, clientX, clientY }: any) {
         const { left, top } = currentTarget.getBoundingClientRect();

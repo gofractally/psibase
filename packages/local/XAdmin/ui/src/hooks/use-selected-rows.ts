@@ -1,5 +1,5 @@
 import { RowSelectionState } from "@tanstack/react-table";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
 
 import { getId } from "@/lib/get-id";
@@ -77,7 +77,7 @@ export const useSelectedRows = (
     const [incomingRows, setIncomingRows] = useState<RowSelectionState>({});
     const skipEffect = useRef(false);
 
-    const check = async () => {
+    const check = useCallback(async () => {
         const change = detectChange(outgoingRows, incomingRows);
         if (change) {
             const pack = allPackages.find((pack) => getId(pack) == change.name);
@@ -124,21 +124,21 @@ export const useSelectedRows = (
         } else {
             setOutgoingRows(incomingRows);
         }
-    };
+    }, [allPackages, confirm, incomingRows, outgoingRows]);
 
     useEffect(() => {
         if (skipEffect.current) {
             skipEffect.current = false;
         } else {
-            check();
+            void check();
         }
-    }, [incomingRows]);
+    }, [check]);
 
-    const overWriteRows = (rows: RowSelectionState) => {
+    const overWriteRows = useCallback((rows: RowSelectionState) => {
         skipEffect.current = true;
         setOutgoingRows(rows);
         setIncomingRows(rows);
-    };
+    }, []);
 
     return [outgoingRows, setIncomingRows, overWriteRows] as const;
 };
