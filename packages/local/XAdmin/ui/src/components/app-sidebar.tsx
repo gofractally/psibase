@@ -82,23 +82,25 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                         })}
                     </SidebarMenu>
                 </SidebarGroup>
-                <SidebarGroup>
-                    <SidebarGroupLabel>Network Admin</SidebarGroupLabel>
-                    <SidebarMenu>
-                        <SidebarMenuItem>
-                            <Link
-                                to={siblingUrl(undefined, "config")}
-                                target="_blank"
-                            >
-                                <SidebarMenuButton>
-                                    <Terminal />
-                                    <span>Config</span>
-                                    <ExternalLink className="scale-70 -translate-x-1.5 -translate-y-1" />
-                                </SidebarMenuButton>
-                            </Link>
-                        </SidebarMenuItem>
-                    </SidebarMenu>
-                </SidebarGroup>
+                {isBooted && (
+                    <SidebarGroup>
+                        <SidebarGroupLabel>Network Admin</SidebarGroupLabel>
+                        <SidebarMenu>
+                            <SidebarMenuItem>
+                                <Link
+                                    to={siblingUrl(undefined, "config")}
+                                    target="_blank"
+                                >
+                                    <SidebarMenuButton>
+                                        <Terminal />
+                                        <span>Config</span>
+                                        <ExternalLink className="scale-70 -translate-x-1.5 -translate-y-1" />
+                                    </SidebarMenuButton>
+                                </Link>
+                            </SidebarMenuItem>
+                        </SidebarMenu>
+                    </SidebarGroup>
+                )}
             </SidebarContent>
             <SidebarFooter>
                 <div className="flex gap-2 p-2">
