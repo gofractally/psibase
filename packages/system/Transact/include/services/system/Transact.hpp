@@ -104,23 +104,13 @@ namespace SystemService
 
       /// Authenticate a top-level action or a `runAs` action
       ///
-      /// * `flags`:          One of the Req (request) constants,
-      ///                     or'ed with 0 or more of the flag
-      ///                     constants
-      /// * `requester`:      `""` if this is a top-level action, or
-      ///                     the sender of the `runAs` action.
-      ///                     This is often different from
-      ///                     `action.sender`.
-      /// * `sender`          The sender being requested for the action.
+      /// * `flags`:          0 or more of the flag constants or'ed together
+      /// * `sender`          The sender being requested for the action
       /// * `action`:         Action to authenticate
-      /// * `allowedActions`: Argument from `runAs`
-      /// * `claims`:         Claims in transaction (e.g. public keys).
-      ///                     Empty if `runAs`
+      /// * `claims`:         Claims in transaction (e.g. public keys)
       bool checkAuthSys(uint32_t                    flags,
-                        psibase::AccountNumber      requester,
                         psibase::AccountNumber      sender,
                         ServiceMethod               action,
-                        std::vector<ServiceMethod>  allowedActions,
                         std::vector<psibase::Claim> claims);
 
       /// Verify that a particular user is allowed to use a
@@ -173,7 +163,7 @@ namespace SystemService
                        std::optional<ServiceMethod>        method);
    };
    PSIO_REFLECT(AuthInterface,
-                method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
+                method(checkAuthSys, flags, sender, action, claims),
                 method(canAuthUserSys, user),
                 method(getDlgsSys, sender),
                 method(isAuthSys, sender, authorizers, method),
@@ -313,7 +303,8 @@ namespace SystemService
       /// This enables the auth checking system. Before this point, `Transact`
       /// allows all transactions to execute without auth checks. After this point,
       /// `Transact` uses [AuthInterface::checkAuthSys] to authenticate
-      /// top-level actions and uses of [runAs].
+      /// top-level actions and [AuthInterface::isAuthSys] to authenticate
+      /// uses of [runAs].
       void finishBoot();
 
       /// Called by native code at the beginning of each block

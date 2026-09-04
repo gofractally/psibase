@@ -72,10 +72,8 @@ namespace SystemService
 
       // Allows this service to be used as an auth service for `prods-weak` and `prods-strong`.
       bool checkAuthSys(uint32_t                    flags,
-                        psibase::AccountNumber      requester,
                         psibase::AccountNumber      sender,
                         ServiceMethod               action,
-                        std::vector<ServiceMethod>  allowedActions,
                         std::vector<psibase::Claim> claims);
       void canAuthUserSys(psibase::AccountNumber user);
 
@@ -117,7 +115,7 @@ namespace SystemService
                 method(getMaxProds),
                 method(getThreshold, account),
                 method(antiThreshold, account),
-                method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
+                method(checkAuthSys, flags, sender, action, claims),
                 method(canAuthUserSys, user),
                 method(getDlgsSys, sender),
                 method(isAuthSys, sender, authorizers),

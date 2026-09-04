@@ -117,10 +117,8 @@ pub mod service {
     #[allow(non_snake_case)]
     fn checkAuthSys(
         _flags: u32,
-        _requester: AccountNumber,
         sender: AccountNumber,
         _action: ServiceMethod,
-        _allowedActions: Vec<ServiceMethod>,
         _claims: Vec<Claim>,
     ) -> bool {
         abort_message(&format!(
@@ -169,10 +167,9 @@ pub mod service {
         let policy = Management::get_assert(sender).dynamic_policy(method);
         assert_ne!(policy.threshold, 0, "multi auth threshold cannot be 0");
 
-        let total_possible_weight = policy
-            .authorizers
-            .iter()
-            .fold(0u8, |acc, authorizer| acc.checked_add(authorizer.weight).unwrap());
+        let total_possible_weight = policy.authorizers.iter().fold(0u8, |acc, authorizer| {
+            acc.checked_add(authorizer.weight).unwrap()
+        });
 
         if policy.threshold > total_possible_weight {
             return !is_approval;
@@ -188,7 +185,9 @@ pub mod service {
             .authorizers
             .into_iter()
             .filter(|authorizer| authorizers.contains(&authorizer.account))
-            .fold(0u8, |acc, authorizer| acc.checked_add(authorizer.weight).unwrap());
+            .fold(0u8, |acc, authorizer| {
+                acc.checked_add(authorizer.weight).unwrap()
+            });
 
         total_weight_approved >= required_weight
     }

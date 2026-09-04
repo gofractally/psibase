@@ -751,7 +751,7 @@ namespace SystemService
             std::printf("call checkAuthSys on %s for sender account %s\n",
                         authService.str().c_str(), act.sender().unpack().str().c_str());
          Actor<AuthInterface> auth(Transact::service, authService);
-         uint32_t             flags = AuthInterface::topActionReq;
+         uint32_t             flags = 0;
          if (first && !readOnly)
          {
             flags |= AuthInterface::firstAuthFlag;
@@ -765,9 +765,8 @@ namespace SystemService
          if (readOnly)
             flags |= AuthInterface::readOnlyFlag;
          // This can execute user defined code, so we must set the timer first
-         if (!auth.checkAuthSys(flags, psibase::AccountNumber{}, act.sender(),
-                                ServiceMethod{act.service(), act.method()},
-                                std::vector<ServiceMethod>{}, claims))
+         if (!auth.checkAuthSys(flags, act.sender(), ServiceMethod{act.service(), act.method()},
+                                claims))
          {
             abortMessage(std::format("Authorization for {} -> {}::{} failed",
                                      act.sender().unpack().str(), act.service().unpack().str(),
