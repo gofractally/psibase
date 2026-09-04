@@ -1,4 +1,4 @@
-import { getJson } from "@psibase/common-lib";
+import { RPCError } from "@psibase/common-lib";
 import { z } from "zod";
 
 const AdminLoginReply = z.object({
@@ -7,25 +7,39 @@ const AdminLoginReply = z.object({
 });
 
 let accessToken: string | undefined;
-let fetchPromise: Promise<string> | undefined;
+let fetchPromise: Promise<string | undefined> | undefined;
 
-export async function getAdminLoginAccessToken(): Promise<string> {
+async function fetchAdminLoginToken(): Promise<string | undefined> {
+    const res = await fetch("/admin_login", {
+        headers: { Accept: "application/json" },
+    });
+    if (res.status === 503) {
+        return undefined;
+    }
+    if (!res.ok) {
+        throw new RPCError(await res.text());
+    }
+    const reply = AdminLoginReply.parse(await res.json());
+    if (reply.token_type !== "bearer") {
+        throw new Error(
+            `unsupported admin login token_type: ${reply.token_type}`,
+        );
+    }
+    return reply.access_token;
+}
+
+export async function getAdminLoginAccessToken(): Promise<string | undefined> {
     if (accessToken !== undefined) {
         return accessToken;
     }
     if (fetchPromise === undefined) {
         fetchPromise = (async () => {
             try {
-                const reply = AdminLoginReply.parse(
-                    await getJson("/admin_login"),
-                );
-                if (reply.token_type !== "bearer") {
-                    throw new Error(
-                        `unsupported admin login token_type: ${reply.token_type}`,
-                    );
+                const token = await fetchAdminLoginToken();
+                if (token !== undefined) {
+                    accessToken = token;
                 }
-                accessToken = reply.access_token;
-                return accessToken;
+                return token;
             } finally {
                 if (accessToken === undefined) {
                     fetchPromise = undefined;
@@ -36,8 +50,12 @@ export async function getAdminLoginAccessToken(): Promise<string> {
     return fetchPromise;
 }
 
-export async function adminBearerAuthHeaders(): Promise<{
-    Authorization: string;
-}> {
-    return { Authorization: `Bearer ${await getAdminLoginAccessToken()}` };
+export async function adminBearerAuthHeaders(): Promise<
+    Record<string, string>
+> {
+    const token = await getAdminLoginAccessToken();
+    if (!token) {
+        return {};
+    }
+    return { Authorization: `Bearer ${token}` };
 }
