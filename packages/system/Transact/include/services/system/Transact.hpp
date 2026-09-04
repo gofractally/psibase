@@ -363,78 +363,18 @@ namespace SystemService
       /// may perform on `action.sender's` behalf, for as long as this call to
       /// `runAs` is in the call stack. Use `""` for `service` in
       /// `allowedActions` to allow use of any service (danger!). Use `""` for
-      /// `method` to allow any method.
+      /// `method` to allow any method. The caller must be able to authorize
+      /// all actions in `allowedActions`.
       ///
       /// Returns the action's return value, if any.
       ///
       /// This will succeed if any of the following are true:
       /// * `getSender() == action.sender's authService`
-      /// * `getSender() == action.sender`. Requires `action.sender's authService`
-      ///   to approve with flag `AuthInterface::runAsRequesterReq` (normally succeeds).
+      /// * `action.sender` is `getSender()` or a subaccount of `getSender()`
+      /// * The auth service of `action.sender` allows `getSender()` to authorize the action
       /// * An existing `runAs` is currently on the call stack, `getSender()` matches
       ///   `action.service` on that earlier call, and `action` matches
-      ///   `allowedActions` from that same earlier call. Requires `action.sender's
-      ///   authService` to approve with flag `AuthInterface::runAsMatchedReq`
-      ///   if `allowedActions` is empty (normally succeeds), or
-      ///   `AuthInterface::runAsMatchedExpandedReq` if not empty (normally fails).
-      /// * All other cases, requires `action.sender's authService`
-      ///   to approve with flag `AuthInterface::runAsOtherReq` (normally fails).
-      ///
-      ///         +---------------------------------------+
-      ///         | call runAs(action, allowedActions)    |
-      ///         +-------------------+-------------------+
-      ///                             |
-      ///                             v
-      ///          +--------------------------------------+
-      ///          | getSender() == action.sender.authSvc |
-      ///          +-------------------+------------------+
-      ///              yes |                          | no
-      ///                  v                          v
-      ///               +----+          +------------------------------+
-      ///               | OK |          | getSender() == action.sender |
-      ///               +----+          +---------------+--------------+
-      ///                                   yes |           | no
-      ///                                       v           v
-      ///                 +-------------------------+   +----------------------+
-      ///                 | Auth: runAsRequesterReq |   | earlier runAs frame? |
-      ///                 +-----------+-------------+   +----------+-----------+
-      ///                             |                    no |           | yes
-      ///                             v                       v           |
-      ///                +----------------+             (FALLTHROUGH)     |
-      ///                | Needs approval |                               |
-      ///                | (Normally OK)  |                               v
-      ///                +----------------+    +-----------------------------------+
-      ///                                      | getSender() == earlier.action.svc |
-      ///                                      +---------------+-------------------+
-      ///                                       no |           | yes
-      ///                                          |           |
-      ///                                          v           |
-      ///                                   (FALLTHROUGH)      |
-      ///                                                      v-
-      ///                                       +---------------------------------+
-      ///                                       | action matches earlier.allowed? |
-      ///                                       +---------------+-----------------+
-      ///                                         no |         | yes
-      ///                                            v         |
-      ///                                     (FALLTHROUGH)    |
-      ///                                                      |
-      ///                                                      v
-      ///                                        +-------------------------------+
-      ///                                        | current allowedActions empty? |
-      ///                                        +------------+------------------+
-      ///                                            yes |              | no
-      ///                                                v              v
-      ///                            +-------------------------+  +-------------------------------+
-      ///                            | Auth: runAsMatchedReq   |  | Auth: runAsMatchedExpandedReq |
-      ///                            +-----------+-------------+  +---------------+---------------+
-      ///                                        |                                |
-      ///                                        v                                v
-      ///                        +------------------------------+   +------------------------------+
-      ///                        | Needs approval (normally OK) |   | Needs approval (normally no) |
-      ///                        +------------------------------+   +------------------------------+
-      ///
-      ///  (FALLTHROUGH) -> "Auth: runAsOtherReq" -> Needs approval (normally no)
-      ///
+      ///   `allowedActions` from that same earlier call.
       std::vector<char> runAs(psibase::Action action, std::vector<ServiceMethod> allowedActions);
 
       /// Checks authorization for the sender of the first action

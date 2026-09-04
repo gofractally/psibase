@@ -292,27 +292,18 @@ mod service {
     /// may perform on `action.sender's` behalf, for as long as this call to
     /// `runAs` is in the call stack. Use `""` for `service` in
     /// `allowedActions` to allow use of any service (danger!). Use `""` for
-    /// `method` to allow any method.
+    /// `method` to allow any method. The caller must be able to authorize
+    /// all actions in `allowedActions`.
     ///
     /// Returns the action's return value, if any.
     ///
     /// This will succeed if any of the following are true:
     /// * `get_sender() == action.sender's authService`
-    /// * `get_sender() == action.sender`. Requires `action.sender's authService`
-    ///   to approve with flag
-    ///   [RUN_AS_REQUESTER_REQ](crate::services::transact::auth_interface::RUN_AS_REQUESTER_REQ)
-    ///   (normally succeeds).
+    /// * `action.sender` is `get_sender()` or a subaccount of `get_sender()`
+    /// * The auth service of `action.sender` allows `get_sender()` to authorize the action
     /// * An existing `runAs` is currently on the call stack, `get_sender()` matches
     ///   `action.service` on that earlier call, and `action` matches
-    ///   `allowedActions` from that same earlier call. Requires `action.sender's
-    ///   authService` to approve with flag
-    ///   [RUN_AS_MATCHED_REQ](crate::services::transact::auth_interface::RUN_AS_MATCHED_REQ)
-    ///   if `allowedActions` is empty (normally succeeds), or
-    ///   [RUN_AS_MATCHED_EXPANDED_REQ](crate::services::transact::auth_interface::RUN_AS_MATCHED_EXPANDED_REQ)
-    ///   if not empty (normally fails).
-    /// * All other cases, requires `action.sender's authService`
-    ///   to approve with flag [RUN_AS_OTHER_REQ](crate::services::transact::auth_interface::RUN_AS_OTHER_REQ)
-    ///   (normally fails).
+    ///   `allowedActions` from that same earlier call.
     #[action]
     fn runAs(
         action: crate::Action,
