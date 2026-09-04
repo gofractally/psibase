@@ -4,7 +4,7 @@ mod bindings;
 use bindings::exports::evaluations::plugin::admin::Guest as Admin;
 use bindings::exports::evaluations::plugin::authorized::Guest as Authorized;
 use bindings::exports::evaluations::plugin::user::Guest as User;
-use bindings::host::common::server as CommonServer;
+use bindings::host::http::api as CommonServer;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 

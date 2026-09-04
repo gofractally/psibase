@@ -8,7 +8,7 @@ use bindings::exports::token_swap::plugin::authorized::Guest as Authorized;
 use bindings::exports::token_swap::plugin::liquidity::Guest as Liquidity;
 use bindings::exports::token_swap::plugin::swap::Guest as Swap;
 
-use bindings::host::common::server;
+use bindings::host::http::api as server;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 

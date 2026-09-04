@@ -12,10 +12,7 @@ use exports::host::http::api::Guest as Api;
 use helpers::make_error;
 use host::client::api as CallContext;
 use host::types::types::{BodyTypes, Error, PostRequest};
-use supervisor::bridge::{
-    intf as Supervisor,
-    types::{self as BridgeTypes, HttpRequest},
-};
+use supervisor::bridge::types::{self as BridgeTypes, HttpRequest};
 use url::Url;
 
 struct HostHttp;
@@ -90,7 +87,8 @@ fn do_get_bytes(app: String, endpoint: String) -> Result<BridgeTypes::HttpRespon
 
 fn parse_sibling_url(url: &str) -> Result<(String, String), Error> {
     let parsed = Url::parse(url).map_err(|e| make_error(&e.to_string()))?;
-    let root = Url::parse(&Supervisor::get_root_domain()).map_err(|e| make_error(&e.to_string()))?;
+    let root = Url::parse(&CallContext::get_root_domain())
+        .map_err(|e| make_error(&e.to_string()))?;
     let root_host = root
         .host_str()
         .ok_or_else(|| make_error("Invalid root domain"))?;

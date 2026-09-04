@@ -199,7 +199,7 @@ export const Packages = () => {
                         {data.map((pack) => (
                             <PackageItem
                                 pack={pack}
-                                isSelected={selectedIds[pack.id]}
+                                isSelected={!!selectedIds[pack.id]}
                                 onClick={(id) => {
                                     onSelect(id);
                                 }}

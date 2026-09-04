@@ -1,7 +1,6 @@
 package invite:plugin;
 
 world impl {
-    include host:common/imports;
     include credentials:plugin/imports;
     include transact:plugin/hook-actions-sender;
     include aes:plugin/imports;

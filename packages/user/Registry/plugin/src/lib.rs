@@ -9,7 +9,7 @@ use bindings::registry::plugin::types::AppMetadata;
 use ::registry::action_structs::*;
 use exports::registry::plugin::authorized::Guest as Authorized;
 use exports::registry::plugin::developer::Guest as Developer;
-use host::common::server as Server;
+use host::http::api as Server;
 use host::types::types::Error;
 use psibase::fracpack::Pack;
 use transact::plugin::intf as Transact;

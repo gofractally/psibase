@@ -319,7 +319,7 @@ fn read_url_packages(url: &str) -> Result<Vec<types::PackageInfo>, HostTypes::Er
         .into_iter()
         .filter(|info| info.scope != "local")
         .map(|mut info| {
-            info.file = resolve_file_url(&index_url, &info.file);
+            info.file = resolve_file_url(url, &info.file);
             info
         })
         .collect())
