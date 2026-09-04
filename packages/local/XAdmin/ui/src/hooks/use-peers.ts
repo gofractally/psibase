@@ -3,11 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 import { PeersType, chain } from "@/lib/chain-endpoints";
 import { queryKeys } from "@/lib/query-keys";
 
-import { useStatuses } from "./use-statuses";
+import { useChainReady } from "./use-statuses";
 
 export const usePeers = () => {
-    const { data: status } = useStatuses();
-    const needgenesis = Boolean(status?.includes("needgenesis"));
+    const chainReady = useChainReady();
 
     return useQuery<PeersType, string>({
         queryKey: queryKeys.peers,
@@ -21,6 +20,6 @@ export const usePeers = () => {
         },
         initialData: [],
         refetchInterval: 10000,
-        enabled: !needgenesis,
+        enabled: chainReady,
     });
 };
