@@ -1,7 +1,7 @@
 import { PluginInterface } from "@shared/hooks/plugin-function";
 import { Account } from "@shared/lib/schemas/account";
 
-class Authorized extends PluginInterface {
+export class Authorized extends PluginInterface {
     protected override readonly _intf = "authorized" as const;
 
     get graphql() {

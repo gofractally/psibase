@@ -1,5 +1,6 @@
 import { PluginInterface } from "@shared/hooks/plugin-function/index";
 import { Account } from "@shared/lib/schemas/account";
+import { Authorized } from "./authorized-graphql-plugin";
 
 type TID = number;
 type Decimal = string;
@@ -96,14 +97,6 @@ class Liquidity extends PluginInterface {
                 desiredAmount: TokenAmount,
             ], [poolTokens: TokenAmount, reserveA: TokenAmount, reserveB: TokenAmount]
         >("quoteSingleSidedRemove");
-    }
-}
-
-class Authorized extends PluginInterface {
-    protected override readonly _intf = "authorized" as const;
-
-    get graphql() {
-        return this._call<[query: string], string>("graphql");
     }
 }
 

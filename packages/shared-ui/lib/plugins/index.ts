@@ -11,7 +11,6 @@ import { Plugin as Packages } from "./packages";
 import { Plugin as Profiles } from "./profiles";
 import { Plugin as TokenSwap } from "./token-swap";
 import { Plugin as Tokens } from "./tokens";
-import { Plugin as VirtualServer } from "./vserver";
 
 const accounts = new Accounts("accounts");
 const config = new Config("config");
@@ -21,7 +20,6 @@ const nameMarket = new NameMarket("namemarket");
 const tokenSwap = new TokenSwap("token-swap");
 const tokens = new Tokens("tokens");
 const profiles = new Profiles("profiles");
-const vserver = new VirtualServer("vserver");
 
 const invite = new AuthorizedGraphqlPlugin("invite");
 const producers = new AuthorizedGraphqlPlugin("producers");
@@ -33,6 +31,7 @@ const sites = new AuthorizedGraphqlPlugin("sites");
 const registry = new AuthorizedGraphqlPlugin("registry");
 const setcode = new AuthorizedGraphqlPlugin("setcode");
 const transact = new AuthorizedGraphqlPlugin("transact");
+const vserver = new AuthorizedGraphqlPlugin("vserver");
 
 export {
     accounts,
