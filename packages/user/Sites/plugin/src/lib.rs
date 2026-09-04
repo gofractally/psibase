@@ -2,6 +2,8 @@
 mod bindings;
 
 use bindings::exports::sites::plugin::api::Guest as Sites;
+use bindings::exports::sites::plugin::authorized::Guest as Authorized;
+use bindings::host::http::api as Server;
 use bindings::host::types::types::Error;
 use bindings::sites::plugin::types::File;
 use bindings::transact::plugin::intf as Transact;
@@ -200,6 +202,12 @@ impl Sites for SitesPlugin {
 
         Transact::add_action_to_transaction("clearProxy", &Actions::clearProxy {}.packed())
             .unwrap();
+    }
+}
+
+impl Authorized for SitesPlugin {
+    fn graphql(query: String) -> Result<String, Error> {
+        Server::post_graphql_get_json(&query)
     }
 }
 

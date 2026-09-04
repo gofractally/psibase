@@ -10,8 +10,8 @@ import {
 import { useSearchParams } from "react-router-dom";
 import { z } from "zod";
 
-import { postGraphQLGetJson, siblingUrl } from "@psibase/common-lib";
-
+import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { invite as invitePlugin } from "@shared/lib/plugins";
 import { supervisor } from "@shared/lib/supervisor";
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -26,12 +26,10 @@ import {
 dayjs.extend(relativeTime);
 
 const inviteDetailsResponse = z.object({
-    data: z.object({
-        inviteById: z.object({
-            inviter: z.string(),
-            numAccounts: z.number(),
-            expiryDate: z.string(),
-        }),
+    inviteById: z.object({
+        inviter: z.string(),
+        numAccounts: z.number(),
+        expiryDate: z.string(),
     }),
 });
 
@@ -43,8 +41,8 @@ const fetchInvite = async (token: string) => {
         params: [token],
     });
 
-    const response = await postGraphQLGetJson(
-        siblingUrl(undefined, "invite", "graphql"),
+    const response = await callGraphqlViaPlugin(
+        invitePlugin.authorized.graphql,
         `
             query InviteById {
                 inviteById(inviteId: ${inviteId}) {
@@ -55,7 +53,7 @@ const fetchInvite = async (token: string) => {
             }
         `,
     );
-    const inviteDetails = inviteDetailsResponse.parse(response).data.inviteById;
+    const inviteDetails = inviteDetailsResponse.parse(response).inviteById;
 
     const networkName = await supervisor.functionCall({
         service: "branding",

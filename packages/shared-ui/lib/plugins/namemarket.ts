@@ -1,13 +1,6 @@
 import { PluginInterface } from "@shared/hooks/plugin-function";
 import { Account } from "@shared/lib/schemas/account";
-
-class Authorized extends PluginInterface {
-    protected override readonly _intf = "authorized" as const;
-
-    get graphql() {
-        return this._call<[query: string], string>("graphql");
-    }
-}
+import { Authorized } from "./authorized-graphql-plugin";
 
 class Api extends PluginInterface {
     protected override readonly _intf = "api" as const;

@@ -993,6 +993,12 @@ namespace LocalService
       {
          if (target.find("/.") != std::string_view::npos)
             return {};
+         static const std::vector<AccountNumber> packagesCors = {
+             AccountNumber{"supervisor"},
+             AccountNumber{"config"},
+         };
+         if (req.method == "OPTIONS")
+            return HttpReply{.headers = allowCors(req, packagesCors)};
          if (req.method != "GET")
             return HttpReply::methodNotAllowed(req);
          auto datadir = getEnv("PSIBASE_DATADIR");
@@ -1017,7 +1023,7 @@ namespace LocalService
             if (sz == -1)
                return {};
             result.body    = getResult();
-            result.headers = allowCors(req, AccountNumber{"config"});
+            result.headers = allowCors(req, packagesCors);
             return result;
          }
       }

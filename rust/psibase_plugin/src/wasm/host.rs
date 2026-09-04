@@ -29,6 +29,11 @@ pub mod client {
     pub fn get_app_url(app: String) -> String {
         api::get_app_url(&app)
     }
+
+    /// Gets the root URL of the current chain (scheme + host + port).
+    pub fn get_root_domain() -> String {
+        api::get_root_domain()
+    }
 }
 
 /// Common calls related to interactions with the server

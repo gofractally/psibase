@@ -72,18 +72,42 @@ export class PluginHost implements HostInterface {
         };
     }
 
-    private getBodyTagFromContentType(contentType: string): string {
-        if (contentType.includes("application/json")) {
+    private getBodyTagFromContentType(
+        contentType: string,
+        binary: boolean,
+    ): string {
+        const ct = contentType.toLowerCase();
+        if (ct.includes("application/json")) {
             return "json";
-        } else if (contentType.includes("application/octet-stream")) {
+        } else if (
+            ct.includes("application/octet-stream") ||
+            ct.includes("application/zip") ||
+            ct.includes("application/wasm")
+        ) {
             return "bytes";
-        } else if (contentType.includes("text/plain")) {
+        } else if (ct.includes("text/plain") || ct.startsWith("text/")) {
             return "text";
+        } else if (binary) {
+            return "bytes";
         } else {
             throw this.recoverableError(
                 `Unsupported content type in response: ${contentType}`,
             );
         }
+    }
+
+    private wantsBinaryResponse(req: HttpRequest): boolean {
+        const headers = convert(req.headers);
+        const accept = (
+            headers["Accept"] ||
+            headers["accept"] ||
+            ""
+        ).toLowerCase();
+        return (
+            accept.includes("application/octet-stream") ||
+            accept.includes("application/zip") ||
+            accept === "*/*"
+        );
     }
 
     private getStorage(duration: number): Storage {
@@ -106,6 +130,14 @@ export class PluginHost implements HostInterface {
         return uri;
     }
 
+    private binaryStringToBytes(data: string): Uint8Array {
+        const bytes = new Uint8Array(data.length);
+        for (let i = 0; i < data.length; i++) {
+            bytes[i] = data.charCodeAt(i) & 0xff;
+        }
+        return bytes;
+    }
+
     // A synchronous web request.
     // This allows the plugin to make http queries.
     // It is a typescript-ified version of the wasip2 browser http shim
@@ -122,6 +154,13 @@ export class PluginHost implements HostInterface {
                 false,
             );
             xhr.withCredentials = withCredentials;
+
+            // Sync XHR cannot use responseType=arraybuffer; force a binary-safe
+            // text encoding and decode to bytes after send.
+            const binary = this.wantsBinaryResponse(req);
+            if (binary) {
+                xhr.overrideMimeType("text/plain; charset=x-user-defined");
+            }
 
             const requestHeaders = new Headers(convert(req.headers));
             for (const [name, value] of requestHeaders.entries()) {
@@ -144,7 +183,13 @@ export class PluginHost implements HostInterface {
                     `Http request error: ${xhr.response}`,
                 );
             }
-            const body = xhr.response || undefined;
+            const raw = xhr.responseText;
+            const body =
+                raw == null || raw === ""
+                    ? undefined
+                    : binary
+                      ? this.binaryStringToBytes(raw)
+                      : raw;
             const headers: Array<[string, string]> = [];
             xhr.getAllResponseHeaders()
                 .trim()
@@ -157,7 +202,7 @@ export class PluginHost implements HostInterface {
                     headers.push([key, value]);
                 });
             const contentType = xhr.getResponseHeader("content-type") || "";
-            const tag = this.getBodyTagFromContentType(contentType);
+            const tag = this.getBodyTagFromContentType(contentType, binary);
 
             return {
                 status: xhr.status,

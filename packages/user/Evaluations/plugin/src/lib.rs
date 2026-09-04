@@ -2,7 +2,9 @@
 mod bindings;
 
 use bindings::exports::evaluations::plugin::admin::Guest as Admin;
+use bindings::exports::evaluations::plugin::authorized::Guest as Authorized;
 use bindings::exports::evaluations::plugin::user::Guest as User;
+use bindings::host::http::api as CommonServer;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
@@ -263,6 +265,12 @@ impl User for EvaluationsPlugin {
             .nodes;
 
         Ok(users.into_iter().map(|user| user.user).collect())
+    }
+}
+
+impl Authorized for EvaluationsPlugin {
+    fn graphql(query: String) -> Result<String, Error> {
+        CommonServer::post_graphql_get_json(&query)
     }
 }
 

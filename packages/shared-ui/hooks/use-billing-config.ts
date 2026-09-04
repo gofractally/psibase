@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { GraphQLUrlOptions, graphql } from "@shared/lib/graphql";
+import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
 import QueryKey from "@shared/lib/query-keys";
+import { vserver } from "@shared/lib/plugins";
 
 interface BillingConfigResponse {
     getBillingConfig: {
@@ -10,7 +11,7 @@ interface BillingConfigResponse {
     } | null;
 }
 
-export const useBillingConfig = (options: GraphQLUrlOptions = {}) => {
+export const useBillingConfig = () => {
     return useQuery({
         queryKey: QueryKey.billingConfig(),
         queryFn: async () => {
@@ -22,10 +23,10 @@ export const useBillingConfig = (options: GraphQLUrlOptions = {}) => {
                     }
                 }
             `;
-            const res = await graphql<BillingConfigResponse>(query, {
-                service: "vserver",
-                ...options,
-            });
+            const res = await callGraphqlViaPlugin<BillingConfigResponse>(
+                vserver.authorized.graphql,
+                query,
+            );
 
             if (!res.getBillingConfig) {
                 return { feeReceiver: null, enabled: false };

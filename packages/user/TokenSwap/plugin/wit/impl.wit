@@ -9,4 +9,5 @@ world impl {
 
     export swap;
     export liquidity;
+    export authorized;
 }

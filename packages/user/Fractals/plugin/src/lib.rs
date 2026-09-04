@@ -2,6 +2,7 @@
 mod bindings;
 
 use bindings::exports::fractals::plugin::admin_fractal::Guest as AdminFractal;
+use bindings::exports::fractals::plugin::authorized::Guest as Authorized;
 use bindings::exports::fractals::plugin::queries::Guest as Queries;
 use bindings::exports::fractals::plugin::user_fractal::Guest as UserFractal;
 
@@ -149,6 +150,13 @@ impl Queries for FractallyPlugin {
             legislature: fractal.legislature.to_string(),
             token_id: fractal.token_id,
         })
+    }
+}
+
+impl Authorized for FractallyPlugin {
+    #[psibase_plugin::authorized(None)]
+    fn graphql(query: String) -> Result<String, Error> {
+        host::server::post_graphql_get_json(&query)
     }
 }
 

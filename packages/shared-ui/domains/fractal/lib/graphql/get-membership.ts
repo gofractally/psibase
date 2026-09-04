@@ -1,10 +1,9 @@
 import { z } from "zod";
 
-import { graphql } from "@shared/lib/graphql";
+import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { fractals } from "@shared/lib/plugins";
 import { Account, zAccount } from "@shared/lib/schemas/account";
 import { zDateTime } from "@shared/lib/schemas/date-time";
-
-import { FRACTALS_SERVICE } from "../constants";
 
 export const zMember = z
     .object({
@@ -20,7 +19,8 @@ export const getMembership = async (
     fractalAccount: Account,
     account: Account,
 ): Promise<Membership> => {
-    const member = await graphql(
+    const member = await callGraphqlViaPlugin(
+        fractals.authorized.graphql,
         `
     {
         member(fractal: "${fractalAccount}", member: "${account}") {     
@@ -30,7 +30,6 @@ export const getMembership = async (
 
         } 
     }`,
-        { service: FRACTALS_SERVICE },
     );
 
     return z

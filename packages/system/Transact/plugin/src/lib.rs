@@ -21,8 +21,8 @@ use virtual_server::plugin::transact as VirtualServer;
 
 // Exported interfaces/types
 use exports::transact::plugin::{
-    admin::Guest as Admin, auth::Guest as Auth, hooks::Guest as Hooks, intf::Guest as Intf,
-    network::Guest as Network,
+    admin::Guest as Admin, auth::Guest as Auth, authorized::Guest as Authorized,
+    hooks::Guest as Hooks, intf::Guest as Intf, network::Guest as Network,
 };
 
 use psibase::services::transact::action_structs::setSnapTime;
@@ -358,6 +358,12 @@ impl Auth for TransactPlugin {
             }
         };
         Ok(reply.access_token)
+    }
+}
+
+impl Authorized for TransactPlugin {
+    fn graphql(query: String) -> Result<String, HostTypes::Error> {
+        Server::post_graphql_get_json(&query)
     }
 }
 
