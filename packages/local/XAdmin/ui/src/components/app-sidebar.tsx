@@ -28,6 +28,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const { data: config } = useConfig();
     const { data: keyDevices } = useKeyDevices();
     const isBootable = status && status.includes("needgenesis");
+    const isBooted = !!status && !isBootable;
     const hasKeyDevices = keyDevices && keyDevices.length > 0;
 
     if (isLoadingStatus) {
@@ -46,7 +47,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                 window.top!.location.href = siblingUrl();
                             }}
                         >
-                            <NetworkLogo producerName={config?.producer} />
+                            <NetworkLogo
+                                producerName={config?.producer}
+                                enableBranding={isBooted}
+                            />
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                 </SidebarMenu>
