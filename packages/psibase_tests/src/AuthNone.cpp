@@ -6,12 +6,10 @@ using namespace psibase;
 using namespace SystemService;
 using namespace TestService;
 
-bool AuthNone::checkAuthSys(std::uint32_t              flags,
-                            AccountNumber              requester,
-                            AccountNumber              sender,
-                            ServiceMethod              action,
-                            std::vector<ServiceMethod> allowedActions,
-                            std::vector<Claim>         claims)
+bool AuthNone::checkAuthSys(std::uint32_t      flags,
+                            AccountNumber      sender,
+                            ServiceMethod      action,
+                            std::vector<Claim> claims)
 {
    return false;
 }

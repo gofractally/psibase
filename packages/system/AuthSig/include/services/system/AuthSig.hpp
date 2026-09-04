@@ -51,10 +51,8 @@ namespace SystemService
          ///
          /// This action verifies that the transaction contains a claim for the user's public key.
          bool checkAuthSys(uint32_t                    flags,
-                           psibase::AccountNumber      requester,
                            psibase::AccountNumber      sender,
                            ServiceMethod               action,
-                           std::vector<ServiceMethod>  allowedActions,
                            std::vector<psibase::Claim> claims);
 
          /// This is an implementation of the standard auth service interface defined in [SystemService::AuthInterface]
@@ -103,7 +101,7 @@ namespace SystemService
          void newAccount(psibase::AccountNumber name, SubjectPublicKeyInfo key);
       };
       PSIO_REFLECT(AuthSig,  //
-                   method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
+                   method(checkAuthSys, flags, sender, action, claims),
                    method(canAuthUserSys, user),
                    method(setKey, key),
                    method(getDlgsSys, sender),
