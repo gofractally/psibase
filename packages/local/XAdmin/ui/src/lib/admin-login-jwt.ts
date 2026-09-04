@@ -15,14 +15,22 @@ export async function getAdminLoginAccessToken(): Promise<string> {
     }
     if (fetchPromise === undefined) {
         fetchPromise = (async () => {
-            const reply = AdminLoginReply.parse(await getJson("/admin_login"));
-            if (reply.token_type !== "bearer") {
-                throw new Error(
-                    `unsupported admin login token_type: ${reply.token_type}`,
+            try {
+                const reply = AdminLoginReply.parse(
+                    await getJson("/admin_login"),
                 );
+                if (reply.token_type !== "bearer") {
+                    throw new Error(
+                        `unsupported admin login token_type: ${reply.token_type}`,
+                    );
+                }
+                accessToken = reply.access_token;
+                return accessToken;
+            } finally {
+                if (accessToken === undefined) {
+                    fetchPromise = undefined;
+                }
             }
-            accessToken = reply.access_token;
-            return accessToken;
         })();
     }
     return fetchPromise;
