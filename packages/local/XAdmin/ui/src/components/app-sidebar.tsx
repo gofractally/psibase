@@ -28,6 +28,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const { data: config } = useConfig();
     const { data: keyDevices } = useKeyDevices();
     const isBootable = status && status.includes("needgenesis");
+    const isBooted = !!status && !isBootable;
     const hasKeyDevices = keyDevices && keyDevices.length > 0;
 
     if (isLoadingStatus) {
@@ -46,7 +47,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                 window.top!.location.href = siblingUrl();
                             }}
                         >
-                            <NetworkLogo producerName={config?.producer} />
+                            <NetworkLogo
+                                producerName={config?.producer}
+                                enableBranding={isBooted}
+                            />
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                 </SidebarMenu>
@@ -78,23 +82,25 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                         })}
                     </SidebarMenu>
                 </SidebarGroup>
-                <SidebarGroup>
-                    <SidebarGroupLabel>Network Admin</SidebarGroupLabel>
-                    <SidebarMenu>
-                        <SidebarMenuItem>
-                            <Link
-                                to={siblingUrl(undefined, "config")}
-                                target="_blank"
-                            >
-                                <SidebarMenuButton>
-                                    <Terminal />
-                                    <span>Config</span>
-                                    <ExternalLink className="scale-70 -translate-x-1.5 -translate-y-1" />
-                                </SidebarMenuButton>
-                            </Link>
-                        </SidebarMenuItem>
-                    </SidebarMenu>
-                </SidebarGroup>
+                {isBooted && (
+                    <SidebarGroup>
+                        <SidebarGroupLabel>Network Admin</SidebarGroupLabel>
+                        <SidebarMenu>
+                            <SidebarMenuItem>
+                                <Link
+                                    to={siblingUrl(undefined, "config")}
+                                    target="_blank"
+                                >
+                                    <SidebarMenuButton>
+                                        <Terminal />
+                                        <span>Config</span>
+                                        <ExternalLink className="scale-70 -translate-x-1.5 -translate-y-1" />
+                                    </SidebarMenuButton>
+                                </Link>
+                            </SidebarMenuItem>
+                        </SidebarMenu>
+                    </SidebarGroup>
+                )}
             </SidebarContent>
             <SidebarFooter>
                 <div className="flex gap-2 p-2">

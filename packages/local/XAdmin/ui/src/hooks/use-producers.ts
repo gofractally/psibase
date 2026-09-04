@@ -5,19 +5,13 @@ import { queryKeys } from "@/lib/query-keys";
 import { type Producer, getProducers } from "@shared/lib/get-producers";
 
 import { useConfig } from "./use-config";
-import { useStatuses } from "./use-statuses";
+import { useChainReady } from "./use-statuses";
 
 export const useProducers = () => {
-    const { data: status, error: statusError } = useStatuses();
+    const chainReady = useChainReady();
     return useQuery<Producer[]>({
         queryKey: queryKeys.producers,
         queryFn: async () => {
-            if (
-                (!!status && ["startup", "needgenesis"].includes(status[0])) ||
-                !!statusError
-            ) {
-                return [];
-            }
             try {
                 return await getProducers();
             } catch (error) {
@@ -26,6 +20,7 @@ export const useProducers = () => {
                 throw new Error(message);
             }
         },
+        enabled: chainReady,
     });
 };
 

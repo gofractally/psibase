@@ -5,6 +5,8 @@ import { queryKeys } from "@/lib/query-keys";
 
 import { adminGraphql } from "@/lib/admin-graphql";
 
+import { useChainReady } from "./use-statuses";
+
 interface NetworkVariables {
     blockReplayFactor: number;
     perBlockSysCpuNs: number;
@@ -22,6 +24,7 @@ const zNetworkVariablesResponse = z.object({
 });
 
 export const useNetworkVariables = () => {
+    const chainReady = useChainReady();
     return useQuery<NetworkVariables>({
         queryKey: [...queryKeys.configNetworkVariables],
         queryFn: async () => {
@@ -51,5 +54,6 @@ export const useNetworkVariables = () => {
                 ),
             };
         },
+        enabled: chainReady,
     });
 };
