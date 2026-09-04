@@ -346,6 +346,177 @@ namespace SystemService
    };
    boost::container::flat_map<RunAsKey, uint32_t> runAsMap;
 
+   struct AuthVertex;
+   using AuthItem = std::pair<const psibase::AccountNumber, AuthVertex>;
+   using AuthMap  = std::map<psibase::AccountNumber, AuthVertex>;
+   struct AuthVertex
+   {
+      psibase::AccountNumber authService = {};
+      std::vector<AuthItem*> parents;
+      std::vector<AuthItem*> children;
+      bool                   authorized = false;
+      bool                   queued     = false;
+      std::uint16_t          refs       = 0;
+      const ServiceMethod*   action     = nullptr;
+      // Returns true if the refcount becomes zero
+      bool decref() { return !authorized && --refs == 0; }
+      void getArgs(std::vector<AccountNumber>& out) const
+      {
+         out.clear();
+         for (AuthItem* child : children)
+         {
+            if (child->second.authorized)
+            {
+               out.push_back(child->first);
+            }
+         }
+      }
+      std::optional<ServiceMethod> getAction() const
+      {
+         if (action)
+            return *action;
+         else
+            return {};
+      }
+   };
+
+   struct AuthState
+   {
+      std::vector<psibase::AccountNumber> accounts;
+      std::vector<AuthItem*>              stack;
+      AuthMap                             authorized;
+
+      void addRoot(AuthItem* item)
+      {
+         stack.push_back(item);
+         ++item->second.refs;
+         item->second.queued = true;
+      }
+
+      void setAuthorized(psibase::AccountNumber account)
+      {
+         auto [iter, _] = authorized.try_emplace(account);
+         if (!iter->second.authorized)
+         {
+            setAuthorized(*iter);
+         }
+      }
+
+      void setAuthorized(AuthItem& self)
+      {
+         self.second.authorized = true;
+         // Add parents to the stack, as their results might have changed
+         for (AuthItem* p : self.second.parents)
+         {
+            if (!p->second.queued && !p->second.authorized && p->second.refs != 0)
+            {
+               p->second.queued = true;
+               stack.push_back(p);
+            }
+         }
+         // Mark any remaining children as unneeded recursively
+         auto handleChildren = [this](const AuthItem& item)
+         {
+            for (AuthItem* c : item.second.children)
+            {
+               if (c->second.decref())
+               {
+                  stack.push_back(c);
+               }
+            }
+         };
+         // reuse stack, making sure to leave it in the original state
+         auto initial = stack.size();
+         handleChildren(self);
+         while (stack.size() > initial)
+         {
+            auto item = stack.back();
+            stack.pop_back();
+            handleChildren(*item);
+         }
+      }
+      void getDelegates(AuthItem& self)
+      {
+         auto delegates = to<AuthInterface>(self.second.authService)
+                              .getDlgsSys(self.first, self.second.getAction());
+         for (auto child : delegates)
+         {
+            auto [iter, inserted] = authorized.try_emplace(child);
+            if (!iter->second.queued)
+            {
+               stack.push_back(&*iter);
+               iter->second.queued = true;
+            }
+            ++iter->second.refs;
+            iter->second.parents.push_back(&self);
+            self.second.children.push_back(&*iter);
+         }
+      }
+      void checkAuth(AuthItem& self)
+      {
+         self.second.getArgs(accounts);
+         if (to<AuthInterface>(self.second.authService)
+                 .isAuthSys(self.first, accounts, self.second.getAction()))
+         {
+            setAuthorized(self);
+         }
+      }
+      void run()
+      {
+         while (!stack.empty())
+         {
+            auto item = stack.back();
+            stack.pop_back();
+            item->second.queued = false;
+            if (item->second.refs > 0)
+            {
+               if (item->second.authService == psibase::AccountNumber{})
+               {
+                  item->second.authService = to<Accounts>().getAuthOf(item->first);
+                  getDelegates(*item);
+               }
+               checkAuth(*item);
+            }
+         }
+      }
+   };
+
+   void checkRunAsAuth(std::uint32_t              flags,
+                       psibase::AccountNumber     requester,
+                       psibase::AccountNumber     sender,
+                       ServiceMethod              action,
+                       std::vector<ServiceMethod> allowedActions)
+   {
+      auto type = flags & AuthInterface::requestMask;
+      if (type == AuthInterface::runAsRequesterReq || type == AuthInterface::runAsMatchedReq)
+         return;  // Request is valid
+
+      AuthState             state;
+      std::vector<AuthItem> roots;
+      roots.reserve(allowedActions.size() + 1);
+      if (type != AuthInterface::runAsMatchedExpandedReq)
+      {
+         roots.emplace_back(sender, AuthVertex{});
+         roots.back().second.action = &action;
+         state.addRoot(&roots.back());
+      }
+      for (ServiceMethod& act : allowedActions)
+      {
+         roots.emplace_back(sender, AuthVertex{});
+         roots.back().second.action = &act;
+         state.addRoot(&roots.back());
+      }
+      state.setAuthorized(requester);
+      state.run();
+      for (const auto& item : roots)
+      {
+         if (!item.second.authorized)
+         {
+            abortMessage("runAs: caller is not authorized");
+         }
+      }
+   }
+
    std::vector<char> Transact::runAs(psibase::Action            action,
                                      std::vector<ServiceMethod> allowedActions)
    {
@@ -419,13 +590,8 @@ namespace SystemService
                }
             }
 
-            Actor<AuthInterface> auth(Transact::service, authService);
-            if (!auth.checkAuthSys(flags, requester, action.sender,
-                                   ServiceMethod{action.service, action.method}, allowedActions,
-                                   std::vector<Claim>{}))
-            {
-               abortMessage("Not authorized");
-            }
+            checkRunAsAuth(flags, requester, action.sender,
+                           ServiceMethod{action.service, action.method}, allowedActions);
          }  // if (requester != authService)
       }  // if(enforceAuth)
 
