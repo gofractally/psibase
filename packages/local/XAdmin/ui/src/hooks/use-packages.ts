@@ -7,6 +7,8 @@ import { PackageInfo } from "@/types";
 
 import { adminGraphql } from "@/lib/admin-graphql";
 
+import { useStatuses } from "./use-statuses";
+
 export const usePackages = () =>
     useQuery<PackageInfo[]>({
         queryKey: queryKeys.packages,
@@ -26,8 +28,11 @@ export const useLocalPackages = () =>
 
 export type InstalledLocalPackage = { name: string; version: string };
 
-export const useInstalledLocalPackages = () =>
-    useQuery<InstalledLocalPackage[]>({
+export const useInstalledLocalPackages = () => {
+    const { data: status } = useStatuses();
+    const needgenesis = Boolean(status?.includes("needgenesis"));
+
+    return useQuery<InstalledLocalPackage[]>({
         queryKey: queryKeys.installedLocalPackages,
         queryFn: async () => {
             const res = (await adminGraphql(
@@ -39,4 +44,6 @@ export const useInstalledLocalPackages = () =>
             return res.installed.edges.map((e) => e.node);
         },
         initialData: [],
+        enabled: !needgenesis,
     });
+};
