@@ -57,51 +57,6 @@ namespace SystemService
       /// protect to resource billing attacks.
       static constexpr uint32_t firstAuthFlag = 0x4000'0000;
 
-      /// Bits which identify kind of request
-      static constexpr uint32_t requestMask = 0x0000'00ff;
-
-      /// Top-level action
-      static constexpr uint32_t topActionReq = 0x01;
-
-      /// See header
-      ///
-      /// `runAs` request. The requester matches the action's
-      /// sender.
-      ///
-      /// Auth services should normally approve this unless
-      /// they enforce stronger rules, e.g. by restricting
-      /// `action` or `allowedActions`.
-      static constexpr uint32_t runAsRequesterReq = 0x02;
-
-      /// See header
-      ///
-      /// `runAs` request. The request matches the criteria from
-      /// a `runAs` request currently in the call stack. `requester`
-      /// matches the earlier `action.service`. `action` matches
-      /// one of the earlier `allowedActions` from the same request.
-      ///
-      /// Auth services should normally approve this unless
-      /// they enforce stronger rules.
-      static constexpr uint32_t runAsMatchedReq = 0x03;
-
-      /// See header
-      ///
-      /// `runAs` request. Same as `runAsMatched`, except the
-      /// requestor provided a non-empty `allowedActions`. This
-      /// expands the authority beyond what was originally granted.
-      ///
-      /// Auth services should normally reject this unless
-      /// they have filtering criteria which allow it.
-      static constexpr uint32_t runAsMatchedExpandedReq = 0x04;
-
-      /// See header
-      ///
-      /// `runAs` request. The other criteria don't match.
-      ///
-      /// Auth services should normally reject this unless
-      /// they have filtering criteria which allow it.
-      static constexpr uint32_t runAsOtherReq = 0x05;
-
       /// Authenticate a top-level action or a `runAs` action
       ///
       /// * `flags`:          0 or more of the flag constants or'ed together

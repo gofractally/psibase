@@ -481,20 +481,16 @@ namespace SystemService
       }
    };
 
-   void checkRunAsAuth(std::uint32_t              flags,
-                       psibase::AccountNumber     requester,
+   void checkRunAsAuth(psibase::AccountNumber     requester,
                        psibase::AccountNumber     sender,
                        ServiceMethod              action,
-                       std::vector<ServiceMethod> allowedActions)
+                       std::vector<ServiceMethod> allowedActions,
+                       bool                       matched)
    {
-      auto type = flags & AuthInterface::requestMask;
-      if (type == AuthInterface::runAsRequesterReq || type == AuthInterface::runAsMatchedReq)
-         return;  // Request is valid
-
       AuthState             state;
       std::vector<AuthItem> roots;
       roots.reserve(allowedActions.size() + 1);
-      if (type != AuthInterface::runAsMatchedExpandedReq)
+      if (!matched)
       {
          roots.emplace_back(sender, AuthVertex{});
          roots.back().second.action = &action;
@@ -543,12 +539,10 @@ namespace SystemService
       {
          auto authService = to<Accounts>().getAuthOf(action.sender);
 
-         if (requester != authService && requester != action.sender.base())
+         if (requester != authService && requester != action.sender &&
+             requester != action.sender.base())
          {
-            uint32_t flags = 0;
-            if (requester == action.sender)
-               flags = AuthInterface::runAsRequesterReq;
-            else
+            bool matched = false;
             {
                auto it = runAsMap.lower_bound(RunAsKey{action.sender, requester, {}, {}});
                while (it != runAsMap.end() &&  //
@@ -558,40 +552,15 @@ namespace SystemService
                       (!it->first.receiver.value || it->first.receiver == action.service) &&
                       (!it->first.method.value || it->first.method == action.method))
                   {
-                     if (allowedActions.empty())
-                        flags = AuthInterface::runAsMatchedReq;
-                     else
-                        flags = AuthInterface::runAsMatchedExpandedReq;
+                     matched = true;
                      break;
                   }
                   ++it;
                }
-               if (!flags)
-                  flags = AuthInterface::runAsOtherReq;
             }
 
-            if constexpr (enable_print)
-            {
-               std::string flags_str = "";
-               auto        type      = flags & AuthInterface::requestMask;
-               if (type == AuthInterface::runAsRequesterReq)
-                  flags_str += " - runAsRequesterReq\n";
-               else if (type == AuthInterface::runAsMatchedReq)
-                  flags_str += " - runAsMatchedReq\n";
-               else if (type == AuthInterface::runAsMatchedExpandedReq)
-                  flags_str += " - runAsMatchedExpandedReq\n";
-               else if (type == AuthInterface::runAsOtherReq)
-                  flags_str += " - runAsOtherReq\n";
-
-               if (!flags_str.empty())
-               {
-                  psibase::writeConsole("Checking auth service " + authService.str() +
-                                        " with flags: \n" + flags_str + "\n");
-               }
-            }
-
-            checkRunAsAuth(flags, requester, action.sender,
-                           ServiceMethod{action.service, action.method}, allowedActions);
+            checkRunAsAuth(requester, action.sender, ServiceMethod{action.service, action.method},
+                           allowedActions, matched);
          }  // if (requester != authService)
       }  // if(enforceAuth)
 
