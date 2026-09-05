@@ -3550,6 +3550,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "transact-admin"
+version = "0.27.0"
+dependencies = [
+ "chrono",
+ "psibase",
+ "psibase-plugin-workspace-hack",
+ "serde",
+ "serde_json",
+ "sha2",
+ "wit-bindgen-rt",
+]
+
+[[package]]
 name = "try-lock"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"

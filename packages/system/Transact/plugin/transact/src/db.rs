@@ -52,8 +52,8 @@ impl TxSignatures {
         TX_SIGNATURES.with(|t| t.borrow().is_empty())
     }
 
-    pub fn with<R>(f: impl FnOnce(&[Claim]) -> R) -> R {
-        TX_SIGNATURES.with(|t| f(&t.borrow()))
+    pub fn take() -> Vec<Claim> {
+        TX_SIGNATURES.with(|t| std::mem::take(&mut *t.borrow_mut()))
     }
 }
 
