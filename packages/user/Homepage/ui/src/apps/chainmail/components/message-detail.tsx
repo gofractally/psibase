@@ -2,19 +2,10 @@ import type { DraftMessage, Mailbox, Message } from "@/apps/chainmail/types";
 
 import { ArrowLeft, Trash2 } from "lucide-react";
 
-// import { AwaitTime } from "@/globals";
-// import { wait } from "@/lib/wait";
-
-import {
-    // useArchiveMessage,
-    useDraftMessages,
-    // useIncomingMessages,
-    // useInvalidateMailboxQueries,
-    // useSaveMessage,
-} from "@/apps/chainmail/hooks/use-mail";
+import { useDraftMessages } from "@/apps/chainmail/hooks/use-mail";
 import { formatDate } from "@/apps/chainmail/utils";
 
-import { Avatar } from "@shared/shadcn/ui/avatar";
+import { Avatar } from "@shared/components/avatar";
 import { Button } from "@shared/shadcn/ui/button";
 import { ScrollArea } from "@shared/shadcn/ui/scroll-area";
 import { toast } from "@shared/shadcn/ui/sonner";
@@ -41,59 +32,6 @@ export function MessageDetail({
     mailbox,
     onBack,
 }: MessageDetailProps) {
-    // const invalidateMailboxQueries = useInvalidateMailboxQueries();
-
-    // const { setSelectedMessageId: setInboxMessageId } = useIncomingMessages();
-    // const { mutateAsync: archiveMessage } = useArchiveMessage();
-    // const { mutateAsync: saveMessage } = useSaveMessage();
-
-    // const onArchive = async (message: Message) => {
-    //     if (message.type === "outgoing") {
-    //         return toast.error(
-    //             "Archiving sent messages is currently not supported.",
-    //         );
-    //     }
-
-    //     const loadingId = toast.loading("Archiving message");
-
-    //     try {
-    //         // TODO: Improve error detection. This promise resolves with success before the transaction is pushed.
-    //         await archiveMessage(message.msgId);
-    //         setInboxMessageId("");
-    //         toast.success("Your message has been archived");
-    //         await wait(AwaitTime);
-    //         invalidateMailboxQueries();
-    //     } catch (error) {
-    //         toast.error("There was a problem archiving this message.");
-    //     } finally {
-    //         toast.dismiss(loadingId);
-    //     }
-    // };
-
-    // const onUnArchive = async (itemId: string) => {
-    //     toast.error("Not implemented");
-    // };
-
-    // const onSave = async (message: Message) => {
-    //     if (message.type === "outgoing") {
-    //         return toast.error(
-    //             "Saving sent messages is currently not supported.",
-    //         );
-    //     }
-
-    //     const loadingId = toast.loading("Saving message");
-
-    //     try {
-    //         await saveMessage(message.msgId);
-    //         toast.success("This message will be kept");
-    //         await wait(AwaitTime);
-    //         invalidateMailboxQueries();
-    //     } catch (error) {
-    //         toast.error("There was a problem. Your message was not saved.");
-    //     } finally {
-    //         toast.dismiss(loadingId);
-    //     }
-    // };
     const {
         selectedMessage: selectedDraftMessage,
         setSelectedMessageId: setDraftMessageId,
@@ -124,38 +62,6 @@ export function MessageDetail({
                     {message.subject}
                 </h2>
                 <div className="flex gap-1">
-                    {/* {(mailbox === "inbox" || mailbox === "saved") && (
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    disabled={!message}
-                                    onClick={() => onArchive(message)}
-                                >
-                                    <Archive className="h-5 w-5" />
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Archive message</TooltipContent>
-                        </Tooltip>
-                    )}
-                    {(mailbox === "inbox" || mailbox === "archived") && (
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    disabled={!message}
-                                    onClick={() => onSave(message)}
-                                >
-                                    <Pin className="h-5 w-5" />
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                Keep message and move to Saved mailbox
-                            </TooltipContent>
-                        </Tooltip>
-                    )} */}
                     {mailbox === "drafts" ? (
                         <>
                             <ComposeDialog
@@ -185,11 +91,11 @@ export function MessageDetail({
                 <div className="p-4">
                     <div className="mb-6 flex items-start justify-between">
                         <div className="flex gap-3">
-                            <Avatar className="h-10 w-10">
-                                <div className="bg-primary text-primary-foreground flex h-full w-full items-center justify-center">
-                                    {account.charAt(0)}
-                                </div>
-                            </Avatar>
+                            <Avatar
+                                account={account}
+                                className="h-10 w-10"
+                                alt={`${account} avatar`}
+                            />
                             <div>
                                 <p className="font-medium">{account}</p>
                                 <p className="text-muted-foreground mt-1 text-xs">
