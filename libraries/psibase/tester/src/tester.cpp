@@ -390,11 +390,6 @@ psibase::TestChain::~TestChain()
       selectedChain.reset();
 }
 
-void psibase::TestChain::shutdown()
-{
-   tester::raw::shutdownChain(id);
-}
-
 void psibase::TestChain::setAutoBlockStart(bool enable)
 {
    isAutoBlockStart = enable;

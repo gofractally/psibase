@@ -2693,7 +2693,6 @@ namespace psibase::loggers
          };
       };
 
-      void print_trace_console(boost::log::formatting_ostream& os, const EventTrace& trace) {}
       void print_trace_console(boost::log::formatting_ostream& os, const ConsoleTrace& trace)
       {
          os << trace.console;

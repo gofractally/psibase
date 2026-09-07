@@ -41,21 +41,21 @@ namespace UserService
       PSIO_REFLECT(Precision, value);
    };
 
-   inline uint8_t& clio_unwrap_packable(Precision& s)
+   inline uint8_t& psio_unwrap_packable(Precision& s)
    {
       return s.value;
    }
-   inline const uint8_t& clio_unwrap_packable(const Precision& s)
+   inline const uint8_t& psio_unwrap_packable(const Precision& s)
    {
       return s.value;
    }
 
-   inline bool clio_validate_packable(const Precision& p)
+   inline bool psio_validate_packable(const Precision& p)
    {
       return Precision::validate(p.value);
    }
 
-   inline bool clio_validate_packable(psio::view<const Precision> p)
+   inline bool psio_validate_packable(psio::view<const Precision> p)
    {
       return Precision::validate(p.value());
    }

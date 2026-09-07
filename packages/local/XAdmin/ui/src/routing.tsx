@@ -80,38 +80,22 @@ export const Routing = () => {
 
             <Route path="" element={<Layout />}>
                 <Route path="" element={<App />}>
-                    {isBootable ? (
-                        <>
-                            <Route
-                                path="configuration"
-                                element={<ConfigurationPage />}
+                    {routes.map((route) => (
+                        <Route
+                            key={route.path}
+                            path={route.path}
+                            element={route.element}
+                        />
+                    ))}
+                    <Route
+                        path=""
+                        element={
+                            <Navigate
+                                to={isBootable ? "/setup" : "/dashboard"}
+                                replace
                             />
-                            <Route
-                                path=""
-                                element={<Navigate to="/setup" replace />}
-                            />
-                            <Route
-                                path="*"
-                                element={<Navigate to="/setup" replace />}
-                            />
-                        </>
-                    ) : (
-                        <>
-                            {routes.map((route) => (
-                                <Route
-                                    key={route.path}
-                                    path={route.path}
-                                    element={route.element}
-                                />
-                            ))}
-                            <Route
-                                path=""
-                                element={
-                                    <Navigate to="/dashboard" replace={true} />
-                                }
-                            />
-                        </>
-                    )}
+                        }
+                    />
                 </Route>
             </Route>
         </Routes>

@@ -1084,6 +1084,15 @@ namespace LocalService
             return HttpReply::methodNotAllowed(req);
          }
 
+         if (!chainIsBooted())
+         {
+            return HttpReply{
+                .status      = HttpStatus::serviceUnavailable,
+                .contentType = "text/html",
+                .body        = toVec("Node is not connected to any psibase network."),
+            };
+         }
+
          HttpReply           reply{.contentType = "application/json"};
          psio::vector_stream stream{reply.body};
          to_json(LoginReply{to<RTransact>().login(to<XHttp>().rootHost(req.host))}, stream);

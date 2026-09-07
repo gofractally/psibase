@@ -539,35 +539,6 @@ impl Chain {
         TransactionTrace::unpacked(&get_result_bytes(size)).unwrap()
     }
 
-    /// Copy database to `path`
-    ///
-    /// Runs the following shell command: `mkdir -p {path} && cp -a {src}/* {path}`,
-    /// where `{path}` is the passed-in argument and `{src}` is the chain's database.
-    ///
-    /// Returns shell exit status; 0 if successful
-    pub fn copy_database(&self, path: &str) -> i32 {
-        let src = unsafe { self.get_path() };
-        execute(&format! {"mkdir -p {path} && cp -a {src}/* {path}", src = src, path = path})
-    }
-
-    /// Get filesystem path of chain's database
-    ///
-    /// See [`copy_database`](Self::copy_database) for the most-common use case
-    ///
-    /// # Safety
-    ///
-    /// It is safe to copy the files to another location on the filesystem. However,
-    /// modifying the original files or launching `psinode` on the original files
-    /// will corrupt the database and likely crash the `psitest` process running this
-    /// wasm.
-    pub unsafe fn get_path(&self) -> String {
-        let size = tester_raw::getChainPath(self.chain_handle, null_mut(), 0);
-        let mut bytes = Vec::with_capacity(size);
-        tester_raw::getChainPath(self.chain_handle, bytes.as_mut_ptr(), size);
-        bytes.set_len(size);
-        String::from_utf8_unchecked(bytes)
-    }
-
     /// Select chain for database native functions
     ///
     /// After you call `select_chain`, the following functions will use

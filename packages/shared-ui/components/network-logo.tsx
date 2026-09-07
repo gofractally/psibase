@@ -5,10 +5,17 @@ import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 interface Props extends React.ComponentProps<"div"> {
     producerName?: string;
+    enableBranding?: boolean;
 }
 
-export const NetworkLogo = ({ producerName, ...props }: Props) => {
-    const { data: branding, isLoading } = useBranding();
+export const NetworkLogo = ({
+    producerName,
+    enableBranding = true,
+    ...props
+}: Props) => {
+    const { data: branding, isLoading } = useBranding({
+        enabled: enableBranding,
+    });
 
     let networkName = branding;
     if (producerName && networkName) {

@@ -35,11 +35,11 @@ namespace LocalService
          psibase::AccountNumber value;
       };
       PSIO_REFLECT_TYPENAME(Account)
-      inline auto& clio_unwrap_packable(Account& obj)
+      inline auto& psio_unwrap_packable(Account& obj)
       {
          return obj.value;
       }
-      inline const auto& clio_unwrap_packable(const Account& obj)
+      inline const auto& psio_unwrap_packable(const Account& obj)
       {
          return obj.value;
       }
@@ -49,11 +49,11 @@ namespace LocalService
          std::string value;
       };
       PSIO_REFLECT_TYPENAME(LocalUsername)
-      inline auto& clio_unwrap_packable(LocalUsername& obj)
+      inline auto& psio_unwrap_packable(LocalUsername& obj)
       {
          return obj.value;
       }
-      inline const auto& clio_unwrap_packable(const LocalUsername& obj)
+      inline const auto& psio_unwrap_packable(const LocalUsername& obj)
       {
          return obj.value;
       }

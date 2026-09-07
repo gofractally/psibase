@@ -19,14 +19,6 @@ namespace psibase
    };
    PSIO_REFLECT(ActionTrace, action, rawRetval, innerTraces, totalTime, error)
 
-   // TODO: need event definitions in ABI
-   struct EventTrace
-   {
-      std::string       name;
-      std::vector<char> data;
-   };
-   PSIO_REFLECT(EventTrace, name, data)
-
    struct ConsoleTrace
    {
       std::string console;
@@ -35,7 +27,7 @@ namespace psibase
 
    struct InnerTrace
    {
-      std::variant<ConsoleTrace, EventTrace, ActionTrace> inner;
+      std::variant<ConsoleTrace, ActionTrace> inner;
    };
    PSIO_REFLECT(InnerTrace, inner)
 
@@ -62,10 +54,6 @@ namespace psibase
                            const ConsoleTrace& t,
                            const GetSchemaFn&  schemas = NoSchema{},
                            const std::string&  indent  = "");
-   void        prettyTrace(std::string&       dest,
-                           const EventTrace&  t,
-                           const GetSchemaFn& schemas = NoSchema{},
-                           const std::string& indent  = "");
    void        prettyTrace(std::string&       dest,
                            const ActionTrace& atrace,
                            const GetSchemaFn& schemas = NoSchema{},
