@@ -2,7 +2,7 @@ import type { DraftMessage, Message } from "@/apps/chainmail/types";
 import type { PluginId } from "@psibase/common-lib";
 
 import { PencilIcon, Reply, Send, SquarePen, X } from "lucide-react";
-import { forwardRef, useEffect, useRef, useState } from "react";
+import { forwardRef, useRef, useState } from "react";
 import { z } from "zod";
 
 import { zDraftMessage } from "@/apps/chainmail/types";
@@ -121,7 +121,7 @@ export function ComposeDialog({
         },
     });
 
-    useEffect(() => {
+    const populateFormFromMessage = () => {
         if (!message) {
             form.reset();
             return;
@@ -133,8 +133,9 @@ export function ComposeDialog({
         } else {
             form.setFieldValue("to", { account: message.from });
             form.setFieldValue("subject", `RE: ${message.subject}`);
+            form.setFieldValue("message", "");
         }
-    }, [message]);
+    };
 
     const createDraft = () => {
         if (!id.current || !user) return;
@@ -156,17 +157,25 @@ export function ComposeDialog({
     };
 
     const updateDraft = () => {
-        const draft = allDrafts.find((msg) => msg.id === id.current);
-        if (!draft) {
+        const draftIndex = allDrafts.findIndex((msg) => msg.id === id.current);
+        if (draftIndex === -1) {
             createDraft();
-        } else {
-            const values = form.state.values;
-            draft.datetime = Date.now();
-            draft.to = values.to.account ?? "";
-            draft.subject = values.subject ?? "";
-            draft.body = values.message ?? "";
-            setDrafts(allDrafts);
+            return;
         }
+
+        const values = form.state.values;
+        const nextDrafts = allDrafts.map((draft, index) =>
+            index === draftIndex
+                ? {
+                      ...draft,
+                      datetime: Date.now(),
+                      to: values.to.account ?? "",
+                      subject: values.subject ?? "",
+                      body: values.message ?? "",
+                  }
+                : draft,
+        );
+        setDrafts(nextDrafts);
     };
 
     const validateComposeForm = async () => {
@@ -187,6 +196,7 @@ export function ComposeDialog({
                 toast.success("Your draft has been saved");
             }
             form.reset();
+            return;
         }
 
         // the ID should be (re)set each time this opens; remember, it stays mounted
@@ -197,6 +207,7 @@ export function ComposeDialog({
             id.current =
                 window.crypto.randomUUID?.() ?? Math.random().toString();
         }
+        populateFormFromMessage();
     };
 
     return (
