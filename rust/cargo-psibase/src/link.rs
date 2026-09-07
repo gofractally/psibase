@@ -763,27 +763,32 @@ pub fn link_module(source: &Module, dest: &mut Module) -> Result<(), anyhow::Err
     Ok(())
 }
 
-struct RetargetCalls {
-    from: FunctionId,
-    to: FunctionId,
+struct RetargetCalls<'a> {
+    map: &'a HashMap<FunctionId, FunctionId>,
 }
 
-impl walrus::ir::VisitorMut for RetargetCalls {
-    fn visit_function_id_mut(&mut self, function: &mut FunctionId) {
-        if *function == self.from {
-            *function = self.to;
+impl RetargetCalls<'_> {
+    fn rewrite(&self, fid: &mut FunctionId) {
+        if let Some(&to) = self.map.get(fid) {
+            *fid = to;
         }
     }
 }
 
-fn retarget(module: &mut Module, from: FunctionId, to: FunctionId) {
-    let mut visitor = RetargetCalls { from, to };
+impl walrus::ir::VisitorMut for RetargetCalls<'_> {
+    fn visit_function_id_mut(&mut self, function: &mut FunctionId) {
+        self.rewrite(function);
+    }
+}
+
+fn retarget(module: &mut Module, map: &HashMap<FunctionId, FunctionId>) {
+    let mut visitor = RetargetCalls { map };
     for (_, local) in module.funcs.iter_local_mut() {
         let entry = local.entry_block();
         walrus::ir::dfs_pre_order_mut(&mut visitor, local, entry);
     }
-    if module.start == Some(from) {
-        module.start = Some(to);
+    if let Some(start) = &mut module.start {
+        visitor.rewrite(start);
     }
     for elem in module.elements.iter_mut() {
         if let walrus::ElementKind::Active {
@@ -791,13 +796,11 @@ fn retarget(module: &mut Module, from: FunctionId, to: FunctionId) {
             ..
         } = &mut elem.kind
         {
-            if *fid == from {
-                *fid = to;
-            }
+            visitor.rewrite(fid);
         }
         for member in &mut elem.members {
-            if *member == Some(from) {
-                *member = Some(to);
+            if let Some(fid) = member {
+                visitor.rewrite(fid);
             }
         }
     }
@@ -806,16 +809,12 @@ fn retarget(module: &mut Module, from: FunctionId, to: FunctionId) {
         if let walrus::GlobalKind::Local(walrus::InitExpr::RefFunc(fid)) =
             &mut module.globals.get_mut(id).kind
         {
-            if *fid == from {
-                *fid = to;
-            }
+            visitor.rewrite(fid);
         }
     }
     for export in module.exports.iter_mut() {
         if let walrus::ExportItem::Function(fid) = &mut export.item {
-            if *fid == from {
-                *fid = to;
-            }
+            visitor.rewrite(fid);
         }
     }
 }
@@ -824,7 +823,8 @@ fn retarget(module: &mut Module, from: FunctionId, to: FunctionId) {
 ///
 /// psitest does not provide `env.*`; the tester polyfill does.
 pub fn bind_env(module: &mut Module) -> Result<(), anyhow::Error> {
-    let mut replacements = Vec::new();
+    let mut map = HashMap::new();
+    let mut import_ids = Vec::new();
     for import in module.imports.iter() {
         if import.module != "env" {
             continue;
@@ -850,15 +850,16 @@ pub fn bind_env(module: &mut Module) -> Result<(), anyhow::Error> {
                 import.name
             ));
         }
-        replacements.push((import_fid, export_fid, import.id()));
+        map.insert(import_fid, export_fid);
+        import_ids.push(import.id());
     }
 
-    if replacements.is_empty() {
+    if map.is_empty() {
         return Ok(());
     }
 
-    for (from, to, import_id) in replacements {
-        retarget(module, from, to);
+    retarget(module, &map);
+    for import_id in import_ids {
         module.imports.delete(import_id);
     }
 
