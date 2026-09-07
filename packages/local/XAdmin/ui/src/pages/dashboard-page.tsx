@@ -19,6 +19,7 @@ import {
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 import { usePerformance } from "../hooks/use-performance";
+import { useStatuses } from "../hooks/use-statuses";
 import { useTransactStats } from "../hooks/use-transact-stats";
 
 const chartConfig = {
@@ -71,6 +72,8 @@ const Stat = ({
 export function DashboardPage() {
     const { data, isPending: isLoadingPerf } = usePerformance();
     const { data: txStats, isPending: isLoadingTx } = useTransactStats();
+    const { data: status } = useStatuses();
+    const needgenesis = Boolean(status?.includes("needgenesis"));
 
     const chartData = React.useMemo(
         () => [
@@ -212,13 +215,28 @@ export function DashboardPage() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="grid grid-cols-2 gap-3">
-                        <Stat label="Succeeded" value={txStats?.succeeded} />
-                        <Stat label="Failed" value={txStats?.failed} />
-                        <Stat label="Expired" value={txStats?.expired} />
-                        <Stat
-                            label="Unprocessed"
-                            value={txStats?.unprocessed}
-                        />
+                        {needgenesis ? (
+                            <p className="text-muted-foreground col-span-2 text-sm">
+                                Transaction counts are unavailable until this
+                                node is connected to a chain.
+                            </p>
+                        ) : (
+                            <>
+                                <Stat
+                                    label="Succeeded"
+                                    value={txStats?.succeeded}
+                                />
+                                <Stat label="Failed" value={txStats?.failed} />
+                                <Stat
+                                    label="Expired"
+                                    value={txStats?.expired}
+                                />
+                                <Stat
+                                    label="Unprocessed"
+                                    value={txStats?.unprocessed}
+                                />
+                            </>
+                        )}
                     </CardContent>
                 </Card>
             </div>
