@@ -2,13 +2,7 @@ import { z } from "zod";
 
 import { zAccount } from "@shared/lib/schemas/account";
 
-export const zMailbox = z.enum([
-    "inbox",
-    "sent",
-    "drafts",
-    "archived",
-    "saved",
-]);
+export const zMailbox = z.enum(["inbox", "sent", "drafts"]);
 
 export const zMessage = z.object({
     id: z.string(),

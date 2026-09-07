@@ -34,6 +34,7 @@ import {
     DialogTrigger,
 } from "@shared/shadcn/ui/dialog";
 import { Input } from "@shared/shadcn/ui/input";
+import { Label } from "@shared/shadcn/ui/label";
 import { toast } from "@shared/shadcn/ui/sonner";
 import { Textarea } from "@shared/shadcn/ui/textarea";
 import {
@@ -67,6 +68,13 @@ const defaultComposeValues = {
     subject: "",
     message: "",
 };
+
+const hasDraftContent = (values: typeof defaultComposeValues) =>
+    Boolean(
+        values.to.account.trim() ||
+            values.subject.trim() ||
+            values.message.trim(),
+    );
 
 export function ComposeDialog({
     trigger,
@@ -140,37 +148,47 @@ export function ComposeDialog({
     const createDraft = () => {
         if (!id.current || !user) return;
         const values = form.state.values;
+        if (!hasDraftContent(values)) return;
+
         const draft = zDraftMessage.parse({
             id: id.current,
             from: user,
-            to: values.to.account || "recipient",
+            to: values.to.account.trim(),
             datetime: Date.now(),
             isDraft: true,
             type: "outgoing",
             read: true,
             saved: true,
             inReplyTo: null,
-            subject: values.subject || "subject here",
+            subject: values.subject.trim(),
             body: values.message ?? "",
         });
         setDrafts([...(allDrafts ?? []), draft]);
     };
 
     const updateDraft = () => {
+        const values = form.state.values;
         const draftIndex = allDrafts.findIndex((msg) => msg.id === id.current);
+
+        if (!hasDraftContent(values)) {
+            if (draftIndex !== -1 && id.current) {
+                deleteDraftById(id.current);
+            }
+            return;
+        }
+
         if (draftIndex === -1) {
             createDraft();
             return;
         }
 
-        const values = form.state.values;
         const nextDrafts = allDrafts.map((draft, index) =>
             index === draftIndex
                 ? {
                       ...draft,
                       datetime: Date.now(),
-                      to: values.to.account ?? "",
-                      subject: values.subject ?? "",
+                      to: values.to.account.trim(),
+                      subject: values.subject.trim(),
                       body: values.message ?? "",
                   }
                 : draft,
@@ -189,10 +207,10 @@ export function ComposeDialog({
     const onOpenChange = (nextOpen: boolean) => {
         setOpen(nextOpen);
         if (!nextOpen) {
-            // if closing
             if (isSent.current) return;
+            const values = form.state.values;
             updateDraft();
-            if (form.state.values.message.length) {
+            if (hasDraftContent(values)) {
                 toast.success("Your draft has been saved");
             }
             form.reset();
@@ -214,7 +232,7 @@ export function ComposeDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             {trigger}
             <DialogContent
-                className="h-[100dvh] max-w-full rounded-none px-4 py-8 sm:h-auto sm:max-w-[600px] sm:p-6"
+                className="flex h-[100dvh] max-h-[100dvh] max-w-full flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[min(90dvh,720px)] sm:max-w-[600px] sm:rounded-lg"
                 onCloseAutoFocus={(e) => {
                     // This helps in not focusing on the trigger after closing the modal
                     e.preventDefault();
@@ -227,10 +245,16 @@ export function ComposeDialog({
                             e.stopPropagation();
                             void form.handleSubmit();
                         }}
-                        className="flex h-full flex-col"
+                        className="flex min-h-0 flex-1 flex-col"
                     >
-                        <DialogHeader>
-                            <DialogTitle>Compose New Message</DialogTitle>
+                        <DialogHeader className="shrink-0 px-4 pt-8 pr-12 sm:px-6 sm:pt-6">
+                            <DialogTitle>
+                                {message?.isDraft
+                                    ? "Edit draft"
+                                    : message
+                                      ? "Reply"
+                                      : "New message"}
+                            </DialogTitle>
                             <DialogDescription>
                                 Send a message to other accounts on chain. This
                                 is for demo purposes only. All messages are
@@ -238,11 +262,11 @@ export function ComposeDialog({
                                 readable.
                             </DialogDescription>
                         </DialogHeader>
-                        <div className="flex flex-grow flex-col gap-4 py-4 sm:grid">
+                        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4 sm:px-6">
                             <FieldAccountExisting
                                 form={form}
                                 fields="to"
-                                label={undefined}
+                                label="To"
                                 description={undefined}
                                 placeholder="Recipient account name"
                                 disabled={false}
@@ -258,8 +282,12 @@ export function ComposeDialog({
                                     },
                                 }}
                                 children={(field) => (
-                                    <div className="flex flex-col gap-2">
+                                    <div className="flex shrink-0 flex-col gap-2">
+                                        <Label htmlFor="compose-subject">
+                                            Subject
+                                        </Label>
                                         <Input
+                                            id="compose-subject"
                                             placeholder="Subject"
                                             value={field.state.value}
                                             onBlur={field.handleBlur}
@@ -281,10 +309,14 @@ export function ComposeDialog({
                                     },
                                 }}
                                 children={(field) => (
-                                    <div className="flex flex-1 flex-col gap-2">
+                                    <div className="flex min-h-0 flex-1 flex-col gap-2">
+                                        <Label htmlFor="compose-message">
+                                            Message
+                                        </Label>
                                         <Textarea
-                                            placeholder="Message"
-                                            className="h-full resize-none text-sm sm:min-h-[200px]"
+                                            id="compose-message"
+                                            placeholder="Write your message..."
+                                            className="field-sizing-fixed min-h-[160px] flex-1 resize-none overflow-y-auto text-sm sm:min-h-[240px]"
                                             value={field.state.value}
                                             onBlur={field.handleBlur}
                                             onChange={(e) => {
@@ -298,7 +330,7 @@ export function ComposeDialog({
                                 )}
                             />
                         </div>
-                        <DialogFooter className="flex flex-col-reverse gap-2 pb-4 sm:flex-row sm:justify-between sm:space-x-2 sm:pb-0">
+                        <DialogFooter className="shrink-0 flex flex-col-reverse gap-2 border-t px-4 py-4 sm:flex-row sm:justify-between sm:space-x-2 sm:px-6 sm:pb-6">
                             <Button
                                 variant="outline"
                                 onClick={(e) => {
@@ -308,7 +340,7 @@ export function ComposeDialog({
                                 className="w-full sm:w-auto"
                                 type="button"
                             >
-                                <X className="mr-2 h-4 w-4" />
+                                <X className="mr-2 size-4" />
                                 Cancel
                             </Button>
                             <AlertDialog>
@@ -374,7 +406,7 @@ const SendTriggerButton = forwardRef<HTMLButtonElement, SendTriggerButtonProps>(
                 ref={ref}
                 onClick={handleClick}
             >
-                <Send className="mr-2 h-4 w-4" />
+                <Send className="mr-2 size-4" />
                 Send Message
             </Button>
         );
@@ -392,8 +424,13 @@ export const ComposeDialogTrigger = ({
         <Tooltip>
             <TooltipTrigger asChild>
                 <DialogTrigger asChild>
-                    <Button variant="ghost" size="icon" disabled={disabled}>
-                        <SquarePen className="h-5 w-5" />
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        disabled={disabled}
+                        aria-label="Compose message"
+                    >
+                        <SquarePen className="size-5" />
                     </Button>
                 </DialogTrigger>
             </TooltipTrigger>
@@ -409,8 +446,8 @@ export const ReplyDialogTrigger = ({
 }) => {
     return (
         <DialogTrigger asChild>
-            <Button variant="outline" disabled={disabled}>
-                <Reply className="mr-2 h-5 w-5" />
+            <Button variant="outline" size="sm" disabled={disabled}>
+                <Reply className="mr-2 size-4" />
                 Reply
             </Button>
         </DialogTrigger>
@@ -426,8 +463,13 @@ export const EditSendDialogTrigger = ({
         <Tooltip>
             <TooltipTrigger asChild>
                 <DialogTrigger asChild>
-                    <Button variant="ghost" size="icon" disabled={disabled}>
-                        <PencilIcon className="h-5 w-5" />
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        disabled={disabled}
+                        aria-label="Edit and send draft"
+                    >
+                        <PencilIcon className="size-5" />
                     </Button>
                 </DialogTrigger>
             </TooltipTrigger>
