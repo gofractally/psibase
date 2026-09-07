@@ -7,9 +7,9 @@ use crate::services::{
 use crate::{
     deserialize_pretty_action, new_account_owned_action, preapprove_action, reg_server,
     schema_types, set_code_action, solve_dependencies, version_match, AccountNumber, Action,
-    AnyPublicKey, Checksum256, CodeRow, CustomPrettyAction, GenesisService, Hex, MethodNumber,
-    MethodString, NullSchemaFetcher, PackageDisposition, PackageOp, PackagePreference, Schema,
-    SchemaFetcher, ServiceWrapper, ToSchema, TypeMatchExt, Version,
+    AnyPublicKey, Checksum256, CodeRow, CustomPrettyAction, ExactAccountNumber, GenesisService,
+    Hex, MethodNumber, MethodString, NullSchemaFetcher, PackageDisposition, PackageOp,
+    PackagePreference, Schema, SchemaFetcher, ServiceWrapper, ToSchema, TypeMatchExt, Version,
 };
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
@@ -283,7 +283,7 @@ pub type SchemaMap = HashMap<AccountNumber, Schema>;
 #[serde(rename_all = "camelCase")]
 pub struct PrettyAction {
     /// Account sending the action
-    pub sender: AccountNumber,
+    pub sender: ExactAccountNumber,
 
     /// Service to execute the action
     pub service: String,
@@ -331,7 +331,7 @@ impl PrettyAction {
             PrettyAction::pack_data(service, self.method, &self.data, schemas)?
         };
         Ok(Action {
-            sender: self.sender,
+            sender: self.sender.into(),
             service,
             method: self.method,
             rawData: raw_data,
@@ -345,7 +345,7 @@ impl PrettyAction {
             PrettyAction::pack_data(service, self.method, &self.data, schemas)?
         };
         Ok(Action {
-            sender: self.sender,
+            sender: self.sender.into(),
             service: service,
             method: self.method,
             rawData: raw_data,
@@ -368,7 +368,7 @@ impl PrettyAction {
         if !self.raw_data.is_some() {
             if let Some(data) = &self.data {
                 SharedPrettyAction {
-                    sender: self.sender,
+                    sender: self.sender.into(),
                     service: self.service.parse()?,
                     method: self.method,
                     data: data,
@@ -386,7 +386,7 @@ impl PrettyAction {
         schemas: &SchemaMap,
     ) -> Result<(), anyhow::Error> {
         let service = self.service.parse()?;
-        accounts.push(self.sender);
+        accounts.push(self.sender.into());
         services.push(service);
         if let Some(data) = &self.data {
             let schema = schemas
