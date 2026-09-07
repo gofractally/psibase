@@ -5,6 +5,7 @@ import { PackageItem } from "@/components/package-item";
 
 import { useInstallPackages } from "@/hooks/use-install-packages";
 import { usePackages } from "@/hooks/use-packages";
+import { useSelectedPackages } from "@/hooks/use-selected-packages";
 import { useSetAccountSources } from "@/hooks/use-set-sources";
 import { useSources } from "@/hooks/use-sources";
 
@@ -29,24 +30,18 @@ export const Packages = () => {
     const { data: sources } = useSources();
     const [showModal, setShowModal] = useState(false);
 
-    const [selectedIds, setSelectedIds] = useState<{ [key: string]: boolean }>(
-        {},
-    );
-
-    const selectedPackageNames = Object.entries(selectedIds)
-        .filter((pack) => pack[1])
-        .map(([name]) => name);
-
-    const onSelect = (id: string) => {
-        setSelectedIds((current) => ({
-            ...current,
-            [id]: !current[id],
-        }));
-    };
+    const {
+        selectedIds,
+        selectedPackageNames,
+        requestedPackageNames,
+        onSelect,
+        clear,
+        resolvingId,
+    } = useSelectedPackages(data);
 
     const onInstall = async () => {
-        await installPackages(selectedPackageNames);
-        setSelectedIds({});
+        await installPackages(requestedPackageNames);
+        clear();
     };
 
     const form = useAppForm({
@@ -58,7 +53,7 @@ export const Packages = () => {
             await setAccountSources([
                 zAccount.array().parse(data.value.accounts),
             ]);
-            setSelectedIds({});
+            clear();
         },
     });
 
@@ -93,6 +88,7 @@ export const Packages = () => {
                                     onClick={() => onInstall()}
                                     disabled={
                                         isPending ||
+                                        Boolean(resolvingId) ||
                                         selectedPackageNames.length == 0
                                     }
                                 >
@@ -200,12 +196,13 @@ export const Packages = () => {
                             <PackageItem
                                 pack={pack}
                                 isSelected={selectedIds[pack.id]}
-                                onClick={(id) => {
-                                    onSelect(id);
-                                }}
+                                onClick={onSelect}
                                 key={pack.id}
                                 isLoading={isLoading && selectedIds[pack.id]}
-                                isMutating={isPending && selectedIds[pack.id]}
+                                isMutating={
+                                    (isPending && selectedIds[pack.id]) ||
+                                    resolvingId === pack.id
+                                }
                             />
                         ))}
                     </div>
