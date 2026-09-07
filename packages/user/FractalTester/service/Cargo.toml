@@ -10,7 +10,7 @@ publish.workspace = true
 [package.metadata.psibase]
 flags = ["isPrivileged"]
 postinstall = [
-    { sender = "frac-tester", service = "frac-tester", method = "setup" },
+    { sender = "fractester", service = "fractester", method = "setup" },
 ]
 
 [dependencies]
