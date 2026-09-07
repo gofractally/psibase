@@ -801,6 +801,16 @@ fn retarget(module: &mut Module, from: FunctionId, to: FunctionId) {
             }
         }
     }
+    let global_ids: Vec<_> = module.globals.iter().map(|g| g.id()).collect();
+    for id in global_ids {
+        if let walrus::GlobalKind::Local(walrus::InitExpr::RefFunc(fid)) =
+            &mut module.globals.get_mut(id).kind
+        {
+            if *fid == from {
+                *fid = to;
+            }
+        }
+    }
     for export in module.exports.iter_mut() {
         if let walrus::ExportItem::Function(fid) = &mut export.item {
             if *fid == from {
@@ -822,7 +832,6 @@ pub fn bind_env(module: &mut Module) -> Result<(), anyhow::Error> {
         let walrus::ImportKind::Function(import_fid) = import.kind else {
             continue;
         };
-        let import_fid = import_fid;
         let Ok(export_fid) = module.exports.get_func(&import.name) else {
             continue;
         };
@@ -830,7 +839,10 @@ pub fn bind_env(module: &mut Module) -> Result<(), anyhow::Error> {
             continue;
         }
         if !matches!(module.funcs.get(export_fid).kind, FunctionKind::Local(_)) {
-            continue;
+            return Err(anyhow!(
+                "Destination import {} matches an export by name, but that export is not a local function.",
+                import.name
+            ));
         }
         if module.func_type(import_fid) != module.func_type(export_fid) {
             return Err(anyhow!(
