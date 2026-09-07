@@ -1,5 +1,7 @@
 import { ProcessedPackage } from "@/lib/zod/common-package";
 
+import { transitivePkgDependants as walkPkgDependants } from "@shared/lib/transitive-pkg-dependants";
+
 export function dependsOf(pack: ProcessedPackage): string[] {
     const meta =
         pack.status === "UpdateAvailable"
@@ -10,35 +12,17 @@ export function dependsOf(pack: ProcessedPackage): string[] {
     return meta.depends.map((dep) => dep.name);
 }
 
-export function transitiveDependants(
+export function transitivePkgDependants(
     name: string,
     selected: string[],
     packages: ProcessedPackage[],
 ): string[] {
     const byName = new Map(packages.map((pack) => [pack.id, pack]));
-    const reverse = new Map<string, string[]>();
-    for (const id of selected) {
+    const items = selected.flatMap((id) => {
         const pack = byName.get(id);
-        if (!pack) {
-            continue;
-        }
-        for (const dep of dependsOf(pack)) {
-            const list = reverse.get(dep) ?? [];
-            list.push(id);
-            reverse.set(dep, list);
-        }
-    }
-
-    const dependants = new Set<string>();
-    const queue = [name];
-    while (queue.length > 0) {
-        const current = queue.shift()!;
-        for (const dependant of reverse.get(current) ?? []) {
-            if (dependant !== name && !dependants.has(dependant)) {
-                dependants.add(dependant);
-                queue.push(dependant);
-            }
-        }
-    }
-    return [...dependants];
+        return pack ? [pack] : [];
+    });
+    return walkPkgDependants(name, items, (pack) => pack.id, dependsOf).map(
+        (pack) => pack.id,
+    );
 }

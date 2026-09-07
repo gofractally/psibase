@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { transitiveDependants } from "@/lib/package-dependants";
+import { transitivePkgDependants } from "@/lib/package-dependants";
 import { ProcessedPackage } from "@/lib/zod/common-package";
 
 import { toast } from "@shared/shadcn/ui/sonner";
@@ -39,7 +39,7 @@ export const useSelectedPackages = (packages: ProcessedPackage[]) => {
             if (selectedIds[id]) {
                 const toDrop = new Set([
                     id,
-                    ...transitiveDependants(id, requested, packages),
+                    ...transitivePkgDependants(id, requested, packages),
                 ]);
                 await applyRequested(requested.filter((name) => !toDrop.has(name)));
             } else {
