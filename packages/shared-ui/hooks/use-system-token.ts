@@ -1,8 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { type PluginCall } from "@shared/lib/plugins/lib/call-plugin-function";
 import QueryKey from "@shared/lib/query-keys";
-import { tokens } from "@shared/lib/plugins";
+
+export type GraphqlPluginCall = PluginCall<[query: string], string>;
 
 export interface SystemTokenInfo {
     id: string;
@@ -27,9 +29,9 @@ interface TokenResponse {
     } | null;
 }
 
-export const useSystemToken = () => {
+export const useSystemToken = (graphql: GraphqlPluginCall) => {
     return useQuery<SystemTokenInfo | null>({
-        queryKey: QueryKey.systemToken(),
+        queryKey: [...QueryKey.systemToken(), graphql.service],
         queryFn: async (): Promise<SystemTokenInfo | null> => {
             const configQuery = `
                     query {
@@ -40,7 +42,7 @@ export const useSystemToken = () => {
                 `;
 
             const configRes = await callGraphqlViaPlugin<ConfigResponse>(
-                tokens.authorized.graphql,
+                graphql,
                 configQuery,
             );
 
@@ -60,7 +62,7 @@ export const useSystemToken = () => {
                 `;
 
             const tokenRes = await callGraphqlViaPlugin<TokenResponse>(
-                tokens.authorized.graphql,
+                graphql,
                 tokenQuery,
             );
 

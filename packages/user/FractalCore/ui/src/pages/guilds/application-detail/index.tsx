@@ -12,6 +12,7 @@ import { GlowingCard } from "@shared/components/glowing-card";
 import { PageContainer } from "@shared/components/page-container";
 import { TableContact } from "@shared/components/tables/table-contact";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { profiles } from "@shared/lib/plugins";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -76,7 +77,13 @@ export const ApplicationDetail = () => {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-3">
                         {applicant ? (
-                            <TableContact account={applicant} />
+                            <TableContact
+                                account={applicant}
+                                getContacts={profiles.contacts.get}
+                                hasReadPermission={
+                                    profiles.api.hasReadPermission
+                                }
+                            />
                         ) : (
                             "Loading..."
                         )}
@@ -156,6 +163,13 @@ export const ApplicationDetail = () => {
                                             <TableCell className="font-medium">
                                                 <TableContact
                                                     account={attest.attester}
+                                                    getContacts={
+                                                        profiles.contacts.get
+                                                    }
+                                                    hasReadPermission={
+                                                        profiles.api
+                                                            .hasReadPermission
+                                                    }
                                                 />
                                             </TableCell>
                                             <TableCell>

@@ -3,7 +3,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import QueryKey from "@/lib/query-keys";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
-import { nameMarket } from "@shared/lib/plugins";
 import { supervisor } from "@shared/lib/supervisor";
 import { toast } from "@shared/shadcn/ui/sonner";
 
@@ -19,8 +18,8 @@ export const useBuyName = () => {
     return useMutation({
         mutationFn: async ({ accountName, maxCost }: BuyNameInput) => {
             await supervisor.functionCall({
-                service: nameMarket.service,
-                intf: "api",
+                service: "homepage",
+                intf: "nameMarket",
                 method: "buy",
                 params: [accountName, maxCost],
             });

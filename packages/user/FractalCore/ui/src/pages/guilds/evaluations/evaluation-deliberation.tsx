@@ -15,6 +15,7 @@ import { ShowContactsButton } from "@shared/components/show-contacts-button";
 import { useContacts } from "@shared/hooks/use-contacts";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { useHasProfilesReadPermission } from "@shared/hooks/use-has-profiles-read-permission";
+import { profiles } from "@shared/lib/plugins";
 import {
     CardAction,
     CardContent,
@@ -41,11 +42,14 @@ export const EvaluationDeliberation = () => {
 
     const { data: currentUser } = useCurrentUser();
 
-    const { data: hasProfilesReadPermission } = useHasProfilesReadPermission({
-        enabled: !!currentUser,
-    });
+    const { data: hasProfilesReadPermission } = useHasProfilesReadPermission(
+        profiles.api.hasReadPermission,
+        {
+            enabled: !!currentUser,
+        },
+    );
 
-    const { data: contacts } = useContacts(currentUser, {
+    const { data: contacts } = useContacts(profiles.contacts.get, currentUser, {
         enabled: !!hasProfilesReadPermission,
     });
 
@@ -75,6 +79,10 @@ export const EvaluationDeliberation = () => {
                                     guildAccount!,
                                     groupNumber,
                                 )}
+                                getContacts={profiles.contacts.get}
+                                hasReadPermission={
+                                    profiles.api.hasReadPermission
+                                }
                             />
                         </div>
                     </CardAction>

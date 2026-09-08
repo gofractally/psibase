@@ -30,7 +30,7 @@ psibase::define_trust! {
         ",
     }
     functions {
-        None => [],
+        None => [get_msgs],
         Low => [],
         Medium => [create_app, set_cache_mode],
         High => [set_app_metadata, publish_app, unpublish_app, upload, upload_tree, enable_spa, set_csp, delete_csp, remove, set_service_code],
@@ -110,6 +110,12 @@ impl Mail for WorkshopPlugin {
         assert_authorized(FunctionName::save)?;
         set_propose_latch(Some(&app)).unwrap();
         chainmail::plugin::api::save(msg_id)
+    }
+
+    fn get_msgs(app: String) -> Result<Vec<chainmail::plugin::types::Message>, Error> {
+        assert_authorized(FunctionName::get_msgs)?;
+        set_propose_latch(Some(&app)).unwrap();
+        chainmail::plugin::queries::get_msgs(None, Some(&app))
     }
 }
 

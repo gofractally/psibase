@@ -1,6 +1,9 @@
 import { type UseQueryResult, useQuery } from "@tanstack/react-query";
 
-import { fetchUserTokenBalances } from "@shared/lib/graphql/tokens";
+import {
+    type GraphqlPluginCall,
+    fetchUserTokenBalances,
+} from "@shared/lib/graphql/tokens";
 import { Quantity } from "@shared/lib/quantity";
 import QueryKey from "@shared/lib/query-keys";
 import { type Account, zAccount } from "@shared/lib/schemas/account";
@@ -22,9 +25,13 @@ export function getSystemTokenBalance(
         ?.balance;
 }
 
-type UserTokenBalancesQueryKey = ReturnType<typeof QueryKey.userTokenBalances>;
+type UserTokenBalancesQueryKey = readonly [
+    ...ReturnType<typeof QueryKey.userTokenBalances>,
+    string,
+];
 
 export const useUserTokenBalances = (
+    graphql: GraphqlPluginCall,
     optionalUsername?: Account | undefined | null,
     options?: { enabled?: boolean },
 ): UseQueryResult<UserTokenBalance[], Error> => {
@@ -37,9 +44,10 @@ export const useUserTokenBalances = (
         UserTokenBalance[],
         UserTokenBalancesQueryKey
     >({
-        queryKey: QueryKey.userTokenBalances(username),
+        queryKey: [...QueryKey.userTokenBalances(username), graphql.service],
         queryFn: async (): Promise<UserTokenBalance[]> => {
             const nodes = await fetchUserTokenBalances(
+                graphql,
                 zAccount.parse(username),
             );
 

@@ -5,6 +5,7 @@ import { NAME_EVENTS_EXISTENCE_PAGE_SIZE } from "@/apps/accounts-marketplace/lib
 
 import { useAccountMarkets } from "@shared/hooks/use-account-markets";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { homepage } from "@shared/lib/plugins";
 import { hasActiveAccountMarket } from "@shared/lib/schemas/account-markets";
 
 export function useAccountMarketplaceVisibility(): SidebarVisibility {
@@ -13,7 +14,7 @@ export function useAccountMarketplaceVisibility(): SidebarVisibility {
         data: markets,
         isPending: isPendingMarkets,
         isSuccess: isSuccessMarkets,
-    } = useAccountMarkets();
+    } = useAccountMarkets(homepage.accountsMarketplace.graphql);
     const isMarketEnabled = hasActiveAccountMarket(markets);
 
     const { data: history, isLoading: isLoadingHistory } = useNameEvents(

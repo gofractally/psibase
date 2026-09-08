@@ -30,3 +30,4 @@ world = "impl"
 "permissions:plugin" = { path = "../../Permissions/plugin/wit/world.wit" }
 "fractals:plugin" = { path = "../../Fractals/plugin/wit/world.wit" }
 "guilds:plugin" = { path = "../../Guilds/plugin/wit/world.wit" }
+"invite:plugin" = { path = "../../Invite/plugin/wit/world.wit" }

@@ -1,8 +1,8 @@
 import { usePluginFunctionMutation } from "@shared/hooks/plugin-function/use-plugin-function-mutation";
-import { tokenSwap } from "@shared/lib/plugins";
+import { homepage } from "@shared/lib/plugins";
 
 export const useAddLiquidity = () =>
-    usePluginFunctionMutation(tokenSwap.liquidity.addLiquidity, {
+    usePluginFunctionMutation(homepage.dex.liquidity.addLiquidity, {
         toast: {
             loading: "Adding liquidity",
             error: "Failed adding liquidity",

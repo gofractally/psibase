@@ -1,6 +1,29 @@
 import { PluginInterface } from "@shared/hooks/plugin-function";
 import { Account } from "@shared/lib/schemas/account";
 
+import { Plugin as TokenSwapPlugin } from "./token-swap";
+
+class GraphqlIntf extends PluginInterface {
+    constructor(intf: string) {
+        super();
+        this._intf = intf;
+    }
+
+    protected override readonly _intf: string;
+
+    get graphql() {
+        return this._call<[query: string], string>("graphql");
+    }
+}
+
+class Contacts extends PluginInterface {
+    protected override readonly _intf = "contacts" as const;
+
+    get get() {
+        return this._call<[], unknown[]>("get");
+    }
+}
+
 class AccountsMarketplace extends PluginInterface {
     protected override readonly _intf = "nameMarket" as const;
 
@@ -11,13 +34,46 @@ class AccountsMarketplace extends PluginInterface {
     get claimAndSetKey() {
         return this._call<[account: string], string>("claimAndSetKey");
     }
+
+    get buy() {
+        return this._call<[account: string, maxCost: string]>("buy");
+    }
+
+    get graphql() {
+        return this._call<[query: string], string>("graphql");
+    }
 }
 
 export class Plugin {
     readonly accountsMarketplace: AccountsMarketplace;
+    readonly tokens: GraphqlIntf;
+    readonly invite: GraphqlIntf;
+    readonly vserver: GraphqlIntf;
+    readonly tokenSwapGraphql: GraphqlIntf;
+    readonly contacts: Contacts;
+    /** Swap and liquidity forwards; do not use `.authorized` (that intf is not on homepage). */
+    readonly dex: TokenSwapPlugin;
 
     constructor(readonly service: Account) {
         this.accountsMarketplace = new AccountsMarketplace();
-        Object.assign(this.accountsMarketplace, { _service: service });
+        this.tokens = new GraphqlIntf("tokens");
+        this.invite = new GraphqlIntf("invite");
+        this.vserver = new GraphqlIntf("vserver");
+        this.tokenSwapGraphql = new GraphqlIntf("tokenSwap");
+        this.contacts = new Contacts();
+        this.dex = new TokenSwapPlugin(service);
+
+        const instances = [
+            this.accountsMarketplace,
+            this.tokens,
+            this.invite,
+            this.vserver,
+            this.tokenSwapGraphql,
+            this.contacts,
+        ] as PluginInterface[];
+
+        for (const instance of instances) {
+            Object.assign(instance, { _service: service });
+        }
     }
 }

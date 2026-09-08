@@ -13,8 +13,8 @@ export const useRemoveAvatar = () => {
             supervisor.functionCall({
                 method: "removeAvatar",
                 params: [],
-                service: "profiles",
-                intf: "api",
+                service: "homepage",
+                intf: "contacts",
             }),
         onSuccess: async (_data, _variables, _onMutateResult, context) => {
             toast.success("Avatar removed");

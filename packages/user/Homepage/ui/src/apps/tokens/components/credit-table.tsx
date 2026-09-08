@@ -12,6 +12,7 @@ import { Loading } from "@/components/loading";
 import { ErrorCard } from "@shared/components/error-card";
 import { GlowingCard } from "@shared/components/glowing-card";
 import { TableContact } from "@shared/components/tables/table-contact";
+import { homepage, profiles } from "@shared/lib/plugins";
 import { cn } from "@shared/lib/utils";
 import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import {
@@ -98,6 +99,10 @@ export function CreditTable({ user, token }: Props) {
                                     <TableCell>
                                         <TableContact
                                             account={transaction.counterParty}
+                                            getContacts={homepage.contacts.get}
+                                            hasReadPermission={
+                                                profiles.api.hasReadPermission
+                                            }
                                         />
                                     </TableCell>
                                     <TableCell className="text-right">

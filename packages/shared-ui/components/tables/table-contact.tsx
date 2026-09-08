@@ -1,10 +1,24 @@
 import { Avatar } from "@shared/components/avatar";
-import { useContacts } from "@shared/hooks/use-contacts";
+import {
+    type ContactsGetCall,
+    useContacts,
+} from "@shared/hooks/use-contacts";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
-import { useHasProfilesReadPermission } from "@shared/hooks/use-has-profiles-read-permission";
+import {
+    type HasReadPermissionCall,
+    useHasProfilesReadPermission,
+} from "@shared/hooks/use-has-profiles-read-permission";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
-export const TableContact = ({ account }: { account: string }) => {
+export const TableContact = ({
+    account,
+    getContacts,
+    hasReadPermission,
+}: {
+    account: string;
+    getContacts: ContactsGetCall;
+    hasReadPermission: HasReadPermissionCall;
+}) => {
     const {
         data: currentUser,
         isPending: isPendingCurrentUser,
@@ -17,7 +31,7 @@ export const TableContact = ({ account }: { account: string }) => {
         isPending: isPendingHasProfilesReadPermission,
         isError: isErrorHasProfilesReadPermission,
         error: errorHasProfilesReadPermission,
-    } = useHasProfilesReadPermission({
+    } = useHasProfilesReadPermission(hasReadPermission, {
         enabled: !!currentUser,
     });
 
@@ -26,7 +40,9 @@ export const TableContact = ({ account }: { account: string }) => {
         isLoading: isLoadingContacts,
         isError: isErrorContacts,
         error: errorContacts,
-    } = useContacts(currentUser, { enabled: !!hasProfilesReadPermission });
+    } = useContacts(getContacts, currentUser, {
+        enabled: !!hasProfilesReadPermission,
+    });
 
     if (
         isPendingCurrentUser ||

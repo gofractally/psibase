@@ -10,6 +10,7 @@ import { paths } from "@/lib/paths";
 import { GlowingCard } from "@shared/components/glowing-card";
 import { ShowContactsButton } from "@shared/components/show-contacts-button";
 import { TableContact } from "@shared/components/tables/table-contact";
+import { profiles } from "@shared/lib/plugins";
 import { Badge } from "@shared/shadcn/ui/badge";
 import {
     CardAction,
@@ -55,6 +56,8 @@ export const GuildMembers = () => {
                         returnPath={paths.guild.membership.members(
                             guild?.account ?? "",
                         )}
+                        getContacts={profiles.contacts.get}
+                        hasReadPermission={profiles.api.hasReadPermission}
                     />
                 </CardAction>
             </CardHeader>
@@ -81,6 +84,13 @@ export const GuildMembers = () => {
                                         <div className="flex flex-row gap-2">
                                             <TableContact
                                                 account={member.member}
+                                                getContacts={
+                                                    profiles.contacts.get
+                                                }
+                                                hasReadPermission={
+                                                    profiles.api
+                                                        .hasReadPermission
+                                                }
                                             />
                                             {roleLabel != null && (
                                                 <Badge variant="default">

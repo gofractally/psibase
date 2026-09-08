@@ -6,6 +6,7 @@ import { useSetFeeReceiverAccount } from "@/hooks/use-set-fee-receiver-account";
 import { useAppForm } from "@shared/components/form/app-form";
 import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
 import { useBillingConfig } from "@shared/hooks/use-billing-config";
+import { config } from "@shared/lib/plugins";
 import { parseError } from "@shared/lib/parse-error-message";
 import { Button } from "@shared/shadcn/ui/button";
 import { Label } from "@shared/shadcn/ui/label";
@@ -38,7 +39,7 @@ export const Billing = ({ systemToken, systemTokenLoading }: BillingProps) => {
         reset: resetEnableBilling,
     } = useSetEnableBilling();
     const { data: billingConfig, isLoading: billingConfigLoading } =
-        useBillingConfig();
+        useBillingConfig(config.virtualServer.graphql);
 
     const computedInitialValues = useMemo<BillingFormData>(() => {
         if (billingConfig) {

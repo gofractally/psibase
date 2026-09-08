@@ -7,8 +7,97 @@ interface name-market {
     ///
     /// The account is imported onto this device.
     claim-and-set-key: func(account: string) -> result<string, error>;
+
+    buy: func(account: string, max-cost: string) -> result<_, error>;
+    graphql: func(query: string) -> result<string, error>;
+}
+
+interface tokens {
+    use host:types/types.{error};
+    use tokens:plugin/types.{decimal};
+
+    credit: func(token-id: u32, debitor: string, amount: decimal, memo: string) -> result<_, error>;
+    uncredit: func(token-id: u32, debitor: string, amount: decimal, memo: string) -> result<_, error>;
+    debit: func(token-id: u32, creditor: string, amount: decimal, memo: string) -> result<_, error>;
+    reject: func(token-id: u32, creditor: string, memo: string) -> result<_, error>;
+    enable-user-auto-debit: func(enable: bool) -> result<_, error>;
+    graphql: func(query: string) -> result<string, error>;
+}
+
+interface contacts {
+    use host:types/types.{error};
+    use profiles:plugin/types.{contact, profile, avatar};
+
+    set: func(contact: contact, overwrite: bool) -> result<_, error>;
+    remove: func(account: string) -> result<_, error>;
+    get: func() -> result<list<contact>, error>;
+    set-profile: func(profile: profile) -> result<_, error>;
+    upload-avatar: func(avatar: avatar) -> result<_, error>;
+    remove-avatar: func() -> result<_, error>;
+}
+
+interface chainmail {
+    use host:types/types.{error};
+    use chainmail:plugin/types.{message};
+
+    get-msgs: func(sender: option<string>, receiver: option<string>) -> result<list<message>, error>;
+    get-archived-msgs: func(sender: option<string>, receiver: option<string>) -> result<list<message>, error>;
+    get-saved-msgs: func(receiver: option<string>) -> result<list<message>, error>;
+    send: func(receiver: string, subject: string, body: string) -> result<_, error>;
+    archive: func(msg-id: u64) -> result<_, error>;
+    save: func(msg-id: u64) -> result<_, error>;
+}
+
+interface invite {
+    use host:types/types.{error};
+
+    generate-invite: func() -> result<string, error>;
+    import-invite-token: func(token: string) -> result<u32, error>;
+    graphql: func(query: string) -> result<string, error>;
+}
+
+interface vserver {
+    use host:types/types.{error};
+
+    fill-gas-tank: func() -> result<_, error>;
+    resize-and-fill-gas-tank: func(new-capacity: string) -> result<_, error>;
+    graphql: func(query: string) -> result<string, error>;
+}
+
+interface swap {
+    use host:types/types.{error};
+    use token-swap:plugin/types.{path, tid, pool, token-amount};
+
+    swap: func(pools: list<string>, amount-in: token-amount, min-return: string) -> result<_, error>;
+    quote: func(pools: option<list<pool>>, from-amount: token-amount, to-token: tid, slippage: u32, max-hops: u8) -> result<path, error>;
+}
+
+interface liquidity {
+    use host:types/types.{error};
+    use token-swap:plugin/types.{tid, pool, token-amount};
+
+    add-liquidity: func(pool-id: u32, a-deposit: token-amount, b-deposit: token-amount) -> result<_, error>;
+    quote-add-liquidity: func(pool: pool, amount: token-amount) -> result<string, error>;
+    remove-liquidity: func(amount: token-amount) -> result<_, error>;
+    quote-single-sided-remove: func(pool: pool, user-pool-token-balance: option<string>, desired-amount: token-amount) -> result<tuple<token-amount, token-amount, token-amount>, error>;
+    new-pool: func(a-deposit: token-amount, b-deposit: token-amount, nft-id: option<u32>) -> result<_, error>;
+    quote-remove-liquidity: func(pool: pool, amount: string) -> result<tuple<token-amount, token-amount>, error>;
+}
+
+interface token-swap {
+    use host:types/types.{error};
+
+    graphql: func(query: string) -> result<string, error>;
 }
 
 world imports {
     import name-market;
+    import tokens;
+    import contacts;
+    import chainmail;
+    import invite;
+    import vserver;
+    import swap;
+    import liquidity;
+    import token-swap;
 }

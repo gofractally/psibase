@@ -9,11 +9,12 @@ world impl {
     include guilds:plugin/imports;
 
     include host:db/imports;
-
+    include invite:plugin/imports;
 
     export admin-guild;
     export admin-fractal;
     export user-guild;
     export user-fractal;
     export user-eval;
+    export invite;
 }

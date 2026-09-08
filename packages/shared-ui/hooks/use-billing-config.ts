@@ -1,8 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { type PluginCall } from "@shared/lib/plugins/lib/call-plugin-function";
 import QueryKey from "@shared/lib/query-keys";
-import { vserver } from "@shared/lib/plugins";
+
+export type GraphqlPluginCall = PluginCall<[query: string], string>;
 
 interface BillingConfigResponse {
     getBillingConfig: {
@@ -11,9 +13,9 @@ interface BillingConfigResponse {
     } | null;
 }
 
-export const useBillingConfig = () => {
+export const useBillingConfig = (graphql: GraphqlPluginCall) => {
     return useQuery({
-        queryKey: QueryKey.billingConfig(),
+        queryKey: [...QueryKey.billingConfig(), graphql.service],
         queryFn: async () => {
             const query = `
                 query {
@@ -24,7 +26,7 @@ export const useBillingConfig = () => {
                 }
             `;
             const res = await callGraphqlViaPlugin<BillingConfigResponse>(
-                vserver.authorized.graphql,
+                graphql,
                 query,
             );
 
