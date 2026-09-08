@@ -30,7 +30,6 @@ namespace psibase
    };
    PSIO_REFLECT(InnerTrace, inner)
 
-   // TODO: Receipts & Merkles. Receipts need sequence numbers, resource consumption, and events.
    struct TransactionTrace
    {
       std::vector<ActionTrace>   actionTraces;
