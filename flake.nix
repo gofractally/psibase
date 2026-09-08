@@ -17,7 +17,7 @@
     };
 
     # Fragile cargo tools, each pinned to the exact nixpkgs revision that packages
-    # the required version (chosen for Rust 1.86.0 / psibase compatibility). These
+    # the required version (chosen for Rust 1.98.0 / psibase compatibility). These
     # MUST stay at their pinned versions, so they deliberately do NOT `follow`
     # nixpkgs — the frozen revision is the whole point. No single nixpkgs rev
     # carries all required versions at once, hence one input per tool (cargo-generate
@@ -71,10 +71,10 @@
         wasmPack = (import nixpkgs-mdbook { inherit system; }).wasm-pack;
         nodejs24 = (import nixpkgs-nodejs { inherit system; }).nodejs_24;
 
-        # Rust 1.86.0 toolchain with WASM targets (see nix/rust-toolchain.toml)
+        # Rust 1.98.0 toolchain with WASM targets (see nix/rust-toolchain.toml)
         rustToolchain = fenix.packages.${system}.fromToolchainFile {
           file = ./nix/rust-toolchain.toml;
-          sha256 = "sha256-X/4ZBHO3iW0fOenQ3foEvscgAPJYl2abspaBThDOukI=";
+          sha256 = "sha256-P30Tm3O7vQAE725YtDCDHGjNrSsfZO4us11UwJGZSJo=";
         };
 
         # DIVERGES from psibase-contributor (wasi-sdk 24 embedded in llvm-18): standalone
