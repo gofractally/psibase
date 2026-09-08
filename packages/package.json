@@ -16,6 +16,7 @@
             "user/Branding/ui",
             "user/Evaluations/ui",
             "user/Config/ui",
+            "user/Explorer/ui",
             "user/Fractals/ui",
             "user/FractalCore/ui",
             "user/TokenStream/ui",
