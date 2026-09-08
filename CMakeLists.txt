@@ -914,8 +914,6 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Explorer.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Explorer-schema.json
         SERVER explorer
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Explorer/ui/dist /
-    DEPENDS ${Explorer_js_DEP}
     DEPENDS wasm
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
 )
