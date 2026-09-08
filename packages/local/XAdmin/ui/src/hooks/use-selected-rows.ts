@@ -6,6 +6,8 @@ import { getId } from "@/lib/get-id";
 import { getRequiredPackages } from "@/lib/get-required-packages";
 import { detectChange } from "@/lib/row-elements";
 
+import { transitivePkgDependants } from "@shared/lib/transitive-pkg-dependants";
+
 import { PackageInfo, PackageInfoSchema } from "../types";
 
 interface ChangeWarning {
@@ -18,45 +20,15 @@ const ChangeWarningSchema = z.object({
     removedPackage: PackageInfoSchema,
 });
 
-const getTransitiveDependants = (
-    removingPackageName: string,
-    selectedPackages: PackageInfo[],
-): PackageInfo[] => {
-    const reverseDeps = new Map<string, PackageInfo[]>();
-    for (const pack of selectedPackages) {
-        for (const dep of pack.depends) {
-            const list = reverseDeps.get(dep.name) ?? [];
-            list.push(pack);
-            reverseDeps.set(dep.name, list);
-        }
-    }
-
-    const dependants = new Map<string, PackageInfo>();
-    const queue = [removingPackageName];
-
-    while (queue.length > 0) {
-        const current = queue.shift()!;
-        for (const pack of reverseDeps.get(current) ?? []) {
-            if (
-                pack.name !== removingPackageName &&
-                !dependants.has(pack.name)
-            ) {
-                dependants.set(pack.name, pack);
-                queue.push(pack.name);
-            }
-        }
-    }
-
-    return [...dependants.values()];
-};
-
 const getChangeWarning = (
     removingPackagename: string,
     selectedPackages: PackageInfo[],
 ) => {
-    const dependants = getTransitiveDependants(
+    const dependants = transitivePkgDependants(
         removingPackagename,
         selectedPackages,
+        (pack) => pack.name,
+        (pack) => pack.depends.map((dep) => dep.name),
     );
 
     if (dependants.length > 0) {
