@@ -17,6 +17,7 @@ world impl {
     import tokens:plugin/admin;
     import packages:plugin/private-api;
     import symbol:plugin/admin;
+    include staged-tx:plugin/imports;
     export name-market;
     export branding;
     export producers;
@@ -24,4 +25,7 @@ world impl {
     export settings;
     export symbol;
     export virtual-server;
+    export staged;
+    export sites;
+    export transact;
 }
