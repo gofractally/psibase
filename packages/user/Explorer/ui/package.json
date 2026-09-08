@@ -11,10 +11,15 @@
     "dependencies": {
         "@psibase/common-lib": "workspace:*",
         "@tanstack/react-query": "^5.90.6",
+        "@tanstack/react-table": "^8.20.4",
+        "cmdk": "^1.1.1",
+        "date-fns": "^4.1.0",
         "lucide-react": "^0.475.0",
+        "motion": "^12.18.1",
         "react": "^19.1.0",
         "react-dom": "^19.1.0",
         "react-router-dom": "^6.26.1",
+        "recharts": "2.15.4",
         "zod": "^3.24.2"
     },
     "devDependencies": {
