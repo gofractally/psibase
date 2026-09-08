@@ -1,6 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 
 import { upsertUserToCache } from "@shared/hooks/use-contacts";
+import { homepage } from "@shared/lib/plugins";
 import SharedQueryKey from "@shared/lib/query-keys";
 import { zAccount } from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";
@@ -25,9 +26,9 @@ export const useCreateContact = () => {
             const username = zAccount.parse(
                 context.client.getQueryData(SharedQueryKey.currentUser()),
             );
-            upsertUserToCache(username, newContact);
+            upsertUserToCache(username, newContact, homepage.service);
             context.client.invalidateQueries({
-                queryKey: SharedQueryKey.contacts(username),
+                queryKey: [...SharedQueryKey.contacts(username), homepage.service],
             });
         },
         onError: (error, _, onMutateResult) => {

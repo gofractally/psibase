@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useBillingConfig } from "@shared/hooks/use-billing-config";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { useSystemToken } from "@shared/hooks/use-system-token";
+import { homepage } from "@shared/lib/plugins";
 import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
@@ -17,10 +18,12 @@ import { GasTank } from "./gas-tank";
 export const UserSettingsSection = () => {
     const { data: currentUser } = useCurrentUser();
     const { data: billingConfig, isLoading: isLoadingBillingConfig } =
-        useBillingConfig();
+        useBillingConfig(homepage.vserver.graphql);
     const billingInited =
         !isLoadingBillingConfig && !!billingConfig?.feeReceiver;
-    const { data: systemToken, isLoading: isLoadingToken } = useSystemToken();
+    const { data: systemToken, isLoading: isLoadingToken } = useSystemToken(
+        homepage.tokens.graphql,
+    );
     const {
         data: userResources,
         isLoading: isLoadingResources,

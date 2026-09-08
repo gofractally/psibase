@@ -11,6 +11,7 @@ import {
 } from "@shared/hooks/use-account-markets";
 import { useCanBuyAccount } from "@shared/hooks/use-can-buy-account";
 import { useSystemToken } from "@shared/hooks/use-system-token";
+import { homepage, nameMarket } from "@shared/lib/plugins";
 import { MAX_ACCOUNT_NAME_LENGTH } from "@shared/lib/schemas/account";
 import { accountMarketPricesFromOverview } from "@shared/lib/schemas/account-markets";
 import {
@@ -22,13 +23,15 @@ import {
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 export const BuyPage = () => {
-    const { data: systemToken, isPending: isPendingToken } = useSystemToken();
+    const { data: systemToken, isPending: isPendingToken } = useSystemToken(
+        homepage.tokens.graphql,
+    );
     const {
         data: markets,
         isPending: isPendingMarkets,
         isError: isMarketsError,
         error: marketsError,
-    } = useAccountMarkets({
+    } = useAccountMarkets(homepage.accountsMarketplace.graphql, {
         refetchInterval: ACCOUNT_MARKETS_REFETCH_INTERVAL_MS,
     });
 
@@ -38,7 +41,7 @@ export const BuyPage = () => {
     );
 
     const { data: canBuyAccount, isPending: isPendingCanBuyAccount } =
-        useCanBuyAccount();
+        useCanBuyAccount(nameMarket.api.canCreateAccount);
 
     const isLoading =
         isPendingToken || isPendingMarkets || isPendingCanBuyAccount;

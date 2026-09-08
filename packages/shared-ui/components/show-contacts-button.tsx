@@ -4,9 +4,15 @@ import { useMemo } from "react";
 import { siblingUrl } from "@psibase/common-lib";
 
 import { useBranding } from "@shared/hooks/use-branding";
-import { useContacts } from "@shared/hooks/use-contacts";
+import {
+    type ContactsGetCall,
+    useContacts,
+} from "@shared/hooks/use-contacts";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
-import { useHasProfilesReadPermission } from "@shared/hooks/use-has-profiles-read-permission";
+import {
+    type HasReadPermissionCall,
+    useHasProfilesReadPermission,
+} from "@shared/hooks/use-has-profiles-read-permission";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -20,7 +26,15 @@ import {
 } from "@shared/shadcn/ui/alert-dialog";
 import { Button } from "@shared/shadcn/ui/button";
 
-export const ShowContactsButton = ({ returnPath }: { returnPath?: string }) => {
+export const ShowContactsButton = ({
+    returnPath,
+    getContacts,
+    hasReadPermission,
+}: {
+    returnPath?: string;
+    getContacts: ContactsGetCall;
+    hasReadPermission: HasReadPermissionCall;
+}) => {
     const { data: networkName } = useBranding();
     const contactsUrl = useMemo(
         () => siblingUrl(null, networkName, "contacts"),
@@ -28,10 +42,14 @@ export const ShowContactsButton = ({ returnPath }: { returnPath?: string }) => {
     );
 
     const { data: currentUser } = useCurrentUser();
-    const { data: hasProfilesReadPermission } = useHasProfilesReadPermission({
-        enabled: !!currentUser,
-    });
+    const { data: hasProfilesReadPermission } = useHasProfilesReadPermission(
+        hasReadPermission,
+        {
+            enabled: !!currentUser,
+        },
+    );
     const { refetch: prompt } = useContacts(
+        getContacts,
         currentUser,
         { enabled: false },
         returnPath ? { enabled: true, returnPath } : undefined,

@@ -9,6 +9,7 @@ import { GlowingCard } from "@shared/components/glowing-card";
 import { PageContainer } from "@shared/components/page-container";
 import { TableContact } from "@shared/components/tables/table-contact";
 import { FractalGuildIdentifier } from "@shared/domains/fractal/components/fractal-guild-header-identifier";
+import { profiles } from "@shared/lib/plugins";
 import { Button } from "@shared/shadcn/ui/button";
 import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import {
@@ -93,6 +94,14 @@ export const Guilds = () => {
                                                     <TableContact
                                                         account={
                                                             guild.rep.member
+                                                        }
+                                                        getContacts={
+                                                            profiles.contacts
+                                                                .get
+                                                        }
+                                                        hasReadPermission={
+                                                            profiles.api
+                                                                .hasReadPermission
                                                         }
                                                     />
                                                 ) : (

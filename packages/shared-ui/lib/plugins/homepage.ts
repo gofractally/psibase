@@ -16,6 +16,14 @@ class GraphqlIntf extends PluginInterface {
     }
 }
 
+class Contacts extends PluginInterface {
+    protected override readonly _intf = "contacts" as const;
+
+    get get() {
+        return this._call<[], unknown[]>("get");
+    }
+}
+
 class AccountsMarketplace extends PluginInterface {
     protected override readonly _intf = "nameMarket" as const;
 
@@ -42,6 +50,7 @@ export class Plugin {
     readonly invite: GraphqlIntf;
     readonly vserver: GraphqlIntf;
     readonly tokenSwapGraphql: GraphqlIntf;
+    readonly contacts: Contacts;
     /** Swap and liquidity forwards; do not use `.authorized` (that intf is not on homepage). */
     readonly dex: TokenSwapPlugin;
 
@@ -51,6 +60,7 @@ export class Plugin {
         this.invite = new GraphqlIntf("invite");
         this.vserver = new GraphqlIntf("vserver");
         this.tokenSwapGraphql = new GraphqlIntf("tokenSwap");
+        this.contacts = new Contacts();
         this.dex = new TokenSwapPlugin(service);
 
         const instances = [
@@ -59,6 +69,7 @@ export class Plugin {
             this.invite,
             this.vserver,
             this.tokenSwapGraphql,
+            this.contacts,
         ] as PluginInterface[];
 
         for (const instance of instances) {
