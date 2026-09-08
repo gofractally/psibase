@@ -464,14 +464,6 @@ namespace SystemService
       return stat.head->header;
    }
 
-   psibase::BlockTime Transact::headBlockTime() const
-   {
-      auto& stat = getStatus();
-      if (stat.head)
-         return stat.head->header.time;
-      return {};
-   }
-
    std::pair<uint8_t, uint32_t> Transact::headTapos()
    {
       return SystemService::headTapos();

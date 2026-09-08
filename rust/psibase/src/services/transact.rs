@@ -390,15 +390,6 @@ mod service {
         unimplemented!()
     }
 
-    /// Get the head block time
-    ///
-    /// This is *not* the currently executing block time.
-    /// TODO: remove
-    #[action]
-    fn headBlockTime() -> crate::TimePointSec {
-        unimplemented!()
-    }
-
     /// Returns the tapos `refBlockIndex` and `refBlockSuffix`
     /// for the head block.
     #[action]
