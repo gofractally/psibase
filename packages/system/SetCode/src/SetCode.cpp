@@ -90,7 +90,6 @@ namespace SystemService
       auto codeByHashTable = native.open<CodeByHashTable>();
       // TODO: validate code here?
       // TODO: special rule for resource charging: pretend CodeByHashRow isn't shared
-      // TODO: move numRefs to a different row?
       check(getSender() == service, "sender must match service account");
       check(vmType == 0 && vmVersion == 0, "unsupported type or version");
 
