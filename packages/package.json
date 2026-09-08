@@ -3,7 +3,7 @@
         "build:all": "yarn workspaces foreach --all -ptv run build",
         "build:pkg": "yarn workspace @psibase/${1}-ui build",
         "clear-cache": "yarn cache clean --all && rm -rf ../.caches/yarn",
-        "install-dev-tools": "yarn add -D @yarnpkg/sdks && yarn sdks vscode && cd user/Explorer/ui && yarn prepare"
+        "install-dev-tools": "yarn add -D @yarnpkg/sdks && yarn sdks vscode"
     },
     "workspaces": {
         "packages": [
@@ -14,7 +14,6 @@
             "system/Producers/ui",
             "user/Supervisor/ui",
             "user/Branding/ui",
-            "user/Explorer/ui",
             "user/Evaluations/ui",
             "user/Config/ui",
             "user/Fractals/ui",
