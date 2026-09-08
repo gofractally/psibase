@@ -34,13 +34,6 @@ mod service {
     }
 
     #[derive(Deserialize, SimpleObject)]
-    struct EvaluationStart {
-        owner: AccountNumber,
-        #[serde(deserialize_with = "deserialize_number_from_string")]
-        evaluation_id: u32,
-    }
-
-    #[derive(Deserialize, SimpleObject)]
     struct NewGroup {
         owner: AccountNumber,
         #[serde(deserialize_with = "deserialize_number_from_string")]
