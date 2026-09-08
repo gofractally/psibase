@@ -1,0 +1,56 @@
+/* Explorer-specific styling on top of the shared theme. */
+
+@keyframes row-enter {
+    0% {
+        opacity: 0;
+        transform: translateY(-6px);
+        background-color: color-mix(in oklch, var(--chart-2) 22%, transparent);
+    }
+    60% {
+        opacity: 1;
+        transform: translateY(0);
+        background-color: color-mix(in oklch, var(--chart-2) 14%, transparent);
+    }
+    100% {
+        background-color: transparent;
+    }
+}
+
+.row-enter {
+    animation: row-enter 1.4s ease-out both;
+}
+
+@keyframes flash-value {
+    0% {
+        color: var(--chart-2);
+    }
+    100% {
+        color: inherit;
+    }
+}
+
+.flash-value {
+    animation: flash-value 0.9s ease-out both;
+}
+
+.block-cell {
+    min-width: 3px;
+}
+
+/* subtle grid background for hero areas */
+.grid-bg {
+    background-image:
+        linear-gradient(to right, color-mix(in oklch, var(--border) 60%, transparent) 1px, transparent 1px),
+        linear-gradient(to bottom, color-mix(in oklch, var(--border) 60%, transparent) 1px, transparent 1px);
+    background-size: 28px 28px;
+    mask-image: radial-gradient(ellipse at top, black 40%, transparent 85%);
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+}
