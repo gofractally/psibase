@@ -47,6 +47,10 @@ const RAW_RUNTIME_STATE =
       "reference": "workspace:user/Evaluations/ui"\
     },\
     {\
+      "name": "@psibase/explorer-ui",\
+      "reference": "workspace:user/Explorer/ui"\
+    },\
+    {\
       "name": "@psibase/fractal-core-ui",\
       "reference": "workspace:user/FractalCore/ui"\
     },\
@@ -87,6 +91,7 @@ const RAW_RUNTIME_STATE =
     ["@psibase/common-lib", ["workspace:user/CommonApi/common/packages/common-lib"]],\
     ["@psibase/config-ui", ["workspace:user/Config/ui"]],\
     ["@psibase/evaluations-ui", ["workspace:user/Evaluations/ui"]],\
+    ["@psibase/explorer-ui", ["workspace:user/Explorer/ui"]],\
     ["@psibase/fractal-core-ui", ["workspace:user/FractalCore/ui"]],\
     ["@psibase/fractals-ui", ["workspace:user/Fractals/ui"]],\
     ["@psibase/homepage-ui", ["workspace:user/Homepage/ui"]],\
@@ -2659,6 +2664,28 @@ const RAW_RUNTIME_STATE =
           ["react-router-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:6.30.4"],\
           ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
           ["usehooks-ts", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:3.1.1"],\
+          ["vite", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:5.4.21"],\
+          ["zod", "npm:3.25.76"]\
+        ],\
+        "linkType": "SOFT"\
+      }]\
+    ]],\
+    ["@psibase/explorer-ui", [\
+      ["workspace:user/Explorer/ui", {\
+        "packageLocation": "./user/Explorer/ui/",\
+        "packageDependencies": [\
+          ["@psibase/common-lib", "workspace:user/CommonApi/common/packages/common-lib"],\
+          ["@psibase/explorer-ui", "workspace:user/Explorer/ui"],\
+          ["@tanstack/react-query", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:5.101.0"],\
+          ["@types/node", "npm:22.19.21"],\
+          ["@types/react", "npm:19.2.17"],\
+          ["@types/react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.2.3"],\
+          ["eslint", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:9.39.4"],\
+          ["lucide-react", "virtual:529da78ee9bbad35b13439475ca33f5401b9121f799d4c60e9de66600b411c43755e83652b7a77638cfb7619392b8f0665243a01d9aeed8d87cb42d3382284db#npm:0.475.0"],\
+          ["react", "npm:19.2.7"],\
+          ["react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.2.7"],\
+          ["react-router-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:6.30.4"],\
+          ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
           ["vite", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:5.4.21"],\
           ["zod", "npm:3.25.76"]\
         ],\
