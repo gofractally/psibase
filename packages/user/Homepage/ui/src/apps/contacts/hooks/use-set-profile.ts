@@ -18,8 +18,8 @@ export const useSetProfile = () =>
             supervisor.functionCall({
                 method: "setProfile",
                 params: [params],
-                service: "profiles",
-                intf: "api",
+                service: "homepage",
+                intf: "contacts",
             }),
         onSuccess: async (_, params, _id, context) => {
             toast.success("Profile updated");

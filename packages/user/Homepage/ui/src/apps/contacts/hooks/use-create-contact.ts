@@ -13,7 +13,7 @@ export const useCreateContact = () => {
         mutationFn: async (newContact: LocalContact) => {
             const parsed = zLocalContact.parse(newContact);
             void (await supervisor.functionCall({
-                service: zAccount.parse("profiles"),
+                service: zAccount.parse("homepage"),
                 method: "set",
                 intf: "contacts",
                 params: [parsed, false],

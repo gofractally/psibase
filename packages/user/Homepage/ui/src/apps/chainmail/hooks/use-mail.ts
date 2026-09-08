@@ -50,8 +50,8 @@ const transformRawMessagesToMessages = (
 const getIncomingMessages = async (account: string) => {
     const rawMessages = zRawMessage.array().parse(
         await supervisor.functionCall({
-            service: "chainmail",
-            intf: "queries",
+            service: "homepage",
+            intf: "chainmail",
             method: "getMsgs",
             params: [undefined, account],
         }),
@@ -83,8 +83,8 @@ export function useIncomingMessages() {
 const getArchivedMessages = async (account: string) => {
     const rawMessages = zRawMessage.array().parse(
         await supervisor.functionCall({
-            service: "chainmail",
-            intf: "queries",
+            service: "homepage",
+            intf: "chainmail",
             method: "getArchivedMsgs",
             params: [undefined, account],
         }),
@@ -116,8 +116,8 @@ export function useArchivedMessages() {
 const getSavedMessages = async (account: string) => {
     const rawMessages = zRawMessage.array().parse(
         await supervisor.functionCall({
-            service: "chainmail",
-            intf: "queries",
+            service: "homepage",
+            intf: "chainmail",
             method: "getSavedMsgs",
             params: [account],
         }),
@@ -150,8 +150,8 @@ export function useSavedMessages() {
 const getSentMessages = async (account: string) => {
     const rawMessages = zRawMessage.array().parse(
         await supervisor.functionCall({
-            service: "chainmail",
-            intf: "queries",
+            service: "homepage",
+            intf: "chainmail",
             method: "getMsgs",
             params: [account],
         }),
@@ -243,8 +243,8 @@ export const useSendMessage = () => {
         mutationFn: async (vars) => {
             const { to, subject, message } = zSendMessageSchema.parse(vars);
             await supervisor.functionCall({
-                service: "chainmail",
-                intf: "api",
+                service: "homepage",
+                intf: "chainmail",
                 method: "send",
                 params: [to, subject, message],
             });
@@ -257,8 +257,8 @@ export const useArchiveMessage = () => {
         mutationFn: async (id) => {
             const messageId = z.coerce.bigint().parse(id);
             await supervisor.functionCall({
-                service: "chainmail",
-                intf: "api",
+                service: "homepage",
+                intf: "chainmail",
                 method: "archive",
                 params: [messageId],
             });
@@ -271,8 +271,8 @@ export const useSaveMessage = () => {
         mutationFn: async (id) => {
             const messageId = z.coerce.bigint().parse(id);
             await supervisor.functionCall({
-                service: "chainmail",
-                intf: "api",
+                service: "homepage",
+                intf: "chainmail",
                 method: "save",
                 params: [messageId],
             });

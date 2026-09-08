@@ -4,7 +4,7 @@ import { z } from "zod";
 import QueryKey from "@/lib/query-keys";
 
 import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
-import { transact } from "@shared/lib/plugins";
+import { config } from "@shared/lib/plugins";
 
 export const SiteConfigResponse = z.object({
     snapshotInfo: z.object({
@@ -17,7 +17,7 @@ export const useSnapshotSeconds = () =>
         queryKey: QueryKey.snapshotSeconds(),
         queryFn: async () => {
             const res = await callGraphqlViaPlugin(
-                transact.authorized.graphql,
+                config.transact.graphql,
                 `
                     {
                         snapshotInfo {
