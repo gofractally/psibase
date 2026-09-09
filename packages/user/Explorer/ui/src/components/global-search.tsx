@@ -183,7 +183,7 @@ export const GlobalSearch = ({ className }: { className?: string }) => {
                             value={value}
                             onValueChange={setValue}
                             placeholder="Block number, block ID, transaction ID, account, or public key"
-                            className="h-12 font-mono text-sm"
+                            className="h-12 border-0 font-mono text-sm shadow-none ring-0 focus:border-0 focus:ring-0 focus:ring-offset-0 focus-visible:ring-0"
                             onKeyDown={(e) => {
                                 if (e.key === "Enter" && !e.defaultPrevented) {
                                     const list = document.querySelector(

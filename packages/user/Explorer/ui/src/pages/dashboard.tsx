@@ -17,7 +17,7 @@ import {
     pct,
 } from "@/lib/format";
 import { fetchNetworkName, fetchProducersInfo } from "@/lib/queries";
-import { useLiveChain, useNow } from "@/store/use-live-chain";
+import { useLiveChain } from "@/store/use-live-chain";
 
 import { AccountLink } from "@/components/account-link";
 import { BlockStrip } from "@/components/block-strip";
@@ -36,7 +36,6 @@ import { Skeleton } from "@shared/shadcn/ui/skeleton";
 export const DashboardPage = () => {
     const state = useLiveChain();
     const { blocks, head, stats, recentUserTransactions, status } = state;
-    const now = useNow();
 
     const { data: producersInfo } = useQuery({
         queryKey: ["producers", "info"],
@@ -57,7 +56,6 @@ export const DashboardPage = () => {
         .filter((v): v is number => v !== null)
         .slice(-60);
     const txSpark = stats.series.slice(-60).map((p) => p.userTxs);
-    const headAgeMs = head ? now - new Date(stats.series.at(-1)?.time ?? now).getTime() : 0;
     const activeProducers = stats.producers.length;
 
     return (
@@ -99,10 +97,7 @@ export const DashboardPage = () => {
                         sub={
                             head ? (
                                 <>
-                                    {headAgeMs < 1500
-                                        ? "just now"
-                                        : `${(headAgeMs / 1000).toFixed(0)}s ago`}{" "}
-                                    · by{" "}
+                                    produced by{" "}
                                     <AccountLink
                                         name={head.producer}
                                         dot={false}
