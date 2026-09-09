@@ -280,8 +280,11 @@
             export CMAKE_PREFIX_PATH="${boostForCMake}''${CMAKE_PREFIX_PATH:+:$CMAKE_PREFIX_PATH}"
             export BOOST_LIBRARYDIR="${boost}/lib"
             export BOOST_INCLUDEDIR="${boost.dev}/include"
-            export NIX_LDFLAGS="-L${pkgs.icu}/lib -L${pkgs.openssl.out}/lib"
-            export LIBRARY_PATH="${pkgs.icu}/lib''${LIBRARY_PATH:+:$LIBRARY_PATH}"
+            # fenix rustc is unwrapped; cargo-psibase's build.rs links wasm-opt/binaryen
+            # (libstdc++) with no RPATH. Keep Nix GCC libs only — not host /usr/lib.
+            export LD_LIBRARY_PATH="${pkgs.stdenv.cc.cc.lib}/lib"
+            export NIX_LDFLAGS="-L${pkgs.stdenv.cc.cc.lib}/lib -L${pkgs.icu}/lib -L${pkgs.openssl.out}/lib"
+            export LIBRARY_PATH="${pkgs.stdenv.cc.cc.lib}/lib:${pkgs.icu}/lib''${LIBRARY_PATH:+:$LIBRARY_PATH}"
             export CMAKE_LIBRARY_PATH="${pkgs.icu}/lib''${CMAKE_LIBRARY_PATH:+:$CMAKE_LIBRARY_PATH}"
 
             # Discover psibase repo root and add built binaries to PATH so
