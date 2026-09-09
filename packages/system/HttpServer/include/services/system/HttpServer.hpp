@@ -116,7 +116,7 @@ namespace SystemService
                                 psibase::AccountNumber      destination,
                                 bool                        keepTarget);
 
-      /// Configures the sender's subdomain to permanently redirect (HTTP 308) all
+      /// Configures the sender's subdomain to temporarily redirect (HTTP 307) all
       /// requests to the `destination` subdomain under the same root host. `Location`
       /// URL preserves the original path and query.
       ///

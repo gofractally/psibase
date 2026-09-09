@@ -108,9 +108,8 @@ mod service {
         unimplemented!()
     }
 
-    /// Configures the sender's subdomain to permanently redirect (HTTP 308) all
+    /// Configures the sender's subdomain to temporarily redirect (HTTP 307) all
     /// requests to the `destination` subdomain under the same root host. `Location`
-    /// URL preserves the original path and query.
     ///
     /// Precedence:
     ///   * Requests whose path starts with `/common/` are handled immediately by `common-api`.

@@ -4,7 +4,7 @@
 flowchart TD
    200[200 OK]
    404[404 Not Found]
-   308[308 Permanent Redirect]
+   307[307 Temporary Redirect]
 
    A[HTTP Request]
    B[psinode]
@@ -17,9 +17,9 @@ flowchart TD
    sites --> E{{was site data found?}} -->|yes| 200
    E -->|no| 404
    C --> R{{root host / no subdomain?}}
-   R -->|yes| homeRedir[redirect to homepage subdomain] --> 308
+   R -->|yes| homeRedir[redirect to homepage subdomain] --> 307
    R -->|no| SR{{subdomain has HttpServer redirect?}}
-   SR -->|yes| sibRedir[308 redirect to sibling subdomain] --> 308
+   SR -->|yes| sibRedir[307 redirect to sibling subdomain] --> 307
    SR -->|no| G{{target begins with '/common/'?}}
    G -->|yes| common['common-api' service's serveSys action] --> serveSys
    G -->|no| J{{Has registered server?}}
@@ -39,7 +39,7 @@ Each subdomain can have a query service which provides a `serveSys` action. The 
 
 ## Redirects
 
-The root host (no subdomain) redirects to the homepage subdomain. If a subdomain owner configured [SystemService::HttpServer::setRedirect], all requests to that subdomain get a permanent redirect to the destination subdomain (path and query preserved).
+The root host (no subdomain) redirects to the homepage subdomain. If a subdomain owner configured [SystemService::HttpServer::setRedirect], all requests to that subdomain get a temporary redirect (HTTP 307) to the destination subdomain (path and query preserved).
 
 ## Common
 
