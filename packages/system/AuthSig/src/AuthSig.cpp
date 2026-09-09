@@ -100,10 +100,10 @@ namespace SystemService
 
       void AuthSig::newAccount(psibase::AccountNumber name, SubjectPublicKeyInfo key)
       {
-         bool created = to<Accounts>().newAccount(name, AuthSig::service, true);
-         check(created, "account already exists");
-         open<AuthTable>(KvMode::readWrite)
-             .put(AuthRecord{.account = name, .pubkey = std::move(key)});
+         auto authTable = open<AuthTable>(KvMode::readWrite);
+         authTable.put(AuthRecord{.account = name, .pubkey = std::move(key)});
+
+         to<Accounts>().newAccount(name, AuthSig::service, NewAccountMode::requireNew);
       }
    }  // namespace AuthSig
 }  // namespace SystemService

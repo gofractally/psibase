@@ -1,7 +1,9 @@
 #[crate::service(name = "auth-delg", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
-    use crate::{services::transact::ServiceMethod, AccountNumber, Claim};
+    use crate::{
+        services::accounts::NewAccountMode, services::transact::ServiceMethod, AccountNumber, Claim,
+    };
 
     /// This is an implementation of the standard auth service interface defined in [SystemService::AuthInterface]
     ///
@@ -89,7 +91,7 @@ mod service {
     /// is set, then the action will fail if the account exists but is not
     /// already owned by the specified owner.
     #[action]
-    fn newAccount(name: AccountNumber, owner: AccountNumber, require_match: bool) -> bool {
+    fn newAccount(name: AccountNumber, owner: AccountNumber, mode: NewAccountMode) -> bool {
         unimplemented!()
     }
 }

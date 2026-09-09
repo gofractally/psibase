@@ -74,7 +74,11 @@ mod service {
 
         // 1. Create accounts with auth-any
         for &acct in &TEST_ACCOUNTS {
-            Accounts::call().newAccount(acct, account!("auth-any"), true);
+            Accounts::call().newAccount(
+                acct,
+                account!("auth-any"),
+                psibase::services::accounts::NewAccountMode::MATCH_EXISTING,
+            );
         }
 
         // 2. Apply each account to the system guild

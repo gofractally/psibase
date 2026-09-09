@@ -6,6 +6,7 @@
 #include <psibase/Table.hpp>
 #include <psibase/block.hpp>
 #include <psio/reflect.hpp>
+#include <services/system/Accounts.hpp>
 #include <services/system/Transact.hpp>
 #include <vector>
 
@@ -96,7 +97,9 @@ namespace SystemService
       /// Existing accounts will not be modified. If the `requireMatch` flag
       /// is set, then the action will fail if the account exists but is not
       /// already owned by the specified owner.
-      bool newAccount(psibase::AccountNumber name, psibase::AccountNumber owner, bool requireMatch);
+      bool newAccount(psibase::AccountNumber name,
+                      psibase::AccountNumber owner,
+                      NewAccountMode         mode);
 
       /// Gets the owner account of the specified account
       psibase::AccountNumber getOwner(psibase::AccountNumber account);
@@ -111,7 +114,7 @@ namespace SystemService
                 method(isAuthSys, sender, authorizers),
                 method(isRejectSys, sender, rejecters),
                 method(setOwner, owner),
-                method(newAccount, name, owner, requireMatch),
+                method(newAccount, name, owner, mode),
                 method(getOwner, owner)
                 //
    )

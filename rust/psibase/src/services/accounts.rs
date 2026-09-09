@@ -16,9 +16,20 @@ pub struct Account {
     pub authSequence: u64,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Pack, Unpack, ToSchema)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct NewAccountMode(u8);
+
+impl NewAccountMode {
+    pub const KEEP_EXISTING: NewAccountMode = NewAccountMode(0);
+    pub const MATCH_EXISTING: NewAccountMode = NewAccountMode(1);
+    pub const REQUIRE_NEW: NewAccountMode = NewAccountMode(2);
+}
+
 #[crate::service(name = "accounts", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
+    use super::*;
     use crate::AccountNumber;
 
     #[action]
@@ -32,7 +43,7 @@ mod service {
     }
 
     #[action]
-    fn newAccount(name: AccountNumber, authService: AccountNumber, requireMatch: bool) -> bool {
+    fn newAccount(name: AccountNumber, authService: AccountNumber, mode: NewAccountMode) -> bool {
         unimplemented!()
     }
 

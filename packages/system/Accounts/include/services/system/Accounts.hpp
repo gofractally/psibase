@@ -39,6 +39,26 @@ namespace SystemService
    using AccountTable = psibase::Table<Account, &Account::accountNum>;
    PSIO_REFLECT_TYPENAME(AccountTable)
 
+   enum class NewAccountMode : std::uint8_t
+   {
+      keepExisting,
+      matchExisting,
+      requireNew,
+   };
+
+   void from_json(NewAccountMode& obj, auto& stream)
+   {
+      std::uint32_t value;
+      from_json(value, stream);
+      psibase::check(value <= 2, "mode out of range");
+      obj = static_cast<NewAccountMode>(value);
+   }
+
+   void to_json(const NewAccountMode& obj, auto& stream)
+   {
+      to_json(static_cast<std::uint32_t>(obj), stream);
+   }
+
    /// This service facilitates the creation of new accounts
    ///
    /// Only the Accounts service itself and the `inviteService` may create new accounts.
@@ -80,7 +100,7 @@ namespace SystemService
       /// Returns true if an account was created
       bool newAccount(psibase::AccountNumber name,
                       psibase::AccountNumber authService,
-                      bool                   requireMatch);
+                      NewAccountMode         mode);
 
       /// Used to update the auth service used by an account
       void setAuthServ(psibase::AccountNumber authService);
@@ -105,7 +125,7 @@ namespace SystemService
    PSIO_REFLECT(Accounts,
                 method(init),
                 method(preapproveAcc, name),
-                method(newAccount, name, authService, requireMatch),
+                method(newAccount, name, authService, mode),
                 method(setAuthServ, authService),
                 method(getAccount, name),
                 method(getAuthOf, account),

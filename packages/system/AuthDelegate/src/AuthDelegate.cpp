@@ -84,10 +84,10 @@ namespace SystemService
    // - the account exists and uses a different auth service but there is a record in auth delegate
    bool AuthDelegate::newAccount(psibase::AccountNumber name,
                                  psibase::AccountNumber owner,
-                                 bool                   requireMatch)
+                                 NewAccountMode         mode)
    {
       auto table = open<AuthDelegateTable>();
-      if (requireMatch)
+      if (mode == NewAccountMode::matchExisting)
       {
          auto record = table.getIndex<0>().get(name);
          if (record && record->owner != owner)
@@ -98,7 +98,7 @@ namespace SystemService
 
       check(to<Accounts>().exists(owner), "owner account does not exist");
 
-      bool created = to<Accounts>().newAccount(name, AuthDelegate::service, requireMatch);
+      bool created = to<Accounts>().newAccount(name, AuthDelegate::service, mode);
       if (created)
          table.put(AuthDelegateRecord{.account = name, .owner = owner});
       return created;

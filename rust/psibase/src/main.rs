@@ -10,7 +10,9 @@ use futures::{
     FutureExt, StreamExt,
 };
 use indicatif::{ProgressBar, ProgressStyle};
-use psibase::services::{auth_delegate, packages, sites, staged_tx, transact, x_packages};
+use psibase::services::{
+    accounts, auth_delegate, packages, sites, staged_tx, transact, x_packages,
+};
 use psibase::{
     account, apply_proxy, as_json, compress_content, create_boot_transactions, fetch_packages,
     get_installed_manifest, get_local_manifest, get_manifest, get_package_sources,
@@ -877,7 +879,7 @@ async fn modify(args: &ModifyArgs) -> Result<(), anyhow::Error> {
             auth_delegate::Wrapper::pack_from(args.sender.into()).newAccount(
                 args.account.into(),
                 args.sender.into(),
-                false,
+                accounts::NewAccountMode::KEEP_EXISTING,
             ),
         )
     }
