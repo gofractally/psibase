@@ -27,7 +27,7 @@ import { StatCard } from "@/components/stat-card";
 import { TimeAgo } from "@/components/time-ago";
 import { TransactionsTable } from "@/components/transactions-table";
 
-import { createIdenticon } from "@shared/lib/create-identicon";
+import { Avatar } from "@shared/components/avatar";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
@@ -114,8 +114,11 @@ export const AccountPage = () => {
     const isProducer = producers.data?.producers.some((p) => p.name === name) ?? false;
     const producerStats = stats.producers.find((p) => p.name === name);
     const isService = !!code.data;
-    const exists = account.data !== null && account.data !== undefined;
-    const identicon = useMemo(() => createIdenticon(name), [name]);
+    // Corroborating evidence that the account exists even if the accounts
+    // service lookup failed (never claim "does not exist" on a fetch error).
+    const knownElsewhere = isProducer || isService || !!pkg || !!auth.data;
+    const lookupFailed = account.isError;
+    const exists = lookupFailed ? knownElsewhere : account.data !== null && account.data !== undefined;
     const siteUrl = siblingUrl(null, name, "/");
 
     return (
@@ -123,20 +126,11 @@ export const AccountPage = () => {
             <PageHeader
                 title={
                     <span className="flex items-center gap-3">
-                        {app.data?.icon ? (
-                            <img
-                                src={`data:${app.data.iconMimeType};base64,${app.data.icon}`}
-                                alt=""
-                                className="size-10 rounded-lg border object-cover"
-                            />
-                        ) : (
-                            <img
-                                src={identicon}
-                                alt=""
-                                className="size-10 rounded-lg border"
-                                style={{ borderColor: colorFor(name) }}
-                            />
-                        )}
+                        <Avatar
+                            account={name}
+                            className="size-10 rounded-lg border-2 bg-card object-cover"
+                            style={{ borderColor: colorFor(name) }}
+                        />
                         <span className="font-mono">{name}</span>
                         <CopyIcon value={name} />
                         <span className="flex flex-wrap gap-1.5">
@@ -161,9 +155,11 @@ export const AccountPage = () => {
                 description={
                     account.isPending
                         ? "Loading…"
-                        : !exists
-                          ? "This account does not exist on chain"
-                          : app.data?.shortDesc || pkg?.description || `Account secured by ${account.data?.authService}`
+                        : lookupFailed
+                          ? `Could not verify account with the accounts service (${(account.error as Error).message})`
+                          : !exists
+                            ? "This account does not exist on chain"
+                            : app.data?.shortDesc || pkg?.description || `Account secured by ${account.data?.authService}`
                 }
                 actions={
                     site.data ? (
@@ -244,7 +240,9 @@ export const AccountPage = () => {
                         ) : auth.data?.pubkey ? (
                             <span className="flex items-start gap-2">
                                 <KeyRound className="text-muted-foreground mt-0.5 size-3.5 shrink-0" />
-                                <span className="font-mono text-xs break-all">{auth.data.pubkey}</span>
+                                <pre className="font-mono text-xs leading-relaxed break-all whitespace-pre-wrap">
+                                    {auth.data.pubkey.trim()}
+                                </pre>
                                 <CopyIcon value={auth.data.pubkey} />
                             </span>
                         ) : (

@@ -11,6 +11,8 @@ import { useLiveChain } from "@/store/use-live-chain";
 import { AccountLink } from "@/components/account-link";
 import { PageHeader, Panel } from "@/components/page-header";
 
+import { Button } from "@shared/shadcn/ui/button";
+
 const KIND_LABEL: Record<string, string> = {
     "block-number": "block number",
     hash: "block or transaction ID",
@@ -122,6 +124,22 @@ export const SearchPage = () => {
                             ? "Transaction lookups scan the most recent 20,000 blocks. Older transactions can be found by browsing the block they were included in."
                             : "Try one of the partial matches below, or refine your search."}
                     </p>
+                </div>
+            )}
+
+            {resolution.data?.type === "error" && (
+                <div className="bg-card/70 flex flex-col items-center gap-2 rounded-xl border p-8 text-center">
+                    <SearchX className="text-destructive size-8" />
+                    <div className="text-lg font-semibold">Lookup failed</div>
+                    <p className="text-muted-foreground max-w-md text-sm">
+                        The accounts service could not be reached to verify “{q}”:{" "}
+                        <span className="text-destructive font-mono text-xs">{resolution.data.message}</span>
+                    </p>
+                    {fuzzyAccounts.some(([name]) => name === q) && (
+                        <Button asChild size="sm" className="mt-2">
+                            <Link to={`/accounts/${q}`}>Open account {q} anyway</Link>
+                        </Button>
+                    )}
                 </div>
             )}
 

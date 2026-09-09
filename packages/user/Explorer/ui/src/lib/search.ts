@@ -31,7 +31,8 @@ export const classify = (raw: string): { kind: SearchKind; term: string } => {
 export type SearchResolution =
     | { type: "navigate"; to: string }
     | { type: "accounts"; accounts: string[]; term: string }
-    | { type: "not-found"; term: string; kind: SearchKind };
+    | { type: "not-found"; term: string; kind: SearchKind }
+    | { type: "error"; term: string; kind: SearchKind; message: string };
 
 export const resolveSearch = async (raw: string): Promise<SearchResolution> => {
     const { kind, term } = classify(raw);
@@ -81,9 +82,19 @@ export const resolveSearch = async (raw: string): Promise<SearchResolution> => {
     }
 
     if (kind === "account") {
-        const account = await fetchAccount(term).catch(() => null);
-        if (account) return { type: "navigate", to: `/accounts/${term}` };
-        return { type: "not-found", term, kind };
+        try {
+            const account = await fetchAccount(term);
+            if (account) return { type: "navigate", to: `/accounts/${term}` };
+            return { type: "not-found", term, kind };
+        } catch (e) {
+            // Don't claim the account is missing when we simply couldn't ask.
+            return {
+                type: "error",
+                term,
+                kind,
+                message: e instanceof Error ? e.message : String(e),
+            };
+        }
     }
 
     return { type: "not-found", term, kind };
