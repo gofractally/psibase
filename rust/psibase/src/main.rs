@@ -743,9 +743,10 @@ async fn push(mut args: PushArgs) -> Result<(), anyhow::Error> {
     let mut schemas = SchemaMap::new();
 
     for action in &actions {
-        if !schemas.contains_key(&action.service.parse()?) {
+        let service = action.service.into();
+        if !schemas.contains_key(&service) {
             schemas.insert(
-                action.service.parse()?,
+                service,
                 crate::as_json(
                     client.get(
                         packages::SERVICE
