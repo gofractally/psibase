@@ -6,6 +6,11 @@ const AppConfigSchema = z.object({
     service: zAccount,
     /** URL path segment; defaults to `service` when omitted. */
     path: z.string().optional(),
+    /**
+     * Absolute URL for apps hosted on their own subdomain. Such apps are
+     * linked from the sidebar/dashboard but are not routed inside Homepage.
+     */
+    href: z.string().url().optional(),
     name: z.string(),
     isMore: z.boolean(),
     element: z.any().optional(),
@@ -41,4 +46,11 @@ export function defineAppConfig(config: AppConfig): AppConfig {
 
 export function getAppPath(app: AppConfig): string {
     return app.path ?? app.service;
+}
+
+/** True for apps that live outside Homepage (linked by absolute URL). */
+export function isExternalApp(
+    app: AppConfig,
+): app is AppConfig & { href: string } {
+    return typeof app.href === "string";
 }
