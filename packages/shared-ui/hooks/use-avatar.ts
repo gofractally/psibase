@@ -55,21 +55,27 @@ export const useAvatar = ({
     });
 
     useEffect(() => {
+        // Reset whenever the target account changes so a previous account's
+        // uploaded image is never shown for the new one.
+        setExistingImageUrl(null);
         if (!account || !chainId) return;
 
+        let cancelled = false;
         const bustParam = bustedUser === account ? `?bust=${bustData}` : "";
         const initialUrl = generateAvatarUrl(account) + bustParam;
 
         const check = async () => {
             setIsCheckingImageExists(true);
             const exists = await checkImageExists(initialUrl, false);
-            if (exists) {
-                setExistingImageUrl(initialUrl);
-            }
+            if (cancelled) return;
+            setExistingImageUrl(exists ? initialUrl : null);
             setIsCheckingImageExists(false);
         };
 
         check();
+        return () => {
+            cancelled = true;
+        };
     }, [account, chainId, bustData, bustedUser]);
 
     if (!account) {
