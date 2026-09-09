@@ -1,4 +1,4 @@
-import { graphql } from "@shared/lib/graphql";
+import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
 import { nameMarket } from "@shared/lib/plugins";
 import {
     type AccountMarketOverviewRow,
@@ -8,7 +8,8 @@ import {
 } from "@shared/lib/schemas/account-markets";
 
 export async function fetchCurrentPrices() {
-    const raw = await graphql(
+    const raw = await callGraphqlViaPlugin(
+        nameMarket.authorized.graphql,
         `
             query {
                 currentPrices {
@@ -17,7 +18,6 @@ export async function fetchCurrentPrices() {
                 }
             }
         `,
-        { service: nameMarket.service },
     );
 
     const { currentPrices } = zCurrentPricesData.parse(raw);
@@ -32,7 +32,8 @@ export const fetchCurrentPriceForLength = async (length: number) => {
 export async function fetchAccountMarketsOverview(): Promise<
     AccountMarketOverviewRow[]
 > {
-    const raw = await graphql(
+    const raw = await callGraphqlViaPlugin(
+        nameMarket.authorized.graphql,
         `
             query {
                 marketParams {
@@ -45,7 +46,6 @@ export async function fetchAccountMarketsOverview(): Promise<
                 }
             }
         `,
-        { service: nameMarket.service },
     );
 
     const { marketParams, currentPrices } =
