@@ -27,7 +27,7 @@ export const PageHeader = ({
                 </p>
             )}
         </div>
-        {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+        {actions && <div className="flex min-w-0 flex-wrap items-center gap-2">{actions}</div>}
     </div>
 );
 
@@ -53,8 +53,8 @@ export const Panel = ({
         )}
     >
         {(title || actions) && (
-            <header className="flex items-center justify-between gap-3 border-b px-4 py-2.5">
-                <div className="min-w-0">
+            <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b px-4 py-2.5">
+                <div className="min-w-0 flex-1 basis-40">
                     {title && (
                         <h2 className="truncate text-sm font-semibold">
                             {title}
@@ -67,7 +67,7 @@ export const Panel = ({
                     )}
                 </div>
                 {actions && (
-                    <div className="flex shrink-0 items-center gap-2">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
                         {actions}
                     </div>
                 )}

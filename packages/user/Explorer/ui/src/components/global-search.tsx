@@ -156,15 +156,18 @@ export const GlobalSearch = ({ className }: { className?: string }) => {
                 type="button"
                 onClick={() => setOpen(true)}
                 className={cn(
-                    "bg-card/60 text-muted-foreground hover:bg-accent hover:text-foreground flex h-9 w-full items-center gap-2 rounded-lg border px-3 text-sm transition-colors",
+                    "bg-card/60 text-muted-foreground hover:bg-accent hover:text-foreground flex h-9 min-w-0 items-center gap-2 rounded-lg border px-3 text-sm transition-colors",
                     className,
                 )}
             >
                 <Search className="size-4 shrink-0" />
-                <span className="flex-1 truncate text-left">
-                    Search blocks, transactions, accounts…
+                <span className="min-w-0 flex-1 truncate text-left">
+                    <span className="sm:hidden">Search…</span>
+                    <span className="hidden sm:inline">
+                        Search blocks, transactions, accounts…
+                    </span>
                 </span>
-                <kbd className="bg-muted text-muted-foreground hidden rounded border px-1.5 py-0.5 font-mono text-[10px] sm:inline">
+                <kbd className="bg-muted text-muted-foreground hidden rounded border px-1.5 py-0.5 font-mono text-[10px] sm:inline md:hidden lg:inline">
                     ⌘K
                 </kbd>
             </button>
