@@ -286,7 +286,7 @@ pub struct PrettyAction {
     pub sender: ExactAccountNumber,
 
     /// Service to execute the action
-    pub service: String,
+    pub service: ExactAccountNumber,
 
     /// Service method to execute
     pub method: MethodNumber,
@@ -324,7 +324,7 @@ impl PrettyAction {
         }
     }
     pub fn into_action(self, schemas: &SchemaMap) -> Result<Action, anyhow::Error> {
-        let service = AccountNumber::from_exact(&self.service)?;
+        let service = self.service.into();
         let raw_data = if let Some(raw_data) = self.raw_data {
             raw_data
         } else {
@@ -338,7 +338,7 @@ impl PrettyAction {
         })
     }
     pub fn to_action(&self, schemas: &SchemaMap) -> Result<Action, anyhow::Error> {
-        let service = AccountNumber::from_exact(&self.service)?;
+        let service = self.service.into();
         let raw_data = if let Some(raw_data) = &self.raw_data {
             raw_data.clone()
         } else {
@@ -369,7 +369,7 @@ impl PrettyAction {
             if let Some(data) = &self.data {
                 SharedPrettyAction {
                     sender: self.sender.into(),
-                    service: self.service.parse()?,
+                    service: self.service.into(),
                     method: self.method,
                     data: data,
                 }
@@ -385,7 +385,7 @@ impl PrettyAction {
         services: &mut Vec<AccountNumber>,
         schemas: &SchemaMap,
     ) -> Result<(), anyhow::Error> {
-        let service = self.service.parse()?;
+        let service = self.service.into();
         accounts.push(self.sender.into());
         services.push(service);
         if let Some(data) = &self.data {
@@ -868,7 +868,7 @@ impl<R: Read + Seek> PackagedService<R> {
     pub fn needs_ui(&mut self) -> bool {
         self.postinstall
             .iter()
-            .any(|act| act.service.parse().unwrap_or(AccountNumber::new(0)) == sites::SERVICE)
+            .any(|act| AccountNumber::from(act.service) == sites::SERVICE)
     }
 
     fn manifest_services(&self) -> HashMap<AccountNumber, ServiceInfo> {

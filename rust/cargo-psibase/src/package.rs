@@ -1,5 +1,5 @@
 use crate::{build, build_plugins, Args, AsyncJobServer, PackageArtifact};
-use anyhow::{anyhow, Context};
+use anyhow::anyhow;
 use cargo_metadata::{Metadata, Node, Package, PackageId};
 use psibase::{
     AccountNumber, Checksum256, Meta, PackageExport, PackageInfo, PackageRef, PackagedService,
@@ -394,10 +394,7 @@ impl<'a> PackageBuilder<'a> {
             .collect();
 
         for act in &postinstall {
-            let service = AccountNumber::from_exact(&act.service).with_context(|| {
-                format!("Invalid postinstall service account '{}'", act.service)
-            })?;
-            if service == AccountNumber::new(0) {
+            if AccountNumber::from(act.service) == AccountNumber::new(0) {
                 return Err(anyhow!(
                     "Invalid postinstall service account '{}'",
                     act.service
