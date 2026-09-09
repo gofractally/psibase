@@ -63,7 +63,7 @@ export const StatusDot = ({ className }: { className?: string }) => {
     );
 };
 
-export const LiveIndicator = () => {
+export const LiveIndicator = ({ className }: { className?: string }) => {
     const status = useLiveStatus();
     const head = useHead();
     const s = STATUS[status];
@@ -72,7 +72,10 @@ export const LiveIndicator = () => {
             <TooltipTrigger asChild>
                 <Link
                     to={head ? `/blocks/${head.blockNum}` : "/blocks"}
-                    className="bg-card/60 hover:bg-accent flex items-center gap-2.5 rounded-full border px-3 py-1.5 text-xs transition-colors"
+                    className={cn(
+                        "bg-card/60 hover:bg-accent flex items-center gap-2.5 rounded-full border px-3 py-1.5 text-xs transition-colors",
+                        className,
+                    )}
                 >
                     <StatusDot />
                     <span className="text-muted-foreground hidden sm:inline">
