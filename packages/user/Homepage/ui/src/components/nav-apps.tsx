@@ -1,6 +1,6 @@
 import { type AppConfig, configuredApps } from "@/configured-apps";
-import { getAppPath } from "@/app-config";
-import { type LucideIcon } from "lucide-react";
+import { getAppPath, isExternalApp } from "@/app-config";
+import { ExternalLink, type LucideIcon } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 import {
@@ -37,6 +37,20 @@ function NavAppItem({ app }: { app: AppConfig }) {
     }
 
     if (!visible) return null;
+
+    if (isExternalApp(app)) {
+        return (
+            <SidebarMenuItem>
+                <a href={app.href}>
+                    <SidebarMenuButton>
+                        {app.icon}
+                        <span>{app.name}</span>
+                        <ExternalLink className="scale-70 -translate-x-1.5 -translate-y-1" />
+                    </SidebarMenuButton>
+                </a>
+            </SidebarMenuItem>
+        );
+    }
 
     return (
         <SidebarMenuItem>

@@ -1,7 +1,7 @@
 import { createBrowserRouter } from "react-router-dom";
 
 import { configuredApps } from "./configured-apps";
-import { getAppPath } from "./app-config";
+import { getAppPath, isExternalApp } from "./app-config";
 import { Layout } from "./layout";
 import Dashboard from "./pages/dashboard";
 import { Invite } from "./pages/invite";
@@ -17,7 +17,7 @@ export default createBrowserRouter([
                 path: "/",
                 element: <Dashboard />,
             },
-            ...configuredApps.map((app) => ({
+            ...configuredApps.filter((app) => !isExternalApp(app)).map((app) => ({
                 path: getAppPath(app),
                 element: app.element,
                 children: app.children.map((child) => ({
