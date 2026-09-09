@@ -3,7 +3,9 @@ mod bindings;
 
 use bindings::*;
 
-use exports::staged_tx::plugin::{proposer::Guest as Proposer, respondent::Guest as Respondent};
+use exports::staged_tx::plugin::{
+    authorized::Guest as Authorized, proposer::Guest as Proposer, respondent::Guest as Respondent,
+};
 use host::http::api as Server;
 use host::types::types::Error;
 use psibase::fracpack::Pack;
@@ -153,6 +155,12 @@ impl Respondent for StagedTxPlugin {
             }
             .packed(),
         )
+    }
+}
+
+impl Authorized for StagedTxPlugin {
+    fn graphql(query: String) -> Result<String, Error> {
+        Server::post_graphql_get_json(&query)
     }
 }
 

@@ -195,8 +195,10 @@ export const Packages = () => {
                         {data.map((pack) => (
                             <PackageItem
                                 pack={pack}
-                                isSelected={selectedIds[pack.id]}
-                                onClick={onSelect}
+                                isSelected={!!selectedIds[pack.id]}
+                                onClick={(id) => {
+                                    onSelect(id);
+                                }}
                                 key={pack.id}
                                 isLoading={isLoading && selectedIds[pack.id]}
                                 isMutating={
