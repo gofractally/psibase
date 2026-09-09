@@ -39,10 +39,18 @@ namespace SystemService
    using AccountTable = psibase::Table<Account, &Account::accountNum>;
    PSIO_REFLECT_TYPENAME(AccountTable)
 
+   /// Determines the behavior of `newAccount` when the
+   /// requested account already exists
    enum class NewAccountMode : std::uint8_t
    {
+      /// An existing account will be unchanged.
       keepExisting,
+      /// If the account already exists, it must match
+      /// the parameters that are passed to `newAccount`.
+      /// This should be used when idempotent account
+      /// creation is needed.
       matchExisting,
+      /// The account must not already exist.
       requireNew,
    };
 
@@ -93,9 +101,7 @@ namespace SystemService
 
       /// Used to create a new account with a specified auth service
       ///
-      /// Existing accounts will not be modified. If the `requireMatch`
-      /// flag is set, then the action will fail if the `name` account
-      /// already exists and uses a different auth service.
+      /// The behavior if the account already exists is determined by `mode`
       ///
       /// Returns true if an account was created
       bool newAccount(psibase::AccountNumber name,

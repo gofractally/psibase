@@ -94,9 +94,9 @@ namespace SystemService
 
       /// Create a new account with the specified name, owned by the specified `owner` account.
       ///
-      /// Existing accounts will not be modified. If the `requireMatch` flag
-      /// is set, then the action will fail if the account exists but is not
-      /// already owned by the specified owner.
+      /// The behavior if the account already exists is determined by `mode`
+      ///
+      /// Returns true if an account was created
       bool newAccount(psibase::AccountNumber name,
                       psibase::AccountNumber owner,
                       NewAccountMode         mode);
