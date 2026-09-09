@@ -544,17 +544,6 @@ enum Command {
     External(Vec<OsString>),
 }
 
-#[allow(dead_code)] // TODO: move to lib if still needed
-fn to_hex(bytes: &[u8]) -> String {
-    let mut result: Vec<u8> = Vec::with_capacity(bytes.len() * 2);
-    const DIGITS: &[u8; 16] = b"0123456789abcdef";
-    for byte in bytes {
-        result.push(DIGITS[(byte >> 4) as usize]);
-        result.push(DIGITS[(byte & 0x0f) as usize]);
-    }
-    String::from_utf8(result).unwrap()
-}
-
 fn store_sys(
     sender: AccountNumber,
     path: &str,
