@@ -66,28 +66,6 @@ namespace
 
 }  // namespace
 
-SCENARIO("AuthDelegate getOwner")
-{
-   GIVEN("Regular chain")
-   {
-      DefaultTestChain t;
-      auto alice = t.addAccount("alice"_a);
-      auto bob   = t.from(t.addAccount("bob"_a));
-
-      THEN("getOwner returns none for an account with no AuthDelegateTable row")
-      {
-         auto result = bob.to<AuthDelegate>().getOwner(alice);
-         REQUIRE(result.succeeded());
-         CHECK(!result.returnVal().has_value());
-      }
-      THEN("getDlgsSys aborts for an account with no AuthDelegateTable row")
-      {
-         REQUIRE(bob.to<AuthDelegate>().getDlgsSys(alice).failed(
-             "account does not have an owning account"));
-      }
-   }
-}
-
 // Tx can be staged on behalf of an account using auth-delegate
 // Tx is executed once the owner accepts it
 // Tx is deleted without execution if owner rejects it

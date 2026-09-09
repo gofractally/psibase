@@ -17,43 +17,36 @@ namespace SystemService
                                    std::vector<ServiceMethod> allowedActions,
                                    std::vector<Claim>         claims)
    {
-      auto owner = getOwner(sender);
-      check(owner.has_value(), "account does not have an owning account");
+      auto owner = checkOwner(sender);
 
-      if (requester == *owner)
+      if (requester == owner)
          flags = (flags & ~AuthInterface::requestMask) | AuthInterface::runAsRequesterReq;
 
       auto _ = recurse();
-      return authServiceOf(*owner).checkAuthSys(flags, requester, *owner, std::move(action),
-                                                std::move(allowedActions), std::move(claims));
+      return authServiceOf(owner).checkAuthSys(flags, requester, owner, std::move(action),
+                                               std::move(allowedActions), std::move(claims));
    }
 
    void AuthDelegate::canAuthUserSys(psibase::AccountNumber user)
    {
-      check(getOwner(user).has_value(), "account does not have an owning account");
+      checkOwner(user);
    }
 
    std::vector<AccountNumber> AuthDelegate::getDlgsSys(psibase::AccountNumber sender)
    {
-      auto owner = getOwner(sender);
-      check(owner.has_value(), "account does not have an owning account");
-      return {*owner};
+      return {checkOwner(sender)};
    }
 
    bool AuthDelegate::isAuthSys(psibase::AccountNumber              sender,
                                 std::vector<psibase::AccountNumber> authorizers)
    {
-      auto owner = getOwner(sender);
-      check(owner.has_value(), "account does not have an owning account");
-      return std::ranges::contains(authorizers, *owner);
+      return std::ranges::contains(authorizers, checkOwner(sender));
    }
 
    bool AuthDelegate::isRejectSys(psibase::AccountNumber              sender,
                                   std::vector<psibase::AccountNumber> rejecters)
    {
-      auto owner = getOwner(sender);
-      check(owner.has_value(), "account does not have an owning account");
-      return std::ranges::contains(rejecters, *owner);
+      return std::ranges::contains(rejecters, checkOwner(sender));
    }
 
    void AuthDelegate::setOwner(psibase::AccountNumber owner)
@@ -76,6 +69,13 @@ namespace SystemService
       if (auto row = open<AuthDelegateTable>(KvMode::read).getIndex<0>().get(account))
          return row->owner;
       return std::nullopt;
+   }
+
+   AccountNumber AuthDelegate::checkOwner(psibase::AccountNumber account)
+   {
+      auto owner = getOwner(account);
+      check(owner.has_value(), "account does not have an owning account");
+      return *owner;
    }
 
    Actor<AuthInterface> AuthDelegate::authServiceOf(psibase::AccountNumber account)

@@ -27,6 +27,14 @@ mod service {
         unimplemented!()
     }
 
+    /// Returns the owner of `account`
+    ///
+    /// Aborts if the account has no owner.
+    #[action]
+    fn checkOwner(account: AccountNumber) -> AccountNumber {
+        unimplemented!()
+    }
+
     /// This is an implementation of the standard auth service interface defined in [SystemService::AuthInterface]
     ///
     /// This action is automatically called by `accounts` when an account is configured to use this auth service.
