@@ -47,10 +47,14 @@ namespace UserService
                                            AuthDelegate::service.str() + " as its auth service");
                   }
                }
-               else if (psibase::to<AuthDelegate>().getOwner(account) != owner)
+               else
                {
-                  psibase::abortMessage("Account " + account.str() + " is not owned by " +
-                                        owner.str());
+                  auto accountOwner = psibase::to<AuthDelegate>().getOwner(account);
+                  if (!accountOwner)
+                     psibase::abortMessage("account does not have an owning account");
+                  else if (*accountOwner != owner)
+                     psibase::abortMessage("Account " + account.str() + " is not owned by " +
+                                           owner.str());
                }
             }
             else

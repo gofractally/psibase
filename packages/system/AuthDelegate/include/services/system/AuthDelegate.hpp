@@ -98,8 +98,13 @@ namespace SystemService
       /// already owned by the specified owner.
       bool newAccount(psibase::AccountNumber name, psibase::AccountNumber owner, bool requireMatch);
 
-      /// Gets the owner account of the specified account
-      psibase::AccountNumber getOwner(psibase::AccountNumber account);
+      /// Returns the owner of `account`, if any
+      std::optional<psibase::AccountNumber> getOwner(psibase::AccountNumber account);
+
+      /// Returns the owner of `account`
+      ///
+      /// Aborts if the account has no owner.
+      psibase::AccountNumber checkOwner(psibase::AccountNumber account);
 
      private:
       psibase::Actor<AuthInterface> authServiceOf(psibase::AccountNumber account);
@@ -112,7 +117,8 @@ namespace SystemService
                 method(isRejectSys, sender, rejecters),
                 method(setOwner, owner),
                 method(newAccount, name, owner, requireMatch),
-                method(getOwner, owner)
+                method(getOwner, owner),
+                method(checkOwner, owner)
                 //
    )
    PSIBASE_REFLECT_TABLES(AuthDelegate, AuthDelegate::Tables)
