@@ -11,7 +11,7 @@ The Nix configuration includes
 - **C++**: GCC (native), LLVM/Clang 18 (WASM, clangd), Boost, CMake
 - **Rust**: 1.98.0 (pinned) with WASM targets (`wasm32-unknown-unknown`, `wasm32-wasip1`)
 - **WebAssembly**: WASI SDK 29, wasm-pack, wasm-tools, binaryen
-- **JavaScript**: Node.js 24.20.0, Yarn 4.18.0
+- **JavaScript**: Node.js 24.19.0, Yarn 4.18.0
 - **Tools**: clangd, gdb, direnv, mkcert, SoftHSM2, gh, cursor-agent (cursor-cli)
 - **Docs**: mdbook with plugins
 

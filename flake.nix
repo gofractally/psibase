@@ -40,8 +40,8 @@
     #   mdbook-pagetoc 0.2.0 — DIVERGES from psibase-contributor (0.2.2): no nixpkgs rev
     #   ships 0.2.2 while keeping mdbook 0.4.x compatibility (0.3.0 breaks mdbook 0.4.x).
     nixpkgs-mdbook-pagetoc.url = "github:NixOS/nixpkgs/ac62194c3917d5f474c1a844b6fd6da2db95077d";
-    #   nodejs 24.20.0
-    nixpkgs-nodejs.url = "github:NixOS/nixpkgs/aefbfa796e0203f83584422979d2a7e7558fa820";
+    #   nodejs 24.19.0 — rev-pinned so `nix flake update` does not bump Node
+    nixpkgs-nodejs.url = "github:NixOS/nixpkgs/6aefcda9401be8acc2b74244fb3b37520ea1f0a8";
   };
 
   outputs = { self, nixpkgs, flake-utils, fenix, nixpkgs-cargo-component, nixpkgs-cargo-generate, nixpkgs-cursor-cli, nixpkgs-mdbook, nixpkgs-mdbook-mermaid, nixpkgs-mdbook-plugins, nixpkgs-mdbook-linkcheck, nixpkgs-mdbook-pagetoc, nixpkgs-nodejs }:
@@ -280,8 +280,11 @@
             export CMAKE_PREFIX_PATH="${boostForCMake}''${CMAKE_PREFIX_PATH:+:$CMAKE_PREFIX_PATH}"
             export BOOST_LIBRARYDIR="${boost}/lib"
             export BOOST_INCLUDEDIR="${boost.dev}/include"
-            export NIX_LDFLAGS="-L${pkgs.icu}/lib -L${pkgs.openssl.out}/lib"
-            export LIBRARY_PATH="${pkgs.icu}/lib''${LIBRARY_PATH:+:$LIBRARY_PATH}"
+            # fenix rustc is unwrapped; cargo-psibase's build.rs links wasm-opt/binaryen
+            # (libstdc++) with no RPATH. Keep Nix GCC libs only — not host /usr/lib.
+            export LD_LIBRARY_PATH="${pkgs.stdenv.cc.cc.lib}/lib"
+            export NIX_LDFLAGS="-L${pkgs.stdenv.cc.cc.lib}/lib -L${pkgs.icu}/lib -L${pkgs.openssl.out}/lib"
+            export LIBRARY_PATH="${pkgs.stdenv.cc.cc.lib}/lib:${pkgs.icu}/lib''${LIBRARY_PATH:+:$LIBRARY_PATH}"
             export CMAKE_LIBRARY_PATH="${pkgs.icu}/lib''${CMAKE_LIBRARY_PATH:+:$CMAKE_LIBRARY_PATH}"
 
             # Discover psibase repo root and add built binaries to PATH so
