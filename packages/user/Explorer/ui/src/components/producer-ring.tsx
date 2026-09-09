@@ -56,7 +56,7 @@ export const ProducerRing = ({
 
     const cx = size / 2;
     const cy = size / 2;
-    const R = size * 0.36;
+    const R = size * 0.29;
     const nodeR = Math.max(14, Math.min(24, size / 16));
     const statMap = new Map(stats.map((s) => [s.name, s]));
     const totalBlocks = stats.reduce((a, b) => a + b.blocks, 0);
