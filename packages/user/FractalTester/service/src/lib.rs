@@ -36,7 +36,8 @@ pub mod tables {
 mod service {
     use crate::tables::ConfigRow;
     use psibase::services::{
-        accounts::Wrapper as Accounts, guilds::Wrapper as Guilds, producers::Wrapper as Producers,
+        accounts::Wrapper as Accounts, auth_any::Wrapper as AuthAny, guilds::Wrapper as Guilds,
+        producers::Wrapper as Producers,
     };
     use psibase::*;
 
@@ -76,7 +77,7 @@ mod service {
         for &acct in &TEST_ACCOUNTS {
             Accounts::call().newAccount(
                 acct,
-                account!("auth-any"),
+                AuthAny::SERVICE,
                 psibase::services::accounts::NewAccountMode::MATCH_EXISTING,
             );
         }

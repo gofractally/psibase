@@ -10,7 +10,7 @@ use bindings::host::types::types as HostTypes;
 use bindings::transact::plugin::intf as Transact;
 use psibase::fracpack::Pack;
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 mod errors;
 use crate::trust::*;
@@ -32,13 +32,6 @@ psibase::define_trust! {
 }
 
 struct IdentityPlugin;
-
-#[derive(Serialize, Deserialize, Debug)]
-struct Attestation {
-    subject: String,
-    attestation_type: String,
-    score: f32,
-}
 
 impl Api for IdentityPlugin {
     fn attest_identity_claim(subject: String, score: f32) -> Result<(), HostTypes::Error> {

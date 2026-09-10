@@ -113,10 +113,24 @@ interface auth {
     get-query-token: func(app: string, user: string) -> result<string, error>;
 }
 
+/// Interface that makes authorized queries to this app's http server.
+interface authorized {
+    use host:types/types.{error};
+
+    /// Executes a GraphQL query against this app's http server.
+    ///
+    /// Arguments
+    /// * `query` - GraphQL query to execute
+    ///
+    /// Returns the result of the query as a string.
+    graphql: func(query: string) -> result<string, error>;
+}
+
 // Include this world to import the most common transact:plugin imports
 world imports {
     import intf;
     import auth;
+    import authorized;
     import network;
     import admin;
 }

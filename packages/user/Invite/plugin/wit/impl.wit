@@ -10,4 +10,5 @@ world impl {
     export inviter;
     export invitee;
     export redemption;
+    export authorized;
 }

@@ -1,9 +1,3 @@
-// TODO: The interaction between checking for no extra data (no gaps)
-//       and the possible presence of unknown fields and variant tags
-//       has some unsolved border cases. It might be best to only check
-//       for gaps when in a mode which prohibits unknown fields and skip
-//       checking for gaps when in a mode which allows unknown fields.
-
 #pragma once
 
 #include <psio/reflect.hpp>

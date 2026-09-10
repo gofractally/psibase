@@ -1,5 +1,6 @@
 import { PluginInterface } from "@shared/hooks/plugin-function/index";
 import { Account } from "@shared/lib/schemas/account";
+import { Authorized } from "./authorized-graphql-plugin";
 
 type TID = number;
 type Decimal = string;
@@ -102,15 +103,21 @@ class Liquidity extends PluginInterface {
 export class Plugin {
     readonly swap: Swap;
     readonly liquidity: Liquidity;
+    readonly authorized: Authorized;
 
     constructor(readonly service: Account) {
         // Initialize all interfaces with the correct service
         this.swap = new Swap();
         this.liquidity = new Liquidity();
+        this.authorized = new Authorized();
 
         // Set the protected _service on each instance
         // This avoids the "used before initialization" error
-        const instances = [this.swap, this.liquidity] as PluginInterface[];
+        const instances = [
+            this.swap,
+            this.liquidity,
+            this.authorized,
+        ] as PluginInterface[];
 
         for (const instance of instances) {
             Object.assign(instance, { _service: service });

@@ -2,12 +2,13 @@ import { z } from "zod";
 
 import { zGuildApplicationListInstance } from "@/lib/zod/attestations";
 
-import { GUILDS_SERVICE } from "@shared/domains/fractal/lib/constants";
-import { graphql } from "@shared/lib/graphql";
+import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { guilds } from "@shared/lib/plugins";
 import { Account } from "@shared/lib/schemas/account";
 
 export const getGuildApplications = async (guildAccount: Account) => {
-    const res = await graphql(
+    const res = await callGraphqlViaPlugin(
+        guilds.authorized.graphql,
         `
             {
                 guildApplications(guild: "${guildAccount}") {
@@ -30,7 +31,6 @@ export const getGuildApplications = async (guildAccount: Account) => {
                 }
             }
         `,
-        { service: GUILDS_SERVICE },
     );
 
     return z

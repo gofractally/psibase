@@ -1081,7 +1081,6 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
             let at = transact
                 .inner_traces
                 .iter()
-                // TODO: improve this filter.. we need to return whatever is the name of the action somehow if possible...
                 .filter_map(|inner| {
                     if let InnerTraceEnum::ActionTrace(at) = &inner.inner {
                         if Self::is_user_action(&at.action) {

@@ -1,7 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-
-import { getArrayBuffer } from "@psibase/common-lib";
+import { z } from "zod";
 
 import { checkLastTx } from "@/lib/check-staging";
 import QueryKey from "@/lib/query-keys";
@@ -10,21 +9,47 @@ import { queryClient } from "@shared/lib/query-client";
 import { supervisor } from "@shared/lib/supervisor";
 import { toast } from "@shared/shadcn/ui/sonner";
 
-import {
-    PackageRepo,
-    PackageSchemaWithSha,
-    getPackageIndex,
-} from "./use-available-packages";
+import { zPackageSchemaWithSha } from "./use-available-packages";
 
-type PackageOp = {
-    old?: unknown;
-    new?: PackageSchemaWithSha;
-};
+const zPackageOp = z.object({
+    old: z.unknown().optional(),
+    new: zPackageSchemaWithSha.nullish(),
+});
+
+type PackageOp = z.infer<typeof zPackageOp>;
 
 type PackageInstallOp = {
     old?: unknown;
     new?: ArrayBuffer;
 };
+
+async function getAvailablePackageIndex(owner: string) {
+    return zPackageSchemaWithSha.array().parse(
+        await supervisor.functionCall({
+            service: "packages",
+            intf: "queries",
+            method: "getAvailablePackages",
+            params: [owner],
+        }),
+    );
+}
+
+async function resolvePackageOps(
+    owner: string,
+    packages: string[],
+    requestPref: string,
+    nonRequestPref: string,
+): Promise<PackageOp[]> {
+    const index = await getAvailablePackageIndex(owner);
+    return zPackageOp.array().parse(
+        await supervisor.functionCall({
+            service: "packages",
+            intf: "privateApi",
+            method: "resolve",
+            params: [index, packages, requestPref, nonRequestPref],
+        }),
+    );
+}
 
 async function installPackages(
     owner: string,
@@ -32,20 +57,27 @@ async function installPackages(
     request_pref: string,
     non_request_pref: string,
 ) {
-    const index = flattenPackageIndex(await getPackageIndex(owner));
-    const resolved = (await supervisor.functionCall({
+    const resolved = await resolvePackageOps(
+        owner,
+        packages,
+        request_pref,
+        non_request_pref,
+    );
+
+    const ops = (await supervisor.functionCall({
         service: "packages",
         intf: "privateApi",
-        method: "resolve",
-        params: [index, packages, request_pref, non_request_pref],
-    })) as PackageOp[];
-    const ops = await loadPackages(resolved);
+        method: "loadPackageOps",
+        params: [resolved],
+    })) as PackageInstallOp[];
+
     const [data, install] = (await supervisor.functionCall({
         service: "packages",
         intf: "privateApi",
         method: "buildTransactions",
         params: [owner, ops, 4],
     })) as [ArrayBuffer[], ArrayBuffer[]];
+
     for (const tx of data) {
         await supervisor.functionCall({
             service: "packages",
@@ -64,25 +96,16 @@ async function installPackages(
     }
 }
 
-function flattenPackageIndex(index: PackageRepo[]) {
-    return index.flatMap((repo) =>
-        repo.index.map((info) => ({
-            ...info,
-            file: new URL(info.file, repo.baseUrl).toString(),
-        })),
+export async function resolveRequiredPackageNames(
+    packages: string[],
+): Promise<string[]> {
+    const resolved = await resolvePackageOps(
+        "root",
+        packages,
+        "best",
+        "current",
     );
-}
-
-async function loadPackages(ops: PackageOp[]): Promise<PackageInstallOp[]> {
-    return await Promise.all(
-        ops.map(async (op) => {
-            if (op.new) {
-                return { old: op.old, new: await getArrayBuffer(op.new.file) };
-            } else {
-                return { old: op.old };
-            }
-        }),
-    );
+    return [...new Set(resolved.flatMap((op) => (op.new ? [op.new.name] : [])))];
 }
 
 export const useInstallPackages = () => {
