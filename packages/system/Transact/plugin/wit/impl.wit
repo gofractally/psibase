@@ -14,7 +14,8 @@ interface hook-handlers {
 }
 
 world impl {
-    include host:common/imports;
+    include host:client/imports;
+    include host:http/imports;
     include host:db/imports;
     include clientdata:plugin/imports;
     include accounts:query/imports;
@@ -26,6 +27,7 @@ world impl {
     export admin;
     export intf;
     export auth;
+    export authorized;
     export network;
 
     import hook-handlers;

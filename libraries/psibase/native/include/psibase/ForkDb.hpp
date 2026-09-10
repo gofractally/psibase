@@ -1976,18 +1976,6 @@ namespace psibase
                   }
                }
 
-               // TODO: RPC: don't forward failed transactions to P2P; this gives users
-               //       feedback.
-               // TODO: P2P: do forward failed transactions; this enables producers to
-               //       bill failed transactions which have tied up P2P nodes.
-               // TODO: If the first authorizer doesn't have enough to bill for failure,
-               //       then drop before running any other checks. Don't propagate.
-               // TODO: Don't propagate failed transactions which have
-               //       do_not_broadcast_flag.
-               // TODO: Revisit all of this. It doesn't appear to eliminate the need to
-               //       shadow bill, and once shadow billing is in place, failed
-               //       transaction billing seems unnecessary.
-
                bc->pushTransaction(std::move(trx), trace, std::nullopt);
             }
          }

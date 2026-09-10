@@ -121,10 +121,6 @@ namespace psibase
       {
          return false;
       }
-      bool hideTrace(const EventTrace& trace)
-      {
-         return false;
-      }
 
       struct PrettyServiceMethod
       {
@@ -301,14 +297,6 @@ namespace psibase
    {
       dest += indent + "console:    ";
       prettyTrace(dest, t.console, indent + "            ");
-   }
-
-   void prettyTrace(std::string&       dest,
-                    const EventTrace&  t,
-                    const GetSchemaFn& schemas,
-                    const std::string& indent)
-   {
-      dest += indent + "event\n";
    }
 
    void prettyTrace(std::string&       dest,

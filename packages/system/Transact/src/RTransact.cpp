@@ -176,13 +176,6 @@ namespace
       };
       PSIO_REFLECT(ActionTrace, action, rawRetval, innerTraces, totalTime, error)
 
-      struct EventTrace
-      {
-         std::string_view      name;
-         std::span<const char> data;
-      };
-      PSIO_REFLECT(EventTrace, name, data)
-
       struct ConsoleTrace
       {
          std::string_view console;
@@ -191,7 +184,7 @@ namespace
 
       struct InnerTrace
       {
-         std::variant<ConsoleTrace, EventTrace, ActionTrace> inner;
+         std::variant<ConsoleTrace, ActionTrace> inner;
       };
       PSIO_REFLECT(InnerTrace, inner)
 
@@ -204,7 +197,6 @@ namespace
    }  // namespace refs
    using ActionRef           = refs::Action;
    using ActionTraceRef      = refs::ActionTrace;
-   using EventTraceRef       = refs::EventTrace;
    using ConsoleTraceRef     = refs::ConsoleTrace;
    using InnerTraceRef       = refs::InnerTrace;
    using TransactionTraceRef = refs::TransactionTrace;
@@ -235,10 +227,6 @@ namespace
       auto operator()(psio::view<const ConsoleTrace> trace)
       {
          return ConsoleTraceRef{trace.console()};
-      }
-      auto operator()(psio::view<const EventTrace> trace)
-      {
-         return EventTraceRef{trace.name(), trace.data()};
       }
       auto operator()(psio::view<const ActionTrace> at)
       {

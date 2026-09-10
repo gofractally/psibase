@@ -559,15 +559,6 @@ namespace psibase::pkcs11
          case object_class::mechanism:
             os << "CKO_MECHANISM";
             break;
-         case object_class::g_collection:
-            os << "CKO_G_COLLECTION";
-            break;
-         case object_class::g_search:
-            os << "CKO_G_SEARCH";
-            break;
-         case object_class::g_credential:
-            os << "CKO_G_CREDENTIAL";
-            break;
          default:
             os << static_cast<unsigned long>(c);
             break;
@@ -581,9 +572,6 @@ namespace psibase::pkcs11
       {
          case key_type::rsa:
             os << "CKK_RSA";
-            break;
-         case key_type::g_secret_item:
-            os << "CKK_G_SECRET_ITEM";
             break;
          default:
             os << "unknown key type: " << static_cast<unsigned long>(t);

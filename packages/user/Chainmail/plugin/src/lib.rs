@@ -14,7 +14,7 @@ use bindings::exports::chainmail::plugin::{
     api::{Error, Guest as Api},
     queries::{Guest as Query, Message},
 };
-use bindings::host::common::server as CommonServer;
+use bindings::host::http::api as CommonServer;
 use bindings::transact::plugin::intf as Transact;
 use chrono::DateTime;
 use errors::ErrorType;

@@ -464,14 +464,6 @@ namespace SystemService
       return stat.head->header;
    }
 
-   psibase::BlockTime Transact::headBlockTime() const
-   {
-      auto& stat = getStatus();
-      if (stat.head)
-         return stat.head->header.time;
-      return {};
-   }
-
    std::pair<uint8_t, uint32_t> Transact::headTapos()
    {
       return SystemService::headTapos();
@@ -864,10 +856,7 @@ namespace SystemService
       if constexpr (enable_print)
          std::printf("processTransaction\n");
 
-      // TODO: check max_net_usage_words, max_cpu_usage_ms
-      // TODO: resource billing
       // TODO: subjective mitigation hooks
-      // TODO: limit execution time
       // TODO: limit charged CPU & NET which can go into a block
       auto top_act                = getCurrentActionView();
       auto args                   = psio::view<const ProcessTransactionArgs>(top_act->rawData());

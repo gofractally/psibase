@@ -4,7 +4,7 @@ use psibase::{services::guilds::GuildRole, AccountNumber};
 
 use crate::bindings::host::types::types::Error;
 use crate::bindings::{
-    host::common::client::get_receiver, transact::plugin::intf::set_propose_latch,
+    host::client::api::get_receiver, transact::plugin::intf::set_propose_latch,
 };
 
 fn latch(account: &str) -> Result<(), Error> {

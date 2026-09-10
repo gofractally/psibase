@@ -1286,7 +1286,6 @@ namespace psio
                   const E&                  error,
                   bool                      allow_unknown_members)
    {
-      // TODO: validate fracpack
       return gql_query(value.unpack(), input_stream, output_stream, error, allow_unknown_members);
    }
 

@@ -103,7 +103,7 @@ export const LogsPage = () => {
         //  else if (!logEnabled && logSocket) {
         //     logSocket.close();
         // }
-    }, [logSocket, logTimeout, keepAllLogs]);
+    }, [logSocket, logTimeout, keepAllLogs, logFilter]);
 
     const onFilter = (input: LogFilterInputs) => {
         setLogFilter(input.filter);
