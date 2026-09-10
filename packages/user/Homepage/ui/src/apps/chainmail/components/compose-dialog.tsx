@@ -26,6 +26,7 @@ import {
 import { Button, type ButtonProps } from "@shared/shadcn/ui/button";
 import {
     Dialog,
+    DialogClose,
     DialogContent,
     DialogDescription,
     DialogFooter,
@@ -69,12 +70,23 @@ const defaultComposeValues = {
     message: "",
 };
 
-const hasDraftContent = (values: typeof defaultComposeValues) =>
-    Boolean(
-        values.to.account.trim() ||
-            values.subject.trim() ||
-            values.message.trim(),
-    );
+/**
+ * Normalizes the form values into what gets persisted in a draft.
+ * The recipient is only saved if it matches `validatedRecipient`, the account
+ * most recently confirmed to exist on chain by the account field. Anything
+ * else (empty, partially typed, invalid, or not yet looked up) is saved as "".
+ */
+const toDraftFields = (
+    values: typeof defaultComposeValues,
+    validatedRecipient: string | null,
+) => {
+    const account = values.to.account.trim();
+    return {
+        to: account && account === validatedRecipient ? account : "",
+        subject: values.subject.trim(),
+        body: values.message ?? "",
+    };
+};
 
 export function ComposeDialog({
     trigger,
@@ -91,6 +103,16 @@ export function ComposeDialog({
     const invalidateMailboxQueries = useInvalidateMailboxQueries();
 
     const id = useRef<string>("");
+    // Recipient most recently confirmed to exist on chain (via FieldAccountExisting)
+    const validatedRecipient = useRef<string | null>(null);
+
+    const getDraftFields = () =>
+        toDraftFields(form.state.values, validatedRecipient.current);
+
+    const hasDraftContent = () => {
+        const { to, subject, body } = getDraftFields();
+        return Boolean(to || subject || body.trim());
+    };
 
     const form = useAppForm({
         defaultValues: defaultComposeValues,
@@ -132,13 +154,18 @@ export function ComposeDialog({
     const populateFormFromMessage = () => {
         if (!message) {
             form.reset();
+            validatedRecipient.current = null;
             return;
         }
         if (message.isDraft) {
+            // Draft recipients were validated before being saved
+            validatedRecipient.current = message.to || null;
             form.setFieldValue("to", { account: message.to });
             form.setFieldValue("subject", message.subject);
             form.setFieldValue("message", message.body);
         } else {
+            // Replying to an existing on-chain sender
+            validatedRecipient.current = message.from;
             form.setFieldValue("to", { account: message.from });
             form.setFieldValue("subject", `RE: ${message.subject}`);
             form.setFieldValue("message", "");
@@ -147,30 +174,26 @@ export function ComposeDialog({
 
     const createDraft = () => {
         if (!id.current || !user) return;
-        const values = form.state.values;
-        if (!hasDraftContent(values)) return;
+        if (!hasDraftContent()) return;
 
         const draft = zDraftMessage.parse({
             id: id.current,
             from: user,
-            to: values.to.account.trim(),
             datetime: Date.now(),
             isDraft: true,
             type: "outgoing",
             read: true,
             saved: true,
             inReplyTo: null,
-            subject: values.subject.trim(),
-            body: values.message ?? "",
+            ...getDraftFields(),
         });
         setDrafts([...(allDrafts ?? []), draft]);
     };
 
     const updateDraft = () => {
-        const values = form.state.values;
         const draftIndex = allDrafts.findIndex((msg) => msg.id === id.current);
 
-        if (!hasDraftContent(values)) {
+        if (!hasDraftContent()) {
             if (draftIndex !== -1 && id.current) {
                 deleteDraftById(id.current);
             }
@@ -187,9 +210,7 @@ export function ComposeDialog({
                 ? {
                       ...draft,
                       datetime: Date.now(),
-                      to: values.to.account.trim(),
-                      subject: values.subject.trim(),
-                      body: values.message ?? "",
+                      ...getDraftFields(),
                   }
                 : draft,
         );
@@ -208,12 +229,12 @@ export function ComposeDialog({
         setOpen(nextOpen);
         if (!nextOpen) {
             if (isSent.current) return;
-            const values = form.state.values;
             updateDraft();
-            if (hasDraftContent(values)) {
+            if (hasDraftContent()) {
                 toast.success("Your draft has been saved");
             }
             form.reset();
+            validatedRecipient.current = null;
             return;
         }
 
@@ -237,7 +258,22 @@ export function ComposeDialog({
                     // This helps in not focusing on the trigger after closing the modal
                     e.preventDefault();
                 }}
+                // Only dismiss via the close button or a successful send; ignore overlay
+                // clicks and Escape so a draft isn't closed accidentally.
+                onInteractOutside={(e) => e.preventDefault()}
+                onEscapeKeyDown={(e) => e.preventDefault()}
+                showCloseButton={false}
             >
+                <DialogClose asChild>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute top-3 right-3 z-10 sm:top-4 sm:right-4"
+                        aria-label="Close and save draft"
+                    >
+                        <X className="size-5" />
+                    </Button>
+                </DialogClose>
                 <form.AppForm>
                     <form
                         onSubmit={(e) => {
@@ -270,7 +306,9 @@ export function ComposeDialog({
                                 description={undefined}
                                 placeholder="Recipient account name"
                                 disabled={false}
-                                onValidate={() => {
+                                onValidate={(account) => {
+                                    validatedRecipient.current =
+                                        account?.accountNum ?? null;
                                     updateDraft();
                                 }}
                             />
@@ -330,19 +368,7 @@ export function ComposeDialog({
                                 )}
                             />
                         </div>
-                        <DialogFooter className="shrink-0 flex flex-col-reverse gap-2 border-t px-4 py-4 sm:flex-row sm:justify-between sm:space-x-2 sm:px-6 sm:pb-6">
-                            <Button
-                                variant="outline"
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    onOpenChange(false);
-                                }}
-                                className="w-full sm:w-auto"
-                                type="button"
-                            >
-                                <X className="mr-2 size-4" />
-                                Cancel
-                            </Button>
+                        <DialogFooter className="shrink-0 border-t px-4 py-4 sm:justify-end sm:px-6 sm:pb-6">
                             <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                     <SendTriggerButton

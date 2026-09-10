@@ -19,7 +19,12 @@ export const zMessage = z.object({
     body: z.string(),
 });
 
-export const zDraftMessage = zMessage.omit({ msgId: true });
+// Drafts are saved as the user types, so the recipient may be empty or an
+// incomplete/invalid account name. It is only validated against `zAccount`
+// when the message is actually sent (see `zSendMessageSchema`).
+export const zDraftMessage = zMessage
+    .omit({ msgId: true })
+    .extend({ to: z.string() });
 
 export const zRawMessage = z.object({
     body: z.string(),
