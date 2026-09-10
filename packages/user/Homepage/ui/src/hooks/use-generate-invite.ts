@@ -11,8 +11,8 @@ export const useGenerateInvite = () =>
         mutationFn: async () => {
             const token = z.string().parse(
                 await supervisor.functionCall({
-                    service: "invite",
-                    intf: "inviter",
+                    service: "homepage",
+                    intf: "invite",
                     method: "generateInvite",
                     params: [],
                 }),

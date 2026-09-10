@@ -10,6 +10,7 @@ import { PageContainer } from "@shared/components/page-container";
 import { ShowContactsButton } from "@shared/components/show-contacts-button";
 import { TableContact } from "@shared/components/tables/table-contact";
 import { COUNCIL_SEATS } from "@shared/domains/fractal/lib/constants";
+import { profiles } from "@shared/lib/plugins";
 import { Badge } from "@shared/shadcn/ui/badge";
 import {
     CardAction,
@@ -50,6 +51,10 @@ export const Members = () => {
                     <CardAction>
                         <ShowContactsButton
                             returnPath={paths.fractal.members()}
+                            getContacts={profiles.contacts.get}
+                            hasReadPermission={
+                                profiles.api.hasReadPermission
+                            }
                         />
                     </CardAction>
                 </CardHeader>
@@ -70,6 +75,13 @@ export const Members = () => {
                                     <TableCell className="font-medium">
                                         <TableContact
                                             account={member.account}
+                                            getContacts={
+                                                profiles.contacts.get
+                                            }
+                                            hasReadPermission={
+                                                profiles.api
+                                                    .hasReadPermission
+                                            }
                                         />
                                     </TableCell>
                                     <TableCell className="flex items-center gap-2">

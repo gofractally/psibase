@@ -19,6 +19,7 @@ import {
     useAccountMarkets,
 } from "@shared/hooks/use-account-markets";
 import { useSystemToken } from "@shared/hooks/use-system-token";
+import { config, tokens } from "@shared/lib/plugins";
 import {
     MAX_ACCOUNT_NAME_LENGTH,
     MIN_ACCOUNT_NAME_LENGTH,
@@ -66,7 +67,7 @@ const isMarketRowDirty = (
 
 export const NameMarketConfig = () => {
     const { data: systemToken, isLoading: systemTokenLoading } =
-        useSystemToken();
+        useSystemToken(tokens.authorized.graphql);
     const rowActionsDisabled = !systemToken;
     const tokenMissingConfirmed = systemToken === null;
 
@@ -78,10 +79,13 @@ export const NameMarketConfig = () => {
         refetch,
     } = useConfiguredNameMarkets();
 
-    const { data: liveMarkets } = useAccountMarkets({
-        refetchInterval: ACCOUNT_MARKETS_REFETCH_INTERVAL_MS,
-        enabled: !systemTokenLoading && systemToken !== undefined,
-    });
+    const { data: liveMarkets } = useAccountMarkets(
+        config.nameMarket.graphql,
+        {
+            refetchInterval: ACCOUNT_MARKETS_REFETCH_INTERVAL_MS,
+            enabled: !systemTokenLoading && systemToken !== undefined,
+        },
+    );
 
     const livePriceByLength = useMemo(
         () => new Map(liveMarkets?.map((row) => [row.length, row.price]) ?? []),

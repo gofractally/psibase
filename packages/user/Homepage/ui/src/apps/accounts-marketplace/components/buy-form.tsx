@@ -16,6 +16,7 @@ import {
     useUserTokenBalances,
 } from "@shared/hooks/use-user-token-balances";
 import { getAccount } from "@shared/lib/get-account";
+import { homepage } from "@shared/lib/plugins";
 import { Quantity } from "@shared/lib/quantity";
 import { zAccount } from "@shared/lib/schemas/account";
 import { CardContent, CardFooter } from "@shared/shadcn/ui/card";
@@ -38,7 +39,7 @@ export function BuyForm({
 }) {
     const { data: currentUser } = useCurrentUser();
     const { data: tokenBalances, isPending: isPendingBalances } =
-        useUserTokenBalances(currentUser);
+        useUserTokenBalances(homepage.tokens.graphql, currentUser);
 
     const availableBalance = useMemo(
         () => getSystemTokenBalance(tokenBalances, systemToken.id),

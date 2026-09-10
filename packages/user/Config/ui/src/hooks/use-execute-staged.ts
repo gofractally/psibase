@@ -7,9 +7,9 @@ export const useExecuteStaged = () => {
 
     return usePluginMutation<[number]>(
         {
-            intf: "respondent",
+            intf: "staged",
             method: "execute",
-            service: "staged-tx",
+            service: "config",
         },
         {
             error: "Failed executing proposal",

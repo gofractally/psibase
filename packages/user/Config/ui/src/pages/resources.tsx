@@ -3,10 +3,11 @@ import { VirtualServer } from "@/components/virtual-server";
 
 import { PageContainer } from "@shared/components/page-container";
 import { useSystemToken } from "@shared/hooks/use-system-token";
+import { tokens } from "@shared/lib/plugins";
 
 export const Resources = () => {
     const { data: systemToken, isLoading: systemTokenLoading } =
-        useSystemToken();
+        useSystemToken(tokens.authorized.graphql);
 
     return (
         <PageContainer className="space-y-6">

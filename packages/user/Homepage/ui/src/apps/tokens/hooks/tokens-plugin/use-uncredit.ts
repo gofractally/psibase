@@ -31,9 +31,9 @@ export const useUncredit = (user: string | null, counterParty: string) =>
             );
 
             return supervisor.functionCall({
-                service: "tokens",
+                service: "homepage",
                 plugin: "plugin",
-                intf: "user",
+                intf: "tokens",
                 method: "uncredit",
                 params: [tokenId, debitor, amount, memo],
             });

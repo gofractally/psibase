@@ -14,6 +14,7 @@ import { GlowingCard } from "@shared/components/glowing-card";
 import { ShowContactsButton } from "@shared/components/show-contacts-button";
 import { TableContact } from "@shared/components/tables/table-contact";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { profiles } from "@shared/lib/plugins";
 import {
     CardAction,
     CardContent,
@@ -60,6 +61,10 @@ export const GuildApplicants = () => {
                                 returnPath={paths.guild.membership.applicants(
                                     guildAccount!,
                                 )}
+                                getContacts={profiles.contacts.get}
+                                hasReadPermission={
+                                    profiles.api.hasReadPermission
+                                }
                             />
                         </CardAction>
                     </CardHeader>
@@ -87,6 +92,13 @@ export const GuildApplicants = () => {
                                         <TableCell className="font-medium">
                                             <TableContact
                                                 account={application.applicant}
+                                                getContacts={
+                                                    profiles.contacts.get
+                                                }
+                                                hasReadPermission={
+                                                    profiles.api
+                                                        .hasReadPermission
+                                                }
                                             />
                                         </TableCell>
                                         <TableCell className="text-end">

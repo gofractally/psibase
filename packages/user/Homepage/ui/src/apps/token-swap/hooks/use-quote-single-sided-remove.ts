@@ -1,4 +1,4 @@
-import { tokenSwap, usePluginFunctionQuery } from "@shared/lib/plugins";
+import { homepage, usePluginFunctionQuery } from "@shared/lib/plugins";
 import { Pool, TokenAmount } from "@shared/lib/plugins/token-swap";
 
 export const useQuoteSingleSidedRemove = (
@@ -8,7 +8,7 @@ export const useQuoteSingleSidedRemove = (
     desiredAmount?: TokenAmount,
 ) =>
     usePluginFunctionQuery(
-        tokenSwap.liquidity.quoteSingleSidedRemove,
+        homepage.dex.liquidity.quoteSingleSidedRemove,
         [pool!, tokenBalance, desiredAmount!],
         { enabled },
     );

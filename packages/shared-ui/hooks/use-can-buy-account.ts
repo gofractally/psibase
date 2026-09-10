@@ -1,9 +1,13 @@
 import { usePluginFunctionQuery } from "@shared/hooks/plugin-function/use-plugin-function-query";
-import { nameMarket } from "@shared/lib/plugins";
+import { type PluginCall } from "@shared/lib/plugins/lib/call-plugin-function";
 
 type Options = {
     enabled?: boolean;
 };
 
-export const useCanBuyAccount = (options: Options = { enabled: true }) =>
-    usePluginFunctionQuery(nameMarket.api.canCreateAccount, [], options);
+export type CanCreateAccountCall = PluginCall<[], unknown>;
+
+export const useCanBuyAccount = (
+    canCreateAccount: CanCreateAccountCall,
+    options: Options = { enabled: true },
+) => usePluginFunctionQuery(canCreateAccount, [], options);

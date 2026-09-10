@@ -4,6 +4,7 @@ mod bindings;
 use bindings::exports::fractal_core::plugin::admin_fractal::Guest as AdminFractal;
 use bindings::exports::fractal_core::plugin::admin_guild::Guest as AdminGuild;
 
+use bindings::exports::fractal_core::plugin::invite::Guest as Invite;
 use bindings::exports::fractal_core::plugin::user_eval::Guest as UserEval;
 use bindings::exports::fractal_core::plugin::user_fractal::Guest as UserFractal;
 use bindings::exports::fractal_core::plugin::user_guild::Guest as UserGuild;
@@ -323,6 +324,12 @@ impl UserGuild for FractalCorePlugin {
             &comment,
             endorses,
         )
+    }
+}
+
+impl Invite for FractalCorePlugin {
+    fn import_invite_token(token: String) -> Result<u32, Error> {
+        bindings::invite::plugin::invitee::import_invite_token(&token)
     }
 }
 

@@ -1,6 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 
 import { removeUserFromCache } from "@shared/hooks/use-contacts";
+import { homepage } from "@shared/lib/plugins";
 import SharedQueryKey from "@shared/lib/query-keys";
 import { type Account, zAccount } from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";
@@ -10,7 +11,7 @@ export const useDeleteContact = () =>
     useMutation({
         mutationFn: async (account: Account) => {
             await supervisor.functionCall({
-                service: zAccount.parse("profiles"),
+                service: zAccount.parse("homepage"),
                 method: "remove",
                 params: [zAccount.parse(account)],
                 intf: "contacts",
@@ -21,6 +22,6 @@ export const useDeleteContact = () =>
             const currentUser = zAccount.parse(
                 context.client.getQueryData(SharedQueryKey.currentUser()),
             );
-            removeUserFromCache(currentUser, account);
+            removeUserFromCache(currentUser, account, homepage.service);
         },
     });

@@ -1,6 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { fetchAccountMarketsOverview } from "@shared/lib/graphql/namemarket";
+import {
+    type GraphqlPluginCall,
+    fetchAccountMarketsOverview,
+} from "@shared/lib/graphql/namemarket";
 import QueryKey from "@shared/lib/query-keys";
 
 export const ACCOUNT_MARKETS_REFETCH_INTERVAL_MS = 1000;
@@ -10,10 +13,13 @@ export type UseAccountMarketsOptions = {
     enabled?: boolean;
 };
 
-export const useAccountMarkets = (options?: UseAccountMarketsOptions) =>
+export const useAccountMarkets = (
+    graphql: GraphqlPluginCall,
+    options?: UseAccountMarketsOptions,
+) =>
     useQuery({
-        queryKey: QueryKey.nameMarketsOverview(),
-        queryFn: fetchAccountMarketsOverview,
+        queryKey: [...QueryKey.nameMarketsOverview(), graphql.service],
+        queryFn: () => fetchAccountMarketsOverview(graphql),
         refetchInterval: options?.refetchInterval ?? false,
         enabled: options?.enabled ?? true,
     });
