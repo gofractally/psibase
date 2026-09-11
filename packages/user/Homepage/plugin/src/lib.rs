@@ -41,6 +41,14 @@ impl NameMarketApi for HomepagePlugin {
         name_market::plugin::api::buy(&account, &max_cost)
     }
 
+    fn can_create_account() -> bool {
+        name_market::plugin::api::can_create_account()
+    }
+
+    fn get_markets_overview() -> Result<name_market::plugin::api::MarketsOverview, Error> {
+        name_market::plugin::api::get_markets_overview()
+    }
+
     fn graphql(query: String) -> Result<String, Error> {
         name_market::plugin::authorized::graphql(&query)
     }
@@ -82,6 +90,14 @@ impl Tokens for HomepagePlugin {
         tokens::plugin::user_config::enable_user_auto_debit(enable)
     }
 
+    fn get_system_token() -> Result<Option<tokens::plugin::types::SystemTokenInfo>, Error> {
+        tokens::plugin::helpers::get_system_token()
+    }
+
+    fn get_user_balances(user: String) -> Result<Vec<tokens::plugin::types::UserBalance>, Error> {
+        tokens::plugin::helpers::get_user_balances(&user)
+    }
+
     fn graphql(query: String) -> Result<String, Error> {
         tokens::plugin::authorized::graphql(&query)
     }
@@ -110,6 +126,10 @@ impl Contacts for HomepagePlugin {
 
     fn remove_avatar() -> Result<(), Error> {
         profiles::plugin::api::remove_avatar()
+    }
+
+    fn has_read_permission() -> bool {
+        profiles::plugin::api::has_read_permission()
     }
 }
 
@@ -168,6 +188,10 @@ impl Vserver for HomepagePlugin {
 
     fn resize_and_fill_gas_tank(new_capacity: String) -> Result<(), Error> {
         virtual_server::plugin::billing::resize_and_fill_gas_tank(&new_capacity)
+    }
+
+    fn get_billing_config() -> Result<virtual_server::plugin::authorized::BillingConfig, Error> {
+        virtual_server::plugin::authorized::get_billing_config()
     }
 
     fn graphql(query: String) -> Result<String, Error> {

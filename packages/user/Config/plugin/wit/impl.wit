@@ -28,4 +28,5 @@ world impl {
     export staged;
     export sites;
     export transact;
+    export tokens;
 }

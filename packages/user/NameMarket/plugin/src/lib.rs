@@ -196,6 +196,29 @@ impl Api for NameMarketPlugin {
         overview.market_params.iter().any(|market| market.enabled)
     }
 
+    #[psibase_plugin::authorized(None)]
+    fn get_markets_overview() -> Result<bindings::exports::name_market::plugin::api::MarketsOverview, Error> {
+        let overview = markets_overview()?;
+        Ok(bindings::exports::name_market::plugin::api::MarketsOverview {
+            market_params: overview
+                .market_params
+                .into_iter()
+                .map(|row| bindings::exports::name_market::plugin::api::MarketParam {
+                    length: row.length,
+                    enabled: row.enabled,
+                })
+                .collect(),
+            current_prices: overview
+                .current_prices
+                .into_iter()
+                .map(|row| bindings::exports::name_market::plugin::api::MarketPrice {
+                    length: row.length,
+                    price: row.price.to_string(),
+                })
+                .collect(),
+        })
+    }
+
     #[psibase_plugin::authorized(High, whitelist = ["accounts", "homepage"])]
     fn buy(account: String, max_cost: String) -> Result<(), Error> {
         let acct_name = AccountNumber::from_exact(&account)

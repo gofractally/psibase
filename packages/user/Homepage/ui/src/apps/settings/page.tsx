@@ -1,11 +1,10 @@
-import { useSystemToken } from "@shared/hooks/use-system-token";
-import { homepage } from "@shared/lib/plugins";
+import { useSystemToken } from "@/hooks/use-system-token";
 
 import { UserProfileSection } from "./components/user-profile-section";
 import { UserSettingsSection } from "./components/user-settings-section";
 
 export const SettingsPage = () => {
-    const { data: systemToken } = useSystemToken(homepage.tokens.graphql);
+    const { data: systemToken } = useSystemToken();
 
     return (
         <div className="p-4">

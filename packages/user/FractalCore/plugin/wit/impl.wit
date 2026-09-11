@@ -10,6 +10,8 @@ world impl {
 
     include host:db/imports;
     include invite:plugin/imports;
+    import profiles:plugin/api;
+    import profiles:plugin/contacts;
 
     export admin-guild;
     export admin-fractal;
@@ -17,4 +19,5 @@ world impl {
     export user-fractal;
     export user-eval;
     export invite;
+    export contacts;
 }

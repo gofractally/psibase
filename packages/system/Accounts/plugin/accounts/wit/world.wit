@@ -56,7 +56,25 @@ interface admin {
     preapprove-account: func(account: string);
 }
 
+interface tokens {
+    use host:types/types.{error};
+    use tokens:plugin/types.{system-token-info, user-balance};
+
+    get-system-token: func() -> result<option<system-token-info>, error>;
+    get-user-balances: func(user: string) -> result<list<user-balance>, error>;
+}
+
+interface name-market {
+    use host:types/types.{error};
+    use name-market:plugin/api.{markets-overview};
+
+    can-create-account: func() -> bool;
+    get-markets-overview: func() -> result<markets-overview, error>;
+}
+
 world imports {
     import api;
     import active-app;
+    import tokens;
+    import name-market;
 }

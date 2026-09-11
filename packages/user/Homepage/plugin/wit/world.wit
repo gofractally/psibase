@@ -2,6 +2,7 @@ package homepage:plugin;
 
 interface name-market {
     use host:types/types.{error};
+    use name-market:plugin/api.{markets-overview};
 
     /// Purchases a account name, claims it, configures auth-sig, and returns the new account's private key.
     ///
@@ -9,18 +10,22 @@ interface name-market {
     claim-and-set-key: func(account: string) -> result<string, error>;
 
     buy: func(account: string, max-cost: string) -> result<_, error>;
+    can-create-account: func() -> bool;
+    get-markets-overview: func() -> result<markets-overview, error>;
     graphql: func(query: string) -> result<string, error>;
 }
 
 interface tokens {
     use host:types/types.{error};
-    use tokens:plugin/types.{decimal};
+    use tokens:plugin/types.{decimal, system-token-info, user-balance};
 
     credit: func(token-id: u32, debitor: string, amount: decimal, memo: string) -> result<_, error>;
     uncredit: func(token-id: u32, debitor: string, amount: decimal, memo: string) -> result<_, error>;
     debit: func(token-id: u32, creditor: string, amount: decimal, memo: string) -> result<_, error>;
     reject: func(token-id: u32, creditor: string, memo: string) -> result<_, error>;
     enable-user-auto-debit: func(enable: bool) -> result<_, error>;
+    get-system-token: func() -> result<option<system-token-info>, error>;
+    get-user-balances: func(user: string) -> result<list<user-balance>, error>;
     graphql: func(query: string) -> result<string, error>;
 }
 
@@ -34,6 +39,7 @@ interface contacts {
     set-profile: func(profile: profile) -> result<_, error>;
     upload-avatar: func(avatar: avatar) -> result<_, error>;
     remove-avatar: func() -> result<_, error>;
+    has-read-permission: func() -> bool;
 }
 
 interface chainmail {
@@ -58,9 +64,11 @@ interface invite {
 
 interface vserver {
     use host:types/types.{error};
+    use virtual-server:plugin/authorized.{billing-config};
 
     fill-gas-tank: func() -> result<_, error>;
     resize-and-fill-gas-tank: func(new-capacity: string) -> result<_, error>;
+    get-billing-config: func() -> result<billing-config, error>;
     graphql: func(query: string) -> result<string, error>;
 }
 

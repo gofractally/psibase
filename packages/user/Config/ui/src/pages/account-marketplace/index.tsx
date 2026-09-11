@@ -5,6 +5,11 @@ import { useCallback, useEffect, useMemo } from "react";
 import { useConfiguredNameMarkets } from "@/hooks/name-markets/use-configured-markets";
 import { useSaveNameMarkets } from "@/hooks/name-markets/use-save-name-markets";
 import {
+    ACCOUNT_MARKETS_REFETCH_INTERVAL_MS,
+    useAccountMarkets,
+} from "@/hooks/use-account-markets";
+import { useSystemToken } from "@/hooks/use-system-token";
+import {
     type NameMarketFormRow,
     buildNameMarketsFormValues,
     validateDirtyMarkets,
@@ -14,12 +19,6 @@ import { scrollToFirstMarketFieldError } from "@/lib/name-market-validation-ui";
 import { useAppForm } from "@shared/components/form/app-form";
 import { LivePrice } from "@shared/components/live-price";
 import { PageContainer } from "@shared/components/page-container";
-import {
-    ACCOUNT_MARKETS_REFETCH_INTERVAL_MS,
-    useAccountMarkets,
-} from "@shared/hooks/use-account-markets";
-import { useSystemToken } from "@shared/hooks/use-system-token";
-import { config, tokens } from "@shared/lib/plugins";
 import {
     MAX_ACCOUNT_NAME_LENGTH,
     MIN_ACCOUNT_NAME_LENGTH,
@@ -67,7 +66,7 @@ const isMarketRowDirty = (
 
 export const NameMarketConfig = () => {
     const { data: systemToken, isLoading: systemTokenLoading } =
-        useSystemToken(tokens.authorized.graphql);
+        useSystemToken();
     const rowActionsDisabled = !systemToken;
     const tokenMissingConfirmed = systemToken === null;
 
@@ -79,13 +78,10 @@ export const NameMarketConfig = () => {
         refetch,
     } = useConfiguredNameMarkets();
 
-    const { data: liveMarkets } = useAccountMarkets(
-        config.nameMarket.graphql,
-        {
-            refetchInterval: ACCOUNT_MARKETS_REFETCH_INTERVAL_MS,
-            enabled: !systemTokenLoading && systemToken !== undefined,
-        },
-    );
+    const { data: liveMarkets } = useAccountMarkets({
+        refetchInterval: ACCOUNT_MARKETS_REFETCH_INTERVAL_MS,
+        enabled: !systemTokenLoading && systemToken !== undefined,
+    });
 
     const livePriceByLength = useMemo(
         () => new Map(liveMarkets?.map((row) => [row.length, row.price]) ?? []),

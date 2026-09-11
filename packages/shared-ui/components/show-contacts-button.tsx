@@ -5,15 +5,6 @@ import { siblingUrl } from "@psibase/common-lib";
 
 import { useBranding } from "@shared/hooks/use-branding";
 import {
-    type ContactsGetCall,
-    useContacts,
-} from "@shared/hooks/use-contacts";
-import { useCurrentUser } from "@shared/hooks/use-current-user";
-import {
-    type HasReadPermissionCall,
-    useHasProfilesReadPermission,
-} from "@shared/hooks/use-has-profiles-read-permission";
-import {
     AlertDialog,
     AlertDialogAction,
     AlertDialogCancel,
@@ -27,13 +18,11 @@ import {
 import { Button } from "@shared/shadcn/ui/button";
 
 export const ShowContactsButton = ({
-    returnPath,
-    getContacts,
     hasReadPermission,
+    onRequestPermission,
 }: {
-    returnPath?: string;
-    getContacts: ContactsGetCall;
-    hasReadPermission: HasReadPermissionCall;
+    hasReadPermission: boolean | undefined;
+    onRequestPermission: () => void;
 }) => {
     const { data: networkName } = useBranding();
     const contactsUrl = useMemo(
@@ -41,21 +30,7 @@ export const ShowContactsButton = ({
         [networkName],
     );
 
-    const { data: currentUser } = useCurrentUser();
-    const { data: hasProfilesReadPermission } = useHasProfilesReadPermission(
-        hasReadPermission,
-        {
-            enabled: !!currentUser,
-        },
-    );
-    const { refetch: prompt } = useContacts(
-        getContacts,
-        currentUser,
-        { enabled: false },
-        returnPath ? { enabled: true, returnPath } : undefined,
-    );
-
-    if (hasProfilesReadPermission === false) {
+    if (hasReadPermission === false) {
         return (
             <AlertDialog>
                 <AlertDialogTrigger asChild>
@@ -84,7 +59,7 @@ export const ShowContactsButton = ({
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => prompt()}>
+                        <AlertDialogAction onClick={onRequestPermission}>
                             Continue
                         </AlertDialogAction>
                     </AlertDialogFooter>

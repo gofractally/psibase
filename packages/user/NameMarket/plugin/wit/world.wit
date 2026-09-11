@@ -57,11 +57,29 @@ interface market-admin {
 interface api {
     use host:types/types.{error};
 
+    record market-param {
+        length: u8,
+        enabled: bool,
+    }
+
+    record market-price {
+        length: u8,
+        price: string,
+    }
+
+    record markets-overview {
+        market-params: list<market-param>,
+        current-prices: list<market-price>,
+    }
+
     /// Returns whether an account can currently be created.
     ///
     /// Returns true when the user is logged in, the network token is defined,
     /// and at least one name market is enabled with a live price row.
     can-create-account: func() -> bool;
+
+    /// Returns configured name markets and current ask prices.
+    get-markets-overview: func() -> result<markets-overview, error>;
 
     /// Purchase an account name
     /// * `account`: the account to purchase the name for

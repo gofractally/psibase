@@ -49,6 +49,7 @@ interface transact {
 interface name-market {
     use host:types/types.{error};
     use name-market:plugin/market-admin.{market-config};
+    use name-market:plugin/api.{markets-overview};
 
     /// Batch create or update name markets.
     /// * For lengths with no existing market: creates the market; `initial-price` must be set.
@@ -56,6 +57,7 @@ interface name-market {
     /// * Skips entries whose params match current on-chain state (no-op).
     configure-markets: func(configs: list<market-config>) -> result<_, error>;
 
+    get-markets-overview: func() -> result<markets-overview, error>;
     graphql: func(query: string) -> result<string, error>;
 }
 
@@ -123,6 +125,7 @@ interface virtual-server {
         cpu-pricing-params,
         net-pricing-params
     };
+    use virtual-server:plugin/authorized.{billing-config};
 
     /// Initialize the billing system
     /// A system token must have already been set to enable billing.
@@ -162,7 +165,15 @@ interface virtual-server {
     /// * `params` - The network pricing parameters
     set-net-pricing-params: func(params: net-pricing-params) -> result<_, error>;
 
+    get-billing-config: func() -> result<billing-config, error>;
     graphql: func(query: string) -> result<string, error>;
+}
+
+interface tokens {
+    use host:types/types.{error};
+    use tokens:plugin/types.{system-token-info};
+
+    get-system-token: func() -> result<option<system-token-info>, error>;
 }
 
 world imports {
@@ -176,4 +187,5 @@ world imports {
     import staged;
     import sites;
     import transact;
+    import tokens;
 }

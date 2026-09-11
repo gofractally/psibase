@@ -30,6 +30,16 @@ class NameMarket extends PluginInterface {
         return this._call<[configs: MarketConfigInput[]]>("configureMarkets");
     }
 
+    get getMarketsOverview() {
+        return this._call<
+            [],
+            {
+                marketParams: Array<{ length: number; enabled: boolean }>;
+                currentPrices: Array<{ length: number; price: string }>;
+            }
+        >("getMarketsOverview");
+    }
+
     get graphql() {
         return this._call<[query: string], string>("graphql");
     }
@@ -107,8 +117,26 @@ class Producers extends PluginInterface {
 class VirtualServer extends PluginInterface {
     protected override readonly _intf = "virtual-server" as const;
 
+    get getBillingConfig() {
+        return this._call<
+            [],
+            { feeReceiver: string | null; enabled: boolean }
+        >("getBillingConfig");
+    }
+
     get graphql() {
         return this._call<[query: string], string>("graphql");
+    }
+}
+
+class Tokens extends PluginInterface {
+    protected override readonly _intf = "tokens" as const;
+
+    get getSystemToken() {
+        return this._call<
+            [],
+            { id: number; symbol: string; precision: number } | null
+        >("getSystemToken");
     }
 }
 
@@ -136,6 +164,7 @@ export class Plugin {
     readonly virtualServer: VirtualServer;
     readonly sites: Sites;
     readonly transact: Transact;
+    readonly tokens: Tokens;
 
     constructor(readonly service: Account) {
         this.nameMarket = new NameMarket();
@@ -145,6 +174,7 @@ export class Plugin {
         this.virtualServer = new VirtualServer();
         this.sites = new Sites();
         this.transact = new Transact();
+        this.tokens = new Tokens();
 
         const instances = [
             this.nameMarket,
@@ -154,6 +184,7 @@ export class Plugin {
             this.virtualServer,
             this.sites,
             this.transact,
+            this.tokens,
         ] as PluginInterface[];
 
         for (const instance of instances) {

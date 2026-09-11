@@ -8,9 +8,8 @@ import { useGuild } from "@/hooks/use-guild";
 import { paths } from "@/lib/paths";
 
 import { GlowingCard } from "@shared/components/glowing-card";
-import { ShowContactsButton } from "@shared/components/show-contacts-button";
-import { TableContact } from "@shared/components/tables/table-contact";
-import { profiles } from "@shared/lib/plugins";
+import { ShowContactsButton } from "@/components/show-contacts-button";
+import { TableContact } from "@/components/table-contact";
 import { Badge } from "@shared/shadcn/ui/badge";
 import {
     CardAction,
@@ -53,12 +52,10 @@ export const GuildMembers = () => {
                 <CardTitle>Guild members</CardTitle>
                 <CardAction>
                     <ShowContactsButton
-                        returnPath={paths.guild.membership.members(
+                            returnPath={paths.guild.membership.members(
                             guild?.account ?? "",
                         )}
-                        getContacts={profiles.contacts.get}
-                        hasReadPermission={profiles.api.hasReadPermission}
-                    />
+                        />
                 </CardAction>
             </CardHeader>
             <CardContent className="@container">
@@ -82,16 +79,7 @@ export const GuildMembers = () => {
                                 <TableRow key={member.member}>
                                     <TableCell className="font-medium">
                                         <div className="flex flex-row gap-2">
-                                            <TableContact
-                                                account={member.member}
-                                                getContacts={
-                                                    profiles.contacts.get
-                                                }
-                                                hasReadPermission={
-                                                    profiles.api
-                                                        .hasReadPermission
-                                                }
-                                            />
+                                            <TableContact account={member.member} />
                                             {roleLabel != null && (
                                                 <Badge variant="default">
                                                     {roleLabel}

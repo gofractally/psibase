@@ -201,12 +201,25 @@ class UserGuild extends PluginInterface {
     }
 }
 
+class Contacts extends PluginInterface {
+    protected override readonly _intf = "contacts" as const;
+
+    get get() {
+        return this._call<[], unknown[]>("get");
+    }
+
+    get hasReadPermission() {
+        return this._call<[], boolean>("hasReadPermission");
+    }
+}
+
 export class Plugin {
     readonly adminFractal: AdminFractal;
     readonly userFractal: UserFractal;
     readonly userEval: UserEval;
     readonly adminGuild: AdminGuild;
     readonly userGuild: UserGuild;
+    readonly contacts: Contacts;
 
     constructor(readonly service: Account) {
         // Initialize all interfaces with the correct service
@@ -215,6 +228,7 @@ export class Plugin {
         this.userEval = new UserEval();
         this.adminGuild = new AdminGuild();
         this.userGuild = new UserGuild();
+        this.contacts = new Contacts();
 
         // Set the protected _service on each instance
         // This avoids the "used before initialization" error
@@ -224,6 +238,7 @@ export class Plugin {
             this.userEval,
             this.adminGuild,
             this.userGuild,
+            this.contacts,
         ] as PluginInterface[];
 
         for (const instance of instances) {

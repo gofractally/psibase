@@ -5,6 +5,20 @@ import { Authorized } from "./authorized-graphql-plugin";
 type TID = number;
 type Decimal = string;
 
+export type SystemTokenInfo = {
+    id: number;
+    symbol: string;
+    precision: number;
+};
+
+export type UserBalance = {
+    tokenId: number;
+    balance: string;
+    symbol: string | null;
+    precision: number;
+    account: string;
+};
+
 class Issuer extends PluginInterface {
     protected override readonly _intf = "issuer" as const;
 
@@ -37,6 +51,14 @@ class Helpers extends PluginInterface {
             [tokenId: TID, amount: Decimal],
             number | string | bigint
         >("decimalToU64");
+    }
+
+    get getSystemToken() {
+        return this._call<[], SystemTokenInfo | null>("getSystemToken");
+    }
+
+    get getUserBalances() {
+        return this._call<[user: string], UserBalance[]>("getUserBalances");
     }
 }
 
