@@ -510,6 +510,16 @@ TEST_CASE("Test runAs")
          REQUIRE(t.to<AuthTest>().newAccount(carol, std::vector{alice}, 1).succeeded());
          REQUIRE(t.to<AuthTest>().newAccount(dave, std::vector{bob, carol}, 1).succeeded());
       }
+      SECTION("or loop right")
+      {
+         REQUIRE(t.to<AuthTest>().newAccount(carol, std::vector{alice}, 1).succeeded());
+         REQUIRE(t.to<AuthTest>().newAccount(dave, std::vector{carol, dave}, 1).succeeded());
+      }
+      SECTION("or loop left")
+      {
+         REQUIRE(t.to<AuthTest>().newAccount(carol, std::vector{alice}, 1).succeeded());
+         REQUIRE(t.to<AuthTest>().newAccount(dave, std::vector{dave, carol}, 1).succeeded());
+      }
       SECTION("regression: refcount management")
       {
          REQUIRE(t.to<AuthTest>().newAccount(eliza, std::vector{alice}, 1).succeeded());
