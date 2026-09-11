@@ -109,30 +109,13 @@ mod service {
     }
 
     #[event(history)]
-    fn minted(nftId: NID, issuer: AccountNumber) {
-        unimplemented!()
-    }
-    #[event(history)]
-    fn burned(nftId: NID, owner: AccountNumber) {
-        unimplemented!()
-    }
-
-    #[event(history)]
-    fn credited(nftId: NID, creditor: AccountNumber, debitor: AccountNumber, memo: String) {
-        unimplemented!()
-    }
-    #[event(history)]
-    fn uncredited(nftId: NID, creditor: AccountNumber, debitor: AccountNumber, memo: String) {
-        unimplemented!()
-    }
-
-    #[event(merkle)]
-    fn transferred(nftId: NID, creditor: AccountNumber, debitor: AccountNumber, memo: String) {
-        unimplemented!()
-    }
-
-    #[event(history)]
-    fn userConfSet(account: AccountNumber, index: u8, enable: bool) {
+    pub fn ownerChange(
+        nftId: NID,
+        action: u8,
+        account: AccountNumber,
+        counter_party: AccountNumber,
+        memo: Memo,
+    ) {
         unimplemented!()
     }
 }
