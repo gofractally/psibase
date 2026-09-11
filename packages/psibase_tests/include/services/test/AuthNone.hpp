@@ -15,6 +15,8 @@ namespace TestService
 
       void canAuthUserSys(psibase::AccountNumber user);
 
+      std::vector<psibase::AccountNumber> getDlgsSys(psibase::AccountNumber);
+
       bool isAuthSys(psibase::AccountNumber              sender,
                      std::vector<psibase::AccountNumber> authorizers);
 
@@ -24,6 +26,7 @@ namespace TestService
    PSIO_REFLECT(AuthNone,  //
                 method(checkAuthSys, flags, sender, action, claims),
                 method(canAuthUserSys, user),
+                method(getDlgsSys, account),
                 method(isAuthSys, sender, authorizers),
                 method(isRejectSys, sender, rejecters)
                 //

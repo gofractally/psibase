@@ -404,6 +404,7 @@ namespace SystemService
 
       void setAuthorized(AuthItem& self)
       {
+         check(!self.second.authorized, "Internal error: cannot set authorized again");
          self.second.authorized = true;
          // Add parents to the stack, as their results might have changed
          for (AuthItem* p : self.second.parents)
@@ -442,7 +443,7 @@ namespace SystemService
          for (auto child : delegates)
          {
             auto [iter, inserted] = authorized.try_emplace(child);
-            if (!iter->second.queued)
+            if (!iter->second.queued && !iter->second.authorized)
             {
                stack.push_back(&*iter);
                iter->second.queued = true;

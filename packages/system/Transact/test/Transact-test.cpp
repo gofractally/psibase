@@ -9,6 +9,7 @@
 #include <services/system/Transact.hpp>
 #include <services/system/VerifySig.hpp>
 #include <services/test/AuthNone.hpp>
+#include <services/test/AuthTest.hpp>
 #include <services/test/RemoveCode.hpp>
 #include <services/user/Nop.hpp>
 
@@ -470,5 +471,55 @@ TEST_CASE("Test runAs")
                   .runAs(std::move(act), std::vector<ServiceMethod>{})
                   .succeeded());
       CHECK(t.from(alice1).to<Nop>().nop().succeeded());
+   }
+   SECTION("multisig pass")
+   {
+      // define some accounts. dave is always the authorized account
+      auto bob   = AccountNumber{"bob45678"};
+      auto carol = AccountNumber{"carol678"};
+      auto dave  = AccountNumber{"dave5678"};
+      t.addService<AuthTest>("AuthTest.wasm");
+      auto eliza = AccountNumber{"eliza678"};
+
+      SECTION("and 2")
+      {
+         REQUIRE(t.to<AuthTest>().newAccount(bob, std::vector{alice}, 1).succeeded());
+         REQUIRE(t.to<AuthTest>().newAccount(carol, std::vector{alice}, 1).succeeded());
+         REQUIRE(t.to<AuthTest>().newAccount(dave, std::vector{bob, carol}, 2).succeeded());
+      }
+      SECTION("or 2")
+      {
+         REQUIRE(t.to<AuthTest>().newAccount(bob, std::vector{alice}, 1).succeeded());
+         REQUIRE(t.to<AuthTest>().newAccount(carol, std::vector{alice}, 1).succeeded());
+         REQUIRE(t.to<AuthTest>().newAccount(dave, std::vector{bob, carol}, 1).succeeded());
+      }
+      SECTION("or left")
+      {
+         t.addService<AuthNone>("AuthNone.wasm");
+         REQUIRE(t.to<AuthTest>().newAccount(bob, std::vector{alice}, 1).succeeded());
+         t.addAccount(carol, AuthNone::service);
+         REQUIRE(t.to<AuthTest>().newAccount(dave, std::vector{bob, carol}, 1).succeeded());
+      }
+      SECTION("or right")
+      {
+         t.addService<AuthNone>("AuthNone.wasm");
+         t.addAccount(bob, AuthNone::service);
+         REQUIRE(t.to<AuthTest>().newAccount(carol, std::vector{alice}, 1).succeeded());
+         REQUIRE(t.to<AuthTest>().newAccount(dave, std::vector{bob, carol}, 1).succeeded());
+      }
+      SECTION("regression: refcount management")
+      {
+         REQUIRE(t.to<AuthTest>().newAccount(eliza, std::vector{alice}, 1).succeeded());
+         REQUIRE(t.to<AuthTest>().newAccount(bob, std::vector{eliza, alice}, 1).succeeded());
+         REQUIRE(t.to<AuthTest>().newAccount(carol, std::vector{eliza, bob}, 2).succeeded());
+         REQUIRE(t.to<AuthTest>().newAccount(dave, std::vector{carol, bob}, 2).succeeded());
+      }
+
+      auto act = transactor<Accounts>().from(dave).setAuthServ(AuthAny::service);
+      REQUIRE(t.from(alice)
+                  .to<Transact>()
+                  .runAs(std::move(act), std::vector<ServiceMethod>{})
+                  .succeeded());
+      CHECK(t.from(dave).to<Nop>().nop().succeeded());
    }
 }
