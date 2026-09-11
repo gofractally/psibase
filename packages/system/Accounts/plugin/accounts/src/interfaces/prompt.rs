@@ -1,9 +1,9 @@
-use crate::bindings::accounts::query::api as AccountsQuery;
+use crate::bindings::accounts::chain_query::api as AccountsQuery;
 use crate::bindings::auth_sig::plugin as AuthSig;
 use crate::bindings::exports::accounts::plugin::prompt::{Credential, Guest as Prompt};
 use crate::bindings::host::{
-    crypto::keyvault as HostCrypto, client::api as Client, auth::api as HostAuth,
-    types::types::Error,
+    accounts::api as HostAccounts, crypto::keyvault as HostCrypto, client::api as Client,
+    auth::api as HostAuth, types::types::Error,
 };
 use crate::bindings::invite::plugin::redemption as Invites;
 use crate::bindings::name_market::plugin::api as NameMarket;
@@ -20,7 +20,7 @@ impl Prompt for AccountsPlugin {
     fn can_create_account() -> bool {
         assert_eq!(Client::get_sender(), Client::get_receiver());
 
-        if AccountsQuery::is_logged_in() {
+        if HostAccounts::is_logged_in() {
             return true;
         }
 
@@ -90,7 +90,7 @@ impl Prompt for AccountsPlugin {
 
         let private_key;
 
-        if AccountsQuery::is_logged_in() {
+        if HostAccounts::is_logged_in() {
             private_key = AuthSig::actions::create_account(&account_name)?;
         } else if Invites::get_active_invite().unwrap_or(false) {
             private_key = Invites::create_new_account(&account_name);

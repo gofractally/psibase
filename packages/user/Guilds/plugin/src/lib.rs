@@ -216,10 +216,10 @@ impl AdminGuild for GuildsPlugin {
             fractal.parse().unwrap(),
             guild_account.parse().unwrap(),
             Memo::try_from(display_name).unwrap(),
-            accounts::query::api::gen_rand_account(Some("c-"))?
+            accounts::chain_query::api::gen_rand_account(Some("c-"))?
                 .parse()
                 .unwrap(),
-            accounts::query::api::gen_rand_account(Some("r-"))?
+            accounts::chain_query::api::gen_rand_account(Some("r-"))?
                 .parse()
                 .unwrap(),
         );

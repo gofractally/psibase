@@ -1,9 +1,7 @@
-package accounts:query;
+package accounts:chain-query;
 
 world impl {
-    include host:client/imports;
     include host:http/imports;
-    include host:db/imports;
     include host:types/imports;
 
     export api;

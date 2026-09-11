@@ -13,7 +13,8 @@ world impl {
     include host:http/imports;
     include host:db/imports;
     include host:crypto/imports;
-    include accounts:query/imports;
+    include accounts:chain-query/imports;
+    include host:accounts/imports;
     include permissions:plugin/imports;
 
     import transact:plugin/ledger;
