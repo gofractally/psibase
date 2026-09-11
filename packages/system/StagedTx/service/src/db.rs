@@ -1,16 +1,16 @@
 #[psibase::service_tables]
 pub mod tables {
     use async_graphql::SimpleObject;
-    use psibase::{AccountNumber, Action, Checksum256, Fracpack, TimePointUSec, ToSchema};
+    use psibase::{AccountNumber, Action, Checksum256, Pack, TimePointUSec, ToSchema, Unpack};
     use serde::{Deserialize, Serialize};
 
-    #[derive(Fracpack, Serialize, Deserialize, ToSchema, SimpleObject)]
+    #[derive(Pack, Unpack, Serialize, Deserialize, ToSchema, SimpleObject)]
     pub struct ActionList {
         pub actions: Vec<Action>,
     }
 
     #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack)]
+    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack)]
     pub struct InitRow {}
     impl InitRow {
         #[primary_key]
@@ -19,7 +19,7 @@ pub mod tables {
 
     /// A table that contains all of the transactions currently staged.
     #[table(name = "StagedTxTable", index = 1)]
-    #[derive(Fracpack, Serialize, Deserialize, ToSchema, SimpleObject)]
+    #[derive(Pack, Unpack, Serialize, Deserialize, ToSchema, SimpleObject)]
     pub struct StagedTx {
         /// Unique ID for a staged transaction
         pub id: u32,
@@ -58,7 +58,7 @@ pub mod tables {
     }
 
     #[table(name = "LastUsedTable", index = 2)]
-    #[derive(Default, Fracpack, Serialize, Deserialize, ToSchema, SimpleObject)]
+    #[derive(Default, Pack, Unpack, Serialize, Deserialize, ToSchema, SimpleObject)]
     pub struct LastUsed {
         pub id: u32,
     }
@@ -69,7 +69,7 @@ pub mod tables {
 
     /// A table that contains all of the responses to staged transactions.
     #[table(name = "ResponseTable", index = 3)]
-    #[derive(Debug, Fracpack, Serialize, Deserialize, ToSchema, SimpleObject)]
+    #[derive(Debug, Pack, Unpack, Serialize, Deserialize, ToSchema, SimpleObject)]
     pub struct Response {
         /// The ID of the staged transaction
         pub id: u32,
@@ -102,7 +102,7 @@ pub mod tables {
     /// Table can be used to search for all parties in a staged transaction, or all
     /// staged transactions related to a given party.
     #[table(name = "StagedTxPartyTable", index = 4)]
-    #[derive(Fracpack, Serialize, Deserialize, ToSchema, SimpleObject)]
+    #[derive(Pack, Unpack, Serialize, Deserialize, ToSchema, SimpleObject)]
     pub struct StagedTxParty {
         /// The ID of the staged transaction
         pub id: u32,

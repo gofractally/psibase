@@ -3,17 +3,18 @@ pub mod tables {
 
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::services::nft::NID;
-    use psibase::services::token_swap::{PPM, Wrapper as TokenSwap, swap};
-    use psibase::services::tokens::{Decimal, Quantity, TID, TokenRecord, Wrapper as Tokens};
+    use psibase::services::token_swap::{swap, Wrapper as TokenSwap, PPM};
+    use psibase::services::tokens::{Decimal, Quantity, TokenRecord, Wrapper as Tokens, TID};
     use psibase::{
-        AccountNumber, Fracpack, Memo, ServiceWrapper, Table, ToSchema, abort_message, get_sender,
+        abort_message, get_sender, AccountNumber, Memo, Pack, ServiceWrapper, Table, ToSchema,
+        Unpack,
     };
 
     use crate::helpers::{mul_div, sqrt};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
+    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug)]
     pub struct InitRow {}
 
     impl InitRow {
@@ -39,7 +40,7 @@ pub mod tables {
     }
 
     #[table(name = "PoolTable", index = 1)]
-    #[derive(Serialize, Deserialize, SimpleObject, ToSchema, Fracpack, Debug)]
+    #[derive(Serialize, Deserialize, SimpleObject, ToSchema, Pack, Unpack, Debug)]
     #[graphql(complex)]
     pub struct Pool {
         #[primary_key]
@@ -48,7 +49,7 @@ pub mod tables {
     }
 
     #[table(name = "ReserveTable", index = 2)]
-    #[derive(Serialize, Deserialize, SimpleObject, ToSchema, Fracpack, Debug)]
+    #[derive(Serialize, Deserialize, SimpleObject, ToSchema, Pack, Unpack, Debug)]
     #[graphql(complex)]
     pub struct Reserve {
         pub pool_id: TID,

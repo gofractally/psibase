@@ -44,13 +44,14 @@ pub fn content_type_mime(content_type: ImgContentType) -> Option<&'static str> {
 #[psibase::service_tables]
 pub mod tables {
     use psibase::AccountNumber;
-    use psibase::{Fracpack, ToSchema};
+    use psibase::{Pack, ToSchema, Unpack};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "ProfileTable", index = 0)]
     #[derive(
         Default,
-        Fracpack,
+        Pack,
+        Unpack,
         ToSchema,
         async_graphql::SimpleObject,
         Serialize,
