@@ -1576,10 +1576,9 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
          if (!account)
             return make404("Account not found");
          Actor<AuthInterface> auth(RTransact::service, account->authService);
-         auto                 flags = AuthInterface::topActionReq | AuthInterface::firstAuthFlag;
-         if (!auth.checkAuthSys(flags, psibase::AccountNumber{}, sender,
-                                ServiceMethod{AccountNumber{}, MethodNumber{}},
-                                std::vector<ServiceMethod>{}, claims))
+         auto                 flags = AuthInterface::firstAuthFlag;
+         if (!auth.checkAuthSys(flags, sender, ServiceMethod{AccountNumber{}, MethodNumber{}},
+                                claims))
          {
             return make400("Login failed");
          }

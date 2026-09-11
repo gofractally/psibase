@@ -8,14 +8,14 @@ namespace TestService
    {
       static constexpr psibase::AccountNumber service = psibase::AccountNumber("auth-none");
 
-      bool checkAuthSys(uint32_t                                  flags,
-                        psibase::AccountNumber                    requester,
-                        psibase::AccountNumber                    sender,
-                        SystemService::ServiceMethod              action,
-                        std::vector<SystemService::ServiceMethod> allowedActions,
-                        std::vector<psibase::Claim>               claims);
+      bool checkAuthSys(uint32_t                     flags,
+                        psibase::AccountNumber       sender,
+                        SystemService::ServiceMethod action,
+                        std::vector<psibase::Claim>  claims);
 
       void canAuthUserSys(psibase::AccountNumber user);
+
+      std::vector<psibase::AccountNumber> getDlgsSys(psibase::AccountNumber);
 
       bool isAuthSys(psibase::AccountNumber              sender,
                      std::vector<psibase::AccountNumber> authorizers);
@@ -24,8 +24,9 @@ namespace TestService
                        std::vector<psibase::AccountNumber> rejecters);
    };
    PSIO_REFLECT(AuthNone,  //
-                method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
+                method(checkAuthSys, flags, sender, action, claims),
                 method(canAuthUserSys, user),
+                method(getDlgsSys, account),
                 method(isAuthSys, sender, authorizers),
                 method(isRejectSys, sender, rejecters)
                 //

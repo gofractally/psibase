@@ -57,70 +57,15 @@ namespace SystemService
       /// protect to resource billing attacks.
       static constexpr uint32_t firstAuthFlag = 0x4000'0000;
 
-      /// Bits which identify kind of request
-      static constexpr uint32_t requestMask = 0x0000'00ff;
-
-      /// Top-level action
-      static constexpr uint32_t topActionReq = 0x01;
-
-      /// See header
-      ///
-      /// `runAs` request. The requester matches the action's
-      /// sender.
-      ///
-      /// Auth services should normally approve this unless
-      /// they enforce stronger rules, e.g. by restricting
-      /// `action` or `allowedActions`.
-      static constexpr uint32_t runAsRequesterReq = 0x02;
-
-      /// See header
-      ///
-      /// `runAs` request. The request matches the criteria from
-      /// a `runAs` request currently in the call stack. `requester`
-      /// matches the earlier `action.service`. `action` matches
-      /// one of the earlier `allowedActions` from the same request.
-      ///
-      /// Auth services should normally approve this unless
-      /// they enforce stronger rules.
-      static constexpr uint32_t runAsMatchedReq = 0x03;
-
-      /// See header
-      ///
-      /// `runAs` request. Same as `runAsMatched`, except the
-      /// requestor provided a non-empty `allowedActions`. This
-      /// expands the authority beyond what was originally granted.
-      ///
-      /// Auth services should normally reject this unless
-      /// they have filtering criteria which allow it.
-      static constexpr uint32_t runAsMatchedExpandedReq = 0x04;
-
-      /// See header
-      ///
-      /// `runAs` request. The other criteria don't match.
-      ///
-      /// Auth services should normally reject this unless
-      /// they have filtering criteria which allow it.
-      static constexpr uint32_t runAsOtherReq = 0x05;
-
       /// Authenticate a top-level action or a `runAs` action
       ///
-      /// * `flags`:          One of the Req (request) constants,
-      ///                     or'ed with 0 or more of the flag
-      ///                     constants
-      /// * `requester`:      `""` if this is a top-level action, or
-      ///                     the sender of the `runAs` action.
-      ///                     This is often different from
-      ///                     `action.sender`.
-      /// * `sender`          The sender being requested for the action.
+      /// * `flags`:          0 or more of the flag constants or'ed together
+      /// * `sender`          The sender being requested for the action
       /// * `action`:         Action to authenticate
-      /// * `allowedActions`: Argument from `runAs`
-      /// * `claims`:         Claims in transaction (e.g. public keys).
-      ///                     Empty if `runAs`
+      /// * `claims`:         Claims in transaction (e.g. public keys)
       bool checkAuthSys(uint32_t                    flags,
-                        psibase::AccountNumber      requester,
                         psibase::AccountNumber      sender,
                         ServiceMethod               action,
-                        std::vector<ServiceMethod>  allowedActions,
                         std::vector<psibase::Claim> claims);
 
       /// Verify that a particular user is allowed to use a
@@ -173,7 +118,7 @@ namespace SystemService
                        std::optional<ServiceMethod>        method);
    };
    PSIO_REFLECT(AuthInterface,
-                method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
+                method(checkAuthSys, flags, sender, action, claims),
                 method(canAuthUserSys, user),
                 method(getDlgsSys, sender),
                 method(isAuthSys, sender, authorizers, method),
@@ -313,7 +258,8 @@ namespace SystemService
       /// This enables the auth checking system. Before this point, `Transact`
       /// allows all transactions to execute without auth checks. After this point,
       /// `Transact` uses [AuthInterface::checkAuthSys] to authenticate
-      /// top-level actions and uses of [runAs].
+      /// top-level actions and [AuthInterface::isAuthSys] to authenticate
+      /// uses of [runAs].
       void finishBoot();
 
       /// Called by native code at the beginning of each block
@@ -363,78 +309,18 @@ namespace SystemService
       /// may perform on `action.sender's` behalf, for as long as this call to
       /// `runAs` is in the call stack. Use `""` for `service` in
       /// `allowedActions` to allow use of any service (danger!). Use `""` for
-      /// `method` to allow any method.
+      /// `method` to allow any method. The caller must be able to authorize
+      /// all actions in `allowedActions`.
       ///
       /// Returns the action's return value, if any.
       ///
       /// This will succeed if any of the following are true:
       /// * `getSender() == action.sender's authService`
-      /// * `getSender() == action.sender`. Requires `action.sender's authService`
-      ///   to approve with flag `AuthInterface::runAsRequesterReq` (normally succeeds).
+      /// * `action.sender` is `getSender()` or a subaccount of `getSender()`
+      /// * The auth service of `action.sender` allows `getSender()` to authorize the action
       /// * An existing `runAs` is currently on the call stack, `getSender()` matches
       ///   `action.service` on that earlier call, and `action` matches
-      ///   `allowedActions` from that same earlier call. Requires `action.sender's
-      ///   authService` to approve with flag `AuthInterface::runAsMatchedReq`
-      ///   if `allowedActions` is empty (normally succeeds), or
-      ///   `AuthInterface::runAsMatchedExpandedReq` if not empty (normally fails).
-      /// * All other cases, requires `action.sender's authService`
-      ///   to approve with flag `AuthInterface::runAsOtherReq` (normally fails).
-      ///
-      ///         +---------------------------------------+
-      ///         | call runAs(action, allowedActions)    |
-      ///         +-------------------+-------------------+
-      ///                             |
-      ///                             v
-      ///          +--------------------------------------+
-      ///          | getSender() == action.sender.authSvc |
-      ///          +-------------------+------------------+
-      ///              yes |                          | no
-      ///                  v                          v
-      ///               +----+          +------------------------------+
-      ///               | OK |          | getSender() == action.sender |
-      ///               +----+          +---------------+--------------+
-      ///                                   yes |           | no
-      ///                                       v           v
-      ///                 +-------------------------+   +----------------------+
-      ///                 | Auth: runAsRequesterReq |   | earlier runAs frame? |
-      ///                 +-----------+-------------+   +----------+-----------+
-      ///                             |                    no |           | yes
-      ///                             v                       v           |
-      ///                +----------------+             (FALLTHROUGH)     |
-      ///                | Needs approval |                               |
-      ///                | (Normally OK)  |                               v
-      ///                +----------------+    +-----------------------------------+
-      ///                                      | getSender() == earlier.action.svc |
-      ///                                      +---------------+-------------------+
-      ///                                       no |           | yes
-      ///                                          |           |
-      ///                                          v           |
-      ///                                   (FALLTHROUGH)      |
-      ///                                                      v-
-      ///                                       +---------------------------------+
-      ///                                       | action matches earlier.allowed? |
-      ///                                       +---------------+-----------------+
-      ///                                         no |         | yes
-      ///                                            v         |
-      ///                                     (FALLTHROUGH)    |
-      ///                                                      |
-      ///                                                      v
-      ///                                        +-------------------------------+
-      ///                                        | current allowedActions empty? |
-      ///                                        +------------+------------------+
-      ///                                            yes |              | no
-      ///                                                v              v
-      ///                            +-------------------------+  +-------------------------------+
-      ///                            | Auth: runAsMatchedReq   |  | Auth: runAsMatchedExpandedReq |
-      ///                            +-----------+-------------+  +---------------+---------------+
-      ///                                        |                                |
-      ///                                        v                                v
-      ///                        +------------------------------+   +------------------------------+
-      ///                        | Needs approval (normally OK) |   | Needs approval (normally no) |
-      ///                        +------------------------------+   +------------------------------+
-      ///
-      ///  (FALLTHROUGH) -> "Auth: runAsOtherReq" -> Needs approval (normally no)
-      ///
+      ///   `allowedActions` from that same earlier call.
       std::vector<char> runAs(psibase::Action action, std::vector<ServiceMethod> allowedActions);
 
       /// Checks authorization for the sender of the first action

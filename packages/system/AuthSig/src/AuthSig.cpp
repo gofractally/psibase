@@ -25,24 +25,10 @@ namespace SystemService
       }
 
       bool AuthSig::checkAuthSys(uint32_t                    flags,
-                                 psibase::AccountNumber      requester,
                                  psibase::AccountNumber      sender,
                                  ServiceMethod               action,
-                                 std::vector<ServiceMethod>  allowedActions,
                                  std::vector<psibase::Claim> claims)
       {
-         auto type = flags & AuthInterface::requestMask;
-         if (type == AuthInterface::runAsRequesterReq)
-            return true;  // Request is valid
-         else if (type == AuthInterface::runAsMatchedReq)
-            return true;  // Request is valid
-         else if (type == AuthInterface::runAsMatchedExpandedReq)
-            abortMessage("runAs: caller attempted to expand powers");
-         else if (type == AuthInterface::runAsOtherReq)
-            abortMessage("runAs: caller is not authorized");
-         else if (type != AuthInterface::topActionReq)
-            abortMessage("unsupported auth type");
-
          auto row = open<AuthTable>(KvMode::read).getIndex<0>().get(sender);
 
          check(row.has_value(), "sender does not have a public key");

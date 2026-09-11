@@ -117,10 +117,8 @@ pub mod service {
     #[allow(non_snake_case)]
     fn checkAuthSys(
         _flags: u32,
-        _requester: AccountNumber,
         sender: AccountNumber,
         _action: ServiceMethod,
-        _allowedActions: Vec<ServiceMethod>,
         _claims: Vec<Claim>,
     ) -> bool {
         abort_message(&format!(

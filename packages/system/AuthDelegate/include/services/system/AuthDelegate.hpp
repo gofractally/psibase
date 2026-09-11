@@ -42,10 +42,8 @@ namespace SystemService
       ///
       /// This action forwards verification to the owning account
       bool checkAuthSys(std::uint32_t               flags,
-                        psibase::AccountNumber      requester,
                         psibase::AccountNumber      sender,
                         ServiceMethod               action,
-                        std::vector<ServiceMethod>  allowedActions,
                         std::vector<psibase::Claim> claims);
 
       /// This is an implementation of the standard auth service interface defined in [SystemService::AuthInterface]
@@ -105,7 +103,7 @@ namespace SystemService
       psibase::Actor<AuthInterface> authServiceOf(psibase::AccountNumber account);
    };
    PSIO_REFLECT(AuthDelegate,  //
-                method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
+                method(checkAuthSys, flags, sender, action, claims),
                 method(canAuthUserSys, user),
                 method(getDlgsSys, sender),
                 method(isAuthSys, sender, authorizers),
