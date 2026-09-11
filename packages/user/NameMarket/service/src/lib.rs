@@ -157,7 +157,11 @@ pub mod service {
         let current_price = Quantity::from(DiffAdjust::call().increment(auction.nft_id, 1));
 
         Accounts::Wrapper::call().preapproveAcc(account);
-        AuthDelegate::Wrapper::call().newAccount(account, get_service(), true);
+        AuthDelegate::Wrapper::call().newAccount(
+            account,
+            get_service(),
+            Accounts::NewAccountMode::REQUIRE_NEW,
+        );
 
         PurchasedAccountsTable::new()
             .put(&PurchasedAccount {

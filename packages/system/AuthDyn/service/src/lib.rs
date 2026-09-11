@@ -83,8 +83,12 @@ pub mod service {
             );
         } else {
             Management::set(account, get_sender());
-            Accounts::call().newAccount(account, Wrapper::SERVICE, true);
         }
+        Accounts::call().newAccount(
+            account,
+            Wrapper::SERVICE,
+            services::accounts::NewAccountMode::MATCH_EXISTING,
+        );
     }
 
     #[action]

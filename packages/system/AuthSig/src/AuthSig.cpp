@@ -103,7 +103,7 @@ namespace SystemService
          auto authTable = open<AuthTable>(KvMode::readWrite);
          authTable.put(AuthRecord{.account = name, .pubkey = std::move(key)});
 
-         to<Accounts>().newAccount(name, AuthSig::service, true);
+         to<Accounts>().newAccount(name, AuthSig::service, NewAccountMode::requireNew);
       }
    }  // namespace AuthSig
 }  // namespace SystemService

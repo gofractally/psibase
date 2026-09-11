@@ -146,7 +146,7 @@ TEST_CASE("Test push_transaction")
    SECTION("No signature")
    {
       auto accounts = transactor<Accounts>{Accounts::service, Accounts::service};
-      auto act      = accounts.newAccount("alice"_a, AuthAny::service, true);
+      auto act      = accounts.newAccount("alice"_a, AuthAny::service, NewAccountMode::requireNew);
       auto trx      = t.signTransaction(t.makeTransaction({std::move(act)}));
       CHECK(httpPush(trx).succeeded());
       CHECK(t.from("alice"_a).to<Accounts>().exists("alice"_a).returnVal() == true);
@@ -206,7 +206,7 @@ TEST_CASE("Test push_transaction")
    SECTION("Not verify service")
    {
       auto accounts = transactor<Accounts>{Accounts::service, Accounts::service};
-      auto act      = accounts.newAccount("alice"_a, AuthAny::service, true);
+      auto act      = accounts.newAccount("alice"_a, AuthAny::service, NewAccountMode::requireNew);
       auto trx      = signTransaction(t.makeTransaction({std::move(act)}, 5),
                                       {{AccountNumber{"nop"}, aliceKeys}});
 
@@ -463,7 +463,10 @@ TEST_CASE("Test runAs")
    {
       t.addService<AuthNone>("AuthNone.wasm");
       auto alice1 = AccountNumber("alice+1");
-      REQUIRE(t.from(alice).to<Accounts>().newAccount(alice1, AuthNone::service, true).succeeded());
+      REQUIRE(t.from(alice)
+                  .to<Accounts>()
+                  .newAccount(alice1, AuthNone::service, NewAccountMode::requireNew)
+                  .succeeded());
       auto act = transactor<Accounts>().from(alice1).setAuthServ(AuthAny::service);
       REQUIRE(t.from(alice)
                   .to<Transact>()
