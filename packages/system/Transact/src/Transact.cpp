@@ -360,6 +360,7 @@ namespace SystemService
       const ServiceMethod*   action     = nullptr;
       // Returns true if the refcount becomes zero
       bool decref() { return !authorized && --refs == 0; }
+      bool incref() { return !authorized && refs++ == 0; }
       void getArgs(std::vector<AccountNumber>& out) const
       {
          out.clear();
@@ -402,25 +403,14 @@ namespace SystemService
          }
       }
 
-      void setAuthorized(AuthItem& self)
+      template <auto F>
+      void updateChildRefs(AuthItem& self)
       {
-         check(!self.second.authorized, "Internal error: cannot set authorized again");
-         self.second.authorized = true;
-         // Add parents to the stack, as their results might have changed
-         for (AuthItem* p : self.second.parents)
-         {
-            if (!p->second.queued && !p->second.authorized && p->second.refs != 0)
-            {
-               p->second.queued = true;
-               stack.push_back(p);
-            }
-         }
-         // Mark any remaining children as unneeded recursively
          auto handleChildren = [this](const AuthItem& item)
          {
             for (AuthItem* c : item.second.children)
             {
-               if (c->second.decref())
+               if ((c->second.*F)())
                {
                   stack.push_back(c);
                }
@@ -436,6 +426,22 @@ namespace SystemService
             handleChildren(*item);
          }
       }
+
+      void setAuthorized(AuthItem& self)
+      {
+         check(!self.second.authorized, "Internal error: cannot set authorized again");
+         self.second.authorized = true;
+         // Add parents to the stack, as their results might have changed
+         for (AuthItem* p : self.second.parents)
+         {
+            if (!p->second.queued && !p->second.authorized && p->second.refs != 0)
+            {
+               p->second.queued = true;
+               stack.push_back(p);
+            }
+         }
+         updateChildRefs<&AuthVertex::decref>(self);
+      }
       void getDelegates(AuthItem& self)
       {
          auto delegates = to<AuthInterface>(self.second.authService)
@@ -448,7 +454,10 @@ namespace SystemService
                stack.push_back(&*iter);
                iter->second.queued = true;
             }
-            ++iter->second.refs;
+            if (iter->second.incref())
+            {
+               updateChildRefs<&AuthVertex::incref>(*iter);
+            }
             iter->second.parents.push_back(&self);
             self.second.children.push_back(&*iter);
          }

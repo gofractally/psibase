@@ -480,6 +480,9 @@ TEST_CASE("Test runAs")
       auto dave  = AccountNumber{"dave5678"};
       t.addService<AuthTest>("AuthTest.wasm");
       auto eliza = AccountNumber{"eliza678"};
+      auto frank = AccountNumber{"frank678"};
+      auto grace = AccountNumber{"grace678"};
+      auto henry = AccountNumber{"henry678"};
 
       SECTION("and 2")
       {
@@ -513,6 +516,16 @@ TEST_CASE("Test runAs")
          REQUIRE(t.to<AuthTest>().newAccount(bob, std::vector{eliza, alice}, 1).succeeded());
          REQUIRE(t.to<AuthTest>().newAccount(carol, std::vector{eliza, bob}, 2).succeeded());
          REQUIRE(t.to<AuthTest>().newAccount(dave, std::vector{carol, bob}, 2).succeeded());
+      }
+      SECTION("regression: refcount tree")
+      {
+         REQUIRE(t.to<AuthTest>().newAccount(henry, std::vector{alice}, 1).succeeded());
+         REQUIRE(t.to<AuthTest>().newAccount(grace, std::vector{alice}, 1).succeeded());
+         REQUIRE(t.to<AuthTest>().newAccount(eliza, std::vector{alice, grace}, 2).succeeded());
+         REQUIRE(t.to<AuthTest>().newAccount(frank, std::vector{eliza}, 1).succeeded());
+         REQUIRE(t.to<AuthTest>().newAccount(bob, std::vector{henry, frank}, 1).succeeded());
+         REQUIRE(t.to<AuthTest>().newAccount(carol, std::vector{frank}, 1).succeeded());
+         REQUIRE(t.to<AuthTest>().newAccount(dave, std::vector{grace, carol, bob}, 3).succeeded());
       }
 
       auto act = transactor<Accounts>().from(dave).setAuthServ(AuthAny::service);
