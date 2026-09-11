@@ -1,17 +1,17 @@
 #[psibase::service_tables]
 pub mod tables {
-    use crate::service::{TID, fmt_amount};
+    use crate::service::{fmt_amount, TID};
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::services::accounts::Wrapper as Accounts;
-    use psibase::services::nft::{NID, Wrapper as Nfts};
+    use psibase::services::nft::{Wrapper as Nfts, NID};
     use psibase::services::tokens::{Decimal, Precision, Quantity};
-    use psibase::{AccountNumber, Memo, ServiceWrapper, TableRecord, abort_message, get_sender};
-    use psibase::{Flags, define_flags};
-    use psibase::{Fracpack, Table, ToSchema};
+    use psibase::{abort_message, get_sender, AccountNumber, Memo, ServiceWrapper, TableRecord};
+    use psibase::{define_flags, Flags};
+    use psibase::{Pack, Table, ToSchema, Unpack};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
+    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug)]
     pub struct InitRow {
         pub last_used_id: TID,
         pub last_used_shared_bal_id: u64,
@@ -87,7 +87,7 @@ pub mod tables {
     }
 
     #[table(name = "TokenTable", index = 1)]
-    #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct Token {
         #[primary_key]
@@ -284,7 +284,7 @@ pub mod tables {
     }
 
     #[table(name = "BalanceTable", index = 2)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject)]
+    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject)]
     #[graphql(complex)]
     pub struct Balance {
         pub account: AccountNumber,
@@ -399,7 +399,7 @@ pub mod tables {
     }
 
     #[table(name = "SharedBalanceTable", index = 3)]
-    #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
+    #[derive(Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
     #[graphql(complex)]
     pub struct SharedBalance {
         #[primary_key]
@@ -650,7 +650,7 @@ pub mod tables {
     });
 
     #[table(name = "BalanceConfigTable", index = 4)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject)]
+    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject)]
     pub struct BalanceConfig {
         pub account: AccountNumber,
         pub token_id: TID,
@@ -716,7 +716,7 @@ pub mod tables {
     }
 
     #[table(name = "UserConfigTable", index = 5)]
-    #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
+    #[derive(Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
     #[graphql(complex)]
     pub struct UserConfig {
         #[primary_key]
@@ -771,7 +771,7 @@ pub mod tables {
     }
 
     #[table(name = "ConfigTable", index = 6)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject)]
+    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject)]
     #[graphql(complex)]
     pub struct ConfigRow {
         pub sys_tid: TID,
@@ -790,7 +790,7 @@ pub mod tables {
     }
 
     #[table(name = "UserPendingTable", index = 7)]
-    #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
+    #[derive(Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
     #[graphql(complex)]
     pub struct UserPendingRecord {
         #[graphql(skip)]
@@ -843,7 +843,7 @@ pub mod tables {
     }
 
     #[table(name = "SubAccountTable", index = 8)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject)]
+    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject)]
     pub struct SubAccount {
         pub account: AccountNumber,
         pub sub_account: String,
@@ -971,7 +971,7 @@ pub mod tables {
     }
 
     #[table(name = "SubAccountBalanceTable", index = 9)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject)]
+    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject)]
     #[graphql(complex)]
     pub struct SubAccountBalance {
         #[graphql(skip)]

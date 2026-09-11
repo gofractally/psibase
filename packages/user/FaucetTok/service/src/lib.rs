@@ -8,7 +8,7 @@ pub mod tables {
     use psibase::*;
 
     #[table(name = "ConfigTable", index = 0)]
-    #[derive(ToSchema, Fracpack)]
+    #[derive(ToSchema, Pack, Unpack)]
     pub struct ConfigRow {
         pub token_id: TID,
     }

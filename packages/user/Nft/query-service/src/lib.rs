@@ -8,7 +8,7 @@ mod service {
     };
     use psibase::{services::accounts::Account, *};
 
-    #[derive(Fracpack, ToSchema, Debug, Clone, SimpleObject)]
+    #[derive(Pack, Unpack, ToSchema, Debug, Clone, SimpleObject)]
     struct UserDetail {
         account: AccountNumber,
         authService: AccountNumber,
@@ -23,7 +23,7 @@ mod service {
         }
     }
 
-    #[derive(Fracpack, ToSchema, Debug, Clone, SimpleObject)]
+    #[derive(Pack, Unpack, ToSchema, Debug, Clone, SimpleObject)]
     struct NftDetail {
         id: NID,
         owner: UserDetail,

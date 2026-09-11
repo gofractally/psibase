@@ -16,12 +16,12 @@ cargo add -F derive serde
 ```rust
 #[psibase::service_tables]
 mod tables {
-    use psibase::{AccountNumber, Fracpack, ToSchema};
+    use psibase::{AccountNumber, Pack, ToSchema, Unpack};
     use serde::{Deserialize, Serialize};
 
     // Our first table (index 0) is MessageTable. It stores Message.
     #[table(name = "MessageTable", index = 0)]
-    #[derive(Fracpack, Serialize, Deserialize, ToSchema)]
+    #[derive(Pack, Unpack, Serialize, Deserialize, ToSchema)]
     pub struct Message {
         // Every table has a unique primary key. This doesn't have
         // to be a u64; many types may be keys, including String,
@@ -154,13 +154,13 @@ A singleton is a table that has at most 1 row. Let's add one to track the most-r
 ```rust
 #[psibase::service_tables]
 mod tables {
-    use psibase::{AccountNumber, Fracpack, ToKey, ToSchema};
+    use psibase::{AccountNumber, Pack, ToSchema, Unpack};
     use serde::{Deserialize, Serialize};
 
     // We can't renumber tables without corrupting
     // them. This table remains 0.
     #[table(name = "MessageTable", index = 0)]
-    #[derive(Fracpack, Serialize, Deserialize, ToKey, ToSchema)]
+    #[derive(Pack, Unpack, Serialize, Deserialize, ToSchema)]
     pub struct Message {
         #[primary_key]
         pub id: u64,
@@ -172,7 +172,7 @@ mod tables {
 
     // This table stores the last used message ID
     #[table(name = "LastUsedTable", index = 1)]
-    #[derive(Default, Fracpack, Serialize, Deserialize, ToKey, ToSchema)]
+    #[derive(Default, Pack, Unpack, Serialize, Deserialize, ToSchema)]
     pub struct LastUsed {
         pub lastMessageId: u64,
     }
@@ -263,12 +263,12 @@ So far we have a way to page through all messages, but don't have a good way to 
 ```rust
 #[psibase::service_tables]
 mod tables {
-    use psibase::{AccountNumber, Fracpack, ToKey, ToSchema};
+    use psibase::{AccountNumber, Pack, ToSchema, Unpack};
     use serde::{Deserialize, Serialize};
 
     // Same as before
     #[table(name = "MessageTable", index = 0)]
-    #[derive(Fracpack, Serialize, Deserialize, ToKey, ToSchema)]
+    #[derive(Pack, Unpack, Serialize, Deserialize, ToSchema)]
     pub struct Message {
         #[primary_key]
         pub id: u64,
@@ -299,7 +299,7 @@ mod tables {
 
     // Same as before
     #[table(name = "LastUsedTable", index = 1)]
-    #[derive(Default, Fracpack, Serialize, Deserialize, ToSchema)]
+    #[derive(Default, Pack, Unpack, Serialize, Deserialize, ToSchema)]
     pub struct LastUsed {
         pub lastMessageId: u64,
     }
@@ -429,7 +429,7 @@ Let's make the following adjustment to Message. `Debug, PartialEq, Eq` aid testa
 
 ```rust
 #[table(name = "MessageTable", index = 0)]
-#[derive(Debug, PartialEq, Eq, Fracpack, Serialize, Deserialize, ToKey, ToSchema)]
+#[derive(Debug, PartialEq, Eq, Pack, Unpack, Serialize, Deserialize, ToSchema)]
 pub struct Message {
     #[primary_key]
     pub id: u64,
@@ -512,7 +512,7 @@ Sometimes services need to define tables whose struct isn't defined within the s
 // This definition lives outside of the service_tables module. We can't use
 // `#[table]`, `#[primary_key]`, or `#[secondary_key]` here since
 // those attributes are part of the `#[service_tables]` macro.
-#[derive(psibase::Fracpack, serde::Serialize, serde::Deserialize)]
+#[derive(psibase::Pack, psibase::Unpack, psibase::ToSchema, serde::Serialize, serde::Deserialize)]
 pub struct Message {
     pub id: u64,
 
@@ -525,7 +525,7 @@ pub struct Message {
 ```rust
 // Inside the service_tables module (replacing both the `struct Message` and `impl Message`)
 #[table(name = "MessageTable", index = 0)]
-#[derive(Fracpack, Serialize, Deserialize, ToSchema)]
+#[derive(Pack, Unpack, Serialize, Deserialize, ToSchema)]
 pub struct WrapMessage(crate::Message);
 
 impl WrapMessage {
