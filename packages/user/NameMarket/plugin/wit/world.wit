@@ -54,9 +54,7 @@ interface market-admin {
     configure-markets: func(configs: list<market-config>) -> result<_, error>;
 }
 
-interface api {
-    use host:types/types.{error};
-
+interface types {
     record market-param {
         length: u8,
         enabled: bool,
@@ -71,6 +69,11 @@ interface api {
         market-params: list<market-param>,
         current-prices: list<market-price>,
     }
+}
+
+interface api {
+    use host:types/types.{error};
+    use types.{markets-overview};
 
     /// Returns whether an account can currently be created.
     ///
@@ -105,6 +108,7 @@ interface authorized {
 }
 
 world imports {
+    import types;
     import api;
     import authorized;
 }

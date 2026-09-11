@@ -5,6 +5,7 @@ use bindings::exports::name_market::plugin::api::Guest as Api;
 use bindings::exports::name_market::plugin::authorized::Guest as Authorized;
 use bindings::exports::name_market::plugin::market_admin::Guest as MarketAdmin;
 use bindings::exports::name_market::plugin::market_admin::MarketConfig;
+use bindings::exports::name_market::plugin::types as ExportTypes;
 use bindings::host::http::api as CommonServer;
 use bindings::tokens::plugin::helpers as TokensHelpers;
 use bindings::tokens::plugin::user as TokensUser;
@@ -197,13 +198,13 @@ impl Api for NameMarketPlugin {
     }
 
     #[psibase_plugin::authorized(None)]
-    fn get_markets_overview() -> Result<bindings::exports::name_market::plugin::api::MarketsOverview, Error> {
+    fn get_markets_overview() -> Result<ExportTypes::MarketsOverview, Error> {
         let overview = markets_overview()?;
-        Ok(bindings::exports::name_market::plugin::api::MarketsOverview {
+        Ok(ExportTypes::MarketsOverview {
             market_params: overview
                 .market_params
                 .into_iter()
-                .map(|row| bindings::exports::name_market::plugin::api::MarketParam {
+                .map(|row| ExportTypes::MarketParam {
                     length: row.length,
                     enabled: row.enabled,
                 })
@@ -211,7 +212,7 @@ impl Api for NameMarketPlugin {
             current_prices: overview
                 .current_prices
                 .into_iter()
-                .map(|row| bindings::exports::name_market::plugin::api::MarketPrice {
+                .map(|row| ExportTypes::MarketPrice {
                     length: row.length,
                     price: row.price.to_string(),
                 })

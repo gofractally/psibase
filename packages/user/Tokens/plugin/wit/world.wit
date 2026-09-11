@@ -6,8 +6,7 @@ interface types {
 
     record system-token-info {
         id: u32,
-        /// Display label: token symbol, or "ID: {id}" when no symbol is set
-        symbol: string,
+        symbol: option<string>,
         precision: u8,
     }
 

@@ -17,7 +17,7 @@ class Tokens extends PluginInterface {
     protected override readonly _intf = "tokens" as const;
 
     get getSystemToken() {
-        return this._call<[], SystemTokenInfo | null>("getSystemToken");
+        return this._call<[], SystemTokenInfo | undefined>("getSystemToken");
     }
 
     get getUserBalances() {

@@ -2,7 +2,7 @@ package homepage:plugin;
 
 interface name-market {
     use host:types/types.{error};
-    use name-market:plugin/api.{markets-overview};
+    use name-market:plugin/types.{markets-overview};
 
     /// Purchases a account name, claims it, configures auth-sig, and returns the new account's private key.
     ///
@@ -64,7 +64,7 @@ interface invite {
 
 interface vserver {
     use host:types/types.{error};
-    use virtual-server:plugin/authorized.{billing-config};
+    use virtual-server:plugin/types.{billing-config};
 
     fill-gas-tank: func() -> result<_, error>;
     resize-and-fill-gas-tank: func(new-capacity: string) -> result<_, error>;

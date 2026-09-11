@@ -166,7 +166,7 @@ impl NameMarket for ConfigPlugin {
         name_market::plugin::market_admin::configure_markets(&configs)
     }
 
-    fn get_markets_overview() -> Result<name_market::plugin::api::MarketsOverview, Error> {
+    fn get_markets_overview() -> Result<name_market::plugin::types::MarketsOverview, Error> {
         name_market::plugin::api::get_markets_overview()
     }
 
@@ -262,7 +262,7 @@ impl VirtualServer for ConfigPlugin {
         })
     }
 
-    fn get_billing_config() -> Result<virtual_server::plugin::authorized::BillingConfig, Error> {
+    fn get_billing_config() -> Result<virtual_server::plugin::types::BillingConfig, Error> {
         virtual_server::plugin::authorized::get_billing_config()
     }
 

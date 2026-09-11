@@ -2,17 +2,9 @@ import { PluginInterface } from "@shared/hooks/plugin-function";
 import { Account } from "@shared/lib/schemas/account";
 
 import { Plugin as TokenSwapPlugin } from "./token-swap";
+import type { MarketsOverview } from "./namemarket";
 import type { SystemTokenInfo, UserBalance } from "./tokens";
-
-export type MarketsOverview = {
-    marketParams: Array<{ length: number; enabled: boolean }>;
-    currentPrices: Array<{ length: number; price: string }>;
-};
-
-export type BillingConfig = {
-    feeReceiver: string | null;
-    enabled: boolean;
-};
+import type { BillingConfig } from "./virtual-server";
 
 class GraphqlIntf extends PluginInterface {
     constructor(intf: string) {
@@ -71,7 +63,7 @@ class Tokens extends PluginInterface {
     protected override readonly _intf = "tokens" as const;
 
     get getSystemToken() {
-        return this._call<[], SystemTokenInfo | null>("getSystemToken");
+        return this._call<[], SystemTokenInfo | undefined>("getSystemToken");
     }
 
     get getUserBalances() {

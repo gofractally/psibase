@@ -49,7 +49,7 @@ interface transact {
 interface name-market {
     use host:types/types.{error};
     use name-market:plugin/market-admin.{market-config};
-    use name-market:plugin/api.{markets-overview};
+    use name-market:plugin/types.{markets-overview};
 
     /// Batch create or update name markets.
     /// * For lengths with no existing market: creates the market; `initial-price` must be set.
@@ -125,7 +125,7 @@ interface virtual-server {
         cpu-pricing-params,
         net-pricing-params
     };
-    use virtual-server:plugin/authorized.{billing-config};
+    use virtual-server:plugin/types.{billing-config};
 
     /// Initialize the billing system
     /// A system token must have already been set to enable billing.
