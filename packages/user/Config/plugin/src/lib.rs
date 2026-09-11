@@ -21,7 +21,7 @@ use virtual_server::plugin::types::{
     NetworkVariables as DestNetworkVariables, ServerSpecs as DestServerSpecs,
 };
 
-use transact::plugin::intf::set_propose_latch;
+use transact::plugin::api::set_propose_latch;
 
 const VIRTUAL_SERVER: &'static str = "vserver";
 

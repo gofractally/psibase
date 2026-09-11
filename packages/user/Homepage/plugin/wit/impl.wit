@@ -2,7 +2,7 @@ package homepage:plugin;
 
 world impl {
     include host:crypto/imports;
-    import transact:plugin/intf;
+    import transact:plugin/api;
     import auth-sig:plugin/keyvault;
     import auth-sig:plugin/actions;
     import name-market:plugin/api;

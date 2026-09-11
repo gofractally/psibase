@@ -130,6 +130,7 @@ impl Bucket {
     }
 
     fn validate_identifier(identifier: &str) {
+        // Validate identifier with regex /^[0-9a-zA-Z-]+$/
         let valid_identifier_regex = Regex::new(r"^[0-9a-zA-Z_-]+$").unwrap();
         assert!(
             valid_identifier_regex.is_match(identifier),
