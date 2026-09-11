@@ -82,6 +82,14 @@ interface invite {
     import-invite-token: func(token: string) -> result<u32, error>;
 }
 
+interface contacts {
+    use host:types/types.{error};
+    use profiles:plugin/types.{contact};
+
+    get: func() -> result<list<contact>, error>;
+    has-read-permission: func() -> bool;
+}
+
 world imports {
     import user-guild;
     import admin-guild;
@@ -89,4 +97,5 @@ world imports {
     import user-fractal;
     import user-eval;
     import invite;
+    import contacts;
 }

@@ -4,12 +4,14 @@ mod bindings;
 use bindings::exports::fractal_core::plugin::admin_fractal::Guest as AdminFractal;
 use bindings::exports::fractal_core::plugin::admin_guild::Guest as AdminGuild;
 
+use bindings::exports::fractal_core::plugin::contacts::Guest as Contacts;
 use bindings::exports::fractal_core::plugin::invite::Guest as Invite;
 use bindings::exports::fractal_core::plugin::user_eval::Guest as UserEval;
 use bindings::exports::fractal_core::plugin::user_fractal::Guest as UserFractal;
 use bindings::exports::fractal_core::plugin::user_guild::Guest as UserGuild;
 
 use bindings::host::types::types::Error;
+use bindings::profiles::plugin::types::Contact;
 
 use psibase::{define_trust, fracpack::Pack};
 mod errors;
@@ -330,6 +332,16 @@ impl UserGuild for FractalCorePlugin {
 impl Invite for FractalCorePlugin {
     fn import_invite_token(token: String) -> Result<u32, Error> {
         bindings::invite::plugin::invitee::import_invite_token(&token)
+    }
+}
+
+impl Contacts for FractalCorePlugin {
+    fn get() -> Result<Vec<Contact>, Error> {
+        bindings::profiles::plugin::contacts::get()
+    }
+
+    fn has_read_permission() -> bool {
+        bindings::profiles::plugin::api::has_read_permission()
     }
 }
 

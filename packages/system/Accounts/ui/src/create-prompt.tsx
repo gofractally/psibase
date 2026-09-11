@@ -13,19 +13,16 @@ import { BrandedGlowingCard } from "@shared/components/branded-glowing-card";
 import { useAppForm } from "@shared/components/form/app-form";
 import {
     ACCOUNT_MARKETS_REFETCH_INTERVAL_MS,
-    useAccountMarkets,
-} from "@shared/hooks/use-account-markets";
-import { useBranding } from "@shared/hooks/use-branding";
-import { useCanBuyAccount } from "@shared/hooks/use-can-buy-account";
-import { useCurrentUser } from "@shared/hooks/use-current-user";
-import { useSystemToken } from "@shared/hooks/use-system-token";
-import {
     getSystemTokenBalance,
+    useAccountMarkets,
+    useCanBuyAccount,
+    useSystemToken,
     useUserTokenBalances,
-} from "@shared/hooks/use-user-token-balances";
+} from "./hooks/use-marketplace-data";
+import { useBranding } from "@shared/hooks/use-branding";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { pemToB64 } from "@shared/lib/b64-key-utils";
 import { getAccount } from "@shared/lib/get-account";
-import { nameMarket, tokens } from "@shared/lib/plugins";
 import { Quantity } from "@shared/lib/quantity";
 import QueryKey from "@shared/lib/query-keys";
 import {
@@ -62,13 +59,13 @@ export const CreatePrompt = () => {
 
     const { data: networkName } = useBranding();
     const { data: systemToken, isPending: isPendingSystemToken } =
-        useSystemToken(tokens.authorized.graphql);
+        useSystemToken();
 
     const { data: canBuyAccount, isPending: isPendingCanBuyAccount } =
-        useCanBuyAccount(nameMarket.api.canCreateAccount);
+        useCanBuyAccount();
 
     const { data: tokenBalances, isPending: isPendingBalances } =
-        useUserTokenBalances(tokens.authorized.graphql, currentUser, {
+        useUserTokenBalances(currentUser, {
             enabled: Boolean(currentUser && canBuyAccount),
         });
 
@@ -80,15 +77,12 @@ export const CreatePrompt = () => {
         [tokenBalances, systemToken],
     );
 
-    const { data: markets, isPending: isPendingMarkets } = useAccountMarkets(
-        nameMarket.authorized.graphql,
-        {
-            enabled: Boolean(canBuyAccount),
-            refetchInterval: canBuyAccount
-                ? ACCOUNT_MARKETS_REFETCH_INTERVAL_MS
-                : false,
-        },
-    );
+    const { data: markets, isPending: isPendingMarkets } = useAccountMarkets({
+        enabled: Boolean(canBuyAccount),
+        refetchInterval: canBuyAccount
+            ? ACCOUNT_MARKETS_REFETCH_INTERVAL_MS
+            : false,
+    });
 
     const prices = useMemo(
         () =>

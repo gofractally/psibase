@@ -13,6 +13,7 @@ use exports::config::plugin::{
     sites::Guest as Sites,
     staged::Guest as Staged,
     symbol::Guest as Symbol,
+    tokens::Guest as Tokens,
     transact::Guest as Transact,
     virtual_server::{
         CpuPricingParams, Guest as VirtualServer, NetPricingParams, NetworkVariables, ServerSpecs,
@@ -165,6 +166,10 @@ impl NameMarket for ConfigPlugin {
         name_market::plugin::market_admin::configure_markets(&configs)
     }
 
+    fn get_markets_overview() -> Result<name_market::plugin::api::MarketsOverview, Error> {
+        name_market::plugin::api::get_markets_overview()
+    }
+
     fn graphql(query: String) -> Result<String, Error> {
         name_market::plugin::authorized::graphql(&query)
     }
@@ -257,8 +262,18 @@ impl VirtualServer for ConfigPlugin {
         })
     }
 
+    fn get_billing_config() -> Result<virtual_server::plugin::authorized::BillingConfig, Error> {
+        virtual_server::plugin::authorized::get_billing_config()
+    }
+
     fn graphql(query: String) -> Result<String, Error> {
         virtual_server::plugin::authorized::graphql(&query)
+    }
+}
+
+impl Tokens for ConfigPlugin {
+    fn get_system_token() -> Result<Option<tokens::plugin::types::SystemTokenInfo>, Error> {
+        tokens::plugin::helpers::get_system_token()
     }
 }
 

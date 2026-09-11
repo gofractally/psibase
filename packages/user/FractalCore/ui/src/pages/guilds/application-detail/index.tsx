@@ -10,9 +10,8 @@ import { useGuildAccount } from "@/hooks/use-guild-account";
 import { EmptyBlock } from "@shared/components/empty-block";
 import { GlowingCard } from "@shared/components/glowing-card";
 import { PageContainer } from "@shared/components/page-container";
-import { TableContact } from "@shared/components/tables/table-contact";
+import { TableContact } from "@/components/table-contact";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
-import { profiles } from "@shared/lib/plugins";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -77,13 +76,7 @@ export const ApplicationDetail = () => {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-3">
                         {applicant ? (
-                            <TableContact
-                                account={applicant}
-                                getContacts={profiles.contacts.get}
-                                hasReadPermission={
-                                    profiles.api.hasReadPermission
-                                }
-                            />
+                            <TableContact account={applicant} />
                         ) : (
                             "Loading..."
                         )}
@@ -161,16 +154,7 @@ export const ApplicationDetail = () => {
                                     (attest) => (
                                         <TableRow key={attest.attester}>
                                             <TableCell className="font-medium">
-                                                <TableContact
-                                                    account={attest.attester}
-                                                    getContacts={
-                                                        profiles.contacts.get
-                                                    }
-                                                    hasReadPermission={
-                                                        profiles.api
-                                                            .hasReadPermission
-                                                    }
-                                                />
+                                                <TableContact account={attest.attester} />
                                             </TableCell>
                                             <TableCell>
                                                 <Badge

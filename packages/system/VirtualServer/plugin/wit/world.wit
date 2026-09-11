@@ -130,6 +130,11 @@ interface billing {
 interface authorized {
     use host:types/types.{error};
 
+    record billing-config {
+        fee-receiver: option<string>,
+        enabled: bool,
+    }
+
     /// Executes a GraphQL query against this app's http server.
     ///
     /// Arguments
@@ -137,6 +142,9 @@ interface authorized {
     ///
     /// Returns the result of the query as a string.
     graphql: func(query: string) -> result<string, error>;
+
+    /// Returns billing enablement and fee receiver for UI display.
+    get-billing-config: func() -> result<billing-config, error>;
 }
 
 world imports {

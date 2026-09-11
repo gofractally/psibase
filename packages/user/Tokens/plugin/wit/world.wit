@@ -3,6 +3,21 @@ package tokens:plugin;
 interface types {
     /// A string that contains a decimal representation of a quantity of tokens, e.g. "10.1234"
     type decimal = string;
+
+    record system-token-info {
+        id: u32,
+        /// Display label: token symbol, or "ID: {id}" when no symbol is set
+        symbol: string,
+        precision: u8,
+    }
+
+    record user-balance {
+        token-id: u32,
+        balance: string,
+        symbol: option<string>,
+        precision: u8,
+        account: string,
+    }
 }
 
 interface issuer {
@@ -148,10 +163,17 @@ interface user-config {
 
 interface helpers {
     use host:types/types.{error};
-    use types.{decimal};
+    use types.{decimal, system-token-info, user-balance};
 
     /// Fetches network token, returns TID
     fetch-network-token: func() -> result<option<u32>, error>;
+
+    /// Fetches the configured system/network token with display metadata.
+    /// Returns none when no system token is configured.
+    get-system-token: func() -> result<option<system-token-info>, error>;
+
+    /// Fetches primary token balances for a user (UI-shaped rows).
+    get-user-balances: func(user: string) -> result<list<user-balance>, error>;
 
     /// Uses the precision of the specified token to convert from a token
     ///   decimal (string) to its u64 representation.

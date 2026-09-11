@@ -31,3 +31,4 @@ world = "impl"
 "fractals:plugin" = { path = "../../Fractals/plugin/wit/world.wit" }
 "guilds:plugin" = { path = "../../Guilds/plugin/wit/world.wit" }
 "invite:plugin" = { path = "../../Invite/plugin/wit/world.wit" }
+"profiles:plugin" = { path = "../../Profiles/plugin/wit/world.wit" }

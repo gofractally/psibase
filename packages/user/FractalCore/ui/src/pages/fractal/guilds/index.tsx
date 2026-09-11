@@ -7,9 +7,8 @@ import { useGuilds } from "@/hooks/fractals/use-guilds";
 import { EmptyBlock } from "@shared/components/empty-block";
 import { GlowingCard } from "@shared/components/glowing-card";
 import { PageContainer } from "@shared/components/page-container";
-import { TableContact } from "@shared/components/tables/table-contact";
+import { TableContact } from "@/components/table-contact";
 import { FractalGuildIdentifier } from "@shared/domains/fractal/components/fractal-guild-header-identifier";
-import { profiles } from "@shared/lib/plugins";
 import { Button } from "@shared/shadcn/ui/button";
 import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import {
@@ -91,19 +90,9 @@ export const Guilds = () => {
                                             </TableCell>
                                             <TableCell className="justify-items-end">
                                                 {guild.rep?.member ? (
-                                                    <TableContact
-                                                        account={
+                                                    <TableContact account={
                                                             guild.rep.member
-                                                        }
-                                                        getContacts={
-                                                            profiles.contacts
-                                                                .get
-                                                        }
-                                                        hasReadPermission={
-                                                            profiles.api
-                                                                .hasReadPermission
-                                                        }
-                                                    />
+                                                        } />
                                                 ) : (
                                                     "Council"
                                                 )}

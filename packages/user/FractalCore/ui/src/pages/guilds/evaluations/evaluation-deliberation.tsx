@@ -5,17 +5,17 @@ import { useParams } from "react-router-dom";
 import { RankedAccountItem } from "@/components/evaluations/deliberation/ranked-account-item";
 import { StatusBadges } from "@/components/evaluations/deliberation/status-badges";
 import { UnrankedAccountChip } from "@/components/evaluations/deliberation/unranked-account-chip";
+import { ShowContactsButton } from "@/components/show-contacts-button";
 
 import { useRanking } from "@/hooks/fractals/use-ranking";
+import { fractalCorePlugin } from "@/lib/plugin";
 import { paths } from "@/lib/paths";
 
 import { GlowingCard } from "@shared/components/glowing-card";
 import { PageContainer } from "@shared/components/page-container";
-import { ShowContactsButton } from "@shared/components/show-contacts-button";
 import { useContacts } from "@shared/hooks/use-contacts";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { useHasProfilesReadPermission } from "@shared/hooks/use-has-profiles-read-permission";
-import { profiles } from "@shared/lib/plugins";
 import {
     CardAction,
     CardContent,
@@ -43,15 +43,19 @@ export const EvaluationDeliberation = () => {
     const { data: currentUser } = useCurrentUser();
 
     const { data: hasProfilesReadPermission } = useHasProfilesReadPermission(
-        profiles.api.hasReadPermission,
+        fractalCorePlugin.contacts.hasReadPermission,
         {
             enabled: !!currentUser,
         },
     );
 
-    const { data: contacts } = useContacts(profiles.contacts.get, currentUser, {
-        enabled: !!hasProfilesReadPermission,
-    });
+    const { data: contacts } = useContacts(
+        fractalCorePlugin.contacts.get,
+        currentUser,
+        {
+            enabled: !!hasProfilesReadPermission,
+        },
+    );
 
     const {
         add,
@@ -79,10 +83,6 @@ export const EvaluationDeliberation = () => {
                                     guildAccount!,
                                     groupNumber,
                                 )}
-                                getContacts={profiles.contacts.get}
-                                hasReadPermission={
-                                    profiles.api.hasReadPermission
-                                }
                             />
                         </div>
                     </CardAction>
