@@ -1,8 +1,8 @@
 import dayjs from "dayjs";
 import { z } from "zod";
 
-import { GUILDS_SERVICE } from "@shared/domains/fractal/lib/constants";
-import { graphql } from "@shared/lib/graphql";
+import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { guilds } from "@shared/lib/plugins";
 import { Account, zAccount } from "@shared/lib/schemas/account";
 
 export const zCompletedEvaluation = z.object({
@@ -24,7 +24,10 @@ const getCompletedEvaluationIds = async (guild: Account) => {
         }
     }`;
 
-    const evaluations = await graphql(gql, { service: GUILDS_SERVICE });
+    const evaluations = await callGraphqlViaPlugin(
+        guilds.authorized.graphql,
+        gql,
+    );
 
     const response = z
         .object({
@@ -54,7 +57,10 @@ const getEvaluationsMetadata = async (guild: Account) => {
         }
     }`;
 
-    const evaluations = await graphql(gql, { service: GUILDS_SERVICE });
+    const evaluations = await callGraphqlViaPlugin(
+        guilds.authorized.graphql,
+        gql,
+    );
 
     const response = z
         .object({

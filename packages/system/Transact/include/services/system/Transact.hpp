@@ -367,12 +367,6 @@ namespace SystemService
       /// See [currentBlock].
       psibase::BlockHeader headBlock() const;
 
-      /// Get the head block time
-      ///
-      /// This is *not* the currently executing block time.
-      /// TODO: remove
-      psibase::BlockTime headBlockTime() const;
-
       /// Returns the tapos `refBlockIndex` and `refBlockSuffix`
       /// for the head block.
       std::pair<uint8_t, uint32_t> headTapos();
@@ -408,7 +402,6 @@ namespace SystemService
                 method(isTransaction),
                 method(currentBlock),
                 method(headBlock),
-                method(headBlockTime),
                 method(headTapos)
                 //
    )

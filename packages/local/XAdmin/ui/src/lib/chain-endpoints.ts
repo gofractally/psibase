@@ -11,6 +11,7 @@ import {
     postJsonGetJson,
     siblingUrl,
     throwIfError,
+    RPCError,
 } from "@psibase/common-lib";
 
 import { adminBearerAuthHeaders } from "./admin-login-jwt";
@@ -94,6 +95,51 @@ const TransactStats = z.object({
 });
 export type TransactStatsType = z.infer<typeof TransactStats>;
 
+const packageFetchAttempts = 3;
+
+async function getPackageBuffer(fileName: string): Promise<ArrayBuffer> {
+    const url = `/packages/${fileName}`;
+    let lastError: unknown;
+    for (let attempt = 0; attempt < packageFetchAttempts; attempt++) {
+        try {
+            return await getArrayBuffer(url);
+        } catch (e) {
+            lastError = e;
+            if (e instanceof RPCError || attempt + 1 >= packageFetchAttempts) {
+                break;
+            }
+            await new Promise((resolve) =>
+                setTimeout(resolve, 250 * (attempt + 1)),
+            );
+        }
+    }
+    throw lastError;
+}
+
+/** Map `items` with at most `limit` calls in flight. Order is preserved. */
+async function mapPool<T, R>(
+    items: T[],
+    limit: number,
+    fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+    const results: R[] = new Array(items.length);
+    let next = 0;
+    const workers = Array.from(
+        { length: Math.min(limit, items.length) },
+        async () => {
+            while (true) {
+                const i = next++;
+                if (i >= items.length) {
+                    return;
+                }
+                results[i] = await fn(items[i]);
+            }
+        },
+    );
+    await Promise.all(workers);
+    return results;
+}
+
 class Chain {
     public async getPeers(): Promise<z.infer<typeof Peers>> {
         const url = siblingUrl(null, "x-peers", "/graphql");
@@ -134,11 +180,7 @@ class Chain {
     }
 
     public async getPackages(fileNames: string[]): Promise<ArrayBuffer[]> {
-        return Promise.all(
-            fileNames.map((fileName) =>
-                getArrayBuffer(`/packages/${fileName}`),
-            ),
-        );
+        return mapPool(fileNames, 6, getPackageBuffer);
     }
 
     private async mergeConfig(

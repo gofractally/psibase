@@ -5,6 +5,8 @@ import { queryKeys } from "@/lib/query-keys";
 
 import { adminGraphql } from "@/lib/admin-graphql";
 
+import { useChainReady } from "./use-statuses";
+
 interface ServerSpecs {
     bandwidthBps: number;
     storageBytes: number;
@@ -31,6 +33,7 @@ const zServerSpecsResponse = z.union([
 ]);
 
 export const useServerSpecs = () => {
+    const chainReady = useChainReady();
     return useQuery<ServerSpecs>({
         queryKey: [...queryKeys.configServerSpecs],
         queryFn: async () => {
@@ -59,5 +62,6 @@ export const useServerSpecs = () => {
                 ),
             };
         },
+        enabled: chainReady,
     });
 };

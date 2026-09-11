@@ -36,7 +36,8 @@ pub mod tables {
 mod service {
     use crate::tables::ConfigRow;
     use psibase::services::{
-        accounts::Wrapper as Accounts, guilds::Wrapper as Guilds, producers::Wrapper as Producers,
+        accounts::Wrapper as Accounts, auth_any::Wrapper as AuthAny, guilds::Wrapper as Guilds,
+        producers::Wrapper as Producers,
     };
     use psibase::*;
 
@@ -74,7 +75,7 @@ mod service {
 
         // 1. Create accounts with auth-any
         for &acct in &TEST_ACCOUNTS {
-            Accounts::call().newAccount(acct, account!("auth-any"), true);
+            Accounts::call().newAccount(acct, AuthAny::SERVICE, true);
         }
 
         // 2. Apply each account to the system guild

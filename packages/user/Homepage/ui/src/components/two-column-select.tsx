@@ -18,24 +18,36 @@ export const TwoColumnSelect = ({
     displayMode: DisplayMode;
 }) => {
     return (
-        <div className="flex h-full flex-col">
+        <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
             {header}
             {displayMode === "right" ? (
-                right
+                <div className="min-h-0 flex-1 overflow-hidden">{right}</div>
             ) : displayMode === "left" ? (
-                left
+                <div className="min-h-0 flex-1 overflow-hidden">{left}</div>
             ) : (
-                <ResizablePanelGroup direction="horizontal">
+                <ResizablePanelGroup
+                    direction="horizontal"
+                    className="min-h-0 flex-1"
+                >
                     <ResizablePanel
                         defaultSize={40}
                         minSize={20}
                         maxSize={40}
-                        className="overflow-y-auto border-r"
+                        className="min-h-0 overflow-hidden border-r"
                     >
-                        {left}
+                        <div className="flex h-full min-h-0 flex-col overflow-hidden">
+                            {left}
+                        </div>
                     </ResizablePanel>
                     <ResizableHandle withHandle />
-                    <ResizablePanel defaultSize={75}>{right}</ResizablePanel>
+                    <ResizablePanel
+                        defaultSize={75}
+                        className="min-h-0 overflow-hidden"
+                    >
+                        <div className="flex h-full min-h-0 flex-col overflow-hidden">
+                            {right}
+                        </div>
+                    </ResizablePanel>
                 </ResizablePanelGroup>
             )}
         </div>

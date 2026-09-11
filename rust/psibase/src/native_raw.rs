@@ -23,6 +23,7 @@ pub enum KvMode {
     ReadWrite = 3,
 }
 
+#[link(wasm_import_module = "env")]
 extern "C" {
     /// Copy `min(dest_size, resultSize - offset)` bytes from
     /// `result + offset` into `dest` and return `resultSize`

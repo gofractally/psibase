@@ -8,11 +8,10 @@ namespace psibase
 {
    struct InnerTrace;
 
-   // TODO: Receipts & Merkles. Receipts need sequence numbers, resource consumption, and events.
    struct ActionTrace
    {
       Action                     action;
-      std::vector<char>          rawRetval;  // TODO: Move to receipt?
+      std::vector<char>          rawRetval;
       std::vector<InnerTrace>    innerTraces;
       std::chrono::nanoseconds   totalTime;  // includes time in inner actions
       std::optional<std::string> error;
@@ -31,7 +30,6 @@ namespace psibase
    };
    PSIO_REFLECT(InnerTrace, inner)
 
-   // TODO: Receipts & Merkles. Receipts need sequence numbers, resource consumption, and events.
    struct TransactionTrace
    {
       std::vector<ActionTrace>   actionTraces;
