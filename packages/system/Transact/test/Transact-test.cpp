@@ -460,6 +460,15 @@ TEST_CASE("Test runAs")
 {
    DefaultTestChain t;
    auto             alice = t.addAccount("alice");
+   // define some accounts.
+   auto bob   = AccountNumber{"bob45678"};
+   auto carol = AccountNumber{"carol678"};
+   auto dave  = AccountNumber{"dave5678"};
+   auto eliza = AccountNumber{"eliza678"};
+   auto frank = AccountNumber{"frank678"};
+   auto grace = AccountNumber{"grace678"};
+   auto henry = AccountNumber{"henry678"};
+   t.addService<AuthTest>("AuthTest.wasm");
    SECTION("subaccount can be authorized by base account")
    {
       t.addService<AuthNone>("AuthNone.wasm");
@@ -474,16 +483,7 @@ TEST_CASE("Test runAs")
    }
    SECTION("multisig pass")
    {
-      // define some accounts. dave is always the authorized account
-      auto bob   = AccountNumber{"bob45678"};
-      auto carol = AccountNumber{"carol678"};
-      auto dave  = AccountNumber{"dave5678"};
-      t.addService<AuthTest>("AuthTest.wasm");
-      auto eliza = AccountNumber{"eliza678"};
-      auto frank = AccountNumber{"frank678"};
-      auto grace = AccountNumber{"grace678"};
-      auto henry = AccountNumber{"henry678"};
-
+      // dave is always the authorized account
       SECTION("and 2")
       {
          REQUIRE(t.to<AuthTest>().newAccount(bob, std::vector{alice}, 1).succeeded());
@@ -544,5 +544,19 @@ TEST_CASE("Test runAs")
                   .runAs(std::move(act), std::vector<ServiceMethod>{})
                   .succeeded());
       CHECK(t.from(dave).to<Nop>().nop().succeeded());
+   }
+
+   SECTION("multisig fail")
+   {
+      SECTION("simple loop")
+      {
+         REQUIRE(t.to<AuthTest>().newAccount(dave, std::vector{dave}, 1).succeeded());
+      }
+
+      auto act = transactor<Accounts>().from(dave).setAuthServ(AuthAny::service);
+      REQUIRE(t.from(alice)
+                  .to<Transact>()
+                  .runAs(std::move(act), std::vector<ServiceMethod>{})
+                  .failed("caller is not authorized"));
    }
 }
