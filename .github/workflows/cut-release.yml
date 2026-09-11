@@ -1,0 +1,181 @@
+name: Cut release
+
+on:
+  push:
+    branches:
+      - main
+      - "release/v[0-9]+"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  open-release-pr:
+    name: Open release PR
+    if: github.ref_name == 'main' && github.event.before != '0000000000000000000000000000000000000000'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/detect-version-bump
+        id: version
+        with:
+          ref-a: ${{ github.event.before }}
+          ref-b: ${{ github.sha }}
+
+      - name: Resolve release branch
+        id: release
+        if: steps.version.outputs.changed == 'true'
+        run: |
+          ver=$(.github/scripts/psibase-version.sh at "${{ github.sha }}")
+          branch=$(.github/scripts/psibase-version.sh release-branch "$ver")
+          cut_branch=$(.github/scripts/psibase-version.sh cut-branch "$ver")
+          echo "version=$ver" >>"$GITHUB_OUTPUT"
+          echo "branch=$branch" >>"$GITHUB_OUTPUT"
+          echo "cut-branch=$cut_branch" >>"$GITHUB_OUTPUT"
+
+      - name: Create release branch at pre-bump main
+        if: steps.version.outputs.changed == 'true'
+        run: |
+          branch="${{ steps.release.outputs.branch }}"
+          if ! git ls-remote --exit-code origin "refs/heads/$branch" >/dev/null; then
+            git push origin "${{ github.event.before }}:refs/heads/$branch"
+          fi
+
+      - name: Open PR into release branch
+        if: steps.version.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          branch="${{ steps.release.outputs.branch }}"
+          cut_branch="${{ steps.release.outputs.cut-branch }}"
+          ver="${{ steps.release.outputs.version }}"
+          open_cut=$(gh pr list --base "$branch" --state open --json number,headRefName \
+              --jq '.[] | select(.headRefName | startswith("cut/v")) | "#\(.number) \(.headRefName)"')
+          if [[ -n "$open_cut" ]]; then
+            echo "A prior release bump has not landed yet. Open cut PR(s) into $branch:" >&2
+            echo "$open_cut" >&2
+            exit 1
+          fi
+          if git ls-remote --exit-code origin "refs/heads/$cut_branch" >/dev/null; then
+            echo "Branch $cut_branch already exists on origin and there is no open cut PR into $branch. Not force-updating or reusing a leftover cut branch." >&2
+            exit 1
+          fi
+          git push origin "${{ github.sha }}:refs/heads/$cut_branch"
+          gh pr create --base "$branch" --head "$cut_branch" \
+              --title "Cut release v$ver" \
+              --body 'Merge/conflict gate for the release cut. Merging this tags the release and drafts a GitHub Release. Conflict fixes go on this cut branch (merge the release branch into it).'
+
+  tag-release:
+    name: Tag release
+    if: startsWith(github.ref_name, 'release/v') && github.event.before != '0000000000000000000000000000000000000000'
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/detect-version-bump
+        id: version
+        with:
+          ref-a: ${{ github.event.before }}
+          ref-b: HEAD
+
+      - name: Read version at HEAD
+        if: steps.version.outputs.changed == 'true'
+        id: head_version
+        run: echo "version=$(.github/scripts/psibase-version.sh at HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: ./.github/actions/major-matches-release-branch
+        if: steps.version.outputs.changed == 'true'
+        with:
+          version: ${{ steps.head_version.outputs.version }}
+          release-branch: ${{ github.ref_name }}
+
+      - name: Check whether this version is already on main
+        id: on_main
+        if: steps.version.outputs.changed == 'true'
+        run: |
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          main_version=$(.github/scripts/psibase-version.sh at origin/main)
+          if [[ "$main_version" == "${{ steps.head_version.outputs.version }}" ]]; then
+            echo "matches=true" >>"$GITHUB_OUTPUT"
+          else
+            echo "matches=false" >>"$GITHUB_OUTPUT"
+          fi
+
+      # A version that already shipped through main was dry-run by the PR
+      # workflow there; only a version first appearing on this branch needs it.
+      - uses: dtolnay/rust-toolchain@1.86.0
+        if: steps.on_main.outputs.matches == 'false'
+
+      - name: Dry-run crate publish
+        if: steps.on_main.outputs.matches == 'false'
+        run: |
+          cd rust
+          ./scripts/publish.sh --dry-run 2>&1 | tee /tmp/crates-dry-run.log || true
+          ../.github/scripts/expect-crates-dry-run-errors.sh < /tmp/crates-dry-run.log
+
+      - name: Create tag
+        id: tag
+        if: steps.version.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ver="${{ steps.head_version.outputs.version }}"
+          tag=$(.github/scripts/psibase-version.sh tag-name "$ver")
+          head_sha=$(git rev-parse HEAD)
+          remote_commit=$(git ls-remote origin "refs/tags/$tag^{}" | awk 'NR==1 {print $1}')
+          if [[ -n "$remote_commit" ]]; then
+            if [[ "$remote_commit" == "$head_sha" ]]; then
+              echo "tag=$tag" >>"$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "Tag $tag already exists at $remote_commit, not HEAD ($head_sha)" >&2
+            exit 1
+          fi
+          if [[ $tag == *-pre ]]; then
+            message="psibase prerelease version v$ver"
+          else
+            message="psibase version v$ver"
+          fi
+          tag_object_sha=$(gh api \
+            --method POST \
+            "repos/${{ github.repository }}/git/tags" \
+            -f tag="$tag" \
+            -f message="$message" \
+            -f object="$head_sha" \
+            -f type=commit \
+            --jq '.sha')
+          gh api \
+            --method POST \
+            "repos/${{ github.repository }}/git/refs" \
+            -f ref="refs/tags/$tag" \
+            -f sha="$tag_object_sha"
+          echo "tag=$tag" >>"$GITHUB_OUTPUT"
+
+  # Build and draft in this run: this workflow is the only path that cuts a
+  # release, and the Git API tag create above uses GITHUB_TOKEN, so it starts
+  # no run of on-tag.yml on its own.
+  build-psibase:
+    name: Run Builds
+    needs: tag-release
+    if: needs.tag-release.outputs.tag != ''
+    uses: ./.github/workflows/ubuntu-builder.yml
+    with:
+      ref: refs/tags/${{ needs.tag-release.outputs.tag }}
+
+  draft-release:
+    name: Draft release
+    needs:
+      - tag-release
+      - build-psibase
+    uses: ./.github/workflows/create-draft-release.yml
+    with:
+      tag: ${{ needs.tag-release.outputs.tag }}
+      ubuntu-versions: ${{ needs.build-psibase.outputs.ubuntu-versions }}

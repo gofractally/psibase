@@ -35,6 +35,13 @@ done
 for dir in "${dirs[@]}"; do
     cd "$dir"
     echo "Publishing $dir..."
-    cargo publish $1
+    if ! out=$(cargo publish $1 2>&1); then
+        printf '%s\n' "$out" >&2
+        if [[ "$1" != "--dry-run" ]] && ! printf '%s\n' "$out" | grep -q 'already exists on crates.io index'; then
+            exit 1
+        fi
+    else
+        printf '%s\n' "$out" >&2
+    fi
     cd - > /dev/null
 done
