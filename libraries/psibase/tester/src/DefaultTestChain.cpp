@@ -95,7 +95,8 @@ namespace
             }
             if (!s.hasService(account))
             {
-               actions.push_back(asys.newAccount(account, AuthDelegate::service, true));
+               actions.push_back(
+                   asys.newAccount(account, AuthDelegate::service, NewAccountMode::matchExisting));
             }
          }
 
@@ -114,7 +115,7 @@ namespace
       actions.push_back(psys.setProducers(producerConfig));
 
       auto root = AccountNumber{"root"};
-      actions.push_back(asys.newAccount(root, AuthAny::service, true));
+      actions.push_back(asys.newAccount(root, AuthAny::service, NewAccountMode::requireNew));
 
       // If a package sets an auth service for an account, we should not override it
       std::vector<AccountNumber> accountsWithAuth;
@@ -249,7 +250,7 @@ AccountNumber DefaultTestChain::addAccount(
    transactor<Accounts> asys(Accounts::service, Accounts::service);
 
    auto trace = pushTransaction(  //
-       makeTransaction({asys.newAccount(acc, authService, true)}));
+       makeTransaction({asys.newAccount(acc, authService, NewAccountMode::requireNew)}));
 
    check(psibase::show(show, trace) == "", "Failed to add account");
 
@@ -272,7 +273,7 @@ AccountNumber DefaultTestChain::addAccount(AccountNumber                        
    transactor<AuthSig::AuthSig> authsig(AuthSig::AuthSig::service, AuthSig::AuthSig::service);
 
    auto trace = pushTransaction(makeTransaction({
-       accounts.newAccount(name, AuthAny::service, true),
+       accounts.newAccount(name, AuthAny::service, NewAccountMode::requireNew),
        authsig.from(name).setKey(public_key),
        accounts.from(name).setAuthServ(AuthSig::AuthSig::service),
    }));
