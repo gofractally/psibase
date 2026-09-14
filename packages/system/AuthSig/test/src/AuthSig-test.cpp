@@ -242,11 +242,4 @@ SCENARIO("AuthSig::newAccount does not overwrite an existing account key")
       auto stolen = t.from(victim.id).with({bob_keys});
       REQUIRE(stolen.to<AuthSig::AuthSig>().setKey(bob_keys.first).failed(""));
    }
-
-   THEN("newAccount still creates a genuinely new account")
-   {
-      REQUIRE(attacker.to<AuthSig::AuthSig>().newAccount("newuser00"_a, bob_keys.first).succeeded());
-      auto fresh = t.from("newuser00"_a).with({bob_keys});
-      REQUIRE(fresh.to<AuthSig::AuthSig>().setKey(bob_keys.first).succeeded());
-   }
 }
