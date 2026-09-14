@@ -1,4 +1,4 @@
-use crate::bindings::host::common::server;
+use crate::bindings::host::http::api as server;
 use crate::errors::ErrorType;
 use banx::path_find::{FxEdge, LineEdge, RoutingEdge};
 use psibase::services::tokens::Decimal;

@@ -27,7 +27,7 @@ pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::{
         services::tokens::{Precision, Quantity},
-        AccountNumber, Fracpack, Memo, TimePointSec, ToSchema,
+        AccountNumber, Pack, Unpack, Memo, TimePointSec, ToSchema,
     };
     use serde::{Deserialize, Serialize};
 
@@ -37,7 +37,7 @@ pub mod tables {
     pub const FX_RATE_SCALE: u64 = RATE_SCALE;
 
     #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
+    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug)]
     pub struct InitRow {
         /// Next primary key for [`Obligation`] rows.
         pub next_obligation_id: u32,
@@ -55,7 +55,7 @@ pub mod tables {
     /// Registered currency / asset. Compact `id` is used everywhere else;
     /// `symbol` is the human/name identity.
     #[table(name = "AssetTable", index = 5)]
-    #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
+    #[derive(Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
     pub struct Asset {
         #[primary_key]
         pub id: u16,
@@ -77,7 +77,7 @@ pub mod tables {
     /// Example: `[(Gary, AUD), (Steve, USD)]` — currency change implies convert
     /// on the previous edge via [`CurrencyPolicy`], then same-asset routing.
     #[derive(
-        Default, Copy, Clone, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug,
+        Default, Copy, Clone, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug,
     )]
     pub struct PathHop {
         pub account: AccountNumber,
@@ -89,7 +89,7 @@ pub mod tables {
     /// before that hop knows the poster; `path_draw` still needs a line or
     /// live claim when the hop runs.
     #[table(name = "ForwardOfferTab", index = 1)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct ForwardOffer {
         pub poster: AccountNumber,
         /// Next hop creditor, or [`Self::GLOBAL`].
@@ -123,7 +123,7 @@ pub mod tables {
     /// `debtor = 0` is global. Residual and debtor-line checks run at take
     /// time, not at post.
     #[table(name = "ClaimOfferTab", index = 6)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct ClaimOffer {
         pub poster: AccountNumber,
         /// Underlying debtor, or [`Self::GLOBAL`].
@@ -157,7 +157,7 @@ pub mod tables {
     /// to `deposit` them — off-graph value received. Only the creditor can
     /// fulfill; the poster cannot clear their own debt.
     #[table(name = "RequestTab", index = 8)]
-    #[derive(Default, Clone, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, Clone, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct PayRequest {
         pub id: u32,
         /// [`Self::INVOICE`] or [`Self::PLEASE_BOOK`].
@@ -187,7 +187,7 @@ pub mod tables {
     /// `path_pay`: the previous hop's **creditor** (middle man) applies their
     /// quote to size the next hop only. Does not rebook.
     #[table(name = "CurrencyPolicyTab", index = 4)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct CurrencyPolicy {
         /// Who posted the from→to offer.
         pub poster: AccountNumber,
@@ -215,7 +215,7 @@ pub mod tables {
     /// `asset_id`. Accrue before any principal change. [`Obligation::net_pair`]
     /// cancels both directions: interest first, then principal; highest rate first.
     #[table(name = "ObligationTable", index = 2)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct Obligation {
         #[primary_key]
         pub id: u32,
@@ -249,7 +249,7 @@ pub mod tables {
     /// actions write the cycle clock via [`PairCycle::sync_cycle`]. Same key as
     /// [`CreditLine`]; separate row so a line upsert cannot clobber the clock.
     #[table(name = "PairCycleTab", index = 7)]
-    #[derive(Default, Clone, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, Clone, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct PairCycle {
         pub creditor: AccountNumber,
         pub debtor: AccountNumber,
@@ -280,7 +280,7 @@ pub mod tables {
     ///
     /// Interest-free grace lives on [`PairCycle`], not this row.
     #[table(name = "CreditLineTable", index = 3)]
-    #[derive(Default, Clone, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, Clone, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct CreditLine {
         pub creditor: AccountNumber,
         pub debtor: AccountNumber,
@@ -313,7 +313,7 @@ pub mod tables {
     /// `to = (from − fee_fixed) * fx_rate / RATE_SCALE`. Out `from` is Banx;
     /// in `from` is tokens.
     #[table(name = "CashQuoteTab", index = 9)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct CashQuote {
         pub poster: AccountNumber,
         pub asset_id: u16,
@@ -335,7 +335,7 @@ pub mod tables {
     /// Invite created through Banx: the first accept extends a credit line to
     /// that claimee (skipped if a line already exists) and consumes the invite.
     #[table(name = "BanxInviteTable", index = 10)]
-    #[derive(Default, Clone, Fracpack, ToSchema, Serialize, Deserialize, Debug)]
+    #[derive(Default, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, Debug)]
     pub struct BanxInvite {
         #[primary_key]
         pub id: u32,
@@ -359,7 +359,7 @@ pub mod tables {
     /// in `asset_id`, spending [`Self::remaining`]. Dual of a credit line
     /// (who may *write* that I owe them, not who may *draw*).
     #[table(name = "BookAuthTab", index = 11)]
-    #[derive(Default, Clone, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, Clone, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct BookAuth {
         pub debtor: AccountNumber,
         pub creditor: AccountNumber,
