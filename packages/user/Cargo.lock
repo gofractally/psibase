@@ -366,7 +366,7 @@ dependencies = [
 
 [[package]]
 name = "banx"
-version = "0.27.0"
+version = "0.29.0"
 dependencies = [
  "async-graphql",
  "banx-pkg",
@@ -380,7 +380,7 @@ dependencies = [
 
 [[package]]
 name = "banx-pkg"
-version = "0.27.0"
+version = "0.29.0"
 dependencies = [
  "banx",
  "banx-plugin",
@@ -389,7 +389,7 @@ dependencies = [
 
 [[package]]
 name = "banx-plugin"
-version = "0.27.0"
+version = "0.29.0"
 dependencies = [
  "banx",
  "psibase",
@@ -2973,7 +2973,7 @@ dependencies = [
 
 [[package]]
 name = "r-banx"
-version = "0.27.0"
+version = "0.29.0"
 dependencies = [
  "async-graphql",
  "banx",
