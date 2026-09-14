@@ -10,7 +10,7 @@
         "sender": "",
         "service": "as-query",
         "method": "onBlock",
-        "rawData": "0000"
+        "data": {}
       }
     }
   }
