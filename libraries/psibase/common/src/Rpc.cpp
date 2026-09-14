@@ -175,7 +175,7 @@ namespace psibase
       return HttpHeader::split(headers, name);
    }
 
-   void HttpRequest::removeCookie(std::string_view name)
+   void HttpRequest::removeCookies(const std::function<bool(std::string_view)>& cond)
    {
       for (auto iter = headers.begin(); iter != headers.end();)
       {
@@ -191,7 +191,7 @@ namespace psibase
                check(pos != std::string_view::npos, "Invalid cookie");
                auto leading = kv.find_first_not_of(" \t");
                auto key     = kv.substr(leading, pos - leading);
-               if (key != name)
+               if (!cond(key))
                {
                   if (first)
                      first = false;
@@ -209,6 +209,11 @@ namespace psibase
          }
          ++iter;
       }
+   }
+
+   void HttpRequest::removeCookie(std::string_view name)
+   {
+      removeCookies([name](std::string_view key) { return key == name; });
    }
 
    void HttpRequest::removeHeader(std::string_view name)

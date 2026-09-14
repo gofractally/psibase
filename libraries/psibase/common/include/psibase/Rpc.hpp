@@ -80,6 +80,9 @@ namespace psibase
       /// Searches for all instances of a header by name and splits at commas
       std::vector<std::string_view> getHeaderValues(std::string_view name) const;
 
+      /// Removes all cookies whose names match a condition
+      void removeCookies(const std::function<bool(std::string_view)>& cond);
+
       /// Removes a cookie
       void removeCookie(std::string_view name);
 
