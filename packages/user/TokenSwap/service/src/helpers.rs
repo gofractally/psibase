@@ -17,6 +17,7 @@ pub fn sqrt(n: u128) -> u128 {
 }
 
 pub fn mul_div(a: Quantity, b: Quantity, c: Quantity) -> Quantity {
+    assert!(c.value > 0, "mul_div division by zero");
     let res = (a.value as u128 * b.value as u128) / (c.value as u128);
-    (res as u64).into()
+    u64::try_from(res).expect("mul_div overflow").into()
 }

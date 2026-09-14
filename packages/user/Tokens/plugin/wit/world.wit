@@ -16,14 +16,25 @@ interface issuer {
     /// * `max_supply` - The permanent max issued supply of the token
     create: func(precision: u8, max-supply: decimal) -> result<_, error>;
 
-    /// Recall an amount of tokens from a user's balance and burn them.
+    /// Recall an amount of tokens from a user's primary or sub-account balance and burn them.
+    ///
+    /// Arguments
+    /// * `token_id`    - Unique token identifier
+    /// * `amount`      - Amount of tokens to recall
+    /// * `memo`        - Memo describing the recall
+    /// * `account`     - Account from which tokens are recalled
+    /// * `sub-account` - If specified, recall from this sub-account of `account`
+    recall: func(token-id: u32, amount: decimal, memo: string, account: string, sub-account: option<string>) -> result<_, error>;
+
+    /// Recall an amount of tokens from a shared balance and burn them.
     ///
     /// Arguments
     /// * `token_id` - Unique token identifier
     /// * `amount`   - Amount of tokens to recall
     /// * `memo`     - Memo describing the recall
-    /// * `account`  - Account from which tokens are recalled
-    recall: func(token-id: u32, amount: decimal, memo: string, account: string) -> result<_, error>;
+    /// * `creditor` - Account that credited the tokens
+    /// * `debitor`  - Account that received the credit
+    recall-shared: func(token-id: u32, amount: decimal, memo: string, creditor: string, debitor: string) -> result<_, error>;
 
     /// Mint new tokens into existence.
     ///

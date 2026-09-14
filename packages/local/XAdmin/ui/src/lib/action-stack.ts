@@ -9,7 +9,6 @@ interface Action {
 interface InnerTrace {
     ActionTrace?: ActionTrace;
     ConsoleTrace?: any;
-    EventTrace?: any;
 }
 
 interface ActionTrace {

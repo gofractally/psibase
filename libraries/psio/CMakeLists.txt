@@ -8,7 +8,6 @@ add_compile_options( -Wall -Wstrict-aliasing )
 target_sources( psio INTERFACE
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/fpconv.h
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/powers.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/compress.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/check.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/reflect.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/schema.hpp
@@ -23,19 +22,9 @@ target_sources( psio INTERFACE
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/to_json/map.hpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/json/any.hpp
-
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/to_bin.hpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/to_bin/map.hpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/to_bin/set.hpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/to_bin/list.hpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/to_bin/deque.hpp
-
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/from_bin.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/from_json.hpp
-
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/varint.hpp
-
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/bytes.hpp
 )
 
 add_subdirectory(tests)

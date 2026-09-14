@@ -1,13 +1,15 @@
 use std::ptr::{null, null_mut};
 use wasi::{
-    Ciovec, Exitcode, Fd, Fdflags, Filedelta, Filesize, Lookupflags, Oflags, Prestat, Rights, Size,
-    ERRNO_BADF, ERRNO_INVAL, PREOPENTYPE_DIR,
+    Ciovec, Exitcode, Fd, Fdflags, Fdstat, Filedelta, Filesize, Lookupflags, Oflags, Prestat,
+    Rights, Size, ERRNO_BADF, ERRNO_INVAL, FDFLAGS_APPEND, FILETYPE_CHARACTER_DEVICE,
+    PREOPENTYPE_DIR, RIGHTS_FD_READ, RIGHTS_FD_WRITE,
 };
 
 type Errno = u16;
 
 const POLYFILL_ROOT_DIR_FD: u32 = 3;
 
+#[link(wasm_import_module = "env")]
 extern "C" {
     pub fn writeConsole(message: *const u8, len: usize);
     pub fn abortMessage(message: *const u8, len: usize) -> !;
@@ -32,7 +34,7 @@ pub unsafe extern "C" fn environ_get(_environ: *mut *mut u8, _environ_buf: *mut 
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn clock_time_get(id: u32, precision: u64, time: *mut u64) -> Errno {
+pub unsafe extern "C" fn clock_time_get(id: u32, _precision: u64, time: *mut u64) -> Errno {
     clockTimeGet(id, time) as Errno
 }
 
@@ -70,31 +72,42 @@ pub unsafe extern "C" fn fd_prestat_dir_name(fd: Fd, path: *mut u8, path_len: Si
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn path_unlink_file(arg0: i32, arg1: i32, arg2: i32) -> Errno {
+pub unsafe extern "C" fn fd_fdstat_get(_fd: Fd, stat: *mut Fdstat) -> Errno {
+    *stat = Fdstat {
+        fs_filetype: FILETYPE_CHARACTER_DEVICE,
+        fs_flags: FDFLAGS_APPEND,
+        fs_rights_base: RIGHTS_FD_READ | RIGHTS_FD_WRITE,
+        fs_rights_inheriting: 0,
+    };
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn path_unlink_file(_arg0: i32, _arg1: i32, _arg2: i32) -> Errno {
     ERRNO_INVAL.raw()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn path_open(
-    fd: Fd,
-    dirflags: Lookupflags,
-    path: *const u8,
-    path_len: Size,
-    oflags: Oflags,
-    fs_rights_base: Rights,
-    fs_rights_inherting: Rights,
-    fdflags: Fdflags,
-    opened_fd: *mut Fd,
+    _fd: Fd,
+    _dirflags: Lookupflags,
+    _path: *const u8,
+    _path_len: Size,
+    _oflags: Oflags,
+    _fs_rights_base: Rights,
+    _fs_rights_inherting: Rights,
+    _fdflags: Fdflags,
+    _opened_fd: *mut Fd,
 ) -> Errno {
     ERRNO_INVAL.raw()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn fd_seek(
-    fd: Fd,
-    offset: Filedelta,
-    whence: u8,
-    newoffset: *mut Filesize,
+    _fd: Fd,
+    _offset: Filedelta,
+    _whence: u8,
+    _newoffset: *mut Filesize,
 ) -> Errno {
     ERRNO_INVAL.raw()
 }
@@ -124,7 +137,7 @@ pub unsafe extern "C" fn fd_write(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn fd_close(fd: Fd) -> Errno {
+pub unsafe extern "C" fn fd_close(_fd: Fd) -> Errno {
     ERRNO_BADF.raw()
 }
 

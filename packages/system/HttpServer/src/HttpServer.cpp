@@ -115,7 +115,6 @@ namespace SystemService
          {
             if (!std::ranges::binary_search(allowedHeaders, header.name))
             {
-               // TODO: Convert to 500 error response (with cors on subdomains) instead of aborting.
                abortMessage("service " + service.str() + " attempted to set http header " +
                             header.name);
             }

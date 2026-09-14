@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { EVALUATIONS_SERVICE } from "@shared/domains/fractal/lib/constants";
-import { graphql } from "@shared/lib/graphql";
+import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { evaluation as evaluationPlugin } from "@shared/lib/plugins";
 import { type Account, zAccount } from "@shared/lib/schemas/account";
 import { zUnix } from "@shared/lib/schemas/unix";
 
@@ -21,7 +21,8 @@ export const zEvaluation = z.object({
 export type Evaluation = z.infer<typeof zEvaluation>;
 
 export const getEvaluation = async (owner: Account, id: number) => {
-    const evaluation = await graphql(
+    const evaluation = await callGraphqlViaPlugin(
+        evaluationPlugin.authorized.graphql,
         `
     {
         getEvaluation(owner: "${owner}", evaluationId: ${id}) {     
@@ -37,7 +38,6 @@ export const getEvaluation = async (owner: Account, id: number) => {
             numOptions
         } 
     }`,
-        { service: EVALUATIONS_SERVICE },
     );
 
     const response = z

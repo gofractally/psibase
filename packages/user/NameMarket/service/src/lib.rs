@@ -13,11 +13,11 @@ pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::services::tokens::Quantity;
     use psibase::AccountNumber;
-    use psibase::{Fracpack, ToSchema};
+    use psibase::{Pack, ToSchema, Unpack};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
+    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug)]
     pub struct InitRow {}
     impl InitRow {
         #[primary_key]
@@ -25,7 +25,7 @@ pub mod tables {
     }
 
     #[table(name = "AuctionsTable", index = 1)]
-    #[derive(Fracpack, ToSchema, Serialize, Deserialize, Debug)]
+    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug)]
     pub struct Auction {
         #[primary_key]
         pub length: u8,
@@ -35,7 +35,7 @@ pub mod tables {
     }
 
     #[table(name = "PurchasedAccountsTable", index = 2)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct PurchasedAccount {
         #[primary_key]
         pub account: AccountNumber,

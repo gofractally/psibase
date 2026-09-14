@@ -23,7 +23,7 @@ export default function SentPage() {
         <TwoColumnSelect
             left={
                 <MailList
-                    mailbox={"sent"}
+                    mailbox="sent"
                     messages={query.data ?? []}
                     onSelectMessage={setSelectedMessageId}
                     selectedMessage={selectedMessage}
@@ -33,12 +33,16 @@ export default function SentPage() {
             right={
                 selectedMessage ? (
                     <MessageDetail
-                        message={selectedMessage ?? null}
-                        mailbox={"sent"}
-                        onBack={() => setSelectedMessageId("")}
+                        message={selectedMessage}
+                        mailbox="sent"
+                        onBack={
+                            display === "right"
+                                ? () => setSelectedMessageId("")
+                                : undefined
+                        }
                     />
                 ) : (
-                    <NoMessageSelected>Select a message</NoMessageSelected>
+                    <NoMessageSelected />
                 )
             }
             header={<MailboxHeader>Sent</MailboxHeader>}

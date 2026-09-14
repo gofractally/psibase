@@ -7,7 +7,6 @@
 #include <psibase/Watchdog.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psio/finally.hpp>
-#include <psio/from_bin.hpp>
 #include <thread>
 
 namespace psibase

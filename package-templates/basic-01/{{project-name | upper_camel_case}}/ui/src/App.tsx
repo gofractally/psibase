@@ -13,12 +13,7 @@ export const App = () => {
     const thisServiceName = "{{project-name}}";
 
     useEffect(() => {
-        const init = async () => {
-            await supervisor.onLoaded();
-            await getExampleThing();
-        };
-
-        init();
+        getExampleThing();
     }, []);
 
     const getExampleThing = async () => {

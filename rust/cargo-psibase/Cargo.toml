@@ -10,7 +10,7 @@ license.workspace = true
 
 [dependencies]
 anyhow.workspace = true
-wasm-opt = "0.116.0"
+wasm-opt = { version = "0.116.0", default-features = false }
 cargo_metadata = "0.18.1"
 clap.workspace = true
 console = "0.15.2"

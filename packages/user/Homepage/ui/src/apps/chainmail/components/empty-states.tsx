@@ -1,19 +1,64 @@
-import { Inbox, Mail } from "lucide-react";
+import type { Mailbox } from "@/apps/chainmail/types";
 
-export const EmptyBox = ({ children }: { children: string }) => {
+import { Inbox, Mail, PencilLine, Send } from "lucide-react";
+
+import {
+    Empty,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyMedia,
+    EmptyTitle,
+} from "@shared/shadcn/ui/empty";
+
+const emptyMailboxCopy: Record<
+    Mailbox,
+    { title: string; description: string; icon: typeof Inbox }
+> = {
+    inbox: {
+        title: "No messages",
+        description: "When someone writes you, it will show up here.",
+        icon: Inbox,
+    },
+    sent: {
+        title: "No sent messages",
+        description: "Messages you send will appear here.",
+        icon: Send,
+    },
+    drafts: {
+        title: "No drafts",
+        description: "Unsent messages are saved here automatically.",
+        icon: PencilLine,
+    },
+};
+
+export const EmptyBox = ({ mailbox }: { mailbox: Mailbox }) => {
+    const { title, description, icon: Icon } = emptyMailboxCopy[mailbox];
+
     return (
-        <div className="flex h-full select-none flex-col items-center justify-center pb-[7%] text-gray-300">
-            <Inbox size={80} />
-            <p className="text-3xl">{children}</p>
-        </div>
+        <Empty className="h-full border-none">
+            <EmptyHeader>
+                <EmptyMedia variant="icon">
+                    <Icon />
+                </EmptyMedia>
+                <EmptyTitle>{title}</EmptyTitle>
+                <EmptyDescription>{description}</EmptyDescription>
+            </EmptyHeader>
+        </Empty>
     );
 };
 
-export const NoMessageSelected = ({ children }: { children: string }) => {
+export const NoMessageSelected = () => {
     return (
-        <div className="flex h-full select-none flex-col items-center justify-center pb-[7%] text-gray-300">
-            <Mail size={80} />
-            <p className="text-3xl">{children}</p>
-        </div>
+        <Empty className="h-full border-none">
+            <EmptyHeader>
+                <EmptyMedia variant="icon">
+                    <Mail />
+                </EmptyMedia>
+                <EmptyTitle>Select a message</EmptyTitle>
+                <EmptyDescription>
+                    Choose a message from the list to read it here.
+                </EmptyDescription>
+            </EmptyHeader>
+        </Empty>
     );
 };

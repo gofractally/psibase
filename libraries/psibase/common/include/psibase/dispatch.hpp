@@ -139,7 +139,6 @@ namespace psibase
 
 #ifndef PSIBASE_GENERATE_SCHEMA
 
-// TODO: prevent recursion, but allow opt-in
 #define PSIBASE_DISPATCH(SERVICE)                                                         \
    extern "C" void called(psibase::AccountNumber receiver, psibase::AccountNumber sender) \
    {                                                                                      \

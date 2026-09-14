@@ -96,13 +96,15 @@ interface private-api {
     push-data: func(tx: list<u8>);
     propose-install: func(tx: list<u8>) -> result<_, error>;
     set-account-sources: func(accounts: list<string>) -> result<_, error>;
+    load-package-ops: func(ops: list<package-op-info>) -> result<list<package-op-full>, error>;
 }
 
 interface queries {
     use host:types/types.{error};
-    use types.{meta, package-source};
+    use types.{meta, package-info, package-source};
     get-installed-packages: func() -> result<list<meta>, error>;
     get-sources: func(owner: string) -> result<list<package-source>, error>;
+    get-available-packages: func(owner: string) -> result<list<package-info>, error>;
 }
 
 world imports {

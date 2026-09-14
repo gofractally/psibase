@@ -57,9 +57,9 @@ jobs:
             $ubuntu-${{ matrix.ubuntu-version }}-caches-
       - name: Build
         env:
-          BUILDER_IMAGE_2204: 56cc3229bf80136970f4c925b5d3fc9d07ce3c35
-          BUILDER_IMAGE_2404: 56cc3229bf80136970f4c925b5d3fc9d07ce3c35
-          BUILDER_IMAGE_2604: 56cc3229bf80136970f4c925b5d3fc9d07ce3c35
+          BUILDER_IMAGE_2204: 983d7b62457785036f381163a2e50039f304e517
+          BUILDER_IMAGE_2404: 983d7b62457785036f381163a2e50039f304e517
+          BUILDER_IMAGE_2604: 983d7b62457785036f381163a2e50039f304e517
         run: |
           BUILDER_IMAGE="ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-${{ matrix.ubuntu-version }}:$BUILDER_IMAGE_${{ matrix.ubuntu-version }}"
           echo $BUILDER_IMAGE
