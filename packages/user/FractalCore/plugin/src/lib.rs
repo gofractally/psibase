@@ -20,7 +20,7 @@ use bindings::guilds::plugin as GuildsPlugin;
 use trust::{assert_authorized, FunctionName};
 
 use crate::bindings::host::{
-    common::client::get_receiver,
+    client::api::get_receiver,
     db::store::{Bucket, Database, DbMode::Transactional, StorageDuration::Persistent},
 };
 

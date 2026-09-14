@@ -11,11 +11,11 @@
 
 #[psibase::service_tables]
 pub mod tables {
-    use psibase::{Fracpack, Table, ToSchema};
+    use psibase::{Pack, Table, ToSchema, Unpack};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "ConfigTable", index = 0)]
-    #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug)]
+    #[derive(Default, Pack, Unpack, ToSchema, Serialize, Deserialize, Debug)]
     pub struct ConfigRow {}
     impl ConfigRow {
         #[primary_key]
@@ -36,7 +36,8 @@ pub mod tables {
 mod service {
     use crate::tables::ConfigRow;
     use psibase::services::{
-        accounts::Wrapper as Accounts, guilds::Wrapper as Guilds, producers::Wrapper as Producers,
+        accounts::Wrapper as Accounts, auth_any::Wrapper as AuthAny, guilds::Wrapper as Guilds,
+        producers::Wrapper as Producers,
     };
     use psibase::*;
 
@@ -74,7 +75,7 @@ mod service {
 
         // 1. Create accounts with auth-any
         for &acct in &TEST_ACCOUNTS {
-            Accounts::call().newAccount(acct, account!("auth-any"), true);
+            Accounts::call().newAccount(acct, AuthAny::SERVICE, true);
         }
 
         // 2. Apply each account to the system guild

@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { graphql } from "@shared/lib/graphql";
+import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { setcode } from "@shared/lib/plugins";
 import { zAccount } from "@shared/lib/schemas/account";
 
 export const ConfigResponse = z.object({
@@ -23,7 +24,8 @@ export const useCodeHash = (
         queryKey: codeHashQueryKey(account),
         enabled: !!account,
         queryFn: async () => {
-            const res = await graphql(
+            const res = await callGraphqlViaPlugin(
+                setcode.authorized.graphql,
                 `
         {
           code(account: "${account}") {
@@ -31,7 +33,6 @@ export const useCodeHash = (
           }
         }
       `,
-                { service: "setcode" },
             );
 
             const parsed = ConfigResponse.parse(res);

@@ -17,8 +17,7 @@ macro_rules! serialize_as_str {
                     }
 
                     fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
-                        <$ty>::from_str(v)
-                            .map_err(|_| E::custom(concat!("Expected string containing ", $desc)))
+                        <$ty>::from_str(v).map_err(E::custom)
                     }
                 }
 

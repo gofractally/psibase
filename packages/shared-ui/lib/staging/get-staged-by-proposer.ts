@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-import { graphql } from "@shared/lib/graphql";
+import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { stagedTx } from "@shared/lib/plugins";
 import { Account } from "@shared/lib/schemas/account";
 
 const zRes = z.object({
@@ -15,7 +16,8 @@ const zRes = z.object({
 });
 
 export const getStagedByProposer = async (account: Account) => {
-    const res = await graphql(
+    const res = await callGraphqlViaPlugin(
+        stagedTx.authorized.graphql,
         ` { 
         getStagedByProposer(proposer: "${account}") {
                 nodes {
@@ -24,7 +26,6 @@ export const getStagedByProposer = async (account: Account) => {
                 }
         }
     }`,
-        { service: "staged-tx" },
     );
 
     return zRes.parse(res).getStagedByProposer.nodes;

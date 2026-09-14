@@ -1,5 +1,6 @@
 import { PluginInterface } from "@shared/hooks/plugin-function";
 import { Account } from "@shared/lib/schemas/account";
+import { Authorized } from "./authorized-graphql-plugin";
 
 type TID = number;
 type Decimal = string;
@@ -36,14 +37,6 @@ class Helpers extends PluginInterface {
             [tokenId: TID, amount: Decimal],
             number | string | bigint
         >("decimalToU64");
-    }
-}
-
-class Authorized extends PluginInterface {
-    protected override readonly _intf = "authorized" as const;
-
-    get graphql() {
-        return this._call<[query: string], string>("graphql");
     }
 }
 

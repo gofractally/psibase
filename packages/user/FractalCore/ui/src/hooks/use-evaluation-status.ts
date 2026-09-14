@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { EvaluationStatus, getStatus } from "@/lib/get-status";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
@@ -28,44 +28,27 @@ export const useEvaluationStatus = (
     );
 
     const isNoScheduledEvaluation = !guild?.evalInstance;
-
-    if (isNoScheduledEvaluation) {
-        return undefined;
-    }
-
     const isLoading = isLoadingFractal || isLoadingUsersAndGroups;
 
-    if (isLoading) return undefined;
-    if (usersAndGroupsError || fractalError || !evaluation) {
-        return undefined;
-    }
+    const currentStatus =
+        !isNoScheduledEvaluation &&
+        !isLoading &&
+        !usersAndGroupsError &&
+        !fractalError &&
+        evaluation &&
+        currentUser &&
+        usersAndGroups
+            ? getStatus(evaluation, currentUser, usersAndGroups, now)
+            : undefined;
 
-    const currentStatus = getStatus(
-        evaluation,
-        currentUser!,
-        usersAndGroups!,
-        now,
-    );
+    const shouldPing =
+        currentStatus?.type === "waitingStart" ||
+        currentStatus?.type === "finished" ||
+        (currentStatus?.type === "submission" && currentStatus.canCloseEarly);
 
-    const pingOnStatuses: EvaluationStatus["type"][] = [
-        "waitingStart",
-        "finished",
-    ];
-    const canCloseEarly =
-        currentStatus.type == "submission" && currentStatus.canCloseEarly;
-
-    if (
-        (pingOnStatuses.includes(currentStatus.type) || canCloseEarly) &&
-        !pingUsersAndGroups
-    ) {
-        setPingUsersAndGroups(true);
-    } else if (
-        !pingOnStatuses.includes(currentStatus.type) &&
-        !canCloseEarly &&
-        pingUsersAndGroups
-    ) {
-        setPingUsersAndGroups(false);
-    }
+    useEffect(() => {
+        setPingUsersAndGroups(Boolean(shouldPing));
+    }, [shouldPing]);
 
     return currentStatus;
 };

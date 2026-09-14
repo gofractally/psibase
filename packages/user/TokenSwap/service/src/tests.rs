@@ -4,9 +4,33 @@
 mod tests {
     use crate::Wrapper;
     use psibase::services::nft::NID;
-    use psibase::services::tokens::{Quantity, Wrapper as Tokens, TID};
+    use psibase::services::tokens::{BalanceFlags, Quantity, Wrapper as Tokens, TID};
     use psibase::*;
 
+    fn enable_nft_auto_debit(chain: &psibase::Chain, account: AccountNumber) {
+        psibase::services::nft::Wrapper::push_from(chain, account)
+            .setUserConf(
+                psibase::services::nft::NftHolderFlags::AUTO_DEBIT.index(),
+                true,
+            )
+            .get()
+            .unwrap();
+    }
+
+    fn enable_token_auto_debit(chain: &psibase::Chain, account: AccountNumber) {
+        Tokens::push_from(chain, account)
+            .setUserConf(BalanceFlags::AUTO_DEBIT.index(), true)
+            .get()
+            .unwrap();
+    }
+
+    fn setup_user(chain: &psibase::Chain, account: AccountNumber) {
+        chain.new_account(account).unwrap();
+        enable_nft_auto_debit(chain, account);
+        enable_token_auto_debit(chain, account);
+    }
+
+    #[track_caller]
     fn create_and_mint_token(
         chain: &psibase::Chain,
         sender: AccountNumber,
@@ -17,7 +41,10 @@ mod tests {
             .get()
             .unwrap();
 
-        Tokens::push_from(&chain, sender).mint(token_id, amount, "".into());
+        Tokens::push_from(&chain, sender)
+            .mint(token_id, amount, "".into())
+            .get()
+            .unwrap();
         token_id
     }
 
@@ -43,6 +70,7 @@ mod tests {
             .unwrap()
     }
 
+    #[track_caller]
     fn tokens_credit(
         chain: &psibase::Chain,
         token_id: u32,
@@ -167,7 +195,7 @@ mod tests {
     #[psibase::test_case(packages("TokenSwap"))]
     fn test_several_trades(chain: psibase::Chain) -> Result<(), psibase::Error> {
         let alice = account!("alice");
-        chain.new_account(alice).unwrap();
+        setup_user(&chain, alice);
 
         let (pool_id, _nft_id, token_a, token_b) =
             initialise_pool(&chain, alice, 100_000.into(), 100_000.into()); // 100k each
@@ -217,7 +245,7 @@ mod tests {
     #[psibase::test_case(packages("TokenSwap"))]
     fn test_single_side_fee(chain: psibase::Chain) -> Result<(), psibase::Error> {
         let alice = account!("alice");
-        chain.new_account(alice).unwrap();
+        setup_user(&chain, alice);
 
         let (pool_id, _nft_id, token_a, token_b) =
             initialise_pool(&chain, alice, 100_000.into(), 100_000.into());
@@ -243,7 +271,7 @@ mod tests {
     #[psibase::test_case(packages("TokenSwap"))]
     fn test_adding_liquidity(chain: psibase::Chain) -> Result<(), psibase::Error> {
         let alice = account!("alice");
-        chain.new_account(alice).unwrap();
+        setup_user(&chain, alice);
 
         // Create a pool of equal 1:1 reserve ratios
         let (pool_id, _nft_id, token_a, token_b) =
@@ -269,7 +297,7 @@ mod tests {
     #[psibase::test_case(packages("TokenSwap"))]
     fn test_remove_liquidity(chain: psibase::Chain) -> Result<(), psibase::Error> {
         let alice = account!("alice");
-        chain.new_account(alice).unwrap();
+        setup_user(&chain, alice);
 
         let (pool_id, _nft_id, token_a, token_b) =
             initialise_pool(&chain, alice, 100_000.into(), 100_000.into());
@@ -306,8 +334,8 @@ mod tests {
             vec![(lp_token, remove_amount)],
             vec![
                 (lp_token, -(remove_amount as i64)),
-                (token_a, 2499),
-                (token_b, 2499),
+                (token_a, 2500),
+                (token_b, 2500),
             ],
             || {
                 Wrapper::push_from(&chain, alice)
@@ -325,7 +353,7 @@ mod tests {
         let alice = account!("alice");
         let token_swap = account!("token-swap");
 
-        chain.new_account(alice).unwrap();
+        setup_user(&chain, alice);
 
         // Pool 1: A-B (1:1)
         let (pool_ab, _, token_a, token_b) =
@@ -364,7 +392,7 @@ mod tests {
     #[psibase::test_case(packages("TokenSwap"))]
     fn test_asymmetric_fees(chain: psibase::Chain) -> Result<(), psibase::Error> {
         let alice = account!("alice");
-        chain.new_account(alice).unwrap();
+        setup_user(&chain, alice);
 
         let (pool_id, _nft_id, token_a, token_b) =
             initialise_pool(&chain, alice, 100_000.into(), 100_000.into());

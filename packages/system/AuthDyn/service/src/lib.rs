@@ -4,13 +4,13 @@ pub mod tables {
     use psibase::services::auth_dyn::int_wrapper;
     use psibase::services::transact::ServiceMethod;
     use psibase::{
-        services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber, Fracpack, ServiceWrapper,
-        Table, ToSchema,
+        services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber, Pack, ServiceWrapper, Table,
+        ToSchema, Unpack,
     };
     use serde::{Deserialize, Serialize};
 
     #[table(name = "ManagementTable", index = 0)]
-    #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct Management {
         #[primary_key]
         pub account: AccountNumber,
@@ -169,10 +169,9 @@ pub mod service {
         let policy = Management::get_assert(sender).dynamic_policy(method);
         assert_ne!(policy.threshold, 0, "multi auth threshold cannot be 0");
 
-        let total_possible_weight = policy
-            .authorizers
-            .iter()
-            .fold(0u8, |acc, authorizer| acc.checked_add(authorizer.weight).unwrap());
+        let total_possible_weight = policy.authorizers.iter().fold(0u8, |acc, authorizer| {
+            acc.checked_add(authorizer.weight).unwrap()
+        });
 
         if policy.threshold > total_possible_weight {
             return !is_approval;
@@ -188,7 +187,9 @@ pub mod service {
             .authorizers
             .into_iter()
             .filter(|authorizer| authorizers.contains(&authorizer.account))
-            .fold(0u8, |acc, authorizer| acc.checked_add(authorizer.weight).unwrap());
+            .fold(0u8, |acc, authorizer| {
+                acc.checked_add(authorizer.weight).unwrap()
+            });
 
         total_weight_approved >= required_weight
     }

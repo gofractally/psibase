@@ -7,7 +7,7 @@ interface test {
 }
 
 world psibase-plugin {
-    import host:common/server;
+    import host:http/api;
     export test;
 }
 

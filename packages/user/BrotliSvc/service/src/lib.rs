@@ -21,6 +21,7 @@ mod tests {
     use crate::Wrapper;
     use anyhow::anyhow;
     use base64::{engine::general_purpose::URL_SAFE, Engine};
+    use psibase::Push;
 
     const UNCOMPRESSED_STRING: &str = "Hello, world!!";
     const COMPRESSED_STRING: &str = "iwaASGVsbG8sIHdvcmxkISED";
