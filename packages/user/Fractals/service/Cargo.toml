@@ -10,7 +10,7 @@ server = "r-fractals"
 plugin = "fractals-plugin"
 data = [{ src = "../ui/dist", dst = "/" }]
 postinstall = [
-    { sender = "fractals", service = "sites", method = "enablespa", rawData = "010001" },
+    { sender = "fractals", service = "sites", method = "enablespa", data = { enable = true } },
 ]
 
 [package.metadata.psibase.dependencies]
