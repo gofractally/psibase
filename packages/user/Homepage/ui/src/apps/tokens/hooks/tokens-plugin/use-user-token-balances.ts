@@ -52,7 +52,7 @@ export const useUserTokenBalances = (
 
                 return {
                     id: balance.tokenId,
-                    symbol: balance.symbol,
+                    symbol: balance.symbol ?? null,
                     precision: quan.precision,
                     label: quan.getDisplayLabel(),
                     balance: quan,

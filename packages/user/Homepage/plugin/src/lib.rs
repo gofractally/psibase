@@ -45,7 +45,7 @@ impl NameMarketApi for HomepagePlugin {
         name_market::plugin::api::can_create_account()
     }
 
-    fn get_markets_overview() -> Result<name_market::plugin::api::MarketsOverview, Error> {
+    fn get_markets_overview() -> Result<name_market::plugin::types::MarketsOverview, Error> {
         name_market::plugin::api::get_markets_overview()
     }
 
@@ -190,7 +190,7 @@ impl Vserver for HomepagePlugin {
         virtual_server::plugin::billing::resize_and_fill_gas_tank(&new_capacity)
     }
 
-    fn get_billing_config() -> Result<virtual_server::plugin::authorized::BillingConfig, Error> {
+    fn get_billing_config() -> Result<virtual_server::plugin::types::BillingConfig, Error> {
         virtual_server::plugin::authorized::get_billing_config()
     }
 

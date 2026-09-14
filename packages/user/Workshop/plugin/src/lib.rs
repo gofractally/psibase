@@ -114,7 +114,6 @@ impl Mail for WorkshopPlugin {
 
     fn get_msgs(app: String) -> Result<Vec<chainmail::plugin::types::Message>, Error> {
         assert_authorized(FunctionName::get_msgs)?;
-        set_propose_latch(Some(&app)).unwrap();
         chainmail::plugin::queries::get_msgs(None, Some(&app))
     }
 }

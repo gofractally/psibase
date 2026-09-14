@@ -1,3 +1,5 @@
+import type { SystemTokenInfo as PluginSystemTokenInfo } from "@shared/lib/plugins/tokens";
+
 export interface SystemTokenInfo {
     id: string;
     /** Display label: token symbol, or "ID: {id}" when no symbol is set */
@@ -7,14 +9,15 @@ export interface SystemTokenInfo {
 }
 
 export function toSystemTokenInfo(
-    token: { id: number; symbol: string; precision: number } | null | undefined,
+    token: PluginSystemTokenInfo | null | undefined,
 ): SystemTokenInfo | null {
     if (!token) {
         return null;
     }
+    const symbol = token.symbol?.trim();
     return {
         id: String(token.id),
-        symbol: token.symbol,
+        symbol: symbol ? symbol : `ID: ${token.id}`,
         precision: token.precision,
     };
 }

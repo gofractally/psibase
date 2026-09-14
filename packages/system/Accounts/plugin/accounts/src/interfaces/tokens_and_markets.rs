@@ -20,7 +20,7 @@ impl NameMarket for AccountsPlugin {
         NameMarketPlugin::api::can_create_account()
     }
 
-    fn get_markets_overview() -> Result<NameMarketPlugin::api::MarketsOverview, Error> {
+    fn get_markets_overview() -> Result<NameMarketPlugin::types::MarketsOverview, Error> {
         NameMarketPlugin::api::get_markets_overview()
     }
 }

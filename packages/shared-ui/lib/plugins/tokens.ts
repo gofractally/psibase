@@ -7,14 +7,14 @@ type Decimal = string;
 
 export type SystemTokenInfo = {
     id: number;
-    symbol: string;
+    symbol: string | undefined;
     precision: number;
 };
 
 export type UserBalance = {
     tokenId: number;
     balance: string;
-    symbol: string | null;
+    symbol: string | undefined;
     precision: number;
     account: string;
 };
@@ -54,7 +54,7 @@ class Helpers extends PluginInterface {
     }
 
     get getSystemToken() {
-        return this._call<[], SystemTokenInfo | null>("getSystemToken");
+        return this._call<[], SystemTokenInfo | undefined>("getSystemToken");
     }
 
     get getUserBalances() {

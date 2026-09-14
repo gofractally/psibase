@@ -61,6 +61,11 @@ interface types {
         /// the nearest billable unit.
         min-billable-unit-bits: u64,
     }
+
+    record billing-config {
+        fee-receiver: option<string>,
+        enabled: bool,
+    }
 }
 
 interface admin {
@@ -129,11 +134,7 @@ interface billing {
 
 interface authorized {
     use host:types/types.{error};
-
-    record billing-config {
-        fee-receiver: option<string>,
-        enabled: bool,
-    }
+    use types.{billing-config};
 
     /// Executes a GraphQL query against this app's http server.
     ///

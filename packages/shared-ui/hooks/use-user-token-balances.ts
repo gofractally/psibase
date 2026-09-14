@@ -19,13 +19,13 @@ export function toUserTokenBalances(
     nodes: Array<{
         tokenId: number;
         balance: string;
-        symbol: string | null;
+        symbol: string | null | undefined;
         precision: number;
     }>,
 ): UserTokenBalance[] {
     return nodes.map((node) => ({
         id: node.tokenId,
-        symbol: node.symbol,
+        symbol: node.symbol ?? null,
         precision: node.precision,
         balance: new Quantity(
             node.balance,

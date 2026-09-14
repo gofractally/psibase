@@ -66,7 +66,7 @@ interface tokens {
 
 interface name-market {
     use host:types/types.{error};
-    use name-market:plugin/api.{markets-overview};
+    use name-market:plugin/types.{markets-overview};
 
     can-create-account: func() -> bool;
     get-markets-overview: func() -> result<markets-overview, error>;

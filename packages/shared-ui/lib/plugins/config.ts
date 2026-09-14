@@ -2,6 +2,10 @@ import { PluginInterface } from "@shared/hooks/plugin-function";
 import { Account } from "@shared/lib/schemas/account";
 import { InstalledPackageMeta } from "@shared/lib/schemas/installed-package";
 
+import type { MarketsOverview } from "./namemarket";
+import type { SystemTokenInfo } from "./tokens";
+import type { BillingConfig } from "./virtual-server";
+
 export type MarketConfigInput = {
     length: number;
     windowSeconds: number;
@@ -31,13 +35,7 @@ class NameMarket extends PluginInterface {
     }
 
     get getMarketsOverview() {
-        return this._call<
-            [],
-            {
-                marketParams: Array<{ length: number; enabled: boolean }>;
-                currentPrices: Array<{ length: number; price: string }>;
-            }
-        >("getMarketsOverview");
+        return this._call<[], MarketsOverview>("getMarketsOverview");
     }
 
     get graphql() {
@@ -118,10 +116,7 @@ class VirtualServer extends PluginInterface {
     protected override readonly _intf = "virtual-server" as const;
 
     get getBillingConfig() {
-        return this._call<
-            [],
-            { feeReceiver: string | null; enabled: boolean }
-        >("getBillingConfig");
+        return this._call<[], BillingConfig>("getBillingConfig");
     }
 
     get graphql() {
@@ -133,10 +128,7 @@ class Tokens extends PluginInterface {
     protected override readonly _intf = "tokens" as const;
 
     get getSystemToken() {
-        return this._call<
-            [],
-            { id: number; symbol: string; precision: number } | null
-        >("getSystemToken");
+        return this._call<[], SystemTokenInfo | undefined>("getSystemToken");
     }
 }
 

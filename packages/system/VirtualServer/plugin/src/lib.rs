@@ -234,14 +234,14 @@ impl Authorized for VirtualServerPlugin {
         host::server::post_graphql_get_json(&query)
     }
 
-    fn get_billing_config() -> Result<Exports::authorized::BillingConfig, Error> {
+    fn get_billing_config() -> Result<Exports::types::BillingConfig, Error> {
         assert_caller(
             &["homepage", "config", &virtual_server::SERVICE.to_string()],
             "authorized::get_billing_config",
         );
 
         let config = query::get_billing_config()?;
-        Ok(Exports::authorized::BillingConfig {
+        Ok(Exports::types::BillingConfig {
             fee_receiver: config.fee_receiver,
             enabled: config.enabled,
         })
