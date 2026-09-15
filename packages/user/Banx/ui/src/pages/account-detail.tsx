@@ -6,6 +6,7 @@ import {
     ArrowLeftRight,
     CircleMinus,
     GitBranch,
+    HandCoins,
     Handshake,
     History,
     Inbox,
@@ -45,6 +46,7 @@ import {
     SellClaimDialog,
     type SellClaimTarget,
 } from "@/components/sell-claim-dialog";
+import { NewDepositLoanDialog } from "@/components/new-deposit-loan-dialog";
 import { TransferDialog } from "@/components/transfer-dialog";
 import { useAssetMap } from "@/hooks/use-assets";
 import { useAccountGroups } from "@/hooks/use-account-groups";
@@ -88,6 +90,7 @@ export function AccountDetailPage() {
     );
 
     const [transferOpen, setTransferOpen] = useState(false);
+    const [depositOpen, setDepositOpen] = useState(false);
     const [creditLineOpen, setCreditLineOpen] = useState(false);
     const [editingLine, setEditingLine] = useState<CreditLine | null>(null);
     const [routingOpen, setRoutingOpen] = useState(false);
@@ -159,6 +162,15 @@ export function AccountDetailPage() {
                                 type="button"
                                 variant="outline"
                                 className="gap-1.5"
+                                onClick={() => setDepositOpen(true)}
+                            >
+                                <HandCoins className="size-4" />
+                                Deposit
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="gap-1.5"
                                 onClick={() => {
                                     setEditingLine(null);
                                     setCreditLineOpen(true);
@@ -191,6 +203,13 @@ export function AccountDetailPage() {
                 open={transferOpen}
                 onOpenChange={setTransferOpen}
                 prefill={{ payee: account }}
+            />
+            <NewDepositLoanDialog
+                open={depositOpen}
+                onOpenChange={setDepositOpen}
+                assets={assets}
+                precisionOf={precisionOf}
+                initialAccount={account}
             />
             <CreditLineDialog
                 open={creditLineOpen}

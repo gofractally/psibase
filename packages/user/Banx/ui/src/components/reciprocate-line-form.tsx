@@ -110,8 +110,11 @@ export function ReciprocateLineForm({
                     await setBookAuth.mutateAsync({
                         creditor: terms.inviter,
                         assetId: terms.assetId,
-                        remaining: displayAmount(terms.limit),
-                        maxInterestRatePpm: terms.interestRatePpm,
+                        remaining: value.limit.trim(),
+                        maxInterestRatePpm: percentStringToPpm(
+                            value.interestPct,
+                            PPM_SCALE,
+                        ),
                         expiresAtSeconds: 0,
                     });
                 }
@@ -297,10 +300,17 @@ export function ReciprocateLineForm({
                             <field.CheckboxField label="Deplete limit on each draw (non-revolving)" />
                         )}
                     />
-                    <form.AppField
-                        name="allowBook"
-                        children={(field) => (
-                            <field.CheckboxField label={`Let ${terms.inviter} book expenses onto you (same ${received} ${symbol} remaining)`} />
+                    <form.Subscribe
+                        selector={(s) => s.values.limit}
+                        children={(limit) => (
+                            <form.AppField
+                                name="allowBook"
+                                children={(field) => (
+                                    <field.CheckboxField
+                                        label={`Let ${terms.inviter} book expenses onto you (same ${limit.trim() || received} ${symbol} remaining)`}
+                                    />
+                                )}
+                            />
                         )}
                     />
                     {forwardAlreadyOn ? (

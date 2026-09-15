@@ -245,7 +245,6 @@ export function PoliciesPage() {
                                 min={0}
                                 max={MAX_PERCENT}
                                 step={MIN_PERCENT_STEP}
-                                description="0–100% (0.0001% = 1 ppm)"
                             />
                         )}
                     />

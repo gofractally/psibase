@@ -360,7 +360,7 @@ export function ObligationsPage() {
                                 type="button"
                                 size="icon"
                                 className="size-11 shrink-0 rounded-full bg-amber-800 text-white hover:bg-amber-900 dark:bg-amber-600 dark:hover:bg-amber-500 sm:size-9"
-                                aria-label="Create deposit or loan"
+                                aria-label="Book a deposit"
                                 onClick={() => setCreateOpen(true)}
                             >
                                 <Plus className="size-5" />

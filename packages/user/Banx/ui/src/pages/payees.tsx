@@ -78,7 +78,7 @@ function PayeeRow({
                 onClick={onPay}
             >
                 <HandCoins className="size-4" />
-                Deposit / loan
+                Deposit
             </Button>
         </div>
     );
@@ -142,7 +142,7 @@ export function PayeesPage() {
         <div className="space-y-8">
             <PageHeader
                 title="Payees"
-                description="Common recipients from your Contacts app — like a banking payee list. Start a deposit or loan, or book an expense if they authorized you."
+                description="Common recipients from your Contacts app — like a banking payee list. Book a deposit, or an expense if they authorized you."
                 action={
                     <div className="flex flex-wrap items-center gap-2">
                         <ShowContactsButton returnPath="/payees" />
@@ -244,7 +244,7 @@ export function PayeesPage() {
                                 <p className="text-muted-foreground max-w-md text-sm">
                                     {search.trim()
                                         ? "Try a different search."
-                                        : "Add people in the Contacts app, then they show up here for deposits and loan draws."}
+                                        : "Add people in the Contacts app, then they show up here for deposits."}
                                 </p>
                             </div>
                             {!search.trim() && (
