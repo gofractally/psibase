@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
 import { guilds } from "@shared/lib/plugins";
 import { Account, zAccount } from "@shared/lib/schemas/account";
 import { zDateTime } from "@shared/lib/schemas/date-time";
@@ -33,7 +33,7 @@ const DataSchema = z.object({
 });
 
 export const getGuildMembership = async (guild: Account, member: Account) => {
-    const res = await callGraphqlViaPlugin(
+    const res = await graphqlAuth(
         guilds.authorized.graphql,
         `
         {

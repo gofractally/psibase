@@ -26,7 +26,7 @@ use virtual_server::plugin::types::{
 };
 
 use exports::config::plugin::packaging::{
-    Meta, PackageInfo, PackagePreference, PackageSource,
+    Meta, PackageInfo, PackageOpFull, PackageOpInfo, PackagePreference, PackageSource,
 };
 use exports::config::plugin::producers::ClaimType;
 
@@ -125,24 +125,16 @@ impl Packaging for ConfigPlugin {
         packages::plugin::queries::get_installed_packages()
     }
 
-    fn get_available_packages(owner: String) -> Result<Vec<PackageInfo>, Error> {
-        packages::plugin::queries::get_available_packages(&owner)
-    }
-
-    fn install_packages(
-        owner: String,
-        pkgs: Vec<String>,
+    fn resolve(
+        index: Vec<PackageInfo>,
+        request: Vec<String>,
         request_pref: PackagePreference,
         non_request_pref: PackagePreference,
-    ) -> Result<(), Error> {
-        let index = packages::plugin::queries::get_available_packages(&owner)?;
-        let resolved = packages::plugin::private_api::resolve(
-            &index,
-            &pkgs,
-            request_pref,
-            non_request_pref,
-        )?;
-        let ops = packages::plugin::private_api::load_package_ops(&resolved)?;
+    ) -> Result<Vec<PackageOpInfo>, Error> {
+        packages::plugin::private_api::resolve(&index, &request, request_pref, non_request_pref)
+    }
+
+    fn install_packages(owner: String, ops: Vec<PackageOpFull>) -> Result<(), Error> {
         let (data, install) =
             packages::plugin::private_api::build_transactions(&owner, &ops, 4)?;
         for tx in data {

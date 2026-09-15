@@ -1,6 +1,6 @@
 import z from "zod";
 
-import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
 import { stagedTx } from "@shared/lib/plugins";
 import { Account, zAccount } from "@shared/lib/schemas/account";
 
@@ -27,7 +27,7 @@ const response = z.object({
 });
 
 export const getActorHistory = async (account: Account) => {
-    const res = await callGraphqlViaPlugin(
+    const res = await graphqlAuth(
         stagedTx.authorized.graphql,
         `{ 
                 actorHistory(actor: "${account}", last: 8) {

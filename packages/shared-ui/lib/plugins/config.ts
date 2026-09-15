@@ -27,6 +27,11 @@ export type PackageSource = {
 
 export type PackagePreference = "best" | "compatible" | "current";
 
+export type PackageInstallOp = {
+    old?: unknown;
+    new?: ArrayBuffer;
+};
+
 class NameMarket extends PluginInterface {
     protected override readonly _intf = "name-market" as const;
 
@@ -54,19 +59,29 @@ class Packaging extends PluginInterface {
         return this._call<[], InstalledPackageMeta[]>("getInstalledPackages");
     }
 
-    get getAvailablePackages() {
-        return this._call<[owner: string], unknown[]>("getAvailablePackages");
-    }
-
-    get installPackages() {
+    /**
+     * Resolves the operations needed to satisfy `request` against an already
+     * fetched package index. The UI fetches the index itself because package
+     * repositories may live on other chains or plain HTTP servers that plugins
+     * cannot reach.
+     */
+    get resolve() {
         return this._call<
             [
-                owner: string,
-                packages: string[],
+                index: unknown[],
+                request: string[],
                 requestPref: PackagePreference,
                 nonRequestPref: PackagePreference,
-            ]
-        >("installPackages");
+            ],
+            unknown[]
+        >("resolve");
+    }
+
+    /** Builds, uploads, and proposes installation of already-fetched packages. */
+    get installPackages() {
+        return this._call<[owner: string, ops: PackageInstallOp[]]>(
+            "installPackages",
+        );
     }
 }
 
