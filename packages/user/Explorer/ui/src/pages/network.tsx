@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
-import { siblingUrl } from "@psibase/common-lib";
 
 import {
     formatDuration,
@@ -17,7 +16,6 @@ import {
     fetchInstalledPackages,
     fetchNetworkName,
     fetchProducersInfo,
-    fetchRootDomain,
     fetchSnapshotInfo,
 } from "@/lib/queries";
 import { FIRST_VISIBLE_BLOCK } from "@/lib/types";
@@ -32,24 +30,12 @@ import { TimeAgo } from "@/components/time-ago";
 
 import { Badge } from "@shared/shadcn/ui/badge";
 
-const API_SERVICES = [
-    { name: "explorer", note: "blocks, block(n), head, transaction(id)" },
-    { name: "producers", note: "providers, consensus, candidates" },
-    { name: "accounts", note: "getAccount" },
-    { name: "auth-sig", note: "account keys, accWithKey" },
-    { name: "packages", note: "installed packages" },
-    { name: "setcode", note: "service code records" },
-    { name: "registry", note: "app metadata" },
-    { name: "transact", note: "snapshotInfo" },
-];
-
 export const NetworkPage = () => {
     const { head, stats, status, lastPollAt, error } = useLiveChain();
     const now = useNow();
 
     const networkName = useQuery({ queryKey: ["branding", "name"], queryFn: fetchNetworkName, staleTime: Infinity });
     const chainId = useQuery({ queryKey: ["chain", "id"], queryFn: fetchChainId, staleTime: Infinity });
-    const rootDomain = useQuery({ queryKey: ["chain", "root"], queryFn: fetchRootDomain, staleTime: Infinity });
     const producers = useQuery({ queryKey: ["producers", "info"], queryFn: fetchProducersInfo, refetchInterval: 15_000 });
     const snapshot = useQuery({ queryKey: ["transact", "snapshot"], queryFn: fetchSnapshotInfo, staleTime: 60_000 });
     const packages = useQuery({ queryKey: ["packages", "installed"], queryFn: fetchInstalledPackages, staleTime: 5 * 60_000 });
@@ -123,18 +109,17 @@ export const NetworkPage = () => {
                     <KeyValue label="Network ID">
                         {chainId.data ? <Hash value={chainId.data} full /> : <span className="text-muted-foreground text-xs">unavailable</span>}
                     </KeyValue>
-                    <KeyValue label="Root domain">
-                        <span className="font-mono text-xs">{rootDomain.data || window.location.host.split(".").slice(1).join(".")}</span>
-                    </KeyValue>
                     <KeyValue label="Head block">
                         {head ? (
-                            <span className="flex flex-wrap items-center gap-2 font-mono text-xs">
-                                #{formatNumber(head.blockNum)}
-                                <span className="text-muted-foreground">
+                            <span className="flex items-center gap-2 font-mono text-xs">
+                                <span className="flex min-w-0 flex-wrap items-center gap-2">
+                                    #{formatNumber(head.blockNum)}
+                                    <span className="text-muted-foreground">by</span>
+                                    <AccountLink name={head.producer} />
+                                </span>
+                                <span className="text-muted-foreground ml-auto shrink-0">
                                     <TimeAgo time={head.time} />
                                 </span>
-                                <span className="text-muted-foreground">by</span>
-                                <AccountLink name={head.producer} />
                             </span>
                         ) : "—"}
                     </KeyValue>
@@ -145,7 +130,7 @@ export const NetworkPage = () => {
                                     #{FIRST_VISIBLE_BLOCK}
                                 </Link>
                                 <span>{formatTime(firstBlock.data.time)}</span>
-                                <span className="text-muted-foreground">(genesis block #1 is not displayable)</span>
+                                <span className="text-muted-foreground">(genesis block #2 is not displayable)</span>
                             </span>
                         ) : "—"}
                     </KeyValue>
@@ -210,43 +195,22 @@ export const NetworkPage = () => {
                 </Panel>
             </div>
 
-            <div className="grid gap-4 xl:grid-cols-2">
-                <Panel title="Block interval distribution" description={`Last ${formatNumber(stats.windowBlocks)} blocks`} bodyClassName="p-3">
-                    <div className="h-48">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={histogram} margin={{ top: 8, right: 8, bottom: 0, left: -20 }}>
-                                <XAxis dataKey="bucket" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
-                                <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} allowDecimals={false} />
-                                <Tooltip
-                                    cursor={{ fill: "var(--muted)", opacity: 0.35 }}
-                                    contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
-                                    itemStyle={{ color: "var(--foreground)" }}
-                                />
-                                <Bar dataKey="count" name="Blocks" fill="var(--chart-2)" radius={[4, 4, 0, 0]} isAnimationActive={false} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-                </Panel>
-
-                <Panel title="GraphQL endpoints" description="Query the network directly">
-                    <ul className="divide-y">
-                        {API_SERVICES.map((s) => {
-                            const url = siblingUrl(null, s.name, "/graphql");
-                            return (
-                                <li key={s.name} className="flex items-center justify-between gap-3 px-4 py-2 text-xs">
-                                    <div className="min-w-0">
-                                        <a href={url} target="_blank" rel="noreferrer" className="text-primary font-mono hover:underline">
-                                            {new URL(url).host}/graphql
-                                        </a>
-                                        <div className="text-muted-foreground truncate">{s.note}</div>
-                                    </div>
-                                    <AccountLink name={s.name} dot={false} className="shrink-0" />
-                                </li>
-                            );
-                        })}
-                    </ul>
-                </Panel>
-            </div>
+            <Panel title="Block interval distribution" description={`Last ${formatNumber(stats.windowBlocks)} blocks`} bodyClassName="p-3">
+                <div className="h-48">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={histogram} margin={{ top: 8, right: 8, bottom: 0, left: -20 }}>
+                            <XAxis dataKey="bucket" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+                            <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} allowDecimals={false} />
+                            <Tooltip
+                                cursor={{ fill: "var(--muted)", opacity: 0.35 }}
+                                contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
+                                itemStyle={{ color: "var(--foreground)" }}
+                            />
+                            <Bar dataKey="count" name="Blocks" fill="var(--chart-2)" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+            </Panel>
         </div>
     );
 };
