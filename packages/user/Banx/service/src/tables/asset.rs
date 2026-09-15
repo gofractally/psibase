@@ -34,6 +34,7 @@ impl Asset {
 
     /// Register a new asset; allocates the next `id` from [`InitRow`].
     pub fn add(symbol: AccountNumber, precision: Precision, description: Memo) -> Self {
+        assert!(symbol != AccountNumber::new(0), "asset symbol required");
         assert!(
             Self::get_by_symbol(symbol).is_none(),
             "asset symbol already exists"

@@ -151,7 +151,7 @@ Everything lives on **Banx**, a psibase service. Quantities on chain are **raw i
 
 ### Assets
 
-Registered currencies (`usd`, `aud`, …). Compact `u16` id everywhere else; `symbol` is the name. Precision is fixed at registration (max 8). Only the Banx service can `add_asset`.
+Registered currencies (`usd`, `aud`, …). Compact `u16` id everywhere else; `symbol` is the name. Precision is fixed at registration (max 8). Anyone can `add_asset`.
 
 ### Obligations
 

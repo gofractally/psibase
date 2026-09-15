@@ -48,6 +48,22 @@ async function accountExistsError(
     return undefined;
 }
 
+/** Ticker / asset symbol: same shape as a chain account, must exist as a name. */
+export function symbolValidators() {
+    return {
+        onChange: ({ value }: { value: string }) => {
+            const t = value.trim().toLowerCase();
+            if (!t) return "Required";
+            return accountFormatError(t);
+        },
+        onSubmit: ({ value }: { value: string }) => {
+            const t = value.trim().toLowerCase();
+            if (!t) return "Required";
+            return accountFormatError(t);
+        },
+    };
+}
+
 /** Free-text chain account. `optional`: empty is allowed (invoice anyone). */
 export function existingAccountValidators(opts?: { optional?: boolean }) {
     const optional = opts?.optional ?? false;

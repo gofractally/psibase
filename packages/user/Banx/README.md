@@ -174,7 +174,7 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 | `cash_out` | Draw Banx on the cashier; tokens from their vault |
 | `cash_in` | Take tokens from the sender’s vault; book Banx onto the cashier; tokens stay in the cashier’s vault |
 | `get_exposure` | Live pair exposure |
-| `add_asset` | Register an asset (service only) |
+| `add_asset` | Register an asset (anyone) |
 
 ## UI
 
@@ -184,7 +184,7 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 - `/requests` — invoices and please-book
 - `/cash` — Tokens cash window: post quotes, fund/withdraw vault, cash in/out
 - `/policies` — path-forward offers, buy-claim offers, and currency policies
-- `/assets` — registered assets
+- `/assets` — registered assets; add a new one
 
 `/obligations` and `/history` redirect to `/accounts`.
 

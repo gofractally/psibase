@@ -92,14 +92,16 @@ mod tests {
     }
 
     #[psibase::test_case(packages("Banx"))]
-    fn test_add_asset_service_only(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    fn test_add_asset_anyone(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
 
         let alice = account!("alice");
+        let bob = account!("bob");
         chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
 
         let prec = Precision::new(2).unwrap();
-        let id = Wrapper::push_from(&chain, Wrapper::SERVICE)
+        let id = Wrapper::push_from(&chain, alice)
             .add_asset(account!("cny"), prec, "Chinese yuan".into())
             .get()?;
         assert_eq!(id, 13);
@@ -107,11 +109,25 @@ mod tests {
         assert_eq!(asset.symbol, account!("cny"));
         assert_eq!(asset.precision.value(), 2);
 
-        // Non-service sender rejected.
-        let result = Wrapper::push_from(&chain, alice)
-            .add_asset(account!("krw"), prec, "Korean won".into())
+        let id2 = Wrapper::push_from(&chain, bob)
+            .add_asset(
+                account!("krw"),
+                Precision::new(0).unwrap(),
+                "Korean won".into(),
+            )
+            .get()?;
+        assert_eq!(id2, 14);
+        assert_eq!(Asset::get_assert(id2).precision.value(), 0);
+
+        let dup = Wrapper::push_from(&chain, alice)
+            .add_asset(account!("cny"), prec, "duplicate".into())
             .get();
-        assert!(result.is_err());
+        assert!(dup.is_err());
+
+        let empty = Wrapper::push_from(&chain, alice)
+            .add_asset(AccountNumber::new(0), prec, "no symbol".into())
+            .get();
+        assert!(empty.is_err());
 
         Ok(())
     }

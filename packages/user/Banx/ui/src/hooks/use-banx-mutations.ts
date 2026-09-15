@@ -876,6 +876,22 @@ export function useCreateInvite() {
     });
 }
 
+export function useAddAsset() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            symbol: string;
+            precision: number;
+            description: string;
+        }) => banxCall("addAsset", [p.symbol, p.precision, p.description]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Asset registered");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
 export function useDeleteInvite() {
     const invalidate = useInvalidateBanx();
     return useMutation({

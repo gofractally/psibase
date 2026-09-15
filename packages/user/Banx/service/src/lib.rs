@@ -83,12 +83,11 @@ pub mod service {
         }
     }
 
-    /// Register a new asset. Service-only (`get_sender() == get_service()`).
+    /// Register a new asset. Anyone may call. Symbol must be unique.
     ///
     /// Returns the allocated `u16` asset id.
     #[action]
     fn add_asset(symbol: AccountNumber, precision: Precision, description: Memo) -> u16 {
-        assert_eq!(get_sender(), get_service());
         Asset::add(symbol, precision, description).id
     }
 

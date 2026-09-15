@@ -1,6 +1,11 @@
+import { useState } from "react";
+import { Plus } from "lucide-react";
+
+import { AddAssetDialog } from "@/components/add-asset-dialog";
 import { PageHeader } from "@/components/page-header";
 import { useAssets } from "@/hooks/use-assets";
 
+import { Button } from "@shared/shadcn/ui/button";
 import {
     Table,
     TableBody,
@@ -12,12 +17,23 @@ import {
 
 export function AssetsPage() {
     const { data: assets = [], isLoading } = useAssets();
+    const [createOpen, setCreateOpen] = useState(false);
 
     return (
         <div>
             <PageHeader
                 title="Assets"
                 description="Registered currencies and metals. Enter amounts as decimals (e.g. 1.45); precision is applied by the Banx plugin."
+                action={
+                    <Button
+                        type="button"
+                        onClick={() => setCreateOpen(true)}
+                        className="gap-1.5"
+                    >
+                        <Plus className="size-4" />
+                        New asset
+                    </Button>
+                }
             />
             {isLoading ? (
                 <p className="text-muted-foreground text-sm">Loading…</p>
@@ -51,6 +67,7 @@ export function AssetsPage() {
                     </Table>
                 </div>
             )}
+            <AddAssetDialog open={createOpen} onOpenChange={setCreateOpen} />
         </div>
     );
 }

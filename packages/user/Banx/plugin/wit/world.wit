@@ -377,6 +377,14 @@ interface api {
 
     /// Revoke a Banx invite. Inviter only.
     delete-invite: func(invite-id: u32) -> result<_, error>;
+
+    /// Register a new Banx asset. Anyone may call. `symbol` is a chain name
+    /// (1–10 chars). `precision` is 0–8 decimal places. `description` max 80 bytes.
+    add-asset: func(
+        symbol: string,
+        precision: u8,
+        description: string,
+    ) -> result<_, error>;
 }
 
 world imports {

@@ -12,8 +12,8 @@ use bindings::transact::plugin::intf::add_action_to_transaction;
 use banx::path_find::{find_banx_path, find_banx_path_exact_out};
 use psibase::define_trust;
 use psibase::fracpack::Pack;
-use psibase::services::tokens::{Decimal, Quantity};
-use psibase::{AccountNumber, TimePointSec};
+use psibase::services::tokens::{Decimal, Precision, Quantity};
+use psibase::{AccountNumber, Memo, TimePointSec};
 
 mod errors;
 use errors::ErrorType;
@@ -37,6 +37,7 @@ define_trust! {
             - Buy or sell claims under a posted claim offer
             - Post cash quotes, fund/withdraw the cash vault, cash_in (from your vault)
             - Create or revoke Banx invites (onboard + extend a credit line, one claimee)
+            - Register a new asset
         ",
         High => "
             - Path-pay (draw on others' credit along a path)
@@ -83,6 +84,7 @@ define_trust! {
             cash_in,
             create_invite,
             delete_invite,
+            add_asset,
         ],
         High => [path_pay, pay_inv, cash_out],
     }
@@ -952,6 +954,26 @@ impl Api for BanxPlugin {
         trust::assert_authorized(trust::FunctionName::delete_invite)?;
         let packed = banx::action_structs::rm_invite { invite_id }.packed();
         add_action_to_transaction(banx::action_structs::rm_invite::ACTION_NAME, &packed)
+    }
+
+    fn add_asset(symbol: String, precision: u8, description: String) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::add_asset)?;
+        let symbol = AccountNumber::from_exact(&symbol)
+            .map_err(|_| ErrorType::InvalidAccount(symbol.clone()))?;
+        if symbol == AccountNumber::new(0) {
+            return Err(ErrorType::InvalidAccount("empty symbol".into()).into());
+        }
+        let precision =
+            Precision::new(precision).map_err(|e| ErrorType::ConversionError(e.to_string()))?;
+        let description = Memo::new(description)
+            .map_err(|e| ErrorType::ConversionError(e.to_string()))?;
+        let packed = banx::action_structs::add_asset {
+            symbol,
+            precision,
+            description,
+        }
+        .packed();
+        add_action_to_transaction(banx::action_structs::add_asset::ACTION_NAME, &packed)
     }
 }
 
