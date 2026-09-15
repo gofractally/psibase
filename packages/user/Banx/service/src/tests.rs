@@ -4422,19 +4422,17 @@ mod tests {
             .is_none());
         assert!(BanxInvite::list_by_inviter(alice).is_empty());
 
-        let again = Wrapper::push_from(&chain, psibase::services::invite::Wrapper::SERVICE)
+        Wrapper::push_from(&chain, psibase::services::invite::Wrapper::SERVICE)
             .onInvAccept(invite_id, bob)
-            .get();
-        assert!(again.is_err());
+            .get()?;
         assert_eq!(
             CreditLine::get_assert(alice, bob, usd).limit.value,
             limit.value
         );
 
-        let other = Wrapper::push_from(&chain, psibase::services::invite::Wrapper::SERVICE)
+        Wrapper::push_from(&chain, psibase::services::invite::Wrapper::SERVICE)
             .onInvAccept(invite_id, carol)
-            .get();
-        assert!(other.is_err());
+            .get()?;
         assert!(CreditLine::get(alice, carol, usd).is_none());
 
         Ok(())
@@ -4485,10 +4483,9 @@ mod tests {
             .get(&invite_id)
             .is_none());
 
-        let other = Wrapper::push_from(&chain, psibase::services::invite::Wrapper::SERVICE)
+        Wrapper::push_from(&chain, psibase::services::invite::Wrapper::SERVICE)
             .onInvAccept(invite_id, carol)
-            .get();
-        assert!(other.is_err());
+            .get()?;
         assert!(CreditLine::get(alice, carol, usd).is_none());
 
         Ok(())
@@ -4592,10 +4589,10 @@ mod tests {
             .get(&invite_id)
             .is_none());
 
-        let result = Wrapper::push_from(&chain, psibase::services::invite::Wrapper::SERVICE)
+        Wrapper::push_from(&chain, psibase::services::invite::Wrapper::SERVICE)
             .onInvAccept(invite_id, bob)
-            .get();
-        assert!(result.is_err());
+            .get()?;
+        assert!(CreditLine::get(alice, bob, usd).is_none());
 
         Ok(())
     }

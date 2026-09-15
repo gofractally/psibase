@@ -148,7 +148,7 @@ export function InvitesPage() {
         <div>
             <PageHeader
                 title="Invites"
-                description="Invite one person onto the network and Banx. When they claim, you extend them this credit line so they have something to spend. If they already have an account, the line is applied to it (skipped if you already lined them in that asset). The link works once."
+                description="Invite one person onto the network and Banx. When they claim, you extend them this credit line so they have something to spend."
                 action={
                     <Button
                         type="button"

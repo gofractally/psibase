@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 import { AccountHistoryDialog } from "@/components/account-history";
+import { ActivityFeed } from "@/components/activity-feed";
 import { BookAuthDialog } from "@/components/book-auth-dialog";
 import { BookExpenseDialog } from "@/components/book-expense-dialog";
 import {
@@ -860,6 +861,26 @@ export function ObligationsPage() {
                         ))}
                     </div>
                 )}
+            </section>
+
+            <Separator />
+
+            <section className="space-y-4">
+                <div className="flex items-center gap-3">
+                    <div className="bg-muted text-muted-foreground flex size-10 items-center justify-center rounded-xl">
+                        <History className="size-5" />
+                    </div>
+                    <div>
+                        <h2 className="text-lg font-semibold tracking-tight">
+                            History
+                        </h2>
+                        <p className="text-muted-foreground text-sm">
+                            Payments, claim takes, booked expenses, invoices,
+                            and line changes. Newest first.
+                        </p>
+                    </div>
+                </div>
+                <ActivityFeed />
             </section>
         </div>
     );

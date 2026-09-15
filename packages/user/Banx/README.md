@@ -178,8 +178,7 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 
 ## UI
 
-- `/accounts` — claims you hold and liabilities you owe; offer/edit lines
-- `/history` — activity feed (path pays, invoices paid, claim takes, books)
+- `/accounts` — claims you hold and liabilities you owe; offer/edit lines; activity feed below
 - `/payees` — contacts; deposit or draw
 - `/path-pay` — Transfer: find a path and execute
 - `/requests` — invoices and please-book
@@ -187,7 +186,7 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 - `/policies` — path-forward offers, buy-claim offers, and currency policies
 - `/assets` — registered assets
 
-`/obligations` redirects to `/accounts`.
+`/obligations` and `/history` redirect to `/accounts`.
 
 ## Build
 

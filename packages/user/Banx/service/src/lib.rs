@@ -132,7 +132,7 @@ pub mod service {
     /// Create a Banx invite. Caller is the inviter; `invite_id` / `invite_payload`
     /// come from `invite:plugin` `prepare-new-invite`. `num_accounts` must be 1.
     /// The first [`onInvAccept`] extends a credit line to that claimee (no-op if
-    /// a line already exists) and consumes the invite.
+    /// a line already exists) and drops the Banx invite row.
     #[action]
     fn cr_invite(
         invite_id: u32,
@@ -162,8 +162,9 @@ pub mod service {
         BanxInvite::get_assert(invite_id).delete();
     }
 
-    /// Invite hook: apply the stored credit line to `accepter` if none exists,
-    /// then consume the invite. Further accepts fail.
+    /// Invite hook: apply the stored credit line to `accepter` if none exists.
+    /// Missing Banx rows are ignored so a later login with the same invite
+    /// token does not fail (invite cannot reenter itself to delete).
     #[action]
     #[allow(non_snake_case)]
     fn onInvAccept(invite_id: u32, accepter: AccountNumber) {
@@ -172,7 +173,9 @@ pub mod service {
             psibase::services::invite::Wrapper::SERVICE,
             "sender must be invite"
         );
-        BanxInvite::get_assert(invite_id).accept(accepter);
+        if let Some(invite) = BanxInvite::get(invite_id) {
+            invite.accept(accepter);
+        }
     }
 
     /// Debtor (sender) lets `creditor` book deposits onto them in `asset_id`,

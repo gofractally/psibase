@@ -17,7 +17,7 @@ impl BanxInvite {
             .expect("failed to save invite");
     }
 
-    fn get(id: u32) -> Option<Self> {
+    pub fn get(id: u32) -> Option<Self> {
         BanxInviteTable::read().get_index_pk().get(&id)
     }
 
@@ -98,9 +98,13 @@ impl BanxInvite {
     }
 
     /// Extend the stored credit line to `accepter` if this inviter has not
-    /// already lined them in this asset, then consume the invite (one claimee).
-    /// Existing lines are left untouched. Inviter and unknown accounts are
-    /// skipped and do not consume the seat.
+    /// already lined them in this asset, then drop the Banx invite row (one
+    /// claimee). Existing lines are left untouched. Inviter and unknown
+    /// accounts are skipped and do not consume the seat.
+    ///
+    /// Does **not** call `invite.delInvite`: this runs from the invite
+    /// `accept` hook, and invite cannot reenter itself. The inviter can
+    /// still `rm_invite` later for a refund if the Banx row is still here.
     pub fn accept(&self, accepter: AccountNumber) {
         if accepter == self.inviter {
             return;
@@ -130,7 +134,7 @@ impl BanxInvite {
                 "",
             );
         }
-        self.consume();
+        BanxInviteTable::read_write().erase(&self.id);
     }
 
     pub fn delete(&self) {

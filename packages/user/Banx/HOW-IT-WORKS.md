@@ -361,7 +361,7 @@ Kinds include `path_draw`, `path_pay`, `deposit`, `book`, `net`, `forgive`, `con
 
 Hop draws write the adjacent pairs (Alice↔Bob, Bob↔Carol). A **multi-hop** `path_pay` / `pay_inv` also writes **sender↔payee** (`kind: path_pay`): `amount` is what was sent (`asset_id` = first hop), `netted` is what was delivered (`other_asset_id` = last hop). Direct (1-hop) pays are only `path_draw` on that pair — same two people.
 
-GraphQL `activity(account, counterparty?, assetId?)` is the pair view when both filters are set (matches `asset_id` **or** `other_asset_id`, so a USD delivery still shows on an AUD pair view). Omit them for the account feed (`/history`). `asset_id` is interpolated as an integer in SQL (`?` would bind as text and miss). Claim-transfer `memo` is the **debtor**.
+GraphQL `activity(account, counterparty?, assetId?)` is the pair view when both filters are set (matches `asset_id` **or** `other_asset_id`, so a USD delivery still shows on an AUD pair view). Omit them for the account feed (Accounts page). `asset_id` is interpolated as an integer in SQL (`?` would bind as text and miss). Claim-transfer `memo` is the **debtor**.
 
 ---
 
@@ -378,8 +378,7 @@ Off-chain path search lives in the service crate (`path_find`) and is called fro
 
 ### UI surfaces
 
-- `/accounts` — claims you hold and liabilities you owe; offer/edit lines
-- `/history` — activity feed: payments, claim takes, booked expenses, invoices
+- `/accounts` — claims you hold and liabilities you owe; offer/edit lines; activity feed below
 - `/payees` — contacts
 - `/path-pay` — Transfer: find a path and execute
 - `/requests` — invoices, deposit requests

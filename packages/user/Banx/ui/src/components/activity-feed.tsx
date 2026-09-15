@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { PageHeader } from "@/components/page-header";
 import { useAssetMap } from "@/hooks/use-assets";
 import { useActivityFeed } from "@/hooks/use-banx-data";
 import {
@@ -35,7 +34,7 @@ const FILTERS: { id: ActivityFilter; label: string }[] = [
     { id: "lines", label: "Lines" },
 ];
 
-export function HistoryPage() {
+export function ActivityFeed() {
     const { data: user } = useCurrentUser();
     const { symbolOf, precisionOf } = useAssetMap();
     const { data: events = [], isLoading, isError } = useActivityFeed();
@@ -68,10 +67,6 @@ export function HistoryPage() {
 
     return (
         <div>
-            <PageHeader
-                title="History"
-                description="Payments, claim takes, booked expenses, invoices, and line changes. Newest first."
-            />
             <div className="mb-4 flex flex-wrap gap-2">
                 {FILTERS.map((f) => (
                     <Button

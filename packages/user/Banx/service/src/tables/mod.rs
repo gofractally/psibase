@@ -333,7 +333,7 @@ pub mod tables {
     }
 
     /// Invite created through Banx: the first accept extends a credit line to
-    /// that claimee (skipped if a line already exists) and consumes the invite.
+    /// that claimee (skipped if a line already exists) and drops this row.
     #[table(name = "BanxInviteTable", index = 10)]
     #[derive(Default, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, Debug)]
     pub struct BanxInvite {
