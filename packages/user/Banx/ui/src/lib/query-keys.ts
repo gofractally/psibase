@@ -29,6 +29,10 @@ export const QueryKey = {
         counterparty: string,
         assetId: number,
     ) => ["banx", "activity", account ?? "", counterparty, assetId] as const,
+    activityWith: (
+        account: string | null | undefined,
+        counterparty: string,
+    ) => ["banx", "activityWith", account ?? "", counterparty] as const,
     activityFeed: (account: string | null | undefined) =>
         ["banx", "activityFeed", account ?? ""] as const,
 };

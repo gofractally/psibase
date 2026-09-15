@@ -4,6 +4,7 @@ import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query
 import {
     fetchActivity,
     fetchActivityFeed,
+    fetchActivityWith,
     fetchBookAuths,
     fetchCashQuotes,
     fetchCashVault,
@@ -68,6 +69,18 @@ export function useActivity(
         queryKey: QueryKey.activity(user, counterparty ?? "", assetId ?? 0),
         queryFn: () => fetchActivity(user!, counterparty!, assetId!),
         enabled: !!user && !!counterparty && assetId !== undefined && enabled,
+    });
+}
+
+export function useActivityWith(
+    counterparty: string | undefined,
+): UseQueryResult<ActivityEvent[], Error> {
+    const { data: user } = useCurrentUser();
+    return useQuery({
+        queryKey: QueryKey.activityWith(user, counterparty ?? ""),
+        queryFn: () => fetchActivityWith(user!, counterparty!),
+        enabled: !!user && !!counterparty,
+        refetchInterval: 15_000,
     });
 }
 

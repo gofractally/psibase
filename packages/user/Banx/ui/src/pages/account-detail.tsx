@@ -20,8 +20,8 @@ import {
     Store,
 } from "lucide-react";
 
-import { AccountHistoryDialog } from "@/components/account-history";
 import { AccountRowAction } from "@/components/account-row-action";
+import { ActivityFeed } from "@/components/activity-feed";
 import { BookAuthDialog } from "@/components/book-auth-dialog";
 import { BookExpenseDialog } from "@/components/book-expense-dialog";
 import { CreditLineDialog } from "@/components/credit-line-dialog";
@@ -71,6 +71,7 @@ import { Avatar } from "@shared/components/avatar";
 import { cn } from "@shared/lib/utils";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
+import { Separator } from "@shared/shadcn/ui/separator";
 
 export function AccountDetailPage() {
     const params = useParams();
@@ -120,9 +121,6 @@ export function AccountDetailPage() {
     const [bookExpenseAuth, setBookExpenseAuth] = useState<BookAuth | null>(
         null,
     );
-    const [history, setHistory] = useState<{
-        assetId: number;
-    } | null>(null);
 
     const nick = nicknameOf(account);
     const display = label(account);
@@ -296,16 +294,6 @@ export function AccountDetailPage() {
                         : 0
                 }
             />
-            <AccountHistoryDialog
-                open={!!history}
-                onOpenChange={(open) => {
-                    if (!open) setHistory(null);
-                }}
-                counterparty={account}
-                assetId={history?.assetId ?? 0}
-                viewer={user ?? ""}
-            />
-
             {isLoading ? (
                 <p className="text-muted-foreground text-sm">Loading…</p>
             ) : !hasAnything ? (
@@ -328,9 +316,6 @@ export function AccountDetailPage() {
                                     group={g}
                                     symbol={symbolOf(g.assetId)}
                                     precision={precisionOf(g.assetId)}
-                                    onHistory={() =>
-                                        setHistory({ assetId: g.assetId })
-                                    }
                                     onEditLine={
                                         g.creditLine
                                             ? () => {
@@ -462,9 +447,6 @@ export function AccountDetailPage() {
                                     group={g}
                                     symbol={symbolOf(g.assetId)}
                                     precision={precisionOf(g.assetId)}
-                                    onHistory={() =>
-                                        setHistory({ assetId: g.assetId })
-                                    }
                                     onRouting={() => {
                                         setRoutingPrefill({
                                             creditor: account,
@@ -511,6 +493,25 @@ export function AccountDetailPage() {
                     ) : null}
                 </div>
             )}
+
+            <Separator />
+
+            <section className="space-y-4">
+                <div className="flex items-center gap-3">
+                    <div className="bg-muted text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-xl sm:size-10">
+                        <History className="size-4 sm:size-5" />
+                    </div>
+                    <div className="min-w-0">
+                        <h2 className="text-base font-semibold tracking-tight sm:text-lg">
+                            History
+                        </h2>
+                        <p className="text-muted-foreground hidden text-sm sm:block">
+                            Activity with {display}, newest first.
+                        </p>
+                    </div>
+                </div>
+                <ActivityFeed counterparty={account} />
+            </section>
         </div>
     );
 }
@@ -520,7 +521,6 @@ function AssetRelationCard({
     group: g,
     symbol,
     precision,
-    onHistory,
     onEditLine,
     onRouting,
     onBuyClaim,
@@ -536,7 +536,6 @@ function AssetRelationCard({
     group: GroupedAccount;
     symbol: string;
     precision: number;
-    onHistory: () => void;
     onEditLine?: () => void;
     onRouting?: () => void;
     onBuyClaim?: () => void;
@@ -656,12 +655,6 @@ function AssetRelationCard({
             </div>
 
             <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                <AccountRowAction
-                    tip="History"
-                    icon={History}
-                    label="History"
-                    onClick={onHistory}
-                />
                 {onEditLine ? (
                     <AccountRowAction
                         tip="Edit credit line"

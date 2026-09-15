@@ -380,6 +380,38 @@ export async function fetchActivity(
     return parseActivityConnection(data);
 }
 
+/** Activity with one counterparty, all assets, newest first. */
+export async function fetchActivityWith(
+    account: string,
+    counterparty: string,
+    last = 200,
+): Promise<ActivityEvent[]> {
+    const data = await gql<{
+        activity: {
+            edges: {
+                node: {
+                    account: string;
+                    counterparty: string;
+                    assetId: number | string;
+                    kind: string;
+                    amount: string;
+                    netted: string;
+                    otherAssetId: number | string;
+                    actor: string;
+                    requestId?: number | string;
+                    memo?: string;
+                    block?: { blockTime?: string | null } | null;
+                } | null;
+            }[];
+        };
+    }>(
+        `{ activity(account: "${account}", counterparty: "${counterparty}", last: ${last}) {
+            edges { node { ${activityNodeFields} } }
+        } }`,
+    );
+    return parseActivityConnection(data);
+}
+
 /** All activity for `account`, newest first. */
 export async function fetchActivityFeed(
     account: string,

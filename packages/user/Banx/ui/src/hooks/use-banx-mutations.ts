@@ -29,6 +29,11 @@ function useInvalidateBanx() {
                 queryKey: QueryKey.requests(user),
             });
             void qc.invalidateQueries({ queryKey: QueryKey.invites(user) });
+            void qc.invalidateQueries({
+                queryKey: QueryKey.activityFeed(user),
+            });
+            void qc.invalidateQueries({ queryKey: ["banx", "activityWith"] });
+            void qc.invalidateQueries({ queryKey: ["banx", "activity"] });
             void qc.invalidateQueries({ queryKey: ["banx", "cashQuotes"] });
             void qc.invalidateQueries({
                 queryKey: QueryKey.cashVault(user),

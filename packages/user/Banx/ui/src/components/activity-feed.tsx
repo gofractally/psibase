@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useAssetMap } from "@/hooks/use-assets";
 import { useBanxContacts } from "@/hooks/use-banx-contacts";
-import { useActivityFeed } from "@/hooks/use-banx-data";
+import { useActivityFeed, useActivityWith } from "@/hooks/use-banx-data";
 import { isNamedAccount } from "@/lib/contacts";
 import {
     activityMatches,
@@ -36,11 +36,19 @@ const FILTERS: { id: ActivityFilter; label: string }[] = [
     { id: "lines", label: "Lines" },
 ];
 
-export function ActivityFeed() {
+export function ActivityFeed({
+    counterparty,
+}: {
+    counterparty?: string;
+} = {}) {
     const { data: user } = useCurrentUser();
     const { symbolOf, precisionOf } = useAssetMap();
     const { label } = useBanxContacts("/accounts");
-    const { data: events = [], isLoading, isError } = useActivityFeed();
+    const feed = useActivityFeed();
+    const withParty = useActivityWith(counterparty);
+    const { data: events = [], isLoading, isError } = counterparty
+        ? withParty
+        : feed;
     const [filter, setFilter] = useState<ActivityFilter>("all");
     const seenKey = useRef<string | null>(null);
 
@@ -50,7 +58,7 @@ export function ActivityFeed() {
     );
 
     useEffect(() => {
-        if (!user || events.length === 0) return;
+        if (counterparty || !user || events.length === 0) return;
         const newest = eventKey(events[0]);
         if (seenKey.current === null) {
             seenKey.current = newest;
@@ -66,7 +74,7 @@ export function ActivityFeed() {
         for (const e of fresh.reverse()) {
             toast(describeEvent(e, user, symbolOf, precisionOf, label).title);
         }
-    }, [events, user, symbolOf, precisionOf, label]);
+    }, [counterparty, events, user, symbolOf, precisionOf, label]);
 
     return (
         <div>
@@ -93,7 +101,9 @@ export function ActivityFeed() {
             ) : rows.length === 0 ? (
                 <p className="text-muted-foreground text-sm">
                     {events.length === 0
-                        ? "No activity yet. Path pays, invoices, booked expenses, and claim transfers show up here."
+                        ? counterparty
+                            ? "No activity with this account yet."
+                            : "No activity yet. Path pays, invoices, booked expenses, and claim transfers show up here."
                         : "Nothing in this filter."}
                 </p>
             ) : (
