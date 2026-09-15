@@ -3,8 +3,8 @@
 pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::{
-        abort_message, define_flags, get_sender, AccountNumber, FlagsType, Memo, Pack,
-        ServiceWrapper, Table, ToSchema, Unpack,
+        abort_message, define_flags, get_sender, AccountNumber, Memo, Pack, ServiceWrapper, Table,
+        ToSchema, Unpack,
     };
     use serde::{Deserialize, Serialize};
 

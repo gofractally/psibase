@@ -6,7 +6,7 @@ use bindings::exports::nft::plugin::issuer::Guest as Issuer;
 use bindings::exports::nft::plugin::user::Guest as User;
 use bindings::exports::nft::plugin::user_config::Guest as UserConfig;
 
-use bindings::host::common::server::post_graphql_get_json;
+use bindings::host::http::api::post_graphql_get_json;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
