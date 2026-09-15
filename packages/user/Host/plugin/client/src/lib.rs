@@ -13,8 +13,8 @@ struct HostClient;
 
 impl Api for HostClient {
     fn get_sender() -> String {
-        // Exported for use by other plugins who want to know which app called *them*.
-        // Look back 2 frames: the client hop is frame 1.
+        // This is exported for use by other plugins who want to know which app called *them*
+        // So need to look back 2 frames in the callstack
         let frame = 2;
         let stack = get_callstack();
         assert!(stack.len() >= frame);
