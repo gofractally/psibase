@@ -132,7 +132,7 @@ pub mod service {
     /// Create a Banx invite. Caller is the inviter; `invite_id` / `invite_payload`
     /// come from `invite:plugin` `prepare-new-invite`. `num_accounts` must be 1.
     /// The first [`onInvAccept`] extends a credit line to that claimee (no-op if
-    /// a line already exists) and drops the Banx invite row.
+    /// a line already exists) and records `claimed_by`.
     #[action]
     fn cr_invite(
         invite_id: u32,
@@ -162,9 +162,8 @@ pub mod service {
         BanxInvite::get_assert(invite_id).delete();
     }
 
-    /// Invite hook: apply the stored credit line to `accepter` if none exists.
-    /// Missing Banx rows are ignored so a later login with the same invite
-    /// token does not fail (invite cannot reenter itself to delete).
+    /// Invite hook: apply the stored credit line to `accepter` if none exists
+    /// and record `claimed_by`. Missing or already-claimed Banx rows are ignored.
     #[action]
     #[allow(non_snake_case)]
     fn onInvAccept(invite_id: u32, accepter: AccountNumber) {

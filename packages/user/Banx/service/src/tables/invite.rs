@@ -93,19 +93,22 @@ impl BanxInvite {
             interest_rate,
             grace_seconds,
             created_at: now,
+            claimed_by: AccountNumber::default(),
         }
         .save();
     }
 
-    /// Extend the stored credit line to `accepter` if this inviter has not
-    /// already lined them in this asset, then drop the Banx invite row (one
-    /// claimee). Existing lines are left untouched. Inviter and unknown
-    /// accounts are skipped and do not consume the seat.
+    /// First successful claimee: extend a line if none exists and record
+    /// `claimed_by` so the inviter can nickname them. A second claimee is
+    /// ignored. Inviter and unknown accounts do not consume the seat.
     ///
-    /// Does **not** call `invite.delInvite`: this runs from the invite
-    /// `accept` hook, and invite cannot reenter itself. The inviter can
-    /// still `rm_invite` later for a refund if the Banx row is still here.
+    /// Does not erase the row or call `invite.delInvite` (this runs from the
+    /// accept hook; invite cannot reenter itself). The inviter can `rm_invite`
+    /// later for a refund.
     pub fn accept(&self, accepter: AccountNumber) {
+        if self.claimed_by != AccountNumber::default() {
+            return;
+        }
         if accepter == self.inviter {
             return;
         }
@@ -134,7 +137,9 @@ impl BanxInvite {
                 "",
             );
         }
-        BanxInviteTable::read_write().erase(&self.id);
+        let mut row = self.clone();
+        row.claimed_by = accepter;
+        row.save();
     }
 
     pub fn delete(&self) {

@@ -2,13 +2,16 @@ import { useEffect } from "react";
 import { Handshake } from "lucide-react";
 
 import { GracePeriodField } from "@/components/form-fields";
+import { NicknameContactField } from "@/components/nickname-contact-field";
 import { useAssetMap } from "@/hooks/use-assets";
+import { useBanxContacts } from "@/hooks/use-banx-contacts";
 import { useForwardOffers } from "@/hooks/use-banx-data";
 import {
     useSetBookAuth,
     useSetCreditLine,
     useSetGlobalForwardOffer,
 } from "@/hooks/use-banx-mutations";
+import { useSaveContact } from "@/hooks/use-save-contact";
 import { displayAmount } from "@/lib/amount";
 import {
     daysToGraceSeconds,
@@ -41,14 +44,25 @@ import {
 export function ReciprocateLineForm({
     terms,
     onDone,
+    skipLine = false,
 }: {
     terms: PendingReciprocal;
     onDone: () => void;
+    /** True when a line back already exists — nickname only. */
+    skipLine?: boolean;
 }) {
     const { symbolOf, precisionOf } = useAssetMap();
     const setLine = useSetCreditLine();
     const setBookAuth = useSetBookAuth();
     const setForward = useSetGlobalForwardOffer();
+    const saveContact = useSaveContact("/invite");
+    const {
+        isContact,
+        hasReadPermission,
+        isLoading: contactsLoading,
+    } = useBanxContacts("/invite");
+    const alreadyContact =
+        hasReadPermission && isContact(terms.inviter);
     const { data: forwardOffers = [] } = useForwardOffers();
     const nowSec = Math.floor(Date.now() / 1000);
     const forwardAlreadyOn = forwardOffers.some(
@@ -70,43 +84,52 @@ export function ReciprocateLineForm({
             graceDays: grace.days,
             allowBook: true,
             allowForward: true,
+            nickname: "",
         },
         onSubmit: async ({ value }) => {
-            await setLine.mutateAsync({
-                debtor: terms.inviter,
-                assetId: terms.assetId,
-                limit: value.limit.trim(),
-                depleteOnDebit: value.deplete,
-                interestRatePpm: percentStringToPpm(
-                    value.interestPct,
-                    PPM_SCALE,
-                ),
-                graceSeconds:
-                    value.gracePreset === "none"
-                        ? 0
-                        : daysToGraceSeconds(
-                              value.gracePreset === "custom"
-                                  ? Number(value.graceDays.trim())
-                                  : Number(value.gracePreset),
-                          ),
-            });
-            if (value.allowBook) {
-                await setBookAuth.mutateAsync({
-                    creditor: terms.inviter,
+            if (!skipLine) {
+                await setLine.mutateAsync({
+                    debtor: terms.inviter,
                     assetId: terms.assetId,
-                    remaining: displayAmount(terms.limit),
-                    maxInterestRatePpm: terms.interestRatePpm,
-                    expiresAtSeconds: 0,
+                    limit: value.limit.trim(),
+                    depleteOnDebit: value.deplete,
+                    interestRatePpm: percentStringToPpm(
+                        value.interestPct,
+                        PPM_SCALE,
+                    ),
+                    graceSeconds:
+                        value.gracePreset === "none"
+                            ? 0
+                            : daysToGraceSeconds(
+                                  value.gracePreset === "custom"
+                                      ? Number(value.graceDays.trim())
+                                      : Number(value.gracePreset),
+                              ),
                 });
+                if (value.allowBook) {
+                    await setBookAuth.mutateAsync({
+                        creditor: terms.inviter,
+                        assetId: terms.assetId,
+                        remaining: displayAmount(terms.limit),
+                        maxInterestRatePpm: terms.interestRatePpm,
+                        expiresAtSeconds: 0,
+                    });
+                }
+                if (value.allowForward && !forwardAlreadyOn) {
+                    await setForward.mutateAsync({
+                        assetId: terms.assetId,
+                        feeFixed: "0",
+                        feePercentPpm: 0,
+                        maxLineAprPpm: 0,
+                        expiresAtSeconds: 0,
+                        allowUnknown: false,
+                    });
+                }
             }
-            if (value.allowForward && !forwardAlreadyOn) {
-                await setForward.mutateAsync({
-                    assetId: terms.assetId,
-                    feeFixed: "0",
-                    feePercentPpm: 0,
-                    maxLineAprPpm: 0,
-                    expiresAtSeconds: 0,
-                    allowUnknown: false,
+            if (!alreadyContact) {
+                await saveContact.mutateAsync({
+                    account: terms.inviter,
+                    nickname: value.nickname,
                 });
             }
             onDone();
@@ -123,9 +146,15 @@ export function ReciprocateLineForm({
             graceDays: next.days,
             allowBook: true,
             allowForward: true,
+            nickname: "",
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [terms]);
+
+    useEffect(() => {
+        if (!skipLine || contactsLoading) return;
+        if (alreadyContact) onDone();
+    }, [skipLine, contactsLoading, alreadyContact, onDone]);
 
     return (
         <Card className="mx-auto mt-4 w-full max-w-md">
@@ -133,7 +162,9 @@ export function ReciprocateLineForm({
                 <div className="mx-auto">
                     <Handshake className="h-12 w-12" />
                 </div>
-                <CardTitle>Line them back?</CardTitle>
+                <CardTitle>
+                    {skipLine ? "Add them as a contact?" : "Line them back?"}
+                </CardTitle>
                 <CardDescription>
                     <span className="text-foreground font-medium">
                         {terms.inviter}
@@ -142,10 +173,34 @@ export function ReciprocateLineForm({
                     <span className="text-foreground font-medium">
                         {received} {symbol}
                     </span>
-                    . Return the favour with the same terms, edit them, or skip.
+                    {skipLine
+                        ? ". You already have a line back. Nickname them to add them to Payees, or skip."
+                        : ". Return the favour with the same terms, edit them, or skip."}
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+                {skipLine && (contactsLoading || alreadyContact) ? (
+                    <p className="text-muted-foreground text-sm">Loading…</p>
+                ) : null}
+                {!alreadyContact ? (
+                    <form.Field
+                        name="nickname"
+                        children={(field) => (
+                            <NicknameContactField
+                                account={terms.inviter}
+                                value={field.state.value}
+                                onChange={(v) => field.handleChange(v)}
+                                disabled={
+                                    setLine.isPending ||
+                                    setBookAuth.isPending ||
+                                    setForward.isPending ||
+                                    saveContact.isPending
+                                }
+                            />
+                        )}
+                    />
+                ) : null}
+                {skipLine ? null : (
                 <dl className="text-muted-foreground grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
                     <dt>Their line to you</dt>
                     <dd className="text-foreground text-right font-mono">
@@ -164,6 +219,7 @@ export function ReciprocateLineForm({
                         {terms.depleteOnDebit ? "yes" : "no"}
                     </dd>
                 </dl>
+                )}
                 <form
                     className="grid gap-4"
                     onSubmit={(e) => {
@@ -172,6 +228,8 @@ export function ReciprocateLineForm({
                         void form.handleSubmit();
                     }}
                 >
+                    {skipLine ? null : (
+                    <>
                     <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
                         <form.AppField
                             name="limit"
@@ -258,6 +316,8 @@ export function ReciprocateLineForm({
                             )}
                         />
                     )}
+                    </>
+                    )}
                     <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                         <Button
                             type="button"
@@ -265,22 +325,40 @@ export function ReciprocateLineForm({
                             disabled={
                                 setLine.isPending ||
                                 setBookAuth.isPending ||
-                                setForward.isPending
+                                setForward.isPending ||
+                                saveContact.isPending
                             }
-                            onClick={onDone}
+                            onClick={() => {
+                                if (skipLine) {
+                                    onDone();
+                                    return;
+                                }
+                                void (async () => {
+                                    if (!alreadyContact) {
+                                        await saveContact.mutateAsync({
+                                            account: terms.inviter,
+                                            nickname:
+                                                form.getFieldValue("nickname"),
+                                        });
+                                    }
+                                    onDone();
+                                })();
+                            }}
                         >
-                            Skip
+                            {skipLine ? "Not now" : "Skip"}
                         </Button>
                         <form.AppForm>
                             <form.SubmitButton
-                                labels={[
-                                    `Line ${terms.inviter}`,
-                                    "Saving…",
-                                ]}
+                                labels={
+                                    skipLine
+                                        ? ["Continue", "Saving…"]
+                                        : [`Line ${terms.inviter}`, "Saving…"]
+                                }
                                 loading={
                                     setLine.isPending ||
                                     setBookAuth.isPending ||
-                                    setForward.isPending
+                                    setForward.isPending ||
+                                    saveContact.isPending
                                 }
                             />
                         </form.AppForm>

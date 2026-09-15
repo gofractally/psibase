@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Copy, Plus, UserPlus } from "lucide-react";
+
+import { ClaimedInviteNicks } from "@/components/claimed-invite-nicks";
 
 import { AssetField, GracePeriodField } from "@/components/form-fields";
 import { formatExpiresAt } from "@/components/expires-at-picker";
@@ -25,6 +27,7 @@ import {
     percentStringToPpm,
     useAppForm,
 } from "@/lib/form";
+import { inviteClaimedBy } from "@/lib/contacts";
 import type { BanxInvite } from "@/lib/graphql";
 import {
     forgetInviteToken,
@@ -64,6 +67,107 @@ async function copyText(text: string) {
     toast.error("Copy failed (needs a secure context)");
 }
 
+function InviteTable({
+    rows,
+    symbolOf,
+    revokingId,
+    onRevoke,
+    showCopy,
+}: {
+    rows: BanxInvite[];
+    symbolOf: (id: number) => string;
+    revokingId: number | null;
+    onRevoke: (row: BanxInvite) => void;
+    showCopy: boolean;
+}) {
+    const showClaimed = rows.some((row) => inviteClaimedBy(row));
+    return (
+        <div className="overflow-x-auto rounded-md border">
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Id</TableHead>
+                        {showClaimed ? <TableHead>Claimed by</TableHead> : null}
+                        <TableHead>Asset</TableHead>
+                        <TableHead className="text-right">Limit</TableHead>
+                        <TableHead>APR</TableHead>
+                        <TableHead>Grace</TableHead>
+                        <TableHead>Expires</TableHead>
+                        <TableHead />
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {rows.map((row) => {
+                        const token = recalledInviteToken(row.id);
+                        const url = token
+                            ? inviteClaimUrl(token)
+                            : undefined;
+                        const claimedBy = inviteClaimedBy(row);
+                        return (
+                            <TableRow key={row.id}>
+                                <TableCell className="font-mono">
+                                    {row.id}
+                                </TableCell>
+                                {showClaimed ? (
+                                    <TableCell className="font-medium">
+                                        {claimedBy ?? "—"}
+                                    </TableCell>
+                                ) : null}
+                                <TableCell>
+                                    {symbolOf(row.assetId)}
+                                </TableCell>
+                                <TableCell className="text-right font-mono">
+                                    {displayAmount(row.limit)}
+                                </TableCell>
+                                <TableCell>
+                                    {ppmToPercent(row.interestRatePpm)}
+                                </TableCell>
+                                <TableCell>
+                                    {formatGracePeriod(row.graceSeconds)}
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                    {formatExpiresAt(row.expiry)}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                    <div className="flex justify-end gap-2">
+                                        {showCopy && url ? (
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="outline"
+                                                className="gap-1.5"
+                                                onClick={() =>
+                                                    void copyText(url)
+                                                }
+                                            >
+                                                <Copy className="size-3.5" />
+                                                Copy
+                                            </Button>
+                                        ) : null}
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="destructive"
+                                            disabled={revokingId === row.id}
+                                            onClick={() => void onRevoke(row)}
+                                        >
+                                            {revokingId === row.id
+                                                ? "Removing…"
+                                                : claimedBy
+                                                  ? "Remove"
+                                                  : "Revoke"}
+                                        </Button>
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        );
+                    })}
+                </TableBody>
+            </Table>
+        </div>
+    );
+}
+
 export function InvitesPage() {
     const { assets, symbolOf, precisionOf } = useAssetMap();
     const { data: invites = [], isLoading } = useInvites();
@@ -75,6 +179,16 @@ export function InvitesPage() {
         null,
     );
     const [revokingId, setRevokingId] = useState<number | null>(null);
+
+    const { outstanding, claimed } = useMemo(() => {
+        const outstanding: BanxInvite[] = [];
+        const claimed: BanxInvite[] = [];
+        for (const row of invites) {
+            if (inviteClaimedBy(row)) claimed.push(row);
+            else outstanding.push(row);
+        }
+        return { outstanding, claimed };
+    }, [invites]);
 
     const form = useAppForm({
         defaultValues: {
@@ -127,9 +241,12 @@ export function InvitesPage() {
     }, [createOpen]);
 
     const revoke = async (row: BanxInvite) => {
+        const claimed = inviteClaimedBy(row);
         if (
             !window.confirm(
-                `Revoke invite #${row.id}? The link will stop working.`,
+                claimed
+                    ? `Remove invite #${row.id}? ${claimed}'s credit line stays.`
+                    : `Revoke invite #${row.id}? The link will stop working.`,
             )
         ) {
             return;
@@ -148,7 +265,7 @@ export function InvitesPage() {
         <div>
             <PageHeader
                 title="Invites"
-                description="Invite one person onto the network and Banx. When they claim, you extend them this credit line so they have something to spend."
+                description="Invite one person onto the network and Banx. When they claim, you extend them this credit line and can nickname them into Payees."
                 action={
                     <Button
                         type="button"
@@ -168,87 +285,36 @@ export function InvitesPage() {
                     No outstanding invites. Create one to share a claim link.
                 </p>
             ) : (
-                <div className="overflow-x-auto rounded-md border">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Id</TableHead>
-                                <TableHead>Asset</TableHead>
-                                <TableHead className="text-right">
-                                    Limit
-                                </TableHead>
-                                <TableHead>APR</TableHead>
-                                <TableHead>Grace</TableHead>
-                                <TableHead>Expires</TableHead>
-                                <TableHead />
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {invites.map((row) => {
-                                const token = recalledInviteToken(row.id);
-                                const url = token
-                                    ? inviteClaimUrl(token)
-                                    : undefined;
-                                return (
-                                    <TableRow key={row.id}>
-                                        <TableCell className="font-mono">
-                                            {row.id}
-                                        </TableCell>
-                                        <TableCell>
-                                            {symbolOf(row.assetId)}
-                                        </TableCell>
-                                        <TableCell className="text-right font-mono">
-                                            {displayAmount(row.limit)}
-                                        </TableCell>
-                                        <TableCell>
-                                            {ppmToPercent(row.interestRatePpm)}
-                                        </TableCell>
-                                        <TableCell>
-                                            {formatGracePeriod(
-                                                row.graceSeconds,
-                                            )}
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {formatExpiresAt(row.expiry)}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <div className="flex justify-end gap-2">
-                                                {url ? (
-                                                    <Button
-                                                        type="button"
-                                                        size="sm"
-                                                        variant="outline"
-                                                        className="gap-1.5"
-                                                        onClick={() =>
-                                                            void copyText(url)
-                                                        }
-                                                    >
-                                                        <Copy className="size-3.5" />
-                                                        Copy
-                                                    </Button>
-                                                ) : null}
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    variant="destructive"
-                                                    disabled={
-                                                        revokingId === row.id
-                                                    }
-                                                    onClick={() =>
-                                                        void revoke(row)
-                                                    }
-                                                >
-                                                    {revokingId === row.id
-                                                        ? "Revoking…"
-                                                        : "Revoke"}
-                                                </Button>
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                );
-                            })}
-                        </TableBody>
-                    </Table>
+                <div className="space-y-8">
+                    <ClaimedInviteNicks returnPath="/invites" />
+                    {outstanding.length === 0 ? (
+                        claimed.length > 0 ? (
+                            <p className="text-muted-foreground text-sm">
+                                No unclaimed invites. Claimed ones stay listed
+                                until you remove them.
+                            </p>
+                        ) : null
+                    ) : (
+                        <InviteTable
+                            rows={outstanding}
+                            symbolOf={symbolOf}
+                            revokingId={revokingId}
+                            onRevoke={revoke}
+                            showCopy
+                        />
+                    )}
+                    {claimed.length > 0 ? (
+                        <div className="space-y-3">
+                            <h2 className="text-sm font-medium">Claimed</h2>
+                            <InviteTable
+                                rows={claimed}
+                                symbolOf={symbolOf}
+                                revokingId={revokingId}
+                                onRevoke={revoke}
+                                showCopy={false}
+                            />
+                        </div>
+                    ) : null}
                 </div>
             )}
 

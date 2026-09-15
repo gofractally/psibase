@@ -375,6 +375,8 @@ mod service {
         createdAt: i64,
         /// Invite-service expiry (`0` if the invite record is gone).
         expiry: i64,
+        /// First claimee; default/empty until claimed.
+        claimedBy: AccountNumber,
     }
 
     #[derive(SimpleObject)]
@@ -414,6 +416,7 @@ mod service {
                 graceSeconds: row.grace_seconds,
                 createdAt: time_sec(row.created_at),
                 expiry: time_sec(expiry),
+                claimedBy: row.claimed_by,
             }
         }
     }

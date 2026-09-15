@@ -4416,11 +4416,9 @@ mod tests {
         assert_eq!(line.limit.value, limit.value);
         assert!(!line.deplete_on_debit);
         assert_eq!(line.interest_rate, 0);
-        assert!(BanxInviteTable::read()
-            .get_index_pk()
-            .get(&invite_id)
-            .is_none());
-        assert!(BanxInvite::list_by_inviter(alice).is_empty());
+        let stored = BanxInvite::get_assert(invite_id);
+        assert_eq!(stored.claimed_by, bob);
+        assert_eq!(BanxInvite::list_by_inviter(alice).len(), 1);
 
         Wrapper::push_from(&chain, psibase::services::invite::Wrapper::SERVICE)
             .onInvAccept(invite_id, bob)
@@ -4429,11 +4427,13 @@ mod tests {
             CreditLine::get_assert(alice, bob, usd).limit.value,
             limit.value
         );
+        assert_eq!(BanxInvite::get_assert(invite_id).claimed_by, bob);
 
         Wrapper::push_from(&chain, psibase::services::invite::Wrapper::SERVICE)
             .onInvAccept(invite_id, carol)
             .get()?;
         assert!(CreditLine::get(alice, carol, usd).is_none());
+        assert_eq!(BanxInvite::get_assert(invite_id).claimed_by, bob);
 
         Ok(())
     }
@@ -4478,15 +4478,13 @@ mod tests {
         assert_eq!(line.limit.value, 1);
         assert!(line.deplete_on_debit);
         assert_eq!(line.interest_rate, 12_000);
-        assert!(BanxInviteTable::read()
-            .get_index_pk()
-            .get(&invite_id)
-            .is_none());
+        assert_eq!(BanxInvite::get_assert(invite_id).claimed_by, bob);
 
         Wrapper::push_from(&chain, psibase::services::invite::Wrapper::SERVICE)
             .onInvAccept(invite_id, carol)
             .get()?;
         assert!(CreditLine::get(alice, carol, usd).is_none());
+        assert_eq!(BanxInvite::get_assert(invite_id).claimed_by, bob);
 
         Ok(())
     }
@@ -4593,6 +4591,47 @@ mod tests {
             .onInvAccept(invite_id, bob)
             .get()?;
         assert!(CreditLine::get(alice, bob, usd).is_none());
+
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_invite_rm_after_claim(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        let invite_id = 13u32;
+        Wrapper::push_from(&chain, alice)
+            .cr_invite(
+                invite_id,
+                invite_payload(6),
+                1,
+                usd,
+                Quantity::new(5_000),
+                false,
+                0,
+                0,
+            )
+            .get()?;
+
+        Wrapper::push_from(&chain, psibase::services::invite::Wrapper::SERVICE)
+            .onInvAccept(invite_id, bob)
+            .get()?;
+        assert_eq!(BanxInvite::get_assert(invite_id).claimed_by, bob);
+
+        Wrapper::push_from(&chain, alice)
+            .rm_invite(invite_id)
+            .get()?;
+        assert!(BanxInviteTable::read()
+            .get_index_pk()
+            .get(&invite_id)
+            .is_none());
+        assert_eq!(CreditLine::get_assert(alice, bob, usd).limit.value, 5_000);
 
         Ok(())
     }

@@ -4,6 +4,7 @@ import { supervisor } from "@shared/lib/supervisor";
 
 const TOKEN_KEY = (id: number) => `banx.invite.token.${id}`;
 const RECIPROCAL_KEY = "banx.invite.reciprocal";
+const NICK_DISMISS_KEY = (id: number) => `banx.invite.nick.dismiss.${id}`;
 
 /** Terms of the line just received, used to prefill "line them back". */
 export type PendingReciprocal = {
@@ -99,5 +100,21 @@ export function forgetPendingReciprocal() {
         sessionStorage.removeItem(RECIPROCAL_KEY);
     } catch {
         // ignore
+    }
+}
+
+export function dismissInviteNickname(id: number) {
+    try {
+        localStorage.setItem(NICK_DISMISS_KEY(id), "1");
+    } catch {
+        // ignore
+    }
+}
+
+export function isInviteNicknameDismissed(id: number): boolean {
+    try {
+        return localStorage.getItem(NICK_DISMISS_KEY(id)) === "1";
+    } catch {
+        return false;
     }
 }

@@ -128,6 +128,7 @@ const zBanxInvite = z.object({
     graceSeconds: z.number(),
     createdAt: z.number(),
     expiry: z.number(),
+    claimedBy: z.string().optional().default(""),
 });
 
 const zActivity = z.object({
@@ -230,7 +231,7 @@ export async function fetchBuyClaimOffers(
     return all.filter((o) => o.isBuy);
 }
 
-const inviteFields = `id inviter assetId limit depleteOnDebit interestRatePpm graceSeconds createdAt expiry`;
+const inviteFields = `id inviter assetId limit depleteOnDebit interestRatePpm graceSeconds createdAt expiry claimedBy`;
 
 export async function fetchInvites(inviter: string): Promise<BanxInvite[]> {
     const data = await gql<{ invites: BanxInvite[] }>(

@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useAssetMap } from "@/hooks/use-assets";
+import { useBanxContacts } from "@/hooks/use-banx-contacts";
 import { useActivityFeed } from "@/hooks/use-banx-data";
+import { isNamedAccount } from "@/lib/contacts";
 import {
     activityMatches,
     describeEvent,
@@ -37,6 +39,7 @@ const FILTERS: { id: ActivityFilter; label: string }[] = [
 export function ActivityFeed() {
     const { data: user } = useCurrentUser();
     const { symbolOf, precisionOf } = useAssetMap();
+    const { label } = useBanxContacts("/accounts");
     const { data: events = [], isLoading, isError } = useActivityFeed();
     const [filter, setFilter] = useState<ActivityFilter>("all");
     const seenKey = useRef<string | null>(null);
@@ -61,9 +64,9 @@ export function ActivityFeed() {
         }
         seenKey.current = newest;
         for (const e of fresh.reverse()) {
-            toast(describeEvent(e, user, symbolOf, precisionOf).title);
+            toast(describeEvent(e, user, symbolOf, precisionOf, label).title);
         }
-    }, [events, user, symbolOf, precisionOf]);
+    }, [events, user, symbolOf, precisionOf, label]);
 
     return (
         <div>
@@ -116,6 +119,7 @@ export function ActivityFeed() {
                                     user ?? "",
                                     symbolOf,
                                     precisionOf,
+                                    label,
                                 );
                                 const incoming = e.actor !== user;
                                 const amountAssetId =
@@ -138,10 +142,9 @@ export function ActivityFeed() {
                                             </p>
                                         </TableCell>
                                         <TableCell className="font-medium">
-                                            {!e.counterparty ||
-                                            e.counterparty === "0"
+                                            {!isNamedAccount(e.counterparty)
                                                 ? "Anyone"
-                                                : e.counterparty}
+                                                : label(e.counterparty)}
                                         </TableCell>
                                         <TableCell className="text-right font-mono text-sm whitespace-nowrap">
                                             {displayAmount(amountValue)}{" "}

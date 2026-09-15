@@ -1,4 +1,5 @@
 import { useAssetMap } from "@/hooks/use-assets";
+import { useBanxContacts } from "@/hooks/use-banx-contacts";
 import { useActivity } from "@/hooks/use-banx-data";
 import {
     describeEvent,
@@ -28,6 +29,7 @@ export function AccountHistoryDialog({
     viewer: string;
 }) {
     const { symbolOf, precisionOf } = useAssetMap();
+    const { label } = useBanxContacts("/accounts");
     const { data: events = [], isLoading, isError } = useActivity(
         counterparty,
         assetId,
@@ -44,8 +46,11 @@ export function AccountHistoryDialog({
                     <DialogDescription>
                         Activity with{" "}
                         <span className="text-foreground font-medium">
-                            {counterparty}
-                        </span>{" "}
+                            {label(counterparty)}
+                        </span>
+                        {label(counterparty) !== counterparty
+                            ? ` (${counterparty})`
+                            : ""}{" "}
                         in {symbol}
                     </DialogDescription>
                 </DialogHeader>
@@ -72,6 +77,7 @@ export function AccountHistoryDialog({
                                     viewer,
                                     symbolOf,
                                     precisionOf,
+                                    label,
                                 );
                                 return (
                                     <li

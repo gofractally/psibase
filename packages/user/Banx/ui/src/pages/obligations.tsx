@@ -20,6 +20,7 @@ import {
 
 import { AccountHistoryDialog } from "@/components/account-history";
 import { ActivityFeed } from "@/components/activity-feed";
+import { ClaimedInviteNicks } from "@/components/claimed-invite-nicks";
 import { BookAuthDialog } from "@/components/book-auth-dialog";
 import { BookExpenseDialog } from "@/components/book-expense-dialog";
 import {
@@ -46,6 +47,7 @@ import {
     type RequestPrefill,
 } from "@/components/request-dialog";
 import { useAssetMap } from "@/hooks/use-assets";
+import { useBanxContacts } from "@/hooks/use-banx-contacts";
 import {
     useBookAuths,
     useCreditLines,
@@ -295,6 +297,7 @@ function spendableBookAuth(
 
 export function ObligationsPage() {
     const { data: user } = useCurrentUser();
+    const { label } = useBanxContacts("/accounts");
     const { data: obs = [], isLoading: obsLoading } = useObligations();
     const { data: lines = [], isLoading: linesLoading } = useCreditLines();
     const { data: forwardOffers = [] } = useForwardOffers();
@@ -545,6 +548,8 @@ export function ObligationsPage() {
                     }
                 />
 
+                <ClaimedInviteNicks returnPath="/accounts" />
+
                 <CreditLineDialog
                     open={creditLineOpen}
                     onOpenChange={(open) => {
@@ -571,7 +576,7 @@ export function ObligationsPage() {
                             <AccountGroupRow
                                 key={g.key}
                                 tone="savings"
-                                title={g.counterparty}
+                                title={label(g.counterparty)}
                                 counterparty={g.counterparty}
                                 assetId={g.assetId}
                                 viewer={user ?? ""}
@@ -810,7 +815,7 @@ export function ObligationsPage() {
                             <AccountGroupRow
                                 key={g.key}
                                 tone="loan"
-                                title={g.counterparty}
+                                title={label(g.counterparty)}
                                 counterparty={g.counterparty}
                                 assetId={g.assetId}
                                 viewer={user ?? ""}
@@ -1527,6 +1532,11 @@ function AccountGroupRow({
                             <p className="truncate font-semibold tracking-tight">
                                 {title}
                             </p>
+                            {title !== counterparty ? (
+                                <span className="text-muted-foreground truncate text-xs">
+                                    {counterparty}
+                                </span>
+                            ) : null}
                             <Badge
                                 variant="outline"
                                 className={cn(

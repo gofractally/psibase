@@ -102,6 +102,7 @@ export function describeEvent(
     viewer: string,
     symbolOf: (id: number) => string,
     precisionOf: (id: number) => number,
+    label: (account: string) => string = (a) => a,
 ): { title: string; detail: string } {
     const sym = symbolOf(e.assetId);
     const prec = precisionOf(e.assetId);
@@ -110,7 +111,10 @@ export function describeEvent(
     const otherSym = symbolOf(e.otherAssetId);
     const nettedRaw = humanToRaw(e.netted || "0", prec);
     const you = e.actor === viewer;
-    const other = e.counterparty;
+    const nameOf = (account: string) =>
+        namedAccount(account) ? label(account) : account;
+    const other = nameOf(e.counterparty);
+    const actor = nameOf(e.actor);
     const req =
         e.requestId && e.requestId > 0 ? `invoice #${e.requestId}` : "";
     const memo = e.memo?.trim();
@@ -120,7 +124,7 @@ export function describeEvent(
         case "path_draw": {
             const title = you
                 ? `You drew ${qty(e.amount, sym)} on ${other}`
-                : `${e.actor} paid you ${qty(e.amount, sym)}`;
+                : `${actor} paid you ${qty(e.amount, sym)}`;
             const detail =
                 nettedRaw > 0n
                     ? `Path hop · auto-netted ${qty(e.netted, sym)}`
@@ -132,9 +136,9 @@ export function describeEvent(
             const gotSym = same ? sym : otherSym;
             const title = you
                 ? `You paid ${other} ${qty(e.netted, gotSym)}`
-                : `${e.actor} paid you ${qty(e.netted, gotSym)}`;
+                : `${actor} paid you ${qty(e.netted, gotSym)}`;
             const bits = [
-                you ? `To ${other}` : `From ${e.actor}`,
+                you ? `To ${other}` : `From ${actor}`,
                 !same || amt !== netted ? `sent ${qty(e.amount, sym)}` : "",
                 req,
             ].filter(Boolean);
@@ -143,7 +147,7 @@ export function describeEvent(
         case "deposit": {
             const title = you
                 ? `You booked a deposit of ${qty(e.amount, sym)}`
-                : `${e.actor} booked a deposit of ${qty(e.amount, sym)}`;
+                : `${actor} booked a deposit of ${qty(e.amount, sym)}`;
             const detail =
                 nettedRaw > 0n
                     ? `Auto-netted ${qty(e.netted, sym)} · ${other}`
@@ -158,7 +162,7 @@ export function describeEvent(
         case "forgive": {
             const title = you
                 ? `You wrote off ${qty(e.amount, sym)}`
-                : `${e.actor} wrote off ${qty(e.amount, sym)}`;
+                : `${actor} wrote off ${qty(e.amount, sym)}`;
             return { title, detail: `Claim on ${other}` };
         }
         case "convert":
@@ -170,14 +174,14 @@ export function describeEvent(
             return {
                 title: you
                     ? `You cashed out ${qty(e.amount, sym)}`
-                    : `${e.actor} cashed out ${qty(e.amount, sym)}`,
+                    : `${actor} cashed out ${qty(e.amount, sym)}`,
                 detail: `Tokens from vault · ${other}`,
             };
         case "cash_in":
             return {
                 title: you
                     ? `You cashed in ${qty(e.amount, sym)}`
-                    : `${e.actor} cashed in ${qty(e.amount, sym)}`,
+                    : `${actor} cashed in ${qty(e.amount, sym)}`,
                 detail: `Tokens into vault · ${other}`,
             };
         case "invoice": {
@@ -187,7 +191,7 @@ export function describeEvent(
                     : other;
             const title = you
                 ? `You invoiced ${who} ${qty(e.amount, sym)}`
-                : `${e.actor} invoiced you ${qty(e.amount, sym)}`;
+                : `${actor} invoiced you ${qty(e.amount, sym)}`;
             return {
                 title,
                 detail: [req, memo].filter(Boolean).join(" · ") || who,
@@ -196,7 +200,7 @@ export function describeEvent(
         case "please_book": {
             const title = you
                 ? `You asked ${other} to book ${qty(e.amount, sym)}`
-                : `${e.actor} asked you to book ${qty(e.amount, sym)}`;
+                : `${actor} asked you to book ${qty(e.amount, sym)}`;
             return {
                 title,
                 detail: [req, memo].filter(Boolean).join(" · ") || other,
@@ -205,31 +209,31 @@ export function describeEvent(
         case "fulfill": {
             const title = you
                 ? `You paid ${other}'s ${req || "invoice"} · ${qty(e.amount, sym)}`
-                : `${e.actor} paid your ${req || "invoice"} · ${qty(e.amount, sym)}`;
+                : `${actor} paid your ${req || "invoice"} · ${qty(e.amount, sym)}`;
             return { title, detail: memo || other };
         }
         case "req_cancel": {
             const title = you
                 ? `You cancelled ${req || "a request"} for ${qty(e.amount, sym)}`
-                : `${e.actor} cancelled ${req || "a request"}`;
+                : `${actor} cancelled ${req || "a request"}`;
             return { title, detail: memo || other };
         }
         case "credit_line": {
             const title = you
                 ? `You lined ${other} for ${qty(e.amount, sym)}`
-                : `${e.actor} lined you for ${qty(e.amount, sym)}`;
+                : `${actor} lined you for ${qty(e.amount, sym)}`;
             return { title, detail: `Credit line · ${other}` };
         }
         case "rm_credit_line": {
             const title = you
                 ? `You removed your line to ${other}`
-                : `${e.actor} removed their line to you`;
+                : `${actor} removed their line to you`;
             return { title, detail: `Credit line erased` };
         }
         case "book": {
             const title = you
                 ? `You booked ${qty(e.amount, sym)} onto ${other}`
-                : `${e.actor} booked ${qty(e.amount, sym)} onto you`;
+                : `${actor} booked ${qty(e.amount, sym)} onto you`;
             const detail =
                 nettedRaw > 0n
                     ? `Auto-netted ${qty(e.netted, sym)}`
@@ -242,34 +246,34 @@ export function describeEvent(
         case "book_auth": {
             const title = you
                 ? `You allowed ${other} to book up to ${qty(e.amount, sym)}`
-                : `${e.actor} allowed you to book up to ${qty(e.amount, sym)}`;
+                : `${actor} allowed you to book up to ${qty(e.amount, sym)}`;
             return { title, detail: "Standing book-auth" };
         }
         case "rm_book_auth": {
             const title = you
                 ? `You revoked book-auth for ${other}`
-                : `${e.actor} revoked your book-auth`;
+                : `${actor} revoked your book-auth`;
             return { title, detail: "Standing book-auth removed" };
         }
         case "sell_claim":
         case "buy_claim": {
-            const on = debtor ? `${debtor}'s debt` : "a claim";
+            const on = debtor ? `${nameOf(debtor)}'s debt` : "a claim";
             const proceeds = qty(e.netted, sym);
             if (e.kind === "sell_claim") {
                 const title = you
                     ? `You sold ${qty(e.amount, sym)} of ${on} to ${other}`
-                    : `${e.actor} sold you ${qty(e.amount, sym)} of ${on}`;
+                    : `${actor} sold you ${qty(e.amount, sym)} of ${on}`;
                 const detail = you
                     ? `${other} owes you ${proceeds}`
-                    : `You owe ${e.actor} ${proceeds}`;
+                    : `You owe ${actor} ${proceeds}`;
                 return { title, detail };
             }
             const title = you
                 ? `You bought ${qty(e.amount, sym)} of ${on} from ${other}`
-                : `${e.actor} bought ${qty(e.amount, sym)} of ${on} from you`;
+                : `${actor} bought ${qty(e.amount, sym)} of ${on} from you`;
             const detail = you
                 ? `You owe ${other} ${proceeds}`
-                : `${e.actor} owes you ${proceeds}`;
+                : `${actor} owes you ${proceeds}`;
             return { title, detail };
         }
         default:

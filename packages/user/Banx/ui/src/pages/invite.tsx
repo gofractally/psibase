@@ -15,6 +15,7 @@ import { useCreditLines } from "@/hooks/use-banx-data";
 import { displayAmount } from "@/lib/amount";
 import { formatGracePeriod, ppmToPercent } from "@/lib/constants";
 import { fetchInvite } from "@/lib/graphql";
+import { inviteClaimedBy } from "@/lib/contacts";
 import {
     forgetPendingReciprocal,
     importInviteToken,
@@ -101,7 +102,7 @@ export function InvitePage() {
             return;
         }
         const expired = row.expiry > 0 && row.expiry * 1000 < Date.now();
-        if (expired) void rejectActiveInvite();
+        if (expired || inviteClaimedBy(row)) void rejectActiveInvite();
     }, [reciprocal, inviteId, invite.isLoading, invite.error, invite.data]);
 
     const alreadyLinedBack = useMemo(() => {
@@ -124,19 +125,8 @@ export function InvitePage() {
         if (!reciprocal || userLoading) return;
         if (user && user === reciprocal.inviter) {
             finishReciprocal();
-            return;
         }
-        if (user && linesFetched && alreadyLinedBack) {
-            finishReciprocal();
-        }
-    }, [
-        reciprocal,
-        user,
-        userLoading,
-        linesFetched,
-        alreadyLinedBack,
-        finishReciprocal,
-    ]);
+    }, [reciprocal, user, userLoading, finishReciprocal]);
 
     const claim = async (row: NonNullable<typeof invite.data>) => {
         const terms = termsFromInvite(row);
@@ -161,8 +151,7 @@ export function InvitePage() {
     };
 
     if (reciprocal) {
-        const bouncing =
-            (user && user === reciprocal.inviter) || alreadyLinedBack;
+        const bouncing = user && user === reciprocal.inviter;
         if (
             userLoading ||
             bouncing ||
@@ -182,6 +171,7 @@ export function InvitePage() {
         return (
             <ReciprocateLineForm
                 terms={reciprocal}
+                skipLine={alreadyLinedBack}
                 onDone={finishReciprocal}
             />
         );
@@ -252,6 +242,24 @@ export function InvitePage() {
         );
     }
 
+    const claimedBy = inviteClaimedBy(row);
+    if (claimedBy) {
+        return (
+            <Card className="mx-auto mt-4 w-[350px]">
+                <CardHeader>
+                    <div className="mx-auto">
+                        <TicketCheck className="h-12 w-12" />
+                    </div>
+                    <CardTitle>Invite already claimed</CardTitle>
+                    <CardDescription>
+                        This Banx invite was claimed by {claimedBy}. Ask the
+                        sender for a new one if you still need a line.
+                    </CardDescription>
+                </CardHeader>
+            </Card>
+        );
+    }
+
     const now = Date.now();
     const expired = row.expiry > 0 && row.expiry * 1000 < now;
     if (expired) {
@@ -289,9 +297,10 @@ export function InvitePage() {
                     <span className="text-foreground font-medium">
                         {limit} {symbol}
                     </span>
-                    . After you claim, you can line them back — or skip. If you
-                    already have an account, claiming applies the line to it
-                    (skipped if they already lined you in {symbol}).
+                    . After you claim, you can nickname them (adds them to
+                    Payees) and line them back — or skip. If you already have
+                    an account, claiming applies the line to it (skipped if they
+                    already lined you in {symbol}).
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

@@ -27,7 +27,7 @@ pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::{
         services::tokens::{Precision, Quantity},
-        AccountNumber, Pack, Unpack, Memo, TimePointSec, ToSchema,
+        AccountNumber, Memo, Pack, TimePointSec, ToSchema, Unpack,
     };
     use serde::{Deserialize, Serialize};
 
@@ -157,7 +157,9 @@ pub mod tables {
     /// to `deposit` them — off-graph value received. Only the creditor can
     /// fulfill; the poster cannot clear their own debt.
     #[table(name = "RequestTab", index = 8)]
-    #[derive(Default, Clone, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(
+        Default, Clone, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug,
+    )]
     pub struct PayRequest {
         pub id: u32,
         /// [`Self::INVOICE`] or [`Self::PLEASE_BOOK`].
@@ -249,7 +251,9 @@ pub mod tables {
     /// actions write the cycle clock via [`PairCycle::sync_cycle`]. Same key as
     /// [`CreditLine`]; separate row so a line upsert cannot clobber the clock.
     #[table(name = "PairCycleTab", index = 7)]
-    #[derive(Default, Clone, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(
+        Default, Clone, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug,
+    )]
     pub struct PairCycle {
         pub creditor: AccountNumber,
         pub debtor: AccountNumber,
@@ -280,7 +284,9 @@ pub mod tables {
     ///
     /// Interest-free grace lives on [`PairCycle`], not this row.
     #[table(name = "CreditLineTable", index = 3)]
-    #[derive(Default, Clone, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(
+        Default, Clone, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug,
+    )]
     pub struct CreditLine {
         pub creditor: AccountNumber,
         pub debtor: AccountNumber,
@@ -333,7 +339,7 @@ pub mod tables {
     }
 
     /// Invite created through Banx: the first accept extends a credit line to
-    /// that claimee (skipped if a line already exists) and drops this row.
+    /// that claimee (skipped if a line already exists) and records `claimed_by`.
     #[table(name = "BanxInviteTable", index = 10)]
     #[derive(Default, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, Debug)]
     pub struct BanxInvite {
@@ -346,6 +352,8 @@ pub mod tables {
         pub interest_rate: u32,
         pub grace_seconds: u32,
         pub created_at: TimePointSec,
+        /// Set on the first successful claim; default until then.
+        pub claimed_by: AccountNumber,
     }
 
     impl BanxInvite {
@@ -359,7 +367,9 @@ pub mod tables {
     /// in `asset_id`, spending [`Self::remaining`]. Dual of a credit line
     /// (who may *write* that I owe them, not who may *draw*).
     #[table(name = "BookAuthTab", index = 11)]
-    #[derive(Default, Clone, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(
+        Default, Clone, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug,
+    )]
     pub struct BookAuth {
         pub debtor: AccountNumber,
         pub creditor: AccountNumber,
