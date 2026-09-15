@@ -32,8 +32,7 @@ void AuthTest::newAccount(AccountNumber              account,
                           std::uint32_t              threshold)
 {
    check(threshold <= deps.size(), "Threshold too big");
-   bool created = to<Accounts>().newAccount(account, getReceiver(), true);
-   check(created, "Account already exists");
+   to<Accounts>().newAccount(account, getReceiver(), NewAccountMode::requireNew);
    open<AuthTable>().put({account, std::move(deps), threshold});
 }
 
