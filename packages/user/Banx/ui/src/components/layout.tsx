@@ -30,7 +30,13 @@ const titles: Record<string, string> = {
 
 export const Layout = () => {
     const { pathname } = useLocation();
-    const page = titles[pathname] ?? "Banx";
+    const accountMatch = pathname.match(/^\/accounts\/([^/]+)$/);
+    const accountName = accountMatch
+        ? decodeURIComponent(accountMatch[1])
+        : null;
+    const page = accountName
+        ? accountName
+        : (titles[pathname] ?? "Banx");
 
     return (
         <SidebarProvider>
@@ -51,9 +57,27 @@ export const Layout = () => {
                                     </BreadcrumbLink>
                                 </BreadcrumbItem>
                                 <BreadcrumbSeparator className="hidden md:block" />
-                                <BreadcrumbItem>
-                                    <BreadcrumbPage>{page}</BreadcrumbPage>
-                                </BreadcrumbItem>
+                                {accountName ? (
+                                    <>
+                                        <BreadcrumbItem>
+                                            <BreadcrumbLink asChild>
+                                                <Link to="/accounts">
+                                                    Accounts
+                                                </Link>
+                                            </BreadcrumbLink>
+                                        </BreadcrumbItem>
+                                        <BreadcrumbSeparator />
+                                        <BreadcrumbItem>
+                                            <BreadcrumbPage>
+                                                {accountName}
+                                            </BreadcrumbPage>
+                                        </BreadcrumbItem>
+                                    </>
+                                ) : (
+                                    <BreadcrumbItem>
+                                        <BreadcrumbPage>{page}</BreadcrumbPage>
+                                    </BreadcrumbItem>
+                                )}
                             </BreadcrumbList>
                         </Breadcrumb>
                     </div>

@@ -1,39 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import {
-    ArrowLeftRight,
     Building2,
-    ChevronDown,
-    CircleMinus,
     GitBranch,
     History,
-    Pencil,
     PiggyBank,
     Handshake,
-    Inbox,
     KeyRound,
-    Receipt,
-    ShoppingCart,
-    Store,
     Plus,
     Route,
 } from "lucide-react";
 
-import { AccountHistoryDialog } from "@/components/account-history";
 import { ActivityFeed } from "@/components/activity-feed";
 import { ClaimedInviteNicks } from "@/components/claimed-invite-nicks";
+import { CreditLineDialog } from "@/components/credit-line-dialog";
 import {
     TransferDialog,
     transferPrefillFromSearch,
 } from "@/components/transfer-dialog";
 import { BookAuthDialog } from "@/components/book-auth-dialog";
-import { BookExpenseDialog } from "@/components/book-expense-dialog";
-import {
-    ForgiveDialog,
-    type ForgiveTarget,
-} from "@/components/forgive-dialog";
-import { AssetField, GracePeriodField } from "@/components/form-fields";
 import { NewDepositLoanDialog } from "@/components/new-deposit-loan-dialog";
 import { PageHeader } from "@/components/page-header";
 import {
@@ -41,88 +27,25 @@ import {
     type RoutingPolicyPrefill,
 } from "@/components/routing-policy-dialog";
 import {
-    SellClaimDialog,
-    type SellClaimTarget,
-} from "@/components/sell-claim-dialog";
-import {
     BuyClaimOfferDialog,
     type BuyClaimPrefill,
 } from "@/components/buy-claim-offer-dialog";
-import {
-    RequestDialog,
-    type RequestPrefill,
-} from "@/components/request-dialog";
 import { useAssetMap } from "@/hooks/use-assets";
+import { useAccountGroups } from "@/hooks/use-account-groups";
 import { useBanxContacts } from "@/hooks/use-banx-contacts";
+import { useForwardOffers, useBuyClaimOffers } from "@/hooks/use-banx-data";
 import {
-    useBookAuths,
-    useCreditLines,
-    useForwardOffers,
-    useObligations,
-    useBuyClaimOffers,
-} from "@/hooks/use-banx-data";
-import {
-    useRemoveCreditLine,
-    useSetCreditLine,
-    useSetGlobalForwardOffer,
-} from "@/hooks/use-banx-mutations";
-import {
-    formatRawAmount,
-    humanToRaw,
-    lineAvailableRaw,
-} from "@/lib/amount";
-import {
-    DEFAULT_GRACE_SECONDS,
-    daysToGraceSeconds,
-    formatGracePeriod,
-    graceSecondsToPreset,
-    ppmToPercent,
-    type GracePreset,
-} from "@/lib/constants";
-import {
-    MAX_PERCENT,
-    MIN_PERCENT_STEP,
-    PPM_SCALE,
-    amountFieldValidator,
-    existingAccountValidators,
-    percentFieldValidator,
-    percentStringToPpm,
-    useAppForm,
-} from "@/lib/form";
-import type {
-    Asset,
-    BookAuth,
-    CreditLine,
-    ForwardOffer,
-    Obligation,
-} from "@/lib/graphql";
-import {
-    REQUEST_INVOICE,
-    REQUEST_PLEASE_BOOK,
-} from "@/lib/graphql";
+    accountHref,
+    filterGroups,
+    isFacilityOnly,
+    type GroupedAccount,
+} from "@/lib/account-groups";
+import { formatRawAmount, humanToRaw, lineAvailableRaw } from "@/lib/amount";
+import type { BookAuth, CreditLine } from "@/lib/graphql";
 
-/** ppm → percent string for form inputs (e.g. 10000 → "1") */
-function ppmToPercentInput(ppm: number): string {
-    return (ppm / 10_000).toString();
-}
-
-import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { cn } from "@shared/lib/utils";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
-import {
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
-} from "@shared/shadcn/ui/collapsible";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@shared/shadcn/ui/dialog";
 import { Label } from "@shared/shadcn/ui/label";
 import { Separator } from "@shared/shadcn/ui/separator";
 import { Switch } from "@shared/shadcn/ui/switch";
@@ -132,177 +55,7 @@ import {
     TooltipTrigger,
 } from "@shared/shadcn/ui/tooltip";
 
-function totalRaw(
-    principal: string,
-    interest: string,
-    precision: number,
-): bigint {
-    return (
-        humanToRaw(principal || "0", precision) +
-        humanToRaw(interest || "0", precision)
-    );
-}
-
-type GroupedAccount = {
-    key: string;
-    counterparty: string;
-    assetId: number;
-    obligations: Obligation[];
-    /** Principal + interest combined */
-    total: bigint;
-    /** Matching credit line, if one is extended for this pair/asset */
-    creditLine?: CreditLine;
-};
-
-function lineKey(creditor: string, debtor: string, assetId: number): string {
-    return `${creditor}\0${debtor}\0${assetId}`;
-}
-
-function groupByCounterpartyAndAsset(
-    items: Obligation[],
-    counterpartyOf: (o: Obligation) => string,
-    precisionOf: (assetId: number) => number,
-): Map<string, GroupedAccount> {
-    const map = new Map<string, GroupedAccount>();
-    for (const o of items) {
-        const counterparty = counterpartyOf(o);
-        const key = `${counterparty}\0${o.assetId}`;
-        let g = map.get(key);
-        if (!g) {
-            g = {
-                key,
-                counterparty,
-                assetId: o.assetId,
-                obligations: [],
-                total: 0n,
-            };
-            map.set(key, g);
-        }
-        g.obligations.push(o);
-        g.total += totalRaw(
-            o.remainingPrincipal,
-            o.accruedInterest,
-            precisionOf(o.assetId),
-        );
-    }
-    return map;
-}
-
-/** Pure undrawn facility: no open obligation balance, just a credit line. */
-function isFacilityOnly(g: GroupedAccount): boolean {
-    return g.total === 0n && g.obligations.length === 0;
-}
-
-function compareByNameThenAsset(a: GroupedAccount, b: GroupedAccount): number {
-    const byParty = a.counterparty.localeCompare(b.counterparty);
-    if (byParty !== 0) return byParty;
-    return a.assetId - b.assetId;
-}
-
-/** Balances first (A–Z), then pure credit facilities (A–Z). */
-function sortGroups(groups: GroupedAccount[]): GroupedAccount[] {
-    return groups.sort((a, b) => {
-        const aFac = isFacilityOnly(a);
-        const bFac = isFacilityOnly(b);
-        if (aFac !== bFac) return aFac ? 1 : -1;
-        return compareByNameThenAsset(a, b);
-    });
-}
-
-function filterGroups(
-    groups: GroupedAccount[],
-    hideEmptyFacilities: boolean,
-): GroupedAccount[] {
-    if (!hideEmptyFacilities) return groups;
-    return groups.filter((g) => !isFacilityOnly(g));
-}
-
-/** Attach lines; also add undrawn facilities so limits show with 0 balance. */
-function mergeCreditLines(
-    groups: Map<string, GroupedAccount>,
-    lines: CreditLine[],
-    role: "savings" | "loan",
-    user: string,
-): GroupedAccount[] {
-    const byLine = new Map(
-        lines.map((l) => [lineKey(l.creditor, l.debtor, l.assetId), l]),
-    );
-
-    for (const g of groups.values()) {
-        const key =
-            role === "loan"
-                ? lineKey(g.counterparty, user, g.assetId)
-                : lineKey(user, g.counterparty, g.assetId);
-        g.creditLine = byLine.get(key);
-    }
-
-    // Undrawn / facility-only rows
-    for (const line of lines) {
-        const isLoan = line.debtor === user;
-        const isSavings = line.creditor === user;
-        if (role === "loan" && !isLoan) continue;
-        if (role === "savings" && !isSavings) continue;
-
-        const counterparty =
-            role === "loan" ? line.creditor : line.debtor;
-        const key = `${counterparty}\0${line.assetId}`;
-        if (groups.has(key)) continue;
-
-        groups.set(key, {
-            key,
-            counterparty,
-            assetId: line.assetId,
-            obligations: [],
-            total: 0n,
-            creditLine: line,
-        });
-    }
-
-    return sortGroups([...groups.values()]);
-}
-
-function liveBookAuth(
-    auths: BookAuth[],
-    debtor: string,
-    creditor: string,
-    assetId: number,
-): BookAuth | undefined {
-    const now = Date.now();
-    return auths.find(
-        (a) =>
-            a.debtor === debtor &&
-            a.creditor === creditor &&
-            a.assetId === assetId &&
-            (!a.expiresAt || a.expiresAt * 1000 >= now),
-    );
-}
-
-function liveGlobalForward(
-    offers: ForwardOffer[],
-    assetId: number | undefined,
-    nowSec: number,
-): boolean {
-    if (assetId === undefined) return false;
-    return offers.some(
-        (p) =>
-            p.isGlobal &&
-            p.assetId === assetId &&
-            (p.expiresAt === 0 || p.expiresAt >= nowSec),
-    );
-}
-
-function spendableBookAuth(
-    auths: BookAuth[],
-    debtor: string,
-    creditor: string,
-    assetId: number,
-): BookAuth | undefined {
-    const auth = liveBookAuth(auths, debtor, creditor, assetId);
-    return auth && Number(auth.remaining) > 0 ? auth : undefined;
-}
-
 export function ObligationsPage() {
-    const { data: user } = useCurrentUser();
     const { label } = useBanxContacts("/accounts");
     const [searchParams, setSearchParams] = useSearchParams();
     const urlTransferPrefill = useMemo(
@@ -313,13 +66,11 @@ export function ObligationsPage() {
     useEffect(() => {
         if (urlTransferPrefill) setTransferOpen(true);
     }, [urlTransferPrefill]);
-    const { data: obs = [], isLoading: obsLoading } = useObligations();
-    const { data: lines = [], isLoading: linesLoading } = useCreditLines();
+    const { savings: savingsGroupsAll, loans: loanGroupsAll, isLoading } =
+        useAccountGroups();
     const { data: forwardOffers = [] } = useForwardOffers();
     const { data: buyClaimOffers = [] } = useBuyClaimOffers();
-    const { data: bookAuths = [] } = useBookAuths();
     const { assets, symbolOf, precisionOf } = useAssetMap();
-    const isLoading = obsLoading || linesLoading;
 
     const nowSec = Math.floor(Date.now() / 1000);
     const globalForwardOn = useMemo(
@@ -339,33 +90,19 @@ export function ObligationsPage() {
 
     const [createOpen, setCreateOpen] = useState(false);
     const [creditLineOpen, setCreditLineOpen] = useState(false);
-    /** When set, credit-line dialog edits this facility instead of creating. */
     const [editingLine, setEditingLine] = useState<CreditLine | null>(null);
     const [routingOpen, setRoutingOpen] = useState(false);
     const [routingPrefill, setRoutingPrefill] =
         useState<RoutingPolicyPrefill | null>(null);
-    const [sellOpen, setSellOpen] = useState(false);
-    const [sellTarget, setSellTarget] = useState<SellClaimTarget | null>(null);
-    const [sellTradeMode, setSellTradeMode] = useState<"sell" | "buy">("sell");
     const [buyClaimOpen, setBuyClaimOpen] = useState(false);
     const [buyClaimPrefill, setBuyClaimPrefill] =
         useState<BuyClaimPrefill | null>(null);
-    const [requestOpen, setRequestOpen] = useState(false);
-    const [requestPrefill, setRequestPrefill] =
-        useState<RequestPrefill | null>(null);
-    const [forgiveOpen, setForgiveOpen] = useState(false);
-    const [forgiveTarget, setForgiveTarget] = useState<ForgiveTarget | null>(
-        null,
-    );
     const [bookAuthOpen, setBookAuthOpen] = useState(false);
     const [bookAuthPrefill, setBookAuthPrefill] = useState<{
         creditor?: string;
         assetId?: number;
     } | null>(null);
     const [editingBookAuth, setEditingBookAuth] = useState<BookAuth | null>(
-        null,
-    );
-    const [bookExpenseAuth, setBookExpenseAuth] = useState<BookAuth | null>(
         null,
     );
     const [hideEmptySavings, setHideEmptySavings] = useState(false);
@@ -380,39 +117,6 @@ export function ObligationsPage() {
         setBuyClaimPrefill(prefill ?? null);
         setBuyClaimOpen(true);
     };
-
-    const openRequest = (prefill: RequestPrefill) => {
-        setRequestPrefill(prefill);
-        setRequestOpen(true);
-    };
-
-    const savingsGroupsAll = useMemo(() => {
-        if (!user) return [];
-        return mergeCreditLines(
-            groupByCounterpartyAndAsset(
-                obs.filter((o) => o.creditor === user),
-                (o) => o.debtor,
-                precisionOf,
-            ),
-            lines,
-            "savings",
-            user,
-        );
-    }, [obs, lines, user, precisionOf]);
-
-    const loanGroupsAll = useMemo(() => {
-        if (!user) return [];
-        return mergeCreditLines(
-            groupByCounterpartyAndAsset(
-                obs.filter((o) => o.debtor === user),
-                (o) => o.creditor,
-                precisionOf,
-            ),
-            lines,
-            "loan",
-            user,
-        );
-    }, [obs, lines, user, precisionOf]);
 
     const savingsGroups = useMemo(
         () => filterGroups(savingsGroupsAll, hideEmptySavings),
@@ -538,17 +242,6 @@ export function ObligationsPage() {
                 prefill={buyClaimPrefill}
             />
 
-            <RequestDialog
-                open={requestOpen}
-                onOpenChange={(open) => {
-                    setRequestOpen(open);
-                    if (!open) setRequestPrefill(null);
-                }}
-                assets={assets}
-                precisionOf={precisionOf}
-                prefill={requestPrefill}
-            />
-
             {/* ── Savings / deposits (you are creditor) ───────────────── */}
             <section className="space-y-4">
                 <SectionHeader
@@ -612,142 +305,16 @@ export function ObligationsPage() {
                                 tone="savings"
                                 title={label(g.counterparty)}
                                 counterparty={g.counterparty}
-                                assetId={g.assetId}
-                                viewer={user ?? ""}
                                 symbol={symbolOf(g.assetId)}
                                 precision={precisionOf(g.assetId)}
                                 total={g.total}
-                                obligations={g.obligations}
                                 creditLine={g.creditLine}
-                                canEditCreditLine={!!g.creditLine}
                                 balanceLabel="Balance"
-                                onEditCreditLine={
-                                    g.creditLine
-                                        ? () => {
-                                              setEditingLine(g.creditLine!);
-                                              setCreditLineOpen(true);
-                                          }
-                                        : undefined
-                                }
-                                onSetRouting={() =>
-                                    openRouting({
-                                        creditor: g.counterparty,
-                                        assetId: g.assetId,
-                                    })
-                                }
-                                onSetBuyClaim={() =>
-                                    openBuyClaim({
-                                        debtor: g.counterparty,
-                                        assetId: g.assetId,
-                                    })
-                                }
-                                onAskRequest={() =>
-                                    openRequest({
-                                        kind: REQUEST_INVOICE,
-                                        counterparty: g.counterparty,
-                                        assetId: g.assetId,
-                                        amount:
-                                            g.total > 0n
-                                                ? formatRawAmount(
-                                                      g.total.toString(),
-                                                      precisionOf(g.assetId),
-                                                  )
-                                                : undefined,
-                                    })
-                                }
-                                onPostSellOffer={() =>
-                                    openBuyClaim({
-                                        debtor: g.counterparty,
-                                        assetId: g.assetId,
-                                        side: "sell",
-                                    })
-                                }
-                                onSellClaim={
-                                    g.total > 0n
-                                        ? () => {
-                                              setSellTradeMode("sell");
-                                              setSellTarget({
-                                                  debtor: g.counterparty,
-                                                  assetId: g.assetId,
-                                                  maxRaw: g.total.toString(),
-                                                  symbol: symbolOf(g.assetId),
-                                                  precision: precisionOf(
-                                                      g.assetId,
-                                                  ),
-                                              });
-                                              setSellOpen(true);
-                                          }
-                                        : undefined
-                                }
-                                onForgive={
-                                    g.total > 0n
-                                        ? () => {
-                                              setForgiveTarget({
-                                                  debtor: g.counterparty,
-                                                  assetId: g.assetId,
-                                                  maxRaw: g.total.toString(),
-                                                  symbol: symbolOf(g.assetId),
-                                                  precision: precisionOf(
-                                                      g.assetId,
-                                                  ),
-                                              });
-                                              setForgiveOpen(true);
-                                          }
-                                        : undefined
-                                }
-                                onBuyPostedClaim={() => {
-                                    setSellTradeMode("buy");
-                                    setSellTarget({
-                                        debtor: g.counterparty,
-                                        assetId: g.assetId,
-                                        maxRaw: "0",
-                                        symbol: symbolOf(g.assetId),
-                                        precision: precisionOf(g.assetId),
-                                    });
-                                    setSellOpen(true);
-                                }}
-                                onBookExpense={
-                                    user
-                                        ? (() => {
-                                              const auth = spendableBookAuth(
-                                                  bookAuths,
-                                                  g.counterparty,
-                                                  user,
-                                                  g.assetId,
-                                              );
-                                              return auth
-                                                  ? () =>
-                                                        setBookExpenseAuth(
-                                                            auth,
-                                                        )
-                                                  : undefined;
-                                          })()
-                                        : undefined
-                                }
                             />
                         ))}
                     </div>
                 )}
             </section>
-
-            <SellClaimDialog
-                open={sellOpen}
-                onOpenChange={(open) => {
-                    setSellOpen(open);
-                    if (!open) setSellTarget(null);
-                }}
-                target={sellTarget}
-                mode={sellTradeMode}
-            />
-
-            <ForgiveDialog
-                open={forgiveOpen}
-                onOpenChange={(open) => {
-                    setForgiveOpen(open);
-                    if (!open) setForgiveTarget(null);
-                }}
-                target={forgiveTarget}
-            />
 
             <Separator />
 
@@ -809,24 +376,6 @@ export function ObligationsPage() {
                     prefill={bookAuthPrefill ?? undefined}
                     existing={editingBookAuth}
                 />
-                <BookExpenseDialog
-                    open={!!bookExpenseAuth}
-                    onOpenChange={(open) => {
-                        if (!open) setBookExpenseAuth(null);
-                    }}
-                    auth={bookExpenseAuth}
-                    symbol={
-                        bookExpenseAuth
-                            ? symbolOf(bookExpenseAuth.assetId)
-                            : ""
-                    }
-                    precision={
-                        bookExpenseAuth
-                            ? precisionOf(bookExpenseAuth.assetId)
-                            : 0
-                    }
-                />
-
                 <NewDepositLoanDialog
                     open={createOpen}
                     onOpenChange={setCreateOpen}
@@ -851,51 +400,11 @@ export function ObligationsPage() {
                                 tone="loan"
                                 title={label(g.counterparty)}
                                 counterparty={g.counterparty}
-                                assetId={g.assetId}
-                                viewer={user ?? ""}
                                 symbol={symbolOf(g.assetId)}
                                 precision={precisionOf(g.assetId)}
                                 total={g.total}
-                                obligations={g.obligations}
                                 creditLine={g.creditLine}
-                                canEditCreditLine={false}
                                 balanceLabel="Outstanding"
-                                onSetRouting={() =>
-                                    openRouting({
-                                        creditor: g.counterparty,
-                                        assetId: g.assetId,
-                                    })
-                                }
-                                onAskRequest={() =>
-                                    openRequest({
-                                        kind: REQUEST_PLEASE_BOOK,
-                                        counterparty: g.counterparty,
-                                        assetId: g.assetId,
-                                        amount:
-                                            g.total > 0n
-                                                ? formatRawAmount(
-                                                      g.total.toString(),
-                                                      precisionOf(g.assetId),
-                                                  )
-                                                : undefined,
-                                    })
-                                }
-                                onEditBookAuth={() => {
-                                    const existing = user
-                                        ? liveBookAuth(
-                                              bookAuths,
-                                              user,
-                                              g.counterparty,
-                                              g.assetId,
-                                          )
-                                        : undefined;
-                                    setEditingBookAuth(existing ?? null);
-                                    setBookAuthPrefill({
-                                        creditor: g.counterparty,
-                                        assetId: g.assetId,
-                                    });
-                                    setBookAuthOpen(true);
-                                }}
                             />
                         ))}
                     </div>
@@ -1025,499 +534,26 @@ function SectionHeader({
     );
 }
 
-function CreditLineDialog({
-    open,
-    onOpenChange,
-    assets,
-    precisionOf,
-    editing,
-}: {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    assets: Asset[];
-    precisionOf: (id: number) => number;
-    /** When set, update this line (debtor + asset fixed). */
-    editing: CreditLine | null;
-}) {
-    const setLine = useSetCreditLine();
-    const removeLine = useRemoveCreditLine();
-    const setForward = useSetGlobalForwardOffer();
-    const { data: forwardOffers = [] } = useForwardOffers();
-    const nowSec = Math.floor(Date.now() / 1000);
-    const isEdit = !!editing;
-
-    const form = useAppForm({
-        defaultValues: {
-            debtor: "",
-            assetId: undefined as number | undefined,
-            limit: "100",
-            interestPct: "0",
-            deplete: false,
-            gracePreset: "7" as GracePreset,
-            graceDays: "7",
-            allowForward: true,
-        },
-        onSubmit: async ({ value }) => {
-            const debtor = isEdit
-                ? editing!.debtor
-                : value.debtor.trim();
-            const assetId = isEdit
-                ? editing!.assetId
-                : value.assetId;
-            if (assetId === undefined || !debtor) return;
-            await setLine.mutateAsync({
-                debtor,
-                assetId,
-                limit: value.limit.trim(),
-                depleteOnDebit: value.deplete,
-                interestRatePpm: percentStringToPpm(
-                    value.interestPct,
-                    PPM_SCALE,
-                ),
-                graceSeconds:
-                    value.gracePreset === "none"
-                        ? 0
-                        : daysToGraceSeconds(
-                              value.gracePreset === "custom"
-                                  ? Number(value.graceDays.trim())
-                                  : Number(value.gracePreset),
-                          ),
-            });
-            if (
-                value.allowForward &&
-                !liveGlobalForward(forwardOffers, assetId, nowSec)
-            ) {
-                await setForward.mutateAsync({
-                    assetId,
-                    feeFixed: "0",
-                    feePercentPpm: 0,
-                    maxLineAprPpm: 0,
-                    expiresAtSeconds: 0,
-                    allowUnknown: false,
-                });
-            }
-            onOpenChange(false);
-        },
-    });
-
-    useEffect(() => {
-        if (!open) return;
-        if (editing) {
-            const grace = graceSecondsToPreset(
-                editing.graceSeconds ?? DEFAULT_GRACE_SECONDS,
-            );
-            form.reset({
-                debtor: editing.debtor,
-                assetId: editing.assetId,
-                limit: formatRawAmount(
-                    editing.limit,
-                    precisionOf(editing.assetId),
-                ).replace(/,/g, ""),
-                interestPct: ppmToPercentInput(editing.interestRatePpm),
-                deplete: editing.depleteOnDebit,
-                gracePreset: grace.preset,
-                graceDays: grace.days,
-                allowForward: !liveGlobalForward(
-                    forwardOffers,
-                    editing.assetId,
-                    nowSec,
-                ),
-            });
-        } else {
-            form.reset({
-                debtor: "",
-                assetId: undefined,
-                limit: "100",
-                interestPct: "0",
-                deplete: false,
-                gracePreset: "7",
-                graceDays: "7",
-                allowForward: true,
-            });
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [open, editing, precisionOf]);
-
-    const editSymbol =
-        isEdit && editing
-            ? (assets.find((a) => a.id === editing.assetId)?.symbol.toUpperCase() ??
-              `#${editing.assetId}`)
-            : null;
-
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                    <DialogTitle>
-                        {isEdit
-                            ? `Edit credit line · ${editing!.debtor} · ${editSymbol}`
-                            : "Offer a credit line"}
-                    </DialogTitle>
-                    <DialogDescription>
-                        {isEdit
-                            ? `Update limit, interest, or revolving terms for ${editing!.debtor} in ${editSymbol}. A zero limit still keeps them as a known counterparty (needed if they may hold a claim on you). Remove the line to drop that.`
-                            : "You are the creditor. Set how much the debtor may draw (and hold outstanding) against you. Drawn amounts show up here as savings-style claims. A zero limit is still a line — they are on your book."}
-                    </DialogDescription>
-                </DialogHeader>
-                <form
-                    className="grid gap-4"
-                    onSubmit={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        void form.handleSubmit();
-                    }}
-                >
-                    {!isEdit ? (
-                        <>
-                            <form.AppField
-                                name="debtor"
-                                validators={existingAccountValidators()}
-                                children={(field) => (
-                                    <field.TextField
-                                        label="Debtor account"
-                                        placeholder="alice"
-                                        required
-                                    />
-                                )}
-                            />
-                            <form.Field
-                                name="assetId"
-                                children={(field) => (
-                                    <AssetField
-                                        assets={assets}
-                                        value={field.state.value}
-                                        onChange={(id) =>
-                                            field.handleChange(id)
-                                        }
-                                    />
-                                )}
-                            />
-                        </>
-                    ) : null}
-                    <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
-                        <form.Subscribe
-                            selector={(s) => s.values.assetId}
-                            children={(assetId) => {
-                                const aid = isEdit
-                                    ? editing!.assetId
-                                    : assetId;
-                                return (
-                                    <form.AppField
-                                        name="limit"
-                                        validators={
-                                            aid !== undefined
-                                                ? {
-                                                      onChange:
-                                                          amountFieldValidator(
-                                                              precisionOf(aid),
-                                                              {
-                                                                  allowZero: true,
-                                                              },
-                                                          ),
-                                                      onSubmit:
-                                                          amountFieldValidator(
-                                                              precisionOf(aid),
-                                                              {
-                                                                  allowZero: true,
-                                                              },
-                                                          ),
-                                                  }
-                                                : undefined
-                                        }
-                                        children={(field) => (
-                                            <field.TextField
-                                                label="Limit"
-                                                inputMode="decimal"
-                                                required
-                                            />
-                                        )}
-                                    />
-                                );
-                            }}
-                        />
-                        <form.AppField
-                            name="interestPct"
-                            validators={{
-                                onChange: percentFieldValidator(MAX_PERCENT),
-                                onSubmit: percentFieldValidator(MAX_PERCENT),
-                            }}
-                            children={(field) => (
-                                <field.TextField
-                                    label="Interest APR %"
-                                    inputMode="decimal"
-                                    min={0}
-                                    max={MAX_PERCENT}
-                                    step={MIN_PERCENT_STEP}
-                                />
-                            )}
-                        />
-                    </div>
-                    <form.Subscribe
-                        selector={(s) => ({
-                            preset: s.values.gracePreset,
-                            days: s.values.graceDays,
-                        })}
-                        children={({ preset, days }) => (
-                            <GracePeriodField
-                                preset={preset}
-                                days={days}
-                                onPresetChange={(p) => {
-                                    form.setFieldValue("gracePreset", p);
-                                    if (p === "none") {
-                                        form.setFieldValue("graceDays", "0");
-                                    } else if (p !== "custom") {
-                                        form.setFieldValue("graceDays", p);
-                                    }
-                                }}
-                                onDaysChange={(d) =>
-                                    form.setFieldValue("graceDays", d)
-                                }
-                            />
-                        )}
-                    />
-                    <p className="text-muted-foreground -mt-2 text-xs">
-                        If they repay this pair to zero within this window, no
-                        interest. Default is 7 days. Custom is whole days (0 =
-                        interest from the first second).{" "}
-                        {isEdit && editing && editing.cycleStartedAt
-                            ? "An open cycle keeps its snapshotted window; this value applies to the next cycle."
-                            : null}
-                    </p>
-                    <form.AppField
-                        name="deplete"
-                        children={(field) => (
-                            <field.CheckboxField label="Deplete limit on each draw (non-revolving)" />
-                        )}
-                    />
-                    <form.Subscribe
-                        selector={(s) =>
-                            isEdit ? editing!.assetId : s.values.assetId
-                        }
-                        children={(assetId) => {
-                            const already = liveGlobalForward(
-                                forwardOffers,
-                                assetId,
-                                nowSec,
-                            );
-                            if (already) {
-                                return (
-                                    <p className="text-muted-foreground text-xs">
-                                        Path-forward is already on for this
-                                        asset — friends can pay through you.
-                                    </p>
-                                );
-                            }
-                            return (
-                                <form.AppField
-                                    name="allowForward"
-                                    children={(field) => (
-                                        <field.CheckboxField label="Let friends path-pay through you in this asset (closed, 0% fee, 0% max APR)" />
-                                    )}
-                                />
-                            );
-                        }}
-                    />
-                    {isEdit && editing ? (
-                        <p className="text-muted-foreground text-xs">
-                            Current line exposure:{" "}
-                            <span className="text-foreground font-mono tabular-nums">
-                                {formatRawAmount(
-                                    editing.exposure,
-                                    precisionOf(editing.assetId),
-                                )}
-                            </span>
-                            {editing.depleteOnDebit ? (
-                                <>
-                                    . Remaining:{" "}
-                                    <span className="text-foreground font-mono tabular-nums">
-                                        {formatRawAmount(
-                                            editing.remaining,
-                                            precisionOf(editing.assetId),
-                                        )}
-                                    </span>{" "}
-                                    (repay does not restore it)
-                                </>
-                            ) : (
-                                ". Limit should stay ≥ exposure for revolving lines."
-                            )}
-                        </p>
-                    ) : null}
-                    <DialogFooter>
-                        {isEdit ? (
-                            <Button
-                                type="button"
-                                variant="destructive"
-                                disabled={removeLine.isPending}
-                                onClick={() => {
-                                    removeLine.mutate(
-                                        {
-                                            debtor: editing!.debtor,
-                                            assetId: editing!.assetId,
-                                        },
-                                        {
-                                            onSuccess: () =>
-                                                onOpenChange(false),
-                                        },
-                                    );
-                                }}
-                            >
-                                {removeLine.isPending
-                                    ? "Removing…"
-                                    : "Remove line"}
-                            </Button>
-                        ) : null}
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => onOpenChange(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <form.Subscribe
-                            selector={(s) => s.values}
-                            children={(values) => {
-                                const assetId = isEdit
-                                    ? editing!.assetId
-                                    : values.assetId;
-                                const debtorOk = isEdit
-                                    ? true
-                                    : !!values.debtor.trim();
-                                return (
-                                    <form.AppForm>
-                                        <form.SubmitButton
-                                            labels={
-                                                isEdit
-                                                    ? [
-                                                          "Update credit line",
-                                                          "Saving…",
-                                                      ]
-                                                    : [
-                                                          "Save credit line",
-                                                          "Saving…",
-                                                      ]
-                                            }
-                                            loading={
-                                                setLine.isPending ||
-                                                setForward.isPending
-                                            }
-                                            disabled={
-                                                assetId === undefined ||
-                                                !debtorOk
-                                            }
-                                        />
-                                    </form.AppForm>
-                                );
-                            }}
-                        />
-                    </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-function AccountRowAction({
-    tip,
-    onClick,
-    icon: Icon,
-    label,
-}: {
-    tip: string;
-    onClick: () => void;
-    icon: React.ComponentType<{ className?: string }>;
-    label?: string;
-}) {
-    return (
-        <Tooltip>
-            <TooltipTrigger asChild>
-                <Button
-                    type="button"
-                    size={label ? "sm" : "icon"}
-                    variant="outline"
-                    className={
-                        label
-                            ? "h-9 shrink-0 gap-1 px-2 text-xs sm:h-8"
-                            : "size-9 shrink-0 sm:size-8"
-                    }
-                    aria-label={tip}
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onClick();
-                    }}
-                >
-                    <Icon className="size-3.5" />
-                    {label ? (
-                        <span className="hidden sm:inline">{label}</span>
-                    ) : null}
-                </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top" className="max-w-xs">
-                {tip}
-            </TooltipContent>
-        </Tooltip>
-    );
-}
-
 function AccountGroupRow({
     tone,
     title,
     counterparty,
-    assetId,
-    viewer,
     symbol,
     precision,
     total,
-    obligations,
     creditLine,
-    canEditCreditLine,
     balanceLabel,
-    onEditCreditLine,
-    onSetRouting,
-    onSetBuyClaim,
-    onPostSellOffer,
-    onAskRequest,
-    onSellClaim,
-    onForgive,
-    onBuyPostedClaim,
-    onBookExpense,
-    onEditBookAuth,
 }: {
     tone: "savings" | "loan";
     title: string;
     counterparty: string;
-    assetId: number;
-    viewer: string;
     symbol: string;
     precision: number;
     total: bigint;
-    obligations: Obligation[];
-    creditLine?: CreditLine;
-    canEditCreditLine?: boolean;
+    creditLine?: GroupedAccount["creditLine"];
     balanceLabel: string;
-    onEditCreditLine?: () => void;
-    /** Path-forward offer with this counterparty as next hop. */
-    onSetRouting?: () => void;
-    /** Buy-claim offer to buy claims on this counterparty. */
-    onSetBuyClaim?: () => void;
-    onPostSellOffer?: () => void;
-    onBuyPostedClaim?: () => void;
-    /** Open the new-request modal with this party filled in. */
-    onAskRequest?: () => void;
-    /** Sell claim on this counterparty (savings / you are creditor). */
-    onSellClaim?: () => void;
-    /** Write off a claim on this counterparty (savings / you are creditor). */
-    onForgive?: () => void;
-    /** Book an expense onto this counterparty (they granted you book-auth). */
-    onBookExpense?: () => void;
-    /** Grant or edit book-auth to this counterparty (you are debtor). */
-    onEditBookAuth?: () => void;
 }) {
-    const [open, setOpen] = useState(false);
-    const [historyOpen, setHistoryOpen] = useState(false);
     const amount = formatRawAmount(total.toString(), precision);
-    const n = obligations.length;
-    const hasPositions = n > 0;
-
     const limitRaw = creditLine
         ? humanToRaw(creditLine.limit || "0", precision)
         : null;
@@ -1550,356 +586,74 @@ function AccountGroupRow({
             : "text-amber-900 dark:text-amber-300";
     const badgeBorder =
         tone === "savings" ? "border-emerald-500/30" : "border-amber-500/40";
-    const expandBg =
-        tone === "savings"
-            ? "bg-emerald-500/[0.03] border-emerald-500/10"
-            : "bg-amber-500/[0.04] border-amber-500/15";
-    const editTip =
-        "Edit credit line — change limit, interest rate, or revolving terms";
-    const historyTip =
-        "History — payments, path draws, deposits, nets, write-offs, and line changes";
-    const routingTip =
-        "Path-forward offer — let others hop through you to this party";
-    const buyClaimTip =
-        "Buy-claim offer — buy others' claims on this party";
-    const requestTip = "Request — invoice or deposit request";
-    const sellTip =
-        "Sell claim — transfer this debt to a buyer under their buy-claim offer";
-    const forgiveTip =
-        "Write off — drop some or all of this claim; they do not need to sign";
-    const postSellTip =
-        "Sell-claim offer — post an ask so others can buy this claim";
-    const buyPostedTip =
-        "Buy posted claim — hit someone's sell-claim ask on this party";
-    const bookExpenseTip =
-        "Book expense — they let you record that they owe you, up to their remaining cap";
-    const bookAuthTip =
-        "Allow booking — let them record expenses onto you, up to a remaining cap";
 
     return (
-        <Collapsible open={open} onOpenChange={setOpen}>
-            <div className={cn("w-full", rowBg)}>
-                <div className="flex items-start gap-2 px-3 py-3 sm:gap-3 sm:px-4 sm:py-4">
-                    {hasPositions ? (
-                        <CollapsibleTrigger asChild>
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="mt-0.5 size-9 shrink-0 sm:size-8"
-                                aria-label={
-                                    open
-                                        ? "Collapse obligation details"
-                                        : "Expand obligation details"
-                                }
-                            >
-                                <ChevronDown
-                                    className={cn(
-                                        "size-4 transition-transform duration-200",
-                                        open && "rotate-180",
-                                    )}
-                                />
-                            </Button>
-                        </CollapsibleTrigger>
-                    ) : (
-                        <div
-                            className="mt-0.5 size-9 shrink-0 sm:size-8"
-                            aria-hidden
-                        />
-                    )}
-
-                    <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                    <p className="truncate font-semibold tracking-tight">
-                                        {title}
-                                    </p>
-                                    {title !== counterparty ? (
-                                        <span className="text-muted-foreground truncate text-xs">
-                                            {counterparty}
-                                        </span>
-                                    ) : null}
-                                    <Badge
-                                        variant="outline"
-                                        className={cn(
-                                            "font-mono text-xs",
-                                            badgeBorder,
-                                        )}
-                                    >
-                                        {symbol}
-                                    </Badge>
-                                    {n > 1 ? (
-                                        <span className="text-muted-foreground text-xs">
-                                            {n} positions
-                                        </span>
-                                    ) : null}
-                                    {creditLine && !hasPositions ? (
-                                        <span className="text-muted-foreground text-xs">
-                                            Credit facility
-                                        </span>
-                                    ) : null}
-                                </div>
-                                {creditLine &&
-                                limitRaw !== null &&
-                                availableRaw !== null ? (
-                                    <p className="text-muted-foreground mt-1 text-xs sm:text-sm">
-                                        Limit{" "}
-                                        <span className="text-foreground font-mono tabular-nums">
-                                            {formatRawAmount(
-                                                limitRaw.toString(),
-                                                precision,
-                                            )}
-                                        </span>
-                                        <span className="mx-1.5 opacity-40">
-                                            ·
-                                        </span>
-                                        Available{" "}
-                                        <span className="text-foreground font-mono tabular-nums">
-                                            {formatRawAmount(
-                                                availableRaw.toString(),
-                                                precision,
-                                            )}
-                                        </span>
-                                        {creditLine.depleteOnDebit ? (
-                                            <span className="ml-1.5 opacity-70">
-                                                · non-revolving
-                                            </span>
-                                        ) : null}
-                                    </p>
-                                ) : null}
-                            </div>
-                            <div className="shrink-0 text-right">
-                                <p className="text-muted-foreground text-[10px] font-medium tracking-wide uppercase sm:text-xs">
-                                    {balanceLabel}
-                                </p>
-                                <p
-                                    className={cn(
-                                        "font-mono text-lg font-semibold tracking-tight tabular-nums sm:text-2xl",
-                                        amountCls,
-                                    )}
-                                >
-                                    {amount}
-                                    <span className="text-muted-foreground ml-1 text-xs font-normal sm:ml-1.5 sm:text-sm">
-                                        {symbol}
-                                    </span>
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                            <AccountRowAction
-                                tip={historyTip}
-                                icon={History}
-                                label="History"
-                                onClick={() => setHistoryOpen(true)}
-                            />
-                            {canEditCreditLine && onEditCreditLine ? (
-                                <AccountRowAction
-                                    tip={editTip}
-                                    icon={Pencil}
-                                    onClick={onEditCreditLine}
-                                />
-                            ) : null}
-                            {onSetRouting ? (
-                                <AccountRowAction
-                                    tip={routingTip}
-                                    icon={Route}
-                                    onClick={onSetRouting}
-                                />
-                            ) : null}
-                            {onSetBuyClaim ? (
-                                <AccountRowAction
-                                    tip={buyClaimTip}
-                                    icon={Handshake}
-                                    onClick={onSetBuyClaim}
-                                />
-                            ) : null}
-                            {onBookExpense ? (
-                                <AccountRowAction
-                                    tip={bookExpenseTip}
-                                    icon={Receipt}
-                                    label="Book"
-                                    onClick={onBookExpense}
-                                />
-                            ) : null}
-                            {onEditBookAuth ? (
-                                <AccountRowAction
-                                    tip={bookAuthTip}
-                                    icon={KeyRound}
-                                    onClick={onEditBookAuth}
-                                />
-                            ) : null}
-                            {onAskRequest ? (
-                                <AccountRowAction
-                                    tip={requestTip}
-                                    icon={Inbox}
-                                    label="Request"
-                                    onClick={onAskRequest}
-                                />
-                            ) : null}
-                            {onPostSellOffer ? (
-                                <AccountRowAction
-                                    tip={postSellTip}
-                                    icon={Store}
-                                    onClick={onPostSellOffer}
-                                />
-                            ) : null}
-                            {onSellClaim ? (
-                                <AccountRowAction
-                                    tip={sellTip}
-                                    icon={ArrowLeftRight}
-                                    onClick={onSellClaim}
-                                />
-                            ) : null}
-                            {onForgive ? (
-                                <AccountRowAction
-                                    tip={forgiveTip}
-                                    icon={CircleMinus}
-                                    onClick={onForgive}
-                                />
-                            ) : null}
-                            {onBuyPostedClaim ? (
-                                <AccountRowAction
-                                    tip={buyPostedTip}
-                                    icon={ShoppingCart}
-                                    onClick={onBuyPostedClaim}
-                                />
-                            ) : null}
-                        </div>
-                    </div>
+        <Link
+            to={accountHref(counterparty)}
+            className={cn(
+                "flex items-start gap-3 px-3 py-3 sm:px-4 sm:py-4",
+                rowBg,
+                "hover:bg-muted/40 transition-colors",
+            )}
+        >
+            <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className="truncate font-semibold tracking-tight underline-offset-4 hover:underline">
+                        {title}
+                    </span>
+                    {title !== counterparty ? (
+                        <span className="text-muted-foreground truncate text-xs">
+                            {counterparty}
+                        </span>
+                    ) : null}
+                    <Badge
+                        variant="outline"
+                        className={cn("font-mono text-xs", badgeBorder)}
+                    >
+                        {symbol}
+                    </Badge>
+                    {creditLine && total === 0n ? (
+                        <span className="text-muted-foreground text-xs">
+                            Credit facility
+                        </span>
+                    ) : null}
                 </div>
-
-                {hasPositions ? (
-                    <CollapsibleContent>
-                        <div
-                            className={cn(
-                                "border-t px-3 py-3 sm:px-14",
-                                expandBg,
+                {creditLine &&
+                limitRaw !== null &&
+                availableRaw !== null ? (
+                    <p className="text-muted-foreground mt-1 text-xs sm:text-sm">
+                        Limit{" "}
+                        <span className="text-foreground font-mono tabular-nums">
+                            {formatRawAmount(limitRaw.toString(), precision)}
+                        </span>
+                        <span className="mx-1.5 opacity-40">·</span>
+                        Available{" "}
+                        <span className="text-foreground font-mono tabular-nums">
+                            {formatRawAmount(
+                                availableRaw.toString(),
+                                precision,
                             )}
-                        >
-                            {creditLine &&
-                            limitRaw !== null &&
-                            exposureRaw !== null &&
-                            availableRaw !== null ? (
-                                <div className="text-muted-foreground mb-3 grid gap-1 text-xs sm:grid-cols-3 sm:gap-4 sm:text-sm">
-                                    <div>
-                                        Credit limit{" "}
-                                        <span className="text-foreground font-mono tabular-nums">
-                                            {formatRawAmount(
-                                                limitRaw.toString(),
-                                                precision,
-                                            )}{" "}
-                                            {symbol}
-                                        </span>
-                                    </div>
-                                    <div>
-                                        Line exposure{" "}
-                                        <span className="text-foreground font-mono tabular-nums">
-                                            {formatRawAmount(
-                                                exposureRaw.toString(),
-                                                precision,
-                                            )}{" "}
-                                            {symbol}
-                                        </span>
-                                    </div>
-                                    <div>
-                                        Available to draw{" "}
-                                        <span className="text-foreground font-mono tabular-nums">
-                                            {formatRawAmount(
-                                                availableRaw.toString(),
-                                                precision,
-                                            )}{" "}
-                                            {symbol}
-                                        </span>
-                                    </div>
-                                    {creditLine.depleteOnDebit &&
-                                    remainingRaw !== null ? (
-                                        <div>
-                                            Remaining{" "}
-                                            <span className="text-foreground font-mono tabular-nums">
-                                                {formatRawAmount(
-                                                    remainingRaw.toString(),
-                                                    precision,
-                                                )}{" "}
-                                                {symbol}
-                                            </span>
-                                        </div>
-                                    ) : null}
-                                    {creditLine.graceSeconds > 0 ||
-                                    creditLine.cycleStartedAt ? (
-                                        <div className="sm:col-span-3">
-                                            Interest-free{" "}
-                                            {formatGracePeriod(
-                                                creditLine.cycleStartedAt
-                                                    ? creditLine.cycleGraceSeconds
-                                                    : creditLine.graceSeconds,
-                                            )}
-                                            {creditLine.cycleStartedAt
-                                                ? " (this cycle)"
-                                                : ""}
-                                        </div>
-                                    ) : null}
-                                </div>
-                            ) : null}
-                            <p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
-                                Individual positions
-                            </p>
-                            <ul className="divide-border divide-y rounded-lg border bg-background/60">
-                                {obligations.map((o) => {
-                                    const principal = formatRawAmount(
-                                        o.remainingPrincipal,
-                                        precision,
-                                    );
-                                    const interest = formatRawAmount(
-                                        o.accruedInterest,
-                                        precision,
-                                    );
-                                    const lineTotal = formatRawAmount(
-                                        totalRaw(
-                                            o.remainingPrincipal,
-                                            o.accruedInterest,
-                                            precision,
-                                        ).toString(),
-                                        precision,
-                                    );
-                                    return (
-                                        <li
-                                            key={o.id}
-                                            className="flex flex-wrap items-center gap-3 px-3 py-3 sm:flex-nowrap"
-                                        >
-                                            <div className="min-w-0 flex-1">
-                                                <p className="font-mono text-sm font-medium tabular-nums">
-                                                    #{o.id}
-                                                    <span className="text-muted-foreground ml-2 font-sans font-normal">
-                                                        {lineTotal} {symbol}
-                                                    </span>
-                                                </p>
-                                                <p className="text-muted-foreground mt-0.5 text-xs">
-                                                    Principal {principal} ·
-                                                    Interest {interest} ·{" "}
-                                                    {ppmToPercent(
-                                                        o.interestRatePpm,
-                                                    )}{" "}
-                                                    APR
-                                                </p>
-                                            </div>
-                                        </li>
-                                    );
-                                })}
-                            </ul>
-                        </div>
-                    </CollapsibleContent>
+                        </span>
+                    </p>
                 ) : null}
             </div>
-            <AccountHistoryDialog
-                open={historyOpen}
-                onOpenChange={setHistoryOpen}
-                counterparty={counterparty}
-                assetId={assetId}
-                viewer={viewer}
-            />
-        </Collapsible>
+            <div className="shrink-0 text-right">
+                <p className="text-muted-foreground text-[10px] font-medium tracking-wide uppercase sm:text-xs">
+                    {balanceLabel}
+                </p>
+                <p
+                    className={cn(
+                        "font-mono text-lg font-semibold tracking-tight tabular-nums sm:text-2xl",
+                        amountCls,
+                    )}
+                >
+                    {amount}
+                    <span className="text-muted-foreground ml-1 text-xs font-normal sm:ml-1.5 sm:text-sm">
+                        {symbol}
+                    </span>
+                </p>
+            </div>
+        </Link>
     );
 }
 

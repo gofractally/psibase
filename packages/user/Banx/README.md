@@ -178,7 +178,7 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 
 ## UI
 
-- `/accounts` — claims you hold and liabilities you owe; offer/edit lines; transfer; activity feed below
+- `/accounts` — claims you hold and liabilities you owe; transfer; activity feed. Click a name for `/accounts/:account` (history, lines, book-auth, claims).
 - `/payees` — contacts; deposit or draw
 - `/requests` — invoices and please-book
 - `/cash` — Tokens cash window: post quotes, fund/withdraw vault, cash in/out
