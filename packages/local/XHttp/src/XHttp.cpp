@@ -120,6 +120,21 @@ namespace
       return location;
    }
 
+   void checkResponseHeaders(const TempPendingRequestRow& row, const HttpReply& reply)
+   {
+      if (row.owner == HttpServer::service ||
+          row.prevOwners && std::ranges::contains(*row.prevOwners, HttpServer::service))
+      {
+         for (const HttpHeader& header : reply.headers)
+         {
+            if (header.matches("set-cookie"))
+            {
+               check(header.value.starts_with("__Host-"), "Only __Host- cookies are allowed");
+            }
+         }
+      }
+   }
+
    HttpReply error(HttpStatus status, std::string_view msg)
    {
       return {.status      = status,
@@ -413,6 +428,7 @@ void XHttp::sendReply(std::int32_t socket, const HttpReply& result)
       {
          abortMessage(sender.str() + " cannot send a response on socket " + std::to_string(socket));
       }
+      checkResponseHeaders(*row, result);
       owned.remove(*row);
    }
    else
@@ -495,6 +511,7 @@ void XHttp::accept(std::int32_t socket, const psibase::HttpReply& reply)
       {
          abortMessage(sender.str() + " cannot send a response on socket " + std::to_string(socket));
       }
+      checkResponseHeaders(*row, reply);
       owned.remove(*row);
    }
    else
