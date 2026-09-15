@@ -112,5 +112,5 @@ export interface TransactionWithContext {
     isSystem: boolean;
 }
 
-/** The genesis block cannot currently be displayed; the UI always skips it. */
-export const FIRST_VISIBLE_BLOCK = 2;
+/** Genesis is block #2; it cannot currently be displayed, so the UI starts at #3. */
+export const FIRST_VISIBLE_BLOCK = 3;
