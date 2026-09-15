@@ -6,10 +6,8 @@ mod service {
     #[action]
     fn checkAuthSys(
         flags: u32,
-        requester: AccountNumber,
         sender: AccountNumber,
         action: ServiceMethod,
-        allowedActions: Vec<ServiceMethod>,
         claims: Vec<Claim>,
     ) -> bool {
         unimplemented!()
