@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
 import { evaluation } from "@shared/lib/plugins";
 import { Account } from "@shared/lib/schemas/account";
 
@@ -23,7 +23,7 @@ export const getGroups = async (
     owner: Account,
     evaluationId: number,
 ): Promise<Group[]> => {
-    const res = await callGraphqlViaPlugin(
+    const res = await graphqlAuth(
         evaluation.authorized.graphql,
         `{ getGroups(owner: "${owner}", evaluationId: ${evaluationId}) { nodes { owner number evaluationId keySubmitter result } } }`,
     );
