@@ -59,7 +59,7 @@ export const ServicesPage = () => {
         <div className="flex flex-col gap-4">
             <PageHeader
                 title="Services & packages"
-                description="Everything installed on the chain, ranked by live activity"
+                description="Everything installed on the network, ranked by live activity"
                 actions={
                     <Input
                         value={q}

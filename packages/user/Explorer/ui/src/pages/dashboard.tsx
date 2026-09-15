@@ -67,7 +67,7 @@ export const DashboardPage = () => {
                             {networkName || "psibase"} · live explorer
                         </div>
                         <h1 className="text-3xl font-semibold tracking-tight">
-                            Chain overview
+                            Network overview
                         </h1>
                     </div>
                     <div className="text-muted-foreground text-xs">
@@ -165,7 +165,7 @@ export const DashboardPage = () => {
             </div>
 
             <Panel
-                title="Chain heartbeat"
+                title="Network heartbeat"
                 description="One cell per block, colored by producer; height shows transactions carried"
                 actions={
                     <div className="text-muted-foreground flex items-center gap-3 text-[11px]">
