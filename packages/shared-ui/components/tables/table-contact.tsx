@@ -1,38 +1,18 @@
 import { Avatar } from "@shared/components/avatar";
-import { useContacts } from "@shared/hooks/use-contacts";
-import { useCurrentUser } from "@shared/hooks/use-current-user";
-import { useHasProfilesReadPermission } from "@shared/hooks/use-has-profiles-read-permission";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
-export const TableContact = ({ account }: { account: string }) => {
-    const {
-        data: currentUser,
-        isPending: isPendingCurrentUser,
-        isError: isErrorCurrentUser,
-        error: errorCurrentUser,
-    } = useCurrentUser();
-
-    const {
-        data: hasProfilesReadPermission,
-        isPending: isPendingHasProfilesReadPermission,
-        isError: isErrorHasProfilesReadPermission,
-        error: errorHasProfilesReadPermission,
-    } = useHasProfilesReadPermission({
-        enabled: !!currentUser,
-    });
-
-    const {
-        data: contacts,
-        isLoading: isLoadingContacts,
-        isError: isErrorContacts,
-        error: errorContacts,
-    } = useContacts(currentUser, { enabled: !!hasProfilesReadPermission });
-
-    if (
-        isPendingCurrentUser ||
-        isPendingHasProfilesReadPermission ||
-        isLoadingContacts
-    ) {
+export const TableContact = ({
+    account,
+    nickname,
+    isLoading = false,
+    isError = false,
+}: {
+    account: string;
+    nickname?: string | null;
+    isLoading?: boolean;
+    isError?: boolean;
+}) => {
+    if (isLoading) {
         return (
             <div className="@lg:h-auto flex h-10 items-center gap-2">
                 <Skeleton className="@lg:h-5 @lg:w-5 h-8 w-8 shrink-0 rounded-full" />
@@ -41,21 +21,10 @@ export const TableContact = ({ account }: { account: string }) => {
         );
     }
 
-    if (
-        isErrorCurrentUser ||
-        isErrorHasProfilesReadPermission ||
-        isErrorContacts
-    ) {
-        console.error("Error fetching current user:", errorCurrentUser);
-        console.error("Error fetching contacts:", errorContacts);
-        console.error(
-            "Error fetching profiles read permission:",
-            errorHasProfilesReadPermission,
-        );
+    if (isError) {
         return <div>{account}</div>;
     }
 
-    const contact = contacts?.find((contact) => contact.account === account);
     return (
         <div className="@lg:h-auto flex h-10 items-center gap-2">
             <Avatar
@@ -63,9 +32,9 @@ export const TableContact = ({ account }: { account: string }) => {
                 className="@lg:h-5 @lg:w-5 h-8 w-8"
                 alt="Contact avatar"
             />
-            {contact?.nickname ? (
+            {nickname ? (
                 <div className="@lg:flex-row @lg:gap-1 flex flex-col">
-                    <div className="font-medium">{contact.nickname}</div>
+                    <div className="font-medium">{nickname}</div>
                     <div className="text-muted-foreground italic">
                         {account}
                     </div>

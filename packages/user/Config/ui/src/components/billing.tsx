@@ -2,10 +2,10 @@ import { useMemo } from "react";
 
 import { useSetEnableBilling } from "@/hooks/use-set-enable-billing";
 import { useSetFeeReceiverAccount } from "@/hooks/use-set-fee-receiver-account";
+import { useBillingConfig } from "@/hooks/use-billing-config";
 
 import { useAppForm } from "@shared/components/form/app-form";
 import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
-import { useBillingConfig } from "@shared/hooks/use-billing-config";
 import { parseError } from "@shared/lib/parse-error-message";
 import { Button } from "@shared/shadcn/ui/button";
 import { Label } from "@shared/shadcn/ui/label";

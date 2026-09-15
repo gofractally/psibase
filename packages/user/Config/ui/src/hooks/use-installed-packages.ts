@@ -3,19 +3,16 @@ import { useQuery } from "@tanstack/react-query";
 import QueryKey from "@/lib/query-keys";
 import { PackageSchema } from "@/lib/zod/common-package";
 
-import { supervisor } from "@shared/lib/supervisor";
+import { callPluginFunction, config } from "@shared/lib/plugins";
 
 export const useInstalledPackages = () =>
     useQuery({
         queryKey: QueryKey.installedPackages(),
         queryFn: async () => {
-            const result = await supervisor.functionCall({
-                service: "packages",
-                plugin: "plugin",
-                intf: "queries",
-                method: "getInstalledPackages",
-                params: [],
-            });
+            const result = await callPluginFunction(
+                config.packaging.getInstalledPackages,
+                [],
+            );
             return PackageSchema.array().parse(result);
         },
     });

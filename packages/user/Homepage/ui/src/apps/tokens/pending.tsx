@@ -6,6 +6,7 @@ import { Avatar } from "@shared/components/avatar";
 import { ErrorCard } from "@shared/components/error-card";
 import { GlowingCard } from "@shared/components/glowing-card";
 import { useContacts } from "@shared/hooks/use-contacts";
+import { homepage } from "@shared/lib/plugins";
 import { cn } from "@shared/lib/utils";
 import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import {
@@ -155,7 +156,7 @@ const CellCounterparty = ({
     counterParty: string;
     currentUser: string | null;
 }) => {
-    const { data: contacts } = useContacts(currentUser);
+    const { data: contacts } = useContacts(homepage.contacts.get, currentUser);
     const contact = contacts?.find(
         (contact) => contact.account === counterParty,
     );

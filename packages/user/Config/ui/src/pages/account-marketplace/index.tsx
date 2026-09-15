@@ -5,6 +5,11 @@ import { useCallback, useEffect, useMemo } from "react";
 import { useConfiguredNameMarkets } from "@/hooks/name-markets/use-configured-markets";
 import { useSaveNameMarkets } from "@/hooks/name-markets/use-save-name-markets";
 import {
+    ACCOUNT_MARKETS_REFETCH_INTERVAL_MS,
+    useAccountMarkets,
+} from "@/hooks/use-account-markets";
+import { useSystemToken } from "@/hooks/use-system-token";
+import {
     type NameMarketFormRow,
     buildNameMarketsFormValues,
     validateDirtyMarkets,
@@ -14,11 +19,6 @@ import { scrollToFirstMarketFieldError } from "@/lib/name-market-validation-ui";
 import { useAppForm } from "@shared/components/form/app-form";
 import { LivePrice } from "@shared/components/live-price";
 import { PageContainer } from "@shared/components/page-container";
-import {
-    ACCOUNT_MARKETS_REFETCH_INTERVAL_MS,
-    useAccountMarkets,
-} from "@shared/hooks/use-account-markets";
-import { useSystemToken } from "@shared/hooks/use-system-token";
 import {
     MAX_ACCOUNT_NAME_LENGTH,
     MIN_ACCOUNT_NAME_LENGTH,

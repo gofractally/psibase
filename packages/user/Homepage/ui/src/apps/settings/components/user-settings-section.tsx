@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { useBillingConfig } from "@shared/hooks/use-billing-config";
+import { useBillingConfig } from "@/hooks/use-billing-config";
+import { useSystemToken } from "@/hooks/use-system-token";
+
 import { useCurrentUser } from "@shared/hooks/use-current-user";
-import { useSystemToken } from "@shared/hooks/use-system-token";
 import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";

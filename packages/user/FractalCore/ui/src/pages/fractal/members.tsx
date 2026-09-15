@@ -7,8 +7,8 @@ import { paths } from "@/lib/paths";
 
 import { GlowingCard } from "@shared/components/glowing-card";
 import { PageContainer } from "@shared/components/page-container";
-import { ShowContactsButton } from "@shared/components/show-contacts-button";
-import { TableContact } from "@shared/components/tables/table-contact";
+import { ShowContactsButton } from "@/components/show-contacts-button";
+import { TableContact } from "@/components/table-contact";
 import { COUNCIL_SEATS } from "@shared/domains/fractal/lib/constants";
 import { Badge } from "@shared/shadcn/ui/badge";
 import {
@@ -68,9 +68,7 @@ export const Members = () => {
                             {sortedMembers?.map((member, index) => (
                                 <TableRow key={member.account}>
                                     <TableCell className="font-medium">
-                                        <TableContact
-                                            account={member.account}
-                                        />
+                                        <TableContact account={member.account} />
                                     </TableCell>
                                     <TableCell className="flex items-center gap-2">
                                         {index < COUNCIL_SEATS && (

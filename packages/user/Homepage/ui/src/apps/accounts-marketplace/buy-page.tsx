@@ -2,15 +2,15 @@ import { useMemo } from "react";
 
 import { AccountMarketsCard } from "@/apps/accounts-marketplace/components/account-markets-card";
 import { BuyForm } from "@/apps/accounts-marketplace/components/buy-form";
-
-import { ErrorCard } from "@shared/components/error-card";
-import { GlowingCard } from "@shared/components/glowing-card";
 import {
     ACCOUNT_MARKETS_REFETCH_INTERVAL_MS,
     useAccountMarkets,
-} from "@shared/hooks/use-account-markets";
-import { useCanBuyAccount } from "@shared/hooks/use-can-buy-account";
-import { useSystemToken } from "@shared/hooks/use-system-token";
+} from "@/hooks/use-account-markets";
+import { useCanBuyAccount } from "@/hooks/use-can-buy-account";
+import { useSystemToken } from "@/hooks/use-system-token";
+
+import { ErrorCard } from "@shared/components/error-card";
+import { GlowingCard } from "@shared/components/glowing-card";
 import { MAX_ACCOUNT_NAME_LENGTH } from "@shared/lib/schemas/account";
 import { accountMarketPricesFromOverview } from "@shared/lib/schemas/account-markets";
 import {

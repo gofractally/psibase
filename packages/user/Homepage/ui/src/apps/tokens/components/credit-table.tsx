@@ -11,7 +11,7 @@ import { Loading } from "@/components/loading";
 
 import { ErrorCard } from "@shared/components/error-card";
 import { GlowingCard } from "@shared/components/glowing-card";
-import { TableContact } from "@shared/components/tables/table-contact";
+import { TableContact } from "@/components/table-contact";
 import { cn } from "@shared/lib/utils";
 import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import {

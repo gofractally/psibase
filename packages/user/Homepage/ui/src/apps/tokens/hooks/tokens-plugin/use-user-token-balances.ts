@@ -6,7 +6,7 @@ import { fetchTokenMeta } from "@/apps/tokens/lib/graphql/ui";
 import QueryKey from "@/lib/query-keys";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
-import { fetchUserTokenBalances } from "@shared/lib/graphql/tokens";
+import { callPluginFunction, homepage } from "@shared/lib/plugins";
 import { Quantity } from "@shared/lib/quantity";
 import { queryClient } from "@shared/lib/query-client";
 import { type Account, zAccount } from "@shared/lib/schemas/account";
@@ -30,7 +30,10 @@ export const useUserTokenBalances = (
         queryKey: QueryKey.userTokenBalances(username),
         enabled: !!username,
         queryFn: async () => {
-            const res = await fetchUserTokenBalances(zAccount.parse(username));
+            const res = await callPluginFunction(
+                homepage.tokens.getUserBalances,
+                [zAccount.parse(username)],
+            );
 
             // TODO: Remove this once token settings comes back from `fetchUserTokenBalances`
             const tokenMetaPromises = res.map(async (balance) => {
@@ -49,7 +52,7 @@ export const useUserTokenBalances = (
 
                 return {
                     id: balance.tokenId,
-                    symbol: balance.symbol,
+                    symbol: balance.symbol ?? null,
                     precision: quan.precision,
                     label: quan.getDisplayLabel(),
                     balance: quan,

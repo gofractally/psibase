@@ -2,8 +2,8 @@ import { type SidebarVisibility } from "@/app-config";
 
 import { useNameEvents } from "@/apps/accounts-marketplace/hooks/use-name-events";
 import { NAME_EVENTS_EXISTENCE_PAGE_SIZE } from "@/apps/accounts-marketplace/lib/graphql/namemarket-api";
+import { useAccountMarkets } from "@/hooks/use-account-markets";
 
-import { useAccountMarkets } from "@shared/hooks/use-account-markets";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { hasActiveAccountMarket } from "@shared/lib/schemas/account-markets";
 

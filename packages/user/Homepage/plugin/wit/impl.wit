@@ -2,12 +2,27 @@ package homepage:plugin;
 
 world impl {
     include host:crypto/imports;
+    include host:types/imports;
     import transact:plugin/intf;
     import auth-sig:plugin/keyvault;
     import auth-sig:plugin/actions;
-    import name-market:plugin/api;
-
     import accounts:plugin/api;
+    include name-market:plugin/imports;
+    include tokens:plugin/imports;
+    import profiles:plugin/api;
+    import profiles:plugin/contacts;
+    include chainmail:plugin/imports;
+    include invite:plugin/imports;
+    include virtual-server:plugin/imports;
+    include token-swap:plugin/imports;
 
     export name-market;
+    export tokens;
+    export contacts;
+    export chainmail;
+    export invite;
+    export vserver;
+    export swap;
+    export liquidity;
+    export token-swap;
 }

@@ -9,9 +9,9 @@ export const useRejectStaged = () => {
 
     return usePluginMutation<[number]>(
         {
-            intf: "respondent",
+            intf: "staged",
             method: "reject",
-            service: "staged-tx",
+            service: "config",
         },
         {
             error: "Failed rejecting proposal",

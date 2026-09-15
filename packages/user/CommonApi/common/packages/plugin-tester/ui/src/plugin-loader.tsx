@@ -66,7 +66,6 @@ export function PluginLoader({ supervisor }: { supervisor: Supervisor }) {
             <ServiceInput
                 service={service}
                 plugin={plugin}
-                onServiceChange={setService}
                 onPluginChange={setPlugin}
                 onLoad={() => {
                     clearSchema();

@@ -4,9 +4,6 @@ import { useMemo } from "react";
 import { siblingUrl } from "@psibase/common-lib";
 
 import { useBranding } from "@shared/hooks/use-branding";
-import { useContacts } from "@shared/hooks/use-contacts";
-import { useCurrentUser } from "@shared/hooks/use-current-user";
-import { useHasProfilesReadPermission } from "@shared/hooks/use-has-profiles-read-permission";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -20,24 +17,20 @@ import {
 } from "@shared/shadcn/ui/alert-dialog";
 import { Button } from "@shared/shadcn/ui/button";
 
-export const ShowContactsButton = ({ returnPath }: { returnPath?: string }) => {
+export const ShowContactsButton = ({
+    hasReadPermission,
+    onRequestPermission,
+}: {
+    hasReadPermission: boolean | undefined;
+    onRequestPermission: () => void;
+}) => {
     const { data: networkName } = useBranding();
     const contactsUrl = useMemo(
         () => siblingUrl(null, networkName, "contacts"),
         [networkName],
     );
 
-    const { data: currentUser } = useCurrentUser();
-    const { data: hasProfilesReadPermission } = useHasProfilesReadPermission({
-        enabled: !!currentUser,
-    });
-    const { refetch: prompt } = useContacts(
-        currentUser,
-        { enabled: false },
-        returnPath ? { enabled: true, returnPath } : undefined,
-    );
-
-    if (hasProfilesReadPermission === false) {
+    if (hasReadPermission === false) {
         return (
             <AlertDialog>
                 <AlertDialogTrigger asChild>
@@ -66,7 +59,7 @@ export const ShowContactsButton = ({ returnPath }: { returnPath?: string }) => {
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => prompt()}>
+                        <AlertDialogAction onClick={onRequestPermission}>
                             Continue
                         </AlertDialogAction>
                     </AlertDialogFooter>
