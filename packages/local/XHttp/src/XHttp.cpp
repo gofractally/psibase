@@ -36,11 +36,6 @@ namespace
 
    using Temporary = TemporaryTables<TempPendingRequestTable, TempResponseHandlerTable>;
 
-   bool matches(psio::view<const HttpHeader> header, std::string_view h)
-   {
-      return iequal(header.name(), h);
-   }
-
    std::string_view getRootHost(std::string_view host)
    {
       static std::vector<std::string> hosts = to<XAdmin>().options().hosts;
@@ -85,10 +80,10 @@ namespace
           info);
    }
 
-   std::string getUrl(psio::view<const HttpRequest> req,
-                      std::int32_t                  socket,
-                      std::string_view              rootHost,
-                      std::optional<AccountNumber>  subdomain = {})
+   std::string getUrl(const HttpRequest&           req,
+                      std::int32_t                 socket,
+                      std::string_view             rootHost,
+                      std::optional<AccountNumber> subdomain = {})
    {
       std::string              location;
       std::optional<SocketRow> socketRow;
@@ -96,7 +91,7 @@ namespace
       {
          socketRow = Native::session(KvMode::read).open<SocketTable>().get(socket);
       }
-      if (auto proto = forwardedProto(req.unpack()))
+      if (auto proto = forwardedProto(req))
          location += *proto + "://";
       else if (hasTls(socketRow.value().info))
          location += "https://";
@@ -108,26 +103,36 @@ namespace
          location += '.';
       }
       location += rootHost;
-      for (auto header : req.headers())
+      if (auto host = req.getHeader("host"))
       {
-         if (matches(header, "host"))
+         if (auto pos = host->rfind(':'); pos != std::string::npos)
          {
-            std::string_view host = header.value();
-            if (auto pos = host.rfind(':'); pos != std::string::npos)
+            if (host->find(']', pos) == std::string::npos)
             {
-               if (host.find(']', pos) == std::string::npos)
-               {
-                  location.append(host.substr(pos));
-               }
+               location.append(host->substr(pos));
             }
-            break;
          }
       }
       if (subdomain)
          location += '/';
       else
-         location += req.target();
+         location += req.target;
       return location;
+   }
+
+   void checkResponseHeaders(const TempPendingRequestRow& row, const HttpReply& reply)
+   {
+      if (row.owner == HttpServer::service ||
+          row.prevOwners && std::ranges::contains(*row.prevOwners, HttpServer::service))
+      {
+         for (const HttpHeader& header : reply.headers)
+         {
+            if (header.matches("set-cookie"))
+            {
+               check(header.value.starts_with("__Host-"), "Only __Host- cookies are allowed");
+            }
+         }
+      }
    }
 
    HttpReply error(HttpStatus status, std::string_view msg)
@@ -151,10 +156,9 @@ namespace
       return result;
    }
 
-   void sendNotFound(std::int32_t sock, psio::view<const HttpRequest> req)
+   void sendNotFound(std::int32_t sock, const HttpRequest& req)
    {
-      auto reply =
-          error(HttpStatus::notFound, "The resource '" + req.target().unpack() + "' was not found");
+      auto reply = error(HttpStatus::notFound, "The resource '" + req.target + "' was not found");
       psibase::socketSend(sock, psio::to_frac(std::move(reply)));
    }
 
@@ -424,6 +428,7 @@ void XHttp::sendReply(std::int32_t socket, const HttpReply& result)
       {
          abortMessage(sender.str() + " cannot send a response on socket " + std::to_string(socket));
       }
+      checkResponseHeaders(*row, result);
       owned.remove(*row);
    }
    else
@@ -506,6 +511,7 @@ void XHttp::accept(std::int32_t socket, const psibase::HttpReply& reply)
       {
          abortMessage(sender.str() + " cannot send a response on socket " + std::to_string(socket));
       }
+      checkResponseHeaders(*row, reply);
       owned.remove(*row);
    }
    else
@@ -603,8 +609,8 @@ bool XHttp::isSecure(int32_t socket)
    return hasTls(socketRow.value().info);
 }
 
-auto XHttp::serveSys(HttpRequest                 req,
-                     std::optional<std::int32_t> socket) -> std::optional<HttpReply>
+auto XHttp::serveSys(HttpRequest req, std::optional<std::int32_t> socket)
+    -> std::optional<HttpReply>
 {
    check(getSender() == XHttp::service, "Wrong sender");
 
@@ -640,8 +646,8 @@ auto XHttp::serveSys(HttpRequest                 req,
       if (req.contentType != "application/json")
          return error(HttpStatus::unsupportedMediaType, "Content-Type must be application/json");
 
-      auto service = psio::convert_from_json<AccountNumber>(
-          std::string(req.body.begin(), req.body.end()));
+      auto service =
+          psio::convert_from_json<AccountNumber>(std::string(req.body.begin(), req.body.end()));
       PSIBASE_SUBJECTIVE_TX
       {
          auto serverTable = open<RegServTable>();
@@ -660,13 +666,13 @@ auto XHttp::serveSys(HttpRequest                 req,
 extern "C" [[clang::export_name("serve")]] void serve()
 {
    auto act                    = getCurrentActionView();
-   psibase::internal::receiver = XHttp::service;
+   psibase::internal::receiver = act->service();
 
-   auto [sockview, req] = psio::view<const std::tuple<std::int32_t, HttpRequest>>(act->rawData());
-   auto sock            = sockview.unpack();
+   auto [sock, req] = psio::from_frac<std::tuple<std::int32_t, HttpRequest>>(act->rawData());
+   act.reset();
 
-   auto owned    = Temporary{act->service(), KvMode::readWrite}.open<TempPendingRequestTable>();
-   auto rootHost = getRootHost(req.host());
+   auto owned    = Temporary{getReceiver(), KvMode::readWrite}.open<TempPendingRequestTable>();
+   auto rootHost = getRootHost(req.host);
 
    if (rootHost.empty())
    {
@@ -674,7 +680,7 @@ extern "C" [[clang::export_name("serve")]] void serve()
       return;
    }
 
-   if (auto service = XHttp::getService(req.host(), rootHost); service != AccountNumber{})
+   if (auto service = XHttp::getService(req.host, rootHost); service != AccountNumber{})
    {
       auto codeTable   = Native::subjective(KvMode::read).open<CodeTable>();
       auto serverTable = XHttp{}.open<RegServTable>();
@@ -696,14 +702,14 @@ extern "C" [[clang::export_name("serve")]] void serve()
       {
          owned.put({.socket = sock, .owner = server->server});
          reply = psibase::Actor<ServerInterface>(XHttp::service, server->server)
-                     .serveSys(req.unpack(), std::optional{sock}, std::nullopt);
+                     .serveSys(req, std::optional{sock}, std::nullopt);
          if (!owned.get(sock))
             return;
       }
       // Local services try x-sites
       if (!reply && code && !(code->flags & CodeRow::isReplacement))
       {
-         if (service == XAdmin::service && std::string_view{req.target()}.starts_with("/native/"))
+         if (service == XAdmin::service && std::string_view{req.target}.starts_with("/native/"))
          {
             return;
          }
@@ -715,7 +721,7 @@ extern "C" [[clang::export_name("serve")]] void serve()
          {
             owned.put({.socket = sock, .owner = XSites::service});
             reply = psibase::Actor<ServerInterface>(XHttp::service, XSites::service)
-                        .serveSys(req.unpack(), std::optional{sock}, std::nullopt);
+                        .serveSys(req, std::optional{sock}, std::nullopt);
 
             if (!owned.get(sock))
                return;
@@ -733,14 +739,14 @@ extern "C" [[clang::export_name("serve")]] void serve()
          return;
       }
    }
-   else if (rootHost != req.host())
+   else if (rootHost != req.host)
    {
       if (!rootHost.empty())
       {
          std::string location = getUrl(req, sock, rootHost);
-         auto        reply    = redirect(HttpStatus::found,
-                                         R"(<html><body>This psibase server is hosted at {}.</body></html>)",
-                                         location);
+         auto reply = redirect(HttpStatus::found,
+                               R"(<html><body>This psibase server is hosted at {}.</body></html>)",
+                               location);
          psibase::socketSend(sock, psio::to_frac(std::move(reply)));
       }
       else
@@ -750,7 +756,7 @@ extern "C" [[clang::export_name("serve")]] void serve()
       return;
    }
 
-   if (std::string_view{req.target()}.starts_with("/native/"))
+   if (std::string_view{req.target}.starts_with("/native/"))
    {
       sendNotFound(sock, req);
       return;
@@ -758,7 +764,7 @@ extern "C" [[clang::export_name("serve")]] void serve()
 
    if (!chainIsBooted())
    {
-      if (req.method() == "GET" || req.method() == "HEAD")
+      if (req.method == "GET" || req.method == "HEAD")
       {
          std::string location = getUrl(req, sock, rootHost, XAdmin::service);
          auto        reply    = redirect(
@@ -778,11 +784,9 @@ extern "C" [[clang::export_name("serve")]] void serve()
    }
 
    // Forward other requests to HttpServer
+   req.removeCookies([](std::string_view name) { return !name.starts_with("__Host-"); });
    owned.put({.socket = sock, .owner = HttpServer::service});
-   act->sender()  = XHttp::service;
-   act->service() = HttpServer::service;
-   act->method()  = MethodNumber("serve");
-   psibase::call(act.data(), act.size());
+   to<HttpServer>().serve(sock, req);
 }  // serve()
 
 #endif
