@@ -48,13 +48,16 @@ namespace psibase
       /// block signatures
       blockProof,
 
+      /// [[doc(hidden)]]
       /// Not accessible to WASM. During joint consensus, this holds a
       /// subset of native as of the last irreversible block. Outside
       /// joint consensus, it is empty.
       prevAuthServices,
 
+      /// [[doc(hidden)]]
       numChainDatabases,
 
+      /// [[doc(hidden)]]
       beginIndependent = 64,
 
       /// Data that is not part of consensus
@@ -76,6 +79,7 @@ namespace psibase
       /// blocks.
       nativeSubjective,
 
+      /// [[doc(hidden)]]
       endPersistent,
 
       /// Data that is not part of consensus and is not preserved when the server exits
@@ -84,10 +88,11 @@ namespace psibase
       /// Native subjective tables that are not preserved when the server exits
       nativeSession,
 
+      /// [[doc(hidden)]]
       endIndependent,
 
       /// Subjective tables that are local to the transaction/query/callback
-      /// context.
+      /// context
       temporary = endIndependent,
    };
 

@@ -2,6 +2,7 @@
 
 #include <openssl/ec.h>
 #include <openssl/evp.h>
+#include <openssl/kdf.h>
 
 // Some C++ wrappers for OpenSSL
 
@@ -13,6 +14,9 @@ namespace psibase
       void operator()(EVP_MD_CTX* ctx) const { EVP_MD_CTX_free(ctx); }
       void operator()(EVP_PKEY* key) const { EVP_PKEY_free(key); }
       void operator()(EVP_PKEY_CTX* ctx) const { EVP_PKEY_CTX_free(ctx); }
+      void operator()(EVP_KDF* kdf) const { EVP_KDF_free(kdf); }
+      void operator()(EVP_KDF_CTX* ctx) const { EVP_KDF_CTX_free(ctx); }
+      void operator()(EVP_CIPHER_CTX* ctx) const { EVP_CIPHER_CTX_free(ctx); }
       void operator()(ECDSA_SIG* sig) const { ECDSA_SIG_free(sig); }
       void operator()(BIGNUM* bn) const { BN_free(bn); }
       void operator()(ASN1_OCTET_STRING* s) const { ASN1_OCTET_STRING_free(s); }

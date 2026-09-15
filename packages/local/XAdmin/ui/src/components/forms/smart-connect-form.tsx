@@ -1,7 +1,3 @@
-import { queryKeys } from "@/lib/query-keys";
-
-import { queryClient } from "@shared/lib/query-client";
-
 import { Schema, UrlForm } from "../../components/forms/url";
 import { useToast } from "../../components/ui/use-toast";
 import { useConnect } from "../../hooks/use-connect";
@@ -16,7 +12,6 @@ export const SmartConnectForm = ({ onConnection }: Props) => {
 
     const onSubmit = async (data: Schema) => {
         const res = await connect(data);
-        queryClient.invalidateQueries({ queryKey: queryKeys.config });
         toast({
             title: "Success",
             description: `Connected to ${res.urls[0] || res.endpoint}.`,

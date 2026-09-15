@@ -99,7 +99,7 @@ bool WebSocket::handleP2P()
       }
       else if (p2pState == P2PState::reading)
       {
-         p2pState == P2PState::messageReady;
+         p2pState = P2PState::messageReady;
          return true;
       }
    }

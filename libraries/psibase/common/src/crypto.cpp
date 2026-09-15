@@ -4,9 +4,6 @@
 
 #include <openssl/sha.h>
 #include <psibase/check.hpp>
-#include <psio/from_bin.hpp>
-#include <psio/psio_ripemd160.hpp>
-#include <psio/to_bin.hpp>
 
 namespace psibase
 {

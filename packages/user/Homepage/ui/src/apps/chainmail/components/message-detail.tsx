@@ -2,21 +2,13 @@ import type { DraftMessage, Mailbox, Message } from "@/apps/chainmail/types";
 
 import { ArrowLeft, Trash2 } from "lucide-react";
 
-// import { AwaitTime } from "@/globals";
-// import { wait } from "@/lib/wait";
-
-import {
-    // useArchiveMessage,
-    useDraftMessages,
-    // useIncomingMessages,
-    // useInvalidateMailboxQueries,
-    // useSaveMessage,
-} from "@/apps/chainmail/hooks/use-mail";
+import { useDraftMessages } from "@/apps/chainmail/hooks/use-mail";
 import { formatDate } from "@/apps/chainmail/utils";
 
-import { Avatar } from "@shared/shadcn/ui/avatar";
+import { Avatar } from "@shared/components/avatar";
 import { Button } from "@shared/shadcn/ui/button";
 import { ScrollArea } from "@shared/shadcn/ui/scroll-area";
+import { Separator } from "@shared/shadcn/ui/separator";
 import { toast } from "@shared/shadcn/ui/sonner";
 import {
     Tooltip,
@@ -41,59 +33,6 @@ export function MessageDetail({
     mailbox,
     onBack,
 }: MessageDetailProps) {
-    // const invalidateMailboxQueries = useInvalidateMailboxQueries();
-
-    // const { setSelectedMessageId: setInboxMessageId } = useIncomingMessages();
-    // const { mutateAsync: archiveMessage } = useArchiveMessage();
-    // const { mutateAsync: saveMessage } = useSaveMessage();
-
-    // const onArchive = async (message: Message) => {
-    //     if (message.type === "outgoing") {
-    //         return toast.error(
-    //             "Archiving sent messages is currently not supported.",
-    //         );
-    //     }
-
-    //     const loadingId = toast.loading("Archiving message");
-
-    //     try {
-    //         // TODO: Improve error detection. This promise resolves with success before the transaction is pushed.
-    //         await archiveMessage(message.msgId);
-    //         setInboxMessageId("");
-    //         toast.success("Your message has been archived");
-    //         await wait(AwaitTime);
-    //         invalidateMailboxQueries();
-    //     } catch (error) {
-    //         toast.error("There was a problem archiving this message.");
-    //     } finally {
-    //         toast.dismiss(loadingId);
-    //     }
-    // };
-
-    // const onUnArchive = async (itemId: string) => {
-    //     toast.error("Not implemented");
-    // };
-
-    // const onSave = async (message: Message) => {
-    //     if (message.type === "outgoing") {
-    //         return toast.error(
-    //             "Saving sent messages is currently not supported.",
-    //         );
-    //     }
-
-    //     const loadingId = toast.loading("Saving message");
-
-    //     try {
-    //         await saveMessage(message.msgId);
-    //         toast.success("This message will be kept");
-    //         await wait(AwaitTime);
-    //         invalidateMailboxQueries();
-    //     } catch (error) {
-    //         toast.error("There was a problem. Your message was not saved.");
-    //     } finally {
-    //         toast.dismiss(loadingId);
-    //     }
-    // };
     const {
         selectedMessage: selectedDraftMessage,
         setSelectedMessageId: setDraftMessageId,
@@ -102,7 +41,7 @@ export function MessageDetail({
 
     if (!message) return null;
 
-    const account = mailbox === "inbox" ? message.from : message.to;
+    const primaryAccount = mailbox === "inbox" ? message.from : message.to;
 
     const onDeleteDraft = () => {
         setDraftMessageId("");
@@ -112,50 +51,22 @@ export function MessageDetail({
     };
 
     return (
-        <div className="flex h-full w-full flex-col">
-            {/* Header with back button on mobile */}
-            <div className="flex items-center gap-2 border-b p-4">
-                {onBack && (
-                    <Button variant="ghost" size="icon" onClick={onBack}>
-                        <ArrowLeft className="h-5 w-5" />
+        <div className="flex h-full w-full min-h-0 flex-col">
+            <div className="border-border flex items-center gap-2 border-b px-4 py-3">
+                {onBack ? (
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={onBack}
+                        aria-label="Back to message list"
+                    >
+                        <ArrowLeft className="size-5" />
                     </Button>
-                )}
-                <h2 className="flex-1 text-lg font-semibold">
-                    {message.subject}
+                ) : null}
+                <h2 className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight">
+                    {message.subject || "(No subject)"}
                 </h2>
-                <div className="flex gap-1">
-                    {/* {(mailbox === "inbox" || mailbox === "saved") && (
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    disabled={!message}
-                                    onClick={() => onArchive(message)}
-                                >
-                                    <Archive className="h-5 w-5" />
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Archive message</TooltipContent>
-                        </Tooltip>
-                    )}
-                    {(mailbox === "inbox" || mailbox === "archived") && (
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    disabled={!message}
-                                    onClick={() => onSave(message)}
-                                >
-                                    <Pin className="h-5 w-5" />
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                Keep message and move to Saved mailbox
-                            </TooltipContent>
-                        </Tooltip>
-                    )} */}
+                <div className="flex shrink-0 gap-1">
                     {mailbox === "drafts" ? (
                         <>
                             <ComposeDialog
@@ -169,8 +80,9 @@ export function MessageDetail({
                                         size="icon"
                                         disabled={!message}
                                         onClick={onDeleteDraft}
+                                        aria-label="Delete draft"
                                     >
-                                        <Trash2 className="h-5 w-5" />
+                                        <Trash2 className="size-5" />
                                     </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>Delete draft</TooltipContent>
@@ -180,35 +92,55 @@ export function MessageDetail({
                 </div>
             </div>
 
-            {/* Message content */}
-            <ScrollArea className="flex-1">
-                <div className="p-4">
-                    <div className="mb-6 flex items-start justify-between">
-                        <div className="flex gap-3">
-                            <Avatar className="h-10 w-10">
-                                <div className="bg-primary text-primary-foreground flex h-full w-full items-center justify-center">
-                                    {account.charAt(0)}
+            <ScrollArea className="min-h-0 flex-1">
+                <div className="space-y-6 p-4 sm:p-6">
+                    <div className="flex items-start justify-between gap-4">
+                        <div className="flex min-w-0 gap-3">
+                            <Avatar
+                                account={primaryAccount}
+                                className="size-10 shrink-0"
+                                alt={`${primaryAccount} avatar`}
+                            />
+                            <div className="min-w-0 space-y-1">
+                                <div className="space-y-0.5 text-sm">
+                                    <p>
+                                        <span className="text-muted-foreground">
+                                            From{" "}
+                                        </span>
+                                        <span className="font-medium">
+                                            {message.from}
+                                        </span>
+                                    </p>
+                                    <p>
+                                        <span className="text-muted-foreground">
+                                            To{" "}
+                                        </span>
+                                        <span className="font-medium">
+                                            {message.to}
+                                        </span>
+                                    </p>
                                 </div>
-                            </Avatar>
-                            <div>
-                                <p className="font-medium">{account}</p>
-                                <p className="text-muted-foreground mt-1 text-xs">
+                                <p className="text-muted-foreground text-xs">
                                     {formatDate(message.datetime)}
                                 </p>
                             </div>
                         </div>
-                        {mailbox !== "drafts" && mailbox !== "sent" && (
+                        {mailbox !== "drafts" && mailbox !== "sent" ? (
                             <ComposeDialog
                                 trigger={<ReplyDialogTrigger />}
                                 message={message}
                             />
-                        )}
+                        ) : null}
                     </div>
 
-                    <article className="prose dark:prose-invert max-w-none">
-                        {message.body.split("\n\n").map((paragraph, i) => (
-                            <p key={i}>{paragraph}</p>
-                        ))}
+                    <Separator />
+
+                    <article className="prose dark:prose-invert max-w-none text-sm leading-relaxed whitespace-pre-wrap">
+                        {message.body || (
+                            <span className="text-muted-foreground italic">
+                                No message body
+                            </span>
+                        )}
                     </article>
                 </div>
             </ScrollArea>

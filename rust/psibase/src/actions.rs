@@ -23,7 +23,11 @@ pub fn preapprove_action(sender: AccountNumber, account: AccountNumber) -> Optio
 }
 
 pub fn new_account_action(sender: AccountNumber, account: AccountNumber) -> Action {
-    accounts::Wrapper::pack_from(sender).newAccount(account, account!("auth-any"), false)
+    accounts::Wrapper::pack_from(sender).newAccount(
+        account,
+        account!("auth-any"),
+        accounts::NewAccountMode::KEEP_EXISTING,
+    )
 }
 
 pub fn new_account_key_action(
@@ -43,7 +47,11 @@ pub fn new_account_owned_action(
     account: AccountNumber,
     owner: AccountNumber,
 ) -> Action {
-    auth_delegate::Wrapper::pack_from(sender).newAccount(account, owner, true)
+    auth_delegate::Wrapper::pack_from(sender).newAccount(
+        account,
+        owner,
+        accounts::NewAccountMode::MATCH_EXISTING,
+    )
 }
 
 pub fn set_key_action(account: AccountNumber, key: &AnyPublicKey) -> Action {

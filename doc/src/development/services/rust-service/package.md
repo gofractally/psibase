@@ -40,7 +40,7 @@ package-name = "example"
 services = ["service1"]
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.26.0"
+HttpServer = "0.29.0"
 ```
 
 ./service/Cargo.toml
@@ -60,6 +60,6 @@ server = "service1"
 plugin = "service1-plugin"
 # Upload the UI
 data = [{src = "../ui/dist", dst = "/"}]
-# Run the service's init action; "0000" represents <no args> from the Fracpack perspective.
-postinstall = [{sender="service1", service="service1", method="init", rawData="0000"}]
+# Run the service's init action.
+postinstall = [{sender="service1", service="service1", method="init", data={}}]
 ```

@@ -11,7 +11,6 @@
 #pragma GCC diagnostic ignored "-Wunused-local-typedef"
 #pragma GCC diagnostic ignored "-Wignored-qualifiers"
 #pragma GCC diagnostic ignored "-Wambiguous-reversed-operator"
-#include <psio/bytes.hpp>
 #include <psio/fracpack.hpp>
 #include <psio/shared_view_ptr.hpp>
 #pragma GCC diagnostic pop
@@ -33,11 +32,11 @@
       using psio::from_json;                                      \
       from_json(obj.value, stream);                               \
    }                                                              \
-   inline auto& clio_unwrap_packable(Name& obj)                   \
+   inline auto& psio_unwrap_packable(Name& obj)                   \
    {                                                              \
       return obj.value;                                           \
    }                                                              \
-   inline const auto& clio_unwrap_packable(const Name& obj)       \
+   inline const auto& psio_unwrap_packable(const Name& obj)       \
    {                                                              \
       return obj.value;                                           \
    }

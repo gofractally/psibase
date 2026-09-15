@@ -28,23 +28,11 @@ export const chainMailConfig = defineAppConfig({
             name: "Drafts",
             icon: <PencilLine className="h-6 w-6" />,
         },
-        // {
-        //     path: "saved",
-        //     element: <SavedPage />,
-        //     name: "Saved",
-        //     icon: <Pin className="h-6 w-6" />,
-        // },
         {
             path: "sent",
             element: <SentPage />,
             name: "Sent",
             icon: <Send className="h-6 w-6" />,
         },
-        // {
-        //     path: "archived",
-        //     element: <ArchivePage />,
-        //     name: "Archived",
-        //     icon: <Archive className="h-6 w-6" />,
-        // },
     ],
 });

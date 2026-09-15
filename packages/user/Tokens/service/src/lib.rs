@@ -248,21 +248,51 @@ pub mod service {
         SharedBalance::get_or_new(creditor, debitor, token_id).balance
     }
 
-    /// Recalls an amount of tokens from a user's balance and burns them
+    /// Recalls an amount of tokens from a user's primary or sub-account balance and burns them
+    ///
+    /// Only the token owner can recall tokens, and only if the token is not marked as unrecallable.
+    ///
+    /// # Arguments
+    /// * `token_id`    - Unique token identifier
+    /// * `from`        - User account from which to recall
+    /// * `amount`      - Amount of tokens to recall
+    /// * `memo`        - Memo
+    /// * `sub_account` - If specified, recall from this sub-account of `from`
+    #[action]
+    fn recall(
+        token_id: TID,
+        from: AccountNumber,
+        amount: Quantity,
+        memo: Memo,
+        sub_account: Option<String>,
+    ) {
+        Token::get_assert(token_id).recall(amount, from, sub_account);
+        emit_recall(token_id, from, amount, memo);
+    }
+
+    /// Recalls an amount of tokens from a shared balance and burns them
     ///
     /// Only the token owner can recall tokens, and only if the token is not marked as unrecallable.
     ///
     /// # Arguments
     /// * `token_id` - Unique token identifier
-    /// * `from`     - User account from which to recall
+    /// * `creditor` - Account that credited the tokens
+    /// * `debitor`  - Account that received the credit
     /// * `amount`   - Amount of tokens to recall
     /// * `memo`     - Memo
     #[action]
-    fn recall(token_id: TID, from: AccountNumber, amount: Quantity, memo: Memo) {
-        let mut token = Token::get_assert(token_id);
+    fn recallShared(
+        token_id: TID,
+        creditor: AccountNumber,
+        debitor: AccountNumber,
+        amount: Quantity,
+        memo: Memo,
+    ) {
+        Token::get_assert(token_id).recall_shared(amount, creditor, debitor);
+        emit_recall(token_id, creditor, amount, memo);
+    }
 
-        token.recall(amount, from);
-
+    fn emit_recall(token_id: TID, from: AccountNumber, amount: Quantity, memo: Memo) {
         let actor = get_sender();
         let recalled = "recalled".to_string();
         let amount = fmt_amount(token_id, amount);
@@ -274,7 +304,7 @@ pub mod service {
             actor, // In this exceptional case, the actor is the counterparty
             recalled.clone(),
             amount.clone(),
-            memo.clone(),
+            memo,
         );
 
         event.supplyChanged(
@@ -388,18 +418,7 @@ pub mod service {
     /// * `memo`     - Memo
     #[action]
     fn uncredit(token_id: TID, debitor: AccountNumber, amount: Quantity, memo: Memo) {
-        let creditor = get_sender();
-
-        SharedBalance::get_assert(creditor, debitor, token_id).uncredit(amount);
-
-        Wrapper::emit().history().balChanged(
-            token_id,
-            creditor,
-            debitor,
-            "uncredited".to_string(),
-            fmt_amount(token_id, amount),
-            memo,
-        );
+        SharedBalance::get_assert(get_sender(), debitor, token_id).uncredit(amount, memo);
     }
 
     /// Debit tokens that were credited into a shared balance

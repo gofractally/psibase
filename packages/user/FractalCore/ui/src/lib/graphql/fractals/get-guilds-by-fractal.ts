@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { GUILDS_SERVICE } from "@shared/domains/fractal/lib/constants";
-import { graphql } from "@shared/lib/graphql";
+import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { guilds } from "@shared/lib/plugins";
 import { Account } from "@shared/lib/schemas/account";
 
 
@@ -23,7 +23,8 @@ const DataSchema = z.object({
 });
 
 export const getGuildsByFractal = async (member: Account) => {
-    const res = await graphql(
+    const res = await callGraphqlViaPlugin(
+        guilds.authorized.graphql,
         `
             {
             guildsByFractal(fractal:"${member}") {
@@ -39,7 +40,6 @@ export const getGuildsByFractal = async (member: Account) => {
 
             }
     `,
-        { service: GUILDS_SERVICE },
     );
 
     return DataSchema.parse(res).guildsByFractal.nodes;

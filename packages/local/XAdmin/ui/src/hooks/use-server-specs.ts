@@ -3,7 +3,9 @@ import { z } from "zod";
 
 import { queryKeys } from "@/lib/query-keys";
 
-import { graphql } from "@shared/lib/graphql";
+import { adminGraphql } from "@/lib/admin-graphql";
+
+import { useChainReady } from "./use-statuses";
 
 interface ServerSpecs {
     bandwidthBps: number;
@@ -31,6 +33,7 @@ const zServerSpecsResponse = z.union([
 ]);
 
 export const useServerSpecs = () => {
+    const chainReady = useChainReady();
     return useQuery<ServerSpecs>({
         queryKey: [...queryKeys.configServerSpecs],
         queryFn: async () => {
@@ -41,7 +44,7 @@ export const useServerSpecs = () => {
                     recommendedMinMemoryBytes
                 }
             }`;
-            const res = await graphql(query, { service: "vserver" });
+            const res = await adminGraphql(query, { service: "vserver" });
 
             if (res && typeof res === "object" && "errors" in res) {
                 console.error("GraphQL errors:", res.errors);
@@ -59,5 +62,6 @@ export const useServerSpecs = () => {
                 ),
             };
         },
+        enabled: chainReady,
     });
 };

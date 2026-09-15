@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { GUILDS_SERVICE } from "@shared/domains/fractal/lib/constants";
-import { graphql } from "@shared/lib/graphql";
+import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { guilds } from "@shared/lib/plugins";
 import { Account, zAccount } from "@shared/lib/schemas/account";
 import { zDateTime } from "@shared/lib/schemas/date-time";
 
@@ -14,7 +14,8 @@ export const zScore = z.object({
 export type Score = z.infer<typeof zScore>;
 
 export const getScores = async (guild: Account) => {
-    const member = await graphql(
+    const member = await callGraphqlViaPlugin(
+        guilds.authorized.graphql,
         `
     {
         scores(guild: "${guild}") {
@@ -25,7 +26,6 @@ export const getScores = async (guild: Account) => {
             } 
         }
     }`,
-        { service: GUILDS_SERVICE },
     );
 
     return z

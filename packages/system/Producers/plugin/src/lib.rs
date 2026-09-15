@@ -2,15 +2,16 @@
 mod bindings;
 use bindings::*;
 
-use crate::bindings::host::common::client as Client;
+use crate::bindings::host::client::api as Client;
 
 use psibase::services::auth_sig::SubjectPublicKeyInfo;
 
-use host::common::server::post_graphql_get_json;
+use host::http::api::post_graphql_get_json;
 use host::types::types::Error;
 use transact::plugin::intf::add_action_to_transaction;
 
 use exports::producers::plugin::api::Guest as Api;
+use exports::producers::plugin::authorized::Guest as Authorized;
 use producers::plugin::types::*;
 
 use psibase::account;
@@ -183,6 +184,12 @@ impl Api for ProducersPlugin {
             Actions::setMaxProds::ACTION_NAME,
             &Actions::setMaxProds { max_prods }.packed(),
         )
+    }
+}
+
+impl Authorized for ProducersPlugin {
+    fn graphql(query: String) -> Result<String, Error> {
+        post_graphql_get_json(&query)
     }
 }
 

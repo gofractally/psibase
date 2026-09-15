@@ -1,13 +1,14 @@
 package accounts:plugin;
 
 world impl {
-    include host:common/imports;
-    include host:common/privileged;
+    include host:client/imports;
+    include host:http/imports;
     include host:auth/imports;
     include host:prompt/imports;
     include host:db/imports;
     include transact:plugin/imports;
     include permissions:plugin/imports;
+    include accounts:query/imports;
     include auth-sig:plugin/imports;
     include name-market:plugin/imports;
     include host:crypto/imports;

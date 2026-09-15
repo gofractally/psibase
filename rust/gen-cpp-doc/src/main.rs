@@ -100,6 +100,16 @@ fn convert_children<'a, 'tu>(items: &'a mut Vec<Item<'tu>>, current: usize, enti
     }
 }
 
+fn include_docs<'tu>(entity: &Entity<'tu>) -> bool {
+    if let Some(name) = entity.get_name() {
+        if name.as_str() == "psio_get_reflect_impl" {
+            return false;
+        }
+    }
+    let doc_str = convert_doc_str(&entity.get_parsed_comment());
+    !doc_str.contains("[[doc(hidden)]]")
+}
+
 // Convert a child and insert it into parent
 #[allow(clippy::unnecessary_unwrap)]
 fn convert_child<'a, 'tu>(
@@ -108,7 +118,10 @@ fn convert_child<'a, 'tu>(
     entity: Entity<'tu>,
     ty: Kind,
     merge: bool,
-) -> usize {
+) {
+    if !include_docs(&entity) {
+        return;
+    }
     let name;
     if entity.get_kind() == EntityKind::Constructor {
         name = items[current].name.clone();
@@ -152,7 +165,6 @@ fn convert_child<'a, 'tu>(
         });
     }
     convert_children(items, child, entity);
-    child
 }
 
 #[allow(dead_code)]
@@ -745,6 +757,7 @@ where
     entity
         .get_children()
         .iter()
+        .filter(|e| include_docs(*e))
         .filter(predicate)
         .copied()
         .collect()

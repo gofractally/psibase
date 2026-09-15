@@ -101,6 +101,8 @@ impl Fractal {
         create_role(executive, Executive);
         create_role(recruitment, Recruitment);
 
+        Occupation::set_ordered_occupations(fractal, vec![defacto_service]);
+
         create_managed_account(fractal, || {
             sites::Wrapper::call_as(fractal).setProxy(account!("fractal-cr"));
         });

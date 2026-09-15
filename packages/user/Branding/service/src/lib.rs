@@ -1,10 +1,10 @@
 #[psibase::service_tables]
 mod tables {
     use async_graphql::SimpleObject;
-    use psibase::{Fracpack, ToSchema};
+    use psibase::{Pack, ToSchema, Unpack};
     use serde::{Deserialize, Serialize};
     #[table(name = "NetworkNameTable")]
-    #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct NetworkName {
         pub name: String,
     }
@@ -53,7 +53,11 @@ mod service {
 
         let account = AccountNumber::from_exact(name.as_str()).expect("Network name invalid");
 
-        let created = AuthDelegate::call().newAccount(account, SERVICE, true);
+        let created = AuthDelegate::call().newAccount(
+            account,
+            SERVICE,
+            services::accounts::NewAccountMode::MATCH_EXISTING,
+        );
         if !created {
             HttpServer::call_as(account).clearRedirect();
         }

@@ -2,7 +2,6 @@
 #include <compare>
 #include <cstdint>
 #include <psibase/AccountNumber.hpp>
-#include <psibase/Bitset.hpp>
 #include <psibase/Table.hpp>
 
 namespace UserService

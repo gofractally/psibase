@@ -14,7 +14,7 @@ import {
 } from "@shared/shadcn/ui/sidebar";
 
 export function NavAdmin() {
-    const isCurrentUserProducer = useIsCurrentUserProducer({});
+    const isCurrentUserProducer = useIsCurrentUserProducer();
     if (!isCurrentUserProducer) return null;
     return (
         <SidebarGroup>

@@ -24,13 +24,17 @@ const loggerOptionClass =
 export const Logger = ({ loggerKey, register, watch, remove }: LoggerProps) => {
     const type_ = watch("type") as string;
     return (
-        <fieldset className="bg-muted flex flex-col gap-2 rounded-md p-3">
-            <div className="flex justify-between py-2">
-                <legend className="scroll-m-20 text-2xl font-semibold tracking-tight">
-                    {loggerKey}
-                </legend>
-                <Button size="sm" variant="outline" onClick={remove}>
-                    <Trash size={20} />
+        <fieldset className="bg-muted/40 flex flex-col gap-2 rounded-lg border p-4">
+            <div className="flex items-center justify-between py-1">
+                <legend className="font-medium">{loggerKey}</legend>
+                <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    onClick={remove}
+                    aria-label={`Remove logger ${loggerKey}`}
+                >
+                    <Trash />
                 </Button>
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -38,7 +42,7 @@ export const Logger = ({ loggerKey, register, watch, remove }: LoggerProps) => {
                     <Label>Type</Label>
                     <select
                         {...register("type")}
-                        className="bg-background ring-offset-background placeholder:text-muted-foreground focus:ring-ring flex h-10  w-full items-center justify-between rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus:ring-ring flex h-9 w-full items-center justify-between rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         <option value="console" className={loggerOptionClass}>
                             Console

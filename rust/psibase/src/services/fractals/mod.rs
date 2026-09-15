@@ -59,6 +59,7 @@ pub mod Occupation {
     /// Get scores for a fractal
     ///
     /// Returns a vector of accounts and their corresponding scores for a fractal.
+    /// Scores are PPM shares (parts per million) and must not sum to more than 1,000,000.
     /// These scores are used by the Fractals service to determine distribution amounts for each member.
     ///
     /// # Arguments
