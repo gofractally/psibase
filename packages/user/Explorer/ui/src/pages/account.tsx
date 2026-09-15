@@ -158,7 +158,7 @@ export const AccountPage = () => {
                         : lookupFailed
                           ? `Could not verify account with the accounts service (${(account.error as Error).message})`
                           : !exists
-                            ? "This account does not exist on chain"
+                            ? "This account does not exist on the network"
                             : app.data?.shortDesc || pkg?.description || `Account secured by ${account.data?.authService}`
                 }
                 actions={

@@ -83,12 +83,12 @@ export const NetworkPage = () => {
         <div className="flex flex-col gap-4">
             <PageHeader
                 title={networkName.data ? `Network: ${networkName.data}` : "Network"}
-                description="Chain identity, consensus configuration, and health"
+                description="Network identity, consensus configuration, and health"
             />
 
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                 <StatCard
-                    label="Chain age"
+                    label="Network age"
                     accent="var(--chart-2)"
                     value={chainAge !== null ? formatDuration(chainAge) : "—"}
                     sub={firstBlock.data ? `since ${formatTime(firstBlock.data.time)}` : "loading…"}
@@ -120,7 +120,7 @@ export const NetworkPage = () => {
             <div className="grid gap-4 xl:grid-cols-2">
                 <Panel title="Identity">
                     <KeyValue label="Network name">{networkName.data || <span className="text-muted-foreground">unset</span>}</KeyValue>
-                    <KeyValue label="Chain ID">
+                    <KeyValue label="Network ID">
                         {chainId.data ? <Hash value={chainId.data} full /> : <span className="text-muted-foreground text-xs">unavailable</span>}
                     </KeyValue>
                     <KeyValue label="Root domain">
@@ -228,7 +228,7 @@ export const NetworkPage = () => {
                     </div>
                 </Panel>
 
-                <Panel title="GraphQL endpoints" description="Query the chain directly">
+                <Panel title="GraphQL endpoints" description="Query the network directly">
                     <ul className="divide-y">
                         {API_SERVICES.map((s) => {
                             const url = siblingUrl(null, s.name, "/graphql");
