@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
 import { stagedTx } from "@shared/lib/plugins";
 import { zAccount } from "@shared/lib/schemas/account";
 
@@ -34,7 +34,7 @@ export const zDataResponse = z.object({
 });
 
 export const getStagedTx = async (id: number) => {
-    const res = await callGraphqlViaPlugin(
+    const res = await graphqlAuth(
         stagedTx.authorized.graphql,
         `
                     {

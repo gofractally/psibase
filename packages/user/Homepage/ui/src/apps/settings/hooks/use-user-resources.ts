@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import QueryKey from "@/lib/query-keys";
 
-import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
 import { vserver } from "@shared/lib/plugins";
 
 interface UserResourcesResponse {
@@ -40,7 +40,7 @@ export const useUserResources = (
                 }
             `;
 
-            const data = await callGraphqlViaPlugin<UserResourcesResponse>(
+            const data = await graphqlAuth<UserResourcesResponse>(
                 vserver.authorized.graphql,
                 query,
             );

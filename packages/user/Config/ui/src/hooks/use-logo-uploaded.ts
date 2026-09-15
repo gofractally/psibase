@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import QueryKey from "@/lib/query-keys";
 
-import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
 import { sites } from "@shared/lib/plugins";
 
 export const SiteConfigResponse = z.object({
@@ -22,7 +22,7 @@ export const useLogoUploaded = () =>
     useQuery({
         queryKey: QueryKey.brandingFiles(),
         queryFn: async () => {
-            const res = await callGraphqlViaPlugin(
+            const res = await graphqlAuth(
                 sites.authorized.graphql,
                 `
                     {

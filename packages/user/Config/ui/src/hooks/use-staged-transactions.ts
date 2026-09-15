@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import QueryKey from "@/lib/query-keys";
 
-import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
 import { stagedTx } from "@shared/lib/plugins";
 import { zAccount } from "@shared/lib/schemas/account";
 
@@ -24,7 +24,7 @@ export const useStagedTransactions = () => {
     return useQuery({
         queryKey: QueryKey.stagedTransactions(),
         queryFn: async () => {
-            const res = await callGraphqlViaPlugin(
+            const res = await graphqlAuth(
                 stagedTx.authorized.graphql,
                 `
                     {

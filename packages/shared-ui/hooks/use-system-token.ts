@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
 import QueryKey from "@shared/lib/query-keys";
 import { tokens } from "@shared/lib/plugins";
 
@@ -39,7 +39,7 @@ export const useSystemToken = () => {
                     }
                 `;
 
-            const configRes = await callGraphqlViaPlugin<ConfigResponse>(
+            const configRes = await graphqlAuth<ConfigResponse>(
                 tokens.authorized.graphql,
                 configQuery,
             );
@@ -59,7 +59,7 @@ export const useSystemToken = () => {
                     }
                 `;
 
-            const tokenRes = await callGraphqlViaPlugin<TokenResponse>(
+            const tokenRes = await graphqlAuth<TokenResponse>(
                 tokens.authorized.graphql,
                 tokenQuery,
             );
