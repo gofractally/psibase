@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { useLocalStorage } from "usehooks-ts";
 
 import {
     Building2,
@@ -105,8 +106,14 @@ export function ObligationsPage() {
     const [editingBookAuth, setEditingBookAuth] = useState<BookAuth | null>(
         null,
     );
-    const [hideEmptySavings, setHideEmptySavings] = useState(false);
-    const [hideEmptyLoans, setHideEmptyLoans] = useState(false);
+    const [hideEmptySavings, setHideEmptySavings] = useLocalStorage(
+        "banx.accounts.hideEmptySavings",
+        true,
+    );
+    const [hideEmptyLoans, setHideEmptyLoans] = useLocalStorage(
+        "banx.accounts.hideEmptyLoans",
+        true,
+    );
 
     const openRouting = (prefill?: RoutingPolicyPrefill | null) => {
         setRoutingPrefill(prefill ?? null);
@@ -249,7 +256,7 @@ export function ObligationsPage() {
                     icon={PiggyBank}
                     title="Savings & deposits"
                     description="You are the creditor — balances others owe you, like funds on deposit. Offer a credit line so they can draw."
-                    count={savingsGroups.length}
+                    count={savingsGroupsAll.length}
                     countLabel="account"
                     action={
                         <>
@@ -325,7 +332,7 @@ export function ObligationsPage() {
                     icon={Building2}
                     title="Loans & liabilities"
                     description="You are the debtor — what you owe, presented like a home loan or line of credit."
-                    count={loanGroups.length}
+                    count={loanGroupsAll.length}
                     countLabel="loan"
                     action={
                         <>
