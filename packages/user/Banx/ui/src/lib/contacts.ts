@@ -9,7 +9,7 @@ export function isNamedAccount(
 }
 
 export function inviteClaimedBy(row: {
-    claimedBy?: string;
+    claimedBy?: string | null;
 }): string | undefined {
     return isNamedAccount(row.claimedBy) ? row.claimedBy.trim() : undefined;
 }

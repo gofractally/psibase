@@ -128,7 +128,7 @@ const zBanxInvite = z.object({
     graceSeconds: z.number(),
     createdAt: z.number(),
     expiry: z.number(),
-    claimedBy: z.string().optional().default(""),
+    claimedBy: z.string().nullish(),
 });
 
 const zActivity = z.object({

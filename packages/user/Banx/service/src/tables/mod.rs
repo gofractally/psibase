@@ -352,8 +352,8 @@ pub mod tables {
         pub interest_rate: u32,
         pub grace_seconds: u32,
         pub created_at: TimePointSec,
-        /// Set on the first successful claim; default until then.
-        pub claimed_by: AccountNumber,
+        /// Set on the first successful claim; `None` until then.
+        pub claimed_by: Option<AccountNumber>,
     }
 
     impl BanxInvite {

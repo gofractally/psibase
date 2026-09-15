@@ -93,7 +93,7 @@ impl BanxInvite {
             interest_rate,
             grace_seconds,
             created_at: now,
-            claimed_by: AccountNumber::default(),
+            claimed_by: None,
         }
         .save();
     }
@@ -106,7 +106,7 @@ impl BanxInvite {
     /// accept hook; invite cannot reenter itself). The inviter can `rm_invite`
     /// later for a refund.
     pub fn accept(&self, accepter: AccountNumber) {
-        if self.claimed_by != AccountNumber::default() {
+        if self.claimed_by.is_some() {
             return;
         }
         if accepter == self.inviter {
@@ -138,7 +138,7 @@ impl BanxInvite {
             );
         }
         let mut row = self.clone();
-        row.claimed_by = accepter;
+        row.claimed_by = Some(accepter);
         row.save();
     }
 

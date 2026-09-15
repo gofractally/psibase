@@ -4417,7 +4417,7 @@ mod tests {
         assert!(!line.deplete_on_debit);
         assert_eq!(line.interest_rate, 0);
         let stored = BanxInvite::get_assert(invite_id);
-        assert_eq!(stored.claimed_by, bob);
+        assert_eq!(stored.claimed_by, Some(bob));
         assert_eq!(BanxInvite::list_by_inviter(alice).len(), 1);
 
         Wrapper::push_from(&chain, psibase::services::invite::Wrapper::SERVICE)
@@ -4427,13 +4427,13 @@ mod tests {
             CreditLine::get_assert(alice, bob, usd).limit.value,
             limit.value
         );
-        assert_eq!(BanxInvite::get_assert(invite_id).claimed_by, bob);
+        assert_eq!(BanxInvite::get_assert(invite_id).claimed_by, Some(bob));
 
         Wrapper::push_from(&chain, psibase::services::invite::Wrapper::SERVICE)
             .onInvAccept(invite_id, carol)
             .get()?;
         assert!(CreditLine::get(alice, carol, usd).is_none());
-        assert_eq!(BanxInvite::get_assert(invite_id).claimed_by, bob);
+        assert_eq!(BanxInvite::get_assert(invite_id).claimed_by, Some(bob));
 
         Ok(())
     }
@@ -4478,13 +4478,13 @@ mod tests {
         assert_eq!(line.limit.value, 1);
         assert!(line.deplete_on_debit);
         assert_eq!(line.interest_rate, 12_000);
-        assert_eq!(BanxInvite::get_assert(invite_id).claimed_by, bob);
+        assert_eq!(BanxInvite::get_assert(invite_id).claimed_by, Some(bob));
 
         Wrapper::push_from(&chain, psibase::services::invite::Wrapper::SERVICE)
             .onInvAccept(invite_id, carol)
             .get()?;
         assert!(CreditLine::get(alice, carol, usd).is_none());
-        assert_eq!(BanxInvite::get_assert(invite_id).claimed_by, bob);
+        assert_eq!(BanxInvite::get_assert(invite_id).claimed_by, Some(bob));
 
         Ok(())
     }
@@ -4622,7 +4622,7 @@ mod tests {
         Wrapper::push_from(&chain, psibase::services::invite::Wrapper::SERVICE)
             .onInvAccept(invite_id, bob)
             .get()?;
-        assert_eq!(BanxInvite::get_assert(invite_id).claimed_by, bob);
+        assert_eq!(BanxInvite::get_assert(invite_id).claimed_by, Some(bob));
 
         Wrapper::push_from(&chain, alice)
             .rm_invite(invite_id)

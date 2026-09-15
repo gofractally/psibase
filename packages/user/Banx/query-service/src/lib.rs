@@ -375,8 +375,8 @@ mod service {
         createdAt: i64,
         /// Invite-service expiry (`0` if the invite record is gone).
         expiry: i64,
-        /// First claimee; default/empty until claimed.
-        claimedBy: AccountNumber,
+        /// First claimee; null until claimed.
+        claimedBy: Option<AccountNumber>,
     }
 
     #[derive(SimpleObject)]
