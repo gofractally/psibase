@@ -1,7 +1,7 @@
 use async_graphql::connection::Connection;
 use async_graphql::ComplexObject;
 use psibase::services::sites;
-use psibase::services::tokens::{Precision, Quantity};
+use psibase::services::tokens::{Precision, Quantity, Wrapper as Tokens, TID};
 
 use crate::constants::{token_distributions::TOKEN_SUPPLY, TOKEN_PRECISION};
 use crate::constants::{
@@ -17,7 +17,7 @@ use psibase::services::fractals::FractalRole::{
     self, Executive, Judiciary, Legislature, Recruitment,
 };
 
-use crate::helpers::create_managed_account;
+use crate::helpers::{create_managed_account, donation_sub_account};
 use crate::tables::tables::{
     Fractal, FractalMember, FractalMemberTable, FractalTable, Occupation, RewardStream, Role,
     RoleTable,
@@ -27,7 +27,6 @@ use psibase::{
 };
 
 use psibase::services::fractals::{self, occu_wrapper};
-use psibase::services::tokens::Wrapper as Tokens;
 use psibase::services::transact::Wrapper as TransactSvc;
 use psibase::{get_sender, RawKey, TableQuery, TimePointSec};
 
@@ -134,6 +133,14 @@ impl Fractal {
         Self::get(fractal).expect(&format!("fractal {} does not exist", fractal.to_string()))
     }
 
+    pub fn get_by_token(token_id: TID) -> Option<Self> {
+        FractalTable::read().get_index_by_token().get(&token_id)
+    }
+
+    pub fn get_by_token_assert(token_id: TID) -> Self {
+        Self::get_by_token(token_id).expect("no fractal for token")
+    }
+
     pub fn init_token(&self) {
         let tokens = psibase::services::tokens::Wrapper::call();
 
@@ -152,22 +159,41 @@ impl Fractal {
         RewardStream::get(self.account, self.account).expect("fractal does not have reward stream")
     }
 
+    pub fn hold_donation(&self, amount: Quantity) {
+        Tokens::call().toSub(self.token_id, donation_sub_account(self.account), amount);
+    }
+
+    fn take_donations(&self) -> Quantity {
+        let key = donation_sub_account(self.account);
+        let Some(amount) = Tokens::call().getSubBal(self.token_id, key.clone()) else {
+            return 0.into();
+        };
+        if amount.value == 0 {
+            return 0.into();
+        }
+        Tokens::call().fromSub(self.token_id, key, amount);
+        amount
+    }
+
     pub fn distribute_tokens(&self) {
         let mut stream = self.reward_stream();
-        let (_, withdrawn) = stream.claim();
-        if withdrawn.value == 0 {
-            return;
-        }
+        let (_, withdrawn) = stream.withdraw();
+        let amount = withdrawn + self.take_donations();
+        assert!(amount.value > 0, "nothing to distribute");
+        self.distribute_amount(amount);
+    }
 
-        let mut dust = withdrawn.value;
-        allocations(self.member_reward_shares(), withdrawn.value).for_each(|(member, amount)| {
-            dust -= amount;
+    fn distribute_amount(&self, amount: Quantity) {
+        let mut dust = amount.value;
+        allocations(self.member_reward_shares(), amount.value).for_each(|(member, share)| {
+            dust -= share;
             RewardStream::get_assert(self.account, member)
-                .deposit(amount.into(), "Fractal reward".into());
+                .deposit(share.into(), "Fractal reward".into());
         });
 
         if dust > 0 {
-            stream.deposit(dust.into(), "Dust recycle".into());
+            self.reward_stream()
+                .deposit(dust.into(), "Dust recycle".into());
         }
     }
 

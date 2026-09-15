@@ -17,6 +17,8 @@ mod helpers;
 use crate::bindings::accounts::query::api::gen_rand_account;
 use crate::bindings::exports::fractals::plugin::types;
 use crate::bindings::guilds::plugin as Guilds;
+use crate::bindings::tokens::plugin::helpers::decimal_to_u64;
+use crate::bindings::tokens::plugin::user as TokensUser;
 use crate::bindings::transact::plugin::intf::set_propose_latch;
 use crate::graphql::fractal::get_fractal;
 use crate::helpers::{get_sender_app, validate_account_name};
@@ -34,6 +36,8 @@ impl TrustConfig for FractallyPlugin {
             high: &[
                 "Setting the occupation service for a fractal role",
                 "Setting paid occupations for token distribution",
+                "Donating tokens to a fractal",
+                "Contributing income to a fractal token stream",
             ],
         }
     }
@@ -136,6 +140,30 @@ impl UserFractal for FractallyPlugin {
     #[psibase_plugin::authorized(Low)]
     fn dist_token() -> Result<(), Error> {
         Fractals::add_to_tx().dist_token(get_sender_app()?);
+        Ok(())
+    }
+
+    #[psibase_plugin::authorized(High)]
+    fn donate(token_id: u32, amount: String) -> Result<(), Error> {
+        TokensUser::credit(
+            token_id,
+            &Fractals::SERVICE.to_string(),
+            &amount,
+            "Fractal donate",
+        )?;
+        Fractals::add_to_tx().donate(token_id, decimal_to_u64(token_id, &amount)?.into());
+        Ok(())
+    }
+
+    #[psibase_plugin::authorized(High)]
+    fn income(token_id: u32, amount: String) -> Result<(), Error> {
+        TokensUser::credit(
+            token_id,
+            &Fractals::SERVICE.to_string(),
+            &amount,
+            "Fractal income",
+        )?;
+        Fractals::add_to_tx().income(token_id, decimal_to_u64(token_id, &amount)?.into());
         Ok(())
     }
 }

@@ -44,6 +44,13 @@ pub mod tables {
         pub genesis_time: TimePointSec,
     }
 
+    impl Fractal {
+        #[secondary_key(1)]
+        fn by_token(&self) -> TID {
+            self.token_id
+        }
+    }
+
     #[table(name = "FractalMemberTable", index = 2)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]

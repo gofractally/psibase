@@ -135,6 +135,7 @@ impl From<FractalRole> for u8 {
 #[allow(non_snake_case, unused_variables)]
 pub mod Service {
     use crate::services::auth_dyn::policy::DynamicAuthPolicy;
+    use crate::services::tokens::{Quantity, TID};
     use crate::services::transact::ServiceMethod;
     use crate::AccountNumber;
 
@@ -282,6 +283,34 @@ pub mod Service {
         unimplemented!()
     }
 
+    /// Donate tokens to the fractal that issued `token_id`.
+    ///
+    /// Debits `amount` from the sender into a `{fractal}+donations` Tokens
+    /// sub-balance. [`dist_token`] later splits that sub-balance to members
+    /// with the same shares as the fractal token stream.
+    ///
+    /// # Arguments
+    /// * `token_id` - Fractal token being donated.
+    /// * `amount` - Amount to debit from the sender.
+    #[action]
+    fn donate(token_id: TID, amount: Quantity) {
+        unimplemented!()
+    }
+
+    /// Contribute income to the fractal that issued `token_id`.
+    ///
+    /// Debits `amount` from the sender and deposits it into that fractal's
+    /// vesting stream. [`dist_token`] later withdraws vested income and splits
+    /// it to members.
+    ///
+    /// # Arguments
+    /// * `token_id` - Fractal token being deposited.
+    /// * `amount` - Amount to debit from the sender.
+    #[action]
+    fn income(token_id: TID, amount: Quantity) {
+        unimplemented!()
+    }
+
     /// Initialise a token for a fractal.
     ///
     /// Called only once per fractal.
@@ -296,6 +325,18 @@ pub mod Service {
 
     #[event(history)]
     pub fn joined_fractal(fractal_account: AccountNumber, account: AccountNumber) {}
+
+    #[event(history)]
+    pub fn donated(fractal: AccountNumber, donor: AccountNumber, token_id: TID, amount: Quantity) {}
+
+    #[event(history)]
+    pub fn received_income(
+        fractal: AccountNumber,
+        payer: AccountNumber,
+        token_id: TID,
+        amount: Quantity,
+    ) {
+    }
 }
 
 #[test]
