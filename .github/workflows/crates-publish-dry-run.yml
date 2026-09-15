@@ -30,12 +30,13 @@ jobs:
           ref-a: ${{ github.event.pull_request.base.sha }}
           ref-b: ${{ github.event.pull_request.head.sha }}
 
-      - uses: dtolnay/rust-toolchain@1.86.0
+      - uses: dtolnay/rust-toolchain@1.98.0
         if: steps.version.outputs.changed == 'true'
+        with:
+          targets: wasm32-wasip1
 
       - name: Dry-run crate publish
         if: steps.version.outputs.changed == 'true'
         run: |
           cd rust
-          ./scripts/publish.sh --dry-run 2>&1 | tee /tmp/crates-dry-run.log || true
-          ../.github/scripts/expect-crates-dry-run-errors.sh < /tmp/crates-dry-run.log
+          cargo publish --workspace --exclude psibase-rust-workspace-hack --dry-run

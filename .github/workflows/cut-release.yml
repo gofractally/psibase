@@ -111,15 +111,16 @@ jobs:
 
       # A version that already shipped through main was dry-run by the PR
       # workflow there; only a version first appearing on this branch needs it.
-      - uses: dtolnay/rust-toolchain@1.86.0
+      - uses: dtolnay/rust-toolchain@1.98.0
         if: steps.on_main.outputs.matches == 'false'
+        with:
+          targets: wasm32-wasip1
 
       - name: Dry-run crate publish
         if: steps.on_main.outputs.matches == 'false'
         run: |
           cd rust
-          ./scripts/publish.sh --dry-run 2>&1 | tee /tmp/crates-dry-run.log || true
-          ../.github/scripts/expect-crates-dry-run-errors.sh < /tmp/crates-dry-run.log
+          cargo publish --workspace --exclude psibase-rust-workspace-hack --dry-run
 
       - name: Create tag
         id: tag
