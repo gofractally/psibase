@@ -49,12 +49,17 @@ namespace UserService
                }
                else
                {
+                  // TODO: return gql errors instead of aborting
                   auto accountOwner = psibase::to<AuthDelegate>().getOwner(account);
                   if (!accountOwner)
+                  {
                      psibase::abortMessage("account does not have an owning account");
+                  }
                   else if (*accountOwner != owner)
+                  {
                      psibase::abortMessage("Account " + account.str() + " is not owned by " +
                                            owner.str());
+                  }
                }
             }
             else

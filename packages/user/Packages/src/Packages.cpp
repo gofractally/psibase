@@ -85,8 +85,7 @@ namespace UserService
          }
          else
          {
-            auto owner = to<AuthDelegate>().checkOwner(account);
-            if (owner != sender)
+            if (to<AuthDelegate>().checkOwner(account) != sender)
                abortMessage("Account " + account.str() + " in " + package.name +
                             " is not owned by " + sender.str());
          }
