@@ -134,7 +134,7 @@ export const DashboardPage = () => {
                         sub={`${formatNumber(stats.actionCount)} actions across ${stats.serviceActivity.length} services`}
                     />
                     <StatCard
-                        label="Producers"
+                        label="Providers"
                         icon={Radio}
                         accent="var(--chart-5)"
                         value={
@@ -166,7 +166,7 @@ export const DashboardPage = () => {
 
             <Panel
                 title="Network heartbeat"
-                description="One cell per block, colored by producer; height shows transactions carried"
+                description="One cell per block, colored by provider; height shows transactions carried"
                 actions={
                     <div className="text-muted-foreground flex items-center gap-3 text-[11px]">
                         {stats.producers.slice(0, 4).map((p) => (
@@ -203,11 +203,11 @@ export const DashboardPage = () => {
                     )}
                 </Panel>
                 <Panel
-                    title="Producer network"
-                    description="Live view of who is producing"
+                    title="Provider network"
+                    description="Live view of the infrastructure providers"
                     actions={
                         <Button asChild variant="ghost" size="sm" className="h-7 text-xs">
-                            <Link to="/producers">Details</Link>
+                            <Link to="/providers">Details</Link>
                         </Button>
                     }
                     bodyClassName="flex items-center justify-center p-3"

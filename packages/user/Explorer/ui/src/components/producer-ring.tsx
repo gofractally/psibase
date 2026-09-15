@@ -22,7 +22,7 @@ interface Pulse {
 }
 
 /**
- * A live constellation of the block producers. Each producer sits on a ring
+ * A live constellation of the infrastructure providers. Each provider sits on a ring
  * around the chain head; every time a block is produced a pulse travels from
  * the producing node into the center and the node flashes.
  */
@@ -81,7 +81,7 @@ export const ProducerRing = ({
                 viewBox={`0 0 ${size} ${size}`}
                 className="h-auto w-full"
                 role="img"
-                aria-label="Block producer network"
+                aria-label="Infrastructure provider network"
             >
                 <defs>
                     <radialGradient id="ring-core" cx="50%" cy="50%" r="50%">
@@ -198,7 +198,7 @@ export const ProducerRing = ({
                     {mode ? `${mode} · term ${head?.term ?? "—"}` : ""}
                 </text>
 
-                {/* producer nodes */}
+                {/* provider nodes */}
                 {positions.map((p) => {
                     const s = statMap.get(p.name);
                     const active = head?.producer === p.name;

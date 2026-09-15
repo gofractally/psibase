@@ -28,7 +28,7 @@ const SECTION_LABELS: Record<string, string> = {
     blocks: "Blocks",
     transactions: "Transactions",
     tx: "Transactions",
-    producers: "Producers",
+    providers: "Providers",
     services: "Services",
     network: "Network",
     accounts: "Accounts",

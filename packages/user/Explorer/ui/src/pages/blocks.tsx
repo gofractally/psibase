@@ -170,7 +170,7 @@ export const BlocksPage = () => {
                                 onChange={(e) => setProducerFilter(e.target.value)}
                                 className="bg-background h-8 rounded-md border px-2 font-mono text-xs"
                             >
-                                <option value="">All producers</option>
+                                <option value="">All providers</option>
                                 {producers.map((p) => (
                                     <option key={p} value={p}>
                                         {p}

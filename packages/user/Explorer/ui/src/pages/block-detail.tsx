@@ -191,7 +191,7 @@ export const BlockDetailPage = () => {
                     <KeyValue label="Timestamp">
                         <span className="font-mono text-xs">{formatUtc(block.header.time)}</span>
                     </KeyValue>
-                    <KeyValue label="Producer">
+                    <KeyValue label="Provider">
                         <AccountLink name={block.header.producer} />
                     </KeyValue>
                     <KeyValue label="Previous block">
@@ -241,7 +241,7 @@ export const BlockDetailPage = () => {
                     description="This block schedules a new consensus configuration"
                 >
                     <KeyValue label="Mode">{ncMode ?? "unknown"}</KeyValue>
-                    <KeyValue label="Producers">
+                    <KeyValue label="Providers">
                         <div className="flex flex-wrap gap-2">
                             {ncProducers.map((p) => (
                                 <AccountLink key={p.name} name={p.name} />

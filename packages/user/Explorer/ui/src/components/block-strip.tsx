@@ -18,7 +18,7 @@ interface Props {
 }
 
 /**
- * The network "heartbeat": one cell per recent block, colored by producer, with
+ * The network "heartbeat": one cell per recent block, colored by provider, with
  * a bar whose height reflects how many user transactions the block carried.
  */
 export const BlockStrip = ({ series, count = 90, className }: Props) => {
