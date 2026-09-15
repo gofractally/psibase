@@ -119,7 +119,7 @@ export const TransactionDetailPage = () => {
                             </span>
                         </span>
                     </KeyValue>
-                    <KeyValue label="Producer">
+                    <KeyValue label="Provider">
                         <AccountLink name={data.producer} />
                     </KeyValue>
                     <KeyValue label="Sender">

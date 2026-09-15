@@ -30,7 +30,7 @@ const hostOf = (endpoint: string) => {
     }
 };
 
-export const ProducersPage = () => {
+export const ProvidersPage = () => {
     const { head, stats } = useLiveChain();
     const now = useNow();
 
@@ -89,7 +89,7 @@ export const ProducersPage = () => {
             <PageHeader
                 title={
                     <span className="flex items-center gap-3">
-                        Block producers
+                        Infrastructure providers
                         {info.data && (
                             <Badge variant="outline" className="font-mono">
                                 {mode}
@@ -99,7 +99,7 @@ export const ProducersPage = () => {
                 }
                 description={
                     info.data
-                        ? `${names.length} producer${names.length === 1 ? "" : "s"} in the active set${
+                        ? `${names.length} provider${names.length === 1 ? "" : "s"} in the active set${
                               quorum ? ` · quorum ${quorum}` : ""
                           }${info.data.nextMode ? ` · transition to ${info.data.nextMode} pending` : ""}`
                         : "Loading consensus configuration…"
@@ -157,7 +157,7 @@ export const ProducersPage = () => {
                     />
                 </Panel>
 
-                <Panel title="Producer set" className="xl:col-span-3">
+                <Panel title="Provider set" className="xl:col-span-3">
                     {info.isPending ? (
                         <div className="flex flex-col gap-2 p-4">
                             <Skeleton className="h-8" />
@@ -168,7 +168,7 @@ export const ProducersPage = () => {
                             <table className="w-full text-[13px]">
                                 <thead className="bg-muted/30 border-b">
                                     <tr className="text-muted-foreground text-left text-[11px] tracking-wider uppercase">
-                                        <th className="h-8 px-3 font-medium">Producer</th>
+                                        <th className="h-8 px-3 font-medium">Provider</th>
                                         <th className="h-8 px-3 font-medium">Status</th>
                                         <th className="h-8 px-3 font-medium">Endpoint</th>
                                         <th className="h-8 px-3 text-right font-medium">Blocks</th>
@@ -282,7 +282,7 @@ export const ProducersPage = () => {
                     description={
                         info.data.jointStart
                             ? `Joint consensus started at block #${formatNumber(info.data.jointStart)}`
-                            : "A new producer set has been scheduled"
+                            : "A new provider set has been scheduled"
                     }
                     bodyClassName="flex flex-wrap items-center gap-2 p-4"
                 >
@@ -297,7 +297,7 @@ export const ProducersPage = () => {
 
             <Panel
                 title="Production timeline"
-                description="Most recent blocks, colored by producer"
+                description="Most recent blocks, colored by provider"
                 bodyClassName="px-4 py-3"
             >
                 {stats.series.length ? (
@@ -309,14 +309,14 @@ export const ProducersPage = () => {
 
             <Panel
                 title="Registered candidates"
-                description="Accounts that have published a producer endpoint"
+                description="Accounts that have published a provider endpoint"
                 bodyClassName="p-2"
             >
                 {allCandidates.isPending ? (
                     <Skeleton className="m-2 h-8" />
                 ) : !allCandidates.data?.length ? (
                     <div className="text-muted-foreground p-4 text-sm">
-                        No producer candidates have registered an endpoint.
+                        No provider candidates have registered an endpoint.
                     </div>
                 ) : (
                     <ul className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3">

@@ -34,7 +34,7 @@ import { Badge } from "@shared/shadcn/ui/badge";
 
 const API_SERVICES = [
     { name: "explorer", note: "blocks, block(n), head, transaction(id)" },
-    { name: "producers", note: "producers, consensus, candidates" },
+    { name: "producers", note: "providers, consensus, candidates" },
     { name: "accounts", note: "getAccount" },
     { name: "auth-sig", note: "account keys, accWithKey" },
     { name: "packages", note: "installed packages" },
@@ -175,7 +175,7 @@ export const NetworkPage = () => {
                             </span>
                         ) : "—"}
                     </KeyValue>
-                    <KeyValue label="Producers">
+                    <KeyValue label="Providers">
                         <div className="flex flex-wrap gap-2">
                             {producers.data?.producers.map((p) => <AccountLink key={p.name} name={p.name} />)}
                         </div>

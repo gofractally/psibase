@@ -68,7 +68,7 @@ export const BlocksTable = ({
                         <Th>Height</Th>
                         <Th>Age</Th>
                         {!compact && <Th>Time</Th>}
-                        <Th>Producer</Th>
+                        <Th>Provider</Th>
                         <Th>Block ID</Th>
                         <Th className="text-right">Txs</Th>
                         <Th className="text-right">Actions</Th>

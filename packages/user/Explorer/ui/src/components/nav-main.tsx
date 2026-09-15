@@ -24,7 +24,7 @@ const items = [
     { to: "/", label: "Dashboard", icon: Activity, end: true },
     { to: "/blocks", label: "Blocks", icon: Boxes },
     { to: "/transactions", label: "Transactions", icon: ArrowLeftRight },
-    { to: "/producers", label: "Producers", icon: Radio },
+    { to: "/providers", label: "Providers", icon: Radio },
     { to: "/services", label: "Services", icon: LayoutGrid },
     { to: "/network", label: "Network", icon: Globe },
 ];
@@ -36,7 +36,7 @@ export function NavMain() {
 
     const badgeFor = (to: string) => {
         if (to === "/blocks" && head) return `#${formatNumber(head.blockNum)}`;
-        if (to === "/producers" && stats.producers.length)
+        if (to === "/providers" && stats.producers.length)
             return String(stats.producers.length);
         return null;
     };

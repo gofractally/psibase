@@ -295,7 +295,7 @@ export const GlobalSearch = ({ className }: { className?: string }) => {
                                 </CommandGroup>
                             )}
                             {producerMatches.length > 0 && (
-                                <CommandGroup heading="Producers">
+                                <CommandGroup heading="Providers">
                                     {producerMatches.map((p) => (
                                         <CommandItem
                                             key={p.name}

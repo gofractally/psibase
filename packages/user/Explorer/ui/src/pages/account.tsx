@@ -141,7 +141,7 @@ export const AccountPage = () => {
                             )}
                             {isProducer && (
                                 <Badge className="gap-1 bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/15">
-                                    <Radio className="size-3" /> Producer
+                                    <Radio className="size-3" /> Provider
                                 </Badge>
                             )}
                             {app.data && (
@@ -193,7 +193,7 @@ export const AccountPage = () => {
                 />
                 {isProducer || producerStats ? (
                     <StatCard
-                        label="Blocks produced"
+                        label="Blocks"
                         accent="var(--chart-5)"
                         value={formatNumber(producerStats?.blocks ?? 0)}
                         sub={

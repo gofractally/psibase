@@ -48,7 +48,7 @@ const ChartTooltip = ({
                 <span className="text-right tabular-nums">
                     {p.interval === null ? "—" : `${p.interval.toFixed(2)}s`}
                 </span>
-                <span className="text-muted-foreground">Producer</span>
+                <span className="text-muted-foreground">Provider</span>
                 <span className="text-right font-mono">{p.producer}</span>
             </div>
         </div>

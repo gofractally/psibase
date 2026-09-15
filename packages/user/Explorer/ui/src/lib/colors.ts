@@ -1,4 +1,4 @@
-/** Deterministic, pleasant color for an arbitrary label (service, producer, ...). */
+/** Deterministic, pleasant color for an arbitrary label (service, provider, ...). */
 export const colorFor = (label: string, saturation = 70, lightness = 58) => {
     let hash = 0;
     for (let i = 0; i < label.length; i++) {

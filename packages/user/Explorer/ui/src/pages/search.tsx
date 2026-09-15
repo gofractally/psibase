@@ -56,7 +56,7 @@ export const SearchPage = () => {
             if (p.name.toLowerCase().includes(lower))
                 for (const a of p.accounts) if (!out.has(a)) out.set(a, p.name);
         }
-        for (const p of producers) if (p.name.includes(lower)) out.set(p.name, "producer");
+        for (const p of producers) if (p.name.includes(lower)) out.set(p.name, "provider");
         return [...out.entries()].slice(0, 30);
     }, [packages.data, producers, lower]);
 

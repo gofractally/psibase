@@ -1,4 +1,4 @@
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, Navigate } from "react-router-dom";
 
 import { AccountPage } from "@/pages/account";
 import { BlockDetailPage } from "@/pages/block-detail";
@@ -6,7 +6,7 @@ import { BlocksPage } from "@/pages/blocks";
 import { DashboardPage } from "@/pages/dashboard";
 import { NetworkPage } from "@/pages/network";
 import { NotFoundPage } from "@/pages/not-found";
-import { ProducersPage } from "@/pages/producers";
+import { ProvidersPage } from "@/pages/providers";
 import { SearchPage } from "@/pages/search";
 import { ServicesPage } from "@/pages/services";
 import { TransactionDetailPage } from "@/pages/transaction-detail";
@@ -24,7 +24,8 @@ export const router = createBrowserRouter([
             { path: "blocks/:blockNum", element: <BlockDetailPage /> },
             { path: "transactions", element: <TransactionsPage /> },
             { path: "tx/:id", element: <TransactionDetailPage /> },
-            { path: "producers", element: <ProducersPage /> },
+            { path: "providers", element: <ProvidersPage /> },
+            { path: "producers", element: <Navigate to="/providers" replace /> },
             { path: "services", element: <ServicesPage /> },
             { path: "network", element: <NetworkPage /> },
             { path: "accounts/:name", element: <AccountPage /> },
