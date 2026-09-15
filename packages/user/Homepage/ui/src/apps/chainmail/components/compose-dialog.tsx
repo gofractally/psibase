@@ -1,14 +1,15 @@
 import type { DraftMessage, Message } from "@/apps/chainmail/types";
 import type { PluginId } from "@psibase/common-lib";
 
-import { zodResolver } from "@hookform/resolvers/zod";
 import { PencilIcon, Reply, Send, SquarePen, X } from "lucide-react";
-import { forwardRef, useEffect, useRef, useState } from "react";
-import { type UseFormReturn, useForm } from "react-hook-form";
+import { forwardRef, useRef, useState } from "react";
 import { z } from "zod";
 
 import { zDraftMessage } from "@/apps/chainmail/types";
 
+import { useAppForm } from "@shared/components/form/app-form";
+import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
+import { FieldErrors } from "@shared/components/form/internal/field-errors";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { zAccount } from "@shared/lib/schemas/account";
 import {
@@ -25,6 +26,7 @@ import {
 import { Button, type ButtonProps } from "@shared/shadcn/ui/button";
 import {
     Dialog,
+    DialogClose,
     DialogContent,
     DialogDescription,
     DialogFooter,
@@ -32,14 +34,8 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@shared/shadcn/ui/dialog";
-import {
-    Form,
-    FormControl,
-    FormField,
-    FormItem,
-    FormMessage,
-} from "@shared/shadcn/ui/form";
 import { Input } from "@shared/shadcn/ui/input";
+import { Label } from "@shared/shadcn/ui/label";
 import { toast } from "@shared/shadcn/ui/sonner";
 import { Textarea } from "@shared/shadcn/ui/textarea";
 import {
@@ -66,6 +62,32 @@ export const zSendMessageSchema = z.object({
     message: z.string().min(1),
 });
 
+const defaultComposeValues = {
+    to: {
+        account: "",
+    },
+    subject: "",
+    message: "",
+};
+
+/**
+ * Normalizes the form values into what gets persisted in a draft.
+ * The recipient is only saved if it matches `validatedRecipient`, the account
+ * most recently confirmed to exist on chain by the account field. Anything
+ * else (empty, partially typed, invalid, or not yet looked up) is saved as "".
+ */
+const toDraftFields = (
+    values: typeof defaultComposeValues,
+    validatedRecipient: string | null,
+) => {
+    const account = values.to.account.trim();
+    return {
+        to: account && account === validatedRecipient ? account : "",
+        subject: values.subject.trim(),
+        body: values.message ?? "",
+    };
+};
+
 export function ComposeDialog({
     trigger,
     message,
@@ -80,100 +102,140 @@ export function ComposeDialog({
     const { mutateAsync } = useSendMessage();
     const invalidateMailboxQueries = useInvalidateMailboxQueries();
 
-    const form = useForm<z.infer<typeof zSendMessageSchema>>({
-        resolver: zodResolver(zSendMessageSchema),
+    const id = useRef<string>("");
+    // Recipient most recently confirmed to exist on chain (via FieldAccountExisting)
+    const validatedRecipient = useRef<string | null>(null);
+
+    const getDraftFields = () =>
+        toDraftFields(form.state.values, validatedRecipient.current);
+
+    const hasDraftContent = () => {
+        const { to, subject, body } = getDraftFields();
+        return Boolean(to || subject || body.trim());
+    };
+
+    const form = useAppForm({
+        defaultValues: defaultComposeValues,
+        validators: {
+            onSubmit: z.object({
+                to: z.object({
+                    account: z.string(),
+                }),
+                subject: z.string().min(1),
+                message: z.string().min(1),
+            }),
+        },
+        onSubmit: async ({ value }) => {
+            const loadingId = toast.loading("Sending message");
+
+            try {
+                // TODO: Improve error detection. This promise resolves with success before the transaction is pushed.
+                await mutateAsync({
+                    to: value.to.account,
+                    subject: value.subject,
+                    message: value.message,
+                });
+                if (!id.current) return;
+                deleteDraftById(id.current);
+                isSent.current = true;
+                form.reset();
+                toast.success("Your message has been sent");
+                setOpen(false);
+                invalidateMailboxQueries(["sent"]);
+            } catch (e: unknown) {
+                toast.error(`${(e as SupervisorError).message}`);
+                console.error(`${(e as SupervisorError).message}`);
+            } finally {
+                toast.dismiss(loadingId);
+            }
+        },
     });
 
-    useEffect(() => {
+    const populateFormFromMessage = () => {
         if (!message) {
-            return form.reset();
+            form.reset();
+            validatedRecipient.current = null;
+            return;
         }
         if (message.isDraft) {
-            form.setValue("to", message.to);
-            form.setValue("subject", message.subject);
-            form.setValue("message", message.body);
+            // Draft recipients were validated before being saved
+            validatedRecipient.current = message.to || null;
+            form.setFieldValue("to", { account: message.to });
+            form.setFieldValue("subject", message.subject);
+            form.setFieldValue("message", message.body);
         } else {
-            form.setValue("to", message.from);
-            form.setValue("subject", `RE: ${message.subject}`);
+            // Replying to an existing on-chain sender
+            validatedRecipient.current = message.from;
+            form.setFieldValue("to", { account: message.from });
+            form.setFieldValue("subject", `RE: ${message.subject}`);
+            form.setFieldValue("message", "");
         }
-    }, [message]);
-
-    const id = useRef<string>("");
+    };
 
     const createDraft = () => {
         if (!id.current || !user) return;
+        if (!hasDraftContent()) return;
+
         const draft = zDraftMessage.parse({
             id: id.current,
             from: user,
-            to: form.getValues().to || "recipient",
             datetime: Date.now(),
             isDraft: true,
             type: "outgoing",
             read: true,
             saved: true,
             inReplyTo: null,
-            subject: form.getValues().subject || "subject here",
-            body: form.getValues().message ?? "",
+            ...getDraftFields(),
         });
         setDrafts([...(allDrafts ?? []), draft]);
     };
 
     const updateDraft = () => {
-        const draft = allDrafts.find((msg) => msg.id === id.current);
-        if (!draft) {
+        const draftIndex = allDrafts.findIndex((msg) => msg.id === id.current);
+
+        if (!hasDraftContent()) {
+            if (draftIndex !== -1 && id.current) {
+                deleteDraftById(id.current);
+            }
+            return;
+        }
+
+        if (draftIndex === -1) {
             createDraft();
-        } else {
-            draft.datetime = Date.now();
-            draft.to = form.getValues().to ?? "";
-            draft.subject = form.getValues().subject ?? "";
-            draft.body = form.getValues().message ?? "";
-            setDrafts(allDrafts);
+            return;
         }
+
+        const nextDrafts = allDrafts.map((draft, index) =>
+            index === draftIndex
+                ? {
+                      ...draft,
+                      datetime: Date.now(),
+                      ...getDraftFields(),
+                  }
+                : draft,
+        );
+        setDrafts(nextDrafts);
     };
 
-    const sendMessage = async () => {
-        const draft = allDrafts.find((msg) => msg.id === id.current);
-        if (!draft) {
-            return console.error("No message found to send");
-        }
+    const validateComposeForm = async () => {
+        const errors = await form.validate("submit");
+        if (Object.keys(errors).length > 0) return false;
 
-        const loadingId = toast.loading("Sending message");
-
-        try {
-            // TODO: Improve error detection. This promise resolves with success before the transaction is pushed.
-            await mutateAsync({
-                to: draft.to,
-                subject: draft.subject,
-                message: draft.body,
-            });
-            if (!id.current) return;
-            deleteDraftById(id.current);
-            isSent.current = true;
-            form.reset();
-            toast.success("Your message has been sent");
-            setOpen(false);
-        } catch (e: unknown) {
-            toast.error(`${(e as SupervisorError).message}`);
-            console.error(`${(e as SupervisorError).message}`);
-        } finally {
-            toast.dismiss(loadingId);
-        }
+        const fieldErrors = await form.validateAllFields("submit");
+        return fieldErrors.length === 0;
     };
 
-    async function onSubmit() {
-        await sendMessage();
-        invalidateMailboxQueries(["sent"]);
-    }
-
-    const onOpenChange = (open: boolean) => {
-        setOpen(open);
-        if (!open) {
-            // if closing
+    const onOpenChange = (nextOpen: boolean) => {
+        setOpen(nextOpen);
+        if (!nextOpen) {
             if (isSent.current) return;
-            if (form.getValues().message.length) {
+            updateDraft();
+            if (hasDraftContent()) {
                 toast.success("Your draft has been saved");
             }
             form.reset();
+            validatedRecipient.current = null;
+            return;
         }
 
         // the ID should be (re)set each time this opens; remember, it stays mounted
@@ -184,25 +246,51 @@ export function ComposeDialog({
             id.current =
                 window.crypto.randomUUID?.() ?? Math.random().toString();
         }
+        populateFormFromMessage();
     };
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             {trigger}
             <DialogContent
-                className="h-[100dvh] max-w-full rounded-none px-4 py-8 sm:h-auto sm:max-w-[600px] sm:p-6"
+                className="flex h-[100dvh] max-h-[100dvh] max-w-full flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[min(90dvh,720px)] sm:max-w-[600px] sm:rounded-lg"
                 onCloseAutoFocus={(e) => {
                     // This helps in not focusing on the trigger after closing the modal
                     e.preventDefault();
                 }}
+                // Only dismiss via the close button or a successful send; ignore overlay
+                // clicks and Escape so a draft isn't closed accidentally.
+                onInteractOutside={(e) => e.preventDefault()}
+                onEscapeKeyDown={(e) => e.preventDefault()}
+                showCloseButton={false}
             >
-                <Form {...form}>
-                    <form
-                        onSubmit={form.handleSubmit(onSubmit)}
-                        className="flex h-full flex-col"
+                <DialogClose asChild>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute top-3 right-3 z-10 sm:top-4 sm:right-4"
+                        aria-label="Close and save draft"
                     >
-                        <DialogHeader>
-                            <DialogTitle>Compose New Message</DialogTitle>
+                        <X className="size-5" />
+                    </Button>
+                </DialogClose>
+                <form.AppForm>
+                    <form
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            void form.handleSubmit();
+                        }}
+                        className="flex min-h-0 flex-1 flex-col"
+                    >
+                        <DialogHeader className="shrink-0 px-4 pt-8 pr-12 sm:px-6 sm:pt-6">
+                            <DialogTitle>
+                                {message?.isDraft
+                                    ? "Edit draft"
+                                    : message
+                                      ? "Reply"
+                                      : "New message"}
+                            </DialogTitle>
                             <DialogDescription>
                                 Send a message to other accounts on chain. This
                                 is for demo purposes only. All messages are
@@ -210,82 +298,82 @@ export function ComposeDialog({
                                 readable.
                             </DialogDescription>
                         </DialogHeader>
-                        <div className="flex flex-grow flex-col gap-4 py-4 sm:grid">
-                            <FormField
-                                control={form.control}
-                                name="to"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormControl>
-                                            <Input
-                                                placeholder="Recipient account name"
-                                                {...field}
-                                                onChange={(e) => {
-                                                    field.onChange(e);
-                                                    updateDraft();
-                                                }}
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
+                        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4 sm:px-6">
+                            <FieldAccountExisting
+                                form={form}
+                                fields="to"
+                                label="To"
+                                description={undefined}
+                                placeholder="Recipient account name"
+                                disabled={false}
+                                onValidate={(account) => {
+                                    validatedRecipient.current =
+                                        account?.accountNum ?? null;
+                                    updateDraft();
+                                }}
                             />
-                            <FormField
-                                control={form.control}
+                            <form.AppField
                                 name="subject"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormControl>
-                                            <Input
-                                                placeholder="Subject"
-                                                {...field}
-                                                onChange={(e) => {
-                                                    field.onChange(e);
-                                                    updateDraft();
-                                                }}
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
+                                listeners={{
+                                    onChange: () => {
+                                        updateDraft();
+                                    },
+                                }}
+                                children={(field) => (
+                                    <div className="flex shrink-0 flex-col gap-2">
+                                        <Label htmlFor="compose-subject">
+                                            Subject
+                                        </Label>
+                                        <Input
+                                            id="compose-subject"
+                                            placeholder="Subject"
+                                            value={field.state.value}
+                                            onBlur={field.handleBlur}
+                                            onChange={(e) => {
+                                                field.handleChange(
+                                                    e.target.value,
+                                                );
+                                            }}
+                                        />
+                                        <FieldErrors meta={field.state.meta} />
+                                    </div>
                                 )}
                             />
-                            <FormField
-                                control={form.control}
+                            <form.AppField
                                 name="message"
-                                render={({ field }) => (
-                                    <FormItem className="flex flex-1 flex-col">
-                                        <FormControl>
-                                            <Textarea
-                                                placeholder="Message"
-                                                className="h-full resize-none text-sm sm:min-h-[200px]"
-                                                {...field}
-                                                onChange={(e) => {
-                                                    field.onChange(e);
-                                                    updateDraft();
-                                                }}
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
+                                listeners={{
+                                    onChange: () => {
+                                        updateDraft();
+                                    },
+                                }}
+                                children={(field) => (
+                                    <div className="flex min-h-0 flex-1 flex-col gap-2">
+                                        <Label htmlFor="compose-message">
+                                            Message
+                                        </Label>
+                                        <Textarea
+                                            id="compose-message"
+                                            placeholder="Write your message..."
+                                            className="field-sizing-fixed min-h-[160px] flex-1 resize-none overflow-y-auto text-sm sm:min-h-[240px]"
+                                            value={field.state.value}
+                                            onBlur={field.handleBlur}
+                                            onChange={(e) => {
+                                                field.handleChange(
+                                                    e.target.value,
+                                                );
+                                            }}
+                                        />
+                                        <FieldErrors meta={field.state.meta} />
+                                    </div>
                                 )}
                             />
                         </div>
-                        <DialogFooter className="flex flex-col-reverse gap-2 pb-4 sm:flex-row sm:justify-between sm:space-x-2 sm:pb-0">
-                            <Button
-                                variant="outline"
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    onOpenChange(false);
-                                }}
-                                className="w-full sm:w-auto"
-                                type="button"
-                            >
-                                <X className="mr-2 h-4 w-4" />
-                                Cancel
-                            </Button>
+                        <DialogFooter className="shrink-0 border-t px-4 py-4 sm:justify-end sm:px-6 sm:pb-6">
                             <AlertDialog>
                                 <AlertDialogTrigger asChild>
-                                    <SendTriggerButton formReturn={form} />
+                                    <SendTriggerButton
+                                        onValidate={validateComposeForm}
+                                    />
                                 </AlertDialogTrigger>
                                 <AlertDialogContent>
                                     <AlertDialogHeader>
@@ -305,9 +393,9 @@ export function ComposeDialog({
                                             Cancel
                                         </AlertDialogCancel>
                                         <AlertDialogAction
-                                            onClick={form.handleSubmit(
-                                                onSubmit,
-                                            )}
+                                            onClick={() => {
+                                                void form.handleSubmit();
+                                            }}
                                         >
                                             Send
                                         </AlertDialogAction>
@@ -316,7 +404,7 @@ export function ComposeDialog({
                             </AlertDialog>
                         </DialogFooter>
                     </form>
-                </Form>
+                </form.AppForm>
             </DialogContent>
         </Dialog>
     );
@@ -325,15 +413,15 @@ export function ComposeDialog({
 export default ComposeDialog;
 
 interface SendTriggerButtonProps extends ButtonProps {
-    formReturn: UseFormReturn<z.infer<typeof zSendMessageSchema>>;
+    onValidate: () => Promise<boolean>;
 }
 
 const SendTriggerButton = forwardRef<HTMLButtonElement, SendTriggerButtonProps>(
-    (props, ref) => {
-        const onClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
-            await props.formReturn.trigger();
-            if (props.formReturn.formState.isValid) {
-                props.onClick?.(e);
+    ({ onValidate, onClick, ...props }, ref) => {
+        const handleClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
+            const isValid = await onValidate();
+            if (isValid) {
+                onClick?.(e);
             }
         };
 
@@ -342,9 +430,9 @@ const SendTriggerButton = forwardRef<HTMLButtonElement, SendTriggerButtonProps>(
                 className="w-full sm:w-auto"
                 {...props}
                 ref={ref}
-                onClick={onClick}
+                onClick={handleClick}
             >
-                <Send className="mr-2 h-4 w-4" />
+                <Send className="mr-2 size-4" />
                 Send Message
             </Button>
         );
@@ -362,8 +450,13 @@ export const ComposeDialogTrigger = ({
         <Tooltip>
             <TooltipTrigger asChild>
                 <DialogTrigger asChild>
-                    <Button variant="ghost" size="icon" disabled={disabled}>
-                        <SquarePen className="h-5 w-5" />
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        disabled={disabled}
+                        aria-label="Compose message"
+                    >
+                        <SquarePen className="size-5" />
                     </Button>
                 </DialogTrigger>
             </TooltipTrigger>
@@ -379,8 +472,8 @@ export const ReplyDialogTrigger = ({
 }) => {
     return (
         <DialogTrigger asChild>
-            <Button variant="outline" disabled={disabled}>
-                <Reply className="mr-2 h-5 w-5" />
+            <Button variant="outline" size="sm" disabled={disabled}>
+                <Reply className="mr-2 size-4" />
                 Reply
             </Button>
         </DialogTrigger>
@@ -396,8 +489,13 @@ export const EditSendDialogTrigger = ({
         <Tooltip>
             <TooltipTrigger asChild>
                 <DialogTrigger asChild>
-                    <Button variant="ghost" size="icon" disabled={disabled}>
-                        <PencilIcon className="h-5 w-5" />
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        disabled={disabled}
+                        aria-label="Edit and send draft"
+                    >
+                        <PencilIcon className="size-5" />
                     </Button>
                 </DialogTrigger>
             </TooltipTrigger>

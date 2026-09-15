@@ -1,18 +1,18 @@
 #[crate::service(name = "staged-tx", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
-    use crate::{AccountNumber, Action, Checksum256, Fracpack, TimePointUSec};
+    use crate::{AccountNumber, Action, Checksum256, Pack, TimePointUSec, Unpack};
     use async_graphql::SimpleObject;
     use fracpack::ToSchema;
     use serde::{Deserialize, Serialize};
 
-    #[derive(Fracpack, Serialize, Deserialize, ToSchema, SimpleObject)]
+    #[derive(Pack, Unpack, Serialize, Deserialize, ToSchema, SimpleObject)]
     #[fracpack(fracpack_mod = "fracpack")]
     pub struct ActionList {
         pub actions: Vec<Action>,
     }
 
-    #[derive(Fracpack, Serialize, Deserialize, ToSchema, SimpleObject)]
+    #[derive(Pack, Unpack, Serialize, Deserialize, ToSchema, SimpleObject)]
     #[fracpack(fracpack_mod = "fracpack")]
     pub struct StagedTx {
         pub id: u32,
