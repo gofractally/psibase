@@ -28,6 +28,8 @@ import { TimeAgo } from "@/components/time-ago";
 import { TransactionsTable } from "@/components/transactions-table";
 
 import { Avatar } from "@shared/components/avatar";
+import { cn } from "@shared/lib/utils";
+import { useProfile } from "@shared/hooks/use-profile";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
@@ -72,6 +74,7 @@ export const AccountPage = () => {
         queryFn: fetchProducersInfo,
         staleTime: 30_000,
     });
+    const profile = useProfile(name || null);
 
     const all = useLiveChain((s) => s.recentTransactions);
     const stats = useLiveChain((s) => s.stats);
@@ -120,47 +123,75 @@ export const AccountPage = () => {
     const lookupFailed = account.isError;
     const exists = lookupFailed ? knownElsewhere : account.data !== null && account.data !== undefined;
     const siteUrl = siblingUrl(null, name, "/");
+    const displayName = profile.data?.profile?.displayName?.trim() || "";
+    const bio = profile.data?.profile?.bio?.trim() || "";
+    const headerDescription = account.isPending
+        ? "Loading…"
+        : lookupFailed
+          ? `Could not verify account with the accounts service (${(account.error as Error).message})`
+          : !exists
+            ? "This account does not exist on the network"
+            : bio || app.data?.shortDesc || pkg?.description || undefined;
 
     return (
         <div className="flex flex-col gap-4">
             <PageHeader
                 title={
-                    <span className="flex items-center gap-3">
+                    <span
+                        className={cn(
+                            "flex gap-3",
+                            displayName ? "items-start" : "items-center",
+                        )}
+                    >
                         <Avatar
                             account={name}
-                            className="size-10 rounded-lg border-2 bg-card object-cover"
+                            className="size-10 shrink-0 rounded-lg border-2 bg-card object-cover"
                             style={{ borderColor: colorFor(name) }}
                         />
-                        <span className="font-mono">{name}</span>
-                        <CopyIcon value={name} />
-                        <span className="flex flex-wrap gap-1.5">
-                            {isService && (
-                                <Badge variant="secondary" className="gap-1">
-                                    <Server className="size-3" /> Service
-                                </Badge>
-                            )}
-                            {isProducer && (
-                                <Badge className="gap-1 bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/15">
-                                    <Radio className="size-3" /> Provider
-                                </Badge>
-                            )}
-                            {app.data && (
-                                <Badge variant="outline" className="gap-1">
-                                    <Store className="size-3" /> {app.data.status || "App"}
-                                </Badge>
-                            )}
+                        <span className="flex min-w-0 flex-col gap-0.5 leading-tight">
+                            {displayName ? (
+                                <span className="truncate text-xl leading-tight">
+                                    {displayName}
+                                </span>
+                            ) : null}
+                            <span className="flex flex-wrap items-center gap-1.5">
+                                <span
+                                    className={
+                                        displayName
+                                            ? "text-muted-foreground font-mono text-sm font-normal"
+                                            : "font-mono"
+                                    }
+                                >
+                                    {name}
+                                </span>
+                                <CopyIcon value={name} />
+                                <span className="flex flex-wrap gap-1.5">
+                                    {isService && (
+                                        <Badge variant="secondary" className="gap-1">
+                                            <Server className="size-3" /> Service
+                                        </Badge>
+                                    )}
+                                    {isProducer && (
+                                        <Badge className="gap-1 bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/15">
+                                            <Radio className="size-3" /> Provider
+                                        </Badge>
+                                    )}
+                                    {app.data && (
+                                        <Badge variant="outline" className="gap-1">
+                                            <Store className="size-3" /> {app.data.status || "App"}
+                                        </Badge>
+                                    )}
+                                </span>
+                            </span>
+                            {displayName && headerDescription ? (
+                                <span className="text-muted-foreground pt-0.5 text-sm font-normal leading-snug">
+                                    {headerDescription}
+                                </span>
+                            ) : null}
                         </span>
                     </span>
                 }
-                description={
-                    account.isPending
-                        ? "Loading…"
-                        : lookupFailed
-                          ? `Could not verify account with the accounts service (${(account.error as Error).message})`
-                          : !exists
-                            ? "This account does not exist on the network"
-                            : app.data?.shortDesc || pkg?.description || `Account secured by ${account.data?.authService}`
-                }
+                description={displayName ? undefined : headerDescription}
                 actions={
                     site.data ? (
                         <Button asChild variant="outline" size="sm" className="h-8">
@@ -225,6 +256,14 @@ export const AccountPage = () => {
                     <KeyValue label="Account">
                         <span className="font-mono">{name}</span>
                     </KeyValue>
+                    {displayName ? (
+                        <KeyValue label="Display name">{displayName}</KeyValue>
+                    ) : null}
+                    {bio ? (
+                        <KeyValue label="Bio">
+                            <span className="text-sm whitespace-pre-wrap">{bio}</span>
+                        </KeyValue>
+                    ) : null}
                     <KeyValue label="Auth service">
                         {account.isPending ? (
                             <Skeleton className="h-4 w-24" />
