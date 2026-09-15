@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate, useSearchParams } from "react-router-dom";
+import { createBrowserRouter, Navigate } from "react-router-dom";
 
 import { Layout } from "@/components/layout";
 import { LoginGate } from "@/components/login-gate";

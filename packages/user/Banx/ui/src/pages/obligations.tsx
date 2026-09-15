@@ -433,15 +433,15 @@ export function ObligationsPage() {
     );
 
     return (
-        <div className="space-y-10">
+        <div className="space-y-6 overflow-x-hidden sm:space-y-10">
             <PageHeader
                 title="Accounts"
                 description="Open obligations as banking products: claims you hold act like savings; amounts you owe act like loans. Grouped by counterparty and currency."
                 action={
-                    <div className="flex gap-2">
+                    <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
                         <Button
                             type="button"
-                            className="gap-1.5"
+                            className="min-h-11 flex-1 gap-1.5 sm:min-h-9 sm:flex-none"
                             onClick={() => setTransferOpen(true)}
                         >
                             <GitBranch className="size-4" />
@@ -454,7 +454,7 @@ export function ObligationsPage() {
                                     size="icon"
                                     variant="outline"
                                     className={cn(
-                                        "size-9 shrink-0 transition-shadow",
+                                        "size-11 shrink-0 sm:size-9 transition-shadow",
                                         globalForwardOn
                                             ? "border-emerald-500/60 text-emerald-700 shadow-[0_0_12px_rgba(16,185,129,0.55)] hover:bg-emerald-500/10 dark:text-emerald-400 dark:shadow-[0_0_14px_rgba(52,211,153,0.45)]"
                                             : "border-red-500/70 text-red-700 shadow-[0_0_14px_rgba(239,68,68,0.65)] hover:bg-red-500/10 dark:text-red-400 dark:shadow-[0_0_16px_rgba(248,113,113,0.5)] animate-pulse",
@@ -482,7 +482,7 @@ export function ObligationsPage() {
                                     size="icon"
                                     variant="outline"
                                     className={cn(
-                                        "size-9 shrink-0 transition-shadow",
+                                        "size-11 shrink-0 sm:size-9 transition-shadow",
                                         globalBuyClaimOn
                                             ? "border-emerald-500/60 text-emerald-700 shadow-[0_0_12px_rgba(16,185,129,0.55)] hover:bg-emerald-500/10 dark:text-emerald-400 dark:shadow-[0_0_14px_rgba(52,211,153,0.45)]"
                                             : "border-red-500/70 text-red-700 shadow-[0_0_14px_rgba(239,68,68,0.65)] hover:bg-red-500/10 dark:text-red-400 dark:shadow-[0_0_16px_rgba(248,113,113,0.5)] animate-pulse",
@@ -569,7 +569,7 @@ export function ObligationsPage() {
                             <Button
                                 type="button"
                                 size="icon"
-                                className="size-9 shrink-0 rounded-full bg-emerald-700 text-white hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+                                className="size-11 shrink-0 rounded-full bg-emerald-700 text-white hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 sm:size-9"
                                 aria-label="Offer a credit line"
                                 onClick={() => {
                                     setEditingLine(null);
@@ -785,7 +785,7 @@ export function ObligationsPage() {
                             <Button
                                 type="button"
                                 size="icon"
-                                className="size-9 shrink-0 rounded-full bg-amber-800 text-white hover:bg-amber-900 dark:bg-amber-600 dark:hover:bg-amber-500"
+                                className="size-11 shrink-0 rounded-full bg-amber-800 text-white hover:bg-amber-900 dark:bg-amber-600 dark:hover:bg-amber-500 sm:size-9"
                                 aria-label="Create deposit or loan"
                                 onClick={() => setCreateOpen(true)}
                             >
@@ -906,14 +906,14 @@ export function ObligationsPage() {
 
             <section className="space-y-4">
                 <div className="flex items-center gap-3">
-                    <div className="bg-muted text-muted-foreground flex size-10 items-center justify-center rounded-xl">
-                        <History className="size-5" />
+                    <div className="bg-muted text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-xl sm:size-10">
+                        <History className="size-4 sm:size-5" />
                     </div>
-                    <div>
-                        <h2 className="text-lg font-semibold tracking-tight">
+                    <div className="min-w-0">
+                        <h2 className="text-base font-semibold tracking-tight sm:text-lg">
                             History
                         </h2>
-                        <p className="text-muted-foreground text-sm">
+                        <p className="text-muted-foreground hidden text-sm sm:block">
                             Payments, claim takes, booked expenses, invoices,
                             and line changes. Newest first.
                         </p>
@@ -993,24 +993,26 @@ function SectionHeader({
             : "bg-amber-500/10 text-amber-900 dark:text-amber-300";
 
     return (
-        <div className="flex items-end justify-between gap-4">
-            <div className="flex items-center gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+            <div className="flex min-w-0 items-center gap-3">
                 <div
                     className={cn(
-                        "flex size-10 items-center justify-center rounded-xl",
+                        "flex size-9 shrink-0 items-center justify-center rounded-xl sm:size-10",
                         iconCls,
                     )}
                 >
-                    <Icon className="size-5" />
+                    <Icon className="size-4 sm:size-5" />
                 </div>
-                <div>
-                    <h2 className="text-lg font-semibold tracking-tight">
+                <div className="min-w-0">
+                    <h2 className="text-base font-semibold tracking-tight sm:text-lg">
                         {title}
                     </h2>
-                    <p className="text-muted-foreground text-sm">{description}</p>
+                    <p className="text-muted-foreground hidden text-sm sm:block">
+                        {description}
+                    </p>
                 </div>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2 self-end sm:self-auto">
                 {count > 0 ? (
                     <Badge variant="secondary" className={badgeCls}>
                         {count} {countLabel}
@@ -1414,6 +1416,48 @@ function CreditLineDialog({
     );
 }
 
+function AccountRowAction({
+    tip,
+    onClick,
+    icon: Icon,
+    label,
+}: {
+    tip: string;
+    onClick: () => void;
+    icon: React.ComponentType<{ className?: string }>;
+    label?: string;
+}) {
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <Button
+                    type="button"
+                    size={label ? "sm" : "icon"}
+                    variant="outline"
+                    className={
+                        label
+                            ? "h-9 shrink-0 gap-1 px-2 text-xs sm:h-8"
+                            : "size-9 shrink-0 sm:size-8"
+                    }
+                    aria-label={tip}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onClick();
+                    }}
+                >
+                    <Icon className="size-3.5" />
+                    {label ? (
+                        <span className="hidden sm:inline">{label}</span>
+                    ) : null}
+                </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-xs">
+                {tip}
+            </TooltipContent>
+        </Tooltip>
+    );
+}
+
 function AccountGroupRow({
     tone,
     title,
@@ -1535,14 +1579,14 @@ function AccountGroupRow({
     return (
         <Collapsible open={open} onOpenChange={setOpen}>
             <div className={cn("w-full", rowBg)}>
-                <div className="flex flex-wrap items-center gap-3 px-4 py-4 sm:flex-nowrap sm:gap-4">
+                <div className="flex items-start gap-2 px-3 py-3 sm:gap-3 sm:px-4 sm:py-4">
                     {hasPositions ? (
                         <CollapsibleTrigger asChild>
                             <Button
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                className="size-8 shrink-0"
+                                className="mt-0.5 size-9 shrink-0 sm:size-8"
                                 aria-label={
                                     open
                                         ? "Collapse obligation details"
@@ -1558,326 +1602,170 @@ function AccountGroupRow({
                             </Button>
                         </CollapsibleTrigger>
                     ) : (
-                        <div className="size-8 shrink-0" aria-hidden />
+                        <div
+                            className="mt-0.5 size-9 shrink-0 sm:size-8"
+                            aria-hidden
+                        />
                     )}
 
                     <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                            <p className="truncate font-semibold tracking-tight">
-                                {title}
-                            </p>
-                            {title !== counterparty ? (
-                                <span className="text-muted-foreground truncate text-xs">
-                                    {counterparty}
-                                </span>
-                            ) : null}
-                            <Badge
-                                variant="outline"
-                                className={cn(
-                                    "font-mono text-xs",
-                                    badgeBorder,
-                                )}
-                            >
-                                {symbol}
-                            </Badge>
-                            {n > 1 ? (
-                                <span className="text-muted-foreground text-xs">
-                                    {n} positions
-                                </span>
-                            ) : null}
-                            {creditLine && !hasPositions ? (
-                                <span className="text-muted-foreground text-xs">
-                                    Credit facility
-                                </span>
-                            ) : null}
-                        </div>
-                        {creditLine &&
-                        limitRaw !== null &&
-                        availableRaw !== null ? (
-                            <p className="text-muted-foreground mt-1 text-xs sm:text-sm">
-                                Limit{" "}
-                                <span className="text-foreground font-mono tabular-nums">
-                                    {formatRawAmount(
-                                        limitRaw.toString(),
-                                        precision,
-                                    )}
-                                </span>
-                                <span className="mx-1.5 opacity-40">·</span>
-                                Available{" "}
-                                <span className="text-foreground font-mono tabular-nums">
-                                    {formatRawAmount(
-                                        availableRaw.toString(),
-                                        precision,
-                                    )}
-                                </span>
-                                {creditLine.depleteOnDebit ? (
-                                    <span className="ml-1.5 opacity-70">
-                                        · non-revolving
-                                    </span>
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                    <p className="truncate font-semibold tracking-tight">
+                                        {title}
+                                    </p>
+                                    {title !== counterparty ? (
+                                        <span className="text-muted-foreground truncate text-xs">
+                                            {counterparty}
+                                        </span>
+                                    ) : null}
+                                    <Badge
+                                        variant="outline"
+                                        className={cn(
+                                            "font-mono text-xs",
+                                            badgeBorder,
+                                        )}
+                                    >
+                                        {symbol}
+                                    </Badge>
+                                    {n > 1 ? (
+                                        <span className="text-muted-foreground text-xs">
+                                            {n} positions
+                                        </span>
+                                    ) : null}
+                                    {creditLine && !hasPositions ? (
+                                        <span className="text-muted-foreground text-xs">
+                                            Credit facility
+                                        </span>
+                                    ) : null}
+                                </div>
+                                {creditLine &&
+                                limitRaw !== null &&
+                                availableRaw !== null ? (
+                                    <p className="text-muted-foreground mt-1 text-xs sm:text-sm">
+                                        Limit{" "}
+                                        <span className="text-foreground font-mono tabular-nums">
+                                            {formatRawAmount(
+                                                limitRaw.toString(),
+                                                precision,
+                                            )}
+                                        </span>
+                                        <span className="mx-1.5 opacity-40">
+                                            ·
+                                        </span>
+                                        Available{" "}
+                                        <span className="text-foreground font-mono tabular-nums">
+                                            {formatRawAmount(
+                                                availableRaw.toString(),
+                                                precision,
+                                            )}
+                                        </span>
+                                        {creditLine.depleteOnDebit ? (
+                                            <span className="ml-1.5 opacity-70">
+                                                · non-revolving
+                                            </span>
+                                        ) : null}
+                                    </p>
                                 ) : null}
-                            </p>
-                        ) : null}
-                    </div>
-
-                    <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-8 shrink-0 gap-1 px-2 text-xs"
-                                    aria-label={historyTip}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setHistoryOpen(true);
-                                    }}
+                            </div>
+                            <div className="shrink-0 text-right">
+                                <p className="text-muted-foreground text-[10px] font-medium tracking-wide uppercase sm:text-xs">
+                                    {balanceLabel}
+                                </p>
+                                <p
+                                    className={cn(
+                                        "font-mono text-lg font-semibold tracking-tight tabular-nums sm:text-2xl",
+                                        amountCls,
+                                    )}
                                 >
-                                    <History className="size-3.5" />
-                                    History
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">
-                                {historyTip}
-                            </TooltipContent>
-                        </Tooltip>
-                        {canEditCreditLine && onEditCreditLine ? (
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        type="button"
-                                        size="icon"
-                                        variant="outline"
-                                        className="size-8 shrink-0"
-                                        aria-label={editTip}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onEditCreditLine();
-                                        }}
-                                    >
-                                        <Pencil className="size-3.5" />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="top">
-                                    {editTip}
-                                </TooltipContent>
-                            </Tooltip>
-                        ) : null}
-                        {onSetRouting ? (
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        type="button"
-                                        size="icon"
-                                        variant="outline"
-                                        className="size-8 shrink-0"
-                                        aria-label={routingTip}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onSetRouting();
-                                        }}
-                                    >
-                                        <Route className="size-3.5" />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="top">
-                                    {routingTip}
-                                </TooltipContent>
-                            </Tooltip>
-                        ) : null}
-                        {onSetBuyClaim ? (
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        type="button"
-                                        size="icon"
-                                        variant="outline"
-                                        className="size-8 shrink-0"
-                                        aria-label={buyClaimTip}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onSetBuyClaim();
-                                        }}
-                                    >
-                                        <Handshake className="size-3.5" />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="top">
-                                    {buyClaimTip}
-                                </TooltipContent>
-                            </Tooltip>
-                        ) : null}
-                        {onBookExpense ? (
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="outline"
-                                        className="h-8 shrink-0 gap-1 px-2 text-xs"
-                                        aria-label={bookExpenseTip}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onBookExpense();
-                                        }}
-                                    >
-                                        <Receipt className="size-3.5" />
-                                        Book
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="top">
-                                    {bookExpenseTip}
-                                </TooltipContent>
-                            </Tooltip>
-                        ) : null}
-                        {onEditBookAuth ? (
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        type="button"
-                                        size="icon"
-                                        variant="outline"
-                                        className="size-8 shrink-0"
-                                        aria-label={bookAuthTip}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onEditBookAuth();
-                                        }}
-                                    >
-                                        <KeyRound className="size-3.5" />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="top">
-                                    {bookAuthTip}
-                                </TooltipContent>
-                            </Tooltip>
-                        ) : null}
-                        {onAskRequest ? (
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="outline"
-                                        className="h-8 shrink-0 gap-1 px-2 text-xs"
-                                        aria-label={requestTip}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onAskRequest();
-                                        }}
-                                    >
-                                        <Inbox className="size-3.5" />
-                                        Request
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="top">
-                                    {requestTip}
-                                </TooltipContent>
-                            </Tooltip>
-                        ) : null}
-                        {onPostSellOffer ? (
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        type="button"
-                                        size="icon"
-                                        variant="outline"
-                                        className="size-8 shrink-0"
-                                        aria-label={postSellTip}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onPostSellOffer();
-                                        }}
-                                    >
-                                        <Store className="size-3.5" />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="top">
-                                    {postSellTip}
-                                </TooltipContent>
-                            </Tooltip>
-                        ) : null}
-                        {onSellClaim ? (
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        type="button"
-                                        size="icon"
-                                        variant="outline"
-                                        className="size-8 shrink-0"
-                                        aria-label={sellTip}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onSellClaim();
-                                        }}
-                                    >
-                                        <ArrowLeftRight className="size-3.5" />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="top">
-                                    {sellTip}
-                                </TooltipContent>
-                            </Tooltip>
-                        ) : null}
-                        {onForgive ? (
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        type="button"
-                                        size="icon"
-                                        variant="outline"
-                                        className="size-8 shrink-0"
-                                        aria-label={forgiveTip}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onForgive();
-                                        }}
-                                    >
-                                        <CircleMinus className="size-3.5" />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="top">
-                                    {forgiveTip}
-                                </TooltipContent>
-                            </Tooltip>
-                        ) : null}
-                        {onBuyPostedClaim ? (
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        type="button"
-                                        size="icon"
-                                        variant="outline"
-                                        className="size-8 shrink-0"
-                                        aria-label={buyPostedTip}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onBuyPostedClaim();
-                                        }}
-                                    >
-                                        <ShoppingCart className="size-3.5" />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="top">
-                                    {buyPostedTip}
-                                </TooltipContent>
-                            </Tooltip>
-                        ) : null}
-                        <div className="min-w-[5.5rem] text-right sm:min-w-[7rem]">
-                            <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-                                {balanceLabel}
-                            </p>
-                            <p
-                                className={cn(
-                                    "font-mono text-xl font-semibold tracking-tight tabular-nums sm:text-2xl",
-                                    amountCls,
-                                )}
-                            >
-                                {amount}
-                                <span className="text-muted-foreground ml-1.5 text-sm font-normal">
-                                    {symbol}
-                                </span>
-                            </p>
+                                    {amount}
+                                    <span className="text-muted-foreground ml-1 text-xs font-normal sm:ml-1.5 sm:text-sm">
+                                        {symbol}
+                                    </span>
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                            <AccountRowAction
+                                tip={historyTip}
+                                icon={History}
+                                label="History"
+                                onClick={() => setHistoryOpen(true)}
+                            />
+                            {canEditCreditLine && onEditCreditLine ? (
+                                <AccountRowAction
+                                    tip={editTip}
+                                    icon={Pencil}
+                                    onClick={onEditCreditLine}
+                                />
+                            ) : null}
+                            {onSetRouting ? (
+                                <AccountRowAction
+                                    tip={routingTip}
+                                    icon={Route}
+                                    onClick={onSetRouting}
+                                />
+                            ) : null}
+                            {onSetBuyClaim ? (
+                                <AccountRowAction
+                                    tip={buyClaimTip}
+                                    icon={Handshake}
+                                    onClick={onSetBuyClaim}
+                                />
+                            ) : null}
+                            {onBookExpense ? (
+                                <AccountRowAction
+                                    tip={bookExpenseTip}
+                                    icon={Receipt}
+                                    label="Book"
+                                    onClick={onBookExpense}
+                                />
+                            ) : null}
+                            {onEditBookAuth ? (
+                                <AccountRowAction
+                                    tip={bookAuthTip}
+                                    icon={KeyRound}
+                                    onClick={onEditBookAuth}
+                                />
+                            ) : null}
+                            {onAskRequest ? (
+                                <AccountRowAction
+                                    tip={requestTip}
+                                    icon={Inbox}
+                                    label="Request"
+                                    onClick={onAskRequest}
+                                />
+                            ) : null}
+                            {onPostSellOffer ? (
+                                <AccountRowAction
+                                    tip={postSellTip}
+                                    icon={Store}
+                                    onClick={onPostSellOffer}
+                                />
+                            ) : null}
+                            {onSellClaim ? (
+                                <AccountRowAction
+                                    tip={sellTip}
+                                    icon={ArrowLeftRight}
+                                    onClick={onSellClaim}
+                                />
+                            ) : null}
+                            {onForgive ? (
+                                <AccountRowAction
+                                    tip={forgiveTip}
+                                    icon={CircleMinus}
+                                    onClick={onForgive}
+                                />
+                            ) : null}
+                            {onBuyPostedClaim ? (
+                                <AccountRowAction
+                                    tip={buyPostedTip}
+                                    icon={ShoppingCart}
+                                    onClick={onBuyPostedClaim}
+                                />
+                            ) : null}
                         </div>
                     </div>
                 </div>
@@ -1886,7 +1774,7 @@ function AccountGroupRow({
                     <CollapsibleContent>
                         <div
                             className={cn(
-                                "border-t px-4 py-3 sm:px-14",
+                                "border-t px-3 py-3 sm:px-14",
                                 expandBg,
                             )}
                         >

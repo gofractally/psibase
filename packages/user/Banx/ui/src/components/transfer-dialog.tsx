@@ -476,7 +476,7 @@ export function TransferDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-2xl">
+            <DialogContent className="flex max-h-[90dvh] w-[calc(100vw-1.5rem)] flex-col sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>
                         {requestId ? `Pay invoice #${requestId}` : "Transfer"}
