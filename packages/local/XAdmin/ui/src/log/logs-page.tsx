@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
+import { useLocalStorage } from "usehooks-ts";
 import { z } from "zod";
 
 import { PageHeading } from "@/components/page-heading";
@@ -24,8 +25,25 @@ import { LogFilterInputs, LogRecord } from "./interfaces";
 
 const MAX_LOGS_ROWS = 20;
 
+const utcLogTimeFormat = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "UTC",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+});
+
+const formatLogTimestamp = (timestamp: Date, useUtc: boolean) =>
+    useUtc ? utcLogTimeFormat.format(timestamp) : timestamp.toLocaleString();
+
 export const LogRecordSchema = z.object({
-    TimeStamp: z.string(),
+    TimeStamp: z
+        .string()
+        .datetime()
+        .transform((timestamp) => new Date(timestamp)),
     Severity: z.string(),
     Message: z.string(),
     RemoteEndpoint: z.string().optional(),
@@ -57,6 +75,7 @@ export const LogsPage = () => {
     > | null>(null);
 
     const [filterError, setFilterError] = useState<string>();
+    const [useUtc, setUseUtc] = useLocalStorage("utc-timestamps", false);
 
     const filterForm = useForm<LogFilterInputs>({
         defaultValues: {
@@ -130,14 +149,30 @@ export const LogsPage = () => {
                 title="Logs"
                 description="Live node logs. Press Enter to apply a filter."
                 actions={
-                    <div className="flex items-center gap-2">
-                        <Label htmlFor="keep-all-logs">Keep all logs</Label>
-                        <Switch
-                            id="keep-all-logs"
-                            onCheckedChange={(checked) =>
-                                (keepAllLogs.current = checked)
-                            }
-                        />
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                            <Label
+                                htmlFor="utc-timestamps"
+                                className="text-muted-foreground font-normal"
+                                title="Show timestamps in 24-hour UTC (yyyy-mm-dd) for timezone-independent screenshots"
+                            >
+                                UTC
+                            </Label>
+                            <Switch
+                                id="utc-timestamps"
+                                checked={useUtc}
+                                onCheckedChange={setUseUtc}
+                            />
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Label htmlFor="keep-all-logs">Keep all logs</Label>
+                            <Switch
+                                id="keep-all-logs"
+                                onCheckedChange={(checked) =>
+                                    (keepAllLogs.current = checked)
+                                }
+                            />
+                        </div>
                     </div>
                 }
             />
@@ -160,7 +195,9 @@ export const LogsPage = () => {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-48">Time</TableHead>
+                            <TableHead className={useUtc ? "w-56" : "w-48"}>
+                                {useUtc ? "Time (UTC)" : "Time"}
+                            </TableHead>
                             <TableHead className="w-28">Severity</TableHead>
                             <TableHead>Message</TableHead>
                         </TableRow>
@@ -171,8 +208,8 @@ export const LogsPage = () => {
                                 key={index}
                                 className={`log log-${row.Severity}`}
                             >
-                                <TableCell className="text-muted-foreground whitespace-nowrap">
-                                    {new Date(row.TimeStamp).toLocaleString()}
+                                <TableCell className="text-muted-foreground whitespace-nowrap tabular-nums">
+                                    {formatLogTimestamp(row.TimeStamp, useUtc)}
                                 </TableCell>
                                 <TableCell>
                                     <Badge

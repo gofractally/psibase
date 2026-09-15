@@ -11,11 +11,11 @@ mod role_map;
 #[psibase::service_tables]
 pub mod tables {
     use async_graphql::SimpleObject;
-    use psibase::{define_flags, AccountNumber, Fracpack, Memo, ToSchema};
+    use psibase::{define_flags, AccountNumber, Memo, Pack, ToSchema, Unpack};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "GuildTable", index = 0)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct Guild {
         #[primary_key]
@@ -32,7 +32,7 @@ pub mod tables {
     }
 
     #[table(name = "RankingTable", index = 1)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct Ranking {
         pub fractal: AccountNumber,
         pub guild: AccountNumber,
@@ -58,7 +58,7 @@ pub mod tables {
     }
 
     #[table(name = "GuildMemberTable", index = 2)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct GuildMember {
         #[graphql(skip)]
@@ -91,7 +91,7 @@ pub mod tables {
     }
 
     #[table(name = "GuildApplicationTable", index = 3)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct GuildApplication {
         #[graphql(skip)]
@@ -115,7 +115,7 @@ pub mod tables {
     }
 
     #[table(name = "GuildInviteTable", index = 4)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct GuildInvite {
         #[primary_key]
@@ -135,7 +135,7 @@ pub mod tables {
     }
 
     #[table(name = "GuildAttestTable", index = 5)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct GuildAttest {
         #[graphql(skip)]
@@ -159,7 +159,7 @@ pub mod tables {
     }
 
     #[table(name = "EvaluationInstanceTable", index = 6)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct EvaluationInstance {
         #[primary_key]
@@ -176,7 +176,7 @@ pub mod tables {
     }
 
     #[table(name = "RoleMapTable", index = 7)]
-    #[derive(Default, Fracpack, SimpleObject, ToSchema, Serialize, Deserialize, Debug)]
+    #[derive(Default, Pack, Unpack, SimpleObject, ToSchema, Serialize, Deserialize, Debug)]
     pub struct RoleMap {
         pub fractal: AccountNumber,
         pub role_id: u8,
@@ -191,7 +191,7 @@ pub mod tables {
     }
 
     #[table(name = "FractalSettingsTable", index = 8)]
-    #[derive(Default, Fracpack, SimpleObject, ToSchema, Serialize, Deserialize, Debug)]
+    #[derive(Default, Pack, Unpack, SimpleObject, ToSchema, Serialize, Deserialize, Debug)]
     pub struct FractalSettings {
         #[primary_key]
         pub fractal: AccountNumber,

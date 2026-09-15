@@ -16,7 +16,11 @@ where
     if new_account.is_subaccount() {
         accounts::Wrapper::call_as(new_account.base()).preapproveAcc(new_account);
     }
-    auth_delegate::Wrapper::call().newAccount(new_account, self_service, true);
+    auth_delegate::Wrapper::call().newAccount(
+        new_account,
+        self_service,
+        accounts::NewAccountMode::REQUIRE_NEW,
+    );
 
     f();
 

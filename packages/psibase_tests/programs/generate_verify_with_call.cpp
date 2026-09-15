@@ -26,16 +26,16 @@ int main(int argc, const char* const* argv)
    transactor<SetCode>  setCode;
 
    AccountNumber alice{"alice"};
-   chain.to<Accounts>().newAccount(alice, AuthAny::service, true);
+   chain.to<Accounts>().newAccount(alice, AuthAny::service, NewAccountMode::requireNew);
 
    expect(chain.pushTransaction(chain.makeTransaction(
-       {accounts.newAccount(SetWasmConfig::service, AuthAny::service, true),
+       {accounts.newAccount(SetWasmConfig::service, AuthAny::service, NewAccountMode::requireNew),
         setCode.from(SetWasmConfig::service)
             .setCode(SetWasmConfig::service, 0, 0, readWholeFile("SetWasmConfig.wasm")),
         setCode.setFlags(SetWasmConfig::service, SetWasmConfig::flags)})));
 
    expect(chain.pushTransaction(chain.makeTransaction(
-       {accounts.newAccount(VerifyWithCall::service, AuthAny::service, true),
+       {accounts.newAccount(VerifyWithCall::service, AuthAny::service, NewAccountMode::requireNew),
         setCode.from(VerifyWithCall::service)
             .setCode(VerifyWithCall::service, 0, 0, readWholeFile("VerifyWithCall.wasm")),
         setCode.setFlags(VerifyWithCall::service, VerifyWithCall::flags)})));
@@ -47,10 +47,10 @@ int main(int argc, const char* const* argv)
 
       transactor<SetCode> setFlags{SetCode::service, SetCode::service};
 
-      expect(chain.pushTransaction(
-          chain.makeTransaction({accounts.newAccount(account, AuthAny::service, true),
-                                 setCode.from(account).setCode(account, 0, 0, nopCode),
-                                 setCode.setFlags(account, VerifyWithCall::flags)})));
+      expect(chain.pushTransaction(chain.makeTransaction(
+          {accounts.newAccount(account, AuthAny::service, NewAccountMode::requireNew),
+           setCode.from(account).setCode(account, 0, 0, nopCode),
+           setCode.setFlags(account, VerifyWithCall::flags)})));
       sigdata.push_back({.sender = VerifyWithCall::service, .service = account});
    }
 

@@ -11,11 +11,11 @@
 
 #[psibase::service_tables]
 pub mod tables {
-    use psibase::{Fracpack, Table, ToSchema};
+    use psibase::{Pack, Table, ToSchema, Unpack};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "ConfigTable", index = 0)]
-    #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug)]
+    #[derive(Default, Pack, Unpack, ToSchema, Serialize, Deserialize, Debug)]
     pub struct ConfigRow {}
     impl ConfigRow {
         #[primary_key]
@@ -75,7 +75,11 @@ mod service {
 
         // 1. Create accounts with auth-any
         for &acct in &TEST_ACCOUNTS {
-            Accounts::call().newAccount(acct, AuthAny::SERVICE, true);
+            Accounts::call().newAccount(
+                acct,
+                AuthAny::SERVICE,
+                psibase::services::accounts::NewAccountMode::MATCH_EXISTING,
+            );
         }
 
         // 2. Apply each account to the system guild
