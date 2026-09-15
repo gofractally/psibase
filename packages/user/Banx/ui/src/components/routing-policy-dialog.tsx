@@ -589,10 +589,7 @@ export function RoutingPolicyDialog({
                     <DialogDescription>
                         Sit in the middle of a path pay for this asset. Post
                         anytime; at pay time the next creditor still needs a
-                        line to you (or a live claim either way). Closed by default:
-                        you must have lined them too (limit 0 is enough). Turn
-                        on allow-unknown to skip that. This does not buy
-                        claims — post a buy-claim offer for that.
+                        line to you.
                     </DialogDescription>
                 </DialogHeader>
                 <form

@@ -450,8 +450,7 @@ export function SellClaimDialog({
                                 <span className="text-foreground font-medium">
                                     {target.debtor}
                                 </span>{" "}
-                                ({target.symbol}). They must know you (a
-                                line to you, or a live claim). New exposure
+                                ({target.symbol}). New exposure
                                 needs your credit line to them with enough
                                 capacity. You get the claim on{" "}
                                 {target.debtor}; the seller receives face
