@@ -12,6 +12,7 @@ import {
 import { useLiveChain, useNow } from "@/store/use-live-chain";
 
 import { AccountLink } from "@/components/account-link";
+import { Avatar } from "@shared/components/avatar";
 import { BlockStrip } from "@/components/block-strip";
 import { PageHeader, Panel } from "@/components/page-header";
 import { ProducerRing } from "@/components/producer-ring";
@@ -182,12 +183,11 @@ export const ProvidersPage = () => {
                                         <tr key={name} className="hover:bg-accent/40 border-b last:border-b-0">
                                             <td className="px-3 py-2">
                                                 <span className="flex items-center gap-2">
-                                                    <span
-                                                        className="flex size-7 items-center justify-center rounded-full font-mono text-[10px] font-semibold text-white"
-                                                        style={{ backgroundColor: colorFor(name) }}
-                                                    >
-                                                        {name.slice(0, 2).toUpperCase()}
-                                                    </span>
+                                                    <Avatar
+                                                        account={name}
+                                                        className="size-7 rounded-full border bg-card object-cover"
+                                                        style={{ borderColor: colorFor(name) }}
+                                                    />
                                                     <AccountLink name={name} dot={false} />
                                                 </span>
                                             </td>
