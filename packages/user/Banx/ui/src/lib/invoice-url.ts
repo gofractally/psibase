@@ -15,7 +15,7 @@ export function invoicePaySearch(r: PayRequest): URLSearchParams {
 /** Absolute Transfer URL a payer can open (or scan) to pay this invoice. */
 export function invoicePayUrl(r: PayRequest): string {
     return new URL(
-        `/path-pay?${invoicePaySearch(r).toString()}`,
+        `/accounts?${invoicePaySearch(r).toString()}`,
         window.location.origin,
     ).href;
 }

@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import {
     ArrowLeftRight,
     Building2,
     ChevronDown,
     CircleMinus,
+    GitBranch,
     History,
     Pencil,
     PiggyBank,
@@ -21,6 +23,10 @@ import {
 import { AccountHistoryDialog } from "@/components/account-history";
 import { ActivityFeed } from "@/components/activity-feed";
 import { ClaimedInviteNicks } from "@/components/claimed-invite-nicks";
+import {
+    TransferDialog,
+    transferPrefillFromSearch,
+} from "@/components/transfer-dialog";
 import { BookAuthDialog } from "@/components/book-auth-dialog";
 import { BookExpenseDialog } from "@/components/book-expense-dialog";
 import {
@@ -298,6 +304,15 @@ function spendableBookAuth(
 export function ObligationsPage() {
     const { data: user } = useCurrentUser();
     const { label } = useBanxContacts("/accounts");
+    const [searchParams, setSearchParams] = useSearchParams();
+    const urlTransferPrefill = useMemo(
+        () => transferPrefillFromSearch(searchParams),
+        [searchParams],
+    );
+    const [transferOpen, setTransferOpen] = useState(!!urlTransferPrefill);
+    useEffect(() => {
+        if (urlTransferPrefill) setTransferOpen(true);
+    }, [urlTransferPrefill]);
     const { data: obs = [], isLoading: obsLoading } = useObligations();
     const { data: lines = [], isLoading: linesLoading } = useCreditLines();
     const { data: forwardOffers = [] } = useForwardOffers();
@@ -424,6 +439,14 @@ export function ObligationsPage() {
                 description="Open obligations as banking products: claims you hold act like savings; amounts you owe act like loans. Grouped by counterparty and currency."
                 action={
                     <div className="flex gap-2">
+                        <Button
+                            type="button"
+                            className="gap-1.5"
+                            onClick={() => setTransferOpen(true)}
+                        >
+                            <GitBranch className="size-4" />
+                            Transfer
+                        </Button>
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <Button
@@ -482,6 +505,17 @@ export function ObligationsPage() {
                         </Tooltip>
                     </div>
                 }
+            />
+
+            <TransferDialog
+                open={transferOpen}
+                onOpenChange={(open) => {
+                    setTransferOpen(open);
+                    if (!open && urlTransferPrefill) {
+                        setSearchParams({}, { replace: true });
+                    }
+                }}
+                prefill={urlTransferPrefill}
             />
 
             <RoutingPolicyDialog

@@ -68,7 +68,7 @@ export function RequestsPage() {
     );
 
     const fulfillInvoice = (r: PayRequest) => {
-        navigate(`/path-pay?${invoicePaySearch(r).toString()}`);
+        navigate(`/accounts?${invoicePaySearch(r).toString()}`);
     };
 
     const fulfillBook = async (r: PayRequest) => {

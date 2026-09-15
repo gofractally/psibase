@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from "react-router-dom";
+import { createBrowserRouter, Navigate, useSearchParams } from "react-router-dom";
 
 import { Layout } from "@/components/layout";
 import { LoginGate } from "@/components/login-gate";
@@ -7,7 +7,6 @@ import { CashPage } from "@/pages/cash";
 import { InvitePage } from "@/pages/invite";
 import { InvitesPage } from "@/pages/invites";
 import { ObligationsPage } from "@/pages/obligations";
-import { PathPayPage } from "@/pages/path-pay";
 import { PayeesPage } from "@/pages/payees";
 import { PoliciesPage } from "@/pages/policies";
 import { RequestsPage } from "@/pages/requests";
@@ -27,7 +26,6 @@ export const router = createBrowserRouter([
             { path: "payees", element: withGate(<PayeesPage />) },
             { path: "invites", element: withGate(<InvitesPage />) },
             { path: "invite", element: <InvitePage /> },
-            { path: "path-pay", element: withGate(<PathPayPage />) },
             { path: "requests", element: withGate(<RequestsPage />) },
             { path: "cash", element: withGate(<CashPage />) },
             { path: "policies", element: withGate(<PoliciesPage />) },

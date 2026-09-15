@@ -3,7 +3,6 @@ import {
     Banknote,
     Coins,
     Contact,
-    GitBranch,
     Inbox,
     ScrollText,
     UserPlus,
@@ -25,7 +24,6 @@ const items: {
     end?: boolean;
 }[] = [
     { to: "/accounts", label: "Accounts", icon: ScrollText },
-    { to: "/path-pay", label: "Transfer", icon: GitBranch },
     { to: "/requests", label: "Requests", icon: Inbox },
     { to: "/payees", label: "Payees", icon: Contact },
     { to: "/invites", label: "Invites", icon: UserPlus },

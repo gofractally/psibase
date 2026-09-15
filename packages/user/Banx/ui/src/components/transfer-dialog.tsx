@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
 
 import { Check, ChevronDown, Loader2, XCircle } from "lucide-react";
 
 import { defaultAssetId } from "@/components/asset-select";
 import { AssetField } from "@/components/form-fields";
-import { PageHeader } from "@/components/page-header";
 import { useAssetMap } from "@/hooks/use-assets";
 import {
     type PathHopQuote,
@@ -49,14 +47,37 @@ function feeIsPositive(fee: string | undefined): boolean {
     return Number.isFinite(n) ? n > 0 : displayAmount(fee) !== "0";
 }
 
-function parseAssetParam(
+export type TransferPrefill = {
+    payee?: string;
+    amount?: string;
+    fromAsset?: number;
+    toAsset?: number;
+    requestId?: number;
+};
+
+export function transferPrefillFromSearch(
     params: URLSearchParams,
-    key: string,
+): TransferPrefill | null {
+    const requestId = Number(params.get("request") || "") || 0;
+    const payee = params.get("payee")?.trim() || undefined;
+    if (!requestId && !payee) return null;
+    const fromAsset = Number(params.get("fromAsset") || "") || 0;
+    const toAsset = Number(params.get("toAsset") || "") || 0;
+    return {
+        payee,
+        amount: params.get("amount") || undefined,
+        fromAsset: fromAsset > 0 ? fromAsset : undefined,
+        toAsset: toAsset > 0 ? toAsset : undefined,
+        requestId: requestId || undefined,
+    };
+}
+
+function parseAssetId(
+    id: number | undefined,
     assets: { id: number }[],
 ): number | undefined {
-    const n = Number(params.get(key) || "");
-    if (!Number.isFinite(n) || n <= 0) return undefined;
-    return assets.some((a) => a.id === n) ? n : undefined;
+    if (id === undefined || !Number.isFinite(id) || id <= 0) return undefined;
+    return assets.some((a) => a.id === id) ? id : undefined;
 }
 
 type FindValues = {
@@ -159,15 +180,24 @@ function AutoFindPath({
     return null;
 }
 
-export function PathPayPage() {
+export function TransferDialog({
+    open,
+    onOpenChange,
+    prefill,
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    prefill?: TransferPrefill | null;
+}) {
     const { data: user } = useCurrentUser();
     const { assets, byId, precisionOf, symbolOf, isSuccess: assetsReady } =
         useAssetMap();
     const pathPay = usePathPay();
     const payInvoice = usePayInvoice();
     const quotePath = useQuotePath();
-    const [searchParams] = useSearchParams();
-    const requestId = Number(searchParams.get("request") || "0") || 0;
+    const requestId = prefill?.requestId && prefill.requestId > 0
+        ? prefill.requestId
+        : 0;
 
     const [quote, setQuote] = useState<QuoteSummary | null>(null);
     const [quotedKey, setQuotedKey] = useState<string | null>(null);
@@ -192,17 +222,17 @@ export function PathPayPage() {
 
     const findForm = useAppForm({
         defaultValues: {
-            payee: searchParams.get("payee") ?? "",
+            payee: prefill?.payee ?? "",
             fromAsset: undefined as number | undefined,
             toAsset: undefined as number | undefined,
             maxHops: "6",
-            amount: "1",
+            amount: prefill?.amount ?? "1",
             /**
              * Fee mode:
              * - `send`  = exact-in: amount is what you send (payee covers fees)
              * - `receive` = exact-out: amount is what payee gets (you cover fees)
              */
-            feeMode: (searchParams.get("request")
+            feeMode: (prefill?.requestId
                 ? "receive"
                 : "send") as "send" | "receive",
         },
@@ -306,14 +336,12 @@ export function PathPayPage() {
             if (cleaned.length === 0) return;
             if (requestId) {
                 const invoicePayee = (
-                    searchParams.get("payee") ||
+                    prefill?.payee ||
                     findForm.state.values.payee
                 ).trim();
-                const parsedAsset = Number(searchParams.get("toAsset") || "");
                 const invoiceAsset =
-                    Number.isFinite(parsedAsset) && parsedAsset > 0
-                        ? parsedAsset
-                        : findForm.state.values.toAsset;
+                    parseAssetId(prefill?.toAsset, assets) ??
+                    findForm.state.values.toAsset;
                 const last = cleaned[cleaned.length - 1];
                 if (
                     !invoicePayee ||
@@ -365,19 +393,18 @@ export function PathPayPage() {
     });
 
     useEffect(() => {
-        if (!assetsReady || assets.length === 0) return;
-        const payee = searchParams.get("payee");
-        const amount = searchParams.get("amount");
+        if (!open || !assetsReady || assets.length === 0) return;
+        const payee = prefill?.payee;
+        const amount = prefill?.amount;
         const toAsset =
-            parseAssetParam(searchParams, "toAsset", assets) ??
-            defaultAssetId(assets);
+            parseAssetId(prefill?.toAsset, assets) ?? defaultAssetId(assets);
         const fromAsset =
-            parseAssetParam(searchParams, "fromAsset", assets) ?? toAsset;
-        if (payee) findForm.setFieldValue("payee", payee);
+            parseAssetId(prefill?.fromAsset, assets) ?? toAsset;
+        findForm.setFieldValue("payee", payee?.trim() ?? "");
+        findForm.setFieldValue("amount", amount ?? "1");
         if (amount) {
-            findForm.setFieldValue("amount", amount);
             execForm.setFieldValue("minReturn", amount);
-            if (searchParams.get("request")) {
+            if (requestId) {
                 execForm.setFieldValue("amount", amount);
             }
         }
@@ -385,11 +412,17 @@ export function PathPayPage() {
         if (fromAsset !== undefined) {
             findForm.setFieldValue("fromAsset", fromAsset);
         }
-        if (searchParams.get("request")) {
-            findForm.setFieldValue("feeMode", "receive");
-        }
+        findForm.setFieldValue("feeMode", requestId ? "receive" : "send");
+        rememberQuotedKey(null);
+        rememberFailedKey(null);
+        setQuoteError(null);
+        setQuote(null);
+        setConfirmOpen(false);
+        setAdvancedOpen(false);
+        quotingKeyRef.current = null;
+        quoteSeq.current += 1;
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [searchParams, assetsReady, assets]);
+    }, [open, prefill, assetsReady, assets, requestId]);
 
     const addHop = () => {
         const hops = execForm.state.values.hops;
@@ -433,6 +466,7 @@ export function PathPayPage() {
         ]);
         execForm.setFieldValue("amount", "");
         execForm.setFieldValue("minReturn", "");
+        onOpenChange(false);
     };
     clearAfterPayRef.current = clearAfterPay;
 
@@ -441,17 +475,19 @@ export function PathPayPage() {
     };
 
     return (
-        <div className="space-y-8">
-            <PageHeader
-                title="Transfer"
-                description={
-                    requestId
-                        ? `Pay invoice #${requestId}. A path is quoted as you fill this in.`
-                        : "Send along a path of credit. A route is quoted as you fill this in."
-                }
-            />
-
-            <section className="grid max-w-2xl gap-4 rounded-lg border p-4">
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle>
+                        {requestId ? `Pay invoice #${requestId}` : "Transfer"}
+                    </DialogTitle>
+                    <DialogDescription>
+                        {requestId
+                            ? "A path is quoted as you fill this in."
+                            : "Send along a path of credit. A route is quoted as you fill this in."}
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
                 <findForm.Subscribe
                     selector={(s) => s.values}
                     children={(values) => (
@@ -1164,7 +1200,8 @@ export function PathPayPage() {
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
-            </section>
-        </div>
+                </div>
+            </DialogContent>
+        </Dialog>
     );
 }
