@@ -165,9 +165,9 @@ impl Fractal {
 
     fn take_donations(&self) -> Quantity {
         let key = donation_sub_account(self.account);
-        let Some(amount) = Tokens::call().getSubBal(self.token_id, key.clone()) else {
-            return 0.into();
-        };
+        let amount = Tokens::call()
+            .getSubBal(self.token_id, key.clone())
+            .unwrap_or(0.into());
         if amount.value == 0 {
             return 0.into();
         }
