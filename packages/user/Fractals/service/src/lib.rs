@@ -19,6 +19,7 @@ pub mod service {
             auth_dyn::{self, policy::DynamicAuthPolicy},
             fractals::{action_structs as Actns, occu_wrapper, FractalRole},
             setcode as SetCode, staged_tx as StagedTx,
+            tokens::{Quantity, Wrapper as Tokens, TID},
             transact::ServiceMethod,
         },
         *,
@@ -161,6 +162,45 @@ pub mod service {
         Fractal::get_assert(fractal).distribute_tokens();
     }
 
+    /// Donate tokens to the fractal that issued `token_id`.
+    ///
+    /// Debits `amount` from the sender into a `{fractal}+donations` Tokens
+    /// sub-balance. [`dist_token`] later splits that sub-balance to members
+    /// with the same shares as the fractal token stream.
+    ///
+    /// # Arguments
+    /// * `token_id` - Fractal token being donated.
+    /// * `amount` - Amount to debit from the sender.
+    #[action]
+    fn donate(token_id: TID, amount: Quantity) {
+        let fractal = Fractal::get_by_token_assert(token_id);
+        Tokens::call().debit(token_id, get_sender(), amount, "Fractal donate".into());
+        fractal.hold_donation(amount);
+        Wrapper::emit()
+            .history()
+            .donated(fractal.account, get_sender(), token_id, amount);
+    }
+
+    /// Contribute income to the fractal that issued `token_id`.
+    ///
+    /// Debits `amount` from the sender and deposits it into that fractal's
+    /// vesting stream. [`dist_token`] later withdraws vested income and splits
+    /// it to members.
+    ///
+    /// # Arguments
+    /// * `token_id` - Fractal token being deposited.
+    /// * `amount` - Amount to debit from the sender.
+    #[action]
+    fn income(token_id: TID, amount: Quantity) {
+        let fractal = Fractal::get_by_token_assert(token_id);
+        Tokens::call().debit(token_id, get_sender(), amount, "Fractal income".into());
+        RewardStream::get_assert(fractal.account, fractal.account)
+            .deposit(amount, "Fractal income".into());
+        Wrapper::emit()
+            .history()
+            .received_income(fractal.account, get_sender(), token_id, amount);
+    }
+
     /// Sets the occupation used to authorize the specified fractal role.
     ///
     /// # Arguments
@@ -266,6 +306,18 @@ pub mod service {
 
     #[event(history)]
     pub fn joined_fractal(fractal_account: AccountNumber, account: AccountNumber) {}
+
+    #[event(history)]
+    pub fn donated(fractal: AccountNumber, donor: AccountNumber, token_id: TID, amount: Quantity) {}
+
+    #[event(history)]
+    pub fn received_income(
+        fractal: AccountNumber,
+        payer: AccountNumber,
+        token_id: TID,
+        amount: Quantity,
+    ) {
+    }
 }
 
 #[cfg(test)]
