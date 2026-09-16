@@ -98,6 +98,11 @@ namespace psibase
       return {};
    }
 
+   void HttpHeader::remove(std::vector<HttpHeader>& headers, std::string_view name)
+   {
+      std::erase_if(headers, [name](const HttpHeader& header) { return header.matches(name); });
+   }
+
    std::vector<std::string_view> HttpHeader::split(const std::vector<HttpHeader>& headers,
                                                    std::string_view               name)
    {
@@ -120,7 +125,7 @@ namespace psibase
       return result;
    }
 
-   std::pair<std::string, std::string> HttpRequest::readQueryItem(std::string_view& query)
+   std::pair<std::string, std::string> detail::readQueryItem(std::string_view& query)
    {
       auto end   = query.find('&');
       auto split = query.substr(0, end).find('=');
@@ -139,14 +144,15 @@ namespace psibase
       return {decode_pct(key), decode_pct(value)};
    }
 
-   std::string HttpRequest::path() const
+   std::string detail::targetPath(std::string_view target)
    {
       return decode_pct(std::string_view(target).substr(0, target.find('?')));
    }
 
-   std::vector<std::string_view> HttpRequest::getCookie(std::string_view name) const
+   std::vector<std::string_view> HttpHeader::getCookie(const std::vector<HttpHeader>& headers,
+                                                       std::string_view               name)
    {
-      if (auto cookieHeader = getHeader("cookie"))
+      if (auto cookieHeader = get(headers, "cookie"))
       {
          std::vector<std::string_view> values;
          for (auto kvrange : *cookieHeader | std::views::split(';'))
@@ -165,17 +171,8 @@ namespace psibase
       return {};
    }
 
-   std::optional<std::string_view> HttpRequest::getHeader(std::string_view name) const
-   {
-      return HttpHeader::get(headers, name);
-   }
-
-   std::vector<std::string_view> HttpRequest::getHeaderValues(std::string_view name) const
-   {
-      return HttpHeader::split(headers, name);
-   }
-
-   void HttpRequest::removeCookies(const std::function<bool(std::string_view)>& cond)
+   void HttpHeader::removeCookies(std::vector<HttpHeader>&                     headers,
+                                  const std::function<bool(std::string_view)>& cond)
    {
       for (auto iter = headers.begin(); iter != headers.end();)
       {
@@ -209,16 +206,6 @@ namespace psibase
          }
          ++iter;
       }
-   }
-
-   void HttpRequest::removeCookie(std::string_view name)
-   {
-      removeCookies([name](std::string_view key) { return key == name; });
-   }
-
-   void HttpRequest::removeHeader(std::string_view name)
-   {
-      std::erase_if(headers, [name](const HttpHeader& header) { return header.matches(name); });
    }
 
    bool isLocalhost(const HttpRequest& request)

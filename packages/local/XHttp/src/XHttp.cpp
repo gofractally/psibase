@@ -80,7 +80,7 @@ namespace
           info);
    }
 
-   std::string getUrl(const HttpRequest&           req,
+   std::string getUrl(const HttpRequestRef&        req,
                       std::int32_t                 socket,
                       std::string_view             rootHost,
                       std::optional<AccountNumber> subdomain = {})
@@ -156,7 +156,7 @@ namespace
       return result;
    }
 
-   void sendNotFound(std::int32_t sock, const HttpRequest& req)
+   void sendNotFound(std::int32_t sock, const HttpRequestRef& req)
    {
       auto reply = error(HttpStatus::notFound, "The resource '" + req.target + "' was not found");
       psibase::socketSend(sock, psio::to_frac(std::move(reply)));
@@ -668,8 +668,7 @@ extern "C" [[clang::export_name("serve")]] void serve()
    auto act                    = getCurrentActionView();
    psibase::internal::receiver = act->service();
 
-   auto [sock, req] = psio::from_frac<std::tuple<std::int32_t, HttpRequest>>(act->rawData());
-   act.reset();
+   auto [sock, req] = psio::from_frac<std::tuple<std::int32_t, HttpRequestRef>>(act->rawData());
 
    auto owned    = Temporary{getReceiver(), KvMode::readWrite}.open<TempPendingRequestTable>();
    auto rootHost = getRootHost(req.host);
