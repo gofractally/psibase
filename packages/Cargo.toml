@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "system/Accounts/plugin/accounts/",
-    "system/Accounts/plugin/query/",
+    "system/Accounts/plugin/chain-query/",
     "system/AuthAny/plugin/",
     "system/AuthDelegate/plugin/",
     "system/AuthSig/plugin/",
@@ -16,6 +16,7 @@ members = [
     "user/Config/plugin",
     "user/FractalCore/plugin",
     "user/Homepage/plugin",
+    "user/Host/plugin/accounts",
     "user/Host/plugin/auth",
     "user/Host/plugin/crypto",
     "user/Host/plugin/client",
