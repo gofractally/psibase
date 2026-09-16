@@ -31,12 +31,6 @@ pub fn component_name(_item: TokenStream) -> TokenStream {
     component_name_macro_impl()
 }
 
-// TODO: remove
-#[proc_macro_derive(Fracpack, attributes(fracpack))]
-pub fn derive_fracpack(input: TokenStream) -> TokenStream {
-    fracpack_macro_impl(input, true, true)
-}
-
 #[proc_macro_derive(Pack, attributes(fracpack))]
 pub fn derive_pack(input: TokenStream) -> TokenStream {
     fracpack_macro_impl(input, true, false)

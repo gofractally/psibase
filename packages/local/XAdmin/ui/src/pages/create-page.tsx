@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { crypto } from "wasm-transpiled";
@@ -72,6 +72,21 @@ const isRequestingUpdate = (data: unknown): data is RequestUpdate =>
 const isBootCompleteUpdate = (data: unknown): data is BootCompleteUpdate =>
     BootCompleteSchema.safeParse(data).success;
 
+const Step = {
+    ChainType: "CHAIN_TYPE",
+    BlockProducer: "BLOCK_PRODUCER",
+    KeyDevice: "KEY_DEVICE",
+    PreBootConfirmation: "PRE_BOOT_CONFIRMATION",
+    Boot: "BOOT",
+    SaveKey: "SAVE_KEY",
+    ConfirmKey: "CONFIRM_KEY",
+    BootComplete: "BOOT_COMPLETE",
+} as const;
+
+type StepKey = (typeof Step)[keyof typeof Step];
+
+const initialLoadingStates = [{ text: "Preparing transactions" }];
+
 export const CreatePage = () => {
     const navigate = useNavigate();
     const [didSaveKey, setDidSaveKey] = useState(false);
@@ -134,19 +149,6 @@ export const CreatePage = () => {
             next();
         },
     });
-
-    const Step = {
-        ChainType: "CHAIN_TYPE",
-        BlockProducer: "BLOCK_PRODUCER",
-        KeyDevice: "KEY_DEVICE",
-        PreBootConfirmation: "PRE_BOOT_CONFIRMATION",
-        Boot: "BOOT",
-        SaveKey: "SAVE_KEY",
-        ConfirmKey: "CONFIRM_KEY",
-        BootComplete: "BOOT_COMPLETE",
-    } as const;
-
-    type StepKey = (typeof Step)[keyof typeof Step];
 
     const {
         canNext,
@@ -220,18 +222,23 @@ export const CreatePage = () => {
         show: false,
     });
 
+    const confirmRowChange = useCallback(async (warning: {
+        removedPackage: PackageInfo;
+        dependencies: PackageInfo[];
+    }) => {
+        setWarningState({
+            removingPackage: warning.removedPackage,
+            dependencies: warning.dependencies,
+            show: true,
+        });
+        return new Promise<boolean>((resolve) => {
+            prom = resolve;
+        });
+    }, []);
+
     const [rows, setRows, overWriteRows] = useSelectedRows(
         packages,
-        async (warning) => {
-            setWarningState({
-                removingPackage: warning.removedPackage,
-                dependencies: warning.dependencies,
-                show: true,
-            });
-            return new Promise((resolve) => {
-                prom = resolve;
-            });
-        },
+        confirmRowChange,
     );
 
     useEffect(() => {
@@ -243,11 +250,10 @@ export const CreatePage = () => {
 
             overWriteRows(state);
         }
-    }, [currentStep]);
+    }, [currentStep, overWriteRows, suggestedSelection]);
 
     const [loading, setLoading] = useState(false);
 
-    const initialLoadingStates = [{ text: "Preparing transactions" }];
     const [loadingStates, setLoadingStates] =
         useState<{ text: string }[]>(initialLoadingStates);
 
@@ -329,7 +335,18 @@ export const CreatePage = () => {
                 installRan.current = false;
             }
         }
-    }, [currentStep, rows, config]);
+    }, [
+        currentStep,
+        rows,
+        config,
+        isDev,
+        keyDevice,
+        packages,
+        createAndSetKey,
+        blockProducerForm,
+        toast,
+        next,
+    ]);
 
     if (currentStep === Step.BootComplete) {
         return (

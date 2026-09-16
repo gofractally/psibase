@@ -32,11 +32,11 @@
       using psio::from_json;                                      \
       from_json(obj.value, stream);                               \
    }                                                              \
-   inline auto& clio_unwrap_packable(Name& obj)                   \
+   inline auto& psio_unwrap_packable(Name& obj)                   \
    {                                                              \
       return obj.value;                                           \
    }                                                              \
-   inline const auto& clio_unwrap_packable(const Name& obj)       \
+   inline const auto& psio_unwrap_packable(const Name& obj)       \
    {                                                              \
       return obj.value;                                           \
    }

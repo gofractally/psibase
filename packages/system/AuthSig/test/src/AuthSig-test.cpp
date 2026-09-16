@@ -221,3 +221,32 @@ SCENARIO("AuthSig")
       }
    }
 }
+
+SCENARIO("AuthSig::newAccount does not overwrite an existing account key")
+{
+   DefaultTestChain t;
+
+   auto victim = t.from(t.addAccount("victim00"_a)).with({alice_keys});
+   t.setAuth<AuthSig::AuthSig>(victim.id, alice_keys.first);
+
+   auto attacker = t.from(t.addAccount("attacker"_a)).with({bob_keys});
+   t.setAuth<AuthSig::AuthSig>(attacker.id, bob_keys.first);
+
+   THEN("an attacker cannot take over the victim via newAccount")
+   {
+      REQUIRE(attacker.to<AuthSig::AuthSig>().newAccount(victim.id, bob_keys.first)
+                  .failed("account already exists"));
+
+      REQUIRE(victim.to<AuthSig::AuthSig>().setKey(alice_keys.first).succeeded());
+
+      auto stolen = t.from(victim.id).with({bob_keys});
+      REQUIRE(stolen.to<AuthSig::AuthSig>().setKey(bob_keys.first).failed(""));
+   }
+
+   THEN("newAccount still creates a genuinely new account")
+   {
+      REQUIRE(attacker.to<AuthSig::AuthSig>().newAccount("newuser00"_a, bob_keys.first).succeeded());
+      auto fresh = t.from("newuser00"_a).with({bob_keys});
+      REQUIRE(fresh.to<AuthSig::AuthSig>().setKey(bob_keys.first).succeeded());
+   }
+}

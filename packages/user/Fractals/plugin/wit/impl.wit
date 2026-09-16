@@ -11,4 +11,5 @@ world impl {
     export user-fractal;
     export queries;
     export types;
+    export authorized;
 }

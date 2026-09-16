@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { GUILDS_SERVICE } from "@shared/domains/fractal/lib/constants";
-import { graphql } from "@shared/lib/graphql";
+import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { guilds } from "@shared/lib/plugins";
 import { zAccount } from "@shared/lib/schemas/account";
 
 export const zGroupFinishes = z.object({
@@ -34,7 +34,10 @@ export const getEvaluationResults = async (evaluationId: number) => {
         }
     }`;
 
-    const results = await graphql(gql, { service: GUILDS_SERVICE });
+    const results = await callGraphqlViaPlugin(
+        guilds.authorized.graphql,
+        gql,
+    );
 
     const response = z
         .object({

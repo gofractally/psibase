@@ -35,6 +35,10 @@ impl Api for HostClient {
         url.to_string().trim_end_matches('/').to_string()
     }
 
+    fn get_root_domain() -> String {
+        Supervisor::get_root_domain()
+    }
+
     fn get_active_app() -> String {
         let stack = get_callstack();
         assert!(stack.len() > 0);
