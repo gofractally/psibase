@@ -75,8 +75,7 @@ impl CreditLine {
             line.limit = amount;
             line.deplete_on_debit = deplete_on_debit;
             line.interest_rate = interest_rate;
-            // Remaining is initialized only on insert. Upsert never refills:
-            // remaining==0 after a full deplete is not "first enable".
+            // Upsert never restores spent remaining.
             if line.remaining.value > amount.value {
                 line.remaining = amount;
             }

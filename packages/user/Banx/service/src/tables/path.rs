@@ -32,7 +32,6 @@ pub(crate) fn execute_path(
     assert!(amount.value > 0, "path amount must be positive");
     let mut path_debtor = sender;
     let mut forward = amount;
-    let mut prev_edge_creditor = sender;
     let mut prev_asset = hops[0].asset_id;
 
     for (i, hop) in hops.into_iter().enumerate() {
@@ -44,20 +43,17 @@ pub(crate) fn execute_path(
 
         if i == 0 {
             Connection::get_live(next_creditor, path_debtor, asset_id).draw(forward);
-            prev_edge_creditor = next_creditor;
             prev_asset = asset_id;
             path_debtor = next_creditor;
             continue;
         }
 
         if asset_id != prev_asset {
-            forward =
-                CurrencyPolicy::get_assert(prev_edge_creditor, prev_asset, asset_id).apply(forward);
+            forward = CurrencyPolicy::get_assert(path_debtor, prev_asset, asset_id).apply(forward);
         }
         assert!(forward.value > 0, "path hop produced nothing to forward");
         forward = ForwardOffer::get_live(path_debtor, next_creditor, asset_id)
             .path_draw(next_creditor, forward);
-        prev_edge_creditor = next_creditor;
         prev_asset = asset_id;
         path_debtor = next_creditor;
     }

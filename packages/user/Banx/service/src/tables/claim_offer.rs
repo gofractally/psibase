@@ -137,8 +137,7 @@ impl ClaimOffer {
                 "debtor does not know buyer (no credit line or existing debt to them)"
             );
         }
-
-        Connection::get_live(buyer, debtor, self.asset_id).accept_claim(seller, amount);
+        take.accept_claim(seller, amount);
         let proceeds = self.apply_fees(amount);
         Connection::get_live(seller, buyer, self.asset_id).deposit(proceeds, 0);
 

@@ -67,7 +67,6 @@ pub mod service {
                 "1.000000 = 1 gram of silver".into(),
             );
 
-            // 7–10 more fiat; 11–12 crypto
             Asset::add(account!("cad"), fiat4, "Canadian dollar".into());
             Asset::add(account!("chf"), fiat4, "Swiss franc".into());
             Asset::add(
