@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { ArrowDownUp } from "lucide-react";
 
 import { AssetField, ExpiresField } from "@/components/form-fields";
 import { formatExpiresAt } from "@/components/expires-at-picker";
@@ -28,6 +29,7 @@ import { useAppForm } from "@/lib/form";
 import type { CashQuote } from "@/lib/graphql";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { cn } from "@shared/lib/utils";
 import { Button } from "@shared/shadcn/ui/button";
 import { Label } from "@shared/shadcn/ui/label";
 import {
@@ -192,128 +194,261 @@ export function CashPage() {
 
             <section className="grid gap-8 lg:grid-cols-2">
                 <form
-                    className="grid gap-3 rounded-lg border p-4"
+                    className="grid gap-4 rounded-xl border p-4"
                     onSubmit={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
                         void quoteForm.handleSubmit();
                     }}
                 >
-                    <h2 className="font-medium">Post quote</h2>
-                    <p className="text-muted-foreground text-xs">
-                        Rate is to-units per 1 from-unit. Out: tokens per 1
-                        Banx. In: Banx per 1 token. Fair reverse of 0.1 tokens
-                        per Banx is 10 Banx per token — post in a bit worse if
-                        you want a spread.
-                    </p>
-                    <quoteForm.Subscribe
-                        selector={(s) => s.values.isOut}
-                        children={(isOut) => (
-                            <quoteForm.Field
-                                name="isOut"
-                                children={(field) => (
-                                    <div className="grid gap-2">
-                                        <Label>Side</Label>
-                                        <Select
-                                            value={isOut ? "out" : "in"}
-                                            onValueChange={(v) =>
-                                                field.handleChange(v === "out")
-                                            }
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="out">
-                                                    Out — sell tokens for Banx
-                                                </SelectItem>
-                                                <SelectItem value="in">
-                                                    In — buy tokens for Banx
-                                                </SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                )}
-                            />
-                        )}
-                    />
-                    <div className="grid gap-2 sm:grid-cols-2">
-                        <quoteForm.Field
-                            name="assetId"
-                            children={(field) => (
-                                <AssetField
-                                    label="Banx asset"
-                                    assets={assets}
-                                    value={field.state.value}
-                                    onChange={(id) => field.handleChange(id)}
-                                />
-                            )}
-                        />
-                        <quoteForm.AppField
-                            name="tokenId"
-                            children={(field) => (
-                                <field.TextField
-                                    label="Token id"
-                                    inputMode="numeric"
-                                    placeholder="1"
-                                />
-                            )}
-                        />
+                    <div>
+                        <h2 className="font-medium">Post quote</h2>
+                        <p className="text-muted-foreground mt-1 text-xs">
+                            You are the cashier. This is the swap takers see:
+                            what they pay, and what they get.
+                        </p>
                     </div>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                        <quoteForm.Subscribe
-                            selector={(s) => s.values}
-                            children={(values) => (
-                                <quoteForm.AppField
-                                    name="feeFixed"
-                                    children={(field) => (
-                                        <field.TextField
-                                            label={
-                                                values.isOut
-                                                    ? `Fee (${values.assetId !== undefined ? symbolOf(values.assetId) : "Banx"})`
-                                                    : "Fee (token)"
-                                            }
-                                            inputMode="decimal"
-                                            placeholder={
-                                                values.isOut &&
-                                                values.assetId !== undefined
-                                                    ? amountPlaceholder(
-                                                          precisionOf(
-                                                              values.assetId,
-                                                          ),
-                                                      )
-                                                    : "0"
-                                            }
-                                        />
-                                    )}
-                                />
-                            )}
-                        />
-                        <quoteForm.Subscribe
-                            selector={(s) => s.values}
-                            children={(values) => (
-                                <div className="grid gap-2">
+                    <quoteForm.Subscribe
+                        selector={(s) => s.values}
+                        children={(values) => {
+                            const banxSym =
+                                values.assetId !== undefined
+                                    ? symbolOf(values.assetId)
+                                    : "Banx";
+                            const tokenLabel = parseTokenId(values.tokenId)
+                                ? `Token #${values.tokenId.trim()}`
+                                : "Token";
+                            const payLabel = values.isOut
+                                ? banxSym
+                                : tokenLabel;
+                            const getLabel = values.isOut
+                                ? tokenLabel
+                                : banxSym;
+                            const rateShown = values.isOut
+                                ? (formatToPrecision(
+                                      values.toRate,
+                                      tokPrec(parseTokenId(values.tokenId)),
+                                  ) ?? values.toRate)
+                                : (formatToPrecision(
+                                      values.toRate,
+                                      values.assetId !== undefined
+                                          ? precisionOf(values.assetId)
+                                          : 4,
+                                  ) ?? values.toRate);
+                            return (
+                                <>
+                                    <quoteForm.Field
+                                        name="isOut"
+                                        children={(field) => (
+                                            <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
+                                                <button
+                                                    type="button"
+                                                    className={cn(
+                                                        "rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                                                        field.state.value
+                                                            ? "bg-background shadow-sm"
+                                                            : "text-muted-foreground hover:text-foreground",
+                                                    )}
+                                                    onClick={() =>
+                                                        field.handleChange(true)
+                                                    }
+                                                >
+                                                    Banx → Token
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className={cn(
+                                                        "rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                                                        !field.state.value
+                                                            ? "bg-background shadow-sm"
+                                                            : "text-muted-foreground hover:text-foreground",
+                                                    )}
+                                                    onClick={() =>
+                                                        field.handleChange(
+                                                            false,
+                                                        )
+                                                    }
+                                                >
+                                                    Token → Banx
+                                                </button>
+                                            </div>
+                                        )}
+                                    />
+
+                                    <div className="relative grid">
+                                        <div className="bg-muted/60 space-y-2 rounded-2xl p-3">
+                                            <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                                                {values.isOut
+                                                    ? "Taker owes"
+                                                    : "Taker sends"}
+                                            </p>
+                                            {values.isOut ? (
+                                                <quoteForm.Field
+                                                    name="assetId"
+                                                    children={(field) => (
+                                                        <AssetField
+                                                            label="Banx asset"
+                                                            assets={assets}
+                                                            value={
+                                                                field.state
+                                                                    .value
+                                                            }
+                                                            onChange={(id) =>
+                                                                field.handleChange(
+                                                                    id,
+                                                                )
+                                                            }
+                                                        />
+                                                    )}
+                                                />
+                                            ) : (
+                                                <quoteForm.AppField
+                                                    name="tokenId"
+                                                    children={(field) => (
+                                                        <field.TextField
+                                                            label="Token ID"
+                                                            inputMode="numeric"
+                                                            placeholder="1"
+                                                        />
+                                                    )}
+                                                />
+                                            )}
+                                        </div>
+
+                                        <div className="relative z-10 -my-3 flex justify-center">
+                                            <Button
+                                                type="button"
+                                                size="icon"
+                                                variant="outline"
+                                                className="bg-background size-9 rounded-full border-2"
+                                                aria-label="Flip direction"
+                                                onClick={() =>
+                                                    quoteForm.setFieldValue(
+                                                        "isOut",
+                                                        !values.isOut,
+                                                    )
+                                                }
+                                            >
+                                                <ArrowDownUp className="size-4" />
+                                            </Button>
+                                        </div>
+
+                                        <div className="bg-muted/60 space-y-2 rounded-2xl p-3">
+                                            <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                                                {values.isOut
+                                                    ? "Taker receives"
+                                                    : "You owe"}
+                                            </p>
+                                            {values.isOut ? (
+                                                <quoteForm.AppField
+                                                    name="tokenId"
+                                                    children={(field) => (
+                                                        <field.TextField
+                                                            label="Token ID"
+                                                            inputMode="numeric"
+                                                            placeholder="1"
+                                                        />
+                                                    )}
+                                                />
+                                            ) : (
+                                                <quoteForm.Field
+                                                    name="assetId"
+                                                    children={(field) => (
+                                                        <AssetField
+                                                            label="Banx asset"
+                                                            assets={assets}
+                                                            value={
+                                                                field.state
+                                                                    .value
+                                                            }
+                                                            onChange={(id) =>
+                                                                field.handleChange(
+                                                                    id,
+                                                                )
+                                                            }
+                                                        />
+                                                    )}
+                                                />
+                                            )}
+                                            <quoteForm.AppField
+                                                name="toRate"
+                                                children={(field) => (
+                                                    <field.TextField
+                                                        label={`Rate · ${getLabel} per 1 ${payLabel}`}
+                                                        inputMode="decimal"
+                                                        placeholder="0.1"
+                                                    />
+                                                )}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <p className="text-muted-foreground text-sm">
+                                        {values.assetId !== undefined &&
+                                        rateShown ? (
+                                            values.isOut ? (
+                                                <>
+                                                    Takers owe{" "}
+                                                    <span className="text-foreground font-medium">
+                                                        1 {payLabel}
+                                                    </span>{" "}
+                                                    and receive{" "}
+                                                    <span className="text-foreground font-medium">
+                                                        {rateShown} {getLabel}
+                                                    </span>{" "}
+                                                    from your vault, minus your
+                                                    fee.
+                                                </>
+                                            ) : (
+                                                <>
+                                                    Takers send{" "}
+                                                    <span className="text-foreground font-medium">
+                                                        1 {payLabel}
+                                                    </span>{" "}
+                                                    into your vault and you owe
+                                                    them{" "}
+                                                    <span className="text-foreground font-medium">
+                                                        {rateShown} {getLabel}
+                                                    </span>
+                                                    , minus your fee.
+                                                </>
+                                            )
+                                        ) : (
+                                            <>
+                                                Pick both sides and a rate.
+                                                Banx → Token: they draw Banx on
+                                                your line and you pay tokens
+                                                from the vault. Token → Banx:
+                                                they send tokens into your
+                                                vault and book Banx onto you.
+                                            </>
+                                        )}
+                                    </p>
+
                                     <quoteForm.AppField
-                                        name="toRate"
+                                        name="feeFixed"
                                         children={(field) => (
                                             <field.TextField
-                                                label="Rate (to per 1 from)"
+                                                label={`Fee (taken from ${payLabel})`}
                                                 inputMode="decimal"
-                                                placeholder="0.1"
+                                                placeholder={
+                                                    values.isOut &&
+                                                    values.assetId !==
+                                                        undefined
+                                                        ? amountPlaceholder(
+                                                              precisionOf(
+                                                                  values.assetId,
+                                                              ),
+                                                          )
+                                                        : "0"
+                                                }
                                             />
                                         )}
                                     />
-                                    {values.assetId !== undefined ? (
-                                        <p className="text-muted-foreground font-mono text-xs">
-                                            {values.isOut
-                                                ? `1 ${symbolOf(values.assetId)} → ${(formatToPrecision(values.toRate, tokPrec(parseTokenId(values.tokenId))) ?? values.toRate) || "?"} token`
-                                                : `1 token → ${(formatToPrecision(values.toRate, precisionOf(values.assetId)) ?? values.toRate) || "?"} ${symbolOf(values.assetId)}`}
-                                        </p>
-                                    ) : null}
-                                </div>
-                            )}
-                        />
-                    </div>
+                                </>
+                            );
+                        }}
+                    />
                     <quoteForm.Field
                         name="expiresAtSeconds"
                         children={(field) => (
@@ -328,7 +463,7 @@ export function CashPage() {
                         children={(values) => (
                             <quoteForm.AppForm>
                                 <quoteForm.SubmitButton
-                                    labels={["Save quote", "Saving…"]}
+                                    labels={["Post quote", "Saving…"]}
                                     loading={setQuote.isPending}
                                     disabled={
                                         values.assetId === undefined ||
@@ -363,7 +498,7 @@ export function CashPage() {
                                 name="tokenId"
                                 children={(field) => (
                                     <field.TextField
-                                        label="Token id"
+                                        label="Token ID"
                                         inputMode="numeric"
                                     />
                                 )}
@@ -390,7 +525,8 @@ export function CashPage() {
                         <h2 className="font-medium">Your vault</h2>
                         {vault.length === 0 ? (
                             <p className="text-muted-foreground text-sm">
-                                Empty. Fund a token id to stock an out quote.
+                                Empty. Fund a Token ID to stock a Banx → Token
+                                quote.
                             </p>
                         ) : (
                             <div className="overflow-x-auto rounded-md border">
@@ -517,9 +653,10 @@ export function CashPage() {
                                             );
                                         }}
                                     >
-                                        {q.isOut ? "Out" : "In"}{" "}
-                                        {symbolOf(q.assetId)} ↔ token #
-                                        {q.tokenId}
+                                        {q.isOut
+                                            ? "Banx → Token"
+                                            : "Token → Banx"}{" "}
+                                        {symbolOf(q.assetId)} ↔ #{q.tokenId}
                                     </button>
                                 </li>
                             ))}
@@ -545,10 +682,12 @@ export function CashPage() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="out">
-                                            Out — draw Banx, receive tokens
+                                            Banx → Token (draw Banx, receive
+                                            tokens)
                                         </SelectItem>
                                         <SelectItem value="in">
-                                            In — send tokens, book Banx
+                                            Token → Banx (send tokens, book
+                                            Banx)
                                         </SelectItem>
                                     </SelectContent>
                                 </Select>
@@ -571,7 +710,7 @@ export function CashPage() {
                             name="tokenId"
                             children={(field) => (
                                 <field.TextField
-                                    label="Token id"
+                                    label="Token ID"
                                     inputMode="numeric"
                                 />
                             )}
@@ -715,7 +854,9 @@ function QuoteTable({
                         <TableRow
                             key={`${q.poster}-${q.isOut}-${q.assetId}-${q.tokenId}`}
                         >
-                            <TableCell>{q.isOut ? "Out" : "In"}</TableCell>
+                            <TableCell>
+                                {q.isOut ? "Banx → Token" : "Token → Banx"}
+                            </TableCell>
                             <TableCell>{symbolOf(q.assetId)}</TableCell>
                             <TableCell className="font-mono">
                                 #{q.tokenId}

@@ -1,3 +1,5 @@
+import { ArrowDownUp } from "lucide-react";
+
 import { AssetField, ExpiresField } from "@/components/form-fields";
 import { formatExpiresAt } from "@/components/expires-at-picker";
 import { PageHeader } from "@/components/page-header";
@@ -118,64 +120,171 @@ export function PoliciesPage() {
         <div className="space-y-10">
             <PageHeader
                 title="Policies"
-                description="Currency policies handle FX (how many to-units you get per 1 from-unit). Path-forward and buy-claim offers are posted from Accounts."
+                description="FX between Banx assets. Path-forward and buy-claim offers are posted from Accounts."
             />
 
             <section className="grid gap-8 lg:grid-cols-2">
                 <form
-                    className="grid gap-3 rounded-lg border p-4"
+                    className="grid gap-4 rounded-xl border p-4"
                     onSubmit={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
                         void currencyForm.handleSubmit();
                     }}
                 >
-                    <h2 className="font-medium">Set currency policy</h2>
-                    <p className="text-muted-foreground text-xs">
-                        You set the rate for hops that change currency through
-                        you, and as an offer others can take with Convert. Rate
-                        is to-units per 1 from-unit (e.g. 0.45 means 1 from →
-                        0.45 to).
-                    </p>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                        <currencyForm.Field
-                            name="fromAsset"
-                            children={(field) => (
-                                <AssetField
-                                    label="From asset"
-                                    assets={assets}
-                                    value={field.state.value}
-                                    onChange={(id) => field.handleChange(id)}
-                                />
-                            )}
-                        />
-                        <currencyForm.Field
-                            name="toAsset"
-                            children={(field) => (
-                                <AssetField
-                                    label="To asset"
-                                    assets={assets}
-                                    value={field.state.value}
-                                    onChange={(id) => field.handleChange(id)}
-                                />
-                            )}
-                        />
+                    <div>
+                        <h2 className="font-medium">Set currency policy</h2>
+                        <p className="text-muted-foreground mt-1 text-xs">
+                            You are the FX desk. Convert takes this quote on a
+                            pair with you; path hops through you use it to size
+                            the next hop.
+                        </p>
                     </div>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                        <currencyForm.Subscribe
-                            selector={(s) => s.values}
-                            children={(values) => (
-                                <div className="grid gap-2">
+                    <currencyForm.Subscribe
+                        selector={(s) => s.values}
+                        children={(values) => {
+                            const fromSym =
+                                values.fromAsset !== undefined
+                                    ? symbolOf(values.fromAsset)
+                                    : "from";
+                            const toSym =
+                                values.toAsset !== undefined
+                                    ? symbolOf(values.toAsset)
+                                    : "to";
+                            const rateShown =
+                                values.toAsset !== undefined
+                                    ? (formatToPrecision(
+                                          values.toRate,
+                                          precisionOf(values.toAsset),
+                                      ) ?? values.toRate)
+                                    : values.toRate;
+                            return (
+                                <>
+                                    <div className="relative grid">
+                                        <div className="bg-muted/60 space-y-2 rounded-2xl p-3">
+                                            <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                                                Taker owes
+                                            </p>
+                                            <currencyForm.Field
+                                                name="fromAsset"
+                                                children={(field) => (
+                                                    <AssetField
+                                                        label="From asset"
+                                                        assets={assets}
+                                                        value={
+                                                            field.state.value
+                                                        }
+                                                        onChange={(id) =>
+                                                            field.handleChange(
+                                                                id,
+                                                            )
+                                                        }
+                                                    />
+                                                )}
+                                            />
+                                        </div>
+
+                                        <div className="relative z-10 -my-3 flex justify-center">
+                                            <Button
+                                                type="button"
+                                                size="icon"
+                                                variant="outline"
+                                                className="bg-background size-9 rounded-full border-2"
+                                                aria-label="Flip pair"
+                                                onClick={() => {
+                                                    currencyForm.setFieldValue(
+                                                        "fromAsset",
+                                                        values.toAsset,
+                                                    );
+                                                    currencyForm.setFieldValue(
+                                                        "toAsset",
+                                                        values.fromAsset,
+                                                    );
+                                                    const n = Number(
+                                                        values.toRate,
+                                                    );
+                                                    if (
+                                                        Number.isFinite(n) &&
+                                                        n > 0
+                                                    ) {
+                                                        currencyForm.setFieldValue(
+                                                            "toRate",
+                                                            String(1 / n),
+                                                        );
+                                                    }
+                                                }}
+                                            >
+                                                <ArrowDownUp className="size-4" />
+                                            </Button>
+                                        </div>
+
+                                        <div className="bg-muted/60 space-y-2 rounded-2xl p-3">
+                                            <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                                                Taker receives
+                                            </p>
+                                            <currencyForm.Field
+                                                name="toAsset"
+                                                children={(field) => (
+                                                    <AssetField
+                                                        label="To asset"
+                                                        assets={assets}
+                                                        value={
+                                                            field.state.value
+                                                        }
+                                                        onChange={(id) =>
+                                                            field.handleChange(
+                                                                id,
+                                                            )
+                                                        }
+                                                    />
+                                                )}
+                                            />
+                                            <currencyForm.AppField
+                                                name="toRate"
+                                                children={(field) => (
+                                                    <field.TextField
+                                                        label={`Rate · ${toSym} per 1 ${fromSym}`}
+                                                        inputMode="decimal"
+                                                        placeholder="0.45"
+                                                    />
+                                                )}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <p className="text-muted-foreground text-sm">
+                                        {values.fromAsset !== undefined &&
+                                        values.toAsset !== undefined &&
+                                        rateShown ? (
+                                            <>
+                                                Takers owe{" "}
+                                                <span className="text-foreground font-medium">
+                                                    1 {fromSym}
+                                                </span>{" "}
+                                                and receive{" "}
+                                                <span className="text-foreground font-medium">
+                                                    {rateShown} {toSym}
+                                                </span>
+                                                , minus your fee. That rebooks
+                                                the pair; path hops through you
+                                                use this rate to size the next
+                                                hop.
+                                            </>
+                                        ) : (
+                                            <>
+                                                Pick both assets and a rate.
+                                                Convert rebooks leftover{" "}
+                                                {fromSym} on the pair into{" "}
+                                                {toSym}.
+                                            </>
+                                        )}
+                                    </p>
+
                                     <currencyForm.AppField
                                         name="feeFixed"
                                         children={(field) => (
                                             <field.TextField
-                                                label={
-                                                    values.fromAsset !==
-                                                    undefined
-                                                        ? `Fee fixed (${symbolOf(values.fromAsset)})`
-                                                        : "Fee fixed"
-                                                }
+                                                label={`Fee (taken from ${fromSym})`}
                                                 inputMode="decimal"
                                                 placeholder={
                                                     values.fromAsset !==
@@ -190,63 +299,31 @@ export function PoliciesPage() {
                                             />
                                         )}
                                     />
-                                    {values.fromAsset !== undefined ? (
-                                        <p className="text-muted-foreground text-xs font-mono">
-                                            {formatToPrecision(
-                                                values.feeFixed,
-                                                precisionOf(values.fromAsset),
-                                            ) ?? "?"}{" "}
-                                            {symbolOf(values.fromAsset)}
-                                        </p>
-                                    ) : null}
-                                </div>
-                            )}
-                        />
-                        <currencyForm.Subscribe
-                            selector={(s) => s.values}
-                            children={(values) => (
-                                <div className="grid gap-2">
                                     <currencyForm.AppField
-                                        name="toRate"
+                                        name="aprPct"
+                                        validators={{
+                                            onChange:
+                                                percentFieldValidator(
+                                                    MAX_PERCENT,
+                                                ),
+                                            onSubmit:
+                                                percentFieldValidator(
+                                                    MAX_PERCENT,
+                                                ),
+                                        }}
                                         children={(field) => (
                                             <field.TextField
-                                                label="Rate (to per 1 from)"
+                                                label={`APR on the ${toSym} claim %`}
                                                 inputMode="decimal"
-                                                placeholder="0.45"
+                                                min={0}
+                                                max={MAX_PERCENT}
+                                                step={MIN_PERCENT_STEP}
                                             />
                                         )}
                                     />
-                                    {values.fromAsset !== undefined &&
-                                    values.toAsset !== undefined ? (
-                                        <p className="text-muted-foreground text-xs font-mono">
-                                            1 {symbolOf(values.fromAsset)} →{" "}
-                                            {formatToPrecision(
-                                                values.toRate,
-                                                precisionOf(values.toAsset),
-                                            ) ??
-                                                (values.toRate || "?")}{" "}
-                                            {symbolOf(values.toAsset)}
-                                        </p>
-                                    ) : null}
-                                </div>
-                            )}
-                        />
-                    </div>
-                    <currencyForm.AppField
-                        name="aprPct"
-                        validators={{
-                            onChange: percentFieldValidator(MAX_PERCENT),
-                            onSubmit: percentFieldValidator(MAX_PERCENT),
+                                </>
+                            );
                         }}
-                        children={(field) => (
-                            <field.TextField
-                                label="To-asset APR %"
-                                inputMode="decimal"
-                                min={0}
-                                max={MAX_PERCENT}
-                                step={MIN_PERCENT_STEP}
-                            />
-                        )}
                     />
                     <currencyForm.Field
                         name="expiresAtSeconds"
@@ -262,14 +339,12 @@ export function PoliciesPage() {
                         children={(values) => (
                             <currencyForm.AppForm>
                                 <currencyForm.SubmitButton
-                                    labels={[
-                                        "Save currency policy",
-                                        "Saving…",
-                                    ]}
+                                    labels={["Post policy", "Saving…"]}
                                     loading={setCurrency.isPending}
                                     disabled={
                                         values.fromAsset === undefined ||
-                                        values.toAsset === undefined
+                                        values.toAsset === undefined ||
+                                        values.fromAsset === values.toAsset
                                     }
                                 />
                             </currencyForm.AppForm>
