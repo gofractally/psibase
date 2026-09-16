@@ -297,6 +297,71 @@ export const fetchAuthRecord = async (
     }
 };
 
+export interface AuthDelegateRecord {
+    account: string;
+    owner: string;
+}
+
+export const fetchAuthDelegateOwner = async (
+    name: string,
+): Promise<AuthDelegateRecord | null> => {
+    try {
+        const data = await graphql<{ owner: AuthDelegateRecord | null }>(
+            `{ owner(account: ${gqlString(name)}) { account owner } }`,
+            "auth-delg",
+        );
+        return data.owner;
+    } catch {
+        return null;
+    }
+};
+
+export interface AuthDynManagement {
+    account: string;
+    manager: string;
+}
+
+export const fetchAuthDynManagement = async (
+    name: string,
+): Promise<AuthDynManagement | null> => {
+    try {
+        const data = await graphql<{ getManagement: AuthDynManagement | null }>(
+            `{ getManagement(account: ${gqlString(name)}) { account manager } }`,
+            "auth-dyn",
+        );
+        return data.getManagement;
+    } catch {
+        return null;
+    }
+};
+
+export interface AuthDynAuthorizer {
+    account: string;
+    weight: number;
+}
+
+export interface AuthDynPolicy {
+    threshold: number;
+    authorizers: AuthDynAuthorizer[];
+}
+
+export const fetchAuthDynPolicy = async (
+    name: string,
+): Promise<AuthDynPolicy | null> => {
+    try {
+        const data = await graphql<{ getPolicy: AuthDynPolicy | null }>(
+            `{ getPolicy(account: ${gqlString(name)}) {
+                threshold
+                authorizers { account weight }
+            } }`,
+            "auth-dyn",
+        );
+        return data.getPolicy;
+    } catch {
+        return null;
+    }
+};
+
 export const fetchAccountsWithKey = async (
     pubkeyPem: string,
 ): Promise<AuthRecord[]> => {
