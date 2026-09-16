@@ -7,7 +7,10 @@ export interface Action {
     sender: string;
     service: string;
     method: string;
+    /** Hex-encoded fracpack arguments. */
     rawData?: string;
+    /** Schema-decoded arguments when a service schema is available. */
+    data?: unknown;
 }
 
 export interface Tapos {
