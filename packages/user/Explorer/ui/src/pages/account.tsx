@@ -10,6 +10,9 @@ import { formatNumber, formatTime } from "@/lib/format";
 import {
     fetchAccount,
     fetchAppMetadata,
+    fetchAuthDelegateOwner,
+    fetchAuthDynManagement,
+    fetchAuthDynPolicy,
     fetchAuthRecord,
     fetchCode,
     fetchInstalledPackages,
@@ -44,10 +47,26 @@ export const AccountPage = () => {
         queryFn: () => fetchAccount(name),
         enabled: !!name,
     });
-    const auth = useQuery({
-        queryKey: ["account", name, "auth"],
+    const authService = account.data?.authService;
+    const authSig = useQuery({
+        queryKey: ["account", name, "auth-sig"],
         queryFn: () => fetchAuthRecord(name),
-        enabled: !!name,
+        enabled: !!name && authService === "auth-sig",
+    });
+    const authDelg = useQuery({
+        queryKey: ["account", name, "auth-delg"],
+        queryFn: () => fetchAuthDelegateOwner(name),
+        enabled: !!name && authService === "auth-delg",
+    });
+    const authDynMgmt = useQuery({
+        queryKey: ["account", name, "auth-dyn", "management"],
+        queryFn: () => fetchAuthDynManagement(name),
+        enabled: !!name && authService === "auth-dyn",
+    });
+    const authDynPolicy = useQuery({
+        queryKey: ["account", name, "auth-dyn", "policy"],
+        queryFn: () => fetchAuthDynPolicy(name),
+        enabled: !!name && authService === "auth-dyn",
     });
     const code = useQuery({
         queryKey: ["account", name, "code"],
@@ -119,7 +138,7 @@ export const AccountPage = () => {
     const isService = !!code.data;
     // Corroborating evidence that the account exists even if the accounts
     // service lookup failed (never claim "does not exist" on a fetch error).
-    const knownElsewhere = isProducer || isService || !!pkg || !!auth.data;
+    const knownElsewhere = isProducer || isService || !!pkg || !!authSig.data || !!authDelg.data || !!authDynMgmt.data;
     const lookupFailed = account.isError;
     const exists = lookupFailed ? knownElsewhere : account.data !== null && account.data !== undefined;
     const siteUrl = siblingUrl(null, name, "/");
@@ -273,23 +292,85 @@ export const AccountPage = () => {
                             <span className="text-muted-foreground">—</span>
                         )}
                     </KeyValue>
-                    <KeyValue label="Public key">
-                        {auth.isPending ? (
-                            <Skeleton className="h-4 w-48" />
-                        ) : auth.data?.pubkey ? (
-                            <span className="flex items-start gap-2">
-                                <KeyRound className="text-muted-foreground mt-0.5 size-3.5 shrink-0" />
-                                <pre className="font-mono text-xs leading-relaxed break-all whitespace-pre-wrap">
-                                    {auth.data.pubkey.trim()}
-                                </pre>
-                                <CopyIcon value={auth.data.pubkey} />
-                            </span>
-                        ) : (
-                            <span className="text-muted-foreground text-xs">
-                                No auth-sig key registered
-                            </span>
-                        )}
-                    </KeyValue>
+                    {authService === "auth-sig" && (
+                        <KeyValue label="Public key">
+                            {authSig.isPending ? (
+                                <Skeleton className="h-4 w-48" />
+                            ) : authSig.data?.pubkey ? (
+                                <span className="flex items-start gap-2">
+                                    <KeyRound className="text-muted-foreground mt-0.5 size-3.5 shrink-0" />
+                                    <pre className="font-mono text-xs leading-relaxed break-all whitespace-pre-wrap">
+                                        {authSig.data.pubkey.trim()}
+                                    </pre>
+                                    <CopyIcon value={authSig.data.pubkey} />
+                                </span>
+                            ) : (
+                                <span className="text-muted-foreground text-xs">
+                                    No auth-sig key registered
+                                </span>
+                            )}
+                        </KeyValue>
+                    )}
+                    {authService === "auth-delg" && (
+                        <KeyValue label="Owner account">
+                            {authDelg.isPending ? (
+                                <Skeleton className="h-4 w-24" />
+                            ) : authDelg.data?.owner ? (
+                                <AccountLink name={authDelg.data.owner} />
+                            ) : (
+                                <span className="text-muted-foreground text-xs">
+                                    No owner registered
+                                </span>
+                            )}
+                        </KeyValue>
+                    )}
+                    {authService === "auth-dyn" && (
+                        <>
+                            <KeyValue label="Manager">
+                                {authDynMgmt.isPending ? (
+                                    <Skeleton className="h-4 w-24" />
+                                ) : authDynMgmt.data?.manager ? (
+                                    <AccountLink name={authDynMgmt.data.manager} />
+                                ) : (
+                                    <span className="text-muted-foreground text-xs">
+                                        No manager registered
+                                    </span>
+                                )}
+                            </KeyValue>
+                            <KeyValue label="Policy">
+                                {authDynPolicy.isPending || authDynMgmt.isPending ? (
+                                    <Skeleton className="h-4 w-48" />
+                                ) : authDynPolicy.data ? (
+                                    <div className="flex flex-col gap-1.5 text-xs">
+                                        <span className="text-muted-foreground">
+                                            {authDynPolicy.data.authorizers.length === 0
+                                                ? "Impossible (no authorizers)"
+                                                : `Threshold ${authDynPolicy.data.threshold} of ${authDynPolicy.data.authorizers.reduce((n, a) => n + a.weight, 0)} weight`}
+                                        </span>
+                                        {authDynPolicy.data.authorizers.length > 0 && (
+                                            <ul className="flex flex-col gap-1">
+                                                {authDynPolicy.data.authorizers.map((a) => (
+                                                    <li
+                                                        key={a.account}
+                                                        className="flex flex-wrap items-center gap-2"
+                                                    >
+                                                        <AccountLink name={a.account} />
+                                                        <span className="text-muted-foreground font-mono">
+                                                            weight {a.weight}
+                                                        </span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <span className="text-muted-foreground text-xs">
+                                        Policy unavailable from manager
+                                    </span>
+                                )}
+                            </KeyValue>
+                        </>
+                    )}
                     {pkg && (
                         <KeyValue label="Package">
                             <span className="flex flex-wrap items-center gap-2">

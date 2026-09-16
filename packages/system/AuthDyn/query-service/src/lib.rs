@@ -5,12 +5,44 @@ mod service {
     use auth_dyn::tables::{Management, ManagementTable};
     use psibase::*;
 
+    #[derive(SimpleObject)]
+    struct WeightedAuthorizerView {
+        account: AccountNumber,
+        weight: u8,
+    }
+
+    #[derive(SimpleObject)]
+    struct DynamicAuthPolicyView {
+        threshold: u8,
+        authorizers: Vec<WeightedAuthorizerView>,
+    }
+
     struct Query;
 
     #[Object]
     impl Query {
         async fn get_management(&self, account: AccountNumber) -> Option<Management> {
             Management::get(account)
+        }
+
+        /// Resolve the account-level dynamic auth policy from the account's manager.
+        async fn get_policy(&self, account: AccountNumber) -> Option<DynamicAuthPolicyView> {
+            let management = Management::get(account)?;
+            if !management.has_policy() {
+                return None;
+            }
+            let policy = management.dynamic_policy(None);
+            Some(DynamicAuthPolicyView {
+                threshold: policy.threshold,
+                authorizers: policy
+                    .authorizers
+                    .into_iter()
+                    .map(|a| WeightedAuthorizerView {
+                        account: a.account,
+                        weight: a.weight,
+                    })
+                    .collect(),
+            })
         }
 
         async fn get_managed(

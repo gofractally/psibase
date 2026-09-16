@@ -11,7 +11,7 @@
       "method": "setcsp",
       "data": {
           "path": "*",
-          "csp": "default-src 'self';script-src 'self';style-src 'self' 'unsafe-inline';img-src 'self' data: profiles.{{root}}/avatar/ branding.{{root}};font-src 'self';connect-src 'self' {{root}} homepage.{{root}} accounts.{{root}} auth-sig.{{root}} branding.{{root}} packages.{{root}} producers.{{root}} profiles.{{root}} registry.{{root}} setcode.{{root}} sites.{{root}} transact.{{root}};frame-src supervisor.{{root}};frame-ancestors 'self';base-uri 'none';form-action 'self';object-src 'none';"
+          "csp": "default-src 'self';script-src 'self';style-src 'self' 'unsafe-inline';img-src 'self' data: profiles.{{root}}/avatar/ branding.{{root}};font-src 'self';connect-src 'self' {{root}} homepage.{{root}} accounts.{{root}} auth-sig.{{root}} auth-delg.{{root}} auth-dyn.{{root}} branding.{{root}} packages.{{root}} producers.{{root}} profiles.{{root}} registry.{{root}} setcode.{{root}} sites.{{root}} transact.{{root}};frame-src supervisor.{{root}};frame-ancestors 'self';base-uri 'none';form-action 'self';object-src 'none';"
       }
   }
 ]
