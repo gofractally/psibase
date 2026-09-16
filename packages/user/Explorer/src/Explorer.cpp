@@ -2,21 +2,114 @@
 
 #include <psibase/crypto.hpp>
 #include <psibase/dispatch.hpp>
+#include <psibase/schema.hpp>
 #include <psibase/serveGraphQL.hpp>
+#include <psio/schema.hpp>
 #include <psio/to_hex.hpp>
 #include <services/system/CommonApi.hpp>
 #include <services/system/HttpServer.hpp>
+#include <services/user/Packages.hpp>
 
 using namespace psibase;
 
 namespace
 {
+   // JSON value embedded directly into a GraphQL response (not re-quoted as a string).
+   struct EmbeddedJson
+   {
+      std::string json;
+   };
+
+   template <typename S>
+   void to_json(const EmbeddedJson& value, S& stream)
+   {
+      stream.write(value.json.data(), value.json.size());
+   }
+
+   inline constexpr bool use_json_string_for_gql(EmbeddedJson*)
+   {
+      return true;
+   }
+
+   std::optional<EmbeddedJson> decodeActionData(AccountNumber         service,
+                                                MethodNumber          method,
+                                                const std::vector<char>& rawData)
+   {
+      auto schema = to<UserService::Packages>().getSchema(service);
+      if (!schema)
+         return std::nullopt;
+
+      auto pos = schema->actions.find(method.str());
+      if (pos == schema->actions.end())
+         return std::nullopt;
+
+      const auto&                        params = pos->second.params;
+      psio::schema_types::CompiledSchema cschema{schema->types, psibase_types(), {&params}};
+      auto*                              cty = cschema.get(params.resolve(schema->types));
+      if (!cty)
+         return std::nullopt;
+
+      psio::schema_types::FracParser parser{psio::FracStream{rawData}, cty, cschema.builtin};
+      std::string                    json;
+      psio::string_stream            stream{json};
+      to_json(parser, stream);
+      if (json.empty() || json == "null")
+         return std::nullopt;
+      return EmbeddedJson{std::move(json)};
+   }
+
+   // Action with optional schema-decoded arguments exposed as `data`.
+   struct PrettyAction
+   {
+      AccountNumber     sender;
+      AccountNumber     service;
+      MethodNumber      method;
+      std::vector<char> rawData;
+
+      std::optional<EmbeddedJson> data() const
+      {
+         return decodeActionData(service, method, rawData);
+      }
+
+      static PrettyAction from(Action&& act)
+      {
+         return PrettyAction{
+             .sender  = act.sender,
+             .service = act.service,
+             .method  = act.method,
+             .rawData = std::move(act.rawData),
+         };
+      }
+
+      PSIO_REFLECT(PrettyAction, sender, service, method, rawData, method(data))
+   };
+
+   struct PrettyTransaction
+   {
+      Tapos                     tapos;
+      std::vector<PrettyAction> actions;
+      std::vector<Claim>        claims;
+
+      static PrettyTransaction from(Transaction&& trx)
+      {
+         PrettyTransaction result;
+         result.tapos = std::move(trx.tapos);
+         result.claims = std::move(trx.claims);
+         result.actions.reserve(trx.actions.size());
+         for (auto& act : trx.actions)
+            result.actions.push_back(PrettyAction::from(std::move(act)));
+         return result;
+      }
+
+      PSIO_REFLECT(PrettyTransaction, tapos, actions, claims)
+   };
+
    // A transaction as stored in a block, decorated with its id (sha256 of the
    // packed Transaction bytes) so that clients don't have to re-pack it.
    struct TransactionRecord
    {
       Checksum256                    id;
-      Transaction                    transaction;
+      PrettyTransaction              transaction;
       std::vector<std::vector<char>> proofs;
       PSIO_REFLECT(TransactionRecord, id, transaction, proofs)
    };
@@ -51,7 +144,7 @@ namespace
    {
       return TransactionRecord{
           .id          = transactionId(trx),
-          .transaction = trx.transaction.unpack(),
+          .transaction = PrettyTransaction::from(trx.transaction.unpack()),
           .proofs      = trx.proofs,
       };
    }

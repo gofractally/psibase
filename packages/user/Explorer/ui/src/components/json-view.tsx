@@ -1,5 +1,7 @@
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+
+import { preferDecodedPayloads } from "@/lib/format";
 
 import { CopyIcon } from "@/components/hash";
 
@@ -10,14 +12,20 @@ export const JsonView = ({
     title = "Raw JSON",
     defaultOpen = false,
     className,
+    decodeHex = true,
 }: {
     value: unknown;
     title?: string;
     defaultOpen?: boolean;
     className?: string;
+    /** When true, prefer schema-decoded / printable forms of hex payloads. */
+    decodeHex?: boolean;
 }) => {
     const [open, setOpen] = useState(defaultOpen);
-    const text = JSON.stringify(value, null, 2);
+    const text = useMemo(() => {
+        const prepared = decodeHex ? preferDecodedPayloads(value) : value;
+        return JSON.stringify(prepared, null, 2);
+    }, [value, decodeHex]);
     return (
         <div className={cn("overflow-hidden rounded-lg border", className)}>
             <div className="bg-muted/30 flex items-center justify-between px-3 py-1.5">

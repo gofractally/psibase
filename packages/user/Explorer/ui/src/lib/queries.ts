@@ -71,7 +71,7 @@ const BLOCK_FULL_FIELDS = `
         id
         transaction {
             tapos { expiration refBlockSuffix flags refBlockIndex }
-            actions { sender service method rawData }
+            actions { sender service method rawData data }
             claims { service rawData }
         }
         proofs
@@ -174,7 +174,7 @@ export const findTransaction = async (
                 id
                 transaction {
                     tapos { expiration refBlockSuffix flags refBlockIndex }
-                    actions { sender service method rawData }
+                    actions { sender service method rawData data }
                     claims { service rawData }
                 }
                 proofs

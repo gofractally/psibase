@@ -117,6 +117,37 @@ export const hexToPrintable = (hex: string): string | null => {
     }
 };
 
+/** Even-length hex string that is not a 64-char hash id. */
+const isHexPayload = (value: string) =>
+    value.length >= 2 &&
+    value.length % 2 === 0 &&
+    /^[0-9a-fA-F]+$/.test(value) &&
+    !/^[0-9a-fA-F]{64}$/.test(value);
+
+/**
+ * Prepare a GraphQL payload for human-readable JSON display:
+ * - Prefer schema-decoded `data` over hex `rawData` when both exist
+ * - Otherwise try UTF-8 printable decoding of hex `rawData` fields
+ */
+export const preferDecodedPayloads = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(preferDecodedPayloads);
+    if (!value || typeof value !== "object") return value;
+
+    const obj = value as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    const hasDecodedData = obj.data !== undefined && obj.data !== null && "rawData" in obj;
+
+    for (const [key, child] of Object.entries(obj)) {
+        if (hasDecodedData && key === "rawData") continue;
+        if (key === "rawData" && typeof child === "string" && isHexPayload(child)) {
+            out[key] = hexToPrintable(child) ?? child;
+            continue;
+        }
+        out[key] = preferDecodedPayloads(child);
+    }
+    return out;
+};
+
 export const blockNumFromId = (id: string): number | null => {
     if (!/^[0-9a-fA-F]{64}$/.test(id)) return null;
     return parseInt(id.slice(0, 8), 16);

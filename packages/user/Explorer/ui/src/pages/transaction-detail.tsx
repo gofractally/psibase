@@ -196,10 +196,25 @@ export const TransactionDetailPage = () => {
 };
 
 const ActionCard = ({ index, action }: { index: number; action: Action }) => {
-    const [mode, setMode] = useState<"hex" | "text">("hex");
     const bytes = hexByteLength(action.rawData);
     const text = action.rawData ? hexToPrintable(action.rawData) : null;
     const hex = action.rawData ?? "";
+    const decoded =
+        action.data !== undefined && action.data !== null
+            ? JSON.stringify(action.data, null, 2)
+            : null;
+    type Mode = "json" | "hex" | "text";
+    const [mode, setMode] = useState<Mode>(decoded ? "json" : "hex");
+    const body =
+        mode === "json" && decoded
+            ? decoded
+            : mode === "text" && text
+              ? text
+              : hex.length > 4096
+                ? `${hex.slice(0, 4096)}… (${formatBytes(bytes)} total, copy for full payload)`
+                : hex;
+    const copyValue =
+        mode === "json" && decoded ? decoded : mode === "text" && text ? text : hex;
     return (
         <div className="flex flex-col gap-2 px-4 py-3">
             <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -209,20 +224,34 @@ const ActionCard = ({ index, action }: { index: number; action: Action }) => {
                 <MethodChip service={action.service} method={action.method} className="text-xs" />
                 <span className="text-muted-foreground ml-auto text-xs">{formatBytes(bytes)}</span>
             </div>
-            {bytes > 0 && (
+            {(bytes > 0 || decoded) && (
                 <div className="bg-muted/30 overflow-hidden rounded-lg border">
                     <div className="flex items-center justify-between border-b px-3 py-1">
                         <div className="flex gap-1">
-                            <button
-                                type="button"
-                                onClick={() => setMode("hex")}
-                                className={cn(
-                                    "rounded px-2 py-0.5 text-[11px]",
-                                    mode === "hex" ? "bg-accent" : "text-muted-foreground",
-                                )}
-                            >
-                                hex
-                            </button>
+                            {decoded && (
+                                <button
+                                    type="button"
+                                    onClick={() => setMode("json")}
+                                    className={cn(
+                                        "rounded px-2 py-0.5 text-[11px]",
+                                        mode === "json" ? "bg-accent" : "text-muted-foreground",
+                                    )}
+                                >
+                                    json
+                                </button>
+                            )}
+                            {bytes > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => setMode("hex")}
+                                    className={cn(
+                                        "rounded px-2 py-0.5 text-[11px]",
+                                        mode === "hex" ? "bg-accent" : "text-muted-foreground",
+                                    )}
+                                >
+                                    hex
+                                </button>
+                            )}
                             {text && (
                                 <button
                                     type="button"
@@ -236,10 +265,10 @@ const ActionCard = ({ index, action }: { index: number; action: Action }) => {
                                 </button>
                             )}
                         </div>
-                        <CopyIcon value={mode === "text" && text ? text : hex} />
+                        <CopyIcon value={copyValue} />
                     </div>
                     <pre className="scrollbar-thin max-h-56 overflow-auto p-3 font-mono text-[11px] leading-relaxed break-all whitespace-pre-wrap">
-                        {mode === "text" && text ? text : hex.length > 4096 ? `${hex.slice(0, 4096)}… (${formatBytes(bytes)} total, copy for full payload)` : hex}
+                        {body}
                     </pre>
                 </div>
             )}
