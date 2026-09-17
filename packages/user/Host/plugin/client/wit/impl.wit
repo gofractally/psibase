@@ -1,0 +1,7 @@
+package host:client;
+
+world impl {
+    include supervisor:bridge/imports;
+
+    export api;
+}

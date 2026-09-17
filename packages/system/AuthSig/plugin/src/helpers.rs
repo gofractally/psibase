@@ -1,4 +1,5 @@
-use crate::bindings::host::common::{client as Client, server as Server};
+use crate::bindings::host::http::api as Server;
+use crate::bindings::host::client::api as Client;
 use crate::bindings::host::types::types as CommonTypes;
 use crate::bindings::host::types::types::Pem;
 use crate::errors::ErrorType::*;

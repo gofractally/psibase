@@ -28,6 +28,7 @@ import {
 
 import { useConfig, useConfigUpdate } from "../hooks/use-config";
 import { useServerSpecs } from "../hooks/use-server-specs";
+import { useChainReady } from "../hooks/use-statuses";
 import { Logger } from "../log/logger";
 import { PsinodeConfigUI, PsinodeConfigUpdate } from "./interfaces";
 import { newId, writeConfig } from "./utils";
@@ -56,13 +57,19 @@ const getHumanFriendlyNumber = (
 };
 
 const NodeSpecsContent = () => {
+    const chainReady = useChainReady();
     const { data: serverSpecs, isLoading: isLoadingSpecs } = useServerSpecs();
     const ramBytes = serverSpecs?.recommendedMinMemoryBytes;
 
     return (
         <div className="space-y-4">
             <div className="space-y-4 rounded-lg border p-4">
-                {isLoadingSpecs ? (
+                {!chainReady ? (
+                    <p className="text-muted-foreground text-sm">
+                        Required specs depend on the network. They appear after
+                        this node is part of one.
+                    </p>
+                ) : isLoadingSpecs ? (
                     <div className="space-y-3">
                         <Skeleton className="h-6 w-32" />
                         <Skeleton className="h-6 w-32" />

@@ -1,7 +1,7 @@
 use crate::bindings::accounts::query::api as AccountsQuery;
 use crate::bindings::exports::accounts::plugin::auth_svc::Guest as AuthSvc;
 use crate::bindings::host::auth::api as HostAuth;
-use crate::bindings::host::common::client as Client;
+use crate::bindings::host::client::api as Client;
 use crate::bindings::host::types::types::{Claim, Error};
 use crate::bindings::invite::plugin::redemption as Invites;
 use crate::db::{apps_table::AppsTable, user_table::UserTable};

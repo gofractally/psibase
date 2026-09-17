@@ -55,7 +55,7 @@ namespace psibase
       {
          auto result = psio::get_gql_schema<std::remove_cvref_t<QueryRoot>>();
          return HttpReply{
-             .contentType = "text",                                          // TODO
+             .contentType = "text/plain",
              .body        = {result.data(), result.data() + result.size()},  // TODO: avoid copy,
              .headers     = allowCors(),
          };

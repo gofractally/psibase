@@ -296,12 +296,12 @@ struct packable_wrapper
 template <typename T>
 packable_wrapper(T) -> packable_wrapper<T>;
 template <typename T>
-const T& clio_unwrap_packable(const packable_wrapper<T>& wrapper)
+const T& psio_unwrap_packable(const packable_wrapper<T>& wrapper)
 {
    return wrapper.value;
 }
 template <typename T>
-T& clio_unwrap_packable(packable_wrapper<T>& wrapper)
+T& psio_unwrap_packable(packable_wrapper<T>& wrapper)
 {
    return wrapper.value;
 }

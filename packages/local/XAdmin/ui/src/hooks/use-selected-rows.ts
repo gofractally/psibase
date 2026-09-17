@@ -1,10 +1,12 @@
 import { RowSelectionState } from "@tanstack/react-table";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
 
 import { getId } from "@/lib/get-id";
 import { getRequiredPackages } from "@/lib/get-required-packages";
 import { detectChange } from "@/lib/row-elements";
+
+import { transitivePkgDependants } from "@shared/lib/transitive-pkg-dependants";
 
 import { PackageInfo, PackageInfoSchema } from "../types";
 
@@ -18,45 +20,15 @@ const ChangeWarningSchema = z.object({
     removedPackage: PackageInfoSchema,
 });
 
-const getTransitiveDependants = (
-    removingPackageName: string,
-    selectedPackages: PackageInfo[],
-): PackageInfo[] => {
-    const reverseDeps = new Map<string, PackageInfo[]>();
-    for (const pack of selectedPackages) {
-        for (const dep of pack.depends) {
-            const list = reverseDeps.get(dep.name) ?? [];
-            list.push(pack);
-            reverseDeps.set(dep.name, list);
-        }
-    }
-
-    const dependants = new Map<string, PackageInfo>();
-    const queue = [removingPackageName];
-
-    while (queue.length > 0) {
-        const current = queue.shift()!;
-        for (const pack of reverseDeps.get(current) ?? []) {
-            if (
-                pack.name !== removingPackageName &&
-                !dependants.has(pack.name)
-            ) {
-                dependants.set(pack.name, pack);
-                queue.push(pack.name);
-            }
-        }
-    }
-
-    return [...dependants.values()];
-};
-
 const getChangeWarning = (
     removingPackagename: string,
     selectedPackages: PackageInfo[],
 ) => {
-    const dependants = getTransitiveDependants(
+    const dependants = transitivePkgDependants(
         removingPackagename,
         selectedPackages,
+        (pack) => pack.name,
+        (pack) => pack.depends.map((dep) => dep.name),
     );
 
     if (dependants.length > 0) {
@@ -77,7 +49,7 @@ export const useSelectedRows = (
     const [incomingRows, setIncomingRows] = useState<RowSelectionState>({});
     const skipEffect = useRef(false);
 
-    const check = async () => {
+    const check = useCallback(async () => {
         const change = detectChange(outgoingRows, incomingRows);
         if (change) {
             const pack = allPackages.find((pack) => getId(pack) == change.name);
@@ -124,21 +96,21 @@ export const useSelectedRows = (
         } else {
             setOutgoingRows(incomingRows);
         }
-    };
+    }, [allPackages, confirm, incomingRows, outgoingRows]);
 
     useEffect(() => {
         if (skipEffect.current) {
             skipEffect.current = false;
         } else {
-            check();
+            void check();
         }
-    }, [incomingRows]);
+    }, [check]);
 
-    const overWriteRows = (rows: RowSelectionState) => {
+    const overWriteRows = useCallback((rows: RowSelectionState) => {
         skipEffect.current = true;
         setOutgoingRows(rows);
         setIncomingRows(rows);
-    };
+    }, []);
 
     return [outgoingRows, setIncomingRows, overWriteRows] as const;
 };

@@ -3,7 +3,7 @@ package host:db;
 world impl {
     include supervisor:bridge/imports;
     include host:types/imports;
-    include host:common/imports;
+    include host:client/imports;
 
     export store;
 }

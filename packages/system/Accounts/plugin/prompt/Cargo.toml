@@ -9,8 +9,6 @@ psibase.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 psibase-plugin-workspace-hack.workspace = true
-psibase_plugin.workspace = true
-thiserror.workspace = true
 
 [lib]
 crate-type = ["cdylib"]
@@ -22,8 +20,14 @@ package = "accounts:prompt"
 world = "impl"
 
 [package.metadata.component.target.dependencies]
-"accounts:query" = { path = "../query/wit/world.wit" }
+"host:client" = { path = "../../../../user/Host/plugin/client/wit/world.wit" }
+"host:http" = { path = "../../../../user/Host/plugin/http/wit/world.wit" }
+"host:types" = { path = "../../../../user/Host/plugin/types/wit/world.wit" }
+"host:db" = { path = "../../../../user/Host/plugin/db/wit/world.wit" }
+"host:crypto" = { path = "../../../../user/Host/plugin/crypto/wit/world.wit" }
 "transact:plugin" = { path = "../../../Transact/plugin/wit/world.wit" }
+"permissions:plugin" = { path = "../../../../user/Permissions/plugin/wit/world.wit" }
+"accounts:query" = { path = "../query/wit/world.wit" }
 "invite:plugin" = { path = "../../../../user/Invite/plugin/wit/redemption.wit" }
 "auth-sig:plugin" = { path = "../../../AuthSig/plugin/wit/world.wit" }
 "auth-any:plugin" = { path = "../../../AuthAny/plugin/wit/world.wit" }
@@ -31,6 +35,3 @@ world = "impl"
 
 [package.metadata.component.bindings]
 derives = ["serde::Deserialize"]
-
-[package.metadata.component.bindings.with]
-"host:types/types" = "psibase_plugin::types"

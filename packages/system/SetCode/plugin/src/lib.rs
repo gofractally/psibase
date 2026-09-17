@@ -3,6 +3,9 @@ mod bindings;
 
 use bindings::*;
 use exports::setcode::plugin::api::Guest as Api;
+use exports::setcode::plugin::authorized::Guest as Authorized;
+use host::http::api as Server;
+use host::types::types::Error;
 use psibase::services::setcode::action_structs::{setCode, stageCode};
 use transact::plugin::intf::add_action_to_transaction;
 
@@ -67,4 +70,11 @@ impl Api for SetcodePlugin {
         .unwrap();
     }
 }
+
+impl Authorized for SetcodePlugin {
+    fn graphql(query: String) -> Result<String, Error> {
+        Server::post_graphql_get_json(&query)
+    }
+}
+
 bindings::export!(SetcodePlugin with_types_in bindings);
