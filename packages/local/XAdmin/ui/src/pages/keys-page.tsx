@@ -16,6 +16,7 @@ import { useToast } from "@/components/ui/use-toast";
 
 import { KeyDeviceForm } from "@/components/forms/key-device-form";
 import { KeysTable } from "@/components/keys-table";
+import { PageHeading } from "@/components/page-heading";
 
 import { getErrorMessage } from "@/lib/utils";
 import { KeyDeviceSchema } from "@/types";
@@ -221,7 +222,11 @@ export const KeysPage = () => {
     return (
         <main className="flex select-none justify-center">
             <div className="w-full space-y-2">
-                <Tabs defaultValue="devices" className="">
+                <PageHeading
+                    title="Keys & devices"
+                    description="Manage security devices and server signing keys."
+                />
+                <Tabs defaultValue="devices">
                     <div className="flex justify-between">
                         <TabsList>
                             <TabsTrigger value="devices">Devices</TabsTrigger>

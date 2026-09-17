@@ -10,17 +10,31 @@ The `sites` service is used to host content for an account and serve it over HTT
 
 ## CSP header baseline
 
-The `Content-Security-Policy` header aids security efforts, as modern browsers restrict the capabilities of the document on the client-side according to the policy expressed in this header. The sites server uses a permissive baseline CSP header that should permit most common requirements.
+The `Content-Security-Policy` header aids security efforts, as modern browsers restrict the capabilities of the document on the client-side according to the policy expressed in this header. The sites server uses a strict baseline CSP header; apps with additional requirements (e.g. the supervisor, prompt pages, or sites built with tooling that emits inline scripts) override it with the `setCsp` action.
 
-| Default policy | Values                                           |
-| -------------- | ------------------------------------------------ |
-| `default-src`  | `self`                                           |
-| `font-src`     | `self, https:`                                   |
-| `script-src`   | `self, unsafe-eval, unsafe-inline, blob: https:` |
-| `img-src`      | `*`                                              |
-| `style-src`    | `self, unsafe-inline`                            |
-| `frame-src`    | `*`                                              |
-| `connect-src`  | `*, blob:`                                       |
+Host sources are written scheme-relative (no `http://`/`https://` prefix), so the same policy works over `http` in local development and `https` in production. The `{{root}}` keyword (see below) is replaced at serve time with the root domain of the request.
+
+| Default policy    | Values                                                       |
+| ----------------- | ------------------------------------------------------------ |
+| `default-src`     | `'self'`                                                     |
+| `script-src`      | `'self'`                                                     |
+| `style-src`       | `'self' 'unsafe-inline'`                                     |
+| `img-src`         | `'self' data: profiles.{{root}}/avatar/ branding.{{root}}`   |
+| `font-src`        | `'self'`                                                     |
+| `connect-src`     | `'self' profiles.{{root}} tokens.{{root}}`                   |
+| `frame-src`       | `supervisor.{{root}}`                                        |
+| `frame-ancestors` | `'self'`                                                     |
+| `base-uri`        | `'none'`                                                     |
+| `form-action`     | `'self'`                                                     |
+| `object-src`      | `'none'`                                                     |
+
+Notable consequences of the strict baseline:
+
+- Inline `<script>` tags, `eval`, and CDN-hosted scripts are blocked.
+- Pages may only be embedded same-origin (`frame-ancestors 'self'`). Pages designed to be embedded by the supervisor (e.g. plugin prompt pages) need to widen `frame-ancestors` to include the supervisor's origin.
+- The supervisor is the only origin a page may embed. This covers the hidden supervisor iframe used by apps that make plugin calls; apps that don't (e.g. static sites) simply never mount a frame.
+- `fetch` and WebSocket connections are limited to the app's own origin plus the `profiles` and `tokens` services. `'self'` covers an app's own `/graphql` and RPC endpoints and the `/common/*` endpoints (served same-origin on every subdomain). `profiles.{{root}}` and `tokens.{{root}}` are granted because the shared UI hooks (`useProfile`, `useSystemToken`) fetch them from nearly every app; both expose only public data, and writes require signed transactions.
+- Cross-subdomain image loads are limited to user avatars (served by the `profiles` service at `profiles.{{root}}/avatar/<account>`) and the network logo (served from `branding.{{root}}`).
 
 ### Dynamic CSP
 

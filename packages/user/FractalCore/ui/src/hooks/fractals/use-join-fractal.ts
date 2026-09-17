@@ -27,7 +27,7 @@ const mutationFn = async (fractal: string): Promise<void> => {
         const message =
             error instanceof Error
                 ? error.message
-                : "Error applying to join fractal";
+                : "Error joining fractal";
 
         console.error(message, error);
         toast.error(message);

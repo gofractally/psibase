@@ -2,6 +2,7 @@ import { usePluginFunctionMutation } from "@shared/hooks/plugin-function/use-plu
 import { usePluginFunctionQuery } from "@shared/hooks/plugin-function/use-plugin-function-query";
 
 import { Plugin as Accounts } from "./accounts";
+import { AuthorizedGraphqlPlugin } from "./authorized-graphql-plugin";
 import { Plugin as Config } from "./config";
 import { Plugin as Homepage } from "./homepage";
 import { callPluginFunction } from "./lib/call-plugin-function";
@@ -20,6 +21,18 @@ const tokenSwap = new TokenSwap("token-swap");
 const tokens = new Tokens("tokens");
 const profiles = new Profiles("profiles");
 
+const invite = new AuthorizedGraphqlPlugin("invite");
+const producers = new AuthorizedGraphqlPlugin("producers");
+const guilds = new AuthorizedGraphqlPlugin("guilds");
+const fractals = new AuthorizedGraphqlPlugin("fractals");
+const evaluation = new AuthorizedGraphqlPlugin("evaluation");
+const stagedTx = new AuthorizedGraphqlPlugin("staged-tx");
+const sites = new AuthorizedGraphqlPlugin("sites");
+const registry = new AuthorizedGraphqlPlugin("registry");
+const setcode = new AuthorizedGraphqlPlugin("setcode");
+const transact = new AuthorizedGraphqlPlugin("transact");
+const vserver = new AuthorizedGraphqlPlugin("vserver");
+
 export {
     accounts,
     config,
@@ -29,6 +42,17 @@ export {
     tokenSwap,
     tokens,
     profiles,
+    vserver,
+    invite,
+    producers,
+    guilds,
+    fractals,
+    evaluation,
+    stagedTx,
+    sites,
+    registry,
+    setcode,
+    transact,
     callPluginFunction,
     usePluginFunctionMutation,
     usePluginFunctionQuery,

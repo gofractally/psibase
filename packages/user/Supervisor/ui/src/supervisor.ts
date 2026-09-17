@@ -41,6 +41,7 @@ const rootDomain = siblingUrl();
 //   in a given call context.
 const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("accounts", "plugin"),
+    pluginId("accounts", "query"),
     pluginId("host", "auth"),
     pluginId("host", "prompt"),
     pluginId("transact", "plugin"),
@@ -233,7 +234,7 @@ export class Supervisor implements AppInterface {
         assertTruthy(this.parentOrigination.app, "Root app unrecognized");
 
         const user = this.supervisorCall(
-            getCallArgs("accounts", "plugin", "api", "get-current-user", []),
+            getCallArgs("accounts", "query", "api", "get-current-user", []),
         );
 
         if (!user) {
@@ -251,14 +252,14 @@ export class Supervisor implements AppInterface {
 
     private authorizeCurrentUser(): void {
         const user = this.supervisorCall(
-            getCallArgs("accounts", "plugin", "api", "get-current-user", []),
+            getCallArgs("accounts", "query", "api", "get-current-user", []),
         );
         if (!user) {
             return;
         }
 
         const account = this.supervisorCall(
-            getCallArgs("accounts", "plugin", "api", "get-account", [user]),
+            getCallArgs("accounts", "query", "api", "get-account", [user]),
         );
         if (!account) {
             return;

@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Unplug } from "lucide-react";
+import { ChevronLeft, Unplug } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -27,9 +27,14 @@ const defaultValues = {
 interface Props {
     onSubmit: (data: Schema) => void | Promise<void>;
     existingValues?: Schema | undefined;
+    onBack?: () => void;
 }
 
-export function UrlForm({ onSubmit: handleSubmit, existingValues }: Props) {
+export function UrlForm({
+    onSubmit: handleSubmit,
+    existingValues,
+    onBack,
+}: Props) {
     const form = useForm<z.infer<typeof FormSchema>>({
         resolver: zodResolver(FormSchema),
         defaultValues: existingValues || defaultValues,
@@ -65,22 +70,32 @@ export function UrlForm({ onSubmit: handleSubmit, existingValues }: Props) {
                         </FormItem>
                     )}
                 />
-                <div className="flex w-full justify-between">
-                    <div>
-                        <FormRootError />
-                    </div>
+                <FormRootError />
+                <div
+                    className={
+                        onBack
+                            ? "flex w-full items-center justify-between gap-3"
+                            : "flex w-full items-center justify-end gap-3"
+                    }
+                >
+                    {onBack && (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onBack}
+                        >
+                            <ChevronLeft />
+                            Back
+                        </Button>
+                    )}
                     <Button
-                        className="w-40"
-                        size="lg"
                         type="submit"
                         disabled={form.formState.isSubmitting}
                     >
-                        <Unplug size={20} className="absolute mr-28" />
-                        <div>
-                            {form.formState.isSubmitting
-                                ? "Connecting.."
-                                : "Connect"}
-                        </div>
+                        <Unplug />
+                        {form.formState.isSubmitting
+                            ? "Connecting..."
+                            : "Connect"}
                     </Button>
                 </div>
             </form>

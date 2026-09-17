@@ -1,3 +1,6 @@
+import { TriangleAlert, Unplug } from "lucide-react";
+import { Link } from "react-router-dom";
+
 import { Alert, AlertDescription, AlertTitle } from "@shared/shadcn/ui/alert";
 
 import { useConfig } from "../hooks/use-config";
@@ -31,19 +34,19 @@ export const StatusBanner = () => {
                     <div>
                         <div>No chain running.</div>
                         <div className="flex gap-1">
-                            <a
+                            <Link
                                 className="text-primary font-medium underline underline-offset-4"
-                                href="#Boot"
+                                to="/setup/create"
                             >
                                 Create a new chain
-                            </a>{" "}
+                            </Link>{" "}
                             or{" "}
-                            <a
+                            <Link
                                 className="text-primary font-medium underline underline-offset-4"
-                                href="#Peers"
+                                to="/setup/join"
                             >
                                 connect to an existing chain
-                            </a>
+                            </Link>
                         </div>
                     </div>
                 );
@@ -57,12 +60,11 @@ export const StatusBanner = () => {
     }
 
     const disconnected = Boolean(peersError && configError && statusError);
-    const statusTitle = disconnected
-        ? "🔴 Node Connection Error"
-        : "⚠️ Warning";
+    const statusTitle = disconnected ? "Node connection error" : "Warning";
 
     return (
-        <Alert variant={disconnected ? "destructive" : "default"}>
+        <Alert variant={disconnected ? "destructive" : "warning"}>
+            {disconnected ? <Unplug /> : <TriangleAlert />}
             <AlertTitle>{statusTitle}</AlertTitle>
             {serverStatus.map((status, idx) => (
                 <AlertDescription key={idx}>{status}</AlertDescription>

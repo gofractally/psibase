@@ -393,6 +393,15 @@ impl<'a> PackageBuilder<'a> {
             })
             .collect();
 
+        for act in &postinstall {
+            if AccountNumber::from(act.service) == AccountNumber::new(0) {
+                return Err(anyhow!(
+                    "Invalid postinstall service account '{}'",
+                    act.service
+                ));
+            }
+        }
+
         let mut data_files = Vec::new();
         for (service, src, dest) in data_sources {
             add_files(crate_to_account[service], &src, &dest, &mut data_files)?;

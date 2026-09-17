@@ -20,7 +20,7 @@ export const useImportExisting = (
             const validatedCredential = CredentialSchema.parse(credential);
             await supervisor.functionCall({
                 service: "accounts",
-                plugin: "plugin",
+                plugin: "prompt",
                 intf: "prompt",
                 method: "importExisting",
                 params: [[validatedCredential]],

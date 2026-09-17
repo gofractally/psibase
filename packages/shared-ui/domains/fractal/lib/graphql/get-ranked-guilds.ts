@@ -1,20 +1,20 @@
 import { Account, zAccount } from "@shared/lib/schemas/account";
-import { graphql } from "@shared/lib/graphql";
-import { GUILDS_SERVICE } from "../constants";
+import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { guilds } from "@shared/lib/plugins";
 import z from "zod";
 
 
 
 export const getRankedGuilds = async (owner: Account): Promise<Account[]> => {
-    const guilds = await graphql(
+    const data = await callGraphqlViaPlugin(
+        guilds.authorized.graphql,
         `
     {
         rankedGuilds(fractal: "${owner}")
     }`,
-        { service: GUILDS_SERVICE },
     );
 
     return z.object({
         rankedGuilds: zAccount.array()
-    }).parse(guilds).rankedGuilds
+    }).parse(data).rankedGuilds
 };

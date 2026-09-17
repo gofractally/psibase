@@ -1,16 +1,7 @@
 use crate::bindings::host::auth::api as HostAuth;
 use crate::bindings::host::db::store::{Bucket, Database, DbMode, StorageDuration};
+use crate::logged_in_user::logged_in_user_table;
 use psibase::fracpack::{Pack, Unpack};
-
-fn logged_in_user_table() -> Bucket {
-    Bucket::new(
-        Database {
-            mode: DbMode::NonTransactional,
-            duration: StorageDuration::Persistent,
-        },
-        "logged_in_user",
-    )
-}
 
 fn connected_accounts_table() -> Bucket {
     Bucket::new(

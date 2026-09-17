@@ -2,7 +2,7 @@ package fractals:plugin;
 
 world impl {
     include transact:plugin/imports;
-    include accounts:plugin/imports;
+    include accounts:query/imports;
     include guilds:plugin/imports;
 
 
@@ -10,4 +10,5 @@ world impl {
     export user-fractal;
     export queries;
     export types;
+    export authorized;
 }

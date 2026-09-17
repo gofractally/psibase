@@ -3,7 +3,7 @@ package guilds:plugin;
 world impl {
     include invite:plugin/imports;
     include evaluations:plugin/imports;
-    include accounts:plugin/imports;
+    include accounts:query/imports;
 
 
 
@@ -12,4 +12,5 @@ world impl {
     export user-eval;
     export admin-fractal;
     export queries;
+    export authorized;
 }

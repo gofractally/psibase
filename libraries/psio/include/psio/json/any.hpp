@@ -98,17 +98,6 @@ namespace psio
                       any_array,
                       error_t>
              _value;
-
-         template <typename S>
-         friend void to_bin(const any& obj, S& stream)
-         {
-            to_bin(obj._value, stream);
-         }
-         template <typename S>
-         friend void from_bin(any& obj, S& stream)
-         {
-            from_bin(obj._value, stream);
-         }
       };
 
       struct entry

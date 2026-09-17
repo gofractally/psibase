@@ -25,7 +25,7 @@ export default function DraftsPage() {
         <TwoColumnSelect
             left={
                 <MailList
-                    mailbox={"drafts"}
+                    mailbox="drafts"
                     messages={userDrafts ?? []}
                     onSelectMessage={setSelectedMessageId}
                     selectedMessage={selectedMessage}
@@ -34,12 +34,16 @@ export default function DraftsPage() {
             right={
                 selectedMessage ? (
                     <MessageDetail
-                        message={selectedMessage ?? null}
-                        mailbox={"drafts"}
-                        onBack={() => setSelectedMessageId("")}
+                        message={selectedMessage}
+                        mailbox="drafts"
+                        onBack={
+                            display === "right"
+                                ? () => setSelectedMessageId("")
+                                : undefined
+                        }
                     />
                 ) : (
-                    <NoMessageSelected>Select a message</NoMessageSelected>
+                    <NoMessageSelected />
                 )
             }
             header={<MailboxHeader>Drafts</MailboxHeader>}

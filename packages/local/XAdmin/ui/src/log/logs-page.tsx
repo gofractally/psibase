@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
+import { useLocalStorage } from "usehooks-ts";
 import { z } from "zod";
 
+import { PageHeading } from "@/components/page-heading";
+
 import { Alert, AlertDescription } from "@shared/shadcn/ui/alert";
+import { Badge } from "@shared/shadcn/ui/badge";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 import { Switch } from "@shared/shadcn/ui/switch";
@@ -21,8 +25,25 @@ import { LogFilterInputs, LogRecord } from "./interfaces";
 
 const MAX_LOGS_ROWS = 20;
 
+const utcLogTimeFormat = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "UTC",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+});
+
+const formatLogTimestamp = (timestamp: Date, useUtc: boolean) =>
+    useUtc ? utcLogTimeFormat.format(timestamp) : timestamp.toLocaleString();
+
 export const LogRecordSchema = z.object({
-    TimeStamp: z.string(),
+    TimeStamp: z
+        .string()
+        .datetime()
+        .transform((timestamp) => new Date(timestamp)),
     Severity: z.string(),
     Message: z.string(),
     RemoteEndpoint: z.string().optional(),
@@ -54,6 +75,7 @@ export const LogsPage = () => {
     > | null>(null);
 
     const [filterError, setFilterError] = useState<string>();
+    const [useUtc, setUseUtc] = useLocalStorage("utc-timestamps", false);
 
     const filterForm = useForm<LogFilterInputs>({
         defaultValues: {
@@ -100,7 +122,7 @@ export const LogsPage = () => {
         //  else if (!logEnabled && logSocket) {
         //     logSocket.close();
         // }
-    }, [logSocket, logTimeout, keepAllLogs]);
+    }, [logSocket, logTimeout, keepAllLogs, logFilter]);
 
     const onFilter = (input: LogFilterInputs) => {
         setLogFilter(input.filter);
@@ -115,37 +137,68 @@ export const LogsPage = () => {
     };
 
     return (
-        <div className="h-dvh ">
+        <div className="flex min-h-0 flex-col">
             {logConnectionError && (
-                <Alert variant="destructive">
+                <Alert variant="destructive" className="mb-4">
                     <AlertDescription>
                         {logConnectionError || "Unknown log connection error"}
                     </AlertDescription>
                 </Alert>
             )}
-            <div className="flex justify-between py-3">
-                <h1 className="">Logs</h1>
-                <div className="flex">
-                    <Label className="my-auto mr-2">Keep all logs</Label>
-                    <Switch
-                        onCheckedChange={(checked) =>
-                            (keepAllLogs.current = checked)
-                        }
-                    />
-                </div>
-            </div>
+            <PageHeading
+                title="Logs"
+                description="Live node logs. Press Enter to apply a filter."
+                actions={
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                            <Label
+                                htmlFor="utc-timestamps"
+                                className="text-muted-foreground font-normal"
+                                title="Show timestamps in 24-hour UTC (yyyy-mm-dd) for timezone-independent screenshots"
+                            >
+                                UTC
+                            </Label>
+                            <Switch
+                                id="utc-timestamps"
+                                checked={useUtc}
+                                onCheckedChange={setUseUtc}
+                            />
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Label htmlFor="keep-all-logs">Keep all logs</Label>
+                            <Switch
+                                id="keep-all-logs"
+                                onCheckedChange={(checked) =>
+                                    (keepAllLogs.current = checked)
+                                }
+                            />
+                        </div>
+                    </div>
+                }
+            />
 
-            <form onSubmit={filterForm.handleSubmit(onFilter)}>
-                <Label>Filter</Label>
-                <Input {...filterForm.register("filter")} />
-                {filterError && <Label>{filterError}</Label>}
+            <form
+                onSubmit={filterForm.handleSubmit(onFilter)}
+                className="mb-4 space-y-1.5"
+            >
+                <Label htmlFor="log-filter">Filter</Label>
+                <Input
+                    id="log-filter"
+                    placeholder="Severity >= info"
+                    {...filterForm.register("filter")}
+                />
+                {filterError && (
+                    <p className="text-destructive text-sm">{filterError}</p>
+                )}
             </form>
-            <div className="max-h-full overflow-y-scroll">
-                <Table className="">
+            <div className="overflow-y-auto rounded-lg border">
+                <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Time</TableHead>
-                            <TableHead>Severity</TableHead>
+                            <TableHead className={useUtc ? "w-56" : "w-48"}>
+                                {useUtc ? "Time (UTC)" : "Time"}
+                            </TableHead>
+                            <TableHead className="w-28">Severity</TableHead>
                             <TableHead>Message</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -155,11 +208,17 @@ export const LogsPage = () => {
                                 key={index}
                                 className={`log log-${row.Severity}`}
                             >
-                                <TableCell>
-                                    {new Date(row.TimeStamp).toLocaleString()}
+                                <TableCell className="text-muted-foreground whitespace-nowrap tabular-nums">
+                                    {formatLogTimestamp(row.TimeStamp, useUtc)}
                                 </TableCell>
-                                <TableCell>{row.Severity}</TableCell>
-                                <TableCell className="log-message">
+                                <TableCell>
+                                    <Badge
+                                        variant={severityVariant(row.Severity)}
+                                    >
+                                        {row.Severity}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell className="log-message whitespace-normal">
                                     {formatLog(row)}
                                 </TableCell>
                             </TableRow>
@@ -179,6 +238,19 @@ export const LogsPage = () => {
         </div>
     );
 };
+
+function severityVariant(
+    severity: string,
+): "default" | "secondary" | "destructive" | "outline" {
+    const value = severity.toLowerCase();
+    if (value.includes("error") || value.includes("fatal")) {
+        return "destructive";
+    }
+    if (value.includes("warn")) {
+        return "outline";
+    }
+    return "secondary";
+}
 
 function formatLog(row: LogRecord): string {
     let result = row.Message;

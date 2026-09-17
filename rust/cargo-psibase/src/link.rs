@@ -763,6 +763,113 @@ pub fn link_module(source: &Module, dest: &mut Module) -> Result<(), anyhow::Err
     Ok(())
 }
 
+struct RetargetCalls<'a> {
+    map: &'a HashMap<FunctionId, FunctionId>,
+}
+
+impl RetargetCalls<'_> {
+    fn rewrite(&self, fid: &mut FunctionId) {
+        if let Some(&to) = self.map.get(fid) {
+            *fid = to;
+        }
+    }
+}
+
+impl walrus::ir::VisitorMut for RetargetCalls<'_> {
+    fn visit_function_id_mut(&mut self, function: &mut FunctionId) {
+        self.rewrite(function);
+    }
+}
+
+fn retarget(module: &mut Module, map: &HashMap<FunctionId, FunctionId>) {
+    let mut visitor = RetargetCalls { map };
+    for (_, local) in module.funcs.iter_local_mut() {
+        let entry = local.entry_block();
+        walrus::ir::dfs_pre_order_mut(&mut visitor, local, entry);
+    }
+    if let Some(start) = &mut module.start {
+        visitor.rewrite(start);
+    }
+    for elem in module.elements.iter_mut() {
+        if let walrus::ElementKind::Active {
+            offset: walrus::InitExpr::RefFunc(fid),
+            ..
+        } = &mut elem.kind
+        {
+            visitor.rewrite(fid);
+        }
+        for member in &mut elem.members {
+            if let Some(fid) = member {
+                visitor.rewrite(fid);
+            }
+        }
+    }
+    let global_ids: Vec<_> = module.globals.iter().map(|g| g.id()).collect();
+    for id in global_ids {
+        if let walrus::GlobalKind::Local(walrus::InitExpr::RefFunc(fid)) =
+            &mut module.globals.get_mut(id).kind
+        {
+            visitor.rewrite(fid);
+        }
+    }
+    for export in module.exports.iter_mut() {
+        if let walrus::ExportItem::Function(fid) = &mut export.item {
+            visitor.rewrite(fid);
+        }
+    }
+}
+
+/// Bind `env` imports to local exports of the same name.
+///
+/// psitest does not provide `env.*`; the tester polyfill does.
+pub fn bind_env(module: &mut Module) -> Result<(), anyhow::Error> {
+    let mut map = HashMap::new();
+    let mut import_ids = Vec::new();
+    for import in module.imports.iter() {
+        if import.module != "env" {
+            continue;
+        }
+        let walrus::ImportKind::Function(import_fid) = import.kind else {
+            continue;
+        };
+        let Ok(export_fid) = module.exports.get_func(&import.name) else {
+            continue;
+        };
+        if import_fid == export_fid {
+            continue;
+        }
+        if !matches!(module.funcs.get(export_fid).kind, FunctionKind::Local(_)) {
+            return Err(anyhow!(
+                "Destination import {} matches an export by name, but that export is not a local function.",
+                import.name
+            ));
+        }
+        if module.func_type(import_fid) != module.func_type(export_fid) {
+            return Err(anyhow!(
+                "Destination import {} matches local export by name but not by type.",
+                import.name
+            ));
+        }
+        map.insert(import_fid, export_fid);
+        import_ids.push(import.id());
+    }
+
+    if map.is_empty() {
+        return Ok(());
+    }
+
+    retarget(module, &map);
+    for import_id in import_ids {
+        module.imports.delete(import_id);
+    }
+
+    walrus::passes::gc::run(module);
+    new_validator()
+        .validate_all(&module.emit_wasm())
+        .map_err(|e| anyhow!("[Wasm linker error] {}", e))?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use anyhow::Error;
@@ -953,6 +1060,41 @@ mod tests {
         assert!(
             post_imports[0].name == "testerClose",
             "Postfill import name incorrect"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_bind_env() -> Result<(), Error> {
+        let path = &rel_to_manifest("/test-data/env-local-override.wat");
+        let mut module = wat(path)?;
+
+        let before = get_import_funcs(&module);
+        assert_eq!(before.len(), 2, "Unexpected imports before satisfy");
+        assert!(
+            before
+                .iter()
+                .any(|i| i.module == "env" && i.name == "kvOpenAt"),
+            "Missing env.kvOpenAt import"
+        );
+        assert!(
+            before
+                .iter()
+                .any(|i| i.module == "psibase" && i.name == "other"),
+            "Missing psibase.other import"
+        );
+
+        bind_env(&mut module)?;
+        print_wat(&suffix(path, "-filled"), &module.emit_wasm())?;
+
+        let after = get_import_funcs(&module);
+        assert_eq!(after.len(), 1, "Unexpected imports after satisfy");
+        assert_eq!(after[0].module, "psibase");
+        assert_eq!(after[0].name, "other");
+        assert!(
+            module.exports.get_func("kvOpenAt").is_ok(),
+            "Local kvOpenAt export should remain"
         );
 
         Ok(())

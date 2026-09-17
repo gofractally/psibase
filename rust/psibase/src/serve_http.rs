@@ -152,7 +152,7 @@ pub fn serve_graphql<Query: async_graphql::ObjectType + 'static>(
         } else if request.method == "GET" {
             Some(HttpReply {
                 status: 200,
-                contentType: "text".into(), // TODO
+                contentType: "text/plain".into(),
                 body: schema.sdl().into_bytes().into(),
                 headers: allow_cors_with_origin("*"),
             })

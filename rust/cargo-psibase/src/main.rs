@@ -27,7 +27,7 @@ use walrus::{ExportItem, Module};
 use wasm_opt::OptimizationOptions;
 
 mod link;
-use link::link_module;
+use link::{bind_env, link_module};
 mod package;
 use package::*;
 
@@ -128,6 +128,10 @@ struct InstallCommand {
     /// Reinstall the package
     #[clap(short = 'r', long)]
     reinstall: bool,
+
+    /// Automatically accept install confirmation
+    #[clap(short = 'y', long)]
+    yes: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -323,6 +327,7 @@ fn process(
         let polyfill_source_module = config.parse(polyfill)?;
         link_module(&polyfill_source_module, &mut dest_module)?;
     }
+    bind_env(&mut dest_module)?;
 
     strip(&mut dest_module, exports)?;
 
@@ -1146,6 +1151,10 @@ async fn install(
 
     if opts.reinstall {
         command.args(["--reinstall"]);
+    }
+
+    if opts.yes {
+        command.args(["--yes"]);
     }
 
     if let Some(compression_level) = opts.compression_level {

@@ -3,6 +3,12 @@ package transact:plugin;
 interface types {
     use host:types/types.{claim};
 
+    /// The verify-service specified in the claim is the service that knows how to verify that
+    /// a proof actually proves the claim.
+    record proof {
+        signature: list<u8>,
+    }
+
     /// Action data from a transaction
     record action {
         /// The sender of this action
@@ -115,10 +121,24 @@ interface network {
     set-snapshot-time: func(seconds: u32) -> result<_, error>;
 }
 
+/// Interface that makes authorized queries to this app's http server.
+interface authorized {
+    use host:types/types.{error};
+
+    /// Executes a GraphQL query against this app's http server.
+    ///
+    /// Arguments
+    /// * `query` - GraphQL query to execute
+    ///
+    /// Returns the result of the query as a string.
+    graphql: func(query: string) -> result<string, error>;
+}
+
 // Include this world to import the most common transact:plugin imports
 world imports {
     import intf;
     import auth;
+    import authorized;
     import network;
     import admin;
 }

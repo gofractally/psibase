@@ -8,11 +8,10 @@ error[E0277]: `?` couldn't convert the error to `i32`
   |     this can't be annotated with `?` because it has type `Result<_, String>`
   |
   = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
-  = help: the following other types implement trait `From<T>`:
-            `i32` implements `From<bool>`
-            `i32` implements `From<i16>`
-            `i32` implements `From<i8>`
-            `i32` implements `From<u16>`
-            `i32` implements `From<u8>`
-  = note: required for `Result<(), i32>` to implement `FromResidual<Result<Infallible, String>>`
+  = help: `i32` implements trait `From<T>`:
+            From<bool>
+            From<i16>
+            From<i8>
+            From<u16>
+            From<u8>
   = note: this error originates in the attribute macro `authorized` (in Nightly builds, run with -Z macro-backtrace for more info)

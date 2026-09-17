@@ -28,8 +28,7 @@ Makefile
 node_modules
 temp
 dist
-vite.config.ts.timestamp-*.mjs
-vite.config.mts.timestamp-*.mjs
+vite.config.*.timestamp-*.mjs
 .pnpm-store
 .env
 .envrc

@@ -25,7 +25,7 @@ export function LoginBar({ supervisor }: { supervisor: Supervisor }) {
         const fetchUser = async () => {
             try {
                 const user = await supervisor.functionCall(
-                    withArgs("accounts", "plugin", "api", "getCurrentUser"),
+                    withArgs("accounts", "query", "api", "getCurrentUser"),
                 );
                 setCurrentUser(user || null);
             } catch (e) {

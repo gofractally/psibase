@@ -4,19 +4,16 @@ use crate::db::{apps_table::*, user_table::*};
 use crate::errors::ErrorType::*;
 use crate::helpers::*;
 use crate::plugin::AccountsPlugin;
+use accounts::query::api as AccountsQuery;
 use bindings::*;
-use exports::accounts::plugin::{
-    active_app::{Guest as ActiveApp, *},
-    api::Guest as Api,
-};
+use exports::accounts::plugin::active_app::{Guest as ActiveApp, *};
+use host::client::api as client;
 use host::auth::api as HostAuth;
-use host::common::client;
 use host::prompt::api as Prompt;
 
 impl ActiveApp for AccountsPlugin {
     fn login(user: String) -> Result<(), Error> {
-        let account_details =
-            <AccountsPlugin as Api>::get_account(user.clone()).expect("Get account failed");
+        let account_details = AccountsQuery::get_account(&user).expect("Get account failed");
         if account_details.is_none() {
             return Err(InvalidAccountName(user).into());
         }

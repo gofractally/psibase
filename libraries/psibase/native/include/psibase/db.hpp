@@ -4,7 +4,6 @@
 
 #include <psibase/blob.hpp>
 #include <psio/fracpack.hpp>
-#include <psio/from_bin.hpp>
 #include <psio/to_key.hpp>
 #include <triedent/file_fwd.hpp>
 

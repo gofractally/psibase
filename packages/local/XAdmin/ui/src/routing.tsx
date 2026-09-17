@@ -78,27 +78,26 @@ export const Routing = () => {
                 <Route path="create" element={<CreatePage />} />
             </Route>
 
-            {isBootable ? (
-                <Route path="*" element={<Navigate to="/setup" replace />} />
-            ) : (
-                <Route path="" element={<Layout />}>
-                    <Route path="" element={<App />}>
-                        {routes.map((route) => (
-                            <Route
-                                key={route.path}
-                                path={route.path}
-                                element={route.element}
-                            />
-                        ))}
+            <Route path="" element={<Layout />}>
+                <Route path="" element={<App />}>
+                    {routes.map((route) => (
                         <Route
-                            path=""
-                            element={
-                                <Navigate to="/dashboard" replace={true} />
-                            }
+                            key={route.path}
+                            path={route.path}
+                            element={route.element}
                         />
-                    </Route>
+                    ))}
+                    <Route
+                        path=""
+                        element={
+                            <Navigate
+                                to={isBootable ? "/setup" : "/dashboard"}
+                                replace
+                            />
+                        }
+                    />
                 </Route>
-            )}
+            </Route>
         </Routes>
     );
 };

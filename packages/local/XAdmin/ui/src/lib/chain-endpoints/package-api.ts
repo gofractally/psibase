@@ -2,6 +2,8 @@ import type { ManifestPayload, PackageMeta } from "./package-extraction";
 
 import { siblingUrl } from "@psibase/common-lib";
 
+import { adminBearerAuthHeaders } from "../admin-login-jwt";
+
 /**
  * Call the preinstall API endpoint
  */
@@ -12,6 +14,7 @@ export async function callPreinstall(meta: PackageMeta): Promise<void> {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
+                ...(await adminBearerAuthHeaders()),
             },
             body: JSON.stringify(meta),
         },
@@ -37,6 +40,7 @@ export async function installManifest(
             method: "PUT",
             headers: {
                 "Content-Type": "application/json",
+                ...(await adminBearerAuthHeaders()),
             },
             body: JSON.stringify(payload),
         },
@@ -59,6 +63,7 @@ export async function callPostinstall(meta: PackageMeta): Promise<void> {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
+                ...(await adminBearerAuthHeaders()),
             },
             body: JSON.stringify(meta),
         },

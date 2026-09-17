@@ -9,6 +9,7 @@ export type PluginCall<
     readonly intf: string;
     readonly method: string;
     readonly service: Account;
+    readonly plugin?: string;
     readonly _params?: TParams;
     readonly _return?: TReturn;
 };
@@ -23,11 +24,11 @@ export async function callPluginFunction<TCall extends PluginCall>(
     call: TCall,
     params: ExtractParams<TCall>,
 ): Promise<ExtractResult<TCall>> {
-    const { intf, method, service } = call;
+    const { intf, method, service, plugin } = call;
 
     const response = await supervisor.functionCall({
         service,
-        plugin: "plugin",
+        plugin: plugin ?? "plugin",
         intf,
         method,
         params,

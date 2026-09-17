@@ -9,12 +9,12 @@ mod queries;
 mod serde_structs;
 
 use crate::trust::*;
-use bindings::accounts::plugin as AccountPlugin;
+use bindings::accounts::query as AccountPlugin;
 use bindings::exports::chainmail::plugin::{
     api::{Error, Guest as Api},
     queries::{Guest as Query, Message},
 };
-use bindings::host::common::server as CommonServer;
+use bindings::host::http::api as CommonServer;
 use bindings::transact::plugin::intf as Transact;
 use chrono::DateTime;
 use errors::ErrorType;
@@ -51,7 +51,10 @@ fn get_unix_time_from_iso8601_str(dt_str: String) -> Result<i64, Error> {
 
 impl Api for ChainmailPlugin {
     fn send(receiver: String, subject: String, body: String) -> Result<(), Error> {
-        assert_authorized_with_whitelist(FunctionName::send, vec![receiver.clone()])?;
+        assert_authorized_with_whitelist(
+            FunctionName::send,
+            vec![receiver.clone(), "homepage".into()],
+        )?;
 
         Transact::add_action_to_transaction(
             "send",
@@ -66,7 +69,10 @@ impl Api for ChainmailPlugin {
     }
 
     fn archive(msg_id: u64) -> Result<(), Error> {
-        assert_authorized_with_whitelist(FunctionName::archive, vec!["workshop".into()])?;
+        assert_authorized_with_whitelist(
+            FunctionName::archive,
+            vec!["workshop".into(), "homepage".into()],
+        )?;
 
         Transact::add_action_to_transaction(
             "archive",
@@ -76,7 +82,10 @@ impl Api for ChainmailPlugin {
     }
 
     fn save(msg_id: u64) -> Result<(), Error> {
-        assert_authorized_with_whitelist(FunctionName::save, vec!["workshop".into()])?;
+        assert_authorized_with_whitelist(
+            FunctionName::save,
+            vec!["workshop".into(), "homepage".into()],
+        )?;
 
         let msg = get_msg_by_id(msg_id)?;
 

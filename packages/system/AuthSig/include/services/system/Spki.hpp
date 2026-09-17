@@ -26,15 +26,15 @@ namespace SystemService
 
       PSIBASE_REFLECT_KEY_TRANSFORM(&SubjectPublicKeyInfo::fingerprint, "sha256-key-fingerprint")
 
-      inline std::vector<unsigned char>& clio_unwrap_packable(SubjectPublicKeyInfo& obj)
+      inline std::vector<unsigned char>& psio_unwrap_packable(SubjectPublicKeyInfo& obj)
       {
          return obj.data;
       }
-      inline const std::vector<unsigned char>& clio_unwrap_packable(const SubjectPublicKeyInfo& obj)
+      inline const std::vector<unsigned char>& psio_unwrap_packable(const SubjectPublicKeyInfo& obj)
       {
          return obj.data;
       }
-      inline bool clio_validate_packable(const SubjectPublicKeyInfo& obj)
+      inline bool psio_validate_packable(const SubjectPublicKeyInfo& obj)
       {
          return SubjectPublicKeyInfo::validate(obj.data);
       }

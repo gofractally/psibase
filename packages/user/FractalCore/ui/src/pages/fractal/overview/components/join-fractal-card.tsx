@@ -27,9 +27,9 @@ export const JoinFractalCard = ({
                         <Plus className="text-muted-foreground h-6 w-6" />
                     </div>
                     <div>
-                        <h3 className="text-lg font-semibold">Apply to Join</h3>
+                        <h3 className="text-lg font-semibold">Join fractal</h3>
                         <p className="text-muted-foreground mt-1 text-sm">
-                            Create an application to join this fractal.
+                            Become a member of this fractal.
                         </p>
                     </div>
                     <Button
@@ -43,7 +43,7 @@ export const JoinFractalCard = ({
                         className="w-full sm:w-auto"
                     >
                         {isPending && <Spinner data-icon="inline-start" />}
-                        Apply
+                        Join
                     </Button>
                 </div>
             </CardContent>
