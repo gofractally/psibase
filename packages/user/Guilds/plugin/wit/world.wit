@@ -5,8 +5,6 @@ interface types {
         fractal: string,
         guild: string,
         evaluation-id: option<u32>,
-        council-role: string,
-        rep-role: string
     }
 }
 
