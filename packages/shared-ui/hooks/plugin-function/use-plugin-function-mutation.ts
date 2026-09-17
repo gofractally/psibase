@@ -17,14 +17,14 @@ export const usePluginFunctionMutation = <TCall extends PluginCall>(
         TCall extends PluginCall<unknown[], infer R> ? R : never
     > = {},
 ) => {
-    const { intf, method, service } = call;
+    const { intf, method, service, plugin } = call;
 
     type Params = TCall extends PluginCall<infer P, unknown> ? P : never;
     type Result = TCall extends PluginCall<unknown[], infer R> ? R : never;
 
     return useMutation<Result, Error, Params, ToastId>({
         ...options,
-        mutationKey: [service, intf, method],
+        mutationKey: [service, plugin ?? "plugin", intf, method],
 
         mutationFn: async (params: Params): Promise<Result> => {
             const parsedParams = z.array(z.unknown()).parse(params);
@@ -32,12 +32,14 @@ export const usePluginFunctionMutation = <TCall extends PluginCall>(
             console.log("Function call:", {
                 parsedParams,
                 service,
+                plugin: plugin ?? "plugin",
                 intf,
                 method,
             });
 
             const response = await supervisor.functionCall({
                 service,
+                plugin: plugin ?? "plugin",
                 intf,
                 method,
                 params: parsedParams,

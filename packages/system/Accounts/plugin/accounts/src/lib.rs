@@ -24,7 +24,7 @@ psibase::define_trust! {
     functions {
         None => [],
         High => [set_auth_service, get_connected_apps],
-        Max => [import_account, remove_account, get_all_accounts, get_auth_services, preapprove_account, import_existing],
+        Max => [import_account, remove_account, get_all_accounts, get_auth_services, preapprove_account],
     }
 }
 
