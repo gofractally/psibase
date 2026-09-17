@@ -125,13 +125,18 @@ impl Packaging for ConfigPlugin {
         packages::plugin::queries::get_installed_packages()
     }
 
-    fn resolve(
+    fn resolve_packages(
         index: Vec<PackageInfo>,
         request: Vec<String>,
         request_pref: PackagePreference,
         non_request_pref: PackagePreference,
     ) -> Result<Vec<PackageOpInfo>, Error> {
-        packages::plugin::private_api::resolve(&index, &request, request_pref, non_request_pref)
+        packages::plugin::private_api::resolve_packages(
+            &index,
+            &request,
+            request_pref,
+            non_request_pref,
+        )
     }
 
     fn install_packages(owner: String, ops: Vec<PackageOpFull>) -> Result<(), Error> {
@@ -274,8 +279,8 @@ impl Staged for ConfigPlugin {
         staged_tx::plugin::respondent::accept(id)
     }
 
-    fn reject(id: u32) -> Result<(), Error> {
-        staged_tx::plugin::respondent::reject(id)
+    fn decline(id: u32) -> Result<(), Error> {
+        staged_tx::plugin::respondent::decline(id)
     }
 
     fn execute(id: u32) -> Result<(), Error> {

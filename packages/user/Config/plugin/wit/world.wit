@@ -22,7 +22,7 @@ interface packaging {
     /// Given the available package index (fetched by the UI, since package
     /// repositories may live on other chains or plain HTTP servers), returns
     /// the install/update/remove operations needed to satisfy `request`.
-    resolve: func(index: list<package-info>, request: list<string>, request-pref: package-preference, non-request-pref: package-preference) -> result<list<package-op-info>, error>;
+    resolve-packages: func(index: list<package-info>, request: list<string>, request-pref: package-preference, non-request-pref: package-preference) -> result<list<package-op-info>, error>;
 
     /// Builds, uploads, and proposes installation of packages whose contents
     /// have already been fetched by the UI.
@@ -33,7 +33,7 @@ interface staged {
     use host:types/types.{error};
 
     accept: func(id: u32) -> result<_, error>;
-    reject: func(id: u32) -> result<_, error>;
+    decline: func(id: u32) -> result<_, error>;
     execute: func(id: u32) -> result<_, error>;
     remove: func(id: u32) -> result<_, error>;
     graphql: func(query: string) -> result<string, error>;

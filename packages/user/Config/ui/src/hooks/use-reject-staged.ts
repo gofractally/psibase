@@ -10,7 +10,7 @@ export const useRejectStaged = () => {
     return usePluginMutation<[number]>(
         {
             intf: "staged",
-            method: "reject",
+            method: "decline",
             service: "config",
         },
         {

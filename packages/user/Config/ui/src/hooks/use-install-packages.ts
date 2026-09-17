@@ -36,7 +36,7 @@ async function resolvePackageOps(
 ): Promise<PackageOp[]> {
     const index = flattenPackageIndex(await getPackageIndex(owner));
     return zPackageOp.array().parse(
-        await callPluginFunction(config.packaging.resolve, [
+        await callPluginFunction(config.packaging.resolvePackages, [
             index,
             packages,
             requestPref,
