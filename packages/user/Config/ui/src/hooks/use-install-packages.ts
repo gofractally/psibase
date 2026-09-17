@@ -49,7 +49,7 @@ async function resolvePackageOps(
         await supervisor.functionCall({
             service: "packages",
             intf: "privateApi",
-            method: "resolve",
+            method: "resolvePackages",
             params: [index, packages, requestPref, nonRequestPref],
         }),
     );

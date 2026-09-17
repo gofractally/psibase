@@ -428,13 +428,13 @@ impl Queries for PackagesPlugin {
 }
 
 impl PrivateApi for PackagesPlugin {
-    fn resolve(
+    fn resolve_packages(
         index: Vec<types::PackageInfo>,
         packages: Vec<String>,
         request_pref: types::PackagePreference,
         non_request_pref: types::PackagePreference,
     ) -> Result<Vec<types::PackageOpInfo>, HostTypes::Error> {
-        assert_caller_config_or_self("resolve");
+        assert_caller_config_or_self("resolve_packages");
 
         let index = index.into_iter().map(|p| p.into()).collect();
         Ok(solve_dependencies(
