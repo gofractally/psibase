@@ -16,11 +16,12 @@ namespace
 {
    struct CallbackArgs
    {
+      std::int32_t                                      socket;
       std::optional<psio::view<const TransactionTrace>> trace;
       PSIO_REFLECT(CallbackArgs, trace)
    };
 
-   void doCallback(std::int32_t socket, CallbackArgs args)
+   void doCallback(std::int32_t socket, std::optional<psio::view<const TransactionTrace>> trace)
    {
       auto          table = XKeys{}.open<TxCallbackTable>();
       ServiceMethod callback;
@@ -33,8 +34,10 @@ namespace
       call(Action{.sender  = getReceiver(),
                   .service = callback.service,
                   .method  = callback.method,
-                  .rawData = psio::to_frac(args)});
+                  .rawData = psio::to_frac(CallbackArgs{.socket = socket, .trace = trace})});
    }
+
+   using Temporary = psibase::TemporaryTables<TxCallbackTable>;
 }  // namespace
 
 Claim XKeys::newKey()
@@ -66,9 +69,8 @@ void XKeys::deleteKey(Claim key)
    }
 }
 
-void XKeys::asyncPushTx(std::vector<psibase::Action> actions,
-                        std::vector<psibase::Claim>  claims,
-                        MethodNumber                 completionCallback)
+std::int32_t XKeys::asyncPushTx(std::vector<psibase::Action> actions,
+                                std::vector<psibase::Claim>  claims)
 {
    auto sender = getSender();
    // Construct transaction
@@ -107,12 +109,23 @@ void XKeys::asyncPushTx(std::vector<psibase::Action> actions,
        .headers     = {{"Accept", "application/octet-stream"}},
        .body        = psio::to_frac(signedTrx),
    };
-   auto sock      = to<XHttp>().sendRequest(req, std::nullopt, std::nullopt);
+   auto sock = to<XHttp>().sendRequest(req, std::nullopt, std::nullopt);
+   Temporary{service}.open<TxCallbackTable>().put({sock, {.service = sender}});
+   return sock;
+}
+
+void XKeys::setCallback(std::int32_t socket, MethodNumber callback)
+{
+   auto temp      = Temporary{service}.open<TxCallbackTable>();
    auto callbacks = open<TxCallbackTable>();
    PSIBASE_SUBJECTIVE_TX
    {
-      to<XHttp>().setCallback(sock, MethodNumber{"onTx"}, MethodNumber{"errTx"});
-      callbacks.put({sock, {.service = sender, .method = completionCallback}});
+      auto row = temp.get(socket);
+      check(row && row->callback.service == getSender(), "Socket not found");
+      temp.remove(*row);
+      row->callback.method = callback;
+      to<XHttp>().setCallback(socket, MethodNumber{"onTx"}, MethodNumber{"errTx"});
+      callbacks.put(*row);
    }
 }
 
@@ -124,7 +137,7 @@ void XKeys::onTx(std::int32_t socket, const HttpReply& reply)
       if (reply.contentType == "application/octet-stream" &&
           psio::fracpack_validate_compatible<TransactionTrace>(reply.body))
       {
-         doCallback(socket, {.trace = psio::view<const TransactionTrace>{reply.body}});
+         doCallback(socket, psio::view<const TransactionTrace>{reply.body});
       }
       else
       {
