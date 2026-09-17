@@ -29,6 +29,7 @@ function(add suffix)
     service(AsRpc "${suffix}" src/AsRpc.cpp)
     service(MockTransact "${suffix}" src/MockTransact.cpp)
     service(AuthNone "${suffix}" src/AuthNone.cpp)
+    service(AuthTest "${suffix}" src/AuthTest.cpp)
 
     set(TEST_GENERATE_SCHEMA 1)
     service(MockCpuLimit "${suffix}" src/MockCpuLimit.cpp)

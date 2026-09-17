@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-import { GraphQLUrlOptions, graphql } from "@shared/lib/graphql";
+import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { producers } from "@shared/lib/plugins";
 import { zAccount } from "@shared/lib/schemas/account";
 
 const zProducerReturn = z.object({
@@ -13,10 +14,9 @@ const zProducerReturn = z.object({
 
 export type Producer = z.infer<typeof zProducerReturn>;
 
-export const getProducers = async (
-    opts: GraphQLUrlOptions = {},
-): Promise<Producer[]> => {
-    const producers = await graphql(
+export const getProducers = async (): Promise<Producer[]> => {
+    const data = await callGraphqlViaPlugin(
+        producers.authorized.graphql,
         `
             {
                 producers {
@@ -28,14 +28,13 @@ export const getProducers = async (
                 }
             }
         `,
-        { service: "producers", ...opts },
     );
 
     const response = z
         .object({
             producers: z.array(zProducerReturn),
         })
-        .parse(producers);
+        .parse(data);
 
     return response.producers;
 };

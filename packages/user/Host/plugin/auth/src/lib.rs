@@ -11,9 +11,13 @@ use psibase::fracpack::{Pack, Unpack};
 
 use crate::bindings::{
     host::{
-        common::admin as HostAdmin,
+        client::api as CallContext,
         db::store::{Bucket, Database, DbMode, StorageDuration},
-        types::types::{BodyTypes, Claim, Error, PostRequest},
+        types::types::{Claim, Error},
+    },
+    supervisor::bridge::{
+        intf as Supervisor,
+        types::{BodyTypes, Header, HttpRequest},
     },
     transact::plugin::auth as Transact,
 };
@@ -29,15 +33,30 @@ fn bucket_id(user: &str) -> String {
     format!("query_tokens-{}", user)
 }
 
-fn install_cookie(query_token: &str, app: &str) {
-    let req: PostRequest = PostRequest {
-        endpoint: String::from("/common/set-auth-cookie"),
-        body: BodyTypes::Json(format!("{{\"accessToken\": \"{}\"}}", query_token)),
-    };
-    HostAdmin::post_with_credentials(app, &req).unwrap();
+fn post_to_app(app: &str, endpoint: &str, body: String) -> HttpRequest {
+    HttpRequest {
+        uri: format!(
+            "{}/{}",
+            CallContext::get_app_url(app),
+            endpoint.trim_start_matches('/')
+        ),
+        method: "POST".to_string(),
+        headers: vec![Header {
+            key: "Content-Type".to_string(),
+            value: "application/json".to_string(),
+        }],
+        body: Some(BodyTypes::Json(body)),
+    }
 }
 
-fn cache_token(query_token: &str, app: &str, user: &str) {
+fn set_active_query_token(query_token: &str, app: &str, user: &str) {
+    let req = post_to_app(
+        app,
+        "/common/set-auth-cookie",
+        format!("{{\"accessToken\": \"{}\"}}", query_token),
+    );
+    Supervisor::send_request(&req, true).unwrap();
+
     Bucket::new(DB, &bucket_id(user)).set(&app, &query_token.to_string().packed());
 }
 
@@ -48,11 +67,8 @@ fn cached_token(app: &str, user: &str) -> Option<String> {
 }
 
 fn remove_active_query_token(app: &str, user: &str) {
-    let req: PostRequest = PostRequest {
-        endpoint: String::from("/common/remove-auth-cookie"),
-        body: BodyTypes::Json(format!("{{}}")),
-    };
-    HostAdmin::post_with_credentials(app, &req).unwrap();
+    let req = post_to_app(app, "/common/remove-auth-cookie", "{}".to_string());
+    Supervisor::send_request(&req, true).unwrap();
 
     Bucket::new(DB, &bucket_id(user)).delete(&&app);
 }
@@ -65,8 +81,7 @@ impl Api for HostAuth {
             Some(t) => t,
             None => Transact::get_query_token(&app, &user, claim.as_ref())?,
         };
-        cache_token(&token, &app, &user);
-        install_cookie(&token, &app);
+        set_active_query_token(&token, &app, &user);
         Ok(())
     }
 

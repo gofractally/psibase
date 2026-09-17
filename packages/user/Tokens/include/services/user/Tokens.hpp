@@ -1,5 +1,8 @@
 #pragma once
 
+#include <optional>
+#include <string>
+
 #include <psibase/Memo.hpp>
 #include <psibase/psibase.hpp>
 
@@ -179,16 +182,37 @@ namespace UserService
       /// * `memo`     - Memo
       void debit(TID tokenId, psibase::AccountNumber creditor, Quantity amount, Memo memo);
 
-      /// Recalls an amount of tokens from a user's balance and burns them
+      /// Recalls an amount of tokens from a user's primary or sub-account balance and burns them
+      ///
+      /// Only the token owner can recall tokens, and only if the token is not marked as unrecallable.
+      ///
+      /// # Arguments
+      /// * `token_id`    - Unique token identifier
+      /// * `from`        - User account from which to recall
+      /// * `amount`      - Amount of tokens to recall
+      /// * `memo`        - Memo
+      /// * `subAccount`  - If specified, recall from this sub-account of `from`
+      void recall(TID                        tokenId,
+                  psibase::AccountNumber     from,
+                  Quantity                   amount,
+                  Memo                       memo,
+                  std::optional<std::string> subAccount);
+
+      /// Recalls an amount of tokens from a shared balance and burns them
       ///
       /// Only the token owner can recall tokens, and only if the token is not marked as unrecallable.
       ///
       /// # Arguments
       /// * `token_id` - Unique token identifier
-      /// * `from`     - User account from which to recall
+      /// * `creditor` - Account that credited the tokens
+      /// * `debitor`  - Account that received the credit
       /// * `amount`   - Amount of tokens to recall
       /// * `memo`     - Memo
-      void recall(TID tokenId, psibase::AccountNumber from, Quantity amount, Memo memo);
+      void recallShared(TID                    tokenId,
+                        psibase::AccountNumber creditor,
+                        psibase::AccountNumber debitor,
+                        Quantity               amount,
+                        Memo                   memo);
 
       /// Sends tokens from an account's primary balance into a "sub-account" balance
       ///
@@ -383,7 +407,8 @@ namespace UserService
       method(createSub, subAccount),
       method(deleteSub, subAccount),
       method(debit, tokenId, creditor, amount, memo),
-      method(recall, tokenId, from, amount, memo),
+      method(recall, tokenId, from, amount, memo, subAccount),
+      method(recallShared, tokenId, creditor, debitor, amount, memo),
       method(getToken, tokenId),
       method(getUserConf, account, index),
       method(setSysToken, tokenId),

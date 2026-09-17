@@ -19,7 +19,7 @@ export const JoinPage = () => {
             title: "Success",
             description: `Connected to ${res.urls[0] || res.endpoint}.`,
         });
-        navigate("/");
+        navigate("/dashboard");
     };
 
     return (

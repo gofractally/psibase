@@ -7,6 +7,8 @@ import { PackageInfo } from "@/types";
 
 import { adminGraphql } from "@/lib/admin-graphql";
 
+import { useChainReady } from "./use-statuses";
+
 export const usePackages = () =>
     useQuery<PackageInfo[]>({
         queryKey: queryKeys.packages,
@@ -26,8 +28,10 @@ export const useLocalPackages = () =>
 
 export type InstalledLocalPackage = { name: string; version: string };
 
-export const useInstalledLocalPackages = () =>
-    useQuery<InstalledLocalPackage[]>({
+export const useInstalledLocalPackages = () => {
+    const chainReady = useChainReady();
+
+    return useQuery<InstalledLocalPackage[]>({
         queryKey: queryKeys.installedLocalPackages,
         queryFn: async () => {
             const res = (await adminGraphql(
@@ -39,4 +43,6 @@ export const useInstalledLocalPackages = () =>
             return res.installed.edges.map((e) => e.node);
         },
         initialData: [],
+        enabled: chainReady,
     });
+};

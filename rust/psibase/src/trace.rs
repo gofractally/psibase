@@ -41,14 +41,6 @@ impl fmt::Display for ActionTrace {
 #[derive(Debug, Clone, Pack, Unpack, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[serde(rename_all = "camelCase")]
-pub struct EventTrace {
-    pub name: String,
-    pub data: Hex<Vec<u8>>,
-}
-
-#[derive(Debug, Clone, Pack, Unpack, Serialize, Deserialize)]
-#[fracpack(fracpack_mod = "fracpack")]
-#[serde(rename_all = "camelCase")]
 pub struct ConsoleTrace {
     pub console: String,
 }
@@ -57,7 +49,6 @@ pub struct ConsoleTrace {
 #[fracpack(fracpack_mod = "fracpack")]
 pub enum InnerTraceEnum {
     ConsoleTrace(ConsoleTrace),
-    EventTrace(EventTrace),
     ActionTrace(ActionTrace),
 }
 
@@ -165,7 +156,6 @@ fn write_action_console(atrace: &ActionTrace, f: &mut fmt::Formatter<'_>) -> fmt
     for inner in &atrace.inner_traces {
         match &inner.inner {
             InnerTraceEnum::ConsoleTrace(c) => write!(f, "{}", &c.console)?,
-            InnerTraceEnum::EventTrace(_) => {}
             InnerTraceEnum::ActionTrace(a) => write_action_console(a, f)?,
         }
     }
@@ -187,10 +177,6 @@ fn format_console(c: &ConsoleTrace, indent: usize, f: &mut fmt::Formatter<'_>) -
     write!(f, "{:indent$}console:    ", "")?;
     format_string(&c.console, indent + 12, f)?;
     writeln!(f)
-}
-
-fn format_event(_: &EventTrace, indent: usize, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    writeln!(f, "{:indent$}event", "")
 }
 
 fn hide_action(action: &Action) -> bool {
@@ -270,7 +256,6 @@ fn format_action_trace(
     for inner in &atrace.inner_traces {
         match &inner.inner {
             InnerTraceEnum::ConsoleTrace(c) => format_console(c, indent + 4, f)?,
-            InnerTraceEnum::EventTrace(e) => format_event(e, indent + 4, f)?,
             InnerTraceEnum::ActionTrace(a) => format_action_trace(schemas, a, indent + 4, f)?,
         }
     }
@@ -481,7 +466,6 @@ fn format_error_stack<T: std::fmt::Write>(
         for inner in &atrace.inner_traces {
             match &inner.inner {
                 InnerTraceEnum::ConsoleTrace(_) => (),
-                InnerTraceEnum::EventTrace(_) => (),
                 InnerTraceEnum::ActionTrace(a) => format_error_stack(schemas, a, f)?,
             }
         }
@@ -608,9 +592,6 @@ impl<'a, F: SchemaFetcher + 'a> ActionFormatter<'a, F> {
         }
         Ok(())
     }
-    pub async fn prepare_event_trace(&self, _etrace: &EventTrace) -> Result<(), anyhow::Error> {
-        Ok(())
-    }
     pub async fn prepare_action_impl<'b>(
         &self,
         act: SharedAction<'b>,
@@ -675,7 +656,6 @@ impl<'a, F: SchemaFetcher + 'a> ActionFormatter<'a, F> {
         }
         for inner in &atrace.inner_traces {
             match &inner.inner {
-                InnerTraceEnum::EventTrace(e) => res = res.and(self.prepare_event_trace(e).await),
                 InnerTraceEnum::ActionTrace(a) => {
                     res = res.and(Box::pin(self.prepare_action_trace(a)).await)
                 }
@@ -944,9 +924,6 @@ impl<'a, 'b> Serialize for UnpackedTrace<'a, &'b InnerTraceEnum> {
         match self.value {
             InnerTraceEnum::ConsoleTrace(trace) => {
                 serializer.serialize_newtype_variant("InnerTraceEnum", 0, "ConsoleTrace", trace)
-            }
-            InnerTraceEnum::EventTrace(trace) => {
-                serializer.serialize_newtype_variant("InnerTraceEnum", 1, "EventTrace", trace)
             }
             InnerTraceEnum::ActionTrace(trace) => serializer.serialize_newtype_variant(
                 "InnerTraceEnum",

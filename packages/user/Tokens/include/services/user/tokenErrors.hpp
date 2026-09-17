@@ -13,6 +13,7 @@ namespace UserService
       constexpr std::string_view tokenOverflow             = "Token overflow";
       constexpr std::string_view insufficientBalance       = "insufficient balance";
       constexpr std::string_view insufficientSharedBalance = "Insufficient shared balance";
+      constexpr std::string_view insufficientSubBalance    = "Insufficient sub-account balance";
       constexpr std::string_view missingSharedBalance      = "Shared balance does not exist";
       constexpr std::string_view supplyGt0           = "Max issued supply must be greater than 0";
       constexpr std::string_view quantityGt0         = "Quantity must be greater than 0";

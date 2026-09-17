@@ -1,6 +1,6 @@
-use psibase::{Fracpack, ToSchema};
+use psibase::{Pack, ToSchema, Unpack};
 
-#[derive(Debug, Copy, Clone, Fracpack, ToSchema)]
+#[derive(Debug, Copy, Clone, Pack, Unpack, ToSchema)]
 pub struct StagedTxEvent {
     pub ty: u8,
 }

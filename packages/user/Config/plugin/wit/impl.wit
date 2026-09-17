@@ -1,7 +1,8 @@
 package config:plugin;
 
 world impl {
-    include host:common/imports;
+    include host:client/imports;
+    include host:http/imports;
     include producers:plugin/imports;
     include branding:plugin/imports;
     include transact:plugin/imports;

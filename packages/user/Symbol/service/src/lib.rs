@@ -7,14 +7,14 @@ pub mod tables {
     use psibase::services::tokens::Wrapper as Tokens;
     use psibase::services::tokens::{Decimal, Quantity, TokenRecord, TID};
     use psibase::{
-        get_sender, get_service, AccountNumber, Fracpack, ServiceWrapper, Table, ToSchema,
+        get_sender, get_service, AccountNumber, Pack, ServiceWrapper, Table, ToSchema, Unpack,
     };
     use serde::{Deserialize, Serialize};
 
     use crate::service::{CREATED, MAPPED};
 
     #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
+    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug)]
     pub struct InitRow {}
     impl InitRow {
         #[primary_key]
@@ -22,7 +22,7 @@ pub mod tables {
     }
 
     #[table(name = "SymbolLengthTable", index = 1)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject)]
+    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject)]
     #[graphql(complex)]
     pub struct SymbolLength {
         #[primary_key]
@@ -131,7 +131,7 @@ pub mod tables {
     }
 
     #[table(name = "SymbolTable", index = 2)]
-    #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug, SimpleObject)]
+    #[derive(Default, Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, SimpleObject)]
     #[graphql(complex)]
     pub struct Symbol {
         #[primary_key]
@@ -228,7 +228,7 @@ pub mod tables {
     }
 
     #[table(name = "MappingTable", index = 3)]
-    #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug, SimpleObject)]
+    #[derive(Default, Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, SimpleObject)]
     #[graphql(complex)]
     pub struct Mapping {
         #[primary_key]

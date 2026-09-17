@@ -3,8 +3,8 @@
 pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::{
-        abort_message, define_flags, get_sender, AccountNumber, FlagsType, Fracpack, Memo,
-        ServiceWrapper, Table, ToSchema,
+        abort_message, define_flags, get_sender, AccountNumber, FlagsType, Memo, Pack,
+        ServiceWrapper, Table, ToSchema, Unpack,
     };
     use serde::{Deserialize, Serialize};
 
@@ -17,7 +17,7 @@ pub mod tables {
     });
 
     #[table(name = "ConfigTable", index = 0)]
-    #[derive(Fracpack, ToSchema, Serialize, Deserialize, Debug)]
+    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug)]
     pub struct ConfigRow {
         pub next_id: NID,
     }
@@ -56,7 +56,7 @@ pub mod tables {
     }
 
     #[table(name = "NftTable", index = 1)]
-    #[derive(Fracpack, ToSchema, Serialize, Deserialize, Debug, Clone, SimpleObject)]
+    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, Clone, SimpleObject)]
     pub struct Nft {
         #[primary_key]
         pub id: NID,
@@ -137,7 +137,7 @@ pub mod tables {
     }
 
     #[table(name = "NftHolderTable", index = 2)]
-    #[derive(Fracpack, ToSchema, Serialize, Deserialize, SimpleObject, Debug, Clone)]
+    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, Debug, Clone)]
     #[graphql(complex)]
     pub struct NftHolder {
         #[primary_key]
@@ -146,7 +146,7 @@ pub mod tables {
     }
 
     #[table(name = "CreditTable", index = 3)]
-    #[derive(Fracpack, ToSchema, Serialize, Deserialize, Debug, Clone, SimpleObject)]
+    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, Clone, SimpleObject)]
     #[allow(non_snake_case)]
     pub struct CreditRecord {
         #[primary_key]

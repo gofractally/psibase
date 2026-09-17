@@ -60,13 +60,13 @@ const myOrigin = `${my.protocol}//${my.hostname}${my.port ? ":" + my.port : ""}`
 export class Supervisor {
     private static instance: Supervisor;
     isSupervisorInitialized = false;
+    private iframeCreated = false;
     private supervisorSrc: string;
 
     private constructor(options?: Options) {
         this.supervisorSrc =
             options?.supervisorSrc || siblingUrl(undefined, "supervisor");
         this.listenToRawMessages();
-        setupSupervisorIFrame(this.supervisorSrc);
     }
 
     public static getInstance(options?: Options) {
@@ -85,6 +85,14 @@ export class Supervisor {
         }
 
         return Supervisor.instance;
+    }
+
+    private ensureIFrame() {
+        if (this.iframeCreated) {
+            return;
+        }
+        this.iframeCreated = true;
+        setupSupervisorIFrame(this.supervisorSrc);
     }
 
     private pendingRequests: {
@@ -227,6 +235,14 @@ export class Supervisor {
         });
     }
 
+    private async onLoaded() {
+        this.ensureIFrame();
+        if (this.isSupervisorInitialized) return;
+        return new Promise((resolve) => {
+            this.onLoadPromiseResolvers.push(resolve);
+        });
+    }
+
     public functionCall(
         args: FunctionCallArgs,
         autoRedirectConfig: AutoRedirectConfig = {
@@ -249,13 +265,6 @@ export class Supervisor {
             autoRedirectConfig,
             request,
         );
-    }
-
-    public async onLoaded() {
-        if (this.isSupervisorInitialized) return;
-        return new Promise((resolve) => {
-            this.onLoadPromiseResolvers.push(resolve);
-        });
     }
 
     public preLoadPlugins(plugins: PluginId[]) {

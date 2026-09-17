@@ -72,6 +72,19 @@ namespace
       return result;
    }
 
+   bool hasTls(const SocketInfo& info)
+   {
+      return std::visit(
+          [](const auto& i) -> bool
+          {
+             if constexpr (requires { i.tls; })
+                return i.tls.has_value();
+             else
+                return false;
+          },
+          info);
+   }
+
    std::string getUrl(psio::view<const HttpRequest> req,
                       std::int32_t                  socket,
                       std::string_view              rootHost,
@@ -83,7 +96,9 @@ namespace
       {
          socketRow = Native::session(KvMode::read).open<SocketTable>().get(socket);
       }
-      if (std::get<HttpSocketInfo>(socketRow.value().info).tls)
+      if (auto proto = forwardedProto(req.unpack()))
+         location += *proto + "://";
+      else if (hasTls(socketRow.value().info))
          location += "https://";
       else
          location += "http://";
@@ -141,19 +156,6 @@ namespace
       auto reply =
           error(HttpStatus::notFound, "The resource '" + req.target().unpack() + "' was not found");
       psibase::socketSend(sock, psio::to_frac(std::move(reply)));
-   }
-
-   bool hasTls(const SocketInfo& info)
-   {
-      return std::visit(
-          [](const auto& i) -> bool
-          {
-             if constexpr (requires { i.tls; })
-                return i.tls.has_value();
-             else
-                return false;
-          },
-          info);
    }
 
    bool chainIsBooted()

@@ -188,17 +188,45 @@ mod service {
         unimplemented!()
     }
 
-    /// Recalls an amount of tokens from a user's balance and burns them
+    /// Recalls an amount of tokens from a user's primary or sub-account balance and burns them
+    ///
+    /// Only the token owner can recall tokens, and only if the token is not marked as unrecallable.
+    ///
+    /// # Arguments
+    /// * `token_id`    - Unique token identifier
+    /// * `from`        - User account from which to recall
+    /// * `amount`      - Amount of tokens to recall
+    /// * `memo`        - Memo
+    /// * `sub_account` - If specified, recall from this sub-account of `from`
+    #[action]
+    fn recall(
+        token_id: TID,
+        from: AccountNumber,
+        amount: Quantity,
+        memo: Memo,
+        sub_account: Option<String>,
+    ) {
+        unimplemented!()
+    }
+
+    /// Recalls an amount of tokens from a shared balance and burns them
     ///
     /// Only the token owner can recall tokens, and only if the token is not marked as unrecallable.
     ///
     /// # Arguments
     /// * `token_id` - Unique token identifier
-    /// * `from`     - User account from which to recall
+    /// * `creditor` - Account that credited the tokens
+    /// * `debitor`  - Account that received the credit
     /// * `amount`   - Amount of tokens to recall
     /// * `memo`     - Memo
     #[action]
-    fn recall(token_id: TID, from: AccountNumber, amount: Quantity, memo: Memo) {
+    fn recallShared(
+        token_id: TID,
+        creditor: AccountNumber,
+        debitor: AccountNumber,
+        amount: Quantity,
+        memo: Memo,
+    ) {
         unimplemented!()
     }
 

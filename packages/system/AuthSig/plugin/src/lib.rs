@@ -12,7 +12,7 @@ use trust::*;
 use bindings::{
     accounts::plugin as AccountsPlugin,
     host::{
-        common::client as Client,
+        client::api as Client,
         crypto::keyvault as HostCrypto,
         types::types::{self as HostTypes, Claim, Error, Keypair, Pem},
     },

@@ -4,7 +4,7 @@ use crate::bindings::auth_any::plugin as AuthAny;
 use crate::bindings::auth_sig::plugin as AuthSig;
 use crate::bindings::exports::accounts::prompt::prompt::{Credential, Guest as Prompt};
 use crate::bindings::host::{
-    common::client as Client, crypto::keyvault as HostCrypto, types::types::Error,
+    client::api as Client, crypto::keyvault as HostCrypto, types::types::Error,
 };
 use crate::bindings::invite::plugin::redemption as Invites;
 use crate::bindings::name_market::plugin::api as NameMarket;
@@ -18,8 +18,6 @@ use psibase::services::auth_sig;
 
 impl Prompt for AccountsPrompt {
     fn can_create_account() -> bool {
-        assert_eq!(Client::get_sender(), Client::get_receiver());
-
         if AccountsQuery::is_logged_in() {
             return true;
         }

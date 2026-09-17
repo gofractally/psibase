@@ -560,7 +560,7 @@ namespace psio
 
    template <typename T>
    concept PackValidatable = requires(T obj) {
-      { clio_validate_packable(obj) } -> std::same_as<bool>;
+      { psio_validate_packable(obj) } -> std::same_as<bool>;
    };
 
    /// \output_section Parse JSON (Reflected Objects)
@@ -584,7 +584,7 @@ namespace psio
 
          if constexpr (PackValidatable<T>)
          {
-            if (!clio_validate_packable(obj))
+            if (!psio_validate_packable(obj))
             {
                check(false, std::string(psio::reflect<T>::name) + " failed unpack validation.");
             }

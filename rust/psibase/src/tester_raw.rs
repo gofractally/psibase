@@ -35,16 +35,6 @@ extern "C" {
     /// This does nothing if a block isn't currently being produced.
     pub fn finishBlock(chain_handle: u32);
 
-    /// Get filesystem path of chain's database
-    ///
-    /// Stores up to `dest_size` bytes if the chain's path into `dest`. Returns
-    /// the path size. The path is UTF8.
-    ///
-    /// It is safe to copy the files to another location on the filesystem. However,
-    /// modifying the original files or launching `psinode` on the original files
-    /// will corrupt the database and likely crash the `psitest` process running this wasm.
-    pub fn getChainPath(chain_handle: u32, dest: *mut u8, dest_size: usize) -> usize;
-
     /// Push a transaction
     ///
     /// `chain_handle` identifies the chain to push to. `transaction/transaction_size`
@@ -56,15 +46,6 @@ extern "C" {
         transaction: *const u8,
         transaction_size: usize,
     ) -> u32;
-
-    /// Shutdown chain without deleting database
-    ///
-    /// This shuts down a chain, but doesn't destroy it or remove the
-    /// database. `chain_handle` still exists, but isn't usable except
-    /// with [`getChainPath`] and [`destroyChain`].
-    ///
-    /// TODO: `shutdownChain` probably isn't useful anymore; it might go away.
-    pub fn shutdownChain(chain_handle: u32);
 
     /// Start a new block
     ///
