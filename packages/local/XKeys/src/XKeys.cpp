@@ -14,35 +14,20 @@ using SystemService::AuthSig::PrivateKeyInfo;
 
 namespace
 {
-   struct CallbackArgs
+   bool isLocal(AccountNumber sender)
    {
-      std::int32_t                                      socket;
-      std::optional<psio::view<const TransactionTrace>> trace;
-      PSIO_REFLECT(CallbackArgs, trace)
-   };
-
-   void doCallback(std::int32_t socket, std::optional<psio::view<const TransactionTrace>> trace)
-   {
-      auto          table = XKeys{}.open<TxCallbackTable>();
-      ServiceMethod callback;
       PSIBASE_SUBJECTIVE_TX
       {
-         auto row = table.get(socket).value();
-         callback = row.callback;
-         table.remove(row);
+         return Native::subjective(KvMode::read).open<CodeTable>().get(sender).has_value();
       }
-      call(Action{.sender  = getReceiver(),
-                  .service = callback.service,
-                  .method  = callback.method,
-                  .rawData = psio::to_frac(CallbackArgs{.socket = socket, .trace = trace})});
+      __builtin_unreachable();
    }
-
-   using Temporary = psibase::TemporaryTables<TxCallbackTable>;
 }  // namespace
 
 Claim XKeys::newKey()
 {
    auto sender = getSender();
+   check(isLocal(sender), "service may not create keys");
    auto priv   = PrivateKeyInfo::create();
    auto pub    = getSubjectPublicKeyInfo(priv);
    auto result = Claim{.service = VerifySig::service, .rawData{pub.data.begin(), pub.data.end()}};
@@ -69,7 +54,7 @@ void XKeys::deleteKey(Claim key)
    }
 }
 
-std::int32_t XKeys::asyncPushTx(std::vector<psibase::Action> actions,
+SignedTransaction XKeys::signTx(std::vector<psibase::Action> actions,
                                 std::vector<psibase::Claim>  claims)
 {
    auto sender = getSender();
@@ -100,60 +85,7 @@ std::int32_t XKeys::asyncPushTx(std::vector<psibase::Action> actions,
       signedTrx.proofs.push_back({proof.begin(), proof.end()});
    }
 
-   // Submit transaction
-   HttpRequest req{
-       .host        = "transact.psibase.localhost:8080",
-       .method      = "POST",
-       .target      = "/push_transaction?wait_for=final",
-       .contentType = "application/octet-stream",
-       .headers     = {{"Accept", "application/octet-stream"}},
-       .body        = psio::to_frac(signedTrx),
-   };
-   auto sock = to<XHttp>().sendRequest(req, std::nullopt, std::nullopt);
-   Temporary{service}.open<TxCallbackTable>().put({sock, {.service = sender}});
-   return sock;
-}
-
-void XKeys::setCallback(std::int32_t socket, MethodNumber callback)
-{
-   auto temp      = Temporary{service}.open<TxCallbackTable>();
-   auto callbacks = open<TxCallbackTable>();
-   PSIBASE_SUBJECTIVE_TX
-   {
-      auto row = temp.get(socket);
-      check(row && row->callback.service == getSender(), "Socket not found");
-      temp.remove(*row);
-      row->callback.method = callback;
-      to<XHttp>().setCallback(socket, MethodNumber{"onTx"}, MethodNumber{"errTx"});
-      callbacks.put(*row);
-   }
-}
-
-void XKeys::onTx(std::int32_t socket, const HttpReply& reply)
-{
-   check(getSender() == HttpServer::service, "Wrong sender");
-   if (reply.status == HttpStatus::ok)
-   {
-      if (reply.contentType == "application/octet-stream" &&
-          psio::fracpack_validate_compatible<TransactionTrace>(reply.body))
-      {
-         doCallback(socket, psio::view<const TransactionTrace>{reply.body});
-      }
-      else
-      {
-         doCallback(socket, {});
-      }
-   }
-   else
-   {
-      doCallback(socket, {});
-   }
-}
-
-void XKeys::errTx(std::int32_t socket)
-{
-   check(getSender() == HttpServer::service, "Wrong sender");
-   doCallback(socket, {});
+   return signedTrx;
 }
 
 PSIBASE_DISPATCH(XKeys)
