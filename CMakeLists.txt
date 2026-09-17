@@ -1153,6 +1153,19 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/XKeys.psi
+    NAME XKeys
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Allows services to manage keys and sign transactions"
+    LOCAL
+    SERVICE x-keys
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/XKeys.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XKeys-schema.json
+        FLAGS isPrivileged
+    DEPENDS wasm
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/XPackages.psi
     NAME XPackages
     VERSION ${PSIBASE_VERSION}.0
