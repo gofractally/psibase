@@ -5,6 +5,7 @@ import { Cpu, HardDrive, Network } from "lucide-react";
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 
+import { EmptyState } from "@/components/empty-state";
 import { TimeAgo } from "@/components/time-ago";
 
 import { formatBytes, formatNumber } from "@/lib/format";
@@ -113,23 +114,18 @@ export const ConsumptionBreakdown = ({
 
     if (isError) {
         return (
-            <div className="text-muted-foreground flex h-40 flex-col items-center justify-center gap-1 p-4 text-center text-sm">
-                <span>Could not load consumption history</span>
-                {errorMessage && (
-                    <span className="max-w-md break-all font-mono text-xs opacity-70">
-                        {errorMessage}
-                    </span>
-                )}
-            </div>
+            <EmptyState detail={errorMessage}>
+                Could not load consumption history
+            </EmptyState>
         );
     }
 
     if (!events || events.length === 0) {
         return (
-            <div className="text-muted-foreground flex h-40 items-center justify-center p-4 text-center text-sm">
+            <EmptyState>
                 No metered consumption yet. Sending a transaction will produce
                 your first CPU, network and storage charges.
-            </div>
+            </EmptyState>
         );
     }
 

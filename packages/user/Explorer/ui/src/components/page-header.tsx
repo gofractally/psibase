@@ -73,7 +73,9 @@ export const Panel = ({
                 )}
             </header>
         )}
-        <div className={cn("min-h-0 flex-1", bodyClassName)}>{children}</div>
+        <div className={cn("flex min-h-0 flex-1 flex-col", bodyClassName)}>
+            {children}
+        </div>
     </section>
 );
 

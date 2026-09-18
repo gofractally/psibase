@@ -10,10 +10,12 @@ import { useChainStats } from "@/store/use-live-chain";
 import { AccountLink } from "@/components/account-link";
 import { ServiceActivityChart } from "@/components/charts/service-activity-chart";
 import { DocLabel } from "@/components/doc-link";
+import { EmptyState } from "@/components/empty-state";
 import { PageHeader, Panel } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { DOC_PATHS } from "@/lib/docs";
 
+import { cn } from "@shared/lib/utils";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Input } from "@shared/shadcn/ui/input";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
@@ -126,7 +128,12 @@ export const ServicesPage = () => {
                     ) : packages.isError ? (
                         <div className="text-destructive p-4 text-sm">{(packages.error as Error).message}</div>
                     ) : (
-                        <div className="scrollbar-thin max-h-[720px] overflow-auto">
+                        <div
+                            className={cn(
+                                "scrollbar-thin max-h-[720px] overflow-auto",
+                                rows.length === 0 && "flex flex-1 flex-col",
+                            )}
+                        >
                             <table className="w-full text-[13px]">
                                 <thead className="bg-muted/30 sticky top-0 border-b backdrop-blur">
                                     <tr className="text-muted-foreground text-left text-[11px] tracking-wider uppercase">
@@ -176,15 +183,11 @@ export const ServicesPage = () => {
                                             </td>
                                         </tr>
                                     ))}
-                                    {rows.length === 0 && (
-                                        <tr>
-                                            <td colSpan={4} className="text-muted-foreground px-3 py-8 text-center text-sm">
-                                                No packages match “{q}”
-                                            </td>
-                                        </tr>
-                                    )}
                                 </tbody>
                             </table>
+                            {rows.length === 0 && (
+                                <EmptyState>No packages match “{q}”</EmptyState>
+                            )}
                         </div>
                     )}
                 </Panel>

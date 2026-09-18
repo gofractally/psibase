@@ -22,6 +22,7 @@ import { useLiveChain } from "@/store/use-live-chain";
 import { AccountLink } from "@/components/account-link";
 import { BlockStrip } from "@/components/block-strip";
 import { BlocksTable } from "@/components/blocks-table";
+import { EmptyState } from "@/components/empty-state";
 import { BlockActivityChart } from "@/components/charts/block-activity-chart";
 import { ServiceActivityChart } from "@/components/charts/service-activity-chart";
 import { MethodChip } from "@/components/action-chips";
@@ -325,9 +326,7 @@ export const DashboardPage = () => {
 };
 
 const EmptyNote = () => (
-    <div className="text-muted-foreground flex h-32 items-center justify-center text-sm">
-        No user activity in the current window
-    </div>
+    <EmptyState>No user activity in the current window</EmptyState>
 );
 
 const hue = (label: string) => {

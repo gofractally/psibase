@@ -13,6 +13,7 @@ import { useLiveChain, useNow } from "@/store/use-live-chain";
 
 import { AccountLink } from "@/components/account-link";
 import { DocLabel } from "@/components/doc-link";
+import { EmptyState } from "@/components/empty-state";
 import { Avatar } from "@shared/components/avatar";
 import { BlockStrip } from "@/components/block-strip";
 import { PageHeader, Panel } from "@/components/page-header";
@@ -333,9 +334,9 @@ export const ProvidersPage = () => {
                 {allCandidates.isPending ? (
                     <Skeleton className="m-2 h-8" />
                 ) : !allCandidates.data?.length ? (
-                    <div className="text-muted-foreground p-4 text-sm">
+                    <EmptyState>
                         No provider candidates have registered an endpoint.
-                    </div>
+                    </EmptyState>
                 ) : (
                     <ul className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
                         {allCandidates.data.map((c) => (

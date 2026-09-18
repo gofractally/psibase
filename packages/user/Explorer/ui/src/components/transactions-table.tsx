@@ -5,6 +5,7 @@ import type { TransactionWithContext } from "@/lib/types";
 import { formatNumber } from "@/lib/format";
 
 import { AccountLink } from "@/components/account-link";
+import { EmptyState } from "@/components/empty-state";
 import { ActionChips } from "@/components/action-chips";
 import { Hash } from "@/components/hash";
 import { TimeAgo } from "@/components/time-ago";
@@ -68,7 +69,13 @@ export const TransactionsTable = ({
     }
 
     return (
-        <div className={cn("scrollbar-thin overflow-x-auto", className)}>
+        <div
+            className={cn(
+                "scrollbar-thin overflow-x-auto",
+                transactions.length === 0 && "flex flex-1 flex-col",
+                className,
+            )}
+        >
             <table className="w-full text-[13px]">
                 <thead className="bg-muted/30 border-b">
                     <tr>
@@ -86,16 +93,6 @@ export const TransactionsTable = ({
                     </tr>
                 </thead>
                 <tbody>
-                    {transactions.length === 0 && (
-                        <tr>
-                            <td
-                                colSpan={7}
-                                className="text-muted-foreground px-3 py-8 text-center text-sm"
-                            >
-                                {emptyMessage}
-                            </td>
-                        </tr>
-                    )}
                     {transactions.map((t) => {
                         const senders = uniqueSenders(t);
                         const isNew =
@@ -178,6 +175,7 @@ export const TransactionsTable = ({
                     })}
                 </tbody>
             </table>
+            {transactions.length === 0 && <EmptyState>{emptyMessage}</EmptyState>}
         </div>
     );
 };

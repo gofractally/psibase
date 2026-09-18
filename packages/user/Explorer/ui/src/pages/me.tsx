@@ -21,6 +21,7 @@ import { siblingUrl } from "@psibase/common-lib";
 
 import { AccountLink } from "@/components/account-link";
 import { MethodChip } from "@/components/action-chips";
+import { EmptyState } from "@/components/empty-state";
 import { CopyIcon } from "@/components/hash";
 import { ConsumptionBreakdown } from "@/components/me/consumption-breakdown";
 import { ResourceBuffer, formatUnits } from "@/components/me/resource-buffer";
@@ -639,7 +640,11 @@ const Dashboard = ({ user }: { user: string }) => {
                             : "Actions you sent across the live window"
                     }
                     className="xl:col-span-2"
-                    bodyClassName="px-2 pt-3 pb-1"
+                    bodyClassName={
+                        activity.actionsSent + activity.actionsReceived > 0
+                            ? "px-2 pt-3 pb-1"
+                            : "p-2"
+                    }
                 >
                     {activity.series.length > 1 ? (
                         activity.actionsSent + activity.actionsReceived > 0 ? (
@@ -649,11 +654,10 @@ const Dashboard = ({ user }: { user: string }) => {
                                 height={240}
                             />
                         ) : (
-                            <div className="text-muted-foreground flex h-[240px] flex-col items-center justify-center gap-1 text-sm">
-                                <Gauge className="size-4 opacity-60" />
+                            <EmptyState icon={Gauge} className="min-h-[240px]">
                                 Nothing from you in the last{" "}
                                 {formatNumber(activity.windowBlocks)} blocks
-                            </div>
+                            </EmptyState>
                         )
                     ) : (
                         <Skeleton className="m-2 h-[220px]" />
@@ -665,9 +669,7 @@ const Dashboard = ({ user }: { user: string }) => {
                     bodyClassName="p-2"
                 >
                     {activity.methods.length === 0 ? (
-                        <div className="text-muted-foreground flex h-32 items-center justify-center text-sm">
-                            No calls in the current window
-                        </div>
+                        <EmptyState>No calls in the current window</EmptyState>
                     ) : (
                         <ul className="flex flex-col">
                             {activity.methods.slice(0, 10).map((m) => (
@@ -735,9 +737,7 @@ const Dashboard = ({ user }: { user: string }) => {
                         bodyClassName="p-2"
                     >
                         {activity.callers.length === 0 ? (
-                            <div className="text-muted-foreground flex h-32 items-center justify-center text-sm">
-                                No callers yet
-                            </div>
+                            <EmptyState>No callers yet</EmptyState>
                         ) : (
                             <ul className="flex flex-col">
                                 {activity.callers.slice(0, 8).map((c, i) => (

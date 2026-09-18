@@ -6,6 +6,7 @@ import { formatClock, formatNumber } from "@/lib/format";
 import { isSystemTransaction } from "@/store/live-chain";
 
 import { AccountLink } from "@/components/account-link";
+import { EmptyState } from "@/components/empty-state";
 import { Hash } from "@/components/hash";
 import { TimeAgo } from "@/components/time-ago";
 
@@ -61,7 +62,13 @@ export const BlocksTable = ({
     }
 
     return (
-        <div className={cn("scrollbar-thin overflow-x-auto", className)}>
+        <div
+            className={cn(
+                "scrollbar-thin overflow-x-auto",
+                blocks.length === 0 && "flex flex-1 flex-col",
+                className,
+            )}
+        >
             <table className="w-full text-[13px]">
                 <thead className="bg-muted/30 border-b">
                     <tr>
@@ -81,16 +88,6 @@ export const BlocksTable = ({
                     </tr>
                 </thead>
                 <tbody>
-                    {blocks.length === 0 && (
-                        <tr>
-                            <td
-                                colSpan={9}
-                                className="text-muted-foreground px-3 py-8 text-center text-sm"
-                            >
-                                {emptyMessage}
-                            </td>
-                        </tr>
-                    )}
                     {blocks.map((b) => {
                         const userTxs = b.transactions.filter(
                             (t) => !isSystemTransaction(t),
@@ -188,6 +185,7 @@ export const BlocksTable = ({
                     })}
                 </tbody>
             </table>
+            {blocks.length === 0 && <EmptyState>{emptyMessage}</EmptyState>}
         </div>
     );
 };
