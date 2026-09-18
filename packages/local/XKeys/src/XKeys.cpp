@@ -3,6 +3,7 @@
 #include <psibase/dispatch.hpp>
 #include <psibase/trace.hpp>
 #include <services/local/XHttp.hpp>
+#include <services/system/Accounts.hpp>
 #include <services/system/Spki.hpp>
 #include <services/system/Transact.hpp>
 #include <services/system/VerifySig.hpp>
@@ -22,6 +23,54 @@ namespace
       }
       __builtin_unreachable();
    }
+
+   using KeyList = std::vector<std::pair<Claim, PrivateKeyInfo>>;
+   std::vector<Claim> getClaims(const KeyList& keyList, auto... skip)
+   {
+      std::vector<Claim> result;
+      result.reserve(keyList.size() - sizeof...(skip));
+      for (auto iter = keyList.begin(), end = keyList.end(); iter != end; ++iter)
+      {
+         if (((iter != skip) && ...))
+         {
+            result.push_back(iter->first);
+         }
+      }
+      return result;
+   }
+
+   struct AuthItem
+   {
+      psibase::AccountNumber sender;
+      psibase::ServiceMethod action;
+      psibase::AccountNumber authService;
+   };
+
+   struct AuthChecker
+   {
+      AuthChecker(const std::vector<Action>& actions)
+      {
+         items.reserve(actions.size());
+         for (const auto& action : actions)
+         {
+            items.push_back({action.sender,
+                             {action.service, action.method},
+                             to<Accounts>().getAuthOf(action.sender)});
+         }
+         // TODO: unique
+      }
+      bool checkAuth(const std::vector<Claim>& claims)
+      {
+         return std::ranges::all_of(items,
+                                    [&](const auto& item)
+                                    {
+                                       return to<AuthInterface>(item.authService)
+                                           .checkAuthSys(AuthInterface::readOnlyFlag, item.sender,
+                                                         item.action, claims);
+                                    });
+      }
+      std::vector<AuthItem> items;
+   };
 }  // namespace
 
 Claim XKeys::newKey()
@@ -48,40 +97,60 @@ void XKeys::deleteKey(Claim key)
    auto table = open<KeyTable>();
    PSIBASE_SUBJECTIVE_TX
    {
-      auto row = table.get(id);
+      auto row = table.get({getSender(), id});
       check(row && row->owner == getSender(), "Key not found");
       table.remove(*row);
    }
 }
 
-SignedTransaction XKeys::signTx(std::vector<psibase::Action> actions,
-                                std::vector<psibase::Claim>  claims)
+SignedTransaction XKeys::signTx(std::vector<psibase::Action> actions)
 {
    auto sender = getSender();
-   // Construct transaction
+
+   // Get available keys
+   std::vector<std::pair<Claim, PrivateKeyInfo>> keys;
+   PSIBASE_SUBJECTIVE_TX
+   {
+      keys.clear();
+      for (auto row : open<KeyTable>().getIndex<0>().subindex(sender))
+      {
+         auto pub = getSubjectPublicKeyInfo(row.key);
+         auto claim =
+             Claim{.service = VerifySig::service, .rawData = {pub.data.begin(), pub.data.end()}};
+         keys.push_back({std::move(claim), std::move(row.key)});
+      }
+   }
+   // Determine which keys are needed
+   {
+      auto checker = AuthChecker{actions};
+      check(checker.checkAuth(getClaims(keys)), "Failed to sign transaction");
+      for (auto iter = keys.begin(); iter != keys.end();)
+      {
+         if (checker.checkAuth(getClaims(keys, iter)))
+         {
+            iter = keys.erase(iter);
+         }
+         else
+         {
+            ++iter;
+         }
+      }
+   }
+
+   // Construct and sign transaction
    auto [refBlockIndex, refBlockSuffix] = to<Transact>().headTapos();
    Transaction trx{.tapos   = {.expiration = std::chrono::time_point_cast<Seconds>(
                                    std::chrono::system_clock::now() + std::chrono::seconds(3)),
                                .refBlockSuffix = refBlockSuffix,
                                .refBlockIndex  = refBlockIndex},
                    .actions = std::move(actions),
-                   .claims  = std::move(claims)};
+                   .claims  = getClaims(keys)};
 
-   // Sign transaction
-   auto              table = open<KeyTable>();
    SignedTransaction signedTrx{.transaction{trx}};
    auto              hash = sha256(signedTrx.transaction.data(), signedTrx.transaction.size());
-   for (const auto& claim : claims)
+   for (const auto& [_, key] : keys)
    {
-      check(claim.service == VerifySig::service, "wrong verify service");
-      auto                  id = psibase::sha256(claim.rawData.data(), claim.rawData.size());
-      std::optional<KeyRow> row;
-      PSIBASE_SUBJECTIVE_TX
-      {
-         row = table.get(id);
-      }
-      check(row && row->owner == sender, "Key not found");
-      auto proof = sign(row->key, hash);
+      auto proof = sign(key, hash);
       signedTrx.proofs.push_back({proof.begin(), proof.end()});
    }
 
