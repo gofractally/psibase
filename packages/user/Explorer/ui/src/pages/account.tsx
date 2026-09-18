@@ -24,11 +24,13 @@ import { useLiveChain } from "@/store/use-live-chain";
 
 import { AccountLink } from "@/components/account-link";
 import { MethodChip } from "@/components/action-chips";
+import { DocLabel } from "@/components/doc-link";
 import { CopyIcon, Hash } from "@/components/hash";
 import { KeyValue, PageHeader, Panel } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { TimeAgo } from "@/components/time-ago";
 import { TransactionsTable } from "@/components/transactions-table";
+import { DOC_PATHS } from "@/lib/docs";
 
 import { Avatar } from "@shared/components/avatar";
 import { cn } from "@shared/lib/utils";
@@ -283,7 +285,20 @@ export const AccountPage = () => {
                             <span className="text-sm whitespace-pre-wrap">{bio}</span>
                         </KeyValue>
                     ) : null}
-                    <KeyValue label="Auth service">
+                    <KeyValue
+                        label={
+                            <DocLabel
+                                path={
+                                    authService === "auth-sig"
+                                        ? DOC_PATHS.authSig
+                                        : DOC_PATHS.smartAuthorization
+                                }
+                                topic="auth services"
+                            >
+                                Auth service
+                            </DocLabel>
+                        }
+                    >
                         {account.isPending ? (
                             <Skeleton className="h-4 w-24" />
                         ) : account.data ? (
@@ -372,7 +387,13 @@ export const AccountPage = () => {
                         </>
                     )}
                     {pkg && (
-                        <KeyValue label="Package">
+                        <KeyValue
+                            label={
+                                <DocLabel path={DOC_PATHS.packages} topic="app packages">
+                                    Package
+                                </DocLabel>
+                            }
+                        >
                             <span className="flex flex-wrap items-center gap-2">
                                 <Package className="text-muted-foreground size-3.5" />
                                 <Link to={`/services?q=${encodeURIComponent(pkg.name)}`} className="text-primary hover:underline">

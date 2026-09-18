@@ -25,10 +25,12 @@ import { BlocksTable } from "@/components/blocks-table";
 import { BlockActivityChart } from "@/components/charts/block-activity-chart";
 import { ServiceActivityChart } from "@/components/charts/service-activity-chart";
 import { MethodChip } from "@/components/action-chips";
+import { DocLabel } from "@/components/doc-link";
 import { Panel } from "@/components/page-header";
 import { ProducerRing } from "@/components/producer-ring";
 import { StatCard } from "@/components/stat-card";
 import { TransactionsTable } from "@/components/transactions-table";
+import { DOC_PATHS, consensusDocPath } from "@/lib/docs";
 
 import { Button } from "@shared/shadcn/ui/button";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
@@ -134,7 +136,14 @@ export const DashboardPage = () => {
                         sub={`${formatNumber(stats.actionCount)} actions across ${stats.serviceActivity.length} services`}
                     />
                     <StatCard
-                        label="Providers"
+                        label={
+                            <DocLabel
+                                path={consensusDocPath(producersInfo?.mode)}
+                                topic={producersInfo?.mode ?? "consensus"}
+                            >
+                                Providers
+                            </DocLabel>
+                        }
                         icon={Radio}
                         accent="var(--chart-5)"
                         value={
@@ -149,7 +158,11 @@ export const DashboardPage = () => {
                         }
                     />
                     <StatCard
-                        label="Finality"
+                        label={
+                            <DocLabel path={DOC_PATHS.peerConsensus} topic="block finality">
+                                Finality
+                            </DocLabel>
+                        }
                         icon={ShieldCheck}
                         accent="var(--chart-2)"
                         value={

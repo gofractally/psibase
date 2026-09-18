@@ -9,8 +9,10 @@ import { useChainStats } from "@/store/use-live-chain";
 
 import { AccountLink } from "@/components/account-link";
 import { ServiceActivityChart } from "@/components/charts/service-activity-chart";
+import { DocLabel } from "@/components/doc-link";
 import { PageHeader, Panel } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
+import { DOC_PATHS } from "@/lib/docs";
 
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Input } from "@shared/shadcn/ui/input";
@@ -72,14 +74,22 @@ export const ServicesPage = () => {
 
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                 <StatCard
-                    label="Packages"
+                    label={
+                        <DocLabel path={DOC_PATHS.packages} topic="app packages">
+                            Packages
+                        </DocLabel>
+                    }
                     icon={Package}
                     accent="var(--chart-4)"
                     value={packages.data ? formatNumber(packages.data.length) : "—"}
                     sub={`${owners} owner${owners === 1 ? "" : "s"}`}
                 />
                 <StatCard
-                    label="Services"
+                    label={
+                        <DocLabel path={DOC_PATHS.services} topic="services">
+                            Services
+                        </DocLabel>
+                    }
                     accent="var(--chart-2)"
                     value={packages.data ? formatNumber(totalServices) : "—"}
                     sub={`${formatNumber(totalAccounts)} accounts total`}
