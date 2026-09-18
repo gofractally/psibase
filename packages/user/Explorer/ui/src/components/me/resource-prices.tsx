@@ -2,6 +2,8 @@ import type { RateLimitPricing, ResourcePricing } from "@/lib/user-queries";
 
 import { Cpu, HardDrive, Network } from "lucide-react";
 
+import { EmptyState } from "@/components/empty-state";
+
 import { formatBytes, formatNumber, pct } from "@/lib/format";
 
 import { cn } from "@shared/lib/utils";
@@ -136,11 +138,7 @@ export const ResourcePrices = ({
         );
     }
     if (isError || !pricing) {
-        return (
-            <div className="text-muted-foreground flex h-32 items-center justify-center text-sm">
-                Pricing is not available right now
-            </div>
-        );
+        return <EmptyState>Pricing is not available right now</EmptyState>;
     }
 
     const { cpu, net, disk } = pricing;

@@ -16,6 +16,7 @@ import {
 import { Link } from "react-router-dom";
 
 import { AccountLink } from "@/components/account-link";
+import { EmptyState } from "@/components/empty-state";
 import { TimeAgo } from "@/components/time-ago";
 
 import { formatNumber } from "@/lib/format";
@@ -23,23 +24,6 @@ import { formatNumber } from "@/lib/format";
 import { cn } from "@shared/lib/utils";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
-
-const EmptyRow = ({
-    children,
-    colSpan,
-}: {
-    children: React.ReactNode;
-    colSpan: number;
-}) => (
-    <tr>
-        <td
-            colSpan={colSpan}
-            className="text-muted-foreground px-4 py-8 text-center text-sm"
-        >
-            {children}
-        </td>
-    </tr>
-);
 
 const Th = ({
     children,
@@ -100,9 +84,9 @@ export const TokenBalances = ({
     }
     if (isError) {
         return (
-            <div className="text-muted-foreground flex h-28 items-center justify-center text-sm">
+            <EmptyState className="min-h-28">
                 Could not load token balances
-            </div>
+            </EmptyState>
         );
     }
     const sorted = [...(balances ?? [])].sort((a, b) => {
@@ -113,10 +97,9 @@ export const TokenBalances = ({
     });
     if (sorted.length === 0) {
         return (
-            <div className="text-muted-foreground flex h-28 flex-col items-center justify-center gap-1 text-sm">
-                <Coins className="size-4 opacity-60" />
+            <EmptyState icon={Coins} className="min-h-28">
                 You do not hold any tokens yet
-            </div>
+            </EmptyState>
         );
     }
     return (
@@ -208,106 +191,108 @@ export const RecentTransfers = ({
     isPending?: boolean;
     isError?: boolean;
     errorMessage?: string;
-}) => (
-    <div className="scrollbar-thin overflow-x-auto">
-        <table className="w-full text-[13px]">
-            <thead className="bg-muted/30 border-b">
-                <tr>
-                    <Th>Type</Th>
-                    <Th>Counterparty</Th>
-                    <Th className="text-right">Amount</Th>
-                    <Th>Memo</Th>
-                    <Th>Block</Th>
-                    <Th>Age</Th>
-                </tr>
-            </thead>
-            <tbody>
-                {isPending && (
+}) => {
+    const isEmpty = !isPending && !isError && (transfers?.length ?? 0) === 0;
+    const showBelowTable = isError || isEmpty;
+    return (
+        <div
+            className={cn(
+                "scrollbar-thin overflow-x-auto",
+                showBelowTable && "flex flex-1 flex-col",
+            )}
+        >
+            <table className="w-full text-[13px]">
+                <thead className="bg-muted/30 border-b">
                     <tr>
-                        <td colSpan={6} className="px-4 py-3">
-                            <Skeleton className="h-4 w-full" />
-                        </td>
+                        <Th>Type</Th>
+                        <Th>Counterparty</Th>
+                        <Th className="text-right">Amount</Th>
+                        <Th>Memo</Th>
+                        <Th>Block</Th>
+                        <Th>Age</Th>
                     </tr>
-                )}
-                {isError && (
-                    <EmptyRow colSpan={6}>
-                        <span className="flex flex-col items-center gap-1">
-                            Could not load transfer history
-                            {errorMessage && (
-                                <span className="max-w-md break-all font-mono text-xs opacity-70">
-                                    {errorMessage}
-                                </span>
-                            )}
-                        </span>
-                    </EmptyRow>
-                )}
-                {!isPending && !isError && (transfers?.length ?? 0) === 0 && (
-                    <EmptyRow colSpan={6}>
-                        No {symbol} transfers recorded for this account
-                    </EmptyRow>
-                )}
-                {transfers?.map((t, i) => {
-                    const m = ACTION_META[t.action] ?? ACTION_META.rejected;
-                    return (
-                        <tr
-                            key={`${t.blockNum}-${i}`}
-                            className="hover:bg-accent/40 border-b transition-colors last:border-b-0"
-                        >
-                            <Td>
-                                <span
+                </thead>
+                <tbody>
+                    {isPending && (
+                        <tr>
+                            <td colSpan={6} className="px-4 py-3">
+                                <Skeleton className="h-4 w-full" />
+                            </td>
+                        </tr>
+                    )}
+                    {transfers?.map((t, i) => {
+                        const m = ACTION_META[t.action] ?? ACTION_META.rejected;
+                        return (
+                            <tr
+                                key={`${t.blockNum}-${i}`}
+                                className="hover:bg-accent/40 border-b transition-colors last:border-b-0"
+                            >
+                                <Td>
+                                    <span
+                                        className={cn(
+                                            "inline-flex items-center gap-1.5",
+                                            m.className,
+                                        )}
+                                    >
+                                        <m.icon className="size-3.5" />
+                                        {m.label}
+                                    </span>
+                                </Td>
+                                <Td>
+                                    <AccountLink name={t.counterParty} />
+                                </Td>
+                                <Td
                                     className={cn(
-                                        "inline-flex items-center gap-1.5",
+                                        "text-right font-mono tabular-nums",
                                         m.className,
                                     )}
                                 >
-                                    <m.icon className="size-3.5" />
-                                    {m.label}
-                                </span>
-                            </Td>
-                            <Td>
-                                <AccountLink name={t.counterParty} />
-                            </Td>
-                            <Td
-                                className={cn(
-                                    "text-right font-mono tabular-nums",
-                                    m.className,
-                                )}
-                            >
-                                {m.sign}
-                                {t.amount}{" "}
-                                <span className="text-muted-foreground text-xs">
-                                    {symbol}
-                                </span>
-                            </Td>
-                            <Td className="text-muted-foreground max-w-[220px] truncate text-xs">
-                                {t.memo || "—"}
-                            </Td>
-                            <Td>
-                                {t.blockNum !== null ? (
-                                    <Link
-                                        to={`/blocks/${t.blockNum}`}
-                                        className="text-primary font-mono tabular-nums hover:underline"
-                                    >
-                                        {formatNumber(t.blockNum)}
-                                    </Link>
-                                ) : (
-                                    "—"
-                                )}
-                            </Td>
-                            <Td className="text-muted-foreground">
-                                {t.blockTime ? (
-                                    <TimeAgo time={t.blockTime} />
-                                ) : (
-                                    "—"
-                                )}
-                            </Td>
-                        </tr>
-                    );
-                })}
-            </tbody>
-        </table>
-    </div>
-);
+                                    {m.sign}
+                                    {t.amount}{" "}
+                                    <span className="text-muted-foreground text-xs">
+                                        {symbol}
+                                    </span>
+                                </Td>
+                                <Td className="text-muted-foreground max-w-[220px] truncate text-xs">
+                                    {t.memo || "—"}
+                                </Td>
+                                <Td>
+                                    {t.blockNum !== null ? (
+                                        <Link
+                                            to={`/blocks/${t.blockNum}`}
+                                            className="text-primary font-mono tabular-nums hover:underline"
+                                        >
+                                            {formatNumber(t.blockNum)}
+                                        </Link>
+                                    ) : (
+                                        "—"
+                                    )}
+                                </Td>
+                                <Td className="text-muted-foreground">
+                                    {t.blockTime ? (
+                                        <TimeAgo time={t.blockTime} />
+                                    ) : (
+                                        "—"
+                                    )}
+                                </Td>
+                            </tr>
+                        );
+                    })}
+                </tbody>
+            </table>
+            {isError && (
+                <EmptyState detail={errorMessage}>
+                    Could not load transfer history
+                </EmptyState>
+            )}
+            {isEmpty && (
+                <EmptyState>
+                    No {symbol} transfers recorded for this account
+                </EmptyState>
+            )}
+        </div>
+    );
+};
 
 // ---------------------------------------------------------------------------
 // Pending (open lines of credit)
@@ -331,9 +316,9 @@ export const PendingTransfers = ({
     }
     if (!pending || pending.length === 0) {
         return (
-            <div className="text-muted-foreground flex h-20 items-center justify-center px-4 text-center text-sm">
+            <EmptyState className="min-h-20">
                 No pending credits waiting on you or your counterparties
-            </div>
+            </EmptyState>
         );
     }
     return (

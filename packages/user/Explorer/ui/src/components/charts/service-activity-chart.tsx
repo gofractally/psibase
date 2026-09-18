@@ -4,6 +4,7 @@ import { colorFor } from "@/lib/colors";
 import { formatNumber, pct } from "@/lib/format";
 
 import { AccountLink } from "@/components/account-link";
+import { EmptyState } from "@/components/empty-state";
 
 interface Props {
     data: { service: string; count: number }[];
@@ -19,12 +20,9 @@ export const ServiceActivityChart = ({ data, max = 8, height = 200 }: Props) => 
 
     if (total === 0) {
         return (
-            <div
-                className="text-muted-foreground flex items-center justify-center text-sm"
-                style={{ height }}
-            >
+            <EmptyState style={{ minHeight: height }}>
                 No user actions in the current window
-            </div>
+            </EmptyState>
         );
     }
 
