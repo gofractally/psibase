@@ -227,7 +227,7 @@ impl TransactInterface for VirtualServerPlugin {
 impl Authorized for VirtualServerPlugin {
     fn graphql(query: String) -> Result<String, Error> {
         assert_caller(
-            &["homepage", "config", &virtual_server::SERVICE.to_string()],
+            &["homepage", "config", "explorer", &virtual_server::SERVICE.to_string()],
             "authorized::graphql",
         );
 

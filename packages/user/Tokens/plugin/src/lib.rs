@@ -231,7 +231,7 @@ impl Admin for TokensPlugin {
 }
 
 impl Authorized for TokensPlugin {
-    #[psibase_plugin::authorized(High, whitelist = ["homepage", "accounts", "config"])]
+    #[psibase_plugin::authorized(High, whitelist = ["homepage", "accounts", "config", "explorer"])]
     fn graphql(query: String) -> Result<String, Error> {
         host::server::post_graphql_get_json(&query)
     }

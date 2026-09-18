@@ -1,14 +1,13 @@
 import { Fragment } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 
-import { shortHash } from "@/lib/format";
-
-import { cn } from "@shared/lib/utils";
-
 import { AppSidebar } from "@/components/app-sidebar";
 import { GlobalSearch } from "@/components/global-search";
 import { LiveIndicator } from "@/components/live-indicator";
 
+import { shortHash } from "@/lib/format";
+
+import { cn } from "@shared/lib/utils";
 import {
     Breadcrumb,
     BreadcrumbItem,
@@ -25,6 +24,7 @@ import {
 } from "@shared/shadcn/ui/sidebar";
 
 const SECTION_LABELS: Record<string, string> = {
+    me: "My dashboard",
     blocks: "Blocks",
     transactions: "Transactions",
     tx: "Transactions",
@@ -48,7 +48,10 @@ const useCrumbs = () => {
     const [section, ...rest] = segments;
     const sectionLabel = SECTION_LABELS[section] ?? section;
     const sectionTo = SECTION_LINKS[section] ?? `/${section}`;
-    crumbs.push({ label: sectionLabel, to: rest.length ? sectionTo : undefined });
+    crumbs.push({
+        label: sectionLabel,
+        to: rest.length ? sectionTo : undefined,
+    });
     if (rest.length) {
         const leaf = decodeURIComponent(rest.join("/"));
         crumbs.push({
@@ -91,9 +94,16 @@ export const Layout = () => {
                             {crumbs.map((c, i) => (
                                 <Fragment key={i}>
                                     <BreadcrumbSeparator
-                                        className={cn("shrink-0", i === 0 && "hidden lg:block")}
+                                        className={cn(
+                                            "shrink-0",
+                                            i === 0 && "hidden lg:block",
+                                        )}
                                     />
-                                    <BreadcrumbItem className={c.to ? "shrink-0" : "min-w-0"}>
+                                    <BreadcrumbItem
+                                        className={
+                                            c.to ? "shrink-0" : "min-w-0"
+                                        }
+                                    >
                                         {c.to ? (
                                             <BreadcrumbLink asChild>
                                                 <Link to={c.to}>{c.label}</Link>
