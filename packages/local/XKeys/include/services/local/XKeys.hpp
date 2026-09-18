@@ -5,6 +5,7 @@
 #include <psibase/Table.hpp>
 #include <psibase/nativeTables.hpp>
 #include <services/system/PrivateKeyInfo.hpp>
+#include <services/system/Spki.hpp>
 
 namespace LocalService
 {
@@ -26,15 +27,17 @@ namespace LocalService
       static constexpr auto service = psibase::AccountNumber{"x-keys"};
       using Subjective              = psibase::SubjectiveTables<KeyTable>;
 
-      /// Creates a new key pair and returns the public key.
+      /// Creates a new key pair and returns the public key
+      ///
       /// The key can only be used by the caller
-      psibase::Claim newKey();
+      SystemService::AuthSig::SubjectPublicKeyInfo newKey();
 
       /// Deletes a private key
+      ///
       /// The key must have been created by the caller
-      void deleteKey(psibase::Claim key);
+      void deleteKey(SystemService::AuthSig::SubjectPublicKeyInfo key);
 
-      /// Signs a transaction.
+      /// Signs a transaction
       ///
       /// All the required keys myst have been created by the caller
       psibase::SignedTransaction signTx(std::vector<psibase::Action> actions);

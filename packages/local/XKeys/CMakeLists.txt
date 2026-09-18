@@ -1,6 +1,6 @@
 function(add suffix)
     add_local_service("${suffix}" XKeys src/XKeys.cpp)
-    target_link_libraries(XKeys${suffix} PUBLIC PrivateKeyInfo${suffix})
+    target_link_libraries(XKeys${suffix} PUBLIC PrivateKeyInfo${suffix} Spki${suffix})
 endfunction(add)
 
 conditional_add()

@@ -11,7 +11,7 @@
 using namespace psibase;
 using namespace LocalService;
 using namespace SystemService;
-using SystemService::AuthSig::PrivateKeyInfo;
+using namespace SystemService::AuthSig;
 
 namespace
 {
@@ -73,27 +73,25 @@ namespace
    };
 }  // namespace
 
-Claim XKeys::newKey()
+SubjectPublicKeyInfo XKeys::newKey()
 {
    auto sender = getSender();
    check(isLocal(sender), "service may not create keys");
-   auto priv   = PrivateKeyInfo::create();
-   auto pub    = getSubjectPublicKeyInfo(priv);
-   auto result = Claim{.service = VerifySig::service, .rawData{pub.data.begin(), pub.data.end()}};
-   auto table  = open<KeyTable>();
-   auto row    = KeyRow{.id    = sha256(result.rawData.data(), result.rawData.size()),
-                        .owner = sender,
-                        .key   = std::move(priv)};
+   auto priv  = PrivateKeyInfo::create();
+   auto pub   = getSubjectPublicKeyInfo(priv);
+   auto table = open<KeyTable>();
+   auto row   = KeyRow{
+       .id = sha256(pub.data.data(), pub.data.size()), .owner = sender, .key = std::move(priv)};
    PSIBASE_SUBJECTIVE_TX
    {
       table.put(row);
    }
-   return result;
+   return pub;
 }
 
-void XKeys::deleteKey(Claim key)
+void XKeys::deleteKey(SubjectPublicKeyInfo key)
 {
-   auto id    = psibase::sha256(key.rawData.data(), key.rawData.size());
+   auto id    = psibase::sha256(key.data.data(), key.data.size());
    auto table = open<KeyTable>();
    PSIBASE_SUBJECTIVE_TX
    {
