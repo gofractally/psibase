@@ -1,5 +1,7 @@
-import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
-import { type PluginCall } from "@shared/lib/plugins/lib/call-plugin-function";
+import {
+    type GraphqlPluginCall,
+    graphqlAuth,
+} from "@shared/lib/graphql/graphql-auth";
 import {
     type AccountMarketOverviewRow,
     buildAccountMarketOverviewRows,
@@ -7,10 +9,8 @@ import {
     zCurrentPricesData,
 } from "@shared/lib/schemas/account-markets";
 
-export type GraphqlPluginCall = PluginCall<[query: string], string>;
-
 export async function fetchCurrentPrices(graphql: GraphqlPluginCall) {
-    const raw = await callGraphqlViaPlugin(
+    const raw = await graphqlAuth(
         graphql,
         `
             query {
@@ -37,7 +37,7 @@ export const fetchCurrentPriceForLength = async (
 export async function fetchAccountMarketsOverview(
     graphql: GraphqlPluginCall,
 ): Promise<AccountMarketOverviewRow[]> {
-    const raw = await callGraphqlViaPlugin(
+    const raw = await graphqlAuth(
         graphql,
         `
             query {

@@ -1,12 +1,12 @@
 import { Account, zAccount } from "@shared/lib/schemas/account";
-import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
 import { guilds } from "@shared/lib/plugins";
 import z from "zod";
 
 
 
 export const getRankedGuilds = async (owner: Account): Promise<Account[]> => {
-    const data = await callGraphqlViaPlugin(
+    const data = await graphqlAuth(
         guilds.authorized.graphql,
         `
     {

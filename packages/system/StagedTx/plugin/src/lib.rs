@@ -31,7 +31,7 @@ psibase::define_trust! {
     functions {
         None => [execute],
         Low => [],
-        High => [accept, reject, remove],
+        High => [accept, decline, remove],
         Max => [],
     }
 }
@@ -129,9 +129,9 @@ impl Respondent for StagedTxPlugin {
         )
     }
 
-    fn reject(id: u32) -> Result<(), Error> {
+    fn decline(id: u32) -> Result<(), Error> {
         assert_authorized_with_whitelist(
-            FunctionName::reject,
+            FunctionName::decline,
             vec!["config".into(), "workshop".into()],
         )?;
 

@@ -12,23 +12,28 @@ interface branding {
 
 interface packaging {
     use host:types/types.{error};
-    use packages:plugin/types.{meta, package-info, package-preference, package-source};
+    use packages:plugin/types.{meta, package-info, package-op-full, package-op-info, package-preference, package-source};
 
     set-account-sources: func(accounts: list<string>) -> result<_, error>;
 
     get-sources: func(owner: string) -> result<list<package-source>, error>;
     get-installed-packages: func() -> result<list<meta>, error>;
-    get-available-packages: func(owner: string) -> result<list<package-info>, error>;
 
-    /// Resolve, fetch, and propose installation of the named packages.
-    install-packages: func(owner: string, packages: list<string>, request-pref: package-preference, non-request-pref: package-preference) -> result<_, error>;
+    /// Given the available package index (fetched by the UI, since package
+    /// repositories may live on other chains or plain HTTP servers), returns
+    /// the install/update/remove operations needed to satisfy `request`.
+    resolve-packages: func(index: list<package-info>, request: list<string>, request-pref: package-preference, non-request-pref: package-preference) -> result<list<package-op-info>, error>;
+
+    /// Builds, uploads, and proposes installation of packages whose contents
+    /// have already been fetched by the UI.
+    install-packages: func(owner: string, ops: list<package-op-full>) -> result<_, error>;
 }
 
 interface staged {
     use host:types/types.{error};
 
     accept: func(id: u32) -> result<_, error>;
-    reject: func(id: u32) -> result<_, error>;
+    decline: func(id: u32) -> result<_, error>;
     execute: func(id: u32) -> result<_, error>;
     remove: func(id: u32) -> result<_, error>;
     graphql: func(query: string) -> result<string, error>;

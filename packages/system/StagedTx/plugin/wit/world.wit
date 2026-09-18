@@ -1,5 +1,5 @@
 /// The staged-tx plugin handles responder-side actions on staged transactions
-/// (accept, reject, execute) and lets the proposer remove a staged transaction.
+/// (accept, decline, execute) and lets the proposer remove a staged transaction.
 ///
 /// Proposing a staged transaction is done via the transact plugin's
 /// `set-propose-latch` and `propose` functions.
@@ -30,7 +30,7 @@ interface respondent {
     /// * `id`: The ID of the database record containing the staged transaction
     accept: func(id: u32) -> result<_, error>;
 
-    /// Reject the specified staged transaction
+    /// Decline (reject) the specified staged transaction.
     ///
     /// Depending on the staging rules enforced by the auth service of the sender
     /// of the staged transaction, this could result in the complete rejection and deletion of the
@@ -38,7 +38,7 @@ interface respondent {
     ///
     /// Parameters:
     /// * `id`: The ID of the database record containing the staged transaction
-    reject: func(id: u32) -> result<_, error>;
+    decline: func(id: u32) -> result<_, error>;
 
     /// Executes a transaction
     ///
