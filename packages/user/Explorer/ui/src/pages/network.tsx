@@ -22,11 +22,13 @@ import { FIRST_VISIBLE_BLOCK } from "@/lib/types";
 import { useLiveChain, useNow } from "@/store/use-live-chain";
 
 import { AccountLink } from "@/components/account-link";
+import { DocLabel } from "@/components/doc-link";
 import { Hash } from "@/components/hash";
 import { StatusDot } from "@/components/live-indicator";
 import { KeyValue, PageHeader, Panel } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { TimeAgo } from "@/components/time-ago";
+import { DOC_PATHS, consensusDocPath } from "@/lib/docs";
 
 import { Badge } from "@shared/shadcn/ui/badge";
 
@@ -149,8 +151,23 @@ export const NetworkPage = () => {
                     </KeyValue>
                 </Panel>
 
-                <Panel title="Consensus">
-                    <KeyValue label="Mode">
+                <Panel
+                    title={
+                        <DocLabel path={DOC_PATHS.peerConsensus} topic="peer consensus">
+                            Consensus
+                        </DocLabel>
+                    }
+                >
+                    <KeyValue
+                        label={
+                            <DocLabel
+                                path={consensusDocPath(producers.data?.mode)}
+                                topic={producers.data?.mode ?? "consensus modes"}
+                            >
+                                Mode
+                            </DocLabel>
+                        }
+                    >
                         {producers.data ? (
                             <span className="flex items-center gap-2">
                                 <Badge variant="outline" className="font-mono">{producers.data.mode}</Badge>
@@ -166,7 +183,13 @@ export const NetworkPage = () => {
                         </div>
                     </KeyValue>
                     {producers.data?.nextConsensus && (
-                        <KeyValue label="Pending change">
+                        <KeyValue
+                            label={
+                                <DocLabel path={DOC_PATHS.jointConsensus} topic="joint consensus">
+                                    Pending change
+                                </DocLabel>
+                            }
+                        >
                             <div className="flex flex-wrap items-center gap-2">
                                 <Badge variant="outline" className="font-mono">{producers.data.nextMode}</Badge>
                                 {producers.data.nextProducers.map((p) => <AccountLink key={p.name} name={p.name} />)}
@@ -176,8 +199,22 @@ export const NetworkPage = () => {
                             </div>
                         </KeyValue>
                     )}
-                    <KeyValue label="Term">{head?.term ?? "—"}</KeyValue>
-                    <KeyValue label="Commit">
+                    <KeyValue
+                        label={
+                            <DocLabel path={DOC_PATHS.peerConsensus} topic="consensus terms">
+                                Term
+                            </DocLabel>
+                        }
+                    >
+                        {head?.term ?? "—"}
+                    </KeyValue>
+                    <KeyValue
+                        label={
+                            <DocLabel path={DOC_PATHS.peerConsensus} topic="block finality">
+                                Commit
+                            </DocLabel>
+                        }
+                    >
                         {head ? (
                             <span className="font-mono text-xs">
                                 #{formatNumber(head.commitNum)}{" "}

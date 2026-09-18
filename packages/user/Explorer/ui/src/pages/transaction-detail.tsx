@@ -17,10 +17,12 @@ import type { Action } from "@/lib/types";
 
 import { AccountLink } from "@/components/account-link";
 import { MethodChip } from "@/components/action-chips";
+import { DocLabel } from "@/components/doc-link";
 import { CopyIcon, Hash } from "@/components/hash";
 import { JsonView } from "@/components/json-view";
 import { KeyValue, PageHeader, Panel } from "@/components/page-header";
 import { TimeAgo } from "@/components/time-ago";
+import { DOC_PATHS } from "@/lib/docs";
 
 import { cn } from "@shared/lib/utils";
 import { Badge } from "@shared/shadcn/ui/badge";
@@ -139,7 +141,13 @@ export const TransactionDetailPage = () => {
                             <span className="text-muted-foreground"> · {formatBytes(payload)} payload</span>
                         </span>
                     </KeyValue>
-                    <KeyValue label="Authorization">
+                    <KeyValue
+                        label={
+                            <DocLabel path={DOC_PATHS.smartAuthorization} topic="claims and proofs">
+                                Authorization
+                            </DocLabel>
+                        }
+                    >
                         {trx.claims.length === 0 ? (
                             <span className="text-muted-foreground text-xs">
                                 No claims (unsigned)
@@ -163,7 +171,13 @@ export const TransactionDetailPage = () => {
                     </KeyValue>
                 </Panel>
 
-                <Panel title="TAPoS">
+                <Panel
+                    title={
+                        <DocLabel path={DOC_PATHS.tapos} topic="TAPoS">
+                            TAPoS
+                        </DocLabel>
+                    }
+                >
                     <KeyValue label="Expiration" className="sm:grid-cols-1">
                         <span className="font-mono text-xs">{formatUtc(trx.tapos.expiration)}</span>
                     </KeyValue>

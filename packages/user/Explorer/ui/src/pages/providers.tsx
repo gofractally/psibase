@@ -12,12 +12,14 @@ import {
 import { useLiveChain, useNow } from "@/store/use-live-chain";
 
 import { AccountLink } from "@/components/account-link";
+import { DocLabel } from "@/components/doc-link";
 import { Avatar } from "@shared/components/avatar";
 import { BlockStrip } from "@/components/block-strip";
 import { PageHeader, Panel } from "@/components/page-header";
 import { ProducerRing } from "@/components/producer-ring";
 import { StatCard } from "@/components/stat-card";
 import { TimeAgo } from "@/components/time-ago";
+import { DOC_PATHS, consensusDocPath } from "@/lib/docs";
 
 import { cn } from "@shared/lib/utils";
 import { Badge } from "@shared/shadcn/ui/badge";
@@ -109,7 +111,11 @@ export const ProvidersPage = () => {
 
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                 <StatCard
-                    label="Consensus"
+                    label={
+                        <DocLabel path={consensusDocPath(info.data?.mode)} topic={mode}>
+                            Consensus
+                        </DocLabel>
+                    }
                     icon={Radio}
                     accent="var(--chart-5)"
                     value={mode}
@@ -128,13 +134,21 @@ export const ProvidersPage = () => {
                     sub={`${stats.producers.length} produced in window`}
                 />
                 <StatCard
-                    label="Current term"
+                    label={
+                        <DocLabel path={DOC_PATHS.peerConsensus} topic="consensus terms">
+                            Current term
+                        </DocLabel>
+                    }
                     accent="var(--chart-3)"
                     value={head?.term ?? "—"}
                     sub={head ? `leader ${head.producer}` : ""}
                 />
                 <StatCard
-                    label="Commit lag"
+                    label={
+                        <DocLabel path={DOC_PATHS.peerConsensus} topic="block finality">
+                            Commit lag
+                        </DocLabel>
+                    }
                     accent="var(--chart-1)"
                     value={stats.commitLag === 0 ? "0" : `${stats.commitLag}`}
                     sub={head ? `commit #${formatNumber(head.commitNum)}` : ""}
@@ -278,7 +292,11 @@ export const ProvidersPage = () => {
 
             {info.data?.nextConsensus && (
                 <Panel
-                    title="Pending consensus change"
+                    title={
+                        <DocLabel path={DOC_PATHS.jointConsensus} topic="joint consensus">
+                            Pending consensus change
+                        </DocLabel>
+                    }
                     description={
                         info.data.jointStart
                             ? `Joint consensus started at block #${formatNumber(info.data.jointStart)}`

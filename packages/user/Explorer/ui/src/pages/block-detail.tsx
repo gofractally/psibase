@@ -16,11 +16,13 @@ import { flattenTransactions } from "@/store/live-chain";
 import { useHead } from "@/store/use-live-chain";
 
 import { AccountLink } from "@/components/account-link";
+import { DocLabel } from "@/components/doc-link";
 import { Hash } from "@/components/hash";
 import { JsonView } from "@/components/json-view";
 import { KeyValue, PageHeader, Panel } from "@/components/page-header";
 import { TimeAgo } from "@/components/time-ago";
 import { TransactionsTable } from "@/components/transactions-table";
+import { DOC_PATHS, consensusDocPath } from "@/lib/docs";
 
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
@@ -215,7 +217,13 @@ export const BlockDetailPage = () => {
                     <KeyValue label="Action payload">
                         <span className="tabular-nums">{formatBytes(payloadBytes)}</span>
                     </KeyValue>
-                    <KeyValue label="Term / Commit">
+                    <KeyValue
+                        label={
+                            <DocLabel path={DOC_PATHS.peerConsensus} topic="term and commit">
+                                Term / Commit
+                            </DocLabel>
+                        }
+                    >
                         <span className="font-mono text-xs tabular-nums">
                             term {block.header.term} · commit #{formatNumber(block.header.commitNum)}
                         </span>
@@ -240,7 +248,15 @@ export const BlockDetailPage = () => {
                     title="Consensus change"
                     description="This block schedules a new consensus configuration"
                 >
-                    <KeyValue label="Mode">{ncMode ?? "unknown"}</KeyValue>
+                    <KeyValue
+                        label={
+                            <DocLabel path={consensusDocPath(ncMode)} topic={ncMode ?? "consensus modes"}>
+                                Mode
+                            </DocLabel>
+                        }
+                    >
+                        {ncMode ?? "unknown"}
+                    </KeyValue>
                     <KeyValue label="Providers">
                         <div className="flex flex-wrap gap-2">
                             {ncProducers.map((p) => (

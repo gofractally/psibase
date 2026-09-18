@@ -6,7 +6,7 @@ import { Area, AreaChart, ResponsiveContainer } from "recharts";
 import { cn } from "@shared/lib/utils";
 
 interface StatCardProps {
-    label: string;
+    label: ReactNode;
     value: ReactNode;
     sub?: ReactNode;
     icon?: LucideIcon;
