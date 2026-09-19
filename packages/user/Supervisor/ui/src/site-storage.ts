@@ -1,7 +1,6 @@
-/** Safari partitions third-party iframe localStorage by top-level site.
- *  prompt.html is first-party supervisor; homepage embeds supervisor as a
- *  third-party iframe, so login/keys written during a prompt are invisible
- *  after redirect. Same-site cookies with Domain=root host are shared. */
+/** Safari partitions iframe localStorage by top-level site. Same-site
+ *  cookies with Domain=root are visible to prompt.html and the homepage
+ *  iframe. Never persist key material or query JWTs. */
 
 const COOKIE_PREFIX = "psibase_ls_";
 const CHUNK = 2000;
@@ -45,6 +44,14 @@ function clearCookie(name: string): void {
     writeCookie(name, "", 0);
 }
 
+export function shouldPersistKey(key: string): boolean {
+    return (
+        !key.includes(":keys:") &&
+        !key.includes(":temp_keys:") &&
+        !key.includes(":query_tokens-")
+    );
+}
+
 function readChunked(): string | undefined {
     const chunks: string[] = [];
     for (let i = 0; i < MAX_CHUNKS; i++) {
@@ -61,15 +68,17 @@ function readChunked(): string | undefined {
 }
 
 function writeChunked(payload: string): void {
-    for (let i = 0; i < MAX_CHUNKS; i++) {
-        clearCookie(`${COOKIE_PREFIX}${i}`);
-    }
     if (!payload) {
+        for (let i = 0; i < MAX_CHUNKS; i++) {
+            clearCookie(`${COOKIE_PREFIX}${i}`);
+        }
         return;
     }
     const n = Math.ceil(payload.length / CHUNK);
     if (n > MAX_CHUNKS) {
-        console.warn("Supervisor site storage exceeds cookie budget; skipping sync");
+        console.warn(
+            "Supervisor site storage exceeds cookie budget; keeping previous backup",
+        );
         return;
     }
     for (let i = 0; i < n; i++) {
@@ -79,6 +88,9 @@ function writeChunked(payload: string): void {
             31536000,
         );
     }
+    for (let i = n; i < MAX_CHUNKS; i++) {
+        clearCookie(`${COOKIE_PREFIX}${i}`);
+    }
 }
 
 export function persistLocalStorageToSiteCookies(): void {
@@ -86,7 +98,7 @@ export function persistLocalStorageToSiteCookies(): void {
         const dump: Record<string, string> = {};
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
-            if (!key) continue;
+            if (!key || !shouldPersistKey(key)) continue;
             const value = localStorage.getItem(key);
             if (value !== null) {
                 dump[key] = value;
@@ -109,21 +121,10 @@ export function restoreLocalStorageFromSiteCookies(): void {
         const json = decodeURIComponent(escape(atob(payload)));
         const dump = JSON.parse(json) as Record<string, string>;
         for (const [key, value] of Object.entries(dump)) {
+            if (!shouldPersistKey(key)) continue;
             localStorage.setItem(key, value);
         }
     } catch (e) {
         console.warn("Supervisor site storage restore failed", e);
     }
-}
-
-let persistTimer: ReturnType<typeof setTimeout> | undefined;
-
-export function schedulePersistLocalStorageToSiteCookies(): void {
-    if (persistTimer !== undefined) {
-        clearTimeout(persistTimer);
-    }
-    persistTimer = setTimeout(() => {
-        persistTimer = undefined;
-        persistLocalStorageToSiteCookies();
-    }, 0);
 }

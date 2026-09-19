@@ -1,4 +1,7 @@
-import { promptDetailsFromSearch } from "@psibase/common-lib";
+import {
+    promptDetailsFromSearch,
+    promptSecretsFromHash,
+} from "@psibase/common-lib";
 
 function base64ToBytes(str: string): Uint8Array {
     return Uint8Array.from(atob(str), (c) => c.charCodeAt(0));
@@ -35,14 +38,14 @@ export function promptDetailsFromTopUrl(): PromptDetailsJs | null {
         const loc = window.top?.location ?? window.location;
         const parsed = promptDetailsFromSearch(loc.search);
         if (!parsed) return null;
+        const secrets = promptSecretsFromHash(loc.hash);
+        const packed = secrets.packedContext || parsed.packedContext;
         return {
             promptApp: parsed.promptApp,
             promptName: parsed.promptName,
             activeApp: parsed.activeApp,
             created: parsed.created || "",
-            packedContext: parsed.packedContext
-                ? base64ToBytes(parsed.packedContext)
-                : null,
+            packedContext: packed ? base64ToBytes(packed) : null,
         };
     } catch {
         return null;

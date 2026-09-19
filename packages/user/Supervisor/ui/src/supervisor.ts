@@ -21,6 +21,7 @@ import { pluginId } from "@psibase/common-lib/messaging/plugin-id";
 
 import { AppInterface } from "./app-interface";
 import { CallContext } from "./call-context";
+import { isWasmJspiAvailable } from "./component-loading/loader";
 import { toPostableError } from "./plugin/errors";
 import { PluginLoader } from "./plugin/plugin-loader";
 import { Plugins } from "./plugin/plugins";
@@ -49,6 +50,14 @@ import {
 } from "./utils";
 
 const rootDomain = siblingUrl();
+
+function assertJspiAvailable(): void {
+    if (!isWasmJspiAvailable()) {
+        throw new Error(
+            "This browser cannot run plugins. WebAssembly JSPI (WebAssembly.Suspending) is required (current Chrome, Firefox, or Safari).",
+        );
+    }
+}
 
 function needsTxContext(args: QualifiedFunctionCallArgs): boolean {
     const intf = args.intf ?? "";
@@ -153,10 +162,7 @@ export class Supervisor implements AppInterface {
     //
     // This does not instantiate wasms, with the exception of core system plugin wasms,
     //   which are instantiated as they are required to be executed during the preloading
-    //   of all other plugins.
-    //
-    // The caller should dispose of all instantiated plugins after the entry function
-    //  finishes.
+    //   of all other plugins. Instances stay live across calls; pagehide disposes them.
     private preload(plugins: QualifiedPluginId[]): Promise<void> {
         return this.doPreload(plugins);
     }
@@ -449,6 +455,7 @@ export class Supervisor implements AppInterface {
         try {
             await networkNamePromise;
             this.setParentOrigination(callerOrigin);
+            assertJspiAvailable();
             await this.preload([plugin]);
             const json = this.plugins.getPlugin(plugin).plugin.getJson();
             this.replyToParent(id, json);
@@ -471,6 +478,7 @@ export class Supervisor implements AppInterface {
         try {
             await networkNamePromise;
             this.setParentOrigination(callerOrigin);
+            assertJspiAvailable();
             await this.preload(plugins);
         } catch (e) {
             result = toPostableError(e);
@@ -489,6 +497,7 @@ export class Supervisor implements AppInterface {
         try {
             await networkNamePromise;
             this.setParentOrigination(callerOrigin);
+            assertJspiAvailable();
 
             // This is the time-intensive step. It includes: downloading, parsing, and transpiling the
             //   each plugin component. Everything needed to prepare for instantiation and execution.

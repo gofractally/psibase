@@ -242,7 +242,7 @@ export interface CompiledPlugin {
     instantiate: () => Promise<InstantiateResult>;
 }
 
-function isWasmJspiAvailable(): boolean {
+export function isWasmJspiAvailable(): boolean {
     return (
         typeof WebAssembly !== "undefined" &&
         typeof (WebAssembly as typeof WebAssembly & { Suspending?: unknown })
@@ -366,7 +366,7 @@ async function compileWasmComponent(
         (jspi.imports.length > 0 || jspi.exports.length > 0);
     if (useJspi && !isWasmJspiAvailable()) {
         throw new Error(
-            `Cannot load ${debugFileName}: WebAssembly JSPI (WebAssembly.Suspending) is required`,
+            `Cannot load ${debugFileName}: this browser cannot run plugins. WebAssembly JSPI (WebAssembly.Suspending) is required (current Chrome, Firefox, or Safari).`,
         );
     }
     const opts: GenerateOptions = {

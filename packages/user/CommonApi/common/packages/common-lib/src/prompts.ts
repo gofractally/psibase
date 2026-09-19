@@ -67,9 +67,34 @@ export function applyPromptDetailsToUrl(
     if (details.created) {
         url.searchParams.set(PROMPT_QUERY.created, details.created);
     }
-    if (details.packedContext) {
-        url.searchParams.set(PROMPT_QUERY.context, details.packedContext);
+}
+
+export function applyPromptSecretsToHash(
+    url: URL,
+    secrets: { inviteToken?: string | null; packedContext?: string | null },
+): void {
+    const hash = new URLSearchParams(url.hash.replace(/^#/, ""));
+    if (secrets.inviteToken) {
+        hash.set(PROMPT_QUERY.inviteToken, secrets.inviteToken);
     }
+    if (secrets.packedContext) {
+        hash.set(PROMPT_QUERY.context, secrets.packedContext);
+    }
+    const encoded = hash.toString();
+    if (encoded) {
+        url.hash = encoded;
+    }
+}
+
+export function promptSecretsFromHash(hash: string): {
+    inviteToken: string | null;
+    packedContext: string | null;
+} {
+    const params = new URLSearchParams(hash.replace(/^#/, ""));
+    return {
+        inviteToken: params.get(PROMPT_QUERY.inviteToken),
+        packedContext: params.get(PROMPT_QUERY.context),
+    };
 }
 
 export function promptDetailsFromSearch(
@@ -129,9 +154,10 @@ export const handlePluginUserPrompt = async (
             const inviteToken =
                 pageParams.get(PROMPT_QUERY.inviteToken) ||
                 pageParams.get("token");
-            if (inviteToken) {
-                url.searchParams.set(PROMPT_QUERY.inviteToken, inviteToken);
-            }
+            applyPromptSecretsToHash(url, {
+                inviteToken,
+                packedContext: details?.packedContext,
+            });
             window.location.href = url.toString();
         }
     }

@@ -11,6 +11,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { isPluginErrorObject } from "@psibase/common-lib/messaging";
 
+vi.mock("./component-loading/loader", async (importOriginal) => {
+    const actual =
+        await importOriginal<typeof import("./component-loading/loader")>();
+    return {
+        ...actual,
+        isWasmJspiAvailable: () => true,
+    };
+});
+
 vi.mock("./plugin/plugin-loader", () => ({
     PluginLoader: class {
         trackPlugins() {}

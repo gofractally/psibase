@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { promptDetailsFromSearch, siblingUrl } from "@psibase/common-lib";
+import {
+    promptDetailsFromSearch,
+    promptSecretsFromHash,
+    siblingUrl,
+} from "@psibase/common-lib";
 
 import { ErrorCard } from "@shared/components/error-card";
 import { supervisor } from "@shared/lib/supervisor";
@@ -69,7 +73,9 @@ export const App = () => {
 
                 setActiveApp(promptDetails.activeApp);
 
-                const inviteToken = urlParams.get("inviteToken");
+                const secrets = promptSecretsFromHash(window.location.hash);
+                const inviteToken =
+                    secrets.inviteToken || urlParams.get("inviteToken");
                 if (inviteToken) {
                     try {
                         await supervisor.functionCall({
@@ -80,10 +86,11 @@ export const App = () => {
                             params: [inviteToken],
                         });
                     } catch (inviteErr) {
-                        console.error(
-                            "Failed to restore invite token for prompt",
-                            inviteErr,
+                        setError(
+                            "Prompt error: Failed to restore invite token. " +
+                                inviteErr,
                         );
+                        return;
                     }
                 }
 

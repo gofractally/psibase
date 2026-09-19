@@ -165,10 +165,8 @@ export class Plugin {
 
     async instantiate(): Promise<void> {
         if (this.pluginModule) return;
-        // Background compile of unrelated plugins may have created this
-        // Plugin object before jco finished. Skip until it is ready so a
-        // branding/login call does not wait on invite transpile.
-        if (!this.compiledPlugin) return;
+        await this.ready;
+        if (!this.compiledPlugin) throw new PluginInvalid(this.id);
         const { exports } = await this.compiledPlugin.instantiate();
         this.pluginModule = exports;
     }

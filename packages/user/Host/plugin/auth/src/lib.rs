@@ -13,7 +13,7 @@ use crate::bindings::{
     host::{
         client::api as CallContext,
         db::store::{Bucket, Database, DbMode, StorageDuration},
-        types::types::Error,
+        types::types::{Error, PluginId},
     },
     supervisor::bridge::{
         intf as Supervisor,
@@ -33,6 +33,28 @@ fn bucket_id(user: &str) -> String {
     format!("query_tokens-{}", user)
 }
 
+fn auth_error(message: &str) -> Error {
+    Error {
+        code: 1,
+        producer: PluginId {
+            service: "host".to_string(),
+            plugin: "auth".to_string(),
+        },
+        message: message.to_string(),
+    }
+}
+
+fn post_cookie_request(req: &HttpRequest) -> Result<(), Error> {
+    let resp = Supervisor::send_request(req, true).map_err(|e| auth_error(&e.message))?;
+    if resp.status < 200 || resp.status >= 300 {
+        return Err(auth_error(&format!(
+            "auth cookie request failed with HTTP {}",
+            resp.status
+        )));
+    }
+    Ok(())
+}
+
 fn post_to_app(app: &str, endpoint: &str, body: String) -> HttpRequest {
     HttpRequest {
         uri: format!("{}/{}", CallContext::get_app_url(app), endpoint.trim_start_matches('/')),
@@ -45,16 +67,15 @@ fn post_to_app(app: &str, endpoint: &str, body: String) -> HttpRequest {
     }
 }
 
-fn set_active_query_token(query_token: &str, app: &str, user: &str) {
+fn set_active_query_token(query_token: &str, app: &str, user: &str) -> Result<(), Error> {
     let req = post_to_app(
         app,
         "/common/set-auth-cookie",
         format!("{{\"accessToken\": \"{}\"}}", query_token),
     );
-    // Do not unwrap: a trap here hangs jco JSPI (click-account never finishes).
-    let _ = Supervisor::send_request(&req, true);
-
+    post_cookie_request(&req)?;
     Bucket::new(DB, &bucket_id(user)).set(&app, &query_token.to_string().packed());
+    Ok(())
 }
 
 fn remove_active_query_token(app: &str, user: &str) {
@@ -69,12 +90,12 @@ impl Api for HostAuth {
         check_caller(&["accounts"], "set-logged-in-user@host:auth/api");
 
         let query_token = if let Some(t) = Bucket::new(DB, &bucket_id(&user)).get(&app) {
-            String::unpacked(&t).unwrap()
+            String::unpacked(&t).map_err(|_| auth_error("corrupt query token"))?
         } else {
             Transact::get_query_token(&app, &user)?
         };
 
-        set_active_query_token(&query_token, &app, &user);
+        set_active_query_token(&query_token, &app, &user)?;
 
         Ok(())
     }
@@ -92,7 +113,7 @@ impl Api for HostAuth {
 
         Bucket::new(DB, &bucket_id(&user))
             .get(&app)
-            .map(|t| String::unpacked(&t).unwrap())
+            .and_then(|t| String::unpacked(&t).ok())
     }
 }
 
