@@ -32,8 +32,6 @@ export function headersRecord(
     return record;
 }
 
-import { slog, watchHang } from "../debug";
-
 export async function performHttpRequest(
     req: HttpRequest,
     uri: string,
@@ -43,17 +41,12 @@ export async function performHttpRequest(
     headers.delete("user-agent");
     headers.delete("host");
 
-    const response = await watchHang(
-        `fetch ${req.method} ${uri}`,
-        () =>
-            fetch(uri, {
-                method: req.method.toString(),
-                headers,
-                body: toRequestBody(req.body),
-                credentials: withCredentials ? "include" : "same-origin",
-            }),
-    );
-    slog(`fetch status ${response.status} ${uri}`);
+    const response = await fetch(uri, {
+        method: req.method.toString(),
+        headers,
+        body: toRequestBody(req.body),
+        credentials: withCredentials ? "include" : "same-origin",
+    });
 
     const responseHeaders: Array<[string, string]> = [];
     response.headers.forEach((value, key) => {

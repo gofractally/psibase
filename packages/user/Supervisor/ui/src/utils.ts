@@ -52,10 +52,6 @@ export function assert(
 
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 
-export function afterMacrotask(): Promise<void> {
-    return new Promise((resolve) => scheduleMacrotask(resolve));
-}
-
 function scheduleMacrotask(cb: () => void): void {
     // MessageChannel is a macrotask and is not clamped like nested setTimeout(0).
     // Nested WebAssembly.promising must not run inside a Suspending import:

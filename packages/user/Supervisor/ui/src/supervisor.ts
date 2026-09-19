@@ -20,7 +20,6 @@ import {
 import { pluginId } from "@psibase/common-lib/messaging/plugin-id";
 
 import { AppInterface } from "./app-interface";
-import { slog, watchHang } from "./debug";
 import { CallContext } from "./call-context";
 import { toPostableError } from "./plugin/errors";
 import { PluginLoader } from "./plugin/plugin-loader";
@@ -46,7 +45,6 @@ import {
     parser,
     serviceFromOrigin,
     setQueryToken,
-    afterMacrotask,
     settleWith,
 } from "./utils";
 
@@ -132,18 +130,13 @@ export class Supervisor implements AppInterface {
     }
 
     startBackgroundCompile(): void {
-        slog("background compile start");
         void parser();
         void this.compilePlugins([
             ...systemPlugins,
             pluginId("branding", "plugin"),
-        ]).then(
-            () => slog("background compile system+branding done"),
-            (e) => console.error("Supervisor plugin warmup failed", e),
-        );
-        void this.compilePlugins([pluginId("invite", "plugin")]).then(
-            () => slog("background compile invite done"),
-            (e) => console.error("Supervisor invite warmup failed", e),
+        ]).catch((e) => console.error("Supervisor plugin warmup failed", e));
+        void this.compilePlugins([pluginId("invite", "plugin")]).catch((e) =>
+            console.error("Supervisor invite warmup failed", e),
         );
     }
 
@@ -414,7 +407,6 @@ export class Supervisor implements AppInterface {
             ),
         );
 
-        slog(`callDyn ${service}:${plugin}/${intf}->${args.method}`);
         return this.call(
             getCallArgs(service, plugin, intf, args.method, args.params),
         );
@@ -487,8 +479,6 @@ export class Supervisor implements AppInterface {
         id: string,
         args: QualifiedFunctionCallArgs,
     ): Promise<any> {
-        const callLabel = `${args.service}:${args.plugin}/${args.intf ?? ""}->${args.method}`;
-        slog(`entry ${callLabel}`, { id, origin: callerOrigin });
         try {
             await networkNamePromise;
             this.setParentOrigination(callerOrigin);
@@ -496,55 +486,37 @@ export class Supervisor implements AppInterface {
             // This is the time-intensive step. It includes: downloading, parsing, and transpiling the
             //   each plugin component. Everything needed to prepare for instantiation and execution.
             // UIs can use `preloadPlugins` to decouple this task from the actual call to the plugin.
-            await watchHang(`preload ${callLabel}`, () =>
-                this.preload([
-                    {
-                        service: args.service,
-                        plugin: args.plugin,
-                    },
-                ]),
-            );
+            await this.preload([
+                {
+                    service: args.service,
+                    plugin: args.plugin,
+                },
+            ]);
 
-            await watchHang(`instantiate ${callLabel}`, () =>
-                this.plugins.instantiate(this.neededPluginIds),
-            );
+            await this.plugins.instantiate(this.neededPluginIds);
 
             this.context = this.getCallContext();
 
             // Starts the tx context.
-            await watchHang(`start-tx for ${callLabel}`, () =>
-                this.supervisorCall(
-                    getCallArgs("transact", "plugin", "admin", "start-tx", []),
-                ),
+            await this.supervisorCall(
+                getCallArgs("transact", "plugin", "admin", "start-tx", []),
             );
 
             // Plugin code is still written synchronously. JSPI suspends the wasm
             // stack across fetch() (and other Promise-returning host imports).
-            const result = await watchHang(`plugin ${callLabel}`, () =>
-                this.call(args),
-            );
+            const result = await this.call(args);
             if (peekPromptSignal()) {
-                slog(`prompt signal after ${callLabel}`);
                 throw peekPromptSignal();
             }
 
-            // Nested transact get-query-token (login cookie) during connectAccount
-            // can leave jco's component task busy. Yield so finish-tx can start.
-            slog(`yield before finish-tx for ${callLabel}`);
-            await afterMacrotask();
-            await afterMacrotask();
-
             // Closes the current tx context. If actions were added, tx is submitted.
-            const txResult = await watchHang(`finish-tx for ${callLabel}`, () =>
-                this.supervisorCall(
-                    getCallArgs("transact", "plugin", "admin", "finish-tx", []),
-                ),
+            const txResult = await this.supervisorCall(
+                getCallArgs("transact", "plugin", "admin", "finish-tx", []),
             );
             if (txResult !== null && txResult !== undefined) {
                 console.warn(txResult);
             }
 
-            slog(`reply success ${callLabel}`);
             // Send plugin result to parent window
             this.replyToParent(id, result);
         } catch (e) {
@@ -597,9 +569,6 @@ export class Supervisor implements AppInterface {
             }
             this.replyToParent(id, result);
         } finally {
-            // Drop wasm instances after every call so JSPI task state from
-            // nested transact get-query-token cannot deadlock a later finish-tx.
-            // compiledPlugin is kept, so the next call only re-instantiates.
             this.plugins.disposeAll();
             this.cleanupSessionState();
         }

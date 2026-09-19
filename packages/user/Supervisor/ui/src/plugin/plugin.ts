@@ -6,7 +6,6 @@ import {
 } from "@psibase/common-lib";
 
 import { kebabToCamel, kebabToPascal } from "../case";
-import { slog, watchHang } from "../debug";
 import { CompiledPlugin } from "../component-loading";
 import {
     ServiceMap,
@@ -18,7 +17,6 @@ import { HostInterface } from "../host-interface";
 import { settleOrPrompt } from "../prompt-signal";
 import {
     invokePluginExport,
-    isThenable,
     networkName,
     parser,
     settleWith,
@@ -200,30 +198,22 @@ export class Plugin {
         }
 
         const jsMethod = kebabToCamel(method);
-        const label = `${this.id.service}:${this.id.plugin}/${intf ?? ""}->${method} active=${this.activeCalls}`;
-        slog(`call ${label}`);
-        // connectAccount → host:auth set-logged-in-user → get-query-token
-        // runs while this transact instance already has start-tx open.
-        // A second promising export on the same component leaves jco's
-        // task busy, so the later finish-tx hangs forever. Login does not
-        // use TX_ACTIONS, so it can run on a fresh instantiate.
+        // Nested promising on the same component deadlocks jco. Login and
+        // transact-hook re-entry (invite accept → add-action → on-actions-sender)
+        // run on a fresh instantiate; they do not use this instance's TX_ACTIONS.
         if (
             this.id.service === "transact" &&
             this.id.plugin === "plugin" &&
             jsMethod === "getQueryToken"
         ) {
-            slog(`getQueryToken isolated instance`);
             return this.callOnFreshInstance(intf, method, params);
         }
-        // invite accept → transact add-action → on-actions-sender re-enters
-        // the same invite component (activeCalls>0) and jco deadlocks.
         if (
             this.activeCalls > 0 &&
             this.compiledPlugin &&
             typeof intf === "string" &&
             intf.startsWith("transact-hook")
         ) {
-            slog(`nested hook ${label} -> isolated instance`);
             return this.callOnFreshInstance(intf, method, params);
         }
         if (this.activeCalls > 0) {
@@ -247,22 +237,14 @@ export class Plugin {
 
         this.activeCalls++;
         try {
-            const raw = invokePluginExport(func, params);
-            const watched = isThenable(raw)
-                ? watchHang(`wasm ${label}`, () => Promise.resolve(raw))
-                : raw;
-            if (!isThenable(raw)) {
-                slog(`done sync ${label}`);
-            }
-            return settleWith(settleOrPrompt(watched), () => {
-                this.activeCalls--;
-                if (isThenable(raw)) {
-                    slog(`done ${label}`);
-                }
-            });
+            return settleWith(
+                settleOrPrompt(invokePluginExport(func, params)),
+                () => {
+                    this.activeCalls--;
+                },
+            );
         } catch (e) {
             this.activeCalls--;
-            slog(`throw ${label}`, e);
             throw e;
         }
     }
@@ -277,8 +259,7 @@ export class Plugin {
             throw new PluginInvalid(this.id);
         }
         const jsMethod = kebabToCamel(method);
-        return watchHang(`isolated ${this.id.service}:${method}`, async () => {
-            slog(`isolated instantiate ${this.id.service}:${this.id.plugin} ${method}`);
+        return (async () => {
             const { exports } = await compiled.instantiate();
             const module = exports as Record<string, Record<string, unknown>>;
             const func = (
@@ -286,9 +267,8 @@ export class Plugin {
                     ? (exports as Record<string, unknown>)[jsMethod]
                     : module[kebabToCamel(intf)][jsMethod]
             ) as (...args: unknown[]) => unknown;
-            slog(`isolated wasm start ${method}`);
             return settleOrPrompt(invokePluginExport(func, params));
-        });
+        })();
     }
 
     resourceCall(
