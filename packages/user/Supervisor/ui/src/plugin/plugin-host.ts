@@ -12,6 +12,7 @@ import {
     HttpResponse,
 } from "../host-interface";
 import { Supervisor } from "../supervisor";
+import { persistLocalStorageToSiteCookies } from "../site-storage";
 import { chainId, detachJspi, networkName } from "../utils";
 import { RecoverableErrorPayload } from "./errors";
 import { headersRecord, performHttpRequest } from "./http-request";
@@ -188,11 +189,17 @@ export class PluginHost implements HostInterface {
         const storage = this.getStorage(duration);
         const base64Value = bytesToBase64(value);
         storage.setItem(key, base64Value);
+        if (duration === storageDuration.persistent) {
+            persistLocalStorageToSiteCookies();
+        }
     }
 
     private dbRemove(duration: number, key: string): void {
         const storage = this.getStorage(duration);
         storage.removeItem(key);
+        if (duration === storageDuration.persistent) {
+            persistLocalStorageToSiteCookies();
+        }
     }
 
     private privilegedPluginImports(): BridgeImports {

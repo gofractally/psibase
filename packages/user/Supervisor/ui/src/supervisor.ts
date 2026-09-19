@@ -50,6 +50,15 @@ import {
 
 const rootDomain = siblingUrl();
 
+function needsTxContext(args: QualifiedFunctionCallArgs): boolean {
+    const intf = args.intf ?? "";
+    if (args.plugin === "query") return false;
+    if (intf === "queries" || intf === "query") return false;
+    if (args.method === "graphql") return false;
+    if (args.service === "branding") return false;
+    return true;
+}
+
 // System plugins are always loaded, even if they are not used
 //   in a given call context.
 const systemPlugins: Array<QualifiedPluginId> = [
@@ -446,7 +455,6 @@ export class Supervisor implements AppInterface {
         } catch (e) {
             this.replyToParent(id, toPostableError(e));
         } finally {
-            this.plugins.disposeAll();
             this.cleanupSessionState();
         }
     }
@@ -467,7 +475,6 @@ export class Supervisor implements AppInterface {
         } catch (e) {
             result = toPostableError(e);
         } finally {
-            this.plugins.disposeAll();
             this.replyToParent(id, result);
             this.cleanupSessionState();
         }
@@ -493,14 +500,22 @@ export class Supervisor implements AppInterface {
                 },
             ]);
 
-            await this.plugins.instantiate(this.neededPluginIds);
+            const openTx = needsTxContext(args);
+            const instantiateIds = openTx
+                ? this.neededPluginIds
+                : this.neededPluginIds.filter(
+                      (id) =>
+                          !(id.service === "transact" && id.plugin === "plugin"),
+                  );
+            await this.plugins.instantiate(instantiateIds);
 
             this.context = this.getCallContext();
 
-            // Starts the tx context.
-            await this.supervisorCall(
-                getCallArgs("transact", "plugin", "admin", "start-tx", []),
-            );
+            if (openTx) {
+                await this.supervisorCall(
+                    getCallArgs("transact", "plugin", "admin", "start-tx", []),
+                );
+            }
 
             // Plugin code is still written synchronously. JSPI suspends the wasm
             // stack across fetch() (and other Promise-returning host imports).
@@ -509,14 +524,20 @@ export class Supervisor implements AppInterface {
                 throw peekPromptSignal();
             }
 
-            // Closes the current tx context. If actions were added, tx is submitted.
-            const txResult = await this.supervisorCall(
-                getCallArgs("transact", "plugin", "admin", "finish-tx", []),
-            );
-            if (txResult !== null && txResult !== undefined) {
-                console.warn(txResult);
+            if (openTx) {
+                const txResult = await this.supervisorCall(
+                    getCallArgs(
+                        "transact",
+                        "plugin",
+                        "admin",
+                        "finish-tx",
+                        [],
+                    ),
+                );
+                if (txResult !== null && txResult !== undefined) {
+                    console.warn(txResult);
+                }
             }
-
             // Send plugin result to parent window
             this.replyToParent(id, result);
         } catch (e) {
@@ -569,7 +590,6 @@ export class Supervisor implements AppInterface {
             }
             this.replyToParent(id, result);
         } finally {
-            this.plugins.disposeAll();
             this.cleanupSessionState();
         }
     }

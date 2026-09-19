@@ -11,6 +11,7 @@ import {
 import { siblingUrl } from "@psibase/common-lib/rpc";
 
 import { camelToKebab } from "./case";
+import { restoreLocalStorageFromSiteCookies } from "./site-storage";
 import { MainPage } from "./main-page";
 import { Supervisor } from "./supervisor";
 import { isEmbedded } from "./utils";
@@ -23,6 +24,8 @@ import {
 const appContainer = document.querySelector<HTMLDivElement>("#app")!;
 const root = createRoot(appContainer);
 root.render(React.createElement(MainPage));
+
+restoreLocalStorageFromSiteCookies();
 
 const supervisor = new Supervisor();
 supervisor.startBackgroundCompile();
