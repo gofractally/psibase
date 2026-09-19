@@ -10,7 +10,6 @@ import {
 } from "@psibase/common-lib/messaging";
 import { siblingUrl } from "@psibase/common-lib/rpc";
 
-import { AppInterface } from "./app-interface";
 import { camelToKebab } from "./case";
 import { MainPage } from "./main-page";
 import { Supervisor } from "./supervisor";
@@ -25,7 +24,8 @@ const appContainer = document.querySelector<HTMLDivElement>("#app")!;
 const root = createRoot(appContainer);
 root.render(React.createElement(MainPage));
 
-const supervisor: AppInterface = new Supervisor();
+const supervisor = new Supervisor();
+supervisor.startBackgroundCompile();
 const callHandlers: CallHandler[] = [];
 
 const shouldHandleMessage = (message: MessageEvent) => {

@@ -43,6 +43,9 @@ export function createTestSupervisor(): Supervisor {
     vi.spyOn(supervisor as unknown as { doPreload: () => Promise<void> }, "doPreload").mockImplementation(
         async function (this: Supervisor) {
             seedTestPlugins((this as unknown as { plugins: Plugins }).plugins);
+            (
+                this as unknown as { neededPluginIds: QualifiedPluginId[] }
+            ).neededPluginIds = [MOCK_APP, TRANSACT];
         },
     );
     return supervisor;

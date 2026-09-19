@@ -75,10 +75,15 @@ export const ConnectPrompt = ({ isPrompt }: { isPrompt?: boolean }) => {
         );
     }
 
-    if (isPending) {
+    if (isPending || connectAccountMutation.isPending) {
         return (
             <BrandedGlowingCard>
                 <CardContent className="flex flex-col">
+                    <CardTitle className="mb-6 text-3xl font-normal">
+                        {connectAccountMutation.isPending
+                            ? "Signing in..."
+                            : "Choose an account"}
+                    </CardTitle>
                     <Skeleton className="mb-6 h-8 w-[200px]" />
                     <div className="space-y-2">
                         <Skeleton className="h-4 w-[250px]" />

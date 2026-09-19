@@ -196,6 +196,25 @@ export class Supervisor {
             return;
         }
 
+        // Safari structured-clone of Error can leave only `{ name: "GenericError" }`.
+        if (
+            result &&
+            typeof result === "object" &&
+            (result.name === "GenericError" ||
+                result.name === "ComponentError" ||
+                result.name === "PluginError" ||
+                result.name === "Error")
+        ) {
+            const message =
+                typeof result.message === "string" && result.message.trim()
+                    ? result.message
+                    : "Unknown plugin error";
+            console.error(`Call to ${resolved.details} failed`);
+            console.error(message, result);
+            pendingRequest.reject(new GenericError(message));
+            return;
+        }
+
         pendingRequest.resolve(response.result);
     }
 

@@ -6,6 +6,7 @@ import {
 } from "@psibase/common-lib";
 
 import { kebabToCamel, kebabToPascal } from "../case";
+import { slog, watchHang } from "../debug";
 import { CompiledPlugin } from "../component-loading";
 import {
     ServiceMap,
@@ -14,7 +15,15 @@ import {
 } from "../component-loading/loader";
 import { DownloadFailed } from "../errors";
 import { HostInterface } from "../host-interface";
-import { networkName, parser, wasmFromUrl } from "../utils";
+import { settleOrPrompt } from "../prompt-signal";
+import {
+    invokePluginExport,
+    isThenable,
+    networkName,
+    parser,
+    settleWith,
+    wasmFromUrl,
+} from "../utils";
 import { ComponentAPI } from "../wit-extraction";
 import { InvalidCall, PluginDownloadFailed, PluginInvalid } from "./errors";
 
@@ -42,6 +51,11 @@ export class Plugin {
 
     private resources: Map<number, any> = new Map();
     private nextResourceHandle: number = 1;
+
+    // Nested JSPI entry into the same component deadlocks jco. host:http
+    // calls back into accounts:query get-current-user while get-account is
+    // suspended; answer that from JS instead of re-entering wasm.
+    private activeCalls = 0;
 
     private methodExists(intf: string | undefined, method: string) {
         if (!this.componentAPI) {
@@ -153,7 +167,10 @@ export class Plugin {
 
     async instantiate(): Promise<void> {
         if (this.pluginModule) return;
-        if (!this.compiledPlugin) throw new PluginInvalid(this.id);
+        // Background compile of unrelated plugins may have created this
+        // Plugin object before jco finished. Skip until it is ready so a
+        // branding/login call does not wait on invite transpile.
+        if (!this.compiledPlugin) return;
         const { exports } = await this.compiledPlugin.instantiate();
         this.pluginModule = exports;
     }
@@ -164,6 +181,7 @@ export class Plugin {
         this.pluginModule = undefined;
         this.resources.clear();
         this.nextResourceHandle = 1;
+        this.activeCalls = 0;
         return true;
     }
 
@@ -182,12 +200,95 @@ export class Plugin {
         }
 
         const jsMethod = kebabToCamel(method);
+        const label = `${this.id.service}:${this.id.plugin}/${intf ?? ""}->${method} active=${this.activeCalls}`;
+        slog(`call ${label}`);
+        // connectAccount → host:auth set-logged-in-user → get-query-token
+        // runs while this transact instance already has start-tx open.
+        // A second promising export on the same component leaves jco's
+        // task busy, so the later finish-tx hangs forever. Login does not
+        // use TX_ACTIONS, so it can run on a fresh instantiate.
+        if (
+            this.id.service === "transact" &&
+            this.id.plugin === "plugin" &&
+            jsMethod === "getQueryToken"
+        ) {
+            slog(`getQueryToken isolated instance`);
+            return this.callOnFreshInstance(intf, method, params);
+        }
+        // invite accept → transact add-action → on-actions-sender re-enters
+        // the same invite component (activeCalls>0) and jco deadlocks.
+        if (
+            this.activeCalls > 0 &&
+            this.compiledPlugin &&
+            typeof intf === "string" &&
+            intf.startsWith("transact-hook")
+        ) {
+            slog(`nested hook ${label} -> isolated instance`);
+            return this.callOnFreshInstance(intf, method, params);
+        }
+        if (this.activeCalls > 0) {
+            if (jsMethod === "getCurrentUser") {
+                return undefined;
+            }
+            if (jsMethod === "isLoggedIn") {
+                return false;
+            }
+            // host:http get_auth_token calls this while set-logged-in-user
+            // is already suspended on the same host:auth instance.
+            if (jsMethod === "getActiveQueryToken") {
+                return undefined;
+            }
+        }
+
         const func =
             typeof intf === "undefined" || intf === ""
                 ? this.pluginModule[jsMethod]
                 : this.pluginModule[kebabToCamel(intf)][jsMethod];
 
-        return func(...params);
+        this.activeCalls++;
+        try {
+            const raw = invokePluginExport(func, params);
+            const watched = isThenable(raw)
+                ? watchHang(`wasm ${label}`, () => Promise.resolve(raw))
+                : raw;
+            if (!isThenable(raw)) {
+                slog(`done sync ${label}`);
+            }
+            return settleWith(settleOrPrompt(watched), () => {
+                this.activeCalls--;
+                if (isThenable(raw)) {
+                    slog(`done ${label}`);
+                }
+            });
+        } catch (e) {
+            this.activeCalls--;
+            slog(`throw ${label}`, e);
+            throw e;
+        }
+    }
+
+    private callOnFreshInstance(
+        intf: string | undefined,
+        method: string,
+        params: any[],
+    ): Promise<unknown> {
+        const compiled = this.compiledPlugin;
+        if (!compiled) {
+            throw new PluginInvalid(this.id);
+        }
+        const jsMethod = kebabToCamel(method);
+        return watchHang(`isolated ${this.id.service}:${method}`, async () => {
+            slog(`isolated instantiate ${this.id.service}:${this.id.plugin} ${method}`);
+            const { exports } = await compiled.instantiate();
+            const module = exports as Record<string, Record<string, unknown>>;
+            const func = (
+                typeof intf === "undefined" || intf === ""
+                    ? (exports as Record<string, unknown>)[jsMethod]
+                    : module[kebabToCamel(intf)][jsMethod]
+            ) as (...args: unknown[]) => unknown;
+            slog(`isolated wasm start ${method}`);
+            return settleOrPrompt(invokePluginExport(func, params));
+        });
     }
 
     resourceCall(
@@ -252,7 +353,7 @@ export class Plugin {
             );
         }
 
-        return resource[jsMethod](...params);
+        return settleOrPrompt(resource[jsMethod](...params));
     }
 
     getJson(): string {

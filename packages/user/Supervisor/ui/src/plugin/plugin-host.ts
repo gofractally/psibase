@@ -12,18 +12,9 @@ import {
     HttpResponse,
 } from "../host-interface";
 import { Supervisor } from "../supervisor";
-import { chainId, networkName } from "../utils";
+import { chainId, detachJspi, networkName } from "../utils";
 import { RecoverableErrorPayload } from "./errors";
-
-function convert(
-    headers: { key: string; value: string }[],
-): Record<string, string> {
-    const record: Record<string, string> = {};
-    headers.forEach(({ key, value }) => {
-        record[key] = value;
-    });
-    return record;
-}
+import { headersRecord, performHttpRequest } from "./http-request";
 
 function convertBack(
     headers: Array<[string, string]>,
@@ -89,15 +80,12 @@ export class PluginHost implements HostInterface {
             return "text";
         } else if (binary) {
             return "bytes";
-        } else {
-            throw this.recoverableError(
-                `Unsupported content type in response: ${contentType}`,
-            );
         }
+        return ct.length > 0 ? "text" : binary ? "bytes" : "text";
     }
 
     private wantsBinaryResponse(req: HttpRequest): boolean {
-        const headers = convert(req.headers);
+        const headers = headersRecord(req.headers);
         const accept = (
             headers["Accept"] ||
             headers["accept"] ||
@@ -130,101 +118,60 @@ export class PluginHost implements HostInterface {
         return uri;
     }
 
-    private binaryStringToBytes(data: string): Uint8Array {
-        const bytes = new Uint8Array(data.length);
-        for (let i = 0; i < data.length; i++) {
-            bytes[i] = data.charCodeAt(i) & 0xff;
-        }
-        return bytes;
+    // Never throw: a throw from this JSPI import becomes a wasm trap, and jco
+    // then hangs on task.completionPromise() (the click-account hang). Callers
+    // that unwrap the WIT result panic on Err for the same reason.
+    private failedHttpResponse(message: string): HttpResponse {
+        console.error(message);
+        return {
+            status: 0,
+            headers: [],
+            body: { tag: "text", val: message },
+        };
     }
 
-    // A synchronous web request.
-    // This allows the plugin to make http queries.
-    // It is a typescript-ified version of the wasip2 browser http shim
-    //    from BytecodeAlliance's JCO project.
-    private sendRequest(
+    // Async HTTP via fetch. JSPI suspends the calling wasm stack until this
+    // Promise resolves, so plugins keep a synchronous WIT/Rust interface.
+    private async sendRequest(
         req: HttpRequest,
         withCredentials: boolean = false,
-    ): HttpResponse {
+    ): Promise<HttpResponse> {
         try {
-            const xhr = new XMLHttpRequest();
-            xhr.open(
-                req.method.toString(),
-                this.rewriteUriHook(req.uri),
-                false,
-            );
-            xhr.withCredentials = withCredentials;
-
-            // Sync XHR cannot use responseType=arraybuffer; force a binary-safe
-            // text encoding and decode to bytes after send.
             const binary = this.wantsBinaryResponse(req);
-            if (binary) {
-                xhr.overrideMimeType("text/plain; charset=x-user-defined");
-            }
-
-            const requestHeaders = new Headers(convert(req.headers));
-            for (const [name, value] of requestHeaders.entries()) {
-                if (name !== "user-agent" && name !== "host") {
-                    xhr.setRequestHeader(name, value);
-                }
-            }
-            xhr.send(
-                req.body && req.body.val.length > 0
-                    ? (req.body.val as string)
-                    : null,
+            const raw = await performHttpRequest(
+                req,
+                this.rewriteUriHook(req.uri),
+                withCredentials,
             );
-            if (xhr.status >= 400) {
-                if (xhr.response) {
-                    console.error(xhr.response);
-                }
+            if (raw.status >= 400 && raw.body.byteLength > 0) {
+                console.error(new TextDecoder().decode(raw.body));
             }
-            if (xhr.status === 500) {
-                throw this.recoverableError(
-                    `Http request error: ${xhr.response}`,
-                );
+            if (raw.body.byteLength === 0) {
+                return {
+                    status: raw.status,
+                    headers: convertBack(raw.headers),
+                    body: null,
+                };
             }
-            const raw = xhr.responseText;
-            const body =
-                raw == null || raw === ""
-                    ? undefined
-                    : binary
-                      ? this.binaryStringToBytes(raw)
-                      : raw;
-            const headers: Array<[string, string]> = [];
-            xhr.getAllResponseHeaders()
-                .trim()
-                .split(/[\r\n]+/)
-                .forEach((line) => {
-                    const parts = line.split(": ");
-                    const key = parts.shift();
-                    assertTruthy(key, "Malformed http response headers");
-                    const value = parts.join(": ");
-                    headers.push([key, value]);
-                });
-            const contentType = xhr.getResponseHeader("content-type") || "";
-            const tag = this.getBodyTagFromContentType(contentType, binary);
 
+            const tag = this.getBodyTagFromContentType(raw.contentType, binary);
             return {
-                status: xhr.status,
-                headers: convertBack(headers),
-                body: body
-                    ? {
-                          tag,
-                          val: body,
-                      }
-                    : null,
+                status: raw.status,
+                headers: convertBack(raw.headers),
+                body: {
+                    tag,
+                    val:
+                        tag === "bytes"
+                            ? raw.body
+                            : new TextDecoder().decode(raw.body),
+                },
             };
-        } catch (err: any) {
-            if (
-                `message` in err &&
-                !err.message.includes("Http request error")
-            ) {
-                throw this.recoverableError(
-                    `Http request error: ${err.message}`,
-                );
-            }
-
-            throw err;
+        } catch (err: unknown) {
+            const message =
+                err && typeof err === "object" && "message" in err
+                    ? String((err as { message: unknown }).message)
+                    : String(err);
+            return this.failedHttpResponse(`Http request error: ${message}`);
         }
     }
 
@@ -252,20 +199,27 @@ export class PluginHost implements HostInterface {
         return {
             "supervisor:bridge/intf": {
                 sendRequest: (req, withCredentials) =>
-                    this.sendRequest(req, withCredentials),
+                    detachJspi(() =>
+                        this.sendRequest(req, withCredentials ?? false),
+                    ),
                 serviceStack: () => this.supervisor.getServiceStack(),
                 getRootDomain: () => this.supervisor.getRootDomain(),
                 getChainId: () => {
                     assertTruthy(chainId, "Chain ID not initialized");
                     return chainId;
                 },
-                sign: (msg, publicKey) => this.supervisor.sign(msg, publicKey),
+                sign: (msg, publicKey) =>
+                    detachJspi(() => this.supervisor.sign(msg, publicKey)),
                 signExplicit: (msg, privateKey) =>
-                    this.supervisor.signExplicit(msg, privateKey),
+                    detachJspi(() =>
+                        this.supervisor.signExplicit(msg, privateKey),
+                    ),
                 importKey: (privateKey) =>
-                    this.supervisor.importKey(privateKey),
+                    detachJspi(() => this.supervisor.importKey(privateKey)),
                 importKeyTransient: (privateKey) =>
-                    this.supervisor.importKeyTransient(privateKey),
+                    detachJspi(() =>
+                        this.supervisor.importKeyTransient(privateKey),
+                    ),
             },
             "supervisor:bridge/database": {
                 get: (duration, key) => this.dbGet(duration, key),
@@ -279,15 +233,15 @@ export class PluginHost implements HostInterface {
     }
 
     // Args arrive in canonical WIT kebab-case from loader.ts.
-    syncCall(args: QualifiedFunctionCallArgs) {
+    call(args: QualifiedFunctionCallArgs) {
         return this.supervisor.call(args);
     }
 
-    syncCallDyn(args: QualifiedDynCallArgs) {
+    callDyn(args: QualifiedDynCallArgs) {
         return this.supervisor.callDyn(args);
     }
 
-    syncCallResource(args: QualifiedResourceCallArgs) {
+    callResource(args: QualifiedResourceCallArgs) {
         return this.supervisor.callResource(args);
     }
 }

@@ -190,16 +190,19 @@ impl Origin {
         Origin { scheme, host }
     }
 
-    fn is_secure(&self) -> bool {
-        self.scheme == "https" || self.host == "localhost" || self.host.ends_with(".localhost")
+    fn is_trusted_origin(&self) -> bool {
+        self.scheme == "https"
+            || self.scheme == "http"
+            || self.host == "localhost"
+            || self.host.ends_with(".localhost")
     }
 
     fn is_service(&self, root_host: &str, account: AccountNumber) -> bool {
-        self.is_secure() && self.host == format!("{}.{}", account, root_host)
+        self.is_trusted_origin() && self.host == format!("{}.{}", account, root_host)
     }
 
     fn is_subdomain(&self, root_host: &str) -> bool {
-        self.is_secure()
+        self.is_trusted_origin()
             && (self.host == root_host || self.host.ends_with(&format!(".{}", root_host)))
     }
 }

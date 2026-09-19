@@ -54,7 +54,7 @@ export function NavUser() {
     const { data: profile } = useProfile(user, true);
 
     const { mutateAsync: logout } = useLogout();
-    const { mutateAsync: login } = useConnectAccount({
+    const { mutateAsync: login, isPending: isPendingLogin } = useConnectAccount({
         onError: (error) => {
             toast.error(error.message);
         },
@@ -185,13 +185,15 @@ export function NavUser() {
                             </DropdownMenuGroup>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
-                                disabled={!user}
+                                disabled={!user || generateInvite.isPending}
                                 onClick={() => {
                                     onGenerateInvite();
                                 }}
                             >
                                 <UserPlus className="mr-2 h-4 w-4" />
-                                Create invite
+                                {generateInvite.isPending
+                                    ? "Creating invite..."
+                                    : "Create invite"}
                             </DropdownMenuItem>
 
                             <DropdownMenuItem
@@ -207,9 +209,14 @@ export function NavUser() {
 
                             {user ? (
                                 <>
-                                    <DropdownMenuItem onClick={onLogin}>
+                                    <DropdownMenuItem
+                                        onClick={onLogin}
+                                        disabled={isPendingLogin}
+                                    >
                                         <Users className="mr-2 h-4 w-4" />
-                                        Switch account
+                                        {isPendingLogin
+                                            ? "Switching..."
+                                            : "Switch account"}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
                                         onClick={() => onLogout()}
@@ -221,10 +228,10 @@ export function NavUser() {
                             ) : (
                                 <DropdownMenuItem
                                     onClick={onLogin}
-                                    disabled={isPendingUser}
+                                    disabled={isPendingUser || isPendingLogin}
                                 >
                                     <LogIn className="mr-2 h-4 w-4" />
-                                    Log in
+                                    {isPendingLogin ? "Logging in..." : "Log in"}
                                 </DropdownMenuItem>
                             )}
                         </DropdownMenuContent>

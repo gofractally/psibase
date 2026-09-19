@@ -115,4 +115,8 @@ export class PluginLoader {
                 .map((p) => this.plugins.getPlugin(p).plugin.ready),
         );
     }
+
+    public loadedIds(): QualifiedPluginId[] {
+        return this.allLoadedPlugins.values();
+    }
 }

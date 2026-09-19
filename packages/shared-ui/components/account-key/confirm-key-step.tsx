@@ -7,8 +7,10 @@ import { FieldAccountExisting } from "@shared/components/form/field-account-exis
 import { useBranding } from "@shared/hooks/use-branding";
 import { useImportExisting } from "@shared/hooks/use-import-existing";
 import { b64ToPem, validateB64 } from "@shared/lib/b64-key-utils";
+import { parseError } from "@shared/lib/parse-error-message";
 import { zAccount } from "@shared/lib/schemas/account";
 import { Button } from "@shared/shadcn/ui/button";
+import { toast } from "@shared/shadcn/ui/sonner";
 import {
     CardAction,
     CardContent,
@@ -104,13 +106,15 @@ export const ConfirmKeyStep = ({
             });
             await onImported(account);
         } catch (e) {
-            console.error("Import and login failed");
-            console.error(e);
+            console.error("Import and login failed", e);
+            const raw = parseError(e);
+            const message = raw || importErrorMessage;
+            toast.error("Couldn't confirm account", { description: message });
             form.setFieldMeta("privateKey", (prev) => ({
                 ...prev,
                 isTouched: true,
-                errors: [importErrorMessage],
-                errorMap: { onSubmit: importErrorMessage },
+                errors: [message],
+                errorMap: { onSubmit: message },
             }));
         }
     };

@@ -50,6 +50,77 @@ export function assert(
     if (!condition) throw new Error(errorMessage);
 }
 
+const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+
+export function afterMacrotask(): Promise<void> {
+    return new Promise((resolve) => scheduleMacrotask(resolve));
+}
+
+function scheduleMacrotask(cb: () => void): void {
+    // MessageChannel is a macrotask and is not clamped like nested setTimeout(0).
+    // Nested WebAssembly.promising must not run inside a Suspending import:
+    // Chrome throws "trying to suspend without WebAssembly.promising";
+    // WebKit throws "cannot block a synchronous task before returning".
+    if (typeof MessageChannel === "function") {
+        const { port1, port2 } = new MessageChannel();
+        port2.onmessage = () => cb();
+        port1.postMessage(null);
+        return;
+    }
+    setTimeout(cb, 0);
+}
+
+/** Run `fn` on a later macrotask so inner WebAssembly.promising is not
+ *  nested inside a JSPI Suspending import. A microtask is not enough. */
+export function detachJspi<T>(fn: () => T | Promise<T>): Promise<T> {
+    return new Promise((resolve, reject) => {
+        scheduleMacrotask(() => {
+            try {
+                Promise.resolve(fn()).then(resolve, reject);
+            } catch (e) {
+                reject(e);
+            }
+        });
+    });
+}
+
+export function invokePluginExport(
+    func: (...args: unknown[]) => unknown,
+    params: unknown[],
+): unknown {
+    if (typeof func !== "function") {
+        throw new TypeError("plugin export is not a function");
+    }
+    // jco JSPI exports are `async function`s wrapping WebAssembly.promising.
+    // Calling that while another component is inside a Suspending import
+    // nests JSPI stacks. WebKit traps with "cannot block a synchronous
+    // task before returning".
+    if (func instanceof AsyncFunction) {
+        return detachJspi(() => func(...params));
+    }
+    return func(...params);
+}
+
+export function isThenable<T = unknown>(value: unknown): value is Promise<T> {
+    return (
+        typeof value === "object" &&
+        value !== null &&
+        "then" in value &&
+        typeof (value as { then: unknown }).then === "function"
+    );
+}
+
+export function settleWith<T>(
+    value: T | Promise<T>,
+    onSettle: () => void,
+): T | Promise<T> {
+    if (isThenable<T>(value)) {
+        return Promise.resolve(value).finally(onSettle);
+    }
+    onSettle();
+    return value;
+}
+
 let modulePromise: Promise<any>;
 
 export const parser = (): Promise<any> => {

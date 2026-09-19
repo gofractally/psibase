@@ -1,4 +1,9 @@
-import { PluginError, QualifiedPluginId } from "@psibase/common-lib";
+import {
+    GenericErrorObject,
+    PluginError,
+    PluginErrorObject,
+    QualifiedPluginId,
+} from "@psibase/common-lib";
 
 export class PluginDownloadFailed extends PluginError {
     constructor(pluginId: QualifiedPluginId) {
@@ -76,6 +81,90 @@ export const getRecoverableError = (
     }
     return undefined;
 };
+
+function isUselessMessage(message: string): boolean {
+    return (
+        message.length === 0 ||
+        message.includes("[object Object]") ||
+        message.includes("(see error.payload)") ||
+        /^\{"name":"[A-Za-z]+"\}$/.test(message)
+    );
+}
+
+export function formatCaughtError(error: unknown, depth = 0): string {
+    if (depth > 8 || error == null) {
+        return "";
+    }
+    if (typeof error === "string") {
+        const message = error.trim();
+        return isUselessMessage(message) ? "" : message;
+    }
+    if (typeof error === "number" || typeof error === "boolean") {
+        return String(error);
+    }
+    if (Array.isArray(error)) {
+        return error
+            .map((item) => formatCaughtError(item, depth + 1))
+            .filter((item) => item.length > 0)
+            .join(": ");
+    }
+    if (typeof error === "object") {
+        const rec = error as Record<string, unknown>;
+        if ("payload" in rec && rec.payload !== undefined) {
+            const fromPayload = formatCaughtError(rec.payload, depth + 1);
+            if (fromPayload) {
+                return fromPayload;
+            }
+        }
+        if (typeof rec.tag === "string" && "val" in rec) {
+            const inner = formatCaughtError(rec.val, depth + 1);
+            return inner ? `${rec.tag}: ${inner}` : rec.tag;
+        }
+        if (typeof rec.message === "string") {
+            const message = rec.message.trim();
+            if (!isUselessMessage(message)) {
+                return message;
+            }
+        }
+        try {
+            const json = JSON.stringify(error);
+            if (json && json !== "{}" && !isUselessMessage(json)) {
+                return json;
+            }
+        } catch {
+            // fall through
+        }
+        if (error instanceof Error) {
+            const message = (error.message || "").trim();
+            return isUselessMessage(message) ? error.name : message;
+        }
+        return "";
+    }
+    return String(error);
+}
+
+export function toPostableError(
+    error: unknown,
+): PluginErrorObject | GenericErrorObject {
+    if (error instanceof PluginErrorObject) {
+        return error;
+    }
+    if (error instanceof GenericErrorObject) {
+        return error;
+    }
+    const recoverable = getRecoverableError(error);
+    if (recoverable) {
+        return new PluginErrorObject(recoverable.producer, recoverable.message);
+    }
+    if (error instanceof PluginError) {
+        return new PluginErrorObject(
+            error.pluginId,
+            error.message || "Unknown plugin error",
+        );
+    }
+    const message = formatCaughtError(error);
+    return new GenericErrorObject(message || "Unknown plugin error");
+}
 
 export const isRecoverableErrorPayload = (
     payload: any,

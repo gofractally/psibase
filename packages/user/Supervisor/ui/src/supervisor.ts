@@ -3,6 +3,7 @@ import {
     QualifiedPluginId,
     assertTruthy,
     buildFunctionCallResponse,
+    encodePromptRedirectMessage,
     siblingUrl,
 } from "@psibase/common-lib";
 import {
@@ -19,10 +20,22 @@ import {
 import { pluginId } from "@psibase/common-lib/messaging/plugin-id";
 
 import { AppInterface } from "./app-interface";
+import { slog, watchHang } from "./debug";
 import { CallContext } from "./call-context";
-import { getRecoverableError } from "./plugin/errors";
+import { toPostableError } from "./plugin/errors";
 import { PluginLoader } from "./plugin/plugin-loader";
 import { Plugins } from "./plugin/plugins";
+import {
+    PromptSignal,
+    peekPromptSignal,
+    promptSignalKind,
+    setPromptSignal,
+    takePromptSignal,
+} from "./prompt-signal";
+import {
+    packedContextToBase64,
+    promptDetailsFromTopUrl,
+} from "./prompt-url";
 import {
     OriginationData,
     assert,
@@ -33,6 +46,8 @@ import {
     parser,
     serviceFromOrigin,
     setQueryToken,
+    afterMacrotask,
+    settleWith,
 } from "./utils";
 
 const rootDomain = siblingUrl();
@@ -49,30 +64,17 @@ const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("webcrypto", "plugin"),
 ];
 
-// Control-flow signal thrown to unwind out of a plugin call.
-//
-// It extends Error so that JCO-transpiled glue never intercepts it: JCO's
-// getErrorPayload() re-throws Error instances rather than converting them into a
-// component Result::Err. The one exception is an Error carrying its own "payload"
-// property, so this class must NOT define one.
-class PromptSignal extends Error {
-    constructor(readonly kind: "prompt" | "embedded-error" | "preload-error") {
-        super(`prompt-signal:${kind}`);
-        this.name = "PromptSignal";
-    }
-}
-
 // The supervisor facilitates all communication
 export class Supervisor implements AppInterface {
     private plugins: Plugins;
-
-    private loader: PluginLoader;
 
     private context: CallContext | undefined;
 
     private embedder: string | undefined;
 
     private inPreload = false;
+
+    private neededPluginIds: QualifiedPluginId[] = [];
 
     parser: Promise<any>;
 
@@ -113,6 +115,38 @@ export class Supervisor implements AppInterface {
         }
     }
 
+    // Compile (download + parse + jco transpile) without instantiating.
+    // Uses a fresh PluginLoader so a background warmup of unrelated plugins
+    // cannot make a user-facing call wait on that extra compile.
+    private async compilePlugins(
+        plugins: QualifiedPluginId[],
+    ): Promise<QualifiedPluginId[]> {
+        if (plugins.length === 0) {
+            return [];
+        }
+        const loader = new PluginLoader(this.plugins);
+        loader.trackPlugins(plugins);
+        await loader.processPlugins();
+        await loader.awaitReady();
+        return loader.loadedIds();
+    }
+
+    startBackgroundCompile(): void {
+        slog("background compile start");
+        void parser();
+        void this.compilePlugins([
+            ...systemPlugins,
+            pluginId("branding", "plugin"),
+        ]).then(
+            () => slog("background compile system+branding done"),
+            (e) => console.error("Supervisor plugin warmup failed", e),
+        );
+        void this.compilePlugins([pluginId("invite", "plugin")]).then(
+            () => slog("background compile invite done"),
+            (e) => console.error("Supervisor invite warmup failed", e),
+        );
+    }
+
     // This step loads the full plugin tree (downloading + parsing + JCO transpiling)
     //
     // This does not instantiate wasms, with the exception of core system plugin wasms,
@@ -135,12 +169,10 @@ export class Supervisor implements AppInterface {
             }
 
             // Phase 0: Loads systemPlugins, including those needed to get current user, i.e., accounts, host:auth
-            this.loader.trackPlugins([...systemPlugins]);
-            await this.loader.processPlugins();
-            await this.loader.awaitReady();
+            const systemIds = await this.compilePlugins([...systemPlugins]);
 
             // Required to instantiate system plugins to execute the plugin calls below
-            await this.plugins.instantiateAll();
+            await this.plugins.instantiate(systemIds);
 
             if (isEmbedded) {
                 const promptDetails = await this.supervisorCall(
@@ -158,17 +190,15 @@ export class Supervisor implements AppInterface {
                 }
             }
 
-            setQueryToken(this.getActiveQueryToken());
+            setQueryToken(await this.getActiveQueryToken());
 
             // Phase 1: Compile app plugins (NO instantiation yet — Memory deferred).
             // The sync call to getAuthServices below only touches Phase 0 plugins.
-            this.loader.trackPlugins([...plugins]);
-            await this.loader.processPlugins();
-            await this.loader.awaitReady();
+            const appIds = await this.compilePlugins([...plugins]);
 
             // Phase 2: Load the auth services for all connected accounts.
             // This sync call uses accounts:plugin (Phase 0, already instantiated).
-            const auth_services: string[] = this.supervisorCall(
+            const auth_services: string[] = await this.supervisorCall(
                 getCallArgs(
                     "accounts",
                     "plugin",
@@ -185,10 +215,8 @@ export class Supervisor implements AppInterface {
                 // Current limitation: an auth service plugin must be called "plugin" ("<service>:plugin")
                 addtl_plugins.push(pluginId(service, "plugin"));
             }
-            this.loader.trackPlugins(addtl_plugins);
-
-            await this.loader.processPlugins();
-            await this.loader.awaitReady();
+            const authIds = await this.compilePlugins(addtl_plugins);
+            this.neededPluginIds = [...systemIds, ...appIds, ...authIds];
         } finally {
             this.inPreload = false;
         }
@@ -196,8 +224,10 @@ export class Supervisor implements AppInterface {
 
     private replyToParent(id: string, result: any) {
         assertTruthy(this.parentOrigination, "Unknown reply target");
+        // Safari structured-clone of Error drops non-enumerable message/payload.
+        const payload = result instanceof Error ? toPostableError(result) : result;
         window.parent.postMessage(
-            buildFunctionCallResponse(id, result),
+            buildFunctionCallResponse(id, payload),
             this.parentOrigination.origin,
         );
     }
@@ -205,35 +235,32 @@ export class Supervisor implements AppInterface {
     private supervisorCall(callArgs: QualifiedFunctionCallArgs): any {
         const context = this.getCallContext();
         context.stack.push("supervisor", "callFunction");
-
-        let ret: any;
         try {
-            ret = this.call(callArgs);
-        } finally {
+            return settleWith(this.call(callArgs), () => context.stack.pop());
+        } catch (e) {
             context.stack.pop();
+            throw e;
         }
-
-        return ret;
     }
 
     private supervisorResourceCall(callArgs: QualifiedResourceCallArgs): any {
         const context = this.getCallContext();
         context.stack.push("supervisor", "callResource");
-        let ret: any;
         try {
-            ret = this.callResource(callArgs);
-        } finally {
+            return settleWith(this.callResource(callArgs), () =>
+                context.stack.pop(),
+            );
+        } catch (e) {
             context.stack.pop();
+            throw e;
         }
-
-        return ret;
     }
 
-    private getActiveQueryToken(): string | undefined {
+    private async getActiveQueryToken(): Promise<string | undefined> {
         assertTruthy(this.parentOrigination, "Parent origination corrupted");
         assertTruthy(this.parentOrigination.app, "Root app unrecognized");
 
-        const user = this.supervisorCall(
+        const user = await this.supervisorCall(
             getCallArgs("accounts", "query", "api", "get-current-user", []),
         );
 
@@ -241,7 +268,7 @@ export class Supervisor implements AppInterface {
             return undefined;
         }
 
-        const token = this.supervisorCall(
+        const token = await this.supervisorCall(
             getCallArgs("host", "auth", "api", "get-active-query-token", [
                 this.parentOrigination.app,
                 user,
@@ -258,7 +285,6 @@ export class Supervisor implements AppInterface {
     constructor() {
         this.plugins = new Plugins(this);
         this.parser = parser();
-        this.loader = new PluginLoader(this.plugins);
 
         // Without this, in some browsers (e.g. chromium), stale supervisor iframes persist
         //  after navigation events. This ensures that after navigations, dev tools look
@@ -311,29 +337,48 @@ export class Supervisor implements AppInterface {
     }
 
     requestPrompt(): never {
-        if (this.inPreload) {
-            throw new PromptSignal("preload-error");
-        }
-        throw new PromptSignal(isEmbedded ? "embedded-error" : "prompt");
+        const signal = new PromptSignal(
+            this.inPreload
+                ? "preload-error"
+                : isEmbedded
+                  ? "embedded-error"
+                  : "prompt",
+        );
+        setPromptSignal(signal);
+        throw signal;
     }
 
     call(args: QualifiedFunctionCallArgs): any {
         assertTruthy(this.context, "Uninitialized call context");
 
         const { service, plugin, intf, method, params } = args;
+        if (service === "host" && plugin === "prompt") {
+            const fromUrl = promptDetailsFromTopUrl();
+            if (fromUrl) {
+                if (method === "get-active-prompt") {
+                    return fromUrl;
+                }
+                if (method === "get-context" && fromUrl.packedContext) {
+                    return fromUrl.packedContext;
+                }
+            }
+        }
         const p = this.plugins.getAssertPlugin({ service, plugin });
 
         this.context.stack.push(args.service, toString(args));
-        let ret: any;
         try {
-            ret = p.call(intf, method, params);
-        } finally {
+            return settleWith(p.call(intf, method, params), () =>
+                this.context!.stack.pop(),
+            );
+        } catch (e) {
             this.context.stack.pop();
+            throw e;
         }
-
-        return ret;
     }
 
+    // PluginRef getters are host:types (sync). The target hook may be a
+    // promising export (auth-sig claim/proof do HTTP); Plugin.call detaches
+    // those onto a macrotask so WebKit JSPI is not nested.
     callDyn(args: QualifiedDynCallArgs): any {
         const service = this.supervisorResourceCall(
             getResourceCallArgs(
@@ -369,6 +414,7 @@ export class Supervisor implements AppInterface {
             ),
         );
 
+        slog(`callDyn ${service}:${plugin}/${intf}->${args.method}`);
         return this.call(
             getCallArgs(service, plugin, intf, args.method, args.params),
         );
@@ -380,14 +426,15 @@ export class Supervisor implements AppInterface {
         const p = this.plugins.getAssertPlugin({ service, plugin });
 
         this.context.stack.push(service, toString(args));
-        let ret: any;
         try {
-            ret = p.resourceCall(intf, type, handle, method, params);
-        } finally {
+            return settleWith(
+                p.resourceCall(intf, type, handle, method, params),
+                () => this.context!.stack.pop(),
+            );
+        } catch (e) {
             this.context.stack.pop();
+            throw e;
         }
-
-        return ret;
     }
 
     private cleanupSessionState(): void {
@@ -405,7 +452,7 @@ export class Supervisor implements AppInterface {
             const json = this.plugins.getPlugin(plugin).plugin.getJson();
             this.replyToParent(id, json);
         } catch (e) {
-            this.replyToParent(id, e);
+            this.replyToParent(id, toPostableError(e));
         } finally {
             this.plugins.disposeAll();
             this.cleanupSessionState();
@@ -426,7 +473,7 @@ export class Supervisor implements AppInterface {
             this.setParentOrigination(callerOrigin);
             await this.preload(plugins);
         } catch (e) {
-            result = e;
+            result = toPostableError(e);
         } finally {
             this.plugins.disposeAll();
             this.replyToParent(id, result);
@@ -440,6 +487,8 @@ export class Supervisor implements AppInterface {
         id: string,
         args: QualifiedFunctionCallArgs,
     ): Promise<any> {
+        const callLabel = `${args.service}:${args.plugin}/${args.intf ?? ""}->${args.method}`;
+        slog(`entry ${callLabel}`, { id, origin: callerOrigin });
         try {
             await networkNamePromise;
             this.setParentOrigination(callerOrigin);
@@ -447,67 +496,110 @@ export class Supervisor implements AppInterface {
             // This is the time-intensive step. It includes: downloading, parsing, and transpiling the
             //   each plugin component. Everything needed to prepare for instantiation and execution.
             // UIs can use `preloadPlugins` to decouple this task from the actual call to the plugin.
-            await this.preload([
-                {
-                    service: args.service,
-                    plugin: args.plugin,
-                },
-            ]);
+            await watchHang(`preload ${callLabel}`, () =>
+                this.preload([
+                    {
+                        service: args.service,
+                        plugin: args.plugin,
+                    },
+                ]),
+            );
 
-            await this.plugins.instantiateAll();
+            await watchHang(`instantiate ${callLabel}`, () =>
+                this.plugins.instantiate(this.neededPluginIds),
+            );
 
             this.context = this.getCallContext();
 
             // Starts the tx context.
-            this.supervisorCall(
-                getCallArgs("transact", "plugin", "admin", "start-tx", []),
+            await watchHang(`start-tx for ${callLabel}`, () =>
+                this.supervisorCall(
+                    getCallArgs("transact", "plugin", "admin", "start-tx", []),
+                ),
             );
 
-            // Make a *synchronous* call into the plugin. It can be fully synchronous since everything was
-            //   preloaded.
-            const result = this.call(args);
+            // Plugin code is still written synchronously. JSPI suspends the wasm
+            // stack across fetch() (and other Promise-returning host imports).
+            const result = await watchHang(`plugin ${callLabel}`, () =>
+                this.call(args),
+            );
+            if (peekPromptSignal()) {
+                slog(`prompt signal after ${callLabel}`);
+                throw peekPromptSignal();
+            }
+
+            // Nested transact get-query-token (login cookie) during connectAccount
+            // can leave jco's component task busy. Yield so finish-tx can start.
+            slog(`yield before finish-tx for ${callLabel}`);
+            await afterMacrotask();
+            await afterMacrotask();
 
             // Closes the current tx context. If actions were added, tx is submitted.
-            const txResult = this.supervisorCall(
-                getCallArgs("transact", "plugin", "admin", "finish-tx", []),
+            const txResult = await watchHang(`finish-tx for ${callLabel}`, () =>
+                this.supervisorCall(
+                    getCallArgs("transact", "plugin", "admin", "finish-tx", []),
+                ),
             );
             if (txResult !== null && txResult !== undefined) {
                 console.warn(txResult);
             }
 
+            slog(`reply success ${callLabel}`);
             // Send plugin result to parent window
             this.replyToParent(id, result);
         } catch (e) {
             let result: any;
-            if (e instanceof PromptSignal && e.kind === "prompt") {
+            const promptKind = promptSignalKind(e) ?? peekPromptSignal()?.kind;
+            takePromptSignal();
+            if (promptKind === "prompt") {
+                let message = "user_prompt_request";
+                try {
+                    const details = this.supervisorCall(
+                        getCallArgs(
+                            "host",
+                            "prompt",
+                            "admin",
+                            "get-active-prompt",
+                            [],
+                        ),
+                    );
+                    if (details) {
+                        message = encodePromptRedirectMessage({
+                            promptApp: details.promptApp,
+                            promptName: details.promptName,
+                            activeApp: details.activeApp,
+                            created: details.created,
+                            packedContext: packedContextToBase64(
+                                details.packedContext,
+                            ),
+                        });
+                    }
+                } catch {
+                    // Still redirect; prompt.html can recover from URL or show a real error.
+                }
                 result = new RedirectErrorObject(
                     { service: "host", plugin: "prompt" },
-                    "user_prompt_request",
+                    message,
                 );
-            } else if (
-                e instanceof PromptSignal &&
-                e.kind === "embedded-error"
-            ) {
+            } else if (promptKind === "embedded-error") {
                 result = new PluginErrorObject(
                     { service: "host", plugin: "prompt" },
                     "Cannot prompt in embedded mode",
                 );
-            } else if (
-                e instanceof PromptSignal &&
-                e.kind === "preload-error"
-            ) {
+            } else if (promptKind === "preload-error") {
                 result = new PluginErrorObject(
                     { service: "host", plugin: "prompt" },
                     "Cannot trigger user prompt during plugin preload",
                 );
             } else {
-                const err = getRecoverableError(e);
-                result = err
-                    ? new PluginErrorObject(err.producer, err.message)
-                    : e;
+                console.error("Supervisor plugin call failed", e);
+                result = toPostableError(e);
             }
             this.replyToParent(id, result);
         } finally {
+            // Drop wasm instances after every call so JSPI task state from
+            // nested transact get-query-token cannot deadlock a later finish-tx.
+            // compiledPlugin is kept, so the next call only re-instantiates.
             this.plugins.disposeAll();
             this.cleanupSessionState();
         }

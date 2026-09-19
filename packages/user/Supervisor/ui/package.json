@@ -10,8 +10,8 @@
         "test": "vitest run"
     },
     "dependencies": {
-        "@bytecodealliance/jco": "1.10.2",
-        "@bytecodealliance/preview2-shim": "^0.17.2",
+        "@bytecodealliance/jco": "1.34.0",
+        "@bytecodealliance/preview2-shim": "0.25.0",
         "@psibase/common-lib": "workspace:*",
         "@tanstack/react-query": "^5.90.6",
         "react": "^19.1.0",

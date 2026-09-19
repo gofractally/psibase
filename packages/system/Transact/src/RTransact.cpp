@@ -1414,8 +1414,7 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
 {
    std::vector<char>            key = getJWTKey();
    std::optional<AccountNumber> result;
-   bool                         isLocalhost = psibase::isLocalhost(request);
-   auto                         rootHost    = to<HttpServer>().rootHost(request.host);
+   auto                         rootHost = to<HttpServer>().rootHost(request.host);
 
    auto isValidJwt = [&](const LoginTokenData& decoded)
    { return decoded.aud == rootHost && checkExp(decoded.exp); };
@@ -1443,7 +1442,7 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
       }
    }
 
-   std::string_view cookieName = isLocalhost ? "SESSION" : "__Host-SESSION";
+   std::string_view cookieName = psibase::sessionCookieName(request);
 
    auto tokens = request.getCookie(cookieName);
    for (const auto& token : tokens)

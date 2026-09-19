@@ -61,19 +61,23 @@ namespace
          }
       }
 
-      bool isSecure() const
+      // Trusted for reflecting ACAO: HTTPS, HTTP (plain HTTP chains such as
+      // host:8080), and *.localhost (secure context even on HTTP).
+      bool isTrustedOrigin() const
       {
-         return scheme == "https" || host == "localhost" || host.ends_with(".localhost");
+         return scheme == "https" || scheme == "http" || host == "localhost" ||
+                host.ends_with(".localhost");
       }
 
       bool isService(std::string_view rootHost, psibase::AccountNumber account)
       {
-         return isSecure() && account.str() + '.' + std::string(rootHost) == host;
+         return isTrustedOrigin() && account.str() + '.' + std::string(rootHost) == host;
       }
 
       bool isSubdomain(std::string_view rootHost)
       {
-         return isSecure() && host == rootHost || host.ends_with('.' + std::string(rootHost));
+         return isTrustedOrigin() &&
+                (host == rootHost || host.ends_with('.' + std::string(rootHost)));
       }
    };
 }  // namespace
@@ -238,6 +242,30 @@ namespace psibase
       }
 
       return false;
+   }
+
+   bool useSecureCookies(const HttpRequest& request)
+   {
+      if (isLocalhost(request))
+         return false;
+      if (auto origin = request.getHeader("origin"))
+      {
+         if (origin->starts_with("http://"))
+            return false;
+         if (origin->starts_with("https://"))
+            return true;
+      }
+      if (auto proto = forwardedProto(request))
+         return *proto == "https";
+      auto port = hostHeaderPortSuffix(request);
+      if (!port.empty() && port != ":443")
+         return false;
+      return true;
+   }
+
+   std::string_view sessionCookieName(const HttpRequest& request)
+   {
+      return useSecureCookies(request) ? "__Host-SESSION" : "SESSION";
    }
 
    std::string_view rootHost(const HttpRequest& request, bool hostIsSubdomain)

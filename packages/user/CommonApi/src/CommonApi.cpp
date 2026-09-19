@@ -4,6 +4,7 @@
 #include <psibase/check.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
+#include <psibase/Rpc.hpp>
 #include <psio/to_json.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/Transact.hpp>
@@ -37,15 +38,15 @@ namespace SystemService
 
       HttpHeader authCookie(const HttpRequest& req, const std::string& accessToken, int maxAge)
       {
-         bool        isLocalhost = psibase::isLocalhost(req);
-         std::string cookieName  = isLocalhost ? "SESSION" : "__Host-SESSION";
+         bool        secure     = psibase::useSecureCookies(req);
+         std::string cookieName = std::string(psibase::sessionCookieName(req));
 
          std::string cookieAttribs;
          cookieAttribs += "Path=/; ";
          cookieAttribs += "HttpOnly; ";
          cookieAttribs += "SameSite=Strict; ";
          cookieAttribs += "Max-Age=" + std::to_string(maxAge);
-         if (!isLocalhost)
+         if (secure)
          {
             cookieAttribs += "; Secure; ";
          }

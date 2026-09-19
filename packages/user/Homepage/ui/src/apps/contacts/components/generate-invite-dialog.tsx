@@ -1,5 +1,5 @@
 import { type UseMutationResult } from "@tanstack/react-query";
-import { Copy, RefreshCcw } from "lucide-react";
+import { Copy, Loader2, RefreshCcw } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
 import { cn } from "@shared/lib/utils";
@@ -60,10 +60,12 @@ export const GenerateInviteDialogContent = ({
                         />
                     ) : (
                         <div
-                            className="bg-muted"
+                            className="bg-muted text-muted-foreground flex flex-col items-center justify-center gap-2 text-sm"
                             style={{ width: QR_SIZE, height: QR_SIZE }}
-                            aria-hidden
-                        />
+                        >
+                            <Loader2 className="h-6 w-6 animate-spin" />
+                            Preparing invite…
+                        </div>
                     )}
                 </div>
                 <div className="flex w-full items-center space-x-2">

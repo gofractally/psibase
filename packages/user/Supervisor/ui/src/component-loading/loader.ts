@@ -1,4 +1,4 @@
-import { GenerateOptions, generate } from "@bytecodealliance/jco/component";
+import { generate } from "@bytecodealliance/jco/component";
 import * as cliNs from "@bytecodealliance/preview2-shim/cli";
 import * as clocksNs from "@bytecodealliance/preview2-shim/clocks";
 import * as filesystemNs from "@bytecodealliance/preview2-shim/filesystem";
@@ -7,8 +7,15 @@ import * as randomNs from "@bytecodealliance/preview2-shim/random";
 
 import { kebabToCamel, kebabToPascal } from "../case.js";
 import { HostInterface } from "../host-interface.js";
-import { assert } from "../utils.js";
+import { assert, detachJspi } from "../utils.js";
 import { ComponentAPI, Functions, Interface } from "../wit-extraction.js";
+import {
+    generateCacheKey,
+    readGenerateCache,
+    writeGenerateCache,
+} from "./jco-cache.js";
+
+type GenerateOptions = Parameters<typeof generate>[1];
 
 type PluginImports = Record<string, Record<string, unknown>>;
 
@@ -90,27 +97,50 @@ function buildInterfaceProxy(
     const proxy: Record<string, unknown> = {};
     for (const func of intf.funcs) {
         if (isResourceMethod(func.name)) {
-            addResourceProxy(proxy, intf, func.name, func.dynamicLink, host, services);
+            addResourceProxy(
+                proxy,
+                intf,
+                func.name,
+                func.dynamicLink,
+                host,
+                services,
+            );
         } else if (func.dynamicLink) {
+            const useJspi =
+                !isJspiSyncInterface(intf) &&
+                !isJspiSyncFunc(intf, func.name);
             proxy[kebabToCamel(func.name)] = (
                 pluginRef: { handle: number },
                 ...args: unknown[]
-            ) =>
-                host.syncCallDyn({
-                    handle: pluginRef.handle,
-                    method: func.name,
-                    params: args,
-                });
+            ) => {
+                const run = () =>
+                    host.callDyn({
+                        handle: pluginRef.handle,
+                        method: func.name,
+                        params: args,
+                    });
+                return useJspi ? detachJspi(run) : run();
+            };
         } else {
             const service = getPluginService(services, intf.namespace);
-            proxy[kebabToCamel(func.name)] = (...args: unknown[]) =>
-                host.syncCall({
-                    service,
-                    plugin: intf.package,
-                    intf: intf.name,
-                    method: func.name,
-                    params: args,
-                });
+            const useJspi =
+                !isJspiSyncInterface(intf) &&
+                !isJspiSyncFunc(intf, func.name) &&
+                !(
+                    intf.namespace === "supervisor" &&
+                    !JSPI_BRIDGE_FUNCS.has(func.name)
+                );
+            proxy[kebabToCamel(func.name)] = (...args: unknown[]) => {
+                const run = () =>
+                    host.call({
+                        service,
+                        plugin: intf.package,
+                        intf: intf.name,
+                        method: func.name,
+                        params: args,
+                    });
+                return useJspi ? detachJspi(run) : run();
+            };
         }
     }
     return proxy;
@@ -167,7 +197,7 @@ function addResourceProxy(
     const service = getPluginService(services, intf.namespace);
 
     const callResource = (handle: number | undefined, ...args: unknown[]) =>
-        host.syncCallResource({
+        host.callResource({
             service,
             plugin: intf.package,
             intf: intf.name,
@@ -212,14 +242,133 @@ export interface CompiledPlugin {
     instantiate: () => Promise<InstantiateResult>;
 }
 
+function isWasmJspiAvailable(): boolean {
+    return (
+        typeof WebAssembly !== "undefined" &&
+        typeof (WebAssembly as typeof WebAssembly & { Suspending?: unknown })
+            .Suspending === "function"
+    );
+}
+
+const JSPI_BRIDGE_FUNCS = new Set([
+    "send-request",
+    "sign",
+    "sign-explicit",
+    "import-key",
+    "import-key-transient",
+]);
+
+// Same-instance JSPI re-entry deadlocks jco (nested promising export on a
+// component that is already suspended). accounts:query get-account calls
+// host:http, which calls back into get-current-user on that same component.
+const JSPI_SYNC_FUNCS = new Set([
+    "accounts:query/api#get-current-user",
+    "accounts:query/api#is-logged-in",
+    "host:auth/api#get-active-query-token",
+]);
+
+function isJspiSyncInterface(intf: Interface): boolean {
+    if (intf.namespace === "wasi") return true;
+    // host:client is used from resource constructors and is fully synchronous.
+    // host:db is localStorage via supervisor:bridge/database (also sync).
+    // host:types PluginRef is in-memory name storage (also sync).
+    if (
+        intf.namespace === "host" &&
+        (intf.package === "client" ||
+            intf.package === "db" ||
+            intf.package === "types" ||
+            intf.package === "prompt")
+    ) {
+        return true;
+    }
+    return false;
+}
+
+function isJspiSyncFunc(intf: Interface, funcName: string): boolean {
+    return JSPI_SYNC_FUNCS.has(
+        `${intf.namespace}:${intf.package}/${intf.name}#${funcName}`,
+    );
+}
+
+// Names jco uses to wrap imports with WebAssembly.Suspending.
+//
+// Only imports whose JS implementations return Promises can be listed:
+// a resource constructor that calls a suspending import is inferred as a
+// promising export, and jco currently emits `await` inside `constructor()`.
+export function collectJspiImportNames(importedFuncs: Functions): string[] {
+    const names: string[] = [];
+    for (const intf of importedFuncs.interfaces) {
+        if (isJspiSyncInterface(intf)) continue;
+        const id = `${intf.namespace}:${intf.package}/${intf.name}`;
+        for (const func of intf.funcs) {
+            if (
+                isResourceMethod(func.name) &&
+                func.name.includes("[constructor]")
+            ) {
+                continue;
+            }
+            if (isJspiSyncFunc(intf, func.name)) continue;
+            if (
+                intf.namespace === "supervisor" &&
+                !JSPI_BRIDGE_FUNCS.has(func.name)
+            ) {
+                continue;
+            }
+            names.push(`${id}#${func.name}`);
+        }
+    }
+    return names;
+}
+
+function isConstructorFunc(name: string): boolean {
+    return isResourceMethod(name) && name.includes("[constructor]");
+}
+
+// Exports that can reach a suspending import must be wrapped with
+// WebAssembly.promising. jco inference misses some plugin-to-plugin
+// edges, which surfaces as "trying to suspend without WebAssembly.promising".
+export function collectJspiExportNames(exportedFuncs: Functions): string[] {
+    const names: string[] = [];
+    for (const intf of exportedFuncs.interfaces) {
+        // Keep in lockstep with collectJspiImportNames: a promising export
+        // whose callers still use a sync trampoline yields
+        // "expected a string, received [object]" (the object is a Promise).
+        if (isJspiSyncInterface(intf)) continue;
+        const id = `${intf.namespace}:${intf.package}/${intf.name}`;
+        for (const func of intf.funcs) {
+            if (isConstructorFunc(func.name)) continue;
+            if (isJspiSyncFunc(intf, func.name)) continue;
+            names.push(`${id}#${func.name}`);
+            // Inline world exports (`export transact-hook-user-auth: interface`)
+            // live in package root:component. jco only wraps them as
+            // `iface#func`, not `root:component/iface#func`.
+            names.push(`${intf.name}#${func.name}`);
+        }
+    }
+    for (const func of exportedFuncs.funcs) {
+        if (isConstructorFunc(func.name)) continue;
+        names.push(func.name);
+    }
+    return names;
+}
+
 // Transpile a WASM component via jco and pre-compile all core modules.
 // Returns a handle whose instantiate() allocates Memory and produces exports.
 async function compileWasmComponent(
     wasmBytes: Uint8Array,
     imports: PluginImports,
     debugFileName: string,
+    jspi?: { imports: string[]; exports: string[] },
 ): Promise<CompiledPlugin> {
     const name = "component";
+    const useJspi =
+        jspi !== undefined &&
+        (jspi.imports.length > 0 || jspi.exports.length > 0);
+    if (useJspi && !isWasmJspiAvailable()) {
+        throw new Error(
+            `Cannot load ${debugFileName}: WebAssembly JSPI (WebAssembly.Suspending) is required`,
+        );
+    }
     const opts: GenerateOptions = {
         name,
         noTypescript: true,
@@ -228,19 +377,53 @@ async function compileWasmComponent(
         tlaCompat: false,
         validLiftingOptimization: false,
         noNamespacedExports: true,
+        noComponentErrorWrapping: false,
         tracing: false,
+        ...(useJspi
+            ? {
+                  asyncMode: {
+                      tag: "jspi" as const,
+                      val: {
+                          imports: jspi.imports,
+                          exports: jspi.exports,
+                      },
+                  },
+              }
+            : {}),
     };
 
-    const { files: transpiledFiles } = await generate(wasmBytes, opts);
-
-    const coreWasmFiles: Array<[string, Uint8Array]> = [];
     let jsSource: string | null = null;
+    let coreWasmFiles: Array<[string, Uint8Array]> = [];
+    let cacheKey: string | undefined;
+    try {
+        cacheKey = generateCacheKey(
+            wasmBytes,
+            jspi?.imports ?? [],
+            jspi?.exports ?? [],
+        );
+        const cached = await readGenerateCache(cacheKey);
+        if (cached) {
+            jsSource = cached.jsSource;
+            coreWasmFiles = cached.cores;
+        }
+    } catch {
+        cacheKey = undefined;
+    }
+    if (!jsSource) {
+        const { files: transpiledFiles } = await generate(wasmBytes, opts);
 
-    for (const [fileName, content] of transpiledFiles) {
-        if (fileName.endsWith(".wasm")) {
-            coreWasmFiles.push([fileName, content]);
-        } else if (fileName.endsWith(".js")) {
-            jsSource = new TextDecoder().decode(content);
+        for (const [fileName, content] of transpiledFiles) {
+            if (fileName.endsWith(".wasm")) {
+                coreWasmFiles.push([fileName, content]);
+            } else if (fileName.endsWith(".js")) {
+                jsSource = new TextDecoder().decode(content);
+            }
+        }
+        if (jsSource && cacheKey) {
+            void writeGenerateCache(cacheKey, {
+                jsSource,
+                cores: coreWasmFiles,
+            });
         }
     }
 
@@ -347,7 +530,10 @@ export async function compilePlugin(
         api.importedFuncs,
         imports,
     );
-    return compileWasmComponent(wasmBytes, imports, `${service}.plugin.js`);
+    return compileWasmComponent(wasmBytes, imports, `${service}.plugin.js`, {
+        imports: collectJspiImportNames(api.importedFuncs),
+        exports: collectJspiExportNames(api.exportedFuncs),
+    });
 }
 
 // Loads a utility WASM component (not a plugin) with only WASI imports.

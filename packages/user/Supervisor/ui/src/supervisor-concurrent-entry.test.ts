@@ -19,22 +19,21 @@ vi.mock("./plugin/plugin-loader", () => ({
     },
 }));
 
-vi.mock("./utils", () => ({
-    networkNamePromise: Promise.resolve("network"),
-    chainIdPromise: Promise.resolve("chain-id"),
-    networkName: "network",
-    chainId: "chain-id",
-    isEmbedded: false,
-    setQueryToken: vi.fn(),
-    serviceFromOrigin: () => "homepage",
-    parser: () => Promise.resolve({ parse: () => ({}) }),
-    assert: (condition: unknown, errorMessage: string) => {
-        if (!condition) {
-            throw new Error(errorMessage);
-        }
-    },
-    wasmFromUrl: vi.fn(),
-}));
+vi.mock("./utils", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("./utils")>();
+    return {
+        ...actual,
+        networkNamePromise: Promise.resolve("network"),
+        chainIdPromise: Promise.resolve("chain-id"),
+        networkName: "network",
+        chainId: "chain-id",
+        isEmbedded: false,
+        setQueryToken: vi.fn(),
+        serviceFromOrigin: () => "homepage",
+        parser: () => Promise.resolve({ parse: () => ({}) }),
+        wasmFromUrl: vi.fn(),
+    };
+});
 
 describe("Supervisor concurrent entry", () => {
     beforeEach(() => {

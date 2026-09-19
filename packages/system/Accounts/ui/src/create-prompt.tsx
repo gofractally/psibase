@@ -25,6 +25,7 @@ import {
 } from "@shared/hooks/use-user-token-balances";
 import { pemToB64 } from "@shared/lib/b64-key-utils";
 import { getAccount } from "@shared/lib/get-account";
+import { parseError } from "@shared/lib/parse-error-message";
 import { Quantity } from "@shared/lib/quantity";
 import QueryKey from "@shared/lib/query-keys";
 import {
@@ -41,6 +42,7 @@ import {
     CardTitle,
 } from "@shared/shadcn/ui/card";
 import { Progress } from "@shared/shadcn/ui/progress";
+import { toast } from "@shared/shadcn/ui/sonner";
 import { Spinner } from "@shared/shadcn/ui/spinner";
 
 import { Loader } from "./components/create-prompt/loader";
@@ -213,27 +215,17 @@ export const CreatePrompt = () => {
         } catch (error) {
             setBuyConfirmOpen(false);
             setConfirmPrice(null);
-            console.error("Failed to secure account:");
-            console.error(
-                error instanceof Error ? error.message : "Unknown error",
-            );
-            let message = "An unknown error occurred";
-            if (
-                error instanceof Error &&
-                error.message.includes("Invalid account name")
-            ) {
+            console.error("Failed to secure account:", error);
+            const raw = parseError(error);
+            let message = raw || "An unknown error occurred";
+            if (raw.includes("Invalid account name")) {
                 message = "This account name is not available";
-            } else if (
-                error instanceof Error &&
-                error.message.includes("has insufficient balance")
-            ) {
+            } else if (raw.includes("has insufficient balance")) {
                 message = "Insufficient balance";
-            } else if (
-                error instanceof Error &&
-                error.message.includes("Max cost below current ask")
-            ) {
+            } else if (raw.includes("Max cost below current ask")) {
                 message = "Market price changed; check new price and try again";
             }
+            toast.error("Couldn't create account", { description: message });
             createForm.setFieldMeta("account", (prev) => ({
                 ...prev,
                 isTouched: true,

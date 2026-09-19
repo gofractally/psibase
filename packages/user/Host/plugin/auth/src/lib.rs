@@ -51,14 +51,15 @@ fn set_active_query_token(query_token: &str, app: &str, user: &str) {
         "/common/set-auth-cookie",
         format!("{{\"accessToken\": \"{}\"}}", query_token),
     );
-    Supervisor::send_request(&req, true).unwrap();
+    // Do not unwrap: a trap here hangs jco JSPI (click-account never finishes).
+    let _ = Supervisor::send_request(&req, true);
 
     Bucket::new(DB, &bucket_id(user)).set(&app, &query_token.to_string().packed());
 }
 
 fn remove_active_query_token(app: &str, user: &str) {
     let req = post_to_app(app, "/common/remove-auth-cookie", "{}".to_string());
-    Supervisor::send_request(&req, true).unwrap();
+    let _ = Supervisor::send_request(&req, true);
 
     Bucket::new(DB, &bucket_id(user)).delete(&&app);
 }
@@ -67,10 +68,11 @@ impl Api for HostAuth {
     fn set_logged_in_user(user: String, app: String) -> Result<(), Error> {
         check_caller(&["accounts"], "set-logged-in-user@host:auth/api");
 
-        let query_token = Bucket::new(DB, &bucket_id(&user))
-            .get(&app)
-            .map(|t| String::unpacked(&t).unwrap())
-            .unwrap_or_else(|| Transact::get_query_token(&app, &user).unwrap());
+        let query_token = if let Some(t) = Bucket::new(DB, &bucket_id(&user)).get(&app) {
+            String::unpacked(&t).unwrap()
+        } else {
+            Transact::get_query_token(&app, &user)?
+        };
 
         set_active_query_token(&query_token, &app, &user);
 

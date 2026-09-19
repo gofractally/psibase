@@ -48,7 +48,7 @@ export const AppSplashScreen = () => {
                 </CardHeader>
                 <CardFooter className="flex justify-center pb-4">
                     <Button disabled={isPending} onClick={onLogin}>
-                        Log in
+                        {isPending ? "Logging in..." : "Log in"}
                     </Button>
                 </CardFooter>
             </Card>

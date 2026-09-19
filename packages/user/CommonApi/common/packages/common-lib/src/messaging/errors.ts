@@ -4,10 +4,9 @@ import { QualifiedPluginId } from "./plugin-id";
 export class PluginError extends Error {
     pluginId: QualifiedPluginId;
     constructor(pluginId: QualifiedPluginId, message: string) {
-        super("");
+        super(message);
         this.name = "PluginError";
         this.pluginId = pluginId;
-        this.message = message;
     }
 }
 

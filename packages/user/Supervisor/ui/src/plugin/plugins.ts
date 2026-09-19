@@ -52,6 +52,12 @@ export class Plugins {
         );
     }
 
+    public async instantiate(ids: QualifiedPluginId[]): Promise<void> {
+        await Promise.all(
+            ids.map((id) => this.getPlugin(id).plugin.instantiate()),
+        );
+    }
+
     // Dispose of *every* instantiated wasm. `compiledPlugin` references are
     //   preserved on each Plugin, so bfcache restore can re-instantiate
     //   without re-fetching or re-compiling.

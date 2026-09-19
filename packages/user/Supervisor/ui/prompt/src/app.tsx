@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { siblingUrl } from "@psibase/common-lib";
+import { promptDetailsFromSearch, siblingUrl } from "@psibase/common-lib";
 
 import { ErrorCard } from "@shared/components/error-card";
 import { supervisor } from "@shared/lib/supervisor";
@@ -31,13 +31,29 @@ export const App = () => {
             setReturnPath(urlParams.get("returnPath") || "/");
 
             try {
-                const promptDetails = (await supervisor.functionCall({
-                    service: "host",
-                    plugin: "prompt",
-                    intf: "admin",
-                    method: "getActivePrompt",
-                    params: [],
-                })) as PromptDetails;
+                const fromUrl = promptDetailsFromSearch(window.location.search);
+                const promptDetails = (fromUrl
+                    ? {
+                          promptApp: fromUrl.promptApp,
+                          promptName: fromUrl.promptName,
+                          activeApp: fromUrl.activeApp,
+                          created: fromUrl.created || "",
+                          packedContext: null,
+                      }
+                    : await supervisor.functionCall({
+                          service: "host",
+                          plugin: "prompt",
+                          intf: "admin",
+                          method: "getActivePrompt",
+                          params: [],
+                      })) as PromptDetails | null;
+
+                if (!promptDetails?.promptApp || !promptDetails.promptName) {
+                    setError(
+                        "Prompt error: No active prompt. Return to the app and try again.",
+                    );
+                    return;
+                }
 
                 if (promptDetails.created) {
                     const createdDate = new Date(promptDetails.created);
@@ -52,6 +68,24 @@ export const App = () => {
                 }
 
                 setActiveApp(promptDetails.activeApp);
+
+                const inviteToken = urlParams.get("inviteToken");
+                if (inviteToken) {
+                    try {
+                        await supervisor.functionCall({
+                            service: "invite",
+                            plugin: "plugin",
+                            intf: "invitee",
+                            method: "importInviteToken",
+                            params: [inviteToken],
+                        });
+                    } catch (inviteErr) {
+                        console.error(
+                            "Failed to restore invite token for prompt",
+                            inviteErr,
+                        );
+                    }
+                }
 
                 const iframeUrl = new URL(
                     siblingUrl(null, promptDetails.promptApp, null),

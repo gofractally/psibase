@@ -60,7 +60,7 @@ impl ActivePrompts {
     }
 
     pub fn get() -> Option<ActivePrompt> {
-        let val = tables::active_prompt().get(PROMPT_KEY).unwrap();
-        Some(<ActivePrompt>::unpacked(&val).unwrap())
+        let val = tables::active_prompt().get(PROMPT_KEY)?;
+        ActivePrompt::unpacked(&val).ok()
     }
 }

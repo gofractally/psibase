@@ -91,6 +91,13 @@ namespace psibase
    /// by looking for "localhost" in the host header
    bool isLocalhost(const HttpRequest& request);
 
+   /// True when Set-Cookie may use the Secure flag and the __Host- prefix.
+   /// False on localhost, plain HTTP origins, and non-443 explicit ports.
+   bool useSecureCookies(const HttpRequest& request);
+
+   /// SESSION on HTTP, __Host-SESSION on HTTPS. Must match between set and get.
+   std::string_view sessionCookieName(const HttpRequest& request);
+
    /// Return the root host for the request.
    /// - isSubdomain: indicates whether the host of the request is a
    ///   subdomain. If the host is not a subdomain, then the host

@@ -28,20 +28,28 @@ export interface PluginPostDetails {
     body: BodyType;
 }
 
-/// Imports exposed to privileged plugins
+/// Imports exposed to privileged plugins.
+/// Functions that may block on I/O or nested plugin calls return Promises so
+/// jco can wrap them with WebAssembly.Suspending (JSPI).
 export interface BridgeImports {
     "supervisor:bridge/intf": {
         sendRequest: (
             req: HttpRequest,
             withCredentials?: boolean,
-        ) => HttpResponse;
+        ) => Promise<HttpResponse>;
         serviceStack: () => string[];
         getRootDomain: () => string;
         getChainId: () => string;
-        sign: (msg: Uint8Array, publicKey: string) => Uint8Array;
-        signExplicit: (msg: Uint8Array, privateKey: string) => Uint8Array;
-        importKey: (privateKey: string) => string;
-        importKeyTransient: (privateKey: string) => string;
+        sign: (
+            msg: Uint8Array,
+            publicKey: string,
+        ) => Uint8Array | Promise<Uint8Array>;
+        signExplicit: (
+            msg: Uint8Array,
+            privateKey: string,
+        ) => Uint8Array | Promise<Uint8Array>;
+        importKey: (privateKey: string) => string | Promise<string>;
+        importKeyTransient: (privateKey: string) => string | Promise<string>;
     };
     "supervisor:bridge/database": {
         get: (duration: number, key: string) => Uint8Array | null;
@@ -59,7 +67,7 @@ export interface HostInterface {
 
     // Proxy entry points used by buildInterfaceProxy. Not exposed to plugins
     //   directly; reachable only through closures the proxy installs.
-    syncCall: (args: QualifiedFunctionCallArgs) => any;
-    syncCallResource: (args: QualifiedResourceCallArgs) => any;
-    syncCallDyn: (args: QualifiedDynCallArgs) => any;
+    call: (args: QualifiedFunctionCallArgs) => any;
+    callResource: (args: QualifiedResourceCallArgs) => any;
+    callDyn: (args: QualifiedDynCallArgs) => any;
 }
