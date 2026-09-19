@@ -61,13 +61,7 @@ namespace
          }
       }
 
-      // Trusted for reflecting ACAO: HTTPS, HTTP (plain HTTP chains such as
-      // host:8080), and *.localhost (secure context even on HTTP).
-      bool isTrustedOrigin() const
-      {
-         return scheme == "https" || scheme == "http" || host == "localhost" ||
-                host.ends_with(".localhost");
-      }
+      bool isTrustedOrigin() const { return scheme == "https" || scheme == "http"; }
 
       bool isService(std::string_view rootHost, psibase::AccountNumber account)
       {

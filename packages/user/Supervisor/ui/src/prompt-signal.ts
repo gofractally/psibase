@@ -1,3 +1,5 @@
+import { isThenable } from "./utils";
+
 export class PromptSignal extends Error {
     constructor(readonly kind: "prompt" | "embedded-error" | "preload-error") {
         super(`prompt-signal:${kind}`);
@@ -5,9 +7,6 @@ export class PromptSignal extends Error {
     }
 }
 
-// JSPI turns a throw from a non-suspending import into a wasm trap, and jco
-// then waits forever on task.completionPromise(). Stash the signal so JS
-// callers can reject immediately.
 let lastPromptSignal: PromptSignal | undefined;
 
 export function setPromptSignal(signal: PromptSignal): void {
@@ -62,11 +61,7 @@ export function promptSignalKind(
 }
 
 export function settleOrPrompt<T>(value: T | Promise<T>): T | Promise<T> {
-    if (
-        typeof value !== "object" ||
-        value === null ||
-        typeof (value as Promise<T>).then !== "function"
-    ) {
+    if (!isThenable(value)) {
         const signal = peekPromptSignal();
         if (signal) throw signal;
         return value;

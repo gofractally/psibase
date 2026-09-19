@@ -112,7 +112,6 @@ export function promptDetailsFromSearch(
         promptName,
         activeApp,
         created: params.get(PROMPT_QUERY.created) || "",
-        packedContext: params.get(PROMPT_QUERY.context),
     };
 }
 

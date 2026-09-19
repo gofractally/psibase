@@ -384,9 +384,6 @@ export class Supervisor implements AppInterface {
         }
     }
 
-    // PluginRef getters are host:types (sync). The target hook may be a
-    // promising export (auth-sig claim/proof do HTTP); Plugin.call detaches
-    // those onto a macrotask so WebKit JSPI is not nested.
     callDyn(args: QualifiedDynCallArgs): any {
         const service = this.supervisorResourceCall(
             getResourceCallArgs(
@@ -526,8 +523,6 @@ export class Supervisor implements AppInterface {
                 );
             }
 
-            // Plugin code is still written synchronously. JSPI suspends the wasm
-            // stack across fetch() (and other Promise-returning host imports).
             const result = await this.call(args);
             if (peekPromptSignal()) {
                 throw peekPromptSignal();
@@ -577,7 +572,7 @@ export class Supervisor implements AppInterface {
                         });
                     }
                 } catch {
-                    // Still redirect; prompt.html can recover from URL or show a real error.
+                    // Redirect even if get-active-prompt fails.
                 }
                 result = new RedirectErrorObject(
                     { service: "host", plugin: "prompt" },

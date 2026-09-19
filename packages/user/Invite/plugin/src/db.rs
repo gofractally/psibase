@@ -162,8 +162,6 @@ impl InviteTokensTable {
             Self::delete_fixed_details(invite_id);
             return None;
         }
-        // Key by the active app (not the immediate sender) so a re-import
-        // from supervisor prompt.html still binds the token to homepage.
         Self::invite_tokens().set(&host::client::get_active_app(), token.as_bytes());
         Some(invite_id)
     }

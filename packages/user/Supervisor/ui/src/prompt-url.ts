@@ -39,13 +39,14 @@ export function promptDetailsFromTopUrl(): PromptDetailsJs | null {
         const parsed = promptDetailsFromSearch(loc.search);
         if (!parsed) return null;
         const secrets = promptSecretsFromHash(loc.hash);
-        const packed = secrets.packedContext || parsed.packedContext;
         return {
             promptApp: parsed.promptApp,
             promptName: parsed.promptName,
             activeApp: parsed.activeApp,
             created: parsed.created || "",
-            packedContext: packed ? base64ToBytes(packed) : null,
+            packedContext: secrets.packedContext
+                ? base64ToBytes(secrets.packedContext)
+                : null,
         };
     } catch {
         return null;

@@ -1,7 +1,2 @@
-export {
-    compilePlugin,
-    loadBasic,
-    collectJspiImportNames,
-    collectJspiExportNames,
-} from "./loader.js";
+export { compilePlugin, loadBasic } from "./loader.js";
 export type { CompiledPlugin } from "./loader.js";

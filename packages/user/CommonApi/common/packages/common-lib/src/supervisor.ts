@@ -196,7 +196,6 @@ export class Supervisor {
             return;
         }
 
-        // Safari structured-clone of Error can leave only `{ name: "GenericError" }`.
         if (
             result &&
             typeof result === "object" &&

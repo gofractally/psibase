@@ -76,10 +76,6 @@ export class ServiceContext {
         );
     }
 
-    async instantiateAll(): Promise<void> {
-        await Promise.all(this.plugins.map((p) => p.instantiate()));
-    }
-
     disposeAll(): string[] {
         const disposed: string[] = [];
         for (const plugin of this.plugins) {

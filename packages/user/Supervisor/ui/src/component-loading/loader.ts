@@ -258,9 +258,6 @@ const JSPI_BRIDGE_FUNCS = new Set([
     "import-key-transient",
 ]);
 
-// Same-instance JSPI re-entry deadlocks jco (nested promising export on a
-// component that is already suspended). accounts:query get-account calls
-// host:http, which calls back into get-current-user on that same component.
 const JSPI_SYNC_FUNCS = new Set([
     "accounts:query/api#get-current-user",
     "accounts:query/api#is-logged-in",
@@ -269,9 +266,6 @@ const JSPI_SYNC_FUNCS = new Set([
 
 function isJspiSyncInterface(intf: Interface): boolean {
     if (intf.namespace === "wasi") return true;
-    // host:client is used from resource constructors and is fully synchronous.
-    // host:db is localStorage via supervisor:bridge/database (also sync).
-    // host:types PluginRef is in-memory name storage (also sync).
     if (
         intf.namespace === "host" &&
         (intf.package === "client" ||
@@ -290,11 +284,6 @@ function isJspiSyncFunc(intf: Interface, funcName: string): boolean {
     );
 }
 
-// Names jco uses to wrap imports with WebAssembly.Suspending.
-//
-// Only imports whose JS implementations return Promises can be listed:
-// a resource constructor that calls a suspending import is inferred as a
-// promising export, and jco currently emits `await` inside `constructor()`.
 export function collectJspiImportNames(importedFuncs: Functions): string[] {
     const names: string[] = [];
     for (const intf of importedFuncs.interfaces) {
@@ -324,24 +313,15 @@ function isConstructorFunc(name: string): boolean {
     return isResourceMethod(name) && name.includes("[constructor]");
 }
 
-// Exports that can reach a suspending import must be wrapped with
-// WebAssembly.promising. jco inference misses some plugin-to-plugin
-// edges, which surfaces as "trying to suspend without WebAssembly.promising".
 export function collectJspiExportNames(exportedFuncs: Functions): string[] {
     const names: string[] = [];
     for (const intf of exportedFuncs.interfaces) {
-        // Keep in lockstep with collectJspiImportNames: a promising export
-        // whose callers still use a sync trampoline yields
-        // "expected a string, received [object]" (the object is a Promise).
         if (isJspiSyncInterface(intf)) continue;
         const id = `${intf.namespace}:${intf.package}/${intf.name}`;
         for (const func of intf.funcs) {
             if (isConstructorFunc(func.name)) continue;
             if (isJspiSyncFunc(intf, func.name)) continue;
             names.push(`${id}#${func.name}`);
-            // Inline world exports (`export transact-hook-user-auth: interface`)
-            // live in package root:component. jco only wraps them as
-            // `iface#func`, not `root:component/iface#func`.
             names.push(`${intf.name}#${func.name}`);
         }
     }

@@ -74,8 +74,7 @@ export const App = () => {
                 setActiveApp(promptDetails.activeApp);
 
                 const secrets = promptSecretsFromHash(window.location.hash);
-                const inviteToken =
-                    secrets.inviteToken || urlParams.get("inviteToken");
+                const inviteToken = secrets.inviteToken;
                 if (inviteToken) {
                     try {
                         await supervisor.functionCall({

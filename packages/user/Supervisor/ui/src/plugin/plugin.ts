@@ -196,10 +196,8 @@ export class Plugin {
         }
 
         const jsMethod = kebabToCamel(method);
-        // Nested promising on the same component deadlocks jco. Login and
-        // transact-hook re-entry (invite accept → add-action → on-actions-sender)
-        // run on a fresh instantiate; they do not use this instance's TX_ACTIONS.
         if (
+            this.isInstantiated &&
             this.id.service === "transact" &&
             this.id.plugin === "plugin" &&
             jsMethod === "getQueryToken"
@@ -221,8 +219,6 @@ export class Plugin {
             if (jsMethod === "isLoggedIn") {
                 return false;
             }
-            // host:http get_auth_token calls this while set-logged-in-user
-            // is already suspended on the same host:auth instance.
             if (jsMethod === "getActiveQueryToken") {
                 return undefined;
             }

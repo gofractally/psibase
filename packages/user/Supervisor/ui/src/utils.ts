@@ -53,10 +53,6 @@ export function assert(
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 
 function scheduleMacrotask(cb: () => void): void {
-    // MessageChannel is a macrotask and is not clamped like nested setTimeout(0).
-    // Nested WebAssembly.promising must not run inside a Suspending import:
-    // Chrome throws "trying to suspend without WebAssembly.promising";
-    // WebKit throws "cannot block a synchronous task before returning".
     if (typeof MessageChannel === "function") {
         const { port1, port2 } = new MessageChannel();
         port2.onmessage = () => cb();
@@ -66,8 +62,6 @@ function scheduleMacrotask(cb: () => void): void {
     setTimeout(cb, 0);
 }
 
-/** Run `fn` on a later macrotask so inner WebAssembly.promising is not
- *  nested inside a JSPI Suspending import. A microtask is not enough. */
 export function detachJspi<T>(fn: () => T | Promise<T>): Promise<T> {
     return new Promise((resolve, reject) => {
         scheduleMacrotask(() => {
@@ -87,10 +81,6 @@ export function invokePluginExport(
     if (typeof func !== "function") {
         throw new TypeError("plugin export is not a function");
     }
-    // jco JSPI exports are `async function`s wrapping WebAssembly.promising.
-    // Calling that while another component is inside a Suspending import
-    // nests JSPI stacks. WebKit traps with "cannot block a synchronous
-    // task before returning".
     if (func instanceof AsyncFunction) {
         return detachJspi(() => func(...params));
     }

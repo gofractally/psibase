@@ -82,7 +82,7 @@ export class PluginHost implements HostInterface {
         } else if (binary) {
             return "bytes";
         }
-        return ct.length > 0 ? "text" : binary ? "bytes" : "text";
+        return "text";
     }
 
     private wantsBinaryResponse(req: HttpRequest): boolean {
@@ -119,9 +119,6 @@ export class PluginHost implements HostInterface {
         return uri;
     }
 
-    // Never throw: a throw from this JSPI import becomes a wasm trap, and jco
-    // then hangs on task.completionPromise() (the click-account hang). Callers
-    // that unwrap the WIT result panic on Err for the same reason.
     private failedHttpResponse(message: string): HttpResponse {
         console.error(message);
         return {
@@ -131,8 +128,6 @@ export class PluginHost implements HostInterface {
         };
     }
 
-    // Async HTTP via fetch. JSPI suspends the calling wasm stack until this
-    // Promise resolves, so plugins keep a synchronous WIT/Rust interface.
     private async sendRequest(
         req: HttpRequest,
         withCredentials: boolean = false,

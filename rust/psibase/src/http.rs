@@ -191,10 +191,7 @@ impl Origin {
     }
 
     fn is_trusted_origin(&self) -> bool {
-        self.scheme == "https"
-            || self.scheme == "http"
-            || self.host == "localhost"
-            || self.host.ends_with(".localhost")
+        self.scheme == "https" || self.scheme == "http"
     }
 
     fn is_service(&self, root_host: &str, account: AccountNumber) -> bool {
