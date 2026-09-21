@@ -9,7 +9,13 @@ struct Query
 {
    auto blocks() const
    {
-      return psibase::TableIndex<psibase::Block, uint32_t>{psibase::DbId::blockLog, {}, false};
+      return psibase::TransformedConnection{
+          psibase::TableIndex<psibase::Block, uint32_t>{psibase::DbId::blockLog, {}, false},
+          [](psibase::Block&& block)
+          {
+             block.transactions.clear();
+             return std::move(block);
+          }};
    }
 };
 PSIO_REFLECT(  //
