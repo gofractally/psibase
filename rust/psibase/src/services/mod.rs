@@ -43,3 +43,4 @@ pub mod x_http;
 pub mod x_keys;
 pub mod x_packages;
 pub mod x_sites;
+pub mod x_ws_auth;
