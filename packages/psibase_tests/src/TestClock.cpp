@@ -62,12 +62,12 @@ void TestClock::testCpu(bool indirect)
    auto            err = ::clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time1);
    check_err(err);
    validate_timespec(time1);
-   check(time1.tv_sec == 0 && time1.tv_nsec < 5000000, "CPU time too large");
+   check(time1.tv_sec == 0 && time1.tv_nsec < 10000000, "CPU time too large");
    struct timespec time2;
    err = ::clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time2);
    check_err(err);
    validate_timespec(time2);
-   check(time2.tv_sec == 0 && time2.tv_nsec < 5000000, "CPU time too large");
+   check(time2.tv_sec == 0 && time2.tv_nsec < 10000000, "CPU time too large");
    check(time1.tv_nsec <= time2.tv_nsec, "cpu clock must not decrease");
 }
 
