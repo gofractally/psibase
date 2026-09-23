@@ -4,7 +4,7 @@ mod service {
         nft::Wrapper as Nft,
         producers::Wrapper as Producers,
         symbol::Wrapper as Symbol,
-        tokens::{Precision, Quantity, TokenFlags, TokenRecord, Wrapper as Tokens},
+        tokens::{Precision, TokenFlags, TokenRecord, Wrapper as Tokens},
         virtual_server::Wrapper as VirtualServer,
     };
     use psibase::FlagsType;
@@ -69,7 +69,7 @@ mod service {
         Tokens::call().credit(tid, VirtualServer::SERVICE, resources, "".into());
         VirtualServer::call().buy_res_for(resources, producer, None);
 
-        let remaining = Quantity::new(supply.value - resources.value);
+        let remaining = supply - resources;
         Tokens::call().credit(tid, producer, remaining, "system token".into());
         Tokens::call_from(producer).debit(tid, Wrapper::SERVICE, remaining, "".into());
 
