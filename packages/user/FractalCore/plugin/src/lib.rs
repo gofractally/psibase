@@ -47,7 +47,6 @@ define_trust! {
             - Exiling a member from the fractal
             - Initialising the fractal token
             - Donating tokens to the fractal
-            - Contributing income to the fractal token stream
             - Setting the fractal token distribution interval
             - Creating a new guild
             - Mapping a governance role to a guild
@@ -64,7 +63,7 @@ define_trust! {
         None => [get_group_users],
         Low => [close_eval, dist_token, start_eval],
         Medium => [apply_guild, claim_rewards, join_fractal, delete_guild_invite, invite_member, attest_membership_app, get_proposal, register, register_candidacy, unregister],
-        High => [attest, set_role_mapping, create_guild, set_role_occupation, set_paid_occupations, exile_member, init_token, donate, income, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_dist_interval, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guilds, set_schedule],
+        High => [attest, set_role_mapping, create_guild, set_role_occupation, set_paid_occupations, exile_member, init_token, donate, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_dist_interval, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guilds, set_schedule],
     }
 }
 
@@ -262,11 +261,6 @@ impl UserFractal for FractalCorePlugin {
     fn donate(token_id: u32, amount: String) -> Result<(), Error> {
         assert_authorized(FunctionName::donate)?;
         FractalsPlugin::user_fractal::donate(token_id, &amount)
-    }
-
-    fn income(token_id: u32, amount: String) -> Result<(), Error> {
-        assert_authorized(FunctionName::income)?;
-        FractalsPlugin::user_fractal::income(token_id, &amount)
     }
 }
 

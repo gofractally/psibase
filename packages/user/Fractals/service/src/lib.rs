@@ -165,8 +165,8 @@ pub mod service {
     /// Donate tokens to the fractal that issued `token_id`.
     ///
     /// Debits `amount` from the sender into a `{fractal}+donations` Tokens
-    /// sub-balance. [`dist_token`] later splits that sub-balance to members
-    /// with the same shares as the fractal token stream.
+    /// sub-balance. [`dist_token`] later deposits that sub-balance into
+    /// member reward streams.
     ///
     /// # Arguments
     /// * `token_id` - Fractal token being donated.
@@ -183,9 +183,9 @@ pub mod service {
 
     /// Contribute income to the fractal that issued `token_id`.
     ///
-    /// Debits `amount` from the sender and deposits it into that fractal's
-    /// vesting stream. [`dist_token`] later withdraws vested income and splits
-    /// it to members.
+    /// Debits `amount` from the sender and deposits it into the fractal's
+    /// reward stream. [`dist_token`] later deposits the vested portion into
+    /// member reward streams.
     ///
     /// # Arguments
     /// * `token_id` - Fractal token being deposited.

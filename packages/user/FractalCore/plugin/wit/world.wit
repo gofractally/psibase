@@ -25,7 +25,6 @@ interface user-fractal {
     join: func() -> result<_, error>;
 
     donate: func(token-id: u32, amount: string) -> result<_, error>;
-    income: func(token-id: u32, amount: string) -> result<_, error>;
 }
 
 interface user-eval {
