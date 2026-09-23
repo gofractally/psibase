@@ -10,7 +10,6 @@ mod service {
     use psibase::FlagsType;
     use psibase::*;
 
-    /// 21 billion tokens, stored at precision 4.
     const MAX_SUPPLY: u64 = 21_000_000_000_0000;
     const PRECISION: u8 = 4;
     const SYSTEM_SYMBOL: AccountNumber = account!("psi");
