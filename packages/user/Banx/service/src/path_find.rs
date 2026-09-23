@@ -110,16 +110,60 @@ fn resolve_routing<'a>(
     global
 }
 
-type StateKey = (AccountNumber, u16); // (account as path debtor after hop, asset)
+#[derive(Clone, Debug)]
+struct Label {
+    account: AccountNumber,
+    asset: u16,
+    amount: u64,
+    hops: Vec<(AccountNumber, u16)>,
+    visited: HashSet<AccountNumber>,
+}
 
-#[derive(Clone, Copy, Debug)]
-struct Pred {
-    /// Previous state account; `0` for hop 0 (from sender).
-    prev_account: AccountNumber,
-    prev_asset: u16,
-    /// Hop that was taken to reach this state.
-    hop_account: AccountNumber,
-    hop_asset: u16,
+fn note_payee(
+    best: &mut Option<Label>,
+    label: &Label,
+    payee: AccountNumber,
+    to_asset: Option<u16>,
+) {
+    if label.account != payee || label.amount == 0 {
+        return;
+    }
+    if let Some(want) = to_asset {
+        if label.asset != want {
+            return;
+        }
+    }
+    if best.as_ref().map_or(true, |b| label.amount > b.amount) {
+        *best = Some(label.clone());
+    }
+}
+
+fn visited_subset(a: &HashSet<AccountNumber>, b: &HashSet<AccountNumber>) -> bool {
+    a.iter().all(|x| b.contains(x))
+}
+
+/// Keep `new` unless a label already at this node forwards the same amount
+/// and can take every next hop `new` can. A larger amount does not replace
+/// a smaller one: the next line may fit only the smaller draw.
+fn admit(labels: &mut Vec<Label>, new: Label) -> bool {
+    let mut i = 0;
+    while i < labels.len() {
+        let old = &labels[i];
+        if old.account != new.account || old.asset != new.asset || old.amount != new.amount {
+            i += 1;
+            continue;
+        }
+        if visited_subset(&old.visited, &new.visited) {
+            return false;
+        }
+        if visited_subset(&new.visited, &old.visited) {
+            labels.swap_remove(i);
+            continue;
+        }
+        i += 1;
+    }
+    labels.push(new);
+    true
 }
 
 /// Find a multi-hop path from `sender` to `payee` maximizing amount_out.
@@ -174,161 +218,100 @@ pub fn find_banx_path(
         }
     }
 
-    let mut best: HashMap<StateKey, u64> = HashMap::new();
-    let mut pred: HashMap<StateKey, Pred> = HashMap::new();
-    // Accounts on the path when this state was reached (including hop accounts).
-    let mut path_accounts: HashMap<StateKey, HashSet<AccountNumber>> = HashMap::new();
+    let mut admitted: Vec<Label> = Vec::new();
+    let mut frontier: Vec<Label> = Vec::new();
 
-    // --- Hop 0: no routing fee; line debtor = sender ---
+    // Hop 0: no routing fee; line debtor = sender.
     let Some(first_lines) = lines_by_debtor.get(&sender) else {
         return None;
     };
     for line in first_lines {
-        if line.asset_id != from_asset {
+        if line.asset_id != from_asset || line.creditor == sender || amount_in > line.capacity {
             continue;
         }
-        if line.creditor == sender {
-            continue;
-        }
-        if amount_in > line.capacity {
-            continue;
-        }
-        let key = (line.creditor, line.asset_id);
-        let amt = amount_in;
-        if best.get(&key).map_or(true, |&b| amt > b) {
-            best.insert(key, amt);
-            pred.insert(
-                key,
-                Pred {
-                    prev_account: AccountNumber::new(0),
-                    prev_asset: from_asset,
-                    hop_account: line.creditor,
-                    hop_asset: line.asset_id,
-                },
-            );
-            path_accounts.insert(key, HashSet::from([line.creditor]));
+        let label = Label {
+            account: line.creditor,
+            asset: line.asset_id,
+            amount: amount_in,
+            hops: vec![(line.creditor, line.asset_id)],
+            visited: HashSet::from([line.creditor]),
+        };
+        if admit(&mut admitted, label.clone()) {
+            frontier.push(label);
         }
     }
 
-    // Later hops: expand from reached states (TokenSwap-style layered rounds).
-    //
-    // On-chain, asset changes use CurrencyPolicy of the **current path
-    // debtor** (previous hop creditor / middle man). For state (D, A):
-    // FX poster = D.
+    let mut best_payee: Option<Label> = None;
+    for label in &frontier {
+        note_payee(&mut best_payee, label, payee, to_asset);
+    }
+
+    // Later hops. Asset changes use the current debtor's FX quote.
     let max_extra = max_hops.saturating_sub(1);
     for _ in 0..max_extra {
-        let mut candidates: HashMap<StateKey, (u64, Pred, HashSet<AccountNumber>)> = HashMap::new();
-
-        for ((debtor, asset), &amt) in &best {
-            let key = (*debtor, *asset);
-            let visited = path_accounts.get(&key).cloned().unwrap_or_default();
-
-            // Same-asset forward hops (no convert).
+        let mut next: Vec<Label> = Vec::new();
+        for label in &frontier {
             expand_hops(
-                *debtor,
-                *asset, // state asset
-                *asset, // hop asset
-                amt,
+                label,
+                label.asset,
+                label.amount,
                 &lines_by_debtor,
                 &known,
                 routing,
                 now,
-                &visited,
                 sender,
-                &mut candidates,
+                &mut admitted,
+                &mut next,
             );
-
-            // Asset-change hops: FX the hop notional (not leftover after unwind).
-            if let Some(fx_list) = fx_by_poster_from.get(&(*debtor, *asset)) {
+            if let Some(fx_list) = fx_by_poster_from.get(&(label.account, label.asset)) {
                 for e in fx_list {
-                    let Some(after_fx) = apply_rate(amt, e.fee_fixed, e.fx_rate) else {
+                    let Some(after_fx) = apply_rate(label.amount, e.fee_fixed, e.fx_rate) else {
                         continue;
                     };
                     expand_hops(
-                        *debtor,
-                        *asset,     // previous state asset (for pred walk)
-                        e.to_asset, // hop / line asset after FX
+                        label,
+                        e.to_asset,
                         after_fx,
                         &lines_by_debtor,
                         &known,
                         routing,
                         now,
-                        &visited,
                         sender,
-                        &mut candidates,
+                        &mut admitted,
+                        &mut next,
                     );
                 }
             }
         }
-
-        let mut updated = false;
-        for (key, (amt, p, visited)) in candidates {
-            let old = *best.get(&key).unwrap_or(&0);
-            if amt > old {
-                best.insert(key, amt);
-                pred.insert(key, p);
-                path_accounts.insert(key, visited);
-                updated = true;
-            }
-        }
-        if !updated {
+        if next.is_empty() {
             break;
         }
+        for label in &next {
+            note_payee(&mut best_payee, label, payee, to_asset);
+        }
+        frontier = next;
     }
 
-    // Pick best state at payee.
-    let mut best_payee: Option<(StateKey, u64)> = None;
-    for ((acct, asset), &amt) in &best {
-        if *acct != payee {
-            continue;
-        }
-        if let Some(want) = to_asset {
-            if *asset != want {
-                continue;
-            }
-        }
-        let better = match &best_payee {
-            None => true,
-            Some((_, a)) => amt > *a,
-        };
-        if better {
-            best_payee = Some(((*acct, *asset), amt));
-        }
+    let best_payee = best_payee?;
+    if best_payee.hops.is_empty() || best_payee.hops.len() > max_hops as usize {
+        return None;
     }
-
-    let ((mut cur_acct, mut cur_asset), amount_out) = best_payee?;
-    if amount_out == 0 {
+    if best_payee.hops.last().map(|h| h.0) != Some(payee) {
         return None;
     }
 
-    // Reconstruct hop accounts/assets (fees filled by simulate_path_fees).
-    let mut hop_keys = Vec::new();
-    loop {
-        let p = pred.get(&(cur_acct, cur_asset))?;
-        hop_keys.push((p.hop_account, p.hop_asset));
-        if p.prev_account.value == 0 {
-            break;
-        }
-        cur_acct = p.prev_account;
-        cur_asset = p.prev_asset;
-    }
-    hop_keys.reverse();
-    if hop_keys.is_empty() || hop_keys.len() > max_hops as usize {
-        return None;
-    }
-    // Last hop must be payee.
-    if hop_keys.last()?.0 != payee {
-        return None;
-    }
-
-    let hops = simulate_path_fees(&hop_keys, amount_in, sender, lines, routing, fx, now)?;
+    let hops = simulate_path_fees(&best_payee.hops, amount_in, sender, lines, routing, fx, now)?;
     let sim_out = hops.last().map(|h| h.amount).unwrap_or(0);
 
     Some(PathQuote {
         hops,
         amount_in,
-        // Prefer search amount_out when both agree; simulation is the fee source of truth.
-        amount_out: if sim_out > 0 { sim_out } else { amount_out },
+        // Simulation is the fee source of truth.
+        amount_out: if sim_out > 0 {
+            sim_out
+        } else {
+            best_payee.amount
+        },
     })
 }
 
@@ -524,18 +507,18 @@ pub fn find_banx_path_exact_out(
 }
 
 fn expand_hops(
-    debtor: AccountNumber,
-    state_asset: u16,
+    parent: &Label,
     hop_asset: u16,
     amount_in: u64,
     lines_by_debtor: &HashMap<AccountNumber, Vec<&LineEdge>>,
     known: &HashSet<(AccountNumber, AccountNumber, u16)>,
     routing: &[RoutingEdge],
     now: i64,
-    visited: &HashSet<AccountNumber>,
     sender: AccountNumber,
-    candidates: &mut HashMap<StateKey, (u64, Pred, HashSet<AccountNumber>)>,
+    admitted: &mut Vec<Label>,
+    out: &mut Vec<Label>,
 ) {
+    let debtor = parent.account;
     let Some(out_lines) = lines_by_debtor.get(&debtor) else {
         return;
     };
@@ -546,7 +529,7 @@ fn expand_hops(
         if line.creditor == debtor || line.creditor == sender {
             continue;
         }
-        if visited.contains(&line.creditor) {
+        if parent.visited.contains(&line.creditor) {
             continue;
         }
         let Some(rpol) = resolve_routing(routing, line.creditor, debtor, hop_asset, now) else {
@@ -571,26 +554,20 @@ fn expand_hops(
             continue;
         }
 
-        let key = (line.creditor, hop_asset);
-        let better = candidates.get(&key).map_or(true, |(b, _, _)| draw > *b);
-        if !better {
-            continue;
+        let mut visited = parent.visited.clone();
+        visited.insert(line.creditor);
+        let mut hops = parent.hops.clone();
+        hops.push((line.creditor, hop_asset));
+        let label = Label {
+            account: line.creditor,
+            asset: hop_asset,
+            amount: draw,
+            hops,
+            visited,
+        };
+        if admit(admitted, label.clone()) {
+            out.push(label);
         }
-        let mut next_visited = visited.clone();
-        next_visited.insert(line.creditor);
-        candidates.insert(
-            key,
-            (
-                draw,
-                Pred {
-                    prev_account: debtor,
-                    prev_asset: state_asset,
-                    hop_account: line.creditor,
-                    hop_asset,
-                },
-                next_visited,
-            ),
-        );
     }
 }
 
@@ -809,6 +786,66 @@ mod tests {
         .expect("exact-in path");
         assert_eq!(q.amount_in, 10_000);
         assert_eq!(q.amount_out, 9_500);
+    }
+
+    /// 0% route puts 100 on mid; 50% route puts 50. Steve's line is 50, so
+    /// only the smaller arrival fits. Search must still return that route.
+    #[test]
+    fn exact_in_keeps_lower_output_route_that_fits() {
+        let lines = vec![
+            line("gary", "alice", 1, 1_000),
+            line("bob", "alice", 1, 1_000),
+            line("mid", "gary", 1, 1_000),
+            line("mid", "bob", 1, 1_000),
+            line("steve", "mid", 1, 50),
+        ];
+        let routing = vec![
+            global_rte("gary", 1, 0),
+            global_rte("bob", 1, PPM_SCALE / 2),
+            global_rte("mid", 1, 0),
+        ];
+        let q = find(
+            &lines,
+            &routing,
+            &[],
+            "alice",
+            "steve",
+            100,
+            1,
+            Some(1),
+            4,
+            0,
+        )
+        .expect("50% route still fits");
+        assert_eq!(
+            q.hops.iter().map(|h| h.account).collect::<Vec<_>>(),
+            vec![acct("bob"), acct("mid"), acct("steve")]
+        );
+        assert_eq!(q.amount_in, 100);
+        assert_eq!(q.amount_out, 50);
+
+        let lines = vec![
+            line("gary", "alice", 1, 1_000),
+            line("bob", "alice", 1, 1_000),
+            line("mid", "gary", 1, 1_000),
+            line("mid", "bob", 1, 1_000),
+            line("steve", "mid", 1, 1_000),
+        ];
+        let q = find(
+            &lines,
+            &routing,
+            &[],
+            "alice",
+            "steve",
+            100,
+            1,
+            Some(1),
+            4,
+            0,
+        )
+        .expect("both routes fit");
+        assert_eq!(q.hops[0].account, acct("gary"));
+        assert_eq!(q.amount_out, 100);
     }
 
     #[test]

@@ -200,7 +200,7 @@ impl Obligation {
         }
 
         Self::sort_for_net(&mut obs);
-        Self::apply_reduction_waterfall(&mut obs, amount);
+        Self::reduce_sorted(&mut obs, amount, |_, _, _| {});
 
         for o in &obs {
             o.persist_or_delete();
@@ -209,8 +209,10 @@ impl Obligation {
         PairCycle::sync_cycle(creditor, debtor, asset_id, before_clear, after_clear);
     }
 
-    /// Interest first (globally, highest-rate order), then principal.
-    fn apply_reduction_waterfall(obs: &mut [Self], amount: u64) {
+    /// `obs` is already [`Self::sort_for_net`] order. Interest, then principal.
+    /// `on_take(rate, interest, principal)` runs only for a positive take.
+    /// Returns the unconsumed remainder.
+    fn reduce_sorted(obs: &mut [Self], amount: u64, mut on_take: impl FnMut(u32, u64, u64)) -> u64 {
         let mut left = amount;
         for o in obs.iter_mut() {
             if left == 0 {
@@ -222,6 +224,7 @@ impl Obligation {
             }
             o.accrued_interest = (o.accrued_interest.value - take).into();
             o.note_grace_change();
+            on_take(o.interest_rate, take, 0);
             left -= take;
         }
         for o in obs.iter_mut() {
@@ -234,8 +237,10 @@ impl Obligation {
             }
             o.remaining_principal = (o.remaining_principal.value - take).into();
             o.note_grace_change();
+            on_take(o.interest_rate, 0, take);
             left -= take;
         }
+        left
     }
 
     /// Move `amount` of claims (interest then principal, highest rate first)
@@ -266,33 +271,10 @@ impl Obligation {
 
         let mut obs = Self::obligations(from_creditor, debtor, asset_id);
         Self::sort_for_net(&mut obs);
-        let mut left = amount;
         let mut dest_delta: Vec<(u32, u64, u64)> = Vec::new();
-
-        for o in obs.iter_mut() {
-            if left == 0 {
-                break;
-            }
-            let take_i = left.min(o.accrued_interest.value);
-            if take_i > 0 {
-                o.accrued_interest = (o.accrued_interest.value - take_i).into();
-                o.note_grace_change();
-                Self::add_rate_delta(&mut dest_delta, o.interest_rate, take_i, 0);
-                left -= take_i;
-            }
-        }
-        for o in obs.iter_mut() {
-            if left == 0 {
-                break;
-            }
-            let take_p = left.min(o.remaining_principal.value);
-            if take_p > 0 {
-                o.remaining_principal = (o.remaining_principal.value - take_p).into();
-                o.note_grace_change();
-                Self::add_rate_delta(&mut dest_delta, o.interest_rate, 0, take_p);
-                left -= take_p;
-            }
-        }
+        let left = Self::reduce_sorted(&mut obs, amount, |rate, interest, principal| {
+            Self::add_rate_delta(&mut dest_delta, rate, interest, principal);
+        });
         assert!(left == 0, "transfer claims underflow");
         for &(rate, interest, principal) in &dest_delta {
             Self::apply_claim_delta(to_creditor, debtor, asset_id, rate, interest, principal);
