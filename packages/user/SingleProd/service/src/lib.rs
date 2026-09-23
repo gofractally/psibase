@@ -29,10 +29,6 @@ mod service {
     /// Create the untransferable system token and take its issuer NFT.
     #[action]
     fn create_token() {
-        if Tokens::call().getSysToken().is_some() {
-            return;
-        }
-
         let id = Tokens::call().create(Precision::new(PRECISION).unwrap(), MAX_SUPPLY.into());
         let nft_id = Tokens::call().getToken(id).nft_id;
         Nft::call().debit(nft_id, "".into());
@@ -43,10 +39,6 @@ mod service {
     /// Map the system token to the `psi` symbol.
     #[action]
     fn set_symbol() {
-        if Symbol::call().exists(SYSTEM_SYMBOL) {
-            return;
-        }
-
         let tid = sys_token().id;
         Symbol::call_as(Symbol::SERVICE).admin_create(SYSTEM_SYMBOL, Wrapper::SERVICE);
 
@@ -70,31 +62,19 @@ mod service {
         let token = sys_token();
         let tid = token.id;
         let producer = producer();
+        let supply = token.max_issued_supply;
+        Tokens::call().mint(tid, supply, "initial mint".into());
 
-        if token.issued_supply.value == 0 {
-            let supply = token.max_issued_supply;
-            Tokens::call().mint(tid, supply, "initial mint".into());
+        let resources = VirtualServer::call().std_buffer_cost();
+        Tokens::call().credit(tid, VirtualServer::SERVICE, resources, "".into());
+        VirtualServer::call().buy_res_for(resources, producer, None);
 
-            let resources = VirtualServer::call().std_buffer_cost();
-            assert!(resources.value > 0, "resource reserve must be non-zero");
-            assert!(
-                resources.value < supply.value,
-                "resource reserve exceeds token supply"
-            );
+        let remaining = Quantity::new(supply.value - resources.value);
+        Tokens::call().credit(tid, producer, remaining, "system token".into());
+        Tokens::call_from(producer).debit(tid, Wrapper::SERVICE, remaining, "".into());
 
-            Tokens::call().credit(tid, VirtualServer::SERVICE, resources, "".into());
-            VirtualServer::call().buy_res_for(resources, producer, None);
-
-            let remaining = Quantity::new(supply.value - resources.value);
-            Tokens::call().credit(tid, producer, remaining, "system token".into());
-            Tokens::call_from(producer).debit(tid, Wrapper::SERVICE, remaining, "".into());
-        }
-
-        let nft_id = token.nft_id;
-        if Nft::call().getNft(nft_id).owner != producer {
-            Nft::call().credit(nft_id, producer, "issuer".into());
-            Nft::call_from(producer).debit(nft_id, "".into());
-        }
+        Nft::call().credit(token.nft_id, producer, "issuer".into());
+        Nft::call_from(producer).debit(token.nft_id, "".into());
     }
 
     /// Cap the producer set at 3.
