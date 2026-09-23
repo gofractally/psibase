@@ -8,6 +8,7 @@
 #include <psibase/net_base.hpp>
 #include <psio/fracpack.hpp>
 #include <psio/reflect.hpp>
+#include <psio/to_hex.hpp>
 #include <random>
 #include <string>
 #include <type_traits>
