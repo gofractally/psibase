@@ -106,7 +106,7 @@ namespace psibase::net
          }
          catch (std::exception& e)
          {
-            PSIBASE_LOG(peers().logger(peer), warning) << e.what();
+            PSIBASE_LOG(peers().logger(peer), warning) << "recv: " << typeid(T).name() << ": " << e.what();
             peers().disconnect(peer);
          }
       }
