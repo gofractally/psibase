@@ -1,36 +1,10 @@
-#[psibase::service_tables]
-pub mod tables {
-    use psibase::services::tokens::TID;
-    use psibase::*;
-
-    #[table(name = "ConfigTable", index = 0)]
-    #[derive(ToSchema, Pack, Unpack)]
-    pub struct ConfigRow {
-        pub token_id: TID,
-    }
-
-    impl ConfigRow {
-        #[primary_key]
-        fn pk(&self) {}
-
-        pub fn get() -> Option<Self> {
-            ConfigTable::read().get_index_pk().get(&())
-        }
-
-        pub fn token_id() -> TID {
-            Self::get().expect("singleprod not initialized").token_id
-        }
-    }
-}
-
-#[psibase::service(name = "singleprod", tables = "tables")]
+#[psibase::service(name = "singleprod")]
 mod service {
-    use crate::tables::{ConfigRow, ConfigTable};
     use psibase::services::{
         nft::Wrapper as Nft,
         producers::Wrapper as Producers,
         symbol::Wrapper as Symbol,
-        tokens::{Precision, Quantity, TokenFlags, Wrapper as Tokens},
+        tokens::{Precision, Quantity, TokenFlags, TokenRecord, Wrapper as Tokens},
         virtual_server::Wrapper as VirtualServer,
     };
     use psibase::FlagsType;
@@ -49,10 +23,14 @@ mod service {
             .expect("no producer")
     }
 
+    fn sys_token() -> TokenRecord {
+        Tokens::call().getSysToken().expect("system token not set")
+    }
+
     /// Create the untransferable system token and take its issuer NFT.
     #[action]
     fn create_token() {
-        if ConfigRow::get().is_some() {
+        if Tokens::call().getSysToken().is_some() {
             return;
         }
 
@@ -61,10 +39,6 @@ mod service {
         Nft::call().debit(nft_id, "".into());
         Tokens::call().setTokenConf(id, TokenFlags::UNTRANSFERABLE.index(), true);
         Tokens::call_as(Tokens::SERVICE).setSysToken(id);
-
-        ConfigTable::read_write()
-            .put(&ConfigRow { token_id: id })
-            .unwrap();
     }
 
     /// Map the system token to the `psi` symbol.
@@ -74,12 +48,9 @@ mod service {
             return;
         }
 
-        let tid = ConfigRow::token_id();
+        let tid = sys_token().id;
         Symbol::call_as(Symbol::SERVICE).admin_create(SYSTEM_SYMBOL, Wrapper::SERVICE);
 
-        // `mapSymbol` debits and burns the symbol NFT as the symbol service,
-        // so the NFT has to be credited back to that service first. The sender
-        // still owns it until the debit inside `mapSymbol`.
         let symbol = Symbol::call().getSymbol(SYSTEM_SYMBOL);
         Nft::call().debit(symbol.ownerNft, "".into());
         Nft::call().credit(symbol.ownerNft, Symbol::SERVICE, "".into());
@@ -97,16 +68,12 @@ mod service {
 
     /// Mint the full supply, fill the producer's resource buffer, and give
     /// the producer the remaining tokens plus the issuer NFT.
-    ///
-    /// The token is untransferable, so only the issuer-NFT holder can move it.
-    /// This service buys the resource buffer while it still holds both, then
-    /// hands them to the producer.
     #[action]
     fn fund_producer() {
         assert_eq!(get_sender(), Wrapper::SERVICE, "Unauthorized");
-        let tid = ConfigRow::token_id();
+        let token = sys_token();
+        let tid = token.id;
         let producer = producer();
-        let token = Tokens::call().getToken(tid);
 
         if token.issued_supply.value == 0 {
             let supply = token.max_issued_supply;
@@ -127,7 +94,7 @@ mod service {
             Tokens::call_from(producer).debit(tid, Wrapper::SERVICE, remaining, "".into());
         }
 
-        let nft_id = Tokens::call().getToken(tid).nft_id;
+        let nft_id = token.nft_id;
         if Nft::call().getNft(nft_id).owner != producer {
             Nft::call().credit(nft_id, producer, "issuer".into());
             Nft::call_from(producer).debit(nft_id, "".into());
