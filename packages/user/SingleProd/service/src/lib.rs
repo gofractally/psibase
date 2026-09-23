@@ -59,9 +59,6 @@ mod service {
     /// Point resource fees at the producer. Billing stays disabled.
     #[action]
     fn init_billing() {
-        if VirtualServer::call().get_fee_receiver().is_some() {
-            return;
-        }
         VirtualServer::call_as(VirtualServer::SERVICE).init_billing(producer());
     }
 
