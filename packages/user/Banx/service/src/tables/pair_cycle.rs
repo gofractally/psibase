@@ -97,12 +97,9 @@ impl PairCycle {
         }
     }
 
-    fn cycle_end(started: TimePointSec, grace_seconds: u32) -> i64 {
-        started.seconds.saturating_add(i64::from(grace_seconds))
-    }
-
-    /// After a claim moves to a new creditor: keep the source remaining
-    /// window (same end). Do not start the dest's posted grace — that
+    /// Empty destination keeps the source remaining window (same end).
+    /// An already-open destination keeps its own window; the incoming
+    /// slice shares it. Do not start the dest's posted grace — that
     /// would reset an already-aged claim.
     pub fn inherit_on_transfer(
         to_creditor: AccountNumber,
@@ -115,25 +112,6 @@ impl PairCycle {
         let src_in_grace = src.map(|c| c.in_grace_at(now)).unwrap_or(false);
 
         if dest_occupied {
-            if !src_in_grace {
-                return;
-            }
-            let src = src.unwrap();
-            let src_end = Self::cycle_end(src.cycle_started_at, src.cycle_grace_seconds);
-            let Some(mut dest) = Self::get(to_creditor, debtor, asset_id) else {
-                return;
-            };
-            if !dest.in_grace_at(now) {
-                return;
-            }
-            let dest_end = Self::cycle_end(dest.cycle_started_at, dest.cycle_grace_seconds);
-            if src_end <= dest_end {
-                return;
-            }
-            dest.cycle_grace_seconds =
-                u32::try_from(src_end.saturating_sub(dest.cycle_started_at.seconds))
-                    .unwrap_or(u32::MAX);
-            dest.save();
             return;
         }
 

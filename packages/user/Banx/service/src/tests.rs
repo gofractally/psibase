@@ -2522,6 +2522,141 @@ mod tests {
         Ok(())
     }
 
+    /// A net that cancels nothing must not slide the interest epoch.
+    /// Day-8 exposure stays the full compound from origination.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_grace_noop_net_keeps_origination_epoch(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        const RATE: u32 = 100_000;
+        const PRINCIPAL: u64 = 1_000_000;
+
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(
+                alice,
+                usd,
+                Quantity::new(10_000_000),
+                false,
+                RATE,
+                WEEK_SECS,
+            )
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(bob, usd)],
+                Quantity::new(PRINCIPAL),
+                Quantity::new(PRINCIPAL),
+                0,
+            )
+            .get()?;
+
+        let epoch = Obligation::get_by_interest_rate(bob, alice, usd, RATE)
+            .unwrap()
+            .last_interest_accrual
+            .seconds;
+
+        chain.start_block_after(Seconds::new(3 * 86_400).into());
+        Wrapper::push_from(&chain, alice)
+            .net(bob, usd, Quantity::new(0))
+            .get()?;
+        assert_eq!(exp(&chain, bob, alice, usd), PRINCIPAL);
+
+        let epoch_after = Obligation::get_by_interest_rate(bob, alice, usd, RATE)
+            .unwrap()
+            .last_interest_accrual
+            .seconds;
+        assert_eq!(
+            epoch_after, epoch,
+            "no-op net during grace moved last_interest_accrual from {epoch} to {epoch_after}"
+        );
+
+        chain.start_block_after(Seconds::new(5 * 86_400).into());
+        let want = compound_amount(PRINCIPAL, RATE, 8 * SECONDS_PER_DAY as u64);
+        let slid = compound_amount(PRINCIPAL, RATE, 5 * SECONDS_PER_DAY as u64);
+        let got = exp(&chain, bob, alice, usd);
+        assert_eq!(
+            got, want,
+            "no-op net on day 3 must not restart the epoch; day-8 exposure should be \
+             8 days from origination ({want}), not 5 days from the poke ({slid}), got {got}"
+        );
+        Ok(())
+    }
+
+    /// Crediting a different rate bucket during grace must not restart
+    /// an untouched bucket's epoch. Auto-net with nothing to cancel is
+    /// still a lone accrue on that other row.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_grace_other_rate_keeps_origination_epoch(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        const RATE: u32 = 100_000;
+        const PRINCIPAL: u64 = 1_000_000;
+
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(
+                alice,
+                usd,
+                Quantity::new(10_000_000),
+                false,
+                RATE,
+                WEEK_SECS,
+            )
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(bob, usd)],
+                Quantity::new(PRINCIPAL),
+                Quantity::new(PRINCIPAL),
+                0,
+            )
+            .get()?;
+
+        let epoch = Obligation::get_by_interest_rate(bob, alice, usd, RATE)
+            .unwrap()
+            .last_interest_accrual
+            .seconds;
+
+        chain.start_block_after(Seconds::new(3 * 86_400).into());
+        // Same direction as the draw: Alice owes Bob 1 more unit, at 0%.
+        // Nothing sits on the reverse side, so auto-net cancels 0.
+        Wrapper::push_from(&chain, alice)
+            .deposit(bob, usd, Quantity::new(1), 0, 0)
+            .get()?;
+
+        let hi = Obligation::get_by_interest_rate(bob, alice, usd, RATE).unwrap();
+        assert_eq!(hi.remaining_principal.value, PRINCIPAL);
+        assert_eq!(
+            hi.last_interest_accrual.seconds, epoch,
+            "0% deposit on day 3 moved the untouched 10% epoch from {epoch} to {}",
+            hi.last_interest_accrual.seconds
+        );
+        let dust = Obligation::get_by_interest_rate(bob, alice, usd, 0).unwrap();
+        assert_eq!(dust.remaining_principal.value, 1);
+
+        chain.start_block_after(Seconds::new(5 * 86_400).into());
+        let want = compound_amount(PRINCIPAL, RATE, 8 * SECONDS_PER_DAY as u64) + 1;
+        let slid = compound_amount(PRINCIPAL, RATE, 5 * SECONDS_PER_DAY as u64) + 1;
+        let got = exp(&chain, bob, alice, usd);
+        assert_eq!(
+            got, want,
+            "untouched 10% bucket must still compound 8 days from origination ({want}), \
+             not 5 days from the other bucket's credit ({slid}), got {got}"
+        );
+        Ok(())
+    }
+
     #[psibase::test_case(packages("Banx"))]
     fn test_grace_repay_to_zero_waives(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
@@ -2870,6 +3005,88 @@ mod tests {
             exp(&chain, peter, bob, usd),
             1_000_000,
             "still inside the original 7-day window"
+        );
+        Ok(())
+    }
+
+    /// Selling one in-grace unit into a buyer who already holds an open
+    /// cycle must not push that cycle's end later. The buyer's existing
+    /// principal keeps its window.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_sell_claim_does_not_lengthen_open_dest_grace(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        let peter = account!("peter");
+        for a in [alice, bob, peter] {
+            chain.new_account(a).unwrap();
+        }
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        const RATE: u32 = 100_000;
+        const PETER_PRINCIPAL: u64 = 1_000_000;
+
+        Wrapper::push_from(&chain, peter)
+            .st_crd_lne(bob, usd, Quantity::new(10_000_000), false, RATE, WEEK_SECS)
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .path_pay(
+                vec![hop(peter, usd)],
+                Quantity::new(PETER_PRINCIPAL),
+                Quantity::new(PETER_PRINCIPAL),
+                0,
+            )
+            .get()?;
+        Wrapper::push_from(&chain, peter)
+            .st_glb_buy(usd, Quantity::new(0), 0, never())
+            .get()?;
+
+        // One day of Peter's 7-day window left.
+        chain.start_block_after(Seconds::new(6 * 86_400).into());
+        assert_eq!(exp(&chain, peter, bob, usd), PETER_PRINCIPAL);
+
+        Wrapper::push_from(&chain, alice)
+            .st_crd_lne(bob, usd, Quantity::new(10_000_000), false, RATE, WEEK_SECS)
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .path_pay(
+                vec![hop(alice, usd)],
+                Quantity::new(1_000),
+                Quantity::new(1_000),
+                0,
+            )
+            .get()?;
+
+        let before = PairCycle::get(peter, bob, usd).expect("peter's open cycle");
+        assert_eq!(before.cycle_grace_seconds, WEEK_SECS);
+        assert!(before.cycle_started_at.seconds != 0);
+
+        Wrapper::push_from(&chain, alice)
+            .sell_claim(peter, bob, usd, Quantity::new(1))
+            .get()?;
+
+        assert_eq!(exp(&chain, peter, bob, usd), PETER_PRINCIPAL + 1);
+        assert_eq!(exp(&chain, alice, bob, usd), 999);
+        let after = PairCycle::get(peter, bob, usd).expect("cycle still open");
+        assert_eq!(
+            after.cycle_started_at.seconds,
+            before.cycle_started_at.seconds
+        );
+        assert_eq!(
+            after.cycle_grace_seconds, before.cycle_grace_seconds,
+            "1-unit sale lengthened Peter's open grace from {}s to {}s",
+            before.cycle_grace_seconds, after.cycle_grace_seconds
+        );
+
+        // Past Peter's original end, still inside Alice's later window.
+        chain.start_block_after(Seconds::new(2 * 86_400).into());
+        let face = PETER_PRINCIPAL + 1;
+        let got = exp(&chain, peter, bob, usd);
+        assert!(
+            got > face,
+            "Peter's original window has ended; existing principal must be \
+             charging (face {face}, got {got})"
         );
         Ok(())
     }

@@ -124,20 +124,15 @@ impl Obligation {
             .into()
     }
 
-    /// Write live interest and start a new epoch. Only for principal/rate
-    /// changes — not for a lone accrue, so 5s vs 5y stays identical.
-    /// During grace, skip new compounding and move the epoch to now so
-    /// post-grace compound runs from this principal change, not origination.
-    /// Keep already-finalized interest (transferred aged claims).
+    /// Finalize live interest and start a new epoch.
+    ///
+    /// No-op during grace. A touch must not move the epoch, or post-grace
+    /// compound starts at the touch instead of the last balance change.
+    /// Callers that change principal or stored interest slide the epoch
+    /// via [`Self::note_grace_change`].
     pub fn accrue(&mut self) {
         let now = Self::now();
         if PairCycle::pair_in_grace(self.creditor, self.debtor, self.asset_id, now) {
-            if now.seconds != self.last_interest_accrual.seconds {
-                self.last_interest_accrual = now;
-                if !self.is_clear() {
-                    self.save();
-                }
-            }
             return;
         }
         let live = self.live_accrued_at(now);
@@ -148,6 +143,17 @@ impl Obligation {
         self.last_interest_accrual = now;
         if !self.is_clear() {
             self.save();
+        }
+    }
+
+    /// This row's balance changed during grace. Later compound runs from now,
+    /// so principal added or removed is not back-dated to the old epoch.
+    fn note_grace_change(&mut self) {
+        let now = Self::now();
+        if PairCycle::pair_in_grace(self.creditor, self.debtor, self.asset_id, now)
+            && now.seconds != self.last_interest_accrual.seconds
+        {
+            self.last_interest_accrual = now;
         }
     }
 
@@ -211,7 +217,11 @@ impl Obligation {
                 break;
             }
             let take = left.min(o.accrued_interest.value);
+            if take == 0 {
+                continue;
+            }
             o.accrued_interest = (o.accrued_interest.value - take).into();
+            o.note_grace_change();
             left -= take;
         }
         for o in obs.iter_mut() {
@@ -219,7 +229,11 @@ impl Obligation {
                 break;
             }
             let take = left.min(o.remaining_principal.value);
+            if take == 0 {
+                continue;
+            }
             o.remaining_principal = (o.remaining_principal.value - take).into();
+            o.note_grace_change();
             left -= take;
         }
     }
@@ -262,6 +276,7 @@ impl Obligation {
             let take_i = left.min(o.accrued_interest.value);
             if take_i > 0 {
                 o.accrued_interest = (o.accrued_interest.value - take_i).into();
+                o.note_grace_change();
                 Self::add_rate_delta(&mut dest_delta, o.interest_rate, take_i, 0);
                 left -= take_i;
             }
@@ -273,6 +288,7 @@ impl Obligation {
             let take_p = left.min(o.remaining_principal.value);
             if take_p > 0 {
                 o.remaining_principal = (o.remaining_principal.value - take_p).into();
+                o.note_grace_change();
                 Self::add_rate_delta(&mut dest_delta, o.interest_rate, 0, take_p);
                 left -= take_p;
             }
@@ -327,6 +343,7 @@ impl Obligation {
     ) {
         let mut dest = Self::get_existing_or_new(creditor, debtor, asset_id, rate);
         dest.accrue();
+        let mut changed = false;
         if interest > 0 {
             dest.accrued_interest = dest
                 .accrued_interest
@@ -334,6 +351,7 @@ impl Obligation {
                 .checked_add(interest)
                 .expect("accrued overflow")
                 .into();
+            changed = true;
         }
         if principal > 0 {
             dest.remaining_principal = dest
@@ -342,6 +360,10 @@ impl Obligation {
                 .checked_add(principal)
                 .expect("obligation principal overflow")
                 .into();
+            changed = true;
+        }
+        if changed {
+            dest.note_grace_change();
         }
         dest.save();
     }
@@ -413,6 +435,7 @@ impl Obligation {
             .checked_add(amount.value)
             .expect("obligation principal overflow")
             .into();
+        self.note_grace_change();
         self.save();
         let after_clear = Self::pair_clear(self.creditor, self.debtor, self.asset_id);
         PairCycle::sync_cycle(
