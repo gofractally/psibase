@@ -5,8 +5,9 @@ use bindings::*;
 
 mod errors;
 use errors::ErrorType::*;
-mod db;
-use db::*;
+#[path = "../../shared/open_tx_table.rs"]
+mod open_tx_table;
+use open_tx_table::OpenTx;
 
 use transact::plugin::hook_handlers::*;
 use transact::plugin::types::{Action as ImportAction, Claim as ImportClaim};
@@ -17,8 +18,8 @@ use host::types::types::{self as HostTypes, BodyTypes, PluginRef};
 
 use exports::transact::plugin::types::{Action as ExportAction, Claim as ExportClaim};
 use exports::transact::plugin::{
-    api::Guest as Api, auth::Guest as Auth, authorized::Guest as Authorized,
-    hooks::Guest as Hooks, ledger::Guest as Ledger, network::Guest as Network,
+    api::Guest as Api, auth::Guest as Auth, authorized::Guest as Authorized, hooks::Guest as Hooks,
+    network::Guest as Network,
 };
 
 use crate::trust::*;
@@ -66,16 +67,6 @@ psibase::define_trust! {
 
 struct TransactPlugin {}
 
-fn assert_transact_driver(context: &str) {
-    let sender = Client::get_sender();
-    assert!(
-        sender == "transact",
-        "{} can only be called by transact, got {}",
-        context,
-        sender
-    );
-}
-
 fn validate_action_name(action_name: &str) -> Result<(), HostTypes::Error> {
     let re = regex::Regex::new(r"^([a-zA-Z0-9_]+|#[a-z]{16})$").unwrap();
     if re.is_match(action_name) {
@@ -85,10 +76,10 @@ fn validate_action_name(action_name: &str) -> Result<(), HostTypes::Error> {
 }
 
 fn get_action_sender(service: &str, method: &str) -> Result<String, HostTypes::Error> {
-    if let Some(sender) = ProposeLatch::subsequent_action_sender() {
+    if let Some(sender) = OpenTx::latch_sender() {
         return Ok(sender);
     }
-    if let Some(plugin) = ActionSenderHook::get() {
+    if let Some(plugin) = OpenTx::sender_hook() {
         if let Some(s) = on_actions_sender(
             PluginRef::new(plugin.as_str(), "plugin", "transact-hook-actions-sender"),
             service,
@@ -104,22 +95,6 @@ fn get_action_sender(service: &str, method: &str) -> Result<String, HostTypes::E
     Err(NotLoggedIn("get_action_sender").into())
 }
 
-fn to_export_action(a: ImportAction) -> ExportAction {
-    ExportAction {
-        sender: a.sender,
-        service: a.service,
-        method: a.method,
-        raw_data: a.raw_data,
-    }
-}
-
-fn to_export_claim(c: ImportClaim) -> ExportClaim {
-    ExportClaim {
-        verify_service: c.verify_service,
-        raw_data: c.raw_data,
-    }
-}
-
 fn schedule_action(
     service: String,
     method_name: String,
@@ -128,17 +103,17 @@ fn schedule_action(
     validate_action_name(&method_name)?;
     let sender = get_action_sender(service.as_str(), method_name.as_str())?;
 
-    let action = ImportAction {
+    let action = psibase::Action::from(ImportAction {
         sender,
         service,
         method: method_name,
         raw_data: packed_args,
-    };
+    });
 
-    if ProposeLatch::is_active() {
-        ProposeLatch::add(action);
+    if OpenTx::latch_is_active() {
+        OpenTx::add_latched(action);
     } else {
-        TxActions::add(action);
+        OpenTx::add_action(action);
     }
 
     Ok(())
@@ -158,26 +133,8 @@ fn pack_staged_propose(actions: Vec<ImportAction>, auto_exec: bool) -> (String, 
 }
 
 fn flush_propose_latch() -> Result<(), HostTypes::Error> {
-    let Some(latch) = ProposeLatch::take() else {
-        return Ok(());
-    };
-
-    if latch.actions.is_empty() {
-        return Ok(());
-    }
-
-    let Some(proposer) = accounts::query::api::get_current_user() else {
-        return Err(NotLoggedIn("flush_propose_latch").into());
-    };
-
-    let (service, method, raw_data) = pack_staged_propose(latch.actions, true);
-    TxActions::add(ImportAction {
-        sender: proposer,
-        service,
-        method,
-        raw_data,
-    });
-    Ok(())
+    OpenTx::flush_latch(accounts::query::api::get_current_user().as_deref())
+        .map_err(|_| NotLoggedIn("flush_propose_latch").into())
 }
 
 fn user_auth_claim(user: &str) -> Result<Option<ImportClaim>, HostTypes::Error> {
@@ -226,19 +183,19 @@ impl Hooks for TransactPlugin {
 
         let sender_app = Client::get_sender();
 
-        if let Some(hooked) = ActionSenderHook::get() {
+        if let Some(hooked) = OpenTx::sender_hook() {
             if hooked != sender_app {
                 panic!("Action sender hook already set");
             }
         }
 
-        ActionSenderHook::set(sender_app);
+        OpenTx::set_sender_hook(sender_app);
     }
 
     fn unhook_actions_sender() {
-        if let Some(sender) = ActionSenderHook::get() {
+        if let Some(sender) = OpenTx::sender_hook() {
             if sender == Client::get_sender() {
-                ActionSenderHook::clear();
+                OpenTx::clear_sender_hook();
             }
         }
     }
@@ -253,9 +210,9 @@ impl Api for TransactPlugin {
     }
 
     fn add_signature(claim: ExportClaim) -> Result<(), HostTypes::Error> {
-        TxSignatures::add(ImportClaim {
-            verify_service: claim.verify_service,
-            raw_data: claim.raw_data,
+        OpenTx::add_claim(psibase::Claim {
+            service: claim.verify_service.parse().unwrap(),
+            rawData: psibase::Hex::from(claim.raw_data),
         });
         Ok(())
     }
@@ -271,13 +228,13 @@ impl Api for TransactPlugin {
             return flush_propose_latch();
         };
 
-        if let Some(existing) = ProposeLatch::subsequent_action_sender() {
+        if let Some(existing) = OpenTx::latch_sender() {
             if existing == acct {
                 return Ok(());
             }
             flush_propose_latch()?;
         }
-        ProposeLatch::open(acct);
+        OpenTx::open_latch(acct);
         Ok(())
     }
 
@@ -349,10 +306,11 @@ impl Auth for TransactPlugin {
             actions,
             claims,
         };
-        let proofs: Vec<Hex<Vec<u8>>> = user_auth_proof(&user, &Sha256::digest(&tx.packed()).into())?
-            .into_iter()
-            .map(|proof| Hex::from(proof.signature))
-            .collect();
+        let proofs: Vec<Hex<Vec<u8>>> =
+            user_auth_proof(&user, &Sha256::digest(&tx.packed()).into())?
+                .into_iter()
+                .map(|proof| Hex::from(proof.signature))
+                .collect();
         let signed_tx = SignedTransaction {
             transaction: Hex::from(tx.packed()),
             proofs,
@@ -382,53 +340,6 @@ impl Auth for TransactPlugin {
 impl Authorized for TransactPlugin {
     fn graphql(query: String) -> Result<String, HostTypes::Error> {
         Server::post_graphql_get_json(&query)
-    }
-}
-
-impl Ledger for TransactPlugin {
-    fn clear() {
-        assert_transact_driver("ledger.clear");
-
-        if !TxActions::is_empty() {
-            println!("[Warning] Tx actions should already have been cleared.");
-            TxActions::reset();
-        }
-        if ProposeLatch::is_active() {
-            println!("[Warning] Propose latch should already have been cleared.");
-            ProposeLatch::clear();
-        }
-        if ActionSenderHook::has() {
-            println!("[Warning] Action sender hook should already have been cleared.");
-            ActionSenderHook::clear();
-        }
-        if !TxSignatures::is_empty() {
-            println!("[Warning] Tx signatures should already have been cleared.");
-            TxSignatures::reset();
-        }
-    }
-
-    fn schedule(
-        service: String,
-        method_name: String,
-        packed_args: Vec<u8>,
-    ) -> Result<(), HostTypes::Error> {
-        assert_transact_driver("ledger.schedule");
-        schedule_action(service, method_name, packed_args)
-    }
-
-    fn take_actions() -> Result<Vec<ExportAction>, HostTypes::Error> {
-        assert_transact_driver("ledger.take-actions");
-        flush_propose_latch()?;
-        ActionSenderHook::clear();
-        Ok(TxActions::take().into_iter().map(to_export_action).collect())
-    }
-
-    fn take_signatures() -> Vec<ExportClaim> {
-        assert_transact_driver("ledger.take-signatures");
-        TxSignatures::take()
-            .into_iter()
-            .map(to_export_claim)
-            .collect()
     }
 }
 

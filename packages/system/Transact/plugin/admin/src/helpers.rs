@@ -3,26 +3,16 @@ use crate::bindings::host::crypto::keyvault as HostCrypto;
 use crate::bindings::host::http::api as Server;
 use crate::bindings::host::types::types::{self as HostTypes, BodyTypes, PluginRef};
 use crate::bindings::transact::admin::hook_handlers::*;
-use crate::bindings::transact::plugin::ledger as ActionsLedger;
-use crate::bindings::transact::plugin::types::{Action, Claim, Proof};
+use crate::bindings::transact::plugin::types::{Claim, Proof};
+use crate::errors::ErrorType::*;
+use crate::open_tx_table::OpenTx;
 use crate::types::FromExpirationTime;
 use psibase::fracpack::Pack;
 use psibase::{Hex, SignedTransaction, Tapos, Transaction};
 use serde::Serialize;
 
-fn sign_with_claim(claim: &Claim, tx_hash: &[u8]) -> Result<Vec<u8>, HostTypes::Error> {
-    HostCrypto::sign(tx_hash, &claim.raw_data)
-}
-
-impl From<Action> for psibase::Action {
-    fn from(action: Action) -> Self {
-        psibase::Action {
-            sender: action.sender.parse().unwrap(),
-            service: action.service.parse().unwrap(),
-            method: psibase::MethodNumber::from(action.method.as_str()),
-            rawData: action.raw_data.into(),
-        }
-    }
+fn sign_with_claim(claim: &psibase::Claim, tx_hash: &[u8]) -> Result<Vec<u8>, HostTypes::Error> {
+    HostCrypto::sign(tx_hash, &claim.rawData)
 }
 
 impl From<Claim> for psibase::Claim {
@@ -48,7 +38,7 @@ fn user_auth_proof(user: &str, tx_hash: &[u8; 32]) -> Result<Option<Proof>, Host
 
 pub fn get_proofs(
     tx_hash: &[u8; 32],
-    extra_claims: &[Claim],
+    extra_claims: &[psibase::Claim],
 ) -> Result<Vec<Hex<Vec<u8>>>, HostTypes::Error> {
     // User auth claims come from hook-user-auth. Extra signatures added via
     // add-signature (e.g. invite credentials) are appended after.
@@ -112,23 +102,28 @@ impl From<Transaction> for SimpleTx {
     }
 }
 
+pub fn take_open_actions() -> Result<Vec<psibase::Action>, HostTypes::Error> {
+    if OpenTx::flush_latch(get_current_user().as_deref()).is_err() {
+        return Err(NotLoggedIn("flush_propose_latch").into());
+    }
+    OpenTx::clear_sender_hook();
+    Ok(OpenTx::take_actions())
+}
+
 pub fn make_transaction(
-    actions: Vec<Action>,
+    actions: Vec<psibase::Action>,
     expiration_seconds: u64,
-) -> (Transaction, Vec<Claim>) {
-    let extra_claims = ActionsLedger::take_signatures();
+) -> (Transaction, Vec<psibase::Claim>) {
+    let extra_claims = OpenTx::take_claims();
     let mut claims = Vec::new();
 
     if let Some(user) = get_current_user() {
         if let Some(claim) = user_auth_claim(&user).expect("Failed to retrieve user auth claim") {
-            claims.push(claim);
+            claims.push(psibase::Claim::from(claim));
         }
     }
 
     claims.extend(extra_claims.iter().cloned());
-
-    let claims: Vec<psibase::Claim> = claims.into_iter().map(Into::into).collect();
-    let actions: Vec<psibase::Action> = actions.into_iter().map(Into::into).collect();
 
     let tapos = Tapos::from_expiration_time(expiration_seconds);
 

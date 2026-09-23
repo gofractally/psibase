@@ -93,26 +93,6 @@ interface api {
     propose: func(actions: list<action>, auto-exec: bool) -> result<_, error>;
 }
 
-/// Driver-only open-tx ledger. Callable only by service `transact` (the tx admin driver).
-interface ledger {
-    use host:types/types.{error};
-    use types.{action, claim};
-
-    /// Reset open-tx state (actions, latch, hooks, extra signatures).
-    clear: func();
-
-    /// Append an action for an arbitrary service. Runs sender resolution like
-    /// `add-action-to-transaction`.
-    schedule: func(service: string, method-name: string, packed-args: list<u8>) -> result<_, error>;
-
-    /// Flush the propose latch into the action list, clear the sender hook, then
-    /// take and clear all accumulated actions.
-    take-actions: func() -> result<list<action>, error>;
-
-    /// Take and clear claims appended via `add-signature` (for finish-tx).
-    take-signatures: func() -> list<claim>;
-}
-
 interface auth {
     use host:types/types.{error};
 
@@ -140,7 +120,7 @@ interface network {
     set-snapshot-time: func(seconds: u32) -> result<_, error>;
 }
 
-/// Import this world to append actions / set the propose latch / propose.
+// Include this world to import the most common transact:plugin imports
 world imports {
     import api;
 }

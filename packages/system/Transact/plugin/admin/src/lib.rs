@@ -7,11 +7,12 @@ mod errors;
 use errors::ErrorType::*;
 mod helpers;
 use helpers::*;
+#[path = "../../shared/open_tx_table.rs"]
+mod open_tx_table;
 mod types;
 
 use host::db::store as Store;
 use host::types::types::{self as HostTypes, BodyTypes};
-use transact::plugin::ledger as ActionsLedger;
 use virtual_server::plugin::transact as VirtualServer;
 
 use exports::transact::admin::admin::Guest as Admin;
@@ -44,13 +45,12 @@ impl Admin for TransactAdmin {
             .unwrap();
 
         Store::clear_buffers();
-        ActionsLedger::clear();
     }
 
     fn finish_tx() -> Result<(), HostTypes::Error> {
         assert_authorized_with_whitelist(FunctionName::finish_tx, vec!["supervisor".into()])?;
 
-        let mut actions = ActionsLedger::take_actions()?;
+        let mut actions = take_open_actions()?;
 
         if actions.is_empty() {
             Store::flush_transactional_data();
@@ -60,8 +60,9 @@ impl Admin for TransactAdmin {
         // This will automatically add the actions into the tx to
         // refill the user's gas tank if it is below some threshold
         // and the user is configured for auto-filling.
-        VirtualServer::auto_fill_gas_tank(&actions[0].sender)?;
-        actions.extend(ActionsLedger::take_actions()?);
+        let sender = actions[0].sender.to_string();
+        VirtualServer::auto_fill_gas_tank(&sender)?;
+        actions.extend(take_open_actions()?);
 
         let (tx, extra_claims) = make_transaction(actions, 3);
 

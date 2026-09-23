@@ -16,7 +16,6 @@ world impl {
     include accounts:query/imports;
     include permissions:plugin/imports;
 
-    import transact:plugin/ledger;
     import virtual-server:plugin/transact;
 
     import hook-handlers;
