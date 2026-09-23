@@ -1,6 +1,3 @@
-//! One-time setup for a single-provider private network.
-//! Install at boot instead of FractalGen.
-
 #[psibase::service_tables]
 pub mod tables {
     use psibase::services::tokens::TID;
@@ -41,6 +38,7 @@ mod service {
 
     /// 21 billion tokens, stored at precision 4.
     const MAX_SUPPLY: u64 = 21_000_000_000_0000;
+    const PRECISION: u8 = 4;
     const SYSTEM_SYMBOL: AccountNumber = account!("psi");
     const MAX_PRODUCERS: u8 = 3;
 
@@ -52,17 +50,13 @@ mod service {
     }
 
     /// Create the untransferable system token and take its issuer NFT.
-    ///
-    /// Invoked by `tokens` through `transact::runAs`, which is what authorizes
-    /// the nested `setSysToken`.
     #[action]
     fn create_token() {
-        assert_eq!(get_sender(), Tokens::SERVICE, "Unauthorized");
         if ConfigRow::get().is_some() {
             return;
         }
 
-        let id = Tokens::call().create(Precision::new(4).unwrap(), MAX_SUPPLY.into());
+        let id = Tokens::call().create(Precision::new(PRECISION).unwrap(), MAX_SUPPLY.into());
         let nft_id = Tokens::call().getToken(id).nft_id;
         Nft::call().debit(nft_id, "".into());
         Tokens::call().setTokenConf(id, TokenFlags::UNTRANSFERABLE.index(), true);
@@ -74,11 +68,8 @@ mod service {
     }
 
     /// Map the system token to the `psi` symbol.
-    ///
-    /// Invoked by `symbol` through `transact::runAs`, which authorizes `admin_create`.
     #[action]
     fn set_symbol() {
-        assert_eq!(get_sender(), Symbol::SERVICE, "Unauthorized");
         if Symbol::call().exists(SYSTEM_SYMBOL) {
             return;
         }
@@ -96,11 +87,8 @@ mod service {
     }
 
     /// Point resource fees at the producer. Billing stays disabled.
-    ///
-    /// Invoked by `vserver` through `transact::runAs`.
     #[action]
     fn init_billing() {
-        assert_eq!(get_sender(), VirtualServer::SERVICE, "Unauthorized");
         if VirtualServer::call().get_fee_receiver().is_some() {
             return;
         }
@@ -147,11 +135,8 @@ mod service {
     }
 
     /// Cap the producer set at 3.
-    ///
-    /// Invoked by `producers` through `transact::runAs`.
     #[action]
     fn set_max_prods() {
-        assert_eq!(get_sender(), Producers::SERVICE, "Unauthorized");
         Producers::call_as(Producers::SERVICE).setMaxProds(MAX_PRODUCERS);
     }
 }
