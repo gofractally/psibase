@@ -106,7 +106,13 @@ namespace psibase::net
          }
          catch (std::exception& e)
          {
-            PSIBASE_LOG(peers().logger(peer), warning) << "recv: " << typeid(T).name() << ": " << e.what();
+            auto data = std::span{s.pos, s.end};
+            if (data.size() > 256)
+            {
+               data = data.first(256);
+            }
+            PSIBASE_LOG(peers().logger(peer), warning)
+                << "recv: " << typeid(T).name() << ": " << e.what() << ": " << psio::to_hex(data);
             peers().disconnect(peer);
          }
       }
