@@ -612,7 +612,11 @@ impl Chain {
     /// Doesn't fail if the account already exists.
     pub fn new_account(&self, account: AccountNumber) -> Result<(), anyhow::Error> {
         services::accounts::Wrapper::push(self)
-            .newAccount(account, AccountNumber::new(account_raw!("auth-any")), false)
+            .newAccount(
+                account,
+                AccountNumber::new(account_raw!("auth-any")),
+                services::accounts::NewAccountMode::KEEP_EXISTING,
+            )
             .get()?;
         Ok(())
     }
@@ -1077,7 +1081,6 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
             let at = transact
                 .inner_traces
                 .iter()
-                // TODO: improve this filter.. we need to return whatever is the name of the action somehow if possible...
                 .filter_map(|inner| {
                     if let InnerTraceEnum::ActionTrace(at) = &inner.inner {
                         if Self::is_user_action(&at.action) {

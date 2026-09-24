@@ -1286,7 +1286,6 @@ namespace psio
                   const E&                  error,
                   bool                      allow_unknown_members)
    {
-      // TODO: validate fracpack
       return gql_query(value.unpack(), input_stream, output_stream, error, allow_unknown_members);
    }
 
@@ -1655,7 +1654,10 @@ namespace psio
          error_stream.write('{');
          increase_indent(error_stream);
          write_newline(error_stream);
-         write_str("\"errors\": {", error_stream);
+         write_str("\"errors\": [", error_stream);
+         increase_indent(error_stream);
+         write_newline(error_stream);
+         error_stream.write('{');
          increase_indent(error_stream);
          write_newline(error_stream);
          write_str("\"message\": ", error_stream);
@@ -1663,6 +1665,9 @@ namespace psio
          decrease_indent(error_stream);
          write_newline(error_stream);
          error_stream.write('}');
+         decrease_indent(error_stream);
+         write_newline(error_stream);
+         error_stream.write(']');
          decrease_indent(error_stream);
          write_newline(error_stream);
          error_stream.write('}');

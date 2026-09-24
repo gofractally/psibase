@@ -32,6 +32,7 @@ world = "impl"
 "transact:plugin" = { path = "../../../system/Transact/plugin/transact/wit/world.wit" }
 "guilds:plugin" = { path = "../../Guilds/plugin/wit/world.wit" }
 "accounts:query" = { path = "../../../system/Accounts/plugin/query/wit/world.wit" }
+"tokens:plugin" = { path = "../../Tokens/plugin/wit/world.wit" }
 
 
 [dev-dependencies]

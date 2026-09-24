@@ -48,17 +48,6 @@ namespace psibase
 
    inline const ActionTrace& getTopAction(TransactionTrace& t, size_t num)
    {
-      // TODO: redesign TransactionTrace to make this easier
-      // Current layout:
-      //    verify proof 0
-      //    verify proof 1
-      //    ...
-      //    transaction.sys (below is interspersed with events, console, etc. in execution order)
-      //        check_auth
-      //        action 0
-      //        check_auth
-      //        action 1
-      //        ...
       check(!t.actionTraces.empty(), "TransactionTrace has no actions");
       auto&                           root = t.actionTraces.back();
       std::vector<const ActionTrace*> top_traces;
@@ -175,9 +164,10 @@ namespace psibase
    template <typename T>
    struct FracPackBody
    {
-      std::string       contentType() const { return "application/octet-stream"; }
-      std::vector<char> body() const { return psio::to_frac(value); }
-      T                 value;
+      static std::string  contentType() { return "application/octet-stream"; }
+      std::vector<char>   body() const { return psio::to_frac(value); }
+      static FracPackBody unpack(std::vector<char> data) { return {psio::from_frac<T>(data)}; }
+      T                   value;
    };
 
    template <typename T>

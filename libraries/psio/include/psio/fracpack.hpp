@@ -1,9 +1,3 @@
-// TODO: The interaction between checking for no extra data (no gaps)
-//       and the possible presence of unknown fields and variant tags
-//       has some unsolved border cases. It might be best to only check
-//       for gaps when in a mode which prohibits unknown fields and skip
-//       checking for gaps when in a mode which allows unknown fields.
-
 #pragma once
 
 #include <psio/reflect.hpp>
@@ -97,6 +91,14 @@ namespace psio
    {
       static_assert(sizeof(std::array<T, N>) == N * sizeof(T));
    };
+
+   // Must be contiguous and constructible from raw pointers
+   // The value type must be PackableMemcpy and unaligned
+   template <typename T>
+   concept UnpackableBorrowed =
+       std::is_same_v<T, std::string_view> || std::is_same_v<T, std::span<const char>> ||
+       std::is_same_v<T, std::span<const unsigned char>> ||
+       std::is_same_v<T, std::span<const std::byte>>;
 
    template <typename T>
    concept RefPackable = Packable<std::remove_cvref_t<T>>;
@@ -482,6 +484,20 @@ namespace psio
          return fixed_size == 0;
       }
 
+      template <bool Verify>
+      static bool clear_container(T* value)
+      {
+         if constexpr (UnpackableBorrowed<T>)
+         {
+            *value = T{};
+         }
+         else
+         {
+            value->clear();
+         }
+         return true;
+      }
+
       template <bool Unpack, bool Verify>
       [[nodiscard]] static bool unpack(T*          value,
                                        bool&       has_unknown,
@@ -503,9 +519,16 @@ namespace psio
          }
          if constexpr (Unpack)
          {
-            value->resize(size);
-            if (size)
-               std::memcpy(value->data(), src + pos, fixed_size);
+            if constexpr (UnpackableBorrowed<T>)
+            {
+               *value = T{reinterpret_cast<typename T::pointer>(src + pos), size};
+            }
+            else
+            {
+               value->resize(size);
+               if (size)
+                  std::memcpy(value->data(), src + pos, fixed_size);
+            }
          }
          pos = new_pos;
          return true;

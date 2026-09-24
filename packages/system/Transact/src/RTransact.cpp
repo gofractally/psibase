@@ -1414,8 +1414,7 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
 {
    std::vector<char>            key = getJWTKey();
    std::optional<AccountNumber> result;
-   bool                         isLocalhost = psibase::isLocalhost(request);
-   auto                         rootHost    = to<HttpServer>().rootHost(request.host);
+   auto                         rootHost = to<HttpServer>().rootHost(request.host);
 
    auto isValidJwt = [&](const LoginTokenData& decoded)
    { return decoded.aud == rootHost && checkExp(decoded.exp); };
@@ -1443,7 +1442,7 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
       }
    }
 
-   std::string_view cookieName = isLocalhost ? "SESSION" : "__Host-SESSION";
+   std::string_view cookieName = "__Host-SESSION";
 
    auto tokens = request.getCookie(cookieName);
    for (const auto& token : tokens)
@@ -1576,10 +1575,9 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
          if (!account)
             return make404("Account not found");
          Actor<AuthInterface> auth(RTransact::service, account->authService);
-         auto                 flags = AuthInterface::topActionReq | AuthInterface::firstAuthFlag;
-         if (!auth.checkAuthSys(flags, psibase::AccountNumber{}, sender,
-                                ServiceMethod{AccountNumber{}, MethodNumber{}},
-                                std::vector<ServiceMethod>{}, claims))
+         auto                 flags = AuthInterface::firstAuthFlag;
+         if (!auth.checkAuthSys(flags, sender, ServiceMethod{AccountNumber{}, MethodNumber{}},
+                                claims))
          {
             return make400("Login failed");
          }
