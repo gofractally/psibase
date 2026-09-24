@@ -9,8 +9,8 @@
         "preview": "vite preview"
     },
     "dependencies": {
-        "@bytecodealliance/jco": "1.10.2",
-        "@bytecodealliance/preview2-shim": "^0.17.2",
+        "@bytecodealliance/jco": "1.35.0",
+        "@bytecodealliance/preview2-shim": "0.26.0",
         "@hookform/resolvers": "^5.1.1",
         "@psibase/common-lib": "workspace:*",
         "@radix-ui/react-toast": "^1.2.1",
