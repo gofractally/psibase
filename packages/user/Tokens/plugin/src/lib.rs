@@ -176,7 +176,7 @@ impl TokensPlugin {
 }
 
 impl User for TokensPlugin {
-    #[psibase_plugin::authorized(High, whitelist = ["homepage", "vserver", "invite", "token-swap", "namemarket", "accounts", "config"])]
+    #[psibase_plugin::authorized(High, whitelist = ["homepage", "vserver", "invite", "token-swap", "namemarket", "fractals", "accounts", "config"])]
     fn credit(token_id: u32, debitor: String, amount: String, memo: String) -> Result<(), Error> {
         let amount = Self::non_zero(token_id, amount)?;
         let memo = memo.try_into().unwrap();

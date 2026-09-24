@@ -51,7 +51,7 @@ TEST_CASE("graphql_escape_sequences", "[graphql]")
 
    // Test that unknown escape sequences result in an error
    auto result3 = psio::gql_query(r, R"({ cat(arg: { one: "Hello\x", two: "World" }) })", "");
-   REQUIRE(result3 == R"({"errors": {"message": "expected }"}})");
+   REQUIRE(result3 == R"({"errors": [{"message": "expected }"}]})");
 
    // Test empty string followed by quote (should be valid)
    auto result4 = psio::gql_query(r, R"({ cat(arg: { one: "", two: "\"" }) })", "");
@@ -71,11 +71,11 @@ TEST_CASE("graphql_escape_sequences", "[graphql]")
 
    // Test invalid surrogate pair (high surrogate without low surrogate)
    auto result8 = psio::gql_query(r, R"({ cat(arg: { one: "\uD83D", two: "" }) })", "");
-   REQUIRE(result8 == R"({"errors": {"message": "expected }"}})");
+   REQUIRE(result8 == R"({"errors": [{"message": "expected }"}]})");
 
    // Test invalid surrogate pair (low surrogate without high surrogate)
    auto result9 = psio::gql_query(r, R"({ cat(arg: { one: "\uDE80", two: "" }) })", "");
-   REQUIRE(result9 == R"({"errors": {"message": "expected }"}})");
+   REQUIRE(result9 == R"({"errors": [{"message": "expected }"}]})");
 }
 
 TEST_CASE("graphql_block_strings", "[graphql]")
