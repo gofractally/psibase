@@ -60,8 +60,7 @@ impl Admin for TransactAdmin {
         // This will automatically add the actions into the tx to
         // refill the user's gas tank if it is below some threshold
         // and the user is configured for auto-filling.
-        let sender = actions[0].sender.to_string();
-        VirtualServer::auto_fill_gas_tank(&sender)?;
+        VirtualServer::auto_fill_gas_tank(&actions[0].sender.to_string())?;
         actions.extend(take_open_actions()?);
 
         let (tx, extra_claims) = make_transaction(actions, 3);
