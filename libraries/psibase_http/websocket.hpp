@@ -43,9 +43,15 @@ namespace psibase::http
       enum class P2PState : std::uint8_t
       {
          off,
-         reading,
-         messageReady,
          running,
+         messageReady,
+      };
+
+      enum class P2PResult : std::uint8_t
+      {
+         notP2P,
+         handled,
+         queued,
       };
 
       enum class StateType : std::uint8_t
@@ -105,9 +111,9 @@ namespace psibase::http
             impl->startWrite(shared_from_this());
          }
       }
-      void handleMessage(CloseLock&& l, bool binary);
-      bool handleP2P();
-      void error(const std::error_code& ec)
+      void      handleMessage(CloseLock&& l, bool binary);
+      P2PResult handleP2P();
+      void      error(const std::error_code& ec)
       {
          StateType oldState;
          {
@@ -158,7 +164,7 @@ namespace psibase::http
             {
                return;
             }
-            p2pState = P2PState::reading;
+            p2pState = P2PState::running;
          }
          channel.set("p2p");
          callback(shared_from_this());
@@ -193,7 +199,7 @@ namespace psibase::http
                messageReady = true;
                p2pState     = P2PState::running;
             }
-            else if (p2pState == P2PState::reading)
+            else
             {
                readCallback = std::move(callback);
                return;
@@ -204,10 +210,6 @@ namespace psibase::http
             auto      inbuffer = input.cdata();
             std::span msg{static_cast<const char*>(inbuffer.data()), inbuffer.size()};
             callback(std::error_code{}, std::vector(msg.begin(), msg.end()));
-         }
-         else
-         {
-            readCallback = std::move(callback);
             impl->startRead(shared_from_this());
          }
       }
@@ -278,6 +280,8 @@ namespace psibase::http
    template <typename Stream>
    struct WebSocketImpl final : WebSocketImplBase
    {
+      using P2PResult = WebSocket::P2PResult;
+
       explicit WebSocketImpl(Stream&& stream) : stream(std::move(stream)) {}
       ~WebSocketImpl() {}
       void startWrite(std::shared_ptr<WebSocket>&& self) override
@@ -351,7 +355,7 @@ namespace psibase::http
                    if (ec)
                    {
                       auto outbox = std::move(self->outbox);
-                      l.unlock(); // `error()` locks the mutex
+                      l.unlock();  // `error()` locks the mutex
                       if (ec != make_error_code(boost::asio::error::operation_aborted))
                       {
                          self->error(ec);
@@ -376,6 +380,8 @@ namespace psibase::http
                 }
              });
       }
+      // readLoop is always running unless either there is a buffered
+      // message, either a p2p message or one waiting for the lock.
       void readLoop(std::shared_ptr<WebSocket>&& self)
       {
          auto& input = self->input;
@@ -389,8 +395,15 @@ namespace psibase::http
                 }
                 else
                 {
-                   if (self->handleP2P())
+                   if (auto res = self->handleP2P(); res != P2PResult::notP2P)
+                   {
+                      if (res == P2PResult::handled)
+                      {
+                         auto derived = static_cast<WebSocketImpl*>(self->impl.get());
+                         derived->readLoop(std::move(self));
+                      }
                       return;
+                   }
                    if (auto l = self->server.sharedState->sockets()->lockRecv(self))
                    {
                       auto derived = static_cast<WebSocketImpl*>(self->impl.get());
@@ -405,8 +418,15 @@ namespace psibase::http
          boost::asio::post(stream.get_executor(),
                            [l = std::move(l), self = std::move(self)]() mutable
                            {
-                              if (self->handleP2P())
+                              if (auto res = self->handleP2P(); res != P2PResult::notP2P)
+                              {
+                                 if (res == P2PResult::handled)
+                                 {
+                                    auto derived = static_cast<WebSocketImpl*>(self->impl.get());
+                                    derived->readLoop(std::move(self));
+                                 }
                                  return;
+                              }
                               auto derived = static_cast<WebSocketImpl*>(self->impl.get());
                               self->handleMessage(std::move(l), derived->stream.got_binary());
                               derived->readLoop(std::move(self));

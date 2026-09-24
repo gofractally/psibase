@@ -78,7 +78,7 @@ void WebSocket::handleMessage(CloseLock&& l, bool binary)
    }
 }
 
-bool WebSocket::handleP2P()
+WebSocket::P2PResult WebSocket::handleP2P()
 {
    auto inbuffer = input.cdata();
    auto msg      = std::span{static_cast<const char*>(inbuffer.data()), inbuffer.size()};
@@ -86,7 +86,12 @@ bool WebSocket::handleP2P()
    {
       std::unique_lock l{mutex};
       using P2PState = WebSocket::P2PState;
-      if (readCallback)
+      assert(p2pState != P2PState::messageReady);
+      if (p2pState == P2PState::off)
+      {
+         return P2PResult::notP2P;
+      }
+      else if (readCallback)
       {
          l.unlock();
          auto readCallback  = std::move(this->readCallback);
@@ -95,13 +100,14 @@ bool WebSocket::handleP2P()
          auto data          = std::vector(msg.begin(), msg.end());
          input.consume(input.size());
          readCallback(std::error_code{}, std::move(data));
-         return true;
+         return P2PResult::handled;
       }
-      else if (p2pState == P2PState::reading)
+      else
       {
+         assert(p2pState == P2PState::running);
          p2pState = P2PState::messageReady;
-         return true;
+         return P2PResult::queued;
       }
    }
-   return false;
+   return P2PResult::notP2P;
 }
