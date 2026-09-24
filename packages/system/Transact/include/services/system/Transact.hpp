@@ -47,14 +47,10 @@ namespace SystemService
 
       /// See header
       ///
-      /// Transaction's first authorizer. This flag is only
-      /// used for `topActionReq`.
+      /// Transaction's first authorizer.
       ///
-      /// Auth services should be aware that if this flag
-      /// is set, then only the first proof has been verified.
-      /// If they rely on other proofs when this flag is set,
-      /// they'll open up the accounts they're trying to
-      /// protect to resource billing attacks.
+      /// This flag is set when checking the authorization of the
+      /// sender of the first action of a transaction.
       static constexpr uint32_t firstAuthFlag = 0x4000'0000;
 
       /// Authenticate a top-level action or a `runAs` action
