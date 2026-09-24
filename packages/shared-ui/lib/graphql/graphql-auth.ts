@@ -14,11 +14,12 @@ type GraphqlResponse<T> = {
 /**
  * Runs an authenticated GraphQL query.
  *
- * Front ends cannot query another service's `/graphql` endpoint directly: the
- * default Content Security Policy only allows `connect-src 'self'`, and a
- * direct request would carry no session credentials anyway. Instead, the query
- * is routed through the app's own plugin (`call`), which attaches the current
- * user's query token for the target service and forwards the request.
+ * Front ends cannot query another service's `/graphql` endpoint directly
+ * without setting a custom CSP allowance: the default Content Security Policy
+ * only allows `connect-src 'self'`, and a direct request would carry no
+ * session credentials anyway. Instead, the query is routed through the app's
+ * own plugin (`call`), which attaches the current user's query token for the
+ * target service and forwards the request.
  *
  * Use this instead of `postGraphQLGetJson` whenever the query targets a
  * service other than the current app, or when the query requires the

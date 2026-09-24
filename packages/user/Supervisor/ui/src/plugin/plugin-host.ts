@@ -73,8 +73,6 @@ export class PluginHost implements HostInterface {
     }
 
     // Classifies the response body from the response's Content-Type header.
-    // The request's Accept header is deliberately not consulted: it lists what
-    // the client can handle, not what the server sent.
     private getBodyTagFromContentType(
         contentType: string,
     ): "json" | "text" | "bytes" {
@@ -171,7 +169,7 @@ export class PluginHost implements HostInterface {
             }
             if (xhr.status === 500) {
                 throw this.recoverableError(
-                    `Http request error: ${bytes ? decodeText(bytes) : ""}`,
+                    `Http request error: ${bytes ? decodeText(bytes) : "No response body"}`,
                 );
             }
             const headers: Array<[string, string]> = [];

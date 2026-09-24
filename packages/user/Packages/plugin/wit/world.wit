@@ -78,9 +78,6 @@ interface private-api {
 
     // Takes a list of available packages and packages to install or update
     // and returns a list of operations to apply.
-    // Named resolve-packages (not resolve): jco async instantiate binds
-    // `let resolve` in the same scope as imports, so a WIT import named
-    // resolve makes the generated JS throw and the plugin never becomes ready.
     resolve-packages: func(index: list<package-info>, request: list<string>, request-pref: package-preference, non-request-pref: package-preference) -> result<list<package-op-info>, error>;
 
     // Returns two lists of transactions
