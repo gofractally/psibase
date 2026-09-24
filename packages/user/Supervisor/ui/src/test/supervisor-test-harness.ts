@@ -12,7 +12,7 @@ import {
 } from "./test-plugin";
 
 const MOCK_APP: QualifiedPluginId = { service: "mock", plugin: "plugin" };
-const TRANSACT: QualifiedPluginId = { service: "transact", plugin: "plugin" };
+const TRANSACT: QualifiedPluginId = { service: "transact", plugin: "admin" };
 
 export const TEST_ORIGIN = "http://network.psibase.localhost:8080";
 
