@@ -209,7 +209,9 @@ namespace psibase::http
          {
             auto      inbuffer = input.cdata();
             std::span msg{static_cast<const char*>(inbuffer.data()), inbuffer.size()};
-            callback(std::error_code{}, std::vector(msg.begin(), msg.end()));
+            auto      data = std::vector(msg.begin(), msg.end());
+            input.consume(input.size());
+            callback(std::error_code{}, std::move(data));
             impl->startRead(shared_from_this());
          }
       }
@@ -385,6 +387,7 @@ namespace psibase::http
       void readLoop(std::shared_ptr<WebSocket>&& self)
       {
          auto& input = self->input;
+         assert(input.size() == 0);
          stream.async_read(
              input,
              [self = std::move(self)](const std::error_code& ec, std::size_t bytes_read) mutable
