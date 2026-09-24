@@ -65,7 +65,7 @@ class Packaging extends PluginInterface {
      * repositories may live on other chains or plain HTTP servers that plugins
      * cannot reach.
      */
-    get resolve() {
+    get resolvePackages() {
         return this._call<
             [
                 index: unknown[],
@@ -74,7 +74,7 @@ class Packaging extends PluginInterface {
                 nonRequestPref: PackagePreference,
             ],
             unknown[]
-        >("resolve");
+        >("resolvePackages");
     }
 
     /** Builds, uploads, and proposes installation of already-fetched packages. */
