@@ -525,11 +525,28 @@ fn disk_accounting_invariant(chain: psibase::Chain) -> Result<(), psibase::Error
 #[psibase::test_case(packages("VirtualServer", "StagedTx", "Invite", "Credentials"))]
 fn invites(chain: psibase::Chain) -> Result<(), psibase::Error> {
     let invite = invite::Wrapper::SERVICE;
+    let cred_sys = credentials::CREDENTIAL_SENDER;
+    let vserver = Wrapper::SERVICE;
     let sys: tokens::TID = 1;
     let token_prod = chain.login(PRODUCER_ACCOUNT, Wrapper::SERVICE)?;
 
     initial_setup(&chain)?;
     setup_enable_billing(&chain)?;
+
+    // The default leeway isn't enough in a debug build
+    // Add some resources to the cred-sys account so we
+    // don't time out before switching over to the invite's
+    // subaccount.
+    let min_resource_buffer = get_user_resources(&chain, PRODUCER_ACCOUNT, &token_prod)?
+        .bufferCapacity
+        .quantity
+        .value;
+    tokens::Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
+        .credit(sys, vserver, min_resource_buffer.into(), "".into())
+        .get()?;
+    Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
+        .buy_res_for(min_resource_buffer.into(), cred_sys, None)
+        .get()?;
 
     // Create the invite
     let (public_key, private_key) = psibase::generate_keypair()?;
@@ -603,6 +620,20 @@ fn invites(chain: psibase::Chain) -> Result<(), psibase::Error> {
         check_disk_invariant("end of invites", &chain),
         "disk accounting invariant violated"
     );
+
+    // Verify that the resource balance of cred_sys is untouched
+    use psibase::fracpack::Unpack;
+    let cred_resources = Quantity::unpacked(
+        &chain
+            .run_action(
+                RunMode::RPC,
+                false,
+                Wrapper::pack_from(cred_sys).get_resources(cred_sys),
+            )
+            .action_traces[0]
+            .raw_retval,
+    )?;
+    assert_eq!(cred_resources.value, min_resource_buffer);
 
     Ok(())
 }
