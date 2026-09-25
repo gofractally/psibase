@@ -1,6 +1,6 @@
+use crate::bindings::host::accounts::api as HostAccounts;
 use crate::bindings::host::auth::api as HostAuth;
 use crate::bindings::host::db::store::{Bucket, Database, DbMode, StorageDuration};
-use crate::logged_in_user::logged_in_user_table;
 use psibase::fracpack::{Pack, Unpack};
 
 fn connected_accounts_table() -> Bucket {
@@ -44,14 +44,11 @@ impl AppsTable {
     }
 
     pub fn get_logged_in_user(&self) -> Option<String> {
-        logged_in_user_table()
-            .get(&self.app)
-            .map(|a| String::from_utf8(a).unwrap())
+        HostAccounts::get_user(&self.app)
     }
 
     pub fn login(&self, user: &str) {
-        logged_in_user_table().set(&self.app, user.as_bytes());
-
+        HostAccounts::set_current_user(user, &self.app);
         self.connect(user);
     }
 
@@ -86,7 +83,7 @@ impl AppsTable {
         if let Some(user) = self.get_logged_in_user() {
             HostAuth::log_out_user(&user, &self.app);
         }
-        logged_in_user_table().delete(&self.app);
+        HostAccounts::clear_current_user(&self.app);
     }
 
     pub fn get_connected_accounts(&self) -> Vec<String> {
