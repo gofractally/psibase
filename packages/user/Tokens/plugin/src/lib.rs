@@ -19,6 +19,8 @@ use tokens::{service::BalanceFlags, service::TokenFlags, Wrapper as Tokens};
 pub mod query {
     pub mod fetch_network_token;
     pub mod fetch_token;
+    pub mod get_system_token;
+    pub mod get_user_balances;
 }
 
 struct TokensPlugin;
@@ -117,6 +119,31 @@ impl Helpers for TokensPlugin {
     #[psibase_plugin::authorized(None)]
     fn fetch_network_token() -> Result<Option<u32>, Error> {
         Ok(query::fetch_network_token::fetch_network_token()?)
+    }
+
+    #[psibase_plugin::authorized(None)]
+    fn get_system_token() -> Result<Option<Exports::types::SystemTokenInfo>, Error> {
+        Ok(
+            query::get_system_token::get_system_token()?.map(|token| Exports::types::SystemTokenInfo {
+                id: token.id,
+                symbol: token.symbol,
+                precision: token.precision,
+            }),
+        )
+    }
+
+    #[psibase_plugin::authorized(High, whitelist = ["homepage", "accounts", "config"])]
+    fn get_user_balances(user: String) -> Result<Vec<Exports::types::UserBalance>, Error> {
+        Ok(query::get_user_balances::get_user_balances(&user)?
+            .into_iter()
+            .map(|balance| Exports::types::UserBalance {
+                token_id: balance.token_id,
+                balance: balance.balance,
+                symbol: balance.symbol,
+                precision: balance.precision,
+                account: balance.account,
+            })
+            .collect())
     }
 
     #[psibase_plugin::authorized(None)]

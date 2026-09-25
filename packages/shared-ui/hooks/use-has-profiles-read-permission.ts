@@ -1,4 +1,5 @@
-import { profiles, usePluginFunctionQuery } from "@shared/lib/plugins";
+import { usePluginFunctionQuery } from "@shared/hooks/plugin-function/use-plugin-function-query";
+import { hostingAppCall } from "@shared/lib/plugins/host-app";
 
 type Options = {
     enabled?: boolean;
@@ -7,7 +8,11 @@ type Options = {
 export const useHasProfilesReadPermission = (
     { enabled }: Options = { enabled: true },
 ) => {
-    return usePluginFunctionQuery(profiles.api.hasReadPermission, [], {
-        enabled,
-    });
+    return usePluginFunctionQuery(
+        hostingAppCall<[], boolean>("contacts", "hasReadPermission"),
+        [],
+        {
+            enabled,
+        },
+    );
 };

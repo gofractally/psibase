@@ -1,4 +1,4 @@
-import { PRODUCERS } from "@/lib/services";
+import { CONFIG } from "@/lib/services";
 
 import { usePluginMutation } from "./use-plugin-mutation";
 
@@ -13,8 +13,8 @@ export const useProducersPlugin = (
 ) =>
     usePluginMutation(
         {
-            intf: "api",
-            service: PRODUCERS,
+            intf: "producers",
+            service: CONFIG,
             method,
         },
         {

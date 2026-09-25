@@ -30,9 +30,9 @@ export const useCredit = (user: string | null) => {
             );
 
             return supervisor.functionCall({
-                service: "tokens",
+                service: "homepage",
                 plugin: "plugin",
-                intf: "user",
+                intf: "tokens",
                 method: "credit",
                 params: [tokenId, receiver, amount, memo],
             });

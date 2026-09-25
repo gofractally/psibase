@@ -77,7 +77,19 @@ interface user-guild {
     attest-membership-app: func(guild-account: string, applicant: string, comment: string, endorses: bool) -> result<_, error>;
 }
 
+interface invite {
+    use host:types/types.{error};
 
+    import-invite-token: func(token: string) -> result<u32, error>;
+}
+
+interface contacts {
+    use host:types/types.{error};
+    use profiles:plugin/types.{contact};
+
+    get: func() -> result<list<contact>, error>;
+    has-read-permission: func() -> bool;
+}
 
 world imports {
     import user-guild;
@@ -85,4 +97,6 @@ world imports {
     import admin-fractal;
     import user-fractal;
     import user-eval;
+    import invite;
+    import contacts;
 }

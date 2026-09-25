@@ -4,11 +4,14 @@ mod bindings;
 use bindings::exports::fractal_core::plugin::admin_fractal::Guest as AdminFractal;
 use bindings::exports::fractal_core::plugin::admin_guild::Guest as AdminGuild;
 
+use bindings::exports::fractal_core::plugin::contacts::Guest as Contacts;
+use bindings::exports::fractal_core::plugin::invite::Guest as Invite;
 use bindings::exports::fractal_core::plugin::user_eval::Guest as UserEval;
 use bindings::exports::fractal_core::plugin::user_fractal::Guest as UserFractal;
 use bindings::exports::fractal_core::plugin::user_guild::Guest as UserGuild;
 
 use bindings::host::types::types::Error;
+use bindings::profiles::plugin::types::Contact;
 
 use psibase::{define_trust, fracpack::Pack};
 mod errors;
@@ -20,7 +23,7 @@ use bindings::guilds::plugin as GuildsPlugin;
 use trust::{assert_authorized, FunctionName};
 
 use crate::bindings::host::{
-    client::api::get_receiver,
+    client::api::{get_receiver, get_sender},
     db::store::{Bucket, Database, DbMode::Transactional, StorageDuration::Persistent},
 };
 
@@ -65,6 +68,10 @@ define_trust! {
         Medium => [apply_guild, claim_rewards, join_fractal, delete_guild_invite, invite_member, attest_membership_app, get_proposal, register, register_candidacy, unregister],
         High => [attest, set_role_mapping, create_guild, set_role_occupation, set_paid_occupations, exile_member, init_token, donate, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_dist_interval, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guilds, set_schedule],
     }
+}
+
+fn assert_caller_self() {
+    assert_eq!(get_sender(), get_receiver());
 }
 
 struct FractalCorePlugin;
@@ -329,6 +336,25 @@ impl UserGuild for FractalCorePlugin {
             &comment,
             endorses,
         )
+    }
+}
+
+impl Invite for FractalCorePlugin {
+    fn import_invite_token(token: String) -> Result<u32, Error> {
+        assert_caller_self();
+        bindings::invite::plugin::invitee::import_invite_token(&token)
+    }
+}
+
+impl Contacts for FractalCorePlugin {
+    fn get() -> Result<Vec<Contact>, Error> {
+        assert_caller_self();
+        bindings::profiles::plugin::contacts::get()
+    }
+
+    fn has_read_permission() -> bool {
+        assert_caller_self();
+        bindings::profiles::plugin::api::has_read_permission()
     }
 }
 

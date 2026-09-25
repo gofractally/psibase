@@ -2,9 +2,7 @@ use crate::bindings::guilds::plugin as GuildsPlugin;
 use crate::bindings::guilds::plugin::queries::Guild;
 
 use crate::bindings::host::types::types::Error;
-use crate::bindings::{
-    host::client::api::get_receiver, transact::plugin::intf::set_propose_latch,
-};
+use crate::bindings::{host::client::api::get_receiver, transact::plugin::intf::set_propose_latch};
 
 fn latch(account: &str) -> Result<(), Error> {
     set_propose_latch(Some(account))
