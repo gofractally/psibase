@@ -300,6 +300,7 @@ add_rs_component_workspace(packages/:Plugins
     host-crypto
     web-crypto
     transact
+    transact-admin
     workshop
     fractal-core
     config
@@ -342,6 +343,7 @@ psibase_package(
     DESCRIPTION "All transactions enter the chain through this service"
     SERVICE transact
         DATA ${Plugins_OUTPUT_FILE_transact} /plugin.wasm
+        DATA ${Plugins_OUTPUT_FILE_transact_admin} /admin.wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "TransactService(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "ClientData(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "VirtualServer(^${PSIBASE_VERSION}.0)"
 )

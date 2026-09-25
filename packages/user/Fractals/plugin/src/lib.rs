@@ -20,7 +20,7 @@ use crate::bindings::exports::fractals::plugin::types;
 use crate::bindings::guilds::plugin as Guilds;
 use crate::bindings::tokens::plugin::helpers::decimal_to_u64;
 use crate::bindings::tokens::plugin::user as TokensUser;
-use crate::bindings::transact::plugin::intf::set_propose_latch;
+use crate::bindings::transact::plugin::api::set_propose_latch;
 use crate::graphql::fractal::get_fractal;
 use crate::helpers::{get_sender_app, validate_account_name};
 

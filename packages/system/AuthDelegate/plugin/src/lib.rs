@@ -7,7 +7,7 @@ mod errors;
 use errors::ErrorType::*;
 use exports::auth_delegate::plugin::api::{Error, Guest as Api};
 use exports::transact_hook_user_auth::{Claim, Guest as HookUserAuth, Proof};
-use transact::plugin::intf::add_action_to_transaction;
+use transact::plugin::api::add_action_to_transaction;
 
 use crate::trust::*;
 use psibase::fracpack::Pack;

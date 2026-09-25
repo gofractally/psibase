@@ -8,7 +8,7 @@ use bindings::exports::nft::plugin::user_config::Guest as UserConfig;
 
 use bindings::host::http::api::post_graphql_get_json;
 use bindings::host::types::types::Error;
-use bindings::transact::plugin::intf::add_action_to_transaction;
+use bindings::transact::plugin::api::add_action_to_transaction;
 
 use psibase::fracpack::Pack;
 use psibase::{define_trust, FlagsType};

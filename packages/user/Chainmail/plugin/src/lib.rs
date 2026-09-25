@@ -15,7 +15,7 @@ use bindings::exports::chainmail::plugin::{
     queries::{Guest as Query, Message},
 };
 use bindings::host::http::api as CommonServer;
-use bindings::transact::plugin::intf as Transact;
+use bindings::transact::plugin::api as Transact;
 use chrono::DateTime;
 use errors::ErrorType;
 use psibase::fracpack::Pack;
