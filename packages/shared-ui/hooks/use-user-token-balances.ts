@@ -2,7 +2,10 @@ import { type UseQueryResult, useQuery } from "@tanstack/react-query";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { hostingAppCall } from "@shared/lib/plugins/host-app";
-import { callPluginFunction } from "@shared/lib/plugins/lib/call-plugin-function";
+import {
+    type PluginCall,
+    callPluginFunction,
+} from "@shared/lib/plugins/lib/call-plugin-function";
 import { type UserBalance } from "@shared/lib/plugins/tokens";
 import { Quantity } from "@shared/lib/quantity";
 import QueryKey from "@shared/lib/query-keys";
@@ -39,7 +42,10 @@ export function toUserTokenBalances(nodes: UserBalance[]): UserTokenBalance[] {
 
 export const useUserTokenBalances = (
     optionalUsername?: Account | undefined | null,
-    options?: { enabled?: boolean },
+    options?: {
+        enabled?: boolean;
+        call?: PluginCall<[user: string], UserBalance[]>;
+    },
 ): UseQueryResult<UserTokenBalance[], Error> => {
     const { data: currentUser } = useCurrentUser();
     const username = optionalUsername ?? currentUser;
@@ -48,10 +54,11 @@ export const useUserTokenBalances = (
         queryKey: QueryKey.userTokenBalances(username),
         queryFn: async (): Promise<UserTokenBalance[]> => {
             const nodes = await callPluginFunction(
-                hostingAppCall<[user: string], UserBalance[]>(
-                    "tokens",
-                    "getUserBalances",
-                ),
+                options?.call ??
+                    hostingAppCall<[user: string], UserBalance[]>(
+                        "tokens",
+                        "getUserBalances",
+                    ),
                 [zAccount.parse(username)],
             );
             return toUserTokenBalances(nodes);

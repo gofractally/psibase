@@ -1,7 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { hostingAppCall } from "@shared/lib/plugins/host-app";
-import { callPluginFunction } from "@shared/lib/plugins/lib/call-plugin-function";
+import {
+    type PluginCall,
+    callPluginFunction,
+} from "@shared/lib/plugins/lib/call-plugin-function";
 import { type MarketsOverview } from "@shared/lib/plugins/namemarket";
 import QueryKey from "@shared/lib/query-keys";
 import {
@@ -14,6 +17,7 @@ export const ACCOUNT_MARKETS_REFETCH_INTERVAL_MS = 1000;
 export type UseAccountMarketsOptions = {
     refetchInterval?: number | false;
     enabled?: boolean;
+    call?: PluginCall<[], MarketsOverview>;
 };
 
 export const useAccountMarkets = (options?: UseAccountMarketsOptions) =>
@@ -21,10 +25,11 @@ export const useAccountMarkets = (options?: UseAccountMarketsOptions) =>
         queryKey: QueryKey.nameMarketsOverview(),
         queryFn: async (): Promise<AccountMarketOverviewRow[]> => {
             const overview = await callPluginFunction(
-                hostingAppCall<[], MarketsOverview>(
-                    "name-market",
-                    "getMarketsOverview",
-                ),
+                options?.call ??
+                    hostingAppCall<[], MarketsOverview>(
+                        "name-market",
+                        "getMarketsOverview",
+                    ),
                 [],
             );
             return buildAccountMarketOverviewRows(

@@ -25,6 +25,7 @@ import {
 } from "@shared/hooks/use-user-token-balances";
 import { pemToB64 } from "@shared/lib/b64-key-utils";
 import { getAccount } from "@shared/lib/get-account";
+import { accounts } from "@shared/lib/plugins";
 import { Quantity } from "@shared/lib/quantity";
 import QueryKey from "@shared/lib/query-keys";
 import {
@@ -61,14 +62,15 @@ export const CreatePrompt = () => {
 
     const { data: networkName } = useBranding();
     const { data: systemToken, isPending: isPendingSystemToken } =
-        useSystemToken();
+        useSystemToken(accounts.prompt.getSystemToken);
 
     const { data: canBuyAccount, isPending: isPendingCanBuyAccount } =
-        useCanBuyAccount();
+        useCanBuyAccount({ call: accounts.prompt.canBuyAccount });
 
     const { data: tokenBalances, isPending: isPendingBalances } =
         useUserTokenBalances(currentUser, {
             enabled: Boolean(currentUser && canBuyAccount),
+            call: accounts.prompt.getUserBalances,
         });
 
     const availableBalance = useMemo(
@@ -84,6 +86,7 @@ export const CreatePrompt = () => {
         refetchInterval: canBuyAccount
             ? ACCOUNT_MARKETS_REFETCH_INTERVAL_MS
             : false,
+        call: accounts.prompt.getMarketsOverview,
     });
 
     const prices = useMemo(

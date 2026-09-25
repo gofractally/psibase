@@ -3,7 +3,10 @@ import type { SystemTokenInfo as PluginSystemTokenInfo } from "@shared/lib/plugi
 import { useQuery } from "@tanstack/react-query";
 
 import { hostingAppCall } from "@shared/lib/plugins/host-app";
-import { callPluginFunction } from "@shared/lib/plugins/lib/call-plugin-function";
+import {
+    type PluginCall,
+    callPluginFunction,
+} from "@shared/lib/plugins/lib/call-plugin-function";
 import QueryKey from "@shared/lib/query-keys";
 
 export interface SystemTokenInfo {
@@ -28,17 +31,14 @@ export function toSystemTokenInfo(
     };
 }
 
-export const useSystemToken = () =>
+export const useSystemToken = (
+    call: PluginCall<[], PluginSystemTokenInfo | undefined> = hostingAppCall(
+        "tokens",
+        "getSystemToken",
+    ),
+) =>
     useQuery<SystemTokenInfo | null>({
         queryKey: QueryKey.systemToken(),
         queryFn: async () =>
-            toSystemTokenInfo(
-                await callPluginFunction(
-                    hostingAppCall<[], PluginSystemTokenInfo | undefined>(
-                        "tokens",
-                        "getSystemToken",
-                    ),
-                    [],
-                ),
-            ),
+            toSystemTokenInfo(await callPluginFunction(call, [])),
     });

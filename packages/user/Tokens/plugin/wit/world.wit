@@ -171,7 +171,7 @@ interface helpers {
     /// Returns none when no system token is configured.
     get-system-token: func() -> result<option<system-token-info>, error>;
 
-    /// Fetches primary token balances for a user (UI-shaped rows).
+    /// Fetches primary token balances for a user.
     get-user-balances: func(user: string) -> result<list<user-balance>, error>;
 
     /// Uses the precision of the specified token to convert from a token
