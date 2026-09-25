@@ -1,10 +1,11 @@
+import type { MarketsOverview } from "./namemarket";
+import type { SystemTokenInfo, UserBalance } from "./tokens";
+import type { BillingConfig } from "./virtual-server";
+
 import { PluginInterface } from "@shared/hooks/plugin-function";
 import { Account } from "@shared/lib/schemas/account";
 
 import { Plugin as TokenSwapPlugin } from "./token-swap";
-import type { MarketsOverview } from "./namemarket";
-import type { SystemTokenInfo, UserBalance } from "./tokens";
-import type { BillingConfig } from "./virtual-server";
 
 class GraphqlIntf extends PluginInterface {
     constructor(intf: string) {
@@ -75,8 +76,8 @@ class Tokens extends PluginInterface {
     }
 }
 
-class Vserver extends PluginInterface {
-    protected override readonly _intf = "vserver" as const;
+class VirtualServer extends PluginInterface {
+    protected override readonly _intf = "virtual-server" as const;
 
     get getBillingConfig() {
         return this._call<[], BillingConfig>("getBillingConfig");
@@ -91,7 +92,7 @@ export class Plugin {
     readonly accountsMarketplace: AccountsMarketplace;
     readonly tokens: Tokens;
     readonly invite: GraphqlIntf;
-    readonly vserver: Vserver;
+    readonly virtualServer: VirtualServer;
     readonly tokenSwapGraphql: GraphqlIntf;
     readonly contacts: Contacts;
     /** Swap and liquidity forwards; do not use `.authorized` (that intf is not on homepage). */
@@ -101,7 +102,7 @@ export class Plugin {
         this.accountsMarketplace = new AccountsMarketplace();
         this.tokens = new Tokens();
         this.invite = new GraphqlIntf("invite");
-        this.vserver = new Vserver();
+        this.virtualServer = new VirtualServer();
         this.tokenSwapGraphql = new GraphqlIntf("tokenSwap");
         this.contacts = new Contacts();
         this.dex = new TokenSwapPlugin(service);
@@ -110,7 +111,7 @@ export class Plugin {
             this.accountsMarketplace,
             this.tokens,
             this.invite,
-            this.vserver,
+            this.virtualServer,
             this.tokenSwapGraphql,
             this.contacts,
         ] as PluginInterface[];

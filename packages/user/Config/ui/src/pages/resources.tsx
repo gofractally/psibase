@@ -1,8 +1,8 @@
 import { Billing } from "@/components/billing";
 import { VirtualServer } from "@/components/virtual-server";
-import { useSystemToken } from "@/hooks/use-system-token";
 
 import { PageContainer } from "@shared/components/page-container";
+import { useSystemToken } from "@shared/hooks/use-system-token";
 
 export const Resources = () => {
     const { data: systemToken, isLoading: systemTokenLoading } =

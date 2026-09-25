@@ -9,9 +9,9 @@ import {
 
 export type GraphqlPluginCall = PluginCall<[query: string], string>;
 
-export async function fetchCurrentPrices(graphql: GraphqlPluginCall) {
+export async function fetchCurrentPrices(graphqlCall: GraphqlPluginCall) {
     const raw = await callGraphqlViaPlugin(
-        graphql,
+        graphqlCall,
         `
             query {
                 currentPrices {
@@ -27,18 +27,18 @@ export async function fetchCurrentPrices(graphql: GraphqlPluginCall) {
 }
 
 export const fetchCurrentPriceForLength = async (
-    graphql: GraphqlPluginCall,
+    graphqlCall: GraphqlPluginCall,
     length: number,
 ) => {
-    const currentPrices = await fetchCurrentPrices(graphql);
+    const currentPrices = await fetchCurrentPrices(graphqlCall);
     return currentPrices.get(length);
 };
 
 export async function fetchAccountMarketsOverview(
-    graphql: GraphqlPluginCall,
+    graphqlCall: GraphqlPluginCall,
 ): Promise<AccountMarketOverviewRow[]> {
     const raw = await callGraphqlViaPlugin(
-        graphql,
+        graphqlCall,
         `
             query {
                 marketParams {

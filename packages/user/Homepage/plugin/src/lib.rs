@@ -11,7 +11,7 @@ use exports::homepage::plugin::{
     swap::Guest as Swap,
     token_swap::Guest as TokenSwapGraphql,
     tokens::Guest as Tokens,
-    vserver::Guest as Vserver,
+    virtual_server::Guest as VirtualServer,
 };
 use host::types::types::Error;
 use profiles::plugin::types::{Avatar, Contact, Profile};
@@ -181,7 +181,7 @@ impl Invite for HomepagePlugin {
     }
 }
 
-impl Vserver for HomepagePlugin {
+impl VirtualServer for HomepagePlugin {
     fn fill_gas_tank() -> Result<(), Error> {
         virtual_server::plugin::billing::fill_gas_tank()
     }

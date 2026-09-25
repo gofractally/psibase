@@ -21,7 +21,7 @@ world impl {
     export contacts;
     export chainmail;
     export invite;
-    export vserver;
+    export virtual-server;
     export swap;
     export liquidity;
     export token-swap;

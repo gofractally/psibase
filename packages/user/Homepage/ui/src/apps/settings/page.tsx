@@ -1,4 +1,4 @@
-import { useSystemToken } from "@/hooks/use-system-token";
+import { useSystemToken } from "@shared/hooks/use-system-token";
 
 import { UserProfileSection } from "./components/user-profile-section";
 import { UserSettingsSection } from "./components/user-settings-section";

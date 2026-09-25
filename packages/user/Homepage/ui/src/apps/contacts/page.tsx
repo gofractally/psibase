@@ -6,7 +6,6 @@ import { TwoColumnSelect } from "@/components/two-column-select";
 
 import { useContacts } from "@shared/hooks/use-contacts";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
-import { homepage } from "@shared/lib/plugins";
 import { Button } from "@shared/shadcn/ui/button";
 import { DialogTrigger } from "@shared/shadcn/ui/dialog";
 import { Input } from "@shared/shadcn/ui/input";
@@ -26,7 +25,7 @@ export const ContactsPage = () => {
         data: contactsData,
         isLoading: isLoadingContacts,
         isSuccess: isSuccessContacts,
-    } = useContacts(homepage.contacts.get, currentUser);
+    } = useContacts(currentUser);
 
     const { mutate: createContact, isPending: isCreatingContact } =
         useCreateContact();
