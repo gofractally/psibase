@@ -1,5 +1,14 @@
 package auth-delegate:plugin;
 
+interface session {
+    use host:types/types.{error};
+
+    /// Log `account-name` into the currently active app.
+    ///
+    /// Can only be called by the `accounts` app.
+    login: func(account-name: string) -> result<_, error>;
+}
+
 world impl {
     include host:client/imports;
     include host:http/imports;
@@ -7,5 +16,6 @@ world impl {
     include transact:plugin/imports;
     include permissions:plugin/imports;
 
+    export session;
     export api;
 }

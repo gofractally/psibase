@@ -44,7 +44,7 @@ import { Progress } from "@shared/shadcn/ui/progress";
 import { Spinner } from "@shared/shadcn/ui/spinner";
 
 import { Loader } from "./components/create-prompt/loader";
-import { useConnectAccount } from "./hooks/use-connect-account";
+import { useLogin } from "./hooks/use-connect-account";
 import { useCreateAccount } from "./hooks/use-create-account";
 import { usePurchaseAccount } from "./hooks/use-purchase-account";
 
@@ -139,7 +139,7 @@ export const CreatePrompt = () => {
             });
         },
     });
-    const connectAccountMutation = useConnectAccount();
+    const connectAccountMutation = useLogin();
 
     const accountValidator = canBuyAccount ? zAccount : zAccountFree;
 
