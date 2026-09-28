@@ -210,6 +210,9 @@ pub mod service {
                 claimed,
                 "Reward claim".into(),
             );
+            if let Some(mut row) = FractalMember::get(fractal, member) {
+                row.add_earned(claimed);
+            }
         }
     }
 

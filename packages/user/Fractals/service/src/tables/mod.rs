@@ -58,6 +58,8 @@ pub mod tables {
         pub fractal: AccountNumber,
         pub account: AccountNumber,
         pub created_at: psibase::TimePointSec,
+        #[graphql(skip)]
+        pub total_earned: Quantity,
     }
 
     impl FractalMember {

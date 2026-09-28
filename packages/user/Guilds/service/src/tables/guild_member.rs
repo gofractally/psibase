@@ -33,6 +33,7 @@ impl GuildMember {
             is_candidate: false,
             candidacy_eligible_from: now,
             attendance: RollingBits16::new().value(),
+            evaluations_participated: 0,
         }
     }
 
@@ -105,6 +106,11 @@ impl GuildMember {
         self.attendance = RollingBits16::from(self.attendance).push(attended).value();
         let pending_level = self.pending_level.take().unwrap();
 
+        // Level 0 is what a missed or failed evaluation leaves in place.
+        if pending_level > 0 {
+            self.evaluations_participated = self.evaluations_participated.saturating_add(1);
+        }
+
         self.score = calculate_ema_u32(
             pending_level as u32 * SCORE_SCALE,
             self.score,
@@ -161,5 +167,39 @@ impl GuildMember {
 
     pub async fn score(&self) -> f32 {
         self.score as f32 / SCORE_SCALE as f32 / GUILD_EVALUATION_GROUP_SIZE as f32 * 100.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn member_with_level(level: u8) -> GuildMember {
+        GuildMember {
+            pending_level: Some(level),
+            ..GuildMember::default()
+        }
+    }
+
+    #[test]
+    fn zero_level_does_not_count_as_participation() {
+        let mut member = member_with_level(0);
+        member.apply_pending_level_to_score(true);
+        assert_eq!(member.evaluations_participated, 0);
+
+        member.pending_level = Some(0);
+        member.apply_pending_level_to_score(false);
+        assert_eq!(member.evaluations_participated, 0);
+    }
+
+    #[test]
+    fn positive_level_counts_a_participation() {
+        let mut member = member_with_level(1);
+        member.apply_pending_level_to_score(true);
+        assert_eq!(member.evaluations_participated, 1);
+
+        member.pending_level = Some(6);
+        member.apply_pending_level_to_score(true);
+        assert_eq!(member.evaluations_participated, 2);
     }
 }

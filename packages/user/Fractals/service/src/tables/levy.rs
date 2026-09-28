@@ -103,6 +103,9 @@ impl Levy {
                     payment,
                     memo,
                 );
+                if let Some(mut payee) = FractalMember::get(self.fractal, self.payee) {
+                    payee.add_earned(payment);
+                }
             }
         }
         payment

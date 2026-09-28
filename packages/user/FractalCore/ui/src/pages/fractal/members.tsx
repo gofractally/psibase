@@ -10,6 +10,7 @@ import { PageContainer } from "@shared/components/page-container";
 import { ShowContactsButton } from "@shared/components/show-contacts-button";
 import { TableContact } from "@shared/components/tables/table-contact";
 import { COUNCIL_SEATS } from "@shared/domains/fractal/lib/constants";
+import { formatThousands } from "@shared/lib/format-number";
 import { Badge } from "@shared/shadcn/ui/badge";
 import {
     CardAction,
@@ -32,12 +33,19 @@ import {
     TooltipTrigger,
 } from "@shared/shadcn/ui/tooltip";
 
+function formatEarned(amount: string) {
+    const fraction = amount.split(".")[1]?.length ?? 0;
+    const value = Number(amount);
+    if (!Number.isFinite(value)) return amount;
+    return formatThousands(value, fraction, true);
+}
+
 export const Members = () => {
     const currentFractal = useFractalAccount();
 
     const { data: members } = useMembers(currentFractal);
 
-    const sortedMembers = (members || []).sort(
+    const sortedMembers = [...(members ?? [])].sort(
         (a, b) =>
             new Date(a.createdAt).valueOf() - new Date(b.createdAt).valueOf(),
     );
@@ -59,6 +67,9 @@ export const Members = () => {
                             <TableRow>
                                 <TableHead>Account</TableHead>
                                 <TableHead>Status</TableHead>
+                                <TableHead className="text-end">
+                                    Total earned
+                                </TableHead>
                                 <TableHead className="text-end">
                                     Created At
                                 </TableHead>
@@ -87,6 +98,9 @@ export const Members = () => {
                                         <Badge variant="default">
                                             Member
                                         </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-end tabular-nums">
+                                        {formatEarned(member.totalEarned)}
                                     </TableCell>
                                     <TableCell className="text-end">
                                         {dayjs(member.createdAt).format(

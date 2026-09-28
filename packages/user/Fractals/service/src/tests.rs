@@ -173,6 +173,33 @@ mod chain {
             .unwrap();
     }
 
+    fn parse_token_amount(amount: &str) -> u64 {
+        let (whole, frac) = amount.split_once('.').unwrap_or((amount, ""));
+        assert!(frac.len() <= 4, "unexpected token amount {amount}");
+        let scale = 10u64.pow(4 - frac.len() as u32);
+        let frac_value = if frac.is_empty() {
+            0
+        } else {
+            frac.parse::<u64>().unwrap()
+        };
+        whole.parse::<u64>().unwrap() * 10_000 + frac_value * scale
+    }
+
+    fn total_earned(chain: &Chain, member: AccountNumber) -> u64 {
+        let reply: serde_json::Value = chain
+            .graphql(
+                Wrapper::SERVICE,
+                &format!(
+                    r#"query {{ member(fractal: "{FRACTAL}", member: "{member}") {{ totalEarned }} }}"#
+                ),
+            )
+            .unwrap();
+        let earned = reply["data"]["member"]["totalEarned"]
+            .as_str()
+            .unwrap_or_else(|| panic!("missing totalEarned: {reply}"));
+        parse_token_amount(earned)
+    }
+
     fn drain_stream(chain: &Chain) {
         pass_time(chain, FRACTAL_STREAM_HALF_LIFE as i64 * 50);
         dist_token(chain);
@@ -271,13 +298,21 @@ mod chain {
 
         pass_time(&chain, DEFAULT_MEMBER_DISTRIBUTION_INTERVAL as i64);
         let before = Tokens::push(&chain).getBalance(tid, ALICE).get()?.value;
+        let earned_before = total_earned(&chain, ALICE);
+        assert!(earned_before > 0, "setup claim should already be recorded",);
         Wrapper::push_from(&chain, ALICE)
             .claim_rew(FRACTAL, ALICE)
             .get()?;
         let after = Tokens::push(&chain).getBalance(tid, ALICE).get()?.value;
+        let earned_after = total_earned(&chain, ALICE);
         assert!(
             after > before,
             "income should increase a later member claim ({before} -> {after})",
+        );
+        assert_eq!(
+            earned_after - earned_before,
+            after - before,
+            "total earned should grow by the net amount credited",
         );
 
         Ok(())
