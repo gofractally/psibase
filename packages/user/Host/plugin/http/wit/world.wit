@@ -37,6 +37,22 @@ interface api {
     /// Parameters
     /// * `url` - A full URL whose host is a sibling service on this chain
     fetch-sibling-bytes: func(url: string) -> result<list<u8>, error>;
+
+    /// Mint a single-use websocket ticket from `service` for the current user.
+    /// Only callable by the active app.
+    ///
+    /// POSTs `{"app": <active app>}` to `<service>/ws-ticket` with the current
+    /// session attached, and returns the `ticket` field of the JSON response.
+    /// The ticket is then presented when opening a websocket to `service`, so the
+    /// session token itself never reaches the app.
+    ///
+    /// Services implementing `/ws-ticket` must only mint a short-lived ticket bound
+    /// to the authenticated user and the given app; the endpoint must have no other
+    /// side effects.
+    ///
+    /// Parameters
+    /// * `service` - The account of the service that will accept the websocket
+    get-ws-ticket: func(service: string) -> result<string, error>;
 }
 
 world imports {

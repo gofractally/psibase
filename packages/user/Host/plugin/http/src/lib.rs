@@ -12,6 +12,7 @@ use exports::host::http::api::Guest as Api;
 use helpers::make_error;
 use host::client::api as CallContext;
 use host::types::types::{BodyTypes, Error, PostRequest};
+use psibase::AccountNumber;
 use supervisor::bridge::types::{self as BridgeTypes, HttpRequest};
 use url::Url;
 
@@ -26,7 +27,11 @@ fn get_auth_token() -> Option<String> {
     }
 }
 
-fn do_post(app: String, endpoint: String, content: BodyTypes) -> Result<BridgeTypes::HttpResponse, Error> {
+fn do_post(
+    app: String,
+    endpoint: String,
+    content: BodyTypes,
+) -> Result<BridgeTypes::HttpResponse, Error> {
     let (ty, content) = content.get_content();
 
     let auth_token = get_auth_token();
@@ -87,8 +92,8 @@ fn do_get_bytes(app: String, endpoint: String) -> Result<BridgeTypes::HttpRespon
 
 fn parse_sibling_url(url: &str) -> Result<(String, String), Error> {
     let parsed = Url::parse(url).map_err(|e| make_error(&e.to_string()))?;
-    let root = Url::parse(&CallContext::get_root_domain())
-        .map_err(|e| make_error(&e.to_string()))?;
+    let root =
+        Url::parse(&CallContext::get_root_domain()).map_err(|e| make_error(&e.to_string()))?;
     let root_host = root
         .host_str()
         .ok_or_else(|| make_error("Invalid root domain"))?;
@@ -135,6 +140,18 @@ fn assert_packages_caller(context: &str) {
         context,
         sender
     );
+}
+
+fn assert_active_app_caller(context: &str) -> String {
+    let sender = CallContext::get_sender();
+    let active_app = CallContext::get_active_app();
+    assert!(
+        sender == active_app,
+        "[{}] Unauthorized caller: {}",
+        context,
+        sender
+    );
+    active_app
 }
 
 impl Api for HostHttp {
@@ -204,6 +221,33 @@ impl Api for HostHttp {
             Some(BridgeTypes::BodyTypes::Bytes(body)) => Ok(body),
             _ => Err(make_error("Http response body absent or wrong type")),
         }
+    }
+
+    fn get_ws_ticket(service: String) -> Result<String, Error> {
+        let app = assert_active_app_caller("get-ws-ticket@host:http/api");
+
+        // `service` becomes part of the request host, so it must be an exact account name.
+        AccountNumber::from_exact(&service)
+            .map_err(|_| make_error(&format!("Invalid service: {}", service)))?;
+
+        if get_auth_token().is_none() {
+            return Err(make_error("No authenticated user"));
+        }
+
+        let body = serde_json::json!({ "app": app }).to_string();
+        let res = do_post(service, "ws-ticket".to_string(), BodyTypes::Json(body))?;
+
+        let Some(BridgeTypes::BodyTypes::Json(body)) = res.body else {
+            return Err(make_error(
+                "Invalid ws-ticket response: 'body' must be JSON",
+            ));
+        };
+        let json: serde_json::Value =
+            serde_json::from_str(&body).map_err(|e| make_error(&e.to_string()))?;
+        json["ticket"]
+            .as_str()
+            .map(str::to_string)
+            .ok_or_else(|| make_error("Invalid ws-ticket response: missing 'ticket'"))
     }
 }
 
