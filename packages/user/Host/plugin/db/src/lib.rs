@@ -3,6 +3,8 @@ mod bindings;
 use bindings::*;
 
 mod bucket;
+mod crypto;
+mod sealed;
 
 use exports::host::db::store::{DbMode, Guest as Store};
 use host::client::api::get_sender;
@@ -27,18 +29,22 @@ impl Store for HostDb {
 
     fn flush_transactional_data() {
         use crate::bucket::host_buffer;
-        use crate::supervisor::bridge::database as HostDb;
+        use crate::sealed::SealedStore;
 
         check_caller(&["transact"], "flush@host:db/store");
 
         let buffer_data = host_buffer::drain_all(DbMode::Transactional);
+        if buffer_data.is_empty() {
+            return;
+        }
 
+        let store = SealedStore::open();
         for (db, entries) in buffer_data {
             for (key, op) in entries {
                 if let Some(value) = op.0 {
-                    HostDb::set(db.duration as u8, &key, &value);
+                    store.set(db.duration as u8, &key, &value);
                 } else {
-                    HostDb::remove(db.duration as u8, &key);
+                    store.remove(db.duration as u8, &key);
                 }
             }
         }

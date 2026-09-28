@@ -1,6 +1,7 @@
 use crate::exports::host::db::store::{Database, DbMode, GuestBucket, StorageDuration};
 use crate::host::client::api::get_sender;
-use crate::supervisor::bridge::{database as HostDb, intf::get_chain_id};
+use crate::sealed::SealedStore;
+use crate::supervisor::bridge::intf::get_chain_id;
 use regex::Regex;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -158,12 +159,14 @@ impl GuestBucket for Bucket {
 
         match (self.db.duration, self.db.mode) {
             (StorageDuration::Ephemeral, _) => host_buffer::get(&self.db, &prefixed_key),
-            (_, DbMode::NonTransactional) => HostDb::get(self.db.duration as u8, &prefixed_key),
+            (_, DbMode::NonTransactional) => {
+                SealedStore::open().get(self.db.duration as u8, &prefixed_key)
+            }
             (_, DbMode::Transactional) => {
                 if host_buffer::exists(&self.db, &prefixed_key) {
                     host_buffer::get(&self.db, &prefixed_key)
                 } else {
-                    HostDb::get(self.db.duration as u8, &prefixed_key)
+                    SealedStore::open().get(self.db.duration as u8, &prefixed_key)
                 }
             }
         }
@@ -178,7 +181,7 @@ impl GuestBucket for Bucket {
                 host_buffer::set(&self.db, &self.get_key(&key), &value);
             }
             (_, DbMode::NonTransactional) => {
-                HostDb::set(self.db.duration as u8, &self.get_key(&key), &value);
+                SealedStore::open().set(self.db.duration as u8, &self.get_key(&key), &value);
             }
             (_, DbMode::Transactional) => {
                 host_buffer::set(&self.db, &self.get_key(&key), &value);
@@ -194,7 +197,7 @@ impl GuestBucket for Bucket {
                 host_buffer::remove(&self.db, &self.get_key(&key));
             }
             (_, DbMode::NonTransactional) => {
-                HostDb::remove(self.db.duration as u8, &self.get_key(&key));
+                SealedStore::open().remove(self.db.duration as u8, &self.get_key(&key));
             }
             (_, DbMode::Transactional) => {
                 host_buffer::remove(&self.db, &self.get_key(&key));
@@ -211,14 +214,16 @@ impl GuestBucket for Bucket {
                 // Doesn't matter if the key dne, or if it does but is a delete OP
                 host_buffer::get(&self.db, &prefixed_key).is_some()
             }
-            (_, DbMode::NonTransactional) => {
-                HostDb::get(self.db.duration as u8, &prefixed_key).is_some()
-            }
+            (_, DbMode::NonTransactional) => SealedStore::open()
+                .get(self.db.duration as u8, &prefixed_key)
+                .is_some(),
             (_, DbMode::Transactional) => {
                 if host_buffer::exists(&self.db, &prefixed_key) {
                     host_buffer::get(&self.db, &prefixed_key).is_some()
                 } else {
-                    HostDb::get(self.db.duration as u8, &prefixed_key).is_some()
+                    SealedStore::open()
+                        .get(self.db.duration as u8, &prefixed_key)
+                        .is_some()
                 }
             }
         }
