@@ -43,14 +43,14 @@ export const EvaluationDeliberation = () => {
     const { data: currentUser } = useCurrentUser();
 
     const { data: hasProfilesReadPermission } = useHasProfilesReadPermission(
-        fractalCorePlugin.contacts.hasReadPermission,
+        fractalCorePlugin.embedded.canReadContacts,
         {
             enabled: !!currentUser,
         },
     );
 
     const { data: contacts } = useContacts(
-        fractalCorePlugin.contacts.get,
+        fractalCorePlugin.embedded.getContacts,
         currentUser,
         {
             enabled: !!hasProfilesReadPermission,

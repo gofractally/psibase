@@ -2,6 +2,8 @@ package accounts:plugin;
 
 interface prompt {
     use host:types/types.{error, pem};
+    use tokens:plugin/types.{system-token-info, user-balance};
+    use name-market:plugin/types.{markets-overview};
 
     record credential {
         /// The name of the account
@@ -51,4 +53,18 @@ interface prompt {
     ///   connected, and login.
     /// If there is currently an active invite, calling this will automatically accept it.
     connect-account: func(account: string);
+
+    /// Fetches the configured system token with display metadata.
+    /// Returns none when no system token is configured.
+    get-system-token: func() -> result<option<system-token-info>, error>;
+
+    /// Fetches primary token balances for a user.
+    get-user-balances: func(user: string) -> result<list<user-balance>, error>;
+
+    /// Whether the name market currently allows creating an account
+    /// (distinct from `can-create-account`, which checks login/invite).
+    name-market-can-create-account: func() -> bool;
+
+    /// Overview of name-market params and current prices.
+    get-markets-overview: func() -> result<markets-overview, error>;
 }

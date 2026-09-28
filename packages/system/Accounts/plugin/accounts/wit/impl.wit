@@ -21,6 +21,4 @@ world impl {
 
     export prompt;
     export admin;
-    export tokens;
-    export name-market;
 }

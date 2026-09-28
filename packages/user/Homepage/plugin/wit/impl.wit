@@ -1,6 +1,7 @@
 package homepage:plugin;
 
 world impl {
+    include host:client/imports;
     include host:crypto/imports;
     include host:types/imports;
     import transact:plugin/intf;
