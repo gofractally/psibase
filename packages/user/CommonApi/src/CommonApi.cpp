@@ -1,6 +1,5 @@
 #include "services/system/CommonApi.hpp"
 
-#include <chrono>
 #include <psibase/check.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
