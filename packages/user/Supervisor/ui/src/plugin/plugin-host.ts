@@ -224,8 +224,8 @@ export class PluginHost implements HostInterface {
                 getClientKey: () => getClientKeyBytes(),
             },
             "supervisor:bridge/database": {
-                get: (duration, key) =>
-                    hostDb.get(duration, key, (req) =>
+                get: (duration, key, debugKey) =>
+                    hostDb.get(duration, key, debugKey, (req) =>
                         this.sendRequest(req, true),
                     ),
                 set: (duration, key, value) => hostDb.set(duration, key, value),

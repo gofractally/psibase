@@ -4,6 +4,7 @@ import { HttpResponse } from "./host-interface";
 import { HostDb } from "./hostdb";
 
 const HEX_KEY = "a".repeat(64);
+const PLAINTEXT_KEY = "non-trx:accounts:contacts:alice";
 
 function hexKey(n: number): string {
     return n.toString(16).padStart(64, "0");
@@ -30,12 +31,12 @@ describe("HostDb negative cache", () => {
         const db = new HostDb();
         const send = vi.fn(() => httpNotFound());
 
-        expect(db.get(0, HEX_KEY, send)).toBeNull();
+        expect(db.get(0, HEX_KEY, PLAINTEXT_KEY, send)).toBeNull();
         expect(send).toHaveBeenCalledTimes(1);
 
         db.clear();
 
-        expect(db.get(0, HEX_KEY, send)).toBeNull();
+        expect(db.get(0, HEX_KEY, PLAINTEXT_KEY, send)).toBeNull();
         expect(send).toHaveBeenCalledTimes(1);
     });
 
@@ -49,12 +50,33 @@ describe("HostDb negative cache", () => {
             return httpOkBytes(value);
         });
 
-        expect(db.get(0, HEX_KEY, send)).toBeNull();
+        expect(db.get(0, HEX_KEY, PLAINTEXT_KEY, send)).toBeNull();
         db.set(0, HEX_KEY, value);
         db.clear();
 
-        expect(db.get(0, HEX_KEY, send)).toEqual(value);
+        expect(db.get(0, HEX_KEY, PLAINTEXT_KEY, send)).toEqual(value);
         expect(send).toHaveBeenCalledTimes(2);
+    });
+
+    it("names the plaintext key when a read misses", () => {
+        const db = new HostDb();
+        const info = vi.spyOn(console, "info").mockImplementation(() => {});
+        const send = vi.fn(() => httpNotFound());
+
+        expect(db.get(0, HEX_KEY, PLAINTEXT_KEY, send)).toBeNull();
+        expect(info).toHaveBeenCalledWith(
+            `host:db missing key: ${PLAINTEXT_KEY}`,
+        );
+        const req = send.mock.calls[0][0];
+        expect(req.uri).not.toContain(PLAINTEXT_KEY);
+        expect(req.headers).toEqual([
+            { key: "Accept", value: "application/octet-stream" },
+        ]);
+
+        db.clear();
+        expect(db.get(0, HEX_KEY, PLAINTEXT_KEY, send)).toBeNull();
+        expect(info).toHaveBeenCalledTimes(1);
+        info.mockRestore();
     });
 });
 

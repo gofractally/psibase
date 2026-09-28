@@ -44,7 +44,11 @@ export interface BridgeImports {
         getClientKey: () => Uint8Array;
     };
     "supervisor:bridge/database": {
-        get: (duration: number, key: string) => Uint8Array | null;
+        get: (
+            duration: number,
+            key: string,
+            debugKey: string,
+        ) => Uint8Array | null;
         set: (duration: number, key: string, value: Uint8Array) => void;
         remove: (duration: number, key: string) => void;
     };

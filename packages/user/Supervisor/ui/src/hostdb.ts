@@ -83,10 +83,13 @@ export class HostDb {
     }
 
     // `send` is the synchronous request path. Throws on any response other
-    //   than a value or 404 (absent).
+    //   than a value or 404 (absent). `debugKey` is the plaintext
+    //   `{mode}:{service}:{identifier}:{key}`; it is named on a miss and is
+    //   not sent to the node.
     get(
         duration: number,
         key: string,
+        debugKey: string,
         send: (req: HttpRequest) => HttpResponse,
     ): Uint8Array | null {
         const path = `${durationName(duration)}/${key}`;
@@ -110,6 +113,7 @@ export class HostDb {
         } else if (res.status === 404) {
             value = null;
             this.negativeCache.add(path);
+            console.info(`host:db missing key: ${debugKey}`);
         } else {
             throw hostDbError(`Read failed: HTTP ${res.status}`);
         }

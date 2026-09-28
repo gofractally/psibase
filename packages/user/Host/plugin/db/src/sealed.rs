@@ -36,7 +36,7 @@ impl SealedStore {
 
     pub(crate) fn get(&self, duration: u8, plaintext_key: &str) -> Option<Vec<u8>> {
         let storage_key = self.storage_key(plaintext_key);
-        let stored = HostDb::get(duration, &storage_key)?;
+        let stored = HostDb::get(duration, &storage_key, plaintext_key)?;
         Some(
             decrypt_value(&self.keys.aes_key, storage_key.as_bytes(), &stored)
                 .unwrap_or_else(|_| panic!("host:db value failed to decrypt")),
@@ -54,6 +54,6 @@ impl SealedStore {
     }
 
     pub(crate) fn exists(&self, duration: u8, plaintext_key: &str) -> bool {
-        HostDb::get(duration, &self.storage_key(plaintext_key)).is_some()
+        HostDb::get(duration, &self.storage_key(plaintext_key), plaintext_key).is_some()
     }
 }
