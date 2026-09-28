@@ -2,12 +2,8 @@ use psibase::services::{accounts, auth_delegate, auth_dyn};
 use psibase::{get_service, AccountNumber, ServiceWrapper};
 
 /// Create `new_account` owned by this service, then switch it to AuthDyn
-/// managed by this service. `f` runs after the account exists (auth-delegate)
-/// and before the AuthDyn switch, so `call_as(new_account)` works.
-///
-/// Subaccounts must be created by their parent, so those are preapproved
-/// first. The parent must already exist and this service must be able to
-/// `call_as` it (auth-delegate owned by this service).
+/// managed by this service. Subaccounts are preapproved so AuthDelegate
+/// can create them; the parent must already exist.
 pub fn create_managed_account<F>(new_account: AccountNumber, f: F)
 where
     F: Fn(),
