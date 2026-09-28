@@ -1666,6 +1666,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "hostdb"
+version = "0.29.0"
+dependencies = [
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_service",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "hostdb-pkg"
+version = "0.29.0"
+dependencies = [
+ "hostdb",
+ "psibase-user-workspace-hack",
+]
+
+[[package]]
 name = "http"
 version = "1.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -60,6 +60,8 @@ members = [
     "Guilds/service",
     "Guilds/query-service",
     "Guilds/plugin",
+    "HostDb",
+    "HostDb/service",
     "TokenSwap",
     "TokenSwap/service",
     "TokenSwap/query-service",

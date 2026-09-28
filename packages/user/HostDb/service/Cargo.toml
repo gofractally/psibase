@@ -1,0 +1,20 @@
+[package]
+name = "hostdb"
+description = "Device-scoped persistent storage for host:db"
+version.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[package.metadata.psibase]
+flags = ["isPrivileged"]
+server = "hostdb"
+
+[dependencies]
+psibase.workspace = true
+psibase_service.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+psibase-user-workspace-hack.workspace = true
