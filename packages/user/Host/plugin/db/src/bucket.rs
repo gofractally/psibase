@@ -214,16 +214,14 @@ impl GuestBucket for Bucket {
                 // Doesn't matter if the key dne, or if it does but is a delete OP
                 host_buffer::get(&self.db, &prefixed_key).is_some()
             }
-            (_, DbMode::NonTransactional) => SealedStore::open()
-                .get(self.db.duration as u8, &prefixed_key)
-                .is_some(),
+            (_, DbMode::NonTransactional) => {
+                SealedStore::open().exists(self.db.duration as u8, &prefixed_key)
+            }
             (_, DbMode::Transactional) => {
                 if host_buffer::exists(&self.db, &prefixed_key) {
                     host_buffer::get(&self.db, &prefixed_key).is_some()
                 } else {
-                    SealedStore::open()
-                        .get(self.db.duration as u8, &prefixed_key)
-                        .is_some()
+                    SealedStore::open().exists(self.db.duration as u8, &prefixed_key)
                 }
             }
         }

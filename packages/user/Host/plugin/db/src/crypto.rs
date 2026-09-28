@@ -9,6 +9,7 @@ const AES_INFO: &[u8] = b"host:db aes-256-gcm";
 const NONCE_LEN: usize = 12;
 const TAG_LEN: usize = 16;
 
+#[derive(Clone, Copy)]
 pub(crate) struct StorageKeys {
     pub(crate) hmac_key: [u8; 32],
     pub(crate) aes_key: [u8; 32],

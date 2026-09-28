@@ -1,14 +1,32 @@
-use crate::crypto::{decrypt_value, derive_storage_keys, encrypt_value, hmac_storage_key};
+use std::cell::RefCell;
+
+use crate::crypto::{
+    decrypt_value, derive_storage_keys, encrypt_value, hmac_storage_key, StorageKeys,
+};
 use crate::supervisor::bridge::{database as HostDb, intf::get_client_key};
 
+// The supervisor never replaces the client key, so derive it once per thread.
+thread_local! {
+    static DERIVED_KEYS: RefCell<Option<StorageKeys>> = RefCell::new(None);
+}
+
+fn derived_keys() -> StorageKeys {
+    if let Some(keys) = DERIVED_KEYS.with(|slot| *slot.borrow()) {
+        return keys;
+    }
+    let keys = derive_storage_keys(&get_client_key());
+    DERIVED_KEYS.with(|slot| *slot.borrow_mut() = Some(keys));
+    keys
+}
+
 pub(crate) struct SealedStore {
-    keys: crate::crypto::StorageKeys,
+    keys: StorageKeys,
 }
 
 impl SealedStore {
     pub(crate) fn open() -> Self {
         Self {
-            keys: derive_storage_keys(&get_client_key()),
+            keys: derived_keys(),
         }
     }
 
@@ -33,5 +51,9 @@ impl SealedStore {
 
     pub(crate) fn remove(&self, duration: u8, plaintext_key: &str) {
         HostDb::remove(duration, &self.storage_key(plaintext_key));
+    }
+
+    pub(crate) fn exists(&self, duration: u8, plaintext_key: &str) -> bool {
+        HostDb::get(duration, &self.storage_key(plaintext_key)).is_some()
     }
 }
