@@ -13,6 +13,43 @@ interface BatchOp {
     value: string | null;
 }
 
+// Browsers reject keepalive request bodies larger than 64 KiB.
+const KEEPALIVE_BODY_LIMIT = 64 * 1024;
+
+function serializeBatchBody(ops: BatchOp[]): string {
+    return JSON.stringify({ ops });
+}
+
+function splitBatchOps(ops: BatchOp[]): BatchOp[][] {
+    const batches: BatchOp[][] = [];
+    let current: BatchOp[] = [];
+
+    for (const op of ops) {
+        const withOp = [...current, op];
+        if (serializeBatchBody(withOp).length <= KEEPALIVE_BODY_LIMIT) {
+            current = withOp;
+            continue;
+        }
+
+        if (current.length > 0) {
+            batches.push(current);
+            current = [op];
+            if (serializeBatchBody(current).length > KEEPALIVE_BODY_LIMIT) {
+                batches.push(current);
+                current = [];
+            }
+        } else {
+            batches.push([op]);
+        }
+    }
+
+    if (current.length > 0) {
+        batches.push(current);
+    }
+
+    return batches;
+}
+
 function durationName(duration: number): Duration {
     const name = DURATIONS[duration];
     if (name === undefined) {
@@ -88,23 +125,32 @@ export class HostDb {
         this.queue.push({ duration: name, key, value: null });
     }
 
-    // Sends every queued write as one batch. Rejects if the batch is not
-    //   applied.
+    // Sends every queued write, splitting into multiple batches when the
+    //   serialized body would exceed the browser keepalive limit. Rejects if
+    //   any batch is not applied.
     async flush(): Promise<void> {
         if (this.queue.length === 0) {
             return;
         }
         const ops = this.queue;
         this.queue = [];
-        const res = await fetch(siblingUrl(null, "hostdb", "/kv/batch"), {
-            method: "POST",
-            credentials: "include",
-            keepalive: true,
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ops }),
-        });
-        if (!res.ok) {
-            throw new Error(`HTTP ${res.status}`);
+        const batches = splitBatchOps(ops);
+        for (let i = 0; i < batches.length; i++) {
+            const batch = batches[i];
+            const body = serializeBatchBody(batch);
+            const isLast = i === batches.length - 1;
+            const res = await fetch(siblingUrl(null, "hostdb", "/kv/batch"), {
+                method: "POST",
+                credentials: "include",
+                ...(isLast && body.length <= KEEPALIVE_BODY_LIMIT
+                    ? { keepalive: true }
+                    : {}),
+                headers: { "Content-Type": "application/json" },
+                body,
+            });
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}`);
+            }
         }
     }
 }
