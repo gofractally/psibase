@@ -116,7 +116,9 @@ struct Label {
     asset: u16,
     amount: u64,
     hops: Vec<(AccountNumber, u16)>,
-    visited: HashSet<AccountNumber>,
+    /// Creditors already drawn on, keyed by the asset of that draw.
+    /// The same account may be a hub again in another asset.
+    visited: HashSet<(AccountNumber, u16)>,
 }
 
 fn note_payee(
@@ -138,7 +140,10 @@ fn note_payee(
     }
 }
 
-fn visited_subset(a: &HashSet<AccountNumber>, b: &HashSet<AccountNumber>) -> bool {
+fn visited_subset(
+    a: &HashSet<(AccountNumber, u16)>,
+    b: &HashSet<(AccountNumber, u16)>,
+) -> bool {
     a.iter().all(|x| b.contains(x))
 }
 
@@ -234,7 +239,7 @@ pub fn find_banx_path(
             asset: line.asset_id,
             amount: amount_in,
             hops: vec![(line.creditor, line.asset_id)],
-            visited: HashSet::from([line.creditor]),
+            visited: HashSet::from([(line.creditor, line.asset_id)]),
         };
         if admit(&mut admitted, label.clone()) {
             frontier.push(label);
@@ -529,7 +534,7 @@ fn expand_hops(
         if line.creditor == debtor || line.creditor == sender {
             continue;
         }
-        if parent.visited.contains(&line.creditor) {
+        if parent.visited.contains(&(line.creditor, hop_asset)) {
             continue;
         }
         let Some(rpol) = resolve_routing(routing, line.creditor, debtor, hop_asset, now) else {
@@ -555,7 +560,7 @@ fn expand_hops(
         }
 
         let mut visited = parent.visited.clone();
-        visited.insert(line.creditor);
+        visited.insert((line.creditor, hop_asset));
         let mut hops = parent.hops.clone();
         hops.push((line.creditor, hop_asset));
         let label = Label {
@@ -1441,6 +1446,93 @@ mod tests {
             )
             .is_none(),
             "mallory owing alice 1 must not open a 100 new_draw hop"
+        );
+    }
+
+    /// Hub is drawn in AUD, then again in USD after Relay converts. A same-asset
+    /// return to Hub still does not open a second draw.
+    #[test]
+    fn hub_reenters_in_another_asset() {
+        let aud = 1u16;
+        let eur = 2u16;
+        let usd = 3u16;
+        let lines = vec![
+            line("hub", "alice", aud, 1_000),
+            line("relay", "hub", eur, 1_000),
+            line("hub", "relay", usd, 1_000),
+            line("dave", "hub", usd, 1_000),
+        ];
+        let routing = vec![
+            global_rte("hub", eur, 0),
+            global_rte("relay", usd, 0),
+            global_rte("hub", usd, 0),
+        ];
+        let fx = vec![
+            FxEdge {
+                poster: acct("hub"),
+                from_asset: aud,
+                to_asset: eur,
+                fee_fixed: 0,
+                fx_rate: RATE_SCALE,
+                expires_at: 0,
+            },
+            FxEdge {
+                poster: acct("relay"),
+                from_asset: eur,
+                to_asset: usd,
+                fee_fixed: 0,
+                fx_rate: RATE_SCALE,
+                expires_at: 0,
+            },
+        ];
+        let q = find(
+            &lines,
+            &routing,
+            &fx,
+            "alice",
+            "dave",
+            100,
+            aud,
+            Some(usd),
+            4,
+            0,
+        )
+        .expect("hub can forward USD after the AUD draw");
+        assert_eq!(
+            q.hops
+                .iter()
+                .map(|h| (h.account, h.asset_id))
+                .collect::<Vec<_>>(),
+            vec![
+                (acct("hub"), aud),
+                (acct("relay"), eur),
+                (acct("hub"), usd),
+                (acct("dave"), usd),
+            ]
+        );
+        assert_eq!(q.amount_in, 100);
+        assert_eq!(q.amount_out, 100);
+    }
+
+    #[test]
+    fn same_asset_reentry_is_blocked() {
+        let aud = 1u16;
+        let lines = vec![
+            line("hub", "alice", aud, 1_000),
+            line("relay", "hub", aud, 1_000),
+            line("hub", "relay", aud, 1_000),
+            line("dave", "hub", aud, 100),
+        ];
+        let routing = vec![
+            global_rte("hub", aud, 0),
+            global_rte("relay", aud, PPM_SCALE / 2),
+        ];
+        assert!(
+            find(
+                &lines, &routing, &[], "alice", "dave", 200, aud, Some(aud), 4, 0,
+            )
+            .is_none(),
+            "returning to hub in AUD must not shrink 200 down to dave's line"
         );
     }
 }
