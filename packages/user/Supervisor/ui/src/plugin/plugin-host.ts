@@ -13,7 +13,7 @@ import {
     HttpResponse,
 } from "../host-interface";
 import { Supervisor } from "../supervisor";
-import { chainId, networkName } from "../utils";
+import { networkName } from "../utils";
 import { RecoverableErrorPayload } from "./errors";
 
 function convert(
@@ -30,23 +30,6 @@ function convertBack(
     headers: Array<[string, string]>,
 ): { key: string; value: string }[] {
     return headers.map(([key, value]) => ({ key, value }));
-}
-
-function bytesToBase64(bytes: Uint8Array): string {
-    let bin = "";
-    for (let i = 0; i < bytes.length; i++) {
-        bin += String.fromCharCode(bytes[i]);
-    }
-    return btoa(bin);
-}
-
-function base64ToBytes(str: string): Uint8Array {
-    return Uint8Array.from(atob(str), (c) => c.charCodeAt(0));
-}
-
-enum storageDuration {
-    persistent = 0,
-    session = 1,
 }
 
 // This host interface is given to each serviceContext, but each is given a host interface
@@ -109,12 +92,6 @@ export class PluginHost implements HostInterface {
             accept.includes("application/zip") ||
             accept === "*/*"
         );
-    }
-
-    private getStorage(duration: number): Storage {
-        return duration === storageDuration.session
-            ? sessionStorage
-            : localStorage;
     }
 
     // The supervisor maps network name subdomains to "homepage",
@@ -229,37 +206,14 @@ export class PluginHost implements HostInterface {
         }
     }
 
-    private dbGet(duration: number, key: string): Uint8Array | null {
-        const storage = this.getStorage(duration);
-        const storedValue = storage.getItem(key);
-        if (storedValue === null) {
-            return null;
-        }
-        return base64ToBytes(storedValue);
-    }
-
-    private dbSet(duration: number, key: string, value: Uint8Array): void {
-        const storage = this.getStorage(duration);
-        const base64Value = bytesToBase64(value);
-        storage.setItem(key, base64Value);
-    }
-
-    private dbRemove(duration: number, key: string): void {
-        const storage = this.getStorage(duration);
-        storage.removeItem(key);
-    }
-
     private privilegedPluginImports(): BridgeImports {
+        const hostDb = this.supervisor.hostDb;
         return {
             "supervisor:bridge/intf": {
                 sendRequest: (req, withCredentials) =>
                     this.sendRequest(req, withCredentials),
                 serviceStack: () => this.supervisor.getServiceStack(),
                 getRootDomain: () => this.supervisor.getRootDomain(),
-                getChainId: () => {
-                    assertTruthy(chainId, "Chain ID not initialized");
-                    return chainId;
-                },
                 sign: (msg, publicKey) => this.supervisor.sign(msg, publicKey),
                 signExplicit: (msg, privateKey) =>
                     this.supervisor.signExplicit(msg, privateKey),
@@ -270,9 +224,12 @@ export class PluginHost implements HostInterface {
                 getClientKey: () => getClientKeyBytes(),
             },
             "supervisor:bridge/database": {
-                get: (duration, key) => this.dbGet(duration, key),
-                set: (duration, key, value) => this.dbSet(duration, key, value),
-                remove: (duration, key) => this.dbRemove(duration, key),
+                get: (duration, key) =>
+                    hostDb.get(duration, key, (req) =>
+                        this.sendRequest(req, true),
+                    ),
+                set: (duration, key, value) => hostDb.set(duration, key, value),
+                remove: (duration, key) => hostDb.remove(duration, key),
             },
             "supervisor:bridge/prompt": {
                 requestPrompt: () => this.supervisor.requestPrompt(),

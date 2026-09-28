@@ -70,8 +70,7 @@ pub mod server {
 /// A keyvalue interface that provides key-value operations.
 ///
 /// Once a write operation completes, all subsequent read operations will return the value that
-/// was written. Another client running in a different context may or may not immediately see the
-/// result.
+/// was written.
 pub mod store {
     use crate::wasm::bindings::host::db::store;
 

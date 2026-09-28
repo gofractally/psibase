@@ -118,9 +118,7 @@ The psibase plugin host provides a key-value interface for plugins to use for re
 
 ### Host-dependent data backing
 
-It is up to the host platform to determine how to implement the key-value interface. For example, in the current implementation of the host:plugin for the web platform, the key-value implementation uses LocalStorage as its data backing, because it is a synchronous interface which is easiest to integrate with wasm.
-
-Note: This imposes a major restriction on the amount of local data storage available for psibase plugins: Currently there is [a hard limit](https://developer.mozilla.org/en-US/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria#web_storage) for the total amount of data stored in LocalStorage across all psibase apps in a given browser, since storage across all apps is managed by a single domain. This restriction will be lifted in a future implementation of plugin storage that uses a different data backing layer such as IndexedDB.
+It is up to the host platform to determine how to implement the key-value interface. For example, the web platform stores plugin data on the node the browser is connected to, in the `hostdb` service, scoped to the browser by cookies. The client hashes keys and encrypts values before they leave the browser, so the data at rest on the node is opaque.
 
 ### API
 

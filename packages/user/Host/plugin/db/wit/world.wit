@@ -3,8 +3,7 @@ package host:db;
 /// A keyvalue interface that provides key-value operations.
 ///
 /// Once a write operation completes, all subsequent read operations will return the value that
-/// was written. Another client running in a different context may or may not immediately see the
-/// result.
+/// was written.
 interface store {
     /// Database mode - Related to the conditions under which database writes will or will not succeed
     enum db-mode {
@@ -22,7 +21,8 @@ interface store {
         /// Persistent storage will last until deleted
         persistent,
         /// Session storage will be deleted at the close of a session. The duration
-        ///    of a session is defined by the host platform.
+        ///    of a session is defined by the host platform (for the web host, see the
+        ///    `hostdb` service).
         session,
         /// Ephemeral storage will be deleted at the close of the current transaction
         ///    context.
