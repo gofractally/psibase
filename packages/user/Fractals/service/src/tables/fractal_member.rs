@@ -24,7 +24,7 @@ impl FractalMember {
     pub async fn total_earned(&self) -> Decimal {
         Decimal::new(
             self.total_earned,
-            Precision::new(TOKEN_PRECISION).expect("fractal token precision"),
+            Precision::new(TOKEN_PRECISION).unwrap(),
         )
     }
 }
