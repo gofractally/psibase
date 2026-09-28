@@ -75,7 +75,7 @@ namespace psibase
                                                            return -1;
                                                         }),
                                           0);
-      if (result == -1)
+      if (result == static_cast<std::uint64_t>(-1))
          return 0;
       return (result << 8) + sub;
    }  // name_to_number

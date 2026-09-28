@@ -39,6 +39,34 @@ namespace SystemService
    using AccountTable = psibase::Table<Account, &Account::accountNum>;
    PSIO_REFLECT_TYPENAME(AccountTable)
 
+   /// Determines the behavior of `newAccount` when the
+   /// requested account already exists
+   enum class NewAccountMode : std::uint8_t
+   {
+      /// An existing account will be unchanged.
+      keepExisting,
+      /// If the account already exists, it must match
+      /// the parameters that are passed to `newAccount`.
+      /// This should be used when idempotent account
+      /// creation is needed.
+      matchExisting,
+      /// The account must not already exist.
+      requireNew,
+   };
+
+   void from_json(NewAccountMode& obj, auto& stream)
+   {
+      std::uint32_t value;
+      from_json(value, stream);
+      psibase::check(value <= 2, "mode out of range");
+      obj = static_cast<NewAccountMode>(value);
+   }
+
+   void to_json(const NewAccountMode& obj, auto& stream)
+   {
+      to_json(static_cast<std::uint32_t>(obj), stream);
+   }
+
    /// This service facilitates the creation of new accounts
    ///
    /// Only the Accounts service itself and the `inviteService` may create new accounts.
@@ -73,14 +101,12 @@ namespace SystemService
 
       /// Used to create a new account with a specified auth service
       ///
-      /// Existing accounts will not be modified. If the `requireMatch`
-      /// flag is set, then the action will fail if the `name` account
-      /// already exists and uses a different auth service.
+      /// The behavior if the account already exists is determined by `mode`
       ///
       /// Returns true if an account was created
       bool newAccount(psibase::AccountNumber name,
                       psibase::AccountNumber authService,
-                      bool                   requireMatch);
+                      NewAccountMode         mode);
 
       /// Used to update the auth service used by an account
       void setAuthServ(psibase::AccountNumber authService);
@@ -105,7 +131,7 @@ namespace SystemService
    PSIO_REFLECT(Accounts,
                 method(init),
                 method(preapproveAcc, name),
-                method(newAccount, name, authService, requireMatch),
+                method(newAccount, name, authService, mode),
                 method(setAuthServ, authService),
                 method(getAccount, name),
                 method(getAuthOf, account),

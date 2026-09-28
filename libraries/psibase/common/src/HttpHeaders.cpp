@@ -224,14 +224,14 @@ std::vector<std::optional<IPAddress>> psibase::forwardedFor(const HttpRequest& r
    return result;
 }
 
-std::optional<std::string> psibase::forwardedProto(const HttpRequest& request)
+std::optional<std::string> psibase::forwardedProto(const HttpHeaders& headers)
 {
-   if (auto value = request.getHeader("x-forwarded-proto"))
+   if (auto value = HttpHeader::get(headers, "x-forwarded-proto"))
    {
       if (iequal(*value, "https") || iequal(*value, "http"))
          return ToLower{}(std::string(*value));
    }
-   for (const auto& forwarded : request.getHeaderValues("forwarded"))
+   for (const auto& forwarded : HttpHeader::split(headers, "forwarded"))
    {
       if (auto proto = parseForwardedParam(forwarded, "proto"))
       {

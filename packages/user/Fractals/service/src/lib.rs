@@ -19,6 +19,7 @@ pub mod service {
             auth_dyn::{self, policy::DynamicAuthPolicy},
             fractals::{action_structs as Actns, occu_wrapper, FractalRole},
             setcode as SetCode, staged_tx as StagedTx,
+            tokens::{Quantity, Wrapper as Tokens, TID},
             transact::ServiceMethod,
         },
         *,
@@ -63,7 +64,7 @@ pub mod service {
                 .find(|(_, name)| method.method == MethodNumber::from(*name))
                 .map(|(role, _)| *role);
             if let Some(role) = role {
-                return Some(Role::get_assert(account, role).auth_policy());
+                return Some(Role::get_assert(account, role.into()).auth_policy());
             }
         }
         None
@@ -73,31 +74,11 @@ pub mod service {
     ///
     /// # Arguments
     /// * `fractal_account` - The account number for the new fractal.
-    /// * `legislature` - Legislature role account.
-    /// * `judiciary` - Judiciary role account.
-    /// * `executive` - Executive role account
-    /// * `recruitment` - Recruitment role account.
     /// * `name` - The name of the fractal.
     /// * `mission` - The mission statement of the fractal.
     #[action]
-    fn create_frac(
-        fractal_account: AccountNumber,
-        legislature: AccountNumber,
-        judiciary: AccountNumber,
-        executive: AccountNumber,
-        recruitment: AccountNumber,
-        name: String,
-        mission: String,
-    ) {
-        Fractal::add(
-            fractal_account,
-            legislature,
-            judiciary,
-            executive,
-            recruitment,
-            name,
-            mission,
-        );
+    fn create_frac(fractal_account: AccountNumber, name: String, mission: String) {
+        Fractal::add(fractal_account, name, mission);
 
         Wrapper::emit().history().created_fractal(fractal_account);
     }
@@ -159,6 +140,45 @@ pub mod service {
     #[action]
     fn dist_token(fractal: AccountNumber) {
         Fractal::get_assert(fractal).distribute_tokens();
+    }
+
+    /// Donate tokens to the fractal that issued `token_id`.
+    ///
+    /// Debits `amount` from the sender into a `{fractal}+donations` Tokens
+    /// sub-balance. [`dist_token`] later deposits that sub-balance into
+    /// member reward streams.
+    ///
+    /// # Arguments
+    /// * `token_id` - Fractal token being donated.
+    /// * `amount` - Amount to debit from the sender.
+    #[action]
+    fn donate(token_id: TID, amount: Quantity) {
+        let fractal = Fractal::get_by_token_assert(token_id);
+        Tokens::call().debit(token_id, get_sender(), amount, "Fractal donate".into());
+        fractal.hold_donation(amount);
+        Wrapper::emit()
+            .history()
+            .donated(fractal.account, get_sender(), token_id, amount);
+    }
+
+    /// Contribute income to the fractal that issued `token_id`.
+    ///
+    /// Debits `amount` from the sender and deposits it into the fractal's
+    /// reward stream. [`dist_token`] later deposits the vested portion into
+    /// member reward streams.
+    ///
+    /// # Arguments
+    /// * `token_id` - Fractal token being deposited.
+    /// * `amount` - Amount to debit from the sender.
+    #[action]
+    fn income(token_id: TID, amount: Quantity) {
+        let fractal = Fractal::get_by_token_assert(token_id);
+        Tokens::call().debit(token_id, get_sender(), amount, "Fractal income".into());
+        RewardStream::get_assert(fractal.account, fractal.account)
+            .deposit(amount, "Fractal income".into());
+        Wrapper::emit()
+            .history()
+            .received_income(fractal.account, get_sender(), token_id, amount);
     }
 
     /// Sets the occupation used to authorize the specified fractal role.
@@ -232,9 +252,11 @@ pub mod service {
     fn account_policy(account: AccountNumber) -> Option<auth_dyn::policy::DynamicAuthPolicy> {
         Fractal::get(account)
             .map(|fractal| fractal.auth_policy())
-            .or(Role::get_by_role_account(account).map(|role| {
-                occu_wrapper::call_to(role.occupation).role_policy(role.fractal, role.role_id)
-            }))
+            .or(
+                Role::get(account.base(), account.subaccount().0).map(|role| {
+                    occu_wrapper::call_to(role.occupation).role_policy(role.fractal, role.role_id)
+                }),
+            )
     }
 
     /// Get policy action used by AuthDyn service.
@@ -266,6 +288,18 @@ pub mod service {
 
     #[event(history)]
     pub fn joined_fractal(fractal_account: AccountNumber, account: AccountNumber) {}
+
+    #[event(history)]
+    pub fn donated(fractal: AccountNumber, donor: AccountNumber, token_id: TID, amount: Quantity) {}
+
+    #[event(history)]
+    pub fn received_income(
+        fractal: AccountNumber,
+        payer: AccountNumber,
+        token_id: TID,
+        amount: Quantity,
+    ) {
+    }
 }
 
 #[cfg(test)]

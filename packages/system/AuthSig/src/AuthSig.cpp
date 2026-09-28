@@ -25,24 +25,10 @@ namespace SystemService
       }
 
       bool AuthSig::checkAuthSys(uint32_t                    flags,
-                                 psibase::AccountNumber      requester,
                                  psibase::AccountNumber      sender,
                                  ServiceMethod               action,
-                                 std::vector<ServiceMethod>  allowedActions,
                                  std::vector<psibase::Claim> claims)
       {
-         auto type = flags & AuthInterface::requestMask;
-         if (type == AuthInterface::runAsRequesterReq)
-            return true;  // Request is valid
-         else if (type == AuthInterface::runAsMatchedReq)
-            return true;  // Request is valid
-         else if (type == AuthInterface::runAsMatchedExpandedReq)
-            abortMessage("runAs: caller attempted to expand powers");
-         else if (type == AuthInterface::runAsOtherReq)
-            abortMessage("runAs: caller is not authorized");
-         else if (type != AuthInterface::topActionReq)
-            abortMessage("unsupported auth type");
-
          auto row = open<AuthTable>(KvMode::read).getIndex<0>().get(sender);
 
          check(row.has_value(), "sender does not have a public key");
@@ -52,16 +38,6 @@ namespace SystemService
          {
             if (claim.service == VerifySig::service && equalByteVector(claim.rawData, expected))
             {
-               // Billing rule: if first proof passes, and auth for first sender passes,
-               // then then first sender will be charged even if the transaction fails,
-               // including time for executing failed proofs and auths. We require the
-               // first auth to be verified by the first signature here to prevent a
-               // resource-billing attack against innocent accounts.
-               //
-               // We do this check after passing the other checks so we can produce the
-               // other errors when appropriate.
-               if ((flags & AuthInterface::firstAuthFlag) && &claim != &claims[0])
-                  abortMessage("first sender is not verified by first signature");
                return true;
             }
          }
@@ -103,7 +79,7 @@ namespace SystemService
          auto authTable = open<AuthTable>(KvMode::readWrite);
          authTable.put(AuthRecord{.account = name, .pubkey = std::move(key)});
 
-         to<Accounts>().newAccount(name, AuthSig::service, true);
+         to<Accounts>().newAccount(name, AuthSig::service, NewAccountMode::requireNew);
       }
    }  // namespace AuthSig
 }  // namespace SystemService

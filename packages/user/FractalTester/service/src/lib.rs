@@ -6,7 +6,7 @@
 ///
 /// The setup flow:
 /// 1. Create 18 accounts with `auth-any`.
-/// 2. Apply each to the system guild (`core-gld-1`).
+/// 2. Apply each to the system guild (`guild-one`).
 /// 3. Look up the first producer and attest each application as that producer.
 
 #[psibase::service_tables]
@@ -62,7 +62,7 @@ mod service {
         account!("testfrac18"),
     ];
 
-    const SYS_GUILD: AccountNumber = account!("core-gld-1");
+    const SYS_GUILD: AccountNumber = account!("guild-one");
 
     #[action]
     fn setup() {
@@ -75,7 +75,11 @@ mod service {
 
         // 1. Create accounts with auth-any
         for &acct in &TEST_ACCOUNTS {
-            Accounts::call().newAccount(acct, AuthAny::SERVICE, true);
+            Accounts::call().newAccount(
+                acct,
+                AuthAny::SERVICE,
+                psibase::services::accounts::NewAccountMode::MATCH_EXISTING,
+            );
         }
 
         // 2. Apply each account to the system guild

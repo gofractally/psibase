@@ -13,8 +13,6 @@ mod tests {
     use psibase::*;
     use psibase::{MAX_ACCOUNT_NAME_LENGTH, MIN_ACCOUNT_NAME_LENGTH};
 
-
-
     /// NameMarket `buy` debits a shared balance where the buyer credited the service.
     fn credit_namemarket(
         chain: &psibase::Chain,

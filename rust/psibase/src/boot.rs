@@ -164,7 +164,7 @@ pub fn get_initial_actions<
                 builder.push(accounts::Wrapper::pack().newAccount(
                     *account,
                     auth_delegate::SERVICE,
-                    true,
+                    accounts::NewAccountMode::MATCH_EXISTING,
                 ))?
             }
         }
@@ -197,7 +197,7 @@ pub fn get_initial_actions<
         builder.push(accounts::Wrapper::pack_from(accounts::SERVICE).newAccount(
             initial_producer,
             auth_sig::SERVICE,
-            true,
+            accounts::NewAccountMode::REQUIRE_NEW,
         ))?;
         builder.push(set_key_action(initial_producer, &key))?;
     } else {
@@ -207,7 +207,7 @@ pub fn get_initial_actions<
     builder.push(accounts::Wrapper::pack().newAccount(
         producers::ROOT,
         auth_delegate::SERVICE,
-        true,
+        accounts::NewAccountMode::REQUIRE_NEW,
     ))?;
     builder.push(
         auth_delegate::Wrapper::pack_from(producers::ROOT)

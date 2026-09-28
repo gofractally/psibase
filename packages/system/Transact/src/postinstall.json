@@ -40,7 +40,7 @@
         "sender": "",
         "service": "transact+1",
         "method": "onBlock",
-        "rawData": "0000"
+        "data": {}
       }
     }
   }

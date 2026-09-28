@@ -2169,6 +2169,7 @@ __metadata:
     react-router-dom: "npm:^6.26.1"
     recharts: "npm:2.15.4"
     typescript: "npm:^5.7.3"
+    usehooks-ts: "npm:^3.1.1"
     vite: "npm:^5.4.1"
     vite-plugin-top-level-await: "npm:^1.4.1"
     vite-plugin-wasm: "npm:^3.3.0"

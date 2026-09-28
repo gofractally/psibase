@@ -53,7 +53,11 @@ mod service {
 
         let account = AccountNumber::from_exact(name.as_str()).expect("Network name invalid");
 
-        let created = AuthDelegate::call().newAccount(account, SERVICE, true);
+        let created = AuthDelegate::call().newAccount(
+            account,
+            SERVICE,
+            services::accounts::NewAccountMode::MATCH_EXISTING,
+        );
         if !created {
             HttpServer::call_as(account).clearRedirect();
         }
