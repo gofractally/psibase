@@ -139,15 +139,17 @@ interface api {
         asset-id: u16,
         fee-fixed: string,
         fee-percent-ppm: s32,
+        remaining: string,
         expires-at-seconds: u32,
     ) -> result<_, error>;
 
-    /// Global buy-claim offer for this asset. Spread only; who and how
-    /// much come from the poster's credit lines to each debtor at take.
+    /// Global buy-claim offer for this asset. `remaining` is the face budget
+    /// shared by every debtor. Each take is still capped by the poster's line.
     set-global-buy-claim-offer: func(
         asset-id: u16,
         fee-fixed: string,
         fee-percent-ppm: s32,
+        remaining: string,
         expires-at-seconds: u32,
     ) -> result<_, error>;
 
@@ -176,14 +178,17 @@ interface api {
         asset-id: u16,
         fee-fixed: string,
         fee-percent-ppm: s32,
+        remaining: string,
         expires-at-seconds: u32,
     ) -> result<_, error>;
 
     /// Global sell-claim offer for this asset (any debtor the poster is owed by).
+    /// `remaining` is the face budget shared by every debtor.
     set-global-sell-claim-offer: func(
         asset-id: u16,
         fee-fixed: string,
         fee-percent-ppm: s32,
+        remaining: string,
         expires-at-seconds: u32,
     ) -> result<_, error>;
 
@@ -310,6 +315,7 @@ interface api {
         is-out: bool,
         fee-fixed: string,
         to-rate: string,
+        remaining: string,
         expires-at-seconds: u32,
     ) -> result<_, error>;
 

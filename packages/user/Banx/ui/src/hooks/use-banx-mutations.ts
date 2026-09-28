@@ -497,6 +497,7 @@ export function useSetBuyClaimOffer() {
             assetId: number;
             feeFixed: string;
             feePercentPpm: number;
+            remaining: string;
             expiresAtSeconds: number;
         }) =>
             banxCall("setBuyClaimOffer", [
@@ -504,6 +505,7 @@ export function useSetBuyClaimOffer() {
                 p.assetId,
                 p.feeFixed,
                 p.feePercentPpm,
+                p.remaining,
                 p.expiresAtSeconds,
             ]),
         onSuccess: () => {
@@ -521,12 +523,14 @@ export function useSetGlobalBuyClaimOffer() {
             assetId: number;
             feeFixed: string;
             feePercentPpm: number;
+            remaining: string;
             expiresAtSeconds: number;
         }) =>
             banxCall("setGlobalBuyClaimOffer", [
                 p.assetId,
                 p.feeFixed,
                 p.feePercentPpm,
+                p.remaining,
                 p.expiresAtSeconds,
             ]),
         onSuccess: () => {
@@ -571,6 +575,7 @@ export function useSetSellClaimOffer() {
             assetId: number;
             feeFixed: string;
             feePercentPpm: number;
+            remaining: string;
             expiresAtSeconds: number;
         }) =>
             banxCall("setSellClaimOffer", [
@@ -578,6 +583,7 @@ export function useSetSellClaimOffer() {
                 p.assetId,
                 p.feeFixed,
                 p.feePercentPpm,
+                p.remaining,
                 p.expiresAtSeconds,
             ]),
         onSuccess: () => {
@@ -595,12 +601,14 @@ export function useSetGlobalSellClaimOffer() {
             assetId: number;
             feeFixed: string;
             feePercentPpm: number;
+            remaining: string;
             expiresAtSeconds: number;
         }) =>
             banxCall("setGlobalSellClaimOffer", [
                 p.assetId,
                 p.feeFixed,
                 p.feePercentPpm,
+                p.remaining,
                 p.expiresAtSeconds,
             ]),
         onSuccess: () => {
@@ -721,6 +729,7 @@ export function useSetCashQuote() {
             isOut: boolean;
             feeFixed: string;
             toRate: string;
+            remaining: string;
             expiresAtSeconds: number;
         }) =>
             banxCall("setCashQuote", [
@@ -729,6 +738,7 @@ export function useSetCashQuote() {
                 p.isOut,
                 p.feeFixed,
                 p.toRate,
+                p.remaining,
                 p.expiresAtSeconds,
             ]),
         onSuccess: () => {

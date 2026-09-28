@@ -75,6 +75,7 @@ impl ClaimOffer {
         side: u8,
         fee_fixed: Quantity,
         fee_percent: i32,
+        remaining: Quantity,
         expires_at: TimePointSec,
     ) {
         Self::assert_side(side);
@@ -87,6 +88,10 @@ impl ClaimOffer {
             (fee_percent as i64) > -scale && (fee_percent as i64) < scale,
             "claim-offer spread must be between -100% and 100%"
         );
+        assert!(
+            remaining.value > 0,
+            "claim-offer remaining must be positive"
+        );
         Self {
             poster,
             debtor,
@@ -94,6 +99,7 @@ impl ClaimOffer {
             side,
             fee_fixed,
             fee_percent,
+            remaining,
             expires_at,
         }
         .save();
@@ -117,8 +123,17 @@ impl ClaimOffer {
 
     /// Move `amount` of seller's claim on `debtor` to `buyer`; seller
     /// receives face after this offer's spread as a claim on buyer.
+    fn spend(&mut self, amount: Quantity) {
+        assert!(
+            amount.value <= self.remaining.value,
+            "claim amount exceeds offer remaining"
+        );
+        self.remaining = (self.remaining.value - amount.value).into();
+        self.save();
+    }
+
     pub fn execute(
-        &self,
+        &mut self,
         seller: AccountNumber,
         buyer: AccountNumber,
         debtor: AccountNumber,
@@ -129,6 +144,7 @@ impl ClaimOffer {
         assert!(seller != debtor, "cannot transfer claim on self as debtor");
         assert!(buyer != debtor, "buyer cannot be the debtor");
         assert!(amount.value > 0, "claim transfer amount must be positive");
+        self.spend(amount);
 
         let take = Connection::get_live(buyer, debtor, self.asset_id);
         if take.new_draw(amount) > 0 {

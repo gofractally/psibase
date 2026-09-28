@@ -57,6 +57,7 @@ type FeeFields = {
     assetId: number | undefined;
     feeFixed: string;
     feePct: string;
+    remaining: string;
     expiresAtSeconds: number;
 };
 
@@ -64,6 +65,7 @@ const defaultFees = (assetId?: number): FeeFields => ({
     assetId,
     feeFixed: "0",
     feePct: "0",
+    remaining: "",
     expiresAtSeconds: 0,
 });
 
@@ -76,6 +78,7 @@ function feesFromOffer(p: BuyClaimOffer): FeeFields {
         assetId: p.assetId,
         feeFixed: displayAmount(p.feeFixed),
         feePct: ppmToPercentInput(p.feePercentPpm),
+        remaining: displayAmount(p.remaining),
         expiresAtSeconds: p.expiresAt,
     };
 }
@@ -281,6 +284,7 @@ export function BuyClaimOfferDialog({
         assetId: value.assetId!,
         feeFixed: value.feeFixed.trim(),
         feePercentPpm: signedPercentStringToPpm(value.feePct, MAX_HOP_FEE_PPM),
+        remaining: value.remaining.trim(),
         expiresAtSeconds: value.expiresAtSeconds,
     });
 
@@ -443,6 +447,25 @@ export function BuyClaimOfferDialog({
                         )}
                     />
                 </div>
+                <form.AppField
+                    name="remaining"
+                    validators={{
+                        onChange: amountFieldValidator(precision, {
+                            allowZero: false,
+                        }),
+                        onSubmit: amountFieldValidator(precision, {
+                            allowZero: false,
+                        }),
+                    }}
+                    children={(field) => (
+                        <field.TextField
+                            label="Remaining face"
+                            inputMode="decimal"
+                            placeholder={amountPlaceholder(precision)}
+                            disabled={locked}
+                        />
+                    )}
+                />
                 <form.Subscribe
                     selector={(s) => ({
                         feeFixed: s.values.feeFixed,
@@ -594,6 +617,7 @@ export function BuyClaimOfferDialog({
             globalForm.setFieldValue("enabled", true);
             globalForm.setFieldValue("feeFixed", fees.feeFixed);
             globalForm.setFieldValue("feePct", fees.feePct);
+            globalForm.setFieldValue("remaining", fees.remaining);
             globalForm.setFieldValue(
                 "expiresAtSeconds",
                 fees.expiresAtSeconds,
@@ -602,6 +626,7 @@ export function BuyClaimOfferDialog({
             globalForm.setFieldValue("enabled", false);
             globalForm.setFieldValue("feeFixed", "0");
             globalForm.setFieldValue("feePct", "0");
+            globalForm.setFieldValue("remaining", "");
             globalForm.setFieldValue("expiresAtSeconds", 0);
         }
     };

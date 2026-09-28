@@ -198,6 +198,8 @@ mod service {
         side: u8,
         feeFixed: Decimal,
         feePercentPpm: i32,
+        /// Face still available.
+        remaining: Decimal,
         expiresAt: i64,
         isGlobal: bool,
         isBuy: bool,
@@ -213,6 +215,7 @@ mod service {
                 side: p.side,
                 feeFixed: Decimal::new(p.fee_fixed, asset_precision(p.asset_id)),
                 feePercentPpm: p.fee_percent,
+                remaining: Decimal::new(p.remaining, asset_precision(p.asset_id)),
                 expiresAt: time_sec(p.expires_at),
                 isGlobal: p.is_global(),
                 isBuy: p.side == ClaimOffer::BUY,
@@ -265,6 +268,8 @@ mod service {
         /// Banx units for out, token units for in.
         feeFixed: Decimal,
         fxRate: String,
+        /// Taker input still available. Same units as `feeFixed`.
+        remaining: Decimal,
         expiresAt: i64,
     }
 
@@ -282,6 +287,7 @@ mod service {
                 isOut: p.is_out,
                 feeFixed: Decimal::new(p.fee_fixed, prec),
                 fxRate: p.fx_rate.to_string(),
+                remaining: Decimal::new(p.remaining, prec),
                 expiresAt: time_sec(p.expires_at),
             }
         }

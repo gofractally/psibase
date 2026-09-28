@@ -355,6 +355,7 @@ pub mod service {
         asset_id: u16,
         fee_fixed: Quantity,
         fee_percent: i32,
+        remaining: Quantity,
         expires_at: TimePointSec,
     ) {
         assert!(
@@ -368,14 +369,22 @@ pub mod service {
             ClaimOffer::BUY,
             fee_fixed,
             fee_percent,
+            remaining,
             expires_at,
         );
     }
 
-    /// Post/update a **global** buy offer (`debtor = 0`). Spread only;
-    /// who and how much come from the buyer's credit lines at take.
+    /// Post/update a **global** buy offer (`debtor = 0`). Spread only.
+    /// `remaining` is the face budget for every debtor; the buyer's line
+    /// still caps each take.
     #[action]
-    fn st_glb_buy(asset_id: u16, fee_fixed: Quantity, fee_percent: i32, expires_at: TimePointSec) {
+    fn st_glb_buy(
+        asset_id: u16,
+        fee_fixed: Quantity,
+        fee_percent: i32,
+        remaining: Quantity,
+        expires_at: TimePointSec,
+    ) {
         ClaimOffer::upsert(
             get_sender(),
             ClaimOffer::GLOBAL,
@@ -383,6 +392,7 @@ pub mod service {
             ClaimOffer::BUY,
             fee_fixed,
             fee_percent,
+            remaining,
             expires_at,
         );
     }
@@ -412,6 +422,7 @@ pub mod service {
         asset_id: u16,
         fee_fixed: Quantity,
         fee_percent: i32,
+        remaining: Quantity,
         expires_at: TimePointSec,
     ) {
         assert!(
@@ -425,13 +436,20 @@ pub mod service {
             ClaimOffer::SELL,
             fee_fixed,
             fee_percent,
+            remaining,
             expires_at,
         );
     }
 
     /// Post/update a **global** sell offer (`debtor = 0`).
     #[action]
-    fn st_glb_sell(asset_id: u16, fee_fixed: Quantity, fee_percent: i32, expires_at: TimePointSec) {
+    fn st_glb_sell(
+        asset_id: u16,
+        fee_fixed: Quantity,
+        fee_percent: i32,
+        remaining: Quantity,
+        expires_at: TimePointSec,
+    ) {
         ClaimOffer::upsert(
             get_sender(),
             ClaimOffer::GLOBAL,
@@ -439,6 +457,7 @@ pub mod service {
             ClaimOffer::SELL,
             fee_fixed,
             fee_percent,
+            remaining,
             expires_at,
         );
     }
@@ -468,7 +487,7 @@ pub mod service {
     #[action]
     fn sell_claim(buyer: AccountNumber, debtor: AccountNumber, asset_id: u16, amount: Quantity) {
         let seller = get_sender();
-        let offer = ClaimOffer::get_live(buyer, debtor, asset_id, ClaimOffer::BUY);
+        let mut offer = ClaimOffer::get_live(buyer, debtor, asset_id, ClaimOffer::BUY);
         offer.execute(seller, buyer, debtor, amount, "sell_claim");
     }
 
@@ -477,7 +496,7 @@ pub mod service {
     #[action]
     fn buy_claim(seller: AccountNumber, debtor: AccountNumber, asset_id: u16, amount: Quantity) {
         let buyer = get_sender();
-        let offer = ClaimOffer::get_live(seller, debtor, asset_id, ClaimOffer::SELL);
+        let mut offer = ClaimOffer::get_live(seller, debtor, asset_id, ClaimOffer::SELL);
         offer.execute(seller, buyer, debtor, amount, "buy_claim");
     }
 
@@ -522,6 +541,7 @@ pub mod service {
         is_out: bool,
         fee_fixed: Quantity,
         fx_rate: u64,
+        remaining: Quantity,
         expires_at: TimePointSec,
     ) {
         CashQuote::upsert(
@@ -531,6 +551,7 @@ pub mod service {
             is_out,
             fee_fixed,
             fx_rate,
+            remaining,
             expires_at,
         );
     }
@@ -567,11 +588,8 @@ pub mod service {
         amount_banx: Quantity,
         min_tokens: Quantity,
     ) {
-        CashQuote::get_live(cashier, asset_id, token_id, true).cash_out(
-            get_sender(),
-            amount_banx,
-            min_tokens,
-        );
+        let mut quote = CashQuote::get_live(cashier, asset_id, token_id, true);
+        quote.cash_out(get_sender(), amount_banx, min_tokens);
     }
 
     /// Send tokens from the sender's `{sender}/{token_id}` vault at
@@ -585,11 +603,8 @@ pub mod service {
         amount_tokens: Quantity,
         min_banx: Quantity,
     ) {
-        CashQuote::get_live(cashier, asset_id, token_id, false).cash_in(
-            get_sender(),
-            amount_tokens,
-            min_banx,
-        );
+        let mut quote = CashQuote::get_live(cashier, asset_id, token_id, false);
+        quote.cash_in(get_sender(), amount_tokens, min_banx);
     }
 
     /// Take the **counterparty's** [`CurrencyPolicy`]: rebook leftover

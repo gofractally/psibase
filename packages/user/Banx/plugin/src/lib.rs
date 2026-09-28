@@ -354,15 +354,18 @@ impl Api for BanxPlugin {
         asset_id: u16,
         fee_fixed: String,
         fee_percent_ppm: i32,
+        remaining: String,
         expires_at_seconds: u32,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::set_buy_claim_offer)?;
         let fee_fixed = parse_amount(asset_id, &fee_fixed)?;
+        let remaining = parse_amount(asset_id, &remaining)?;
         let packed = banx::action_structs::st_buy_clm {
             debtor: parse_account(&debtor)?,
             asset_id,
             fee_fixed,
             fee_percent: fee_percent_ppm,
+            remaining,
             expires_at: time_point(expires_at_seconds),
         }
         .packed();
@@ -373,14 +376,17 @@ impl Api for BanxPlugin {
         asset_id: u16,
         fee_fixed: String,
         fee_percent_ppm: i32,
+        remaining: String,
         expires_at_seconds: u32,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::set_global_buy_claim_offer)?;
         let fee_fixed = parse_amount(asset_id, &fee_fixed)?;
+        let remaining = parse_amount(asset_id, &remaining)?;
         let packed = banx::action_structs::st_glb_buy {
             asset_id,
             fee_fixed,
             fee_percent: fee_percent_ppm,
+            remaining,
             expires_at: time_point(expires_at_seconds),
         }
         .packed();
@@ -445,15 +451,18 @@ impl Api for BanxPlugin {
         asset_id: u16,
         fee_fixed: String,
         fee_percent_ppm: i32,
+        remaining: String,
         expires_at_seconds: u32,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::set_sell_claim_offer)?;
         let fee_fixed = parse_amount(asset_id, &fee_fixed)?;
+        let remaining = parse_amount(asset_id, &remaining)?;
         let packed = banx::action_structs::st_sell_clm {
             debtor: parse_account(&debtor)?,
             asset_id,
             fee_fixed,
             fee_percent: fee_percent_ppm,
+            remaining,
             expires_at: time_point(expires_at_seconds),
         }
         .packed();
@@ -464,14 +473,17 @@ impl Api for BanxPlugin {
         asset_id: u16,
         fee_fixed: String,
         fee_percent_ppm: i32,
+        remaining: String,
         expires_at_seconds: u32,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::set_global_sell_claim_offer)?;
         let fee_fixed = parse_amount(asset_id, &fee_fixed)?;
+        let remaining = parse_amount(asset_id, &remaining)?;
         let packed = banx::action_structs::st_glb_sell {
             asset_id,
             fee_fixed,
             fee_percent: fee_percent_ppm,
+            remaining,
             expires_at: time_point(expires_at_seconds),
         }
         .packed();
@@ -826,21 +838,24 @@ impl Api for BanxPlugin {
         is_out: bool,
         fee_fixed: String,
         to_rate: String,
+        remaining: String,
         expires_at_seconds: u32,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::set_cash_quote)?;
         let token_prec = query::fetch_asset::fetch_token_precision(token_id)?;
         let asset = query::fetch_asset::fetch_asset(asset_id)?;
         let asset_prec = asset.precision()?;
-        let (fee_fixed, fx_rate) = if is_out {
+        let (fee_fixed, fx_rate, remaining) = if is_out {
             (
                 parse_amount(asset_id, &fee_fixed)?,
                 human_to_fx_rate_precs(asset_prec, token_prec, &to_rate)?,
+                parse_amount(asset_id, &remaining)?,
             )
         } else {
             (
                 parse_token_amount(token_id, &fee_fixed)?,
                 human_to_fx_rate_precs(token_prec, asset_prec, &to_rate)?,
+                parse_token_amount(token_id, &remaining)?,
             )
         };
         let packed = banx::action_structs::st_csh_qte {
@@ -849,6 +864,7 @@ impl Api for BanxPlugin {
             is_out,
             fee_fixed,
             fx_rate,
+            remaining,
             expires_at: time_point(expires_at_seconds),
         }
         .packed();

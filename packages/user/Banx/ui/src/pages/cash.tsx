@@ -25,7 +25,7 @@ import {
     formatFxToRate,
     formatToPrecision,
 } from "@/lib/amount";
-import { useAppForm } from "@/lib/form";
+import { amountFieldValidator, useAppForm } from "@/lib/form";
 import type { CashQuote } from "@/lib/graphql";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
@@ -79,6 +79,7 @@ export function CashPage() {
             isOut: true,
             feeFixed: "0",
             toRate: "1",
+            remaining: "",
             expiresAtSeconds: 0,
         },
         onSubmit: async ({ value }) => {
@@ -92,6 +93,7 @@ export function CashPage() {
                         isOut: value.isOut,
                         feeFixed: value.feeFixed.trim(),
                         toRate: value.toRate.trim(),
+                        remaining: value.remaining.trim(),
                         expiresAtSeconds: value.expiresAtSeconds,
                     },
                     {
@@ -445,6 +447,61 @@ export function CashPage() {
                                             />
                                         )}
                                     />
+                                    <quoteForm.AppField
+                                        name="remaining"
+                                        validators={{
+                                            onChange: amountFieldValidator(
+                                                values.isOut
+                                                    ? values.assetId !==
+                                                      undefined
+                                                        ? precisionOf(
+                                                              values.assetId,
+                                                          )
+                                                        : 0
+                                                    : tokPrec(
+                                                          parseTokenId(
+                                                              values.tokenId,
+                                                          ),
+                                                      ),
+                                                { allowZero: false },
+                                            ),
+                                            onSubmit: amountFieldValidator(
+                                                values.isOut
+                                                    ? values.assetId !==
+                                                      undefined
+                                                        ? precisionOf(
+                                                              values.assetId,
+                                                          )
+                                                        : 0
+                                                    : tokPrec(
+                                                          parseTokenId(
+                                                              values.tokenId,
+                                                          ),
+                                                      ),
+                                                { allowZero: false },
+                                            ),
+                                        }}
+                                        children={(field) => (
+                                            <field.TextField
+                                                label={`Budget (${payLabel})`}
+                                                inputMode="decimal"
+                                                placeholder={amountPlaceholder(
+                                                    values.isOut
+                                                        ? values.assetId !==
+                                                          undefined
+                                                            ? precisionOf(
+                                                                  values.assetId,
+                                                              )
+                                                            : 0
+                                                        : tokPrec(
+                                                              parseTokenId(
+                                                                  values.tokenId,
+                                                              ),
+                                                          ),
+                                                )}
+                                            />
+                                        )}
+                                    />
                                 </>
                             );
                         }}
@@ -786,6 +843,7 @@ export function CashPage() {
                                             {quoted
                                                 ? ` · this size → ${quoted}`
                                                 : ""}
+                                            {` · left ${displayAmount(q.remaining)}`}
                                         </p>
                                     ) : null}
                                 </>
@@ -845,6 +903,7 @@ function QuoteTable({
                         <TableHead>Token</TableHead>
                         <TableHead className="text-right">Fee</TableHead>
                         <TableHead>Rate</TableHead>
+                        <TableHead className="text-right">Left</TableHead>
                         <TableHead className="text-right">Expires</TableHead>
                         {onRemove ? <TableHead /> : null}
                     </TableRow>
@@ -868,6 +927,9 @@ function QuoteTable({
                                 {q.isOut
                                     ? `1 ${symbolOf(q.assetId)} → ${formatFxToRate(q.fxRate, precisionOf(q.assetId), tokenPrecision(q.tokenId))} tok`
                                     : `1 tok → ${formatFxToRate(q.fxRate, tokenPrecision(q.tokenId), precisionOf(q.assetId))} ${symbolOf(q.assetId)}`}
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                                {displayAmount(q.remaining)}
                             </TableCell>
                             <TableCell className="text-right text-sm">
                                 {formatExpiresAt(q.expiresAt)}

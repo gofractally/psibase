@@ -137,6 +137,8 @@ pub mod tables {
         /// is a premium the buyer pays. Sell: positive is the seller's
         /// profit, negative is a discount. `|fee_percent| < PPM_SCALE`.
         pub fee_percent: i32,
+        /// Face still available. 0 means spent; the row stays so it can be topped up.
+        pub remaining: Quantity,
         /// Absolute expiry (`seconds == 0` → never).
         pub expires_at: TimePointSec,
     }
@@ -328,6 +330,9 @@ pub mod tables {
         pub is_out: bool,
         pub fee_fixed: Quantity,
         pub fx_rate: u64,
+        /// Taker input still available: Banx units when `is_out`, token units
+        /// otherwise. 0 means spent; the row stays so it can be topped up.
+        pub remaining: Quantity,
         pub expires_at: TimePointSec,
     }
 

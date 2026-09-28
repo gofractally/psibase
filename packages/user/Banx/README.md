@@ -85,7 +85,7 @@ Posted by the **poster** (`st_fwd_ofr` / `st_glb_fwd`): poster is an intermediat
 
 ## Claim offers
 
-One table, `side` in the primary key (`1` buy, `2` sell). Spread ppm is signed (`10_000` = 1%). **Buy:** positive haircuts the seller, negative is a premium the buyer pays. **Sell:** positive is the seller’s profit (`+10_000` = 1% over face), negative is a discount. The debtor must know the buyer (a line to them, or a live claim). New exposure requires the buyer’s credit line to the debtor and is capped like a path hop (reverse claim + headroom); `remaining` is spent only on **new_draw**. A take that only unwinds a reverse claim needs no buyer line. The offer is the rate; the line is who and how much.
+One table, `side` in the primary key (`1` buy, `2` sell). Spread ppm is signed (`10_000` = 1%). **Buy:** positive haircuts the seller, negative is a premium the buyer pays. **Sell:** positive is the seller’s profit (`+10_000` = 1% over face), negative is a discount. The debtor must know the buyer (a line to them, or a live claim). New exposure requires the buyer’s credit line to the debtor and is capped like a path hop (reverse claim + headroom). That line’s depleting budget is spent only on **new_draw**; a take that only unwinds a reverse claim needs no buyer line. The offer itself has a separate face budget, spent on every take and left at 0 so it can be topped up. The line is who and how much new exposure.
 
 - **Buy** (`st_buy_clm` / `st_glb_buy`): poster’s bid. Taker calls `sell_claim`.
 - **Sell** (`st_sell_clm` / `st_glb_sell`): poster’s ask. Taker calls `buy_claim`.

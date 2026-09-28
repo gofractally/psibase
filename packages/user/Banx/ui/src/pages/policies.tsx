@@ -522,6 +522,9 @@ export function PoliciesPage() {
                                         Fee %
                                     </TableHead>
                                     <TableHead className="text-right">
+                                        Left
+                                    </TableHead>
+                                    <TableHead className="text-right">
                                         Expires
                                     </TableHead>
                                 </TableRow>
@@ -545,6 +548,9 @@ export function PoliciesPage() {
                                         </TableCell>
                                         <TableCell className="text-right">
                                             {ppmToPercent(p.feePercentPpm)}
+                                        </TableCell>
+                                        <TableCell className="text-right font-mono">
+                                            {displayAmount(p.remaining)}
                                         </TableCell>
                                         <TableCell className="text-right text-sm">
                                             {formatExpiresAt(p.expiresAt)}

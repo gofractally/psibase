@@ -332,6 +332,11 @@ export function SellClaimDialog({
                 target.precision,
             );
             if (lineCap !== null && lineCap <= 0n) return;
+            const offerLeft = humanToRaw(
+                offer.remaining || "0",
+                target.precision,
+            );
+            if (offerLeft <= 0n) return;
             const held = takingAsk
                 ? claimHeldRaw(
                       debtorObs,
@@ -342,8 +347,8 @@ export function SellClaimDialog({
                   )
                 : maxClaim;
             if (held <= 0n) return;
-            const maxFace =
-                lineCap !== null && lineCap < held ? lineCap : held;
+            let maxFace = lineCap !== null && lineCap < held ? lineCap : held;
+            if (offerLeft < maxFace) maxFace = offerLeft;
             if (maxFace <= 0n) return;
             const contact = (contacts as LocalContact[]).find(
                 (c) => c.account === account,

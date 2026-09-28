@@ -69,6 +69,7 @@ const zClaimOffer = z.object({
     side: z.number(),
     feeFixed: z.string(),
     feePercentPpm: z.number(),
+    remaining: z.string(),
     expiresAt: z.number(),
     isGlobal: z.boolean(),
     isBuy: z.boolean(),
@@ -82,6 +83,7 @@ const zCashQuote = z.object({
     isOut: z.boolean(),
     feeFixed: z.string(),
     fxRate: z.string(),
+    remaining: z.string(),
     expiresAt: z.number(),
 });
 
@@ -217,7 +219,7 @@ export async function fetchClaimOffers(
 ): Promise<ClaimOffer[]> {
     const data = await gql<{ claimOffers: ClaimOffer[] }>(
         `{ claimOffers(poster: "${account}") {
-            poster debtor assetId side feeFixed feePercentPpm expiresAt
+            poster debtor assetId side feeFixed feePercentPpm remaining expiresAt
             isGlobal isBuy isSell
         } }`,
     );
@@ -259,7 +261,7 @@ export async function fetchRequests(account: string): Promise<PayRequest[]> {
     return zPayRequest.array().parse(data.requests);
 }
 
-const cashQuoteFields = `poster assetId tokenId isOut feeFixed fxRate expiresAt`;
+const cashQuoteFields = `poster assetId tokenId isOut feeFixed fxRate remaining expiresAt`;
 
 export async function fetchCashQuotes(poster?: string): Promise<CashQuote[]> {
     const arg = poster?.trim() ? `(poster: "${poster.trim()}")` : "";

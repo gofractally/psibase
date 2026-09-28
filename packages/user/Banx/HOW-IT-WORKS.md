@@ -294,7 +294,9 @@ One table, `side` in the primary key (`1` buy, `2` sell). `debtor = 0` is global
 
 `out = in × (1 − spread) − fee_fixed` after flipping sell so positive is the poster’s profit.
 
-The **debtor must know the buyer** (line to them, or a live claim). New exposure requires the **buyer’s credit line** to the debtor and is **capped** with the same capacity as a path hop (reverse claim + headroom); `remaining` is spent only on **new_draw**. A take that only unwinds a reverse claim needs no buyer line. The offer is the rate; the line is who and how much. Checks run at **take**, not at post.
+The offer’s face budget is separate from a credit line. Each take spends that face amount and leaves the row at 0 so the poster can top up by posting again. A zero post is rejected. A spent specific offer still blocks the global one until it is removed or topped up.
+
+The **debtor must know the buyer** (line to them, or a live claim). New exposure requires the **buyer’s credit line** to the debtor and is **capped** with the same capacity as a path hop (reverse claim + headroom). A depleting line’s own budget is spent only on **new_draw**. A take that only unwinds a reverse claim needs no buyer line. The offer is the rate and the face budget; the line is who and how much new exposure. Checks run at **take**, not at post.
 
 Sell / convert / path_pay are **not** a grace payoff. They lock whatever is owed (zero during grace) and move or rebook. A sold claim keeps the source cycle’s remaining window (same end). It does not start the buyer’s posted grace.
 
@@ -347,7 +349,7 @@ Banx claims stay claims. Tokens stay Tokens. A **cash quote** is the edge: the p
 
 Inventory is Banx’s Tokens sub-account `{account}/{token_id}`. `csh_fund` is credit Banx, then Banx `toSub` into **your** bucket. `csh_wd` is `fromSub` back to you. `cash_in` `fromSub`s the taker and `toSub`s the cashier (same bucket `cash_out` spends). No Banx vault table.
 
-Out uses the same capacity / remaining as a path draw. In is the same book as deposit (repay if you owe them; otherwise you hold a claim on them). The poster’s quote is consent. Tokens history records the coin move; Banx activity is `cash_out` / `cash_in`.
+Out uses the same capacity / remaining as a path draw. In is the same book as deposit (repay if you owe them; otherwise you hold a claim on them). The quote’s own `remaining` is the taker’s input still available: Banx units on the way out, token units on the way in. A take spends it and leaves the row at 0 so the cashier can top up. The poster’s quote is consent. Tokens history records the coin move; Banx activity is `cash_out` / `cash_in`.
 
 Multiple tokens per Banx asset: one quote row per `(poster, asset, token, is_out)`.
 

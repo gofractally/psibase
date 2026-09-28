@@ -43,11 +43,16 @@ impl CashQuote {
         is_out: bool,
         fee_fixed: Quantity,
         fx_rate: u64,
+        remaining: Quantity,
         expires_at: TimePointSec,
     ) {
         let _ = Asset::get_assert(asset_id);
         let _ = Tokens::call().getToken(token_id);
         assert!(fx_rate > 0, "fx_rate must be positive");
+        assert!(
+            remaining.value > 0,
+            "cash-quote remaining must be positive"
+        );
         Self {
             poster,
             asset_id,
@@ -55,6 +60,7 @@ impl CashQuote {
             is_out,
             fee_fixed,
             fx_rate,
+            remaining,
             expires_at,
         }
         .save();
@@ -104,12 +110,27 @@ impl CashQuote {
         Tokens::call().credit(token_id, to, amount, Self::token_memo(memo));
     }
 
+    fn spend(&mut self, amount: Quantity) {
+        assert!(
+            amount.value <= self.remaining.value,
+            "cash amount exceeds quote remaining"
+        );
+        self.remaining = (self.remaining.value - amount.value).into();
+        self.save();
+    }
+
     /// Taker draws `amount_banx` on poster; receives tokens. `min_tokens` is
     /// the cash-out floor. Tokens come from `{poster}/{token_id}` on Banx.
-    pub fn cash_out(&self, taker: AccountNumber, amount_banx: Quantity, min_tokens: Quantity) {
+    pub fn cash_out(
+        &mut self,
+        taker: AccountNumber,
+        amount_banx: Quantity,
+        min_tokens: Quantity,
+    ) {
         assert!(self.is_out, "cash quote is not out");
         assert!(taker != self.poster, "cannot cash_out with self");
         assert!(amount_banx.value > 0, "cash_out amount must be positive");
+        self.spend(amount_banx);
         let tokens = self.apply(amount_banx);
         assert!(
             tokens.value >= min_tokens.value,
@@ -135,10 +156,16 @@ impl CashQuote {
 
     /// Taker sends `amount_tokens` from `{taker}/{token_id}` (filled by
     /// `csh_fund`) into the poster's vault; books a deposit onto the poster.
-    pub fn cash_in(&self, taker: AccountNumber, amount_tokens: Quantity, min_banx: Quantity) {
+    pub fn cash_in(
+        &mut self,
+        taker: AccountNumber,
+        amount_tokens: Quantity,
+        min_banx: Quantity,
+    ) {
         assert!(!self.is_out, "cash quote is not in");
         assert!(taker != self.poster, "cannot cash_in with self");
         assert!(amount_tokens.value > 0, "cash_in amount must be positive");
+        self.spend(amount_tokens);
         let banx_amt = self.apply(amount_tokens);
         assert!(
             banx_amt.value >= min_banx.value,
