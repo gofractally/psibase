@@ -1,6 +1,6 @@
 [package]
 name = "single-prod-pkg"
-description = "One-time setup for a single-provider private network. Install at boot instead of FractalGen."
+description = "One-time setup for a single-provider private network."
 version.workspace = true
 edition.workspace = true
 repository.workspace = true

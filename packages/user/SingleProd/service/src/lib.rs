@@ -4,7 +4,7 @@ mod service {
         nft::Wrapper as Nft,
         producers::Wrapper as Producers,
         symbol::Wrapper as Symbol,
-        tokens::{Precision, TokenFlags, TokenRecord, Wrapper as Tokens},
+        tokens::{Precision, Quantity, TokenFlags, TokenRecord, Wrapper as Tokens},
         virtual_server::Wrapper as VirtualServer,
     };
     use psibase::FlagsType;
@@ -65,7 +65,13 @@ mod service {
         let supply = token.max_issued_supply;
         Tokens::call().mint(tid, supply, "initial mint".into());
 
-        let resources = VirtualServer::call().std_buffer_cost();
+        let resources = Quantity::new(
+            VirtualServer::call()
+                .std_buffer_cost()
+                .value
+                .checked_mul(100)
+                .unwrap(),
+        );
         Tokens::call().credit(tid, VirtualServer::SERVICE, resources, "".into());
         VirtualServer::call().buy_res_for(resources, producer, None);
 
