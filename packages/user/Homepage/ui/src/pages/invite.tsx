@@ -1,27 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
-import {
-    AlarmClockMinus,
-    LoaderCircle,
-    TicketCheck,
-    TriangleAlert,
-} from "lucide-react";
+import { AlarmClockMinus, TicketCheck, TriangleAlert } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { z } from "zod";
+
+import { Loading } from "@/components/loading";
+import { NoticeCard } from "@/components/notice-card";
+import { KeyValue } from "@/components/page-header";
 
 import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
 import { invite as invitePlugin } from "@shared/lib/plugins";
 import { supervisor } from "@shared/lib/supervisor";
 import { Button } from "@shared/shadcn/ui/button";
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardFooter,
-    CardHeader,
-    CardTitle,
-} from "@shared/shadcn/ui/card";
 
 dayjs.extend(relativeTime);
 
@@ -69,6 +60,12 @@ const fetchInvite = async (token: string) => {
     };
 };
 
+const Centered = ({ children }: { children: React.ReactNode }) => (
+    <div className="grid-bg -m-4 flex flex-1 items-center justify-center p-4 md:-m-6 md:p-6">
+        {children}
+    </div>
+);
+
 export const Invite = () => {
     const [searchParams] = useSearchParams();
     const token = searchParams.get("token");
@@ -85,109 +82,124 @@ export const Invite = () => {
 
     if (!token) {
         return (
-            <Card className="mx-auto mt-4 w-[350px]">
-                <CardHeader>
-                    <div className="mx-auto">
-                        <TriangleAlert className="h-12 w-12" />
-                    </div>
-                    <CardTitle>Token not found.</CardTitle>
-                    <CardDescription>
-                        The invitation token is either invalid or does not
-                        exist.
-                    </CardDescription>
-                </CardHeader>
-            </Card>
+            <Centered>
+                <NoticeCard
+                    icon={TriangleAlert}
+                    tone="warning"
+                    eyebrow="Invitation"
+                    title="Token not found"
+                    description="The invitation token is either invalid or does not exist."
+                />
+            </Centered>
         );
-    } else if (isError) {
-        return (
-            <Card className="mx-auto mt-4 w-[350px]">
-                <CardHeader>
-                    <div className="mx-auto">
-                        <TriangleAlert className="h-12 w-12" />
-                    </div>
-                    <CardTitle>Error.</CardTitle>
-                    <CardDescription>
-                        The invitation token is either invalid or has already
-                        been used.
-                    </CardDescription>
-                </CardHeader>
-            </Card>
-        );
-    } else if (isLoading) {
-        return (
-            <Card className="mx-auto mt-4 w-[350px]">
-                <CardHeader>
-                    <div className="mx-auto">
-                        <LoaderCircle className="h-12 w-12 animate-spin" />
-                    </div>
-                    <CardTitle className="text-center">Loading...</CardTitle>
-                </CardHeader>
-            </Card>
-        );
-    } else {
-        const now = new Date().valueOf();
-        const isExpired = invite!.expiry.valueOf() < now;
-
-        const inviter = invite?.inviter;
-        const chainName = invite?.chainName;
-
-        const description = isExpired
-            ? `This invitation expired ${dayjs().to(invite!.expiry)} (${dayjs(
-                  invite!.expiry,
-              ).format("YYYY/MM/DD HH:mm")}).`
-            : `${inviter} has invited you to create an account
-        on the ${chainName} platform.`;
-
-        if (isExpired) {
-            return (
-                <Card className="mx-auto mt-4 w-[350px]">
-                    <CardHeader>
-                        <div className="mx-auto">
-                            <AlarmClockMinus className="h-12 w-12" />
-                        </div>
-                        <CardTitle>Expired invitation</CardTitle>
-                        <CardDescription>{description}</CardDescription>
-                        <CardDescription>
-                            Please ask the sender{" "}
-                            <span className="text-primary">{inviter}</span> for
-                            a new one.
-                        </CardDescription>
-                    </CardHeader>
-                </Card>
-            );
-        } else {
-            return (
-                <Card className="mx-auto mt-4 w-[350px]">
-                    <CardHeader>
-                        <div className="mx-auto">
-                            <TicketCheck className="h-12 w-12" />
-                        </div>
-                        <CardTitle>{`You're invited to ${chainName}`}</CardTitle>
-                        <CardDescription>{description}</CardDescription>
-                    </CardHeader>
-                    <CardContent></CardContent>
-                    <CardFooter className="flex justify-between">
-                        <Button
-                            onClick={async () => {
-                                await supervisor.functionCall(
-                                    {
-                                        service: "accounts",
-                                        intf: "activeApp",
-                                        method: "connectAccount",
-                                        params: [],
-                                    },
-                                    {
-                                        enabled: true,
-                                        returnPath: "/invite-response",
-                                    },
-                                );
-                            }}
-                        >
-                            Continue
-                        </Button>
-                    </CardFooter>
-                </Card>
-            );
-        }
     }
+
+    if (isError) {
+        return (
+            <Centered>
+                <NoticeCard
+                    icon={TriangleAlert}
+                    tone="warning"
+                    eyebrow="Invitation"
+                    title="Invalid invitation"
+                    description="The invitation token is either invalid or has already been used."
+                />
+            </Centered>
+        );
+    }
+
+    if (isLoading || !invite) {
+        return (
+            <Centered>
+                <Loading label="Checking invitation…" />
+            </Centered>
+        );
+    }
+
+    const now = new Date().valueOf();
+    const isExpired = invite.expiry.valueOf() < now;
+    const { inviter, chainName, expiry } = invite;
+
+    if (isExpired) {
+        return (
+            <Centered>
+                <NoticeCard
+                    icon={AlarmClockMinus}
+                    tone="warning"
+                    eyebrow="Invitation"
+                    title="Expired invitation"
+                    description={
+                        <>
+                            This invitation expired {dayjs().to(expiry)} (
+                            {dayjs(expiry).format("YYYY/MM/DD HH:mm")}). Ask{" "}
+                            <span className="text-foreground font-mono">
+                                {inviter}
+                            </span>{" "}
+                            for a new one.
+                        </>
+                    }
+                />
+            </Centered>
+        );
+    }
+
+    return (
+        <Centered>
+            <NoticeCard
+                icon={TicketCheck}
+                eyebrow={String(chainName)}
+                title={`You're invited to ${chainName}`}
+                description={
+                    <>
+                        <span className="text-foreground font-mono">
+                            {inviter}
+                        </span>{" "}
+                        has invited you to create an account on this network.
+                    </>
+                }
+                footer={
+                    <Button
+                        size="sm"
+                        className="h-8 w-full"
+                        onClick={async () => {
+                            await supervisor.functionCall(
+                                {
+                                    service: "accounts",
+                                    intf: "activeApp",
+                                    method: "connectAccount",
+                                    params: [],
+                                },
+                                {
+                                    enabled: true,
+                                    returnPath: "/invite-response",
+                                },
+                            );
+                        }}
+                    >
+                        Continue
+                    </Button>
+                }
+            >
+                <div className="bg-muted/30 w-full rounded-lg border text-left">
+                    <KeyValue
+                        label="Invited by"
+                        className="py-2 sm:grid-cols-[100px_1fr]"
+                    >
+                        <span className="font-mono">{inviter}</span>
+                    </KeyValue>
+                    <KeyValue
+                        label="Expires"
+                        className="py-2 sm:grid-cols-[100px_1fr]"
+                    >
+                        <span
+                            className="tabular-nums"
+                            title={dayjs(expiry).format("YYYY/MM/DD HH:mm")}
+                        >
+                            {dayjs().to(expiry)}
+                        </span>
+                    </KeyValue>
+                </div>
+            </NoticeCard>
+        </Centered>
+    );
 };

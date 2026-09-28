@@ -1,15 +1,10 @@
-import { useNavLocation } from "@/hooks/use-nav-location";
+import { LogIn } from "lucide-react";
 import { useLocation } from "react-router-dom";
+
+import { useNavLocation } from "@/hooks/use-nav-location";
 
 import { useConnectAccount } from "@shared/hooks/use-connect-account";
 import { Button } from "@shared/shadcn/ui/button";
-import {
-    Card,
-    CardDescription,
-    CardFooter,
-    CardHeader,
-    CardTitle,
-} from "@shared/shadcn/ui/card";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 export const AppSplashScreen = () => {
@@ -29,29 +24,29 @@ export const AppSplashScreen = () => {
     };
 
     return (
-        <div className="mx-auto mt-4 w-[350px]">
-            {/* Main app info card */}
-            <Card className="rounded-b-none border-b-0 shadow-sm">
-                <CardHeader>
-                    <div className="mx-auto">{currentApp?.icon}</div>
-                    <CardTitle>{currentApp?.name}</CardTitle>
-                    <CardDescription>{currentApp?.description}</CardDescription>
-                </CardHeader>
-            </Card>
-
-            {/* Login prompt card */}
-            <Card className="bg-muted/50 rounded-t-none border-t-0">
-                <CardHeader className="pb-2 pt-4">
-                    <CardDescription className="text-center font-medium">
-                        {`Please log in to access ${currentApp?.name}`}
-                    </CardDescription>
-                </CardHeader>
-                <CardFooter className="flex justify-center pb-4">
-                    <Button disabled={isPending} onClick={onLogin}>
-                        Log in
-                    </Button>
-                </CardFooter>
-            </Card>
+        <div className="bg-card/70 mx-auto flex w-full max-w-sm flex-col items-center gap-4 rounded-xl border p-8 text-center shadow-sm backdrop-blur">
+            <div className="bg-primary/10 text-primary flex size-12 items-center justify-center rounded-xl border [&_svg]:size-6">
+                {currentApp?.icon}
+            </div>
+            <div className="space-y-1">
+                <h1 className="text-lg font-semibold tracking-tight">
+                    {currentApp?.name}
+                </h1>
+                <p className="text-muted-foreground text-sm">
+                    {currentApp?.description}
+                </p>
+            </div>
+            <div className="text-muted-foreground text-xs">
+                Sign in to use {currentApp?.name ?? "this app"}.
+            </div>
+            <Button
+                size="sm"
+                className="h-8"
+                disabled={isPending}
+                onClick={onLogin}
+            >
+                <LogIn className="size-3.5" /> Log in
+            </Button>
         </div>
     );
 };

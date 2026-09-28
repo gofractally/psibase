@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 import { NavApps } from "@/components/nav-apps";
 import { NavUser } from "@/components/nav-user";
@@ -13,6 +13,7 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
+    SidebarRail,
 } from "@shared/shadcn/ui/sidebar";
 
 import { Developers } from "./developers";
@@ -21,24 +22,20 @@ import { NavMain } from "./nav-main";
 import { NavSubNav } from "./nav-sub-nav";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-    const navigate = useNavigate();
-
     return (
-        <Sidebar variant="inset" {...props}>
+        <Sidebar collapsible="icon" {...props}>
             <SidebarHeader>
                 <SidebarMenu>
                     <SidebarMenuItem>
-                        <SidebarMenuButton
-                            size="lg"
-                            asChild
-                            onClick={() => navigate("/")}
-                        >
-                            <NetworkLogo />
-                        </SidebarMenuButton>
+                        <Link to="/">
+                            <SidebarMenuButton size="lg" asChild>
+                                <NetworkLogo />
+                            </SidebarMenuButton>
+                        </Link>
                     </SidebarMenuItem>
                 </SidebarMenu>
             </SidebarHeader>
-            <SidebarContent>
+            <SidebarContent className="scrollbar-thin">
                 <NavMain />
                 <NavApps />
                 <NavSubNav />
@@ -48,6 +45,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <Developers />
                 <NavUser />
             </SidebarFooter>
+            <SidebarRail />
         </Sidebar>
     );
 }

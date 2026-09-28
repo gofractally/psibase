@@ -1,24 +1,16 @@
-import { type ColumnDef } from "@tanstack/react-table";
-import { useMemo, useState } from "react";
+import { Package } from "lucide-react";
+import { useState } from "react";
+import { Link } from "react-router-dom";
 
 import { ClaimNameDialog } from "@/apps/accounts-marketplace/components/claim-name-dialog";
+import { ACCOUNT_MARKETPLACE_PATH } from "@/apps/accounts-marketplace/route";
 
-import { Loading } from "@/components/loading";
+import { EmptyState } from "@/components/empty-state";
+import { Panel } from "@/components/page-header";
+import { DataTable, THead, Table, Td, Th, Tr } from "@/components/table";
 
-import { DataTable } from "@shared/components/data-table";
-import { ErrorCard } from "@shared/components/error-card";
-import { GlowingCard } from "@shared/components/glowing-card";
 import { Button } from "@shared/shadcn/ui/button";
-import {
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@shared/shadcn/ui/card";
-
-type UnclaimedNameRow = {
-    account: string;
-};
+import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 type Props = {
     names: string[];
@@ -35,110 +27,90 @@ export function UnclaimedNamesTable({
 }: Props) {
     const [accountToClaim, setAccountToClaim] = useState<string | null>(null);
 
-    const data = useMemo(() => names.map((account) => ({ account })), [names]);
-
-    const columns = useMemo<ColumnDef<UnclaimedNameRow>[]>(
-        () => [
-            {
-                accessorKey: "account",
-                header: "Account",
-                cell: ({ row }) => (
-                    <span className="font-mono text-sm font-medium">
-                        {row.original.account}
-                    </span>
-                ),
-            },
-            {
-                id: "actions",
-                header: () => <div className="text-right">Action</div>,
-                meta: { className: "w-[1%] whitespace-nowrap pl-3" },
-                cell: ({ row }) => (
-                    <div className="flex justify-end">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="xs"
-                            onClick={() =>
-                                setAccountToClaim(row.original.account)
-                            }
-                        >
-                            Claim
-                        </Button>
-                    </div>
-                ),
-            },
-        ],
-        [],
-    );
-
-    const claimDialog = (
-        <ClaimNameDialog
-            account={accountToClaim ?? ""}
-            open={accountToClaim !== null}
-            onClose={() => setAccountToClaim(null)}
-        />
-    );
-
-    if (isPending) {
-        return (
-            <>
-                <GlowingCard>
-                    <Loading />
-                </GlowingCard>
-                {claimDialog}
-            </>
-        );
-    }
-
-    if (isError) {
-        return (
-            <>
-                <GlowingCard>
-                    <ErrorCard
-                        error={
-                            error ??
-                            new Error("Failed to load unclaimed names.")
-                        }
-                    />
-                </GlowingCard>
-                {claimDialog}
-            </>
-        );
-    }
-
-    if (names.length === 0) {
-        return (
-            <>
-                <GlowingCard>
-                    <CardContent className="text-muted-foreground py-8 text-center">
-                        You have no purchased accounts waiting to be claimed.
-                    </CardContent>
-                </GlowingCard>
-                {claimDialog}
-            </>
-        );
-    }
-
     return (
         <>
-            <GlowingCard>
-                <CardHeader>
-                    <CardTitle>Unclaimed names</CardTitle>
-                    <CardDescription>
-                        Claim purchased names to activate them on this chain.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <DataTable
-                        columns={columns}
-                        data={data}
-                        pageSize={10}
-                        caption="Purchased names awaiting claim."
-                        emptyMessage="You have no purchased accounts waiting to be claimed."
-                    />
-                </CardContent>
-            </GlowingCard>
-            {claimDialog}
+            <Panel
+                title="Unclaimed names"
+                description={
+                    names.length
+                        ? `${names.length} purchased name${names.length === 1 ? "" : "s"} waiting to be claimed`
+                        : "Claim purchased names to activate them on this network"
+                }
+                className="max-w-3xl"
+            >
+                {isPending ? (
+                    <div className="flex flex-col gap-2 p-4">
+                        {Array.from({ length: 3 }).map((_, i) => (
+                            <Skeleton key={i} className="h-6 w-full" />
+                        ))}
+                    </div>
+                ) : isError ? (
+                    <EmptyState
+                        className="text-destructive min-h-24"
+                        detail={error?.message}
+                    >
+                        Failed to load unclaimed names
+                    </EmptyState>
+                ) : names.length === 0 ? (
+                    <EmptyState
+                        icon={Package}
+                        className="min-h-40"
+                        detail="Names you buy show up here until you claim them and set a key."
+                        action={
+                            <Button
+                                asChild
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs"
+                            >
+                                <Link to={`/${ACCOUNT_MARKETPLACE_PATH}`}>
+                                    Buy a name
+                                </Link>
+                            </Button>
+                        }
+                    >
+                        Nothing to claim
+                    </EmptyState>
+                ) : (
+                    <DataTable>
+                        <Table>
+                            <THead>
+                                <tr>
+                                    <Th>Account</Th>
+                                    <Th className="text-right">Action</Th>
+                                </tr>
+                            </THead>
+                            <tbody>
+                                {names.map((account) => (
+                                    <Tr key={account}>
+                                        <Td>
+                                            <span className="font-mono font-medium">
+                                                {account}
+                                            </span>
+                                        </Td>
+                                        <Td className="text-right">
+                                            <Button
+                                                type="button"
+                                                size="xs"
+                                                onClick={() =>
+                                                    setAccountToClaim(account)
+                                                }
+                                            >
+                                                Claim
+                                            </Button>
+                                        </Td>
+                                    </Tr>
+                                ))}
+                            </tbody>
+                        </Table>
+                    </DataTable>
+                )}
+            </Panel>
+            <ClaimNameDialog
+                account={accountToClaim ?? ""}
+                open={accountToClaim !== null}
+                onClose={() => setAccountToClaim(null)}
+            />
         </>
     );
 }

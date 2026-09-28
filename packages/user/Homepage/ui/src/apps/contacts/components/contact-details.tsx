@@ -1,19 +1,27 @@
 import {
     ArrowLeft,
-    Copy,
     Edit,
     Mail,
+    MessageCircle,
     MoreVertical,
     Phone,
     Trash,
+    UserRound,
     Wallet,
 } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
 
+import { CopyIcon } from "@/components/account-cell";
+import { EmptyState } from "@/components/empty-state";
+import { KeyValue, Panel } from "@/components/page-header";
+
+import { colorFor } from "@/lib/colors";
+
 import { Avatar } from "@shared/components/avatar";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { useProfile } from "@shared/hooks/use-profile";
+import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Dialog,
@@ -29,6 +37,12 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@shared/shadcn/ui/dropdown-menu";
+import { ScrollArea } from "@shared/shadcn/ui/scroll-area";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from "@shared/shadcn/ui/tooltip";
 
 import { useDeleteContact } from "../hooks/use-delete-contact";
 import { useUpdateContact } from "../hooks/use-update-contact";
@@ -50,6 +64,43 @@ const modalPages = z.enum([
     "deleteContact",
     "closed",
 ]);
+
+const ValueWithActions = ({
+    value,
+    href,
+    hrefIcon: HrefIcon,
+    hrefLabel,
+    mono,
+}: {
+    value: string;
+    href?: string;
+    hrefIcon?: typeof Mail;
+    hrefLabel?: string;
+    mono?: boolean;
+}) => (
+    <span className="group/value flex min-w-0 items-center gap-1.5">
+        <span className={mono ? "truncate font-mono" : "truncate"}>
+            {value}
+        </span>
+        <CopyIcon value={value} />
+        {href && HrefIcon && (
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <a
+                        href={href}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-muted-foreground hover:text-foreground inline-flex size-5 items-center justify-center rounded transition-colors"
+                        aria-label={hrefLabel}
+                    >
+                        <HrefIcon className="size-3" />
+                    </a>
+                </TooltipTrigger>
+                <TooltipContent>{hrefLabel}</TooltipContent>
+            </Tooltip>
+        )}
+    </span>
+);
 
 export function ContactDetails({
     contact,
@@ -73,9 +124,13 @@ export function ContactDetails({
     const showModal = modalPage !== modalPages.Values.closed;
     if (!contact) {
         return (
-            <div className="flex h-full items-center justify-center">
-                Select a contact to view details
-            </div>
+            <EmptyState
+                icon={UserRound}
+                detail="Choose a contact from the list to see their details."
+                className="h-full"
+            >
+                Select a contact
+            </EmptyState>
         );
     }
 
@@ -85,48 +140,88 @@ export function ContactDetails({
         profile?.profile?.displayName,
         contact.account,
     );
+    const displayName = profile?.profile?.displayName?.trim();
+    const bio = profile?.profile?.bio?.trim();
+    const accent = colorFor(contact.account);
 
     return (
-        <div className="flex h-full w-full flex-col">
-            {/* Header with back button on mobile */}
-            <div className="flex items-center gap-2 border-b p-4">
+        <div className="flex h-full min-h-0 w-full flex-col">
+            <div className="border-border flex items-center gap-2 border-b px-4 py-2.5">
                 {onBack && (
-                    <Button variant="ghost" size="icon" onClick={onBack}>
-                        <ArrowLeft className="h-5 w-5" />
+                    <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={onBack}
+                        aria-label="Back to contacts"
+                    >
+                        <ArrowLeft className="size-4" />
                     </Button>
                 )}
-                <div className="flex flex-1 items-center justify-between text-lg font-semibold">
-                    <h2 className="text-lg">{primaryName}</h2>
+                <div className="flex min-w-0 flex-1 items-baseline gap-2">
+                    <h2 className="truncate text-sm font-semibold">
+                        {primaryName}
+                    </h2>
+                    {isSelf && (
+                        <Badge
+                            variant="secondary"
+                            className="h-4 px-1.5 text-[10px]"
+                        >
+                            you
+                        </Badge>
+                    )}
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() =>
+                            setModalPage(modalPages.Values.editContact)
+                        }
+                    >
+                        <Edit className="size-3.5" />
+                        Edit
+                    </Button>
                     <DropdownMenu>
-                        <DropdownMenuTrigger>
-                            <Button variant="ghost" size="icon">
-                                <MoreVertical />
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label="More actions"
+                            >
+                                <MoreVertical className="size-4" />
                             </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                            <DropdownMenuItem
-                                onClick={() => {
-                                    setModalPage(modalPages.Values.editContact);
-                                }}
-                            >
-                                <Edit className="mr-2 h-4 w-4" />
-                                Edit
-                            </DropdownMenuItem>
+                        <DropdownMenuContent align="end">
+                            {isSelf && (
+                                <DropdownMenuItem
+                                    onClick={() =>
+                                        setModalPage(
+                                            modalPages.Values.editProfile,
+                                        )
+                                    }
+                                >
+                                    <UserRound className="size-4" />
+                                    Edit public profile
+                                </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem
                                 disabled={isSelf}
+                                variant="destructive"
                                 onClick={() => {
                                     setModalPage(
                                         modalPages.Values.deleteContact,
                                     );
                                 }}
                             >
-                                <Trash className="mr-2 h-4 w-4" />
-                                Delete
+                                <Trash className="size-4" />
+                                Delete contact
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>
             </div>
+
             <Dialog
                 open={showModal}
                 onOpenChange={(open) => {
@@ -140,14 +235,14 @@ export function ContactDetails({
                         <DialogHeader>
                             <DialogTitle>Edit contact</DialogTitle>
                             <DialogDescription>
-                                <div className="py-2">
-                                    These details are stored locally and not
-                                    sent to the network.
-                                </div>
+                                These details are stored locally and not sent to
+                                the network.
                                 {isSelf && (
-                                    <div className="py-2">
+                                    <>
+                                        {" "}
                                         Edit your{" "}
                                         <button
+                                            type="button"
                                             className="hover:text-primary underline focus:outline-none"
                                             onClick={() =>
                                                 setModalPage(
@@ -159,38 +254,43 @@ export function ContactDetails({
                                             profile
                                         </button>{" "}
                                         to update your public information.
-                                    </div>
+                                    </>
                                 )}
-
-                                <ContactForm
-                                    initialValues={contact}
-                                    onSubmit={async (data) => {
-                                        await updateContact(data);
-                                        closeModal();
-                                    }}
-                                />
                             </DialogDescription>
                         </DialogHeader>
+                        <ContactForm
+                            initialValues={contact}
+                            onSubmit={async (data) => {
+                                await updateContact(data);
+                                closeModal();
+                            }}
+                        />
                     </DialogContent>
                 ) : modalPage === modalPages.Values.deleteContact ? (
                     <DialogContent>
                         <DialogHeader>
                             <DialogTitle>Delete contact</DialogTitle>
                             <DialogDescription>
-                                This will permanently delete the contact{" "}
-                                <span className="font-bold">
-                                    @{contact.account}
-                                </span>
+                                This removes{" "}
+                                <span className="text-foreground font-mono">
+                                    {contact.account}
+                                </span>{" "}
+                                from your local contacts. It does not affect the
+                                account itself.
                             </DialogDescription>
                         </DialogHeader>
                         <DialogFooter>
+                            <Button variant="outline" onClick={closeModal}>
+                                Cancel
+                            </Button>
                             <Button
+                                variant="destructive"
                                 onClick={async () => {
                                     await deleteContact(contact.account);
                                     closeModal();
                                 }}
                             >
-                                Confirm
+                                Delete
                             </Button>
                         </DialogFooter>
                     </DialogContent>
@@ -206,116 +306,167 @@ export function ContactDetails({
                     </DialogContent>
                 )}
             </Dialog>
-            <div className="mx-auto flex w-full max-w-screen-md flex-col items-center justify-center gap-4 p-4">
-                <div className="flex w-full justify-center">
-                    <Avatar
-                        account={contact.account}
-                        className="h-56 border-4"
-                        alt="Contact avatar"
-                    />
-                </div>
-                <div className="flex flex-col gap-2 text-center">
-                    <div className="text-lg font-medium">{primaryName}</div>
-                    {secondaryName && (
-                        <div className="flex flex-col gap-1">
-                            <div className="text-muted-foreground text-sm">
-                                {secondaryName?.toLowerCase()}
+
+            <ScrollArea className="min-h-0 flex-1">
+                <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4 sm:p-6">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+                        <Avatar
+                            account={contact.account}
+                            className="bg-card size-20 shrink-0 rounded-xl border-2 object-cover"
+                            style={{ borderColor: accent }}
+                            alt="Contact avatar"
+                        />
+                        <div className="min-w-0 flex-1">
+                            <div className="text-muted-foreground text-[11px] font-medium uppercase tracking-[0.2em]">
+                                {isSelf ? "your account" : "contact"}
+                            </div>
+                            <h3 className="mt-0.5 truncate text-2xl font-semibold tracking-tight">
+                                {primaryName}
+                            </h3>
+                            {secondaryName && (
+                                <div className="flex items-center gap-1.5">
+                                    <span className="text-muted-foreground truncate font-mono text-sm">
+                                        {secondaryName.toLowerCase()}
+                                    </span>
+                                    <CopyIcon value={contact.account} />
+                                </div>
+                            )}
+                            {bio && (
+                                <p className="text-muted-foreground mt-2 max-w-prose text-sm">
+                                    {bio}
+                                </p>
+                            )}
+                            <div className="mt-3 flex flex-wrap gap-2">
+                                <Button
+                                    onClick={() =>
+                                        onTransferFunds(contact.account)
+                                    }
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 text-xs"
+                                    disabled={isSelf}
+                                >
+                                    <Wallet className="size-3.5" />
+                                    Send tokens
+                                </Button>
+                                <Button
+                                    onClick={() =>
+                                        onChainMailUser(contact.account)
+                                    }
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 text-xs"
+                                    disabled={isSelf}
+                                >
+                                    <MessageCircle className="size-3.5" />
+                                    Message
+                                </Button>
                             </div>
                         </div>
-                    )}
-                    {profile?.profile?.bio && (
-                        <div className="flex flex-col gap-1">
-                            <div className="text-muted-foreground text-sm">
-                                {profile?.profile?.bio}
-                            </div>
-                        </div>
-                    )}
-                    <div className="text-muted-foreground flex w-full justify-center gap-2 ">
-                        <Button
-                            onClick={() => onTransferFunds(contact.account)}
-                            size="icon"
-                            variant="outline"
-                            className="hover:text-primary"
+                    </div>
+
+                    <div className="grid gap-4 lg:grid-cols-2">
+                        <Panel
+                            title="Local details"
+                            description="Only visible to you"
                         >
-                            <Wallet />
-                        </Button>
-                        <Button
-                            onClick={() => onChainMailUser(contact.account)}
-                            size="icon"
-                            variant="outline"
-                            className="hover:text-primary"
+                            <KeyValue label="Account">
+                                <ValueWithActions
+                                    value={contact.account}
+                                    mono
+                                />
+                            </KeyValue>
+                            <KeyValue label="Nickname">
+                                {contact.nickname || (
+                                    <span className="text-muted-foreground italic">
+                                        not set
+                                    </span>
+                                )}
+                            </KeyValue>
+                            <KeyValue label="Email">
+                                {contact.email ? (
+                                    <ValueWithActions
+                                        value={contact.email}
+                                        href={`mailto:${contact.email}`}
+                                        hrefIcon={Mail}
+                                        hrefLabel="Send email"
+                                    />
+                                ) : (
+                                    <span className="text-muted-foreground italic">
+                                        not set
+                                    </span>
+                                )}
+                            </KeyValue>
+                            <KeyValue label="Phone">
+                                {contact.phone ? (
+                                    <ValueWithActions
+                                        value={contact.phone}
+                                        href={`tel:${contact.phone}`}
+                                        hrefIcon={Phone}
+                                        hrefLabel="Call"
+                                    />
+                                ) : (
+                                    <span className="text-muted-foreground italic">
+                                        not set
+                                    </span>
+                                )}
+                            </KeyValue>
+                        </Panel>
+
+                        <Panel
+                            title="Public profile"
+                            description="Published on the network by the account owner"
+                            actions={
+                                isSelf ? (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 text-xs"
+                                        onClick={() =>
+                                            setModalPage(
+                                                modalPages.Values.editProfile,
+                                            )
+                                        }
+                                    >
+                                        <Edit className="size-3.5" />
+                                        Edit
+                                    </Button>
+                                ) : undefined
+                            }
                         >
-                            <Mail />
-                        </Button>
+                            <KeyValue label="Display name">
+                                {displayName || (
+                                    <span className="text-muted-foreground italic">
+                                        not set
+                                    </span>
+                                )}
+                            </KeyValue>
+                            <KeyValue label="Bio">
+                                {bio ? (
+                                    <span className="whitespace-pre-wrap">
+                                        {bio}
+                                    </span>
+                                ) : (
+                                    <span className="text-muted-foreground italic">
+                                        not set
+                                    </span>
+                                )}
+                            </KeyValue>
+                            <KeyValue label="Profile">
+                                {profile?.profile ? (
+                                    <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                                        published
+                                    </span>
+                                ) : (
+                                    <span className="text-muted-foreground italic">
+                                        not published
+                                    </span>
+                                )}
+                            </KeyValue>
+                        </Panel>
                     </div>
                 </div>
-            </div>
-            <div className="mx-auto grid max-w-screen-sm grid-cols-1 gap-3 p-4">
-                {contact.phone && (
-                    <div className="flex items-center justify-between rounded-md border px-4 py-2">
-                        <span>{contact.phone}</span>
-                        <div className="flex gap-2">
-                            <Button
-                                onClick={() => {
-                                    navigator.clipboard.writeText(
-                                        contact.phone!,
-                                    );
-                                }}
-                                variant="ghost"
-                                size="icon"
-                                className="text-muted-foreground hover:text-primary"
-                            >
-                                <Copy className="h-5 w-5" />
-                            </Button>
-                            <Button
-                                onClick={() => {
-                                    window.open(
-                                        `tel:${contact.phone}`,
-                                        "_blank",
-                                    );
-                                }}
-                                variant="ghost"
-                                size="icon"
-                                className="text-muted-foreground hover:text-primary"
-                            >
-                                <Phone className="h-5 w-5" />
-                            </Button>
-                        </div>
-                    </div>
-                )}
-                {contact.email && (
-                    <div className="flex items-center justify-between rounded-md border px-4 py-2">
-                        <span>{contact.email}</span>
-                        <div className="flex gap-2">
-                            <Button
-                                onClick={() => {
-                                    navigator.clipboard.writeText(
-                                        contact.email!,
-                                    );
-                                }}
-                                variant="ghost"
-                                size="icon"
-                                className="text-muted-foreground hover:text-primary"
-                            >
-                                <Copy className="h-5 w-5" />
-                            </Button>
-                            <Button
-                                onClick={() => {
-                                    window.open(
-                                        `mailto:${contact.email}`,
-                                        "_blank",
-                                    );
-                                }}
-                                variant="ghost"
-                                size="icon"
-                                className="text-muted-foreground hover:text-primary"
-                            >
-                                <Mail className="h-5 w-5" />
-                            </Button>
-                        </div>
-                    </div>
-                )}
-            </div>
+            </ScrollArea>
         </div>
     );
 }

@@ -1,31 +1,30 @@
 import { Home } from "lucide-react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 
 import {
     SidebarGroup,
-    SidebarGroupLabel,
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
 } from "@shared/shadcn/ui/sidebar";
 
 export function NavMain() {
+    const location = useLocation();
+
     return (
         <SidebarGroup>
-            <SidebarGroupLabel>Dashboard</SidebarGroupLabel>
             <SidebarMenu>
                 <SidebarMenuItem>
-                    <NavLink to="/">
-                        {({ isActive }) => (
-                            <SidebarMenuButton
-                                data-active={isActive}
-                                className="data-[active=true]:bg-accent"
-                            >
-                                <Home />
-                                <span>Dashboard</span>
-                            </SidebarMenuButton>
-                        )}
-                    </NavLink>
+                    <SidebarMenuButton
+                        asChild
+                        isActive={location.pathname === "/"}
+                        tooltip="Home"
+                    >
+                        <NavLink to="/" end>
+                            <Home />
+                            <span>Home</span>
+                        </NavLink>
+                    </SidebarMenuButton>
                 </SidebarMenuItem>
             </SidebarMenu>
         </SidebarGroup>

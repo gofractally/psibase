@@ -1,6 +1,9 @@
 import { Trash, Upload } from "lucide-react";
 
 import { FormProfile } from "@/components/form-profile";
+import { Panel } from "@/components/page-header";
+
+import { colorFor } from "@/lib/colors";
 
 import { Avatar } from "@shared/components/avatar";
 import { useAvatar } from "@shared/hooks/use-avatar";
@@ -64,30 +67,44 @@ export const UserProfileSection = () => {
     };
 
     return (
-        <div className="space-y-6">
-            <div>
-                <h2 className="mb-2 text-2xl font-bold">User Profile</h2>
-                <p className="text-muted-foreground text-sm">
-                    All information is public.
-                </p>
-            </div>
-
-            <div className="flex items-center justify-between space-x-4">
+        <Panel
+            title="Public profile"
+            description="Shown to everyone, in every app on the network"
+            className="self-start"
+        >
+            <div className="bg-muted/20 flex items-center gap-4 border-b px-4 py-4">
                 <Avatar
                     account={currentUser || ""}
                     src={avatarSrc}
-                    className="h-24 w-24 transition-opacity duration-200"
+                    className="bg-card size-20 shrink-0 rounded-xl border-2 object-cover transition-opacity duration-200"
+                    style={{ borderColor: colorFor(currentUser || "") }}
                     alt={`Avatar of ${currentUser}`}
                 />
-                <div className="flex flex-1 flex-col justify-center gap-2">
+                <div className="flex min-w-0 flex-1 flex-col gap-2">
                     <div>
-                        <Button asChild disabled={isPending}>
+                        <div className="text-muted-foreground text-[11px] font-medium uppercase tracking-wider">
+                            Avatar
+                        </div>
+                        <p className="text-muted-foreground text-xs">
+                            {type === "uploaded"
+                                ? "Using your uploaded image."
+                                : "Using a generated identicon. Upload an image to replace it."}
+                        </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                            asChild
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs"
+                            disabled={isPending}
+                        >
                             <label
                                 htmlFor="icon-upload"
                                 className="cursor-pointer"
                             >
-                                <Upload className="mr-2 h-5 w-5" />
-                                Upload avatar
+                                <Upload className="size-3.5" />
+                                Upload
                             </label>
                         </Button>
                         <Input
@@ -97,41 +114,47 @@ export const UserProfileSection = () => {
                             onChange={handleImageChange}
                             className="hidden"
                         />
-                    </div>
-                    <div>
                         {type === "uploaded" && (
                             <Button
                                 type="button"
+                                size="sm"
+                                variant="ghost"
+                                className="hover:text-destructive h-7 text-xs"
                                 disabled={isPending}
                                 onClick={() => {
                                     removeImage();
                                 }}
-                                variant="destructive"
                             >
-                                <Trash className="mr-2 h-5 w-5" />
-                                Delete avatar
+                                <Trash className="size-3.5" />
+                                Remove
                             </Button>
                         )}
                     </div>
                 </div>
             </div>
 
-            {(isLoading || profile === undefined) && <UserProfileSkeleton />}
-            {profile !== undefined && !isFetching && (
-                <FormProfile
-                    initialData={profile?.profile ?? undefined}
-                    onSubmit={async (data) => {
-                        await setProfile({
-                            bio: data.bio,
-                            displayName: data.displayName,
-                        });
-                        return data;
-                    }}
-                />
-            )}
-            {isError && (
-                <div className="text-destructive">{error?.message}</div>
-            )}
-        </div>
+            <div className="p-4">
+                {(isLoading || profile === undefined) && (
+                    <UserProfileSkeleton />
+                )}
+                {profile !== undefined && !isFetching && (
+                    <FormProfile
+                        initialData={profile?.profile ?? undefined}
+                        onSubmit={async (data) => {
+                            await setProfile({
+                                bio: data.bio,
+                                displayName: data.displayName,
+                            });
+                            return data;
+                        }}
+                    />
+                )}
+                {isError && (
+                    <div className="text-destructive mt-2 text-xs">
+                        {error?.message}
+                    </div>
+                )}
+            </div>
+        </Panel>
     );
 };

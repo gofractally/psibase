@@ -1,4 +1,4 @@
-import { ArrowDown } from "lucide-react";
+import { ArrowDown, Loader2 } from "lucide-react";
 import { useBoolean } from "usehooks-ts";
 import z from "zod";
 
@@ -70,10 +70,10 @@ export const ConfirmSwapModal = ({
         <AlertDialog open={show}>
             <AlertDialogContent className="max-w-md">
                 <AlertDialogHeader className="text-center">
-                    <AlertDialogTitle className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                    <AlertDialogTitle className="text-lg font-semibold tracking-tight">
                         Confirm Swap
                     </AlertDialogTitle>
-                    <AlertDialogDescription className="text-slate-600 dark:text-slate-400">
+                    <AlertDialogDescription className="text-muted-foreground">
                         Please review the details before confirming your trade.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
@@ -89,7 +89,7 @@ export const ConfirmSwapModal = ({
 
                     {/* Arrow */}
                     <div className="flex justify-center">
-                        <ArrowDown className="text-slate-600 dark:text-slate-400" />
+                        <ArrowDown className="text-muted-foreground" />
                     </div>
 
                     {/* To Account */}
@@ -103,43 +103,26 @@ export const ConfirmSwapModal = ({
 
                 {/* Force user to accept slippage is it is deemed high */}
                 {isHighSlippage && (
-                    <div
-                        className="cursor-pointer rounded-xl border border-yellow-200 bg-yellow-50 p-4 transition-colors hover:bg-yellow-100 dark:border-yellow-700/30 dark:bg-yellow-900/20 dark:hover:bg-yellow-900/30"
-                        onClick={() => toggleUserAcceptsSlippage()}
+                    <label
+                        htmlFor="accept-slippage"
+                        className="flex cursor-pointer items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-amber-700 transition-colors hover:bg-amber-500/15 dark:text-amber-300"
                     >
-                        <div className="flex items-start gap-3">
-                            <div className="shrink-0">
-                                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-yellow-100 dark:bg-yellow-800/30">
-                                    <span className="text-sm font-bold text-yellow-700 dark:text-yellow-300">
-                                        !
-                                    </span>
-                                </div>
-                            </div>
-                            <div className="flex-1">
-                                <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                                    This trade involves high slippage.
-                                </p>
-                                <div className="mt-2 flex items-center gap-2">
-                                    <input
-                                        type="checkbox"
-                                        id="add-to-contacts"
-                                        checked={isUserAcceptingOfSlippage}
-                                        onChange={(e) => {
-                                            e.stopPropagation();
-                                            toggleUserAcceptsSlippage();
-                                        }}
-                                        className="h-4 w-4 rounded border-yellow-300 text-yellow-600 focus:ring-yellow-500 dark:border-yellow-600/50 dark:bg-yellow-800/20 dark:ring-yellow-500/50"
-                                    />
-                                    <label
-                                        htmlFor="add-to-contacts"
-                                        className="cursor-pointer text-sm text-yellow-800 dark:text-yellow-200"
-                                    >
-                                        I accept the poor slippage returns.
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                        <input
+                            type="checkbox"
+                            id="accept-slippage"
+                            checked={isUserAcceptingOfSlippage}
+                            onChange={() => toggleUserAcceptsSlippage()}
+                            className="mt-0.5 size-4 shrink-0 accent-amber-500"
+                        />
+                        <span className="flex flex-col gap-0.5 leading-tight">
+                            <span className="text-sm font-medium">
+                                This trade involves high slippage.
+                            </span>
+                            <span className="text-xs opacity-80">
+                                I understand and accept the reduced return.
+                            </span>
+                        </span>
+                    </label>
                 )}
 
                 <AlertDialogFooter className="mt-6 flex-col gap-3 sm:flex-row">
@@ -161,7 +144,7 @@ export const ConfirmSwapModal = ({
                     >
                         {isPending ? (
                             <div className="flex items-center gap-2">
-                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-500 border-t-transparent"></div>
+                                <Loader2 className="size-4 animate-spin" />
                                 Swapping...
                             </div>
                         ) : (

@@ -1,14 +1,18 @@
-import { TriangleAlert } from "lucide-react";
+import { Coins } from "lucide-react";
 
-import { EmptyBlock } from "@shared/components/empty-block";
+import { EmptyState } from "@/components/empty-state";
+import { Panel } from "@/components/page-header";
 
 export const NoTokensWarning = () => {
     return (
-        <EmptyBlock
-            title="Heads up!"
-            description="You currently have no token balances or tokens to administer. Receive some tokens to continue."
-            Icon={TriangleAlert}
-            iconClass="text-yellow-500"
-        />
+        <Panel title="No tokens yet">
+            <EmptyState
+                icon={Coins}
+                className="min-h-40"
+                detail="You currently have no token balances. Once another account sends you tokens they will appear here and you can send them onward."
+            >
+                Nothing to send
+            </EmptyState>
+        </Panel>
     );
 };

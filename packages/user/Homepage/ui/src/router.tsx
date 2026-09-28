@@ -1,12 +1,11 @@
-import { createBrowserRouter } from "react-router-dom";
+import { Navigate, createBrowserRouter } from "react-router-dom";
 
-import { configuredApps } from "./configured-apps";
 import { getAppPath } from "./app-config";
+import { configuredApps } from "./configured-apps";
 import { Layout } from "./layout";
 import Dashboard from "./pages/dashboard";
 import { Invite } from "./pages/invite";
 import { InviteResponse } from "./pages/invite-response";
-import { SettingsPage } from "./apps/settings/page";
 
 export default createBrowserRouter([
     {
@@ -35,7 +34,7 @@ export default createBrowserRouter([
             },
             {
                 path: "settings",
-                element: <SettingsPage />,
+                element: <Navigate to="/?account=profile" replace />,
             },
         ],
     },

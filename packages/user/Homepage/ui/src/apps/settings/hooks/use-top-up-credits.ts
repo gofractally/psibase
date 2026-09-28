@@ -5,9 +5,9 @@ import QueryKey from "@/lib/query-keys";
 import { supervisor } from "@shared/lib/supervisor";
 import { toast } from "@shared/shadcn/ui/sonner";
 
-export const useFillGasTank = () => {
+export const useTopUpCredits = () => {
     return useMutation<void, Error, void>({
-        mutationKey: ["fillGasTank"],
+        mutationKey: ["topUpCredits"],
         mutationFn: async () => {
             await supervisor.functionCall({
                 service: "vserver",
@@ -18,20 +18,20 @@ export const useFillGasTank = () => {
             });
         },
         onSuccess: (_, _variables, _id, context) => {
-            toast.success("Gas tank refilled");
+            toast.success("Usage credits topped up");
             context.client.invalidateQueries({
                 queryKey: QueryKey.userResources(),
             });
         },
         onError: (error) => {
-            toast.error(error.message || "Failed to refill gas tank");
+            toast.error(error.message || "Couldn't top up usage credits");
         },
     });
 };
 
-export const useResizeAndFillGasTank = () => {
+export const useResizeAndTopUpCredits = () => {
     return useMutation<void, Error, string>({
-        mutationKey: ["resizeAndFillGasTank"],
+        mutationKey: ["resizeAndTopUpCredits"],
         mutationFn: async (newCapacity: string) => {
             await supervisor.functionCall({
                 service: "vserver",
@@ -42,15 +42,13 @@ export const useResizeAndFillGasTank = () => {
             });
         },
         onSuccess: (_, _variables, _id, context) => {
-            toast.success("Gas tank resized and refilled");
+            toast.success("Reserve resized and topped up");
             context.client.invalidateQueries({
                 queryKey: QueryKey.userResources(),
             });
         },
         onError: (error) => {
-            toast.error(
-                error.message || "Failed to resize and refill gas tank",
-            );
+            toast.error(error.message || "Couldn't resize your reserve");
         },
     });
 };

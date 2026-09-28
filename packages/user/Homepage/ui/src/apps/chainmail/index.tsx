@@ -1,38 +1,24 @@
 import { defineAppConfig } from "@/app-config";
-import { Inbox, Mail, PencilLine, Send } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 
 import { zAccount } from "@shared/lib/schemas/account";
 
-import DraftsPage from "./drafts-page";
-import InboxPage from "./inbox-page";
-import SentPage from "./sent-page";
+import ChatPage from "./page";
 
 export const chainMailConfig = defineAppConfig({
     service: zAccount.parse("chainmail"),
     name: "Chain mail",
-    description: "Send mail between accounts.",
-    icon: <Mail className="h-6 w-6" />,
+    description: "Chat with anyone on the network.",
+    icon: <MessageCircle className="h-6 w-6" />,
     isMore: false,
+    fill: true,
     showLoginLoadingSpinner: true,
     isLoginRequired: true,
     children: [
         {
             path: "",
-            element: <InboxPage />,
-            name: "Inbox",
-            icon: <Inbox className="h-6 w-6" />,
-        },
-        {
-            path: "drafts",
-            element: <DraftsPage />,
-            name: "Drafts",
-            icon: <PencilLine className="h-6 w-6" />,
-        },
-        {
-            path: "sent",
-            element: <SentPage />,
-            name: "Sent",
-            icon: <Send className="h-6 w-6" />,
+            element: <ChatPage />,
+            name: "Chats",
         },
     ],
 });

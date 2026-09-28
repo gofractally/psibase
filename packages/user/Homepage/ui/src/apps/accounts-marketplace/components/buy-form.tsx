@@ -18,7 +18,6 @@ import {
 import { getAccount } from "@shared/lib/get-account";
 import { Quantity } from "@shared/lib/quantity";
 import { zAccount } from "@shared/lib/schemas/account";
-import { CardContent, CardFooter } from "@shared/shadcn/ui/card";
 import { Spinner } from "@shared/shadcn/ui/spinner";
 
 function maxCostFromPrice(price: Quantity): string {
@@ -247,12 +246,12 @@ export function BuyForm({
         <form.Subscribe selector={(state) => [state.isFieldsValidating]}>
             {([isFieldsValidating]) =>
                 isFieldsValidating ? (
-                    <span className="shrink-0 pr-3 text-green-500">
+                    <span className="shrink-0 pr-3 text-emerald-600 dark:text-emerald-400">
                         <Spinner className="size-3.5 shrink-0" />
                     </span>
                 ) : livePrice ? (
                     <span
-                        className={`shrink-0 whitespace-nowrap pr-3 text-sm font-medium tabular-nums ${hasInsufficientFunds ? "text-red-500" : "text-green-500"}`}
+                        className={`shrink-0 whitespace-nowrap pr-3 text-sm font-medium tabular-nums ${hasInsufficientFunds ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}
                     >
                         Costs {livePrice.format({ includeLabel: true })}
                     </span>
@@ -269,8 +268,8 @@ export function BuyForm({
                     void form.handleSubmit();
                 }}
             >
-                <div className="flex flex-col gap-6">
-                    <CardContent className="@container space-y-4">
+                <div className="flex flex-col">
+                    <div className="@container p-4">
                         <form.AppField
                             name="accountName"
                             asyncDebounceMs={500}
@@ -289,8 +288,8 @@ export function BuyForm({
                                 />
                             )}
                         />
-                    </CardContent>
-                    <CardFooter className="flex w-full items-center justify-between gap-4">
+                    </div>
+                    <div className="bg-muted/30 flex w-full items-center justify-between gap-4 border-t px-4 py-3">
                         <AvailableBalanceLabel
                             systemToken={systemToken}
                             balance={availableBalance}
@@ -304,7 +303,7 @@ export function BuyForm({
                             }
                             disabled={isBuying || hasInsufficientFunds}
                         />
-                    </CardFooter>
+                    </div>
                 </div>
             </form>
             {confirmPrice ? (
