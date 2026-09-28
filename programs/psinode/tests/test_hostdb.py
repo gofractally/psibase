@@ -20,8 +20,33 @@ def b64url(data):
     return base64.urlsafe_b64encode(data).rstrip(b'=').decode()
 
 
-def cookie_header(device):
-    return f'__Host-HOSTDB-DEVICE={device}'
+def cookie_header(device, session=None):
+    header = f'__Host-HOSTDB-DEVICE={device}'
+    if session is not None:
+        header += f'; __Host-HOSTDB-SESSION={session}'
+    return header
+
+
+def set_cookies(reply):
+    values = reply.raw.headers.getlist('Set-Cookie')
+    parsed = {}
+    for value in values:
+        name_value, attrs = value.split(';', 1)
+        name, cookie = name_value.split('=', 1)
+        parsed[name] = (cookie, attrs)
+    return parsed
+
+
+def assert_id_cookie(test, cookie, attrs, *, max_age=False):
+    test.assertEqual(len(cookie), 32)
+    test.assertTrue(all(c in '0123456789abcdef' for c in cookie))
+    if max_age:
+        test.assertEqual(
+            attrs,
+            f' Path=/; SameSite=Strict; Secure; Max-Age={COOKIE_MAX_AGE}; HttpOnly;',
+        )
+    else:
+        test.assertEqual(attrs, ' Path=/; SameSite=Strict; Secure; HttpOnly;')
 
 
 class TestHostDb(unittest.TestCase):
@@ -249,6 +274,178 @@ class TestHostDb(unittest.TestCase):
             headers={'Origin': 'https://not-supervisor.example'},
         ) as reply:
             self.assertEqual(reply.status_code, 403)
+
+    @testutil.psinode_test
+    def test_session(self, cluster):
+        (a,) = cluster.complete(*testutil.generate_names(1))
+        a.boot(packages=['Minimal', 'Explorer', 'HostDb'])
+        root = a.hostname
+        origin = supervisor_origin(root)
+        api = a.new_api()
+
+        def headers(device=None, session=None, **extra):
+            result = {'Origin': origin}
+            if device is not None:
+                result['Cookie'] = cookie_header(device, session)
+            result.update(extra)
+            return result
+
+        def ids(reply):
+            cookies = set_cookies(reply)
+            device, device_attrs = cookies['__Host-HOSTDB-DEVICE']
+            session, session_attrs = cookies['__Host-HOSTDB-SESSION']
+            assert_id_cookie(self, device, device_attrs, max_age=True)
+            assert_id_cookie(self, session, session_attrs)
+            return device, session
+
+        key_s = hex_key(1)
+        key_s2 = hex_key(2)
+        key_p = hex_key(3)
+        value_s = b'session-one'
+        value_p = b'persistent-one'
+
+        with api.post(
+            '/kv/batch',
+            service='hostdb',
+            json={'ops': [
+                {'duration': 'persistent', 'key': key_p, 'value': b64url(value_p)},
+                {'duration': 'session', 'key': key_s, 'value': b64url(value_s)},
+            ]},
+            headers=headers(),
+        ) as reply:
+            self.assertEqual(reply.status_code, 204)
+            self.assertEqual(reply.headers.get('Access-Control-Allow-Origin'), origin)
+            self.assertEqual(reply.headers.get('Access-Control-Allow-Credentials'), 'true')
+            device, session_a = ids(reply)
+        api.session.cookies.clear()
+
+        with api.get(
+            f'/kv/session/{key_s}', service='hostdb', headers=headers(device, session_a)
+        ) as reply:
+            self.assertEqual(reply.status_code, 200)
+            self.assertEqual(reply.headers.get('Content-Type'), 'application/octet-stream')
+            self.assertEqual(reply.content, value_s)
+            self.assertEqual(ids(reply), (device, session_a))
+        api.session.cookies.clear()
+
+        with api.get(
+            f'/kv/persistent/{key_p}', service='hostdb', headers=headers(device, session_a)
+        ) as reply:
+            self.assertEqual(reply.status_code, 200)
+            self.assertEqual(reply.content, value_p)
+            self.assertNotIn('__Host-HOSTDB-SESSION', set_cookies(reply))
+        api.session.cookies.clear()
+
+        with api.get(f'/kv/session/{key_s}', service='hostdb', headers=headers(device)) as reply:
+            self.assertEqual(reply.status_code, 404)
+            echoed_device, session_b = ids(reply)
+            self.assertEqual(echoed_device, device)
+            self.assertNotEqual(session_b, session_a)
+        api.session.cookies.clear()
+
+        with api.get(
+            f'/kv/session/{key_s}', service='hostdb', headers=headers(device, session_a)
+        ) as reply:
+            self.assertEqual(reply.status_code, 200)
+            self.assertEqual(reply.content, value_s)
+        api.session.cookies.clear()
+
+        with api.get(
+            f'/kv/persistent/{key_p}', service='hostdb', headers=headers(device)
+        ) as reply:
+            self.assertEqual(reply.status_code, 200)
+            self.assertEqual(reply.content, value_p)
+            self.assertNotIn('__Host-HOSTDB-SESSION', set_cookies(reply))
+        api.session.cookies.clear()
+
+        with api.post(
+            '/kv/batch',
+            service='hostdb',
+            json={'ops': [{'duration': 'session', 'key': key_s2, 'value': b64url(b'other-session')}]},
+            headers=headers(device),
+        ) as reply:
+            self.assertEqual(reply.status_code, 204)
+            echoed_device, session_c = ids(reply)
+            self.assertEqual(echoed_device, device)
+            self.assertNotEqual(session_c, session_a)
+        api.session.cookies.clear()
+
+        with api.post(
+            '/kv/batch',
+            service='hostdb',
+            json={'ops': [{'duration': 'session', 'key': key_s2, 'value': b64url(b'later')}]},
+            headers=headers(device, session_a),
+        ) as reply:
+            self.assertEqual(reply.status_code, 204)
+            self.assertEqual(ids(reply)[1], session_a)
+        api.session.cookies.clear()
+
+        with api.get(
+            f'/kv/session/{key_s}', service='hostdb', headers=headers(device, session_a)
+        ) as reply:
+            self.assertEqual(reply.status_code, 200)
+            self.assertEqual(reply.content, value_s)
+        api.session.cookies.clear()
+        with api.get(
+            f'/kv/session/{key_s2}', service='hostdb', headers=headers(device, session_c)
+        ) as reply:
+            self.assertEqual(reply.status_code, 200)
+            self.assertEqual(reply.content, b'other-session')
+        api.session.cookies.clear()
+        with api.get(
+            f'/kv/session/{key_s2}', service='hostdb', headers=headers(device, session_a)
+        ) as reply:
+            self.assertEqual(reply.status_code, 200)
+            self.assertEqual(reply.content, b'later')
+        api.session.cookies.clear()
+
+        with api.post(
+            '/kv/batch',
+            service='hostdb',
+            json={'ops': [
+                {'duration': 'session', 'key': key_s, 'value': b64url(b'replaced')},
+                {'duration': 'persistent', 'key': 'zz' + 'a' * 62, 'value': b64url(b'nope')},
+            ]},
+            headers=headers(device, session_a),
+        ) as reply:
+            self.assertEqual(reply.status_code, 400)
+        api.session.cookies.clear()
+        with api.get(
+            f'/kv/session/{key_s}', service='hostdb', headers=headers(device, session_a)
+        ) as reply:
+            self.assertEqual(reply.content, value_s)
+        api.session.cookies.clear()
+        with api.get(
+            f'/kv/persistent/{key_p}', service='hostdb', headers=headers(device)
+        ) as reply:
+            self.assertEqual(reply.content, value_p)
+        api.session.cookies.clear()
+
+        with api.get(
+            '/kv/session/' + 'ab', service='hostdb', headers=headers(device, session_a)
+        ) as reply:
+            self.assertEqual(reply.status_code, 400)
+        api.session.cookies.clear()
+        with api.get(
+            f'/kv/session/{hex_key(9)}', service='hostdb', headers=headers(device, session_a)
+        ) as reply:
+            self.assertEqual(reply.status_code, 404)
+        api.session.cookies.clear()
+
+        with api.request(
+            'OPTIONS',
+            f'/kv/session/{key_s}',
+            service='hostdb',
+            headers={
+                'Origin': origin,
+                'Access-Control-Request-Method': 'GET',
+                'Access-Control-Request-Headers': 'content-type',
+            },
+        ) as reply:
+            self.assertEqual(reply.status_code, 204)
+            self.assertEqual(reply.headers.get('Access-Control-Allow-Methods'), 'GET, POST')
+            self.assertNotIn('__Host-HOSTDB-SESSION', set_cookies(reply))
+        api.session.cookies.clear()
 
 
 if __name__ == '__main__':

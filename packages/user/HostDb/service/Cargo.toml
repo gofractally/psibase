@@ -1,6 +1,6 @@
 [package]
 name = "hostdb"
-description = "Device-scoped persistent storage for host:db"
+description = "Device-scoped persistent and session storage for host:db"
 version.workspace = true
 rust-version.workspace = true
 repository.workspace = true

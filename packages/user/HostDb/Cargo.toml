@@ -1,6 +1,6 @@
 [package]
 name = "hostdb-pkg"
-description = "Device-scoped persistent storage for host:db"
+description = "Device-scoped persistent and session storage for host:db"
 version.workspace = true
 edition.workspace = true
 repository.workspace = true

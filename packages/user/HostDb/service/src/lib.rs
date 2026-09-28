@@ -1,12 +1,18 @@
-/// Persistent `host:db` storage on `hostdb.{root}`.
+/// `host:db` storage on `hostdb.{root}`.
 ///
-/// `GET /kv/persistent/<key>` returns the raw value (`application/octet-stream`),
-/// or 404 when it is absent. `POST /kv/batch` applies
-/// `{"ops":[{"duration":"persistent","key":<hex>,"value":<base64url>|null}]}`
+/// `GET /kv/persistent/<key>` and `GET /kv/session/<key>` return the raw value
+/// (`application/octet-stream`), or 404 when it is absent. `POST /kv/batch`
+/// applies `{"ops":[{"duration":"persistent"|"session","key":<hex>,"value":<base64url>|null}]}`
 /// in one subjective transaction and returns 204; a null value deletes the key.
 /// An invalid op returns 400 and writes nothing. `OPTIONS` on these paths is the
-/// CORS preflight. Only `Origin: supervisor.{root}` is accepted. The device id is
-/// the `__Host-HOSTDB-DEVICE` cookie.
+/// CORS preflight. Only `Origin: supervisor.{root}` is accepted.
+///
+/// The device id is the `__Host-HOSTDB-DEVICE` cookie. Session rows are keyed by
+/// that device, the `__Host-HOSTDB-SESSION` cookie, and the key. A session
+/// request that lacks a session cookie starts an empty session. Each session
+/// row records `lastAccess`, updated on get and put. A batch that puts a session
+/// row also deletes up to 16 session rows on the node whose `lastAccess` is more
+/// than 7 days old.
 #[psibase::service_tables]
 mod tables {
     use psibase::{Pack, ToSchema, Unpack};
@@ -25,22 +31,56 @@ mod tables {
             (self.device.clone(), self.key.clone())
         }
     }
+
+    #[table(name = "SessionKvTable", index = 1, db = "Subjective")]
+    #[derive(Pack, Unpack, ToSchema)]
+    pub struct SessionKvRow {
+        pub device: Vec<u8>,
+        pub session: Vec<u8>,
+        pub key: Vec<u8>,
+        pub value: Vec<u8>,
+        pub last_access: u64,
+    }
+
+    impl SessionKvRow {
+        #[primary_key]
+        fn by_device_session_key(&self) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
+            (self.device.clone(), self.session.clone(), self.key.clone())
+        }
+
+        /// `last_access` leads so the index is oldest-first. The row identity
+        /// follows so each row has its own index entry.
+        #[secondary_key(1)]
+        fn by_last_access(&self) -> (u64, Vec<u8>, Vec<u8>, Vec<u8>) {
+            (
+                self.last_access,
+                self.device.clone(),
+                self.session.clone(),
+                self.key.clone(),
+            )
+        }
+    }
 }
 
 #[psibase::service(name = "hostdb", tables = "tables")]
 mod service {
-    use crate::tables::{KvRow, KvTable};
+    use crate::tables::{KvRow, KvTable, SessionKvRow, SessionKvTable};
     use psibase::native_raw;
     use psibase::services::http_server::Wrapper as HttpServer;
     use psibase::*;
     use serde::Deserialize;
 
     const DEVICE_COOKIE: &str = "__Host-HOSTDB-DEVICE";
-    const DEVICE_ID_LEN: usize = 16;
+    const SESSION_COOKIE: &str = "__Host-HOSTDB-SESSION";
+    const ID_LEN: usize = 16;
     const KEY_LEN: usize = 32;
     /// 100 KB plaintext plus the 12-byte nonce and 16-byte GCM tag `host:db` stores.
     const MAX_VALUE_LEN: usize = 100 * 1024 + 28;
     const COOKIE_MAX_AGE: u64 = 400 * 24 * 60 * 60;
+    /// `__WASI_CLOCKID_REALTIME`: wall-clock nanoseconds since the unix epoch.
+    const CLOCK_REALTIME: u32 = 0;
+    const SESSION_IDLE_NS: u64 = 7 * 24 * 60 * 60 * 1_000_000_000;
+    const SESSION_GC_LIMIT: usize = 16;
 
     #[derive(Deserialize)]
     #[serde(deny_unknown_fields)]
@@ -56,9 +96,46 @@ mod service {
         value: Option<String>,
     }
 
+    enum Duration {
+        Persistent,
+        Session,
+    }
+
     enum Change {
-        Put { key: Vec<u8>, value: Vec<u8> },
-        Delete { key: Vec<u8> },
+        Put {
+            duration: Duration,
+            key: Vec<u8>,
+            value: Vec<u8>,
+        },
+        Delete {
+            duration: Duration,
+            key: Vec<u8>,
+        },
+    }
+
+    impl Change {
+        fn is_session(&self) -> bool {
+            matches!(
+                self,
+                Change::Put {
+                    duration: Duration::Session,
+                    ..
+                } | Change::Delete {
+                    duration: Duration::Session,
+                    ..
+                }
+            )
+        }
+
+        fn is_session_put(&self) -> bool {
+            matches!(
+                self,
+                Change::Put {
+                    duration: Duration::Session,
+                    ..
+                }
+            )
+        }
     }
 
     #[action]
@@ -74,16 +151,25 @@ mod service {
         };
         if !is_supervisor_origin(origin, &root) {
             return Some(status_reply(403));
-        }
+        };
 
-        let device = match device_from_request(&request) {
-            Device::Id(id) => id,
-            Device::Missing => mint_device_id(),
-            Device::Malformed => {
-                return Some(reply(&request, origin, 400, "", Vec::new(), false, None));
+        let device = match cookie_id(&request, DEVICE_COOKIE, ID_LEN) {
+            CookieValue::Id(id) => id,
+            CookieValue::Missing => mint_id(),
+            CookieValue::Malformed => {
+                return Some(reply(
+                    &request,
+                    origin,
+                    400,
+                    "",
+                    Vec::new(),
+                    false,
+                    None,
+                    None,
+                ));
             }
         };
-        let cookie = hex_encode(&device);
+        let device_cookie = hex_encode(&device);
 
         let path = request.path();
         let path = path.as_ref();
@@ -95,7 +181,8 @@ mod service {
                 "",
                 Vec::new(),
                 true,
-                Some(cookie),
+                Some(device_cookie),
+                None,
             ));
         }
 
@@ -109,7 +196,8 @@ mod service {
                         "",
                         Vec::new(),
                         false,
-                        Some(cookie),
+                        Some(device_cookie),
+                        None,
                     ));
                 };
                 let value = {
@@ -128,9 +216,84 @@ mod service {
                         "application/octet-stream",
                         value,
                         false,
-                        Some(cookie),
+                        Some(device_cookie),
+                        None,
                     ),
-                    None => reply(&request, origin, 404, "", Vec::new(), false, Some(cookie)),
+                    None => reply(
+                        &request,
+                        origin,
+                        404,
+                        "",
+                        Vec::new(),
+                        false,
+                        Some(device_cookie),
+                        None,
+                    ),
+                });
+            }
+
+            if let Some(key) = path.strip_prefix("/kv/session/") {
+                let Some(session) = session_id(&request) else {
+                    return Some(reply(
+                        &request,
+                        origin,
+                        400,
+                        "",
+                        Vec::new(),
+                        false,
+                        Some(device_cookie),
+                        None,
+                    ));
+                };
+                let session_cookie = hex_encode(&session);
+                let Some(key) = decode_fixed_hex(key, KEY_LEN) else {
+                    return Some(reply(
+                        &request,
+                        origin,
+                        400,
+                        "",
+                        Vec::new(),
+                        false,
+                        Some(device_cookie),
+                        Some(session_cookie),
+                    ));
+                };
+                let value = {
+                    subjective_tx! {
+                        let table = SessionKvTable::new();
+                        let pk = (device.clone(), session.clone(), key.clone());
+                        match table.get_index_pk().get(&pk) {
+                            Some(mut row) => {
+                                row.last_access = wall_time_ns();
+                                let value = row.value.clone();
+                                table.put(&row).unwrap();
+                                Some(value)
+                            }
+                            None => None,
+                        }
+                    }
+                };
+                return Some(match value {
+                    Some(value) => reply(
+                        &request,
+                        origin,
+                        200,
+                        "application/octet-stream",
+                        value,
+                        false,
+                        Some(device_cookie),
+                        Some(session_cookie),
+                    ),
+                    None => reply(
+                        &request,
+                        origin,
+                        404,
+                        "",
+                        Vec::new(),
+                        false,
+                        Some(device_cookie),
+                        Some(session_cookie),
+                    ),
                 });
             }
         }
@@ -144,15 +307,42 @@ mod service {
                     "",
                     Vec::new(),
                     false,
-                    Some(cookie),
+                    Some(device_cookie),
+                    None,
                 ));
             };
+            let session = if changes.iter().any(Change::is_session) {
+                let Some(session) = session_id(&request) else {
+                    return Some(reply(
+                        &request,
+                        origin,
+                        400,
+                        "",
+                        Vec::new(),
+                        false,
+                        Some(device_cookie),
+                        None,
+                    ));
+                };
+                Some(session)
+            } else {
+                None
+            };
+            let session_cookie = session.as_ref().map(|id| hex_encode(id));
+            let gc = changes.iter().any(Change::is_session_put);
+            let session = session.as_deref();
             subjective_tx! {
-                let table = KvTable::new();
+                let now = wall_time_ns();
+                let persistent = KvTable::new();
+                let sessions = SessionKvTable::new();
                 for change in &changes {
                     match change {
-                        Change::Put { key, value } => {
-                            table
+                        Change::Put {
+                            duration: Duration::Persistent,
+                            key,
+                            value,
+                        } => {
+                            persistent
                                 .put(&KvRow {
                                     device: device.clone(),
                                     key: key.clone(),
@@ -160,10 +350,41 @@ mod service {
                                 })
                                 .unwrap();
                         }
-                        Change::Delete { key } => {
-                            table.erase(&(device.clone(), key.clone()));
+                        Change::Delete {
+                            duration: Duration::Persistent,
+                            key,
+                        } => {
+                            persistent.erase(&(device.clone(), key.clone()));
+                        }
+                        Change::Put {
+                            duration: Duration::Session,
+                            key,
+                            value,
+                        } => {
+                            sessions
+                                .put(&SessionKvRow {
+                                    device: device.clone(),
+                                    session: session.unwrap().to_vec(),
+                                    key: key.clone(),
+                                    value: value.clone(),
+                                    last_access: now,
+                                })
+                                .unwrap();
+                        }
+                        Change::Delete {
+                            duration: Duration::Session,
+                            key,
+                        } => {
+                            sessions.erase(&(
+                                device.clone(),
+                                session.unwrap().to_vec(),
+                                key.clone(),
+                            ));
                         }
                     }
+                }
+                if gc {
+                    collect_expired_sessions(&sessions, now);
                 }
             }
             return Some(reply(
@@ -173,7 +394,8 @@ mod service {
                 "",
                 Vec::new(),
                 false,
-                Some(cookie),
+                Some(device_cookie),
+                session_cookie,
             ));
         }
 
@@ -184,12 +406,15 @@ mod service {
             "",
             Vec::new(),
             false,
-            Some(cookie),
+            Some(device_cookie),
+            None,
         ))
     }
 
     fn is_storage_path(path: &str) -> bool {
-        path == "/kv/batch" || path.starts_with("/kv/persistent/")
+        path == "/kv/batch"
+            || path.starts_with("/kv/persistent/")
+            || path.starts_with("/kv/session/")
     }
 
     fn is_supervisor_origin(origin: &str, root: &str) -> bool {
@@ -213,13 +438,13 @@ mod service {
         host == format!("supervisor.{root}")
     }
 
-    enum Device {
+    enum CookieValue {
         Id(Vec<u8>),
         Missing,
         Malformed,
     }
 
-    fn device_from_request(request: &HttpRequest) -> Device {
+    fn cookie_id(request: &HttpRequest, name: &str, byte_len: usize) -> CookieValue {
         let mut found = None;
         for header in &request.headers {
             if !header.matches("cookie") {
@@ -230,50 +455,88 @@ mod service {
                 if part.is_empty() {
                     continue;
                 }
-                let Some((name, value)) = part.split_once('=') else {
-                    return Device::Malformed;
+                let Some((cookie_name, value)) = part.split_once('=') else {
+                    return CookieValue::Malformed;
                 };
-                if name.trim() == DEVICE_COOKIE {
+                if cookie_name.trim() == name {
                     if found.is_some() {
-                        return Device::Malformed;
+                        return CookieValue::Malformed;
                     }
                     found = Some(value);
                 }
             }
         }
         match found {
-            None => Device::Missing,
-            Some(value) => match decode_fixed_hex(value, DEVICE_ID_LEN) {
-                Some(id) => Device::Id(id),
-                None => Device::Malformed,
+            None => CookieValue::Missing,
+            Some(value) => match decode_fixed_hex(value, byte_len) {
+                Some(id) => CookieValue::Id(id),
+                None => CookieValue::Malformed,
             },
         }
     }
 
-    fn mint_device_id() -> Vec<u8> {
-        let mut id = vec![0u8; DEVICE_ID_LEN];
+    /// Session id for a session read or write. `None` when the cookie is present
+    /// and malformed; a missing cookie starts an empty session.
+    fn session_id(request: &HttpRequest) -> Option<Vec<u8>> {
+        match cookie_id(request, SESSION_COOKIE, ID_LEN) {
+            CookieValue::Id(id) => Some(id),
+            CookieValue::Missing => Some(mint_id()),
+            CookieValue::Malformed => None,
+        }
+    }
+
+    fn mint_id() -> Vec<u8> {
+        let mut id = vec![0u8; ID_LEN];
         unsafe { native_raw::getRandom(id.as_mut_ptr(), id.len()) };
         id
+    }
+
+    fn wall_time_ns() -> u64 {
+        let mut time = 0u64;
+        let err = unsafe { native_raw::clockTimeGet(CLOCK_REALTIME, &mut time) };
+        if err != 0 {
+            abort_message("clockTimeGet failed");
+        }
+        time
+    }
+
+    fn collect_expired_sessions(table: &SessionKvTable, now: u64) {
+        let cutoff = now.saturating_sub(SESSION_IDLE_NS);
+        let stale: Vec<_> = table
+            .get_index_by_last_access()
+            .range(..(cutoff, Vec::new(), Vec::new(), Vec::new()))
+            .take(SESSION_GC_LIMIT)
+            .map(|row| (row.device, row.session, row.key))
+            .collect();
+        for key in stale {
+            table.erase(&key);
+        }
     }
 
     fn parse_batch(body: &[u8]) -> Option<Vec<Change>> {
         let body: BatchBody = serde_json::from_slice(body).ok()?;
         let mut changes = Vec::with_capacity(body.ops.len());
         for op in body.ops {
-            if op.duration != "persistent" {
-                return None;
-            }
+            let duration = match op.duration.as_str() {
+                "persistent" => Duration::Persistent,
+                "session" => Duration::Session,
+                _ => return None,
+            };
             let Some(key) = decode_fixed_hex(&op.key, KEY_LEN) else {
                 return None;
             };
             match op.value {
-                None => changes.push(Change::Delete { key }),
+                None => changes.push(Change::Delete { duration, key }),
                 Some(value) => {
                     let value = decode_base64url(&value)?;
                     if value.len() > MAX_VALUE_LEN {
                         return None;
                     }
-                    changes.push(Change::Put { key, value });
+                    changes.push(Change::Put {
+                        duration,
+                        key,
+                        value,
+                    });
                 }
             }
         }
@@ -374,6 +637,7 @@ mod service {
         body: Vec<u8>,
         preflight: bool,
         device_cookie: Option<String>,
+        session_cookie: Option<String>,
     ) -> HttpReply {
         let mut headers = vec![
             HttpHeader::new("Access-Control-Allow-Origin", origin),
@@ -391,6 +655,12 @@ mod service {
                 &format!(
                     "{DEVICE_COOKIE}={cookie}; Path=/; SameSite=Strict; Secure; Max-Age={COOKIE_MAX_AGE}; HttpOnly;"
                 ),
+            ));
+        }
+        if let Some(cookie) = session_cookie {
+            headers.push(HttpHeader::new(
+                "Set-Cookie",
+                &format!("{SESSION_COOKIE}={cookie}; Path=/; SameSite=Strict; Secure; HttpOnly;"),
             ));
         }
         HttpReply {
