@@ -154,261 +154,159 @@ mod service {
         };
 
         let device = match cookie_id(&request, DEVICE_COOKIE, ID_LEN) {
-            CookieValue::Id(id) => id,
-            CookieValue::Missing => mint_id(),
-            CookieValue::Malformed => {
-                return Some(reply(
-                    &request,
-                    origin,
-                    400,
-                    "",
-                    Vec::new(),
-                    false,
-                    None,
-                    None,
-                ));
-            }
+            CookieValue::Id(id) => Some(id),
+            CookieValue::Missing => Some(mint_id()),
+            CookieValue::Malformed => None,
         };
-        let device_cookie = hex_encode(&device);
-
-        let path = request.path();
-        let path = path.as_ref();
-        if request.method == "OPTIONS" && is_storage_path(path) {
-            return Some(reply(
-                &request,
-                origin,
-                204,
-                "",
-                Vec::new(),
-                true,
-                Some(device_cookie),
-                None,
-            ));
-        }
-
-        if request.method == "GET" {
-            if let Some(key) = path.strip_prefix("/kv/persistent/") {
-                let Some(key) = decode_fixed_hex(key, KEY_LEN) else {
-                    return Some(reply(
-                        &request,
-                        origin,
-                        400,
-                        "",
-                        Vec::new(),
-                        false,
-                        Some(device_cookie),
-                        None,
-                    ));
-                };
-                let value = {
-                    subjective_tx! {
-                        KvTable::new()
-                            .get_index_pk()
-                            .get(&(device.clone(), key.clone()))
-                            .map(|row| row.value)
-                    }
-                };
-                return Some(match value {
-                    Some(value) => reply(
-                        &request,
-                        origin,
-                        200,
-                        "application/octet-stream",
-                        value,
-                        false,
-                        Some(device_cookie),
-                        None,
-                    ),
-                    None => reply(
-                        &request,
-                        origin,
-                        404,
-                        "",
-                        Vec::new(),
-                        false,
-                        Some(device_cookie),
-                        None,
-                    ),
-                });
+        let (result, device_cookie, session_cookie) = match device {
+            Some(device) => {
+                let (result, session_cookie) = route(&request, &device);
+                (result, Some(hex_encode(&device)), session_cookie)
             }
-
-            if let Some(key) = path.strip_prefix("/kv/session/") {
-                let Some(session) = session_id(&request) else {
-                    return Some(reply(
-                        &request,
-                        origin,
-                        400,
-                        "",
-                        Vec::new(),
-                        false,
-                        Some(device_cookie),
-                        None,
-                    ));
-                };
-                let session_cookie = hex_encode(&session);
-                let Some(key) = decode_fixed_hex(key, KEY_LEN) else {
-                    return Some(reply(
-                        &request,
-                        origin,
-                        400,
-                        "",
-                        Vec::new(),
-                        false,
-                        Some(device_cookie),
-                        Some(session_cookie),
-                    ));
-                };
-                let value = {
-                    subjective_tx! {
-                        let table = SessionKvTable::new();
-                        let pk = (device.clone(), session.clone(), key.clone());
-                        match table.get_index_pk().get(&pk) {
-                            Some(mut row) => {
-                                row.last_access = wall_time_ns();
-                                let value = row.value.clone();
-                                table.put(&row).unwrap();
-                                Some(value)
-                            }
-                            None => None,
-                        }
-                    }
-                };
-                return Some(match value {
-                    Some(value) => reply(
-                        &request,
-                        origin,
-                        200,
-                        "application/octet-stream",
-                        value,
-                        false,
-                        Some(device_cookie),
-                        Some(session_cookie),
-                    ),
-                    None => reply(
-                        &request,
-                        origin,
-                        404,
-                        "",
-                        Vec::new(),
-                        false,
-                        Some(device_cookie),
-                        Some(session_cookie),
-                    ),
-                });
-            }
-        }
-
-        if request.method == "POST" && path == "/kv/batch" {
-            let Some(changes) = parse_batch(&request.body.0) else {
-                return Some(reply(
-                    &request,
-                    origin,
-                    400,
-                    "",
-                    Vec::new(),
-                    false,
-                    Some(device_cookie),
-                    None,
-                ));
-            };
-            let session = if changes.iter().any(Change::is_session) {
-                let Some(session) = session_id(&request) else {
-                    return Some(reply(
-                        &request,
-                        origin,
-                        400,
-                        "",
-                        Vec::new(),
-                        false,
-                        Some(device_cookie),
-                        None,
-                    ));
-                };
-                Some(session)
-            } else {
-                None
-            };
-            let session_cookie = session.as_ref().map(|id| hex_encode(id));
-            let gc = changes.iter().any(Change::is_session_put);
-            let session = session.as_deref();
-            subjective_tx! {
-                let now = wall_time_ns();
-                let persistent = KvTable::new();
-                let sessions = SessionKvTable::new();
-                for change in &changes {
-                    match change {
-                        Change::Put {
-                            duration: Duration::Persistent,
-                            key,
-                            value,
-                        } => {
-                            persistent
-                                .put(&KvRow {
-                                    device: device.clone(),
-                                    key: key.clone(),
-                                    value: value.clone(),
-                                })
-                                .unwrap();
-                        }
-                        Change::Delete {
-                            duration: Duration::Persistent,
-                            key,
-                        } => {
-                            persistent.erase(&(device.clone(), key.clone()));
-                        }
-                        Change::Put {
-                            duration: Duration::Session,
-                            key,
-                            value,
-                        } => {
-                            sessions
-                                .put(&SessionKvRow {
-                                    device: device.clone(),
-                                    session: session.unwrap().to_vec(),
-                                    key: key.clone(),
-                                    value: value.clone(),
-                                    last_access: now,
-                                })
-                                .unwrap();
-                        }
-                        Change::Delete {
-                            duration: Duration::Session,
-                            key,
-                        } => {
-                            sessions.erase(&(
-                                device.clone(),
-                                session.unwrap().to_vec(),
-                                key.clone(),
-                            ));
-                        }
-                    }
-                }
-                if gc {
-                    collect_expired_sessions(&sessions, now);
-                }
-            }
-            return Some(reply(
-                &request,
-                origin,
-                204,
-                "",
-                Vec::new(),
-                false,
-                Some(device_cookie),
-                session_cookie,
-            ));
-        }
-
+            None => (Err(400u16), None, None),
+        };
+        let (status, body) = result.unwrap_or_else(|status| (status, None));
         Some(reply(
             &request,
             origin,
-            404,
-            "",
-            Vec::new(),
-            false,
-            Some(device_cookie),
-            None,
+            status,
+            body,
+            device_cookie,
+            session_cookie,
         ))
+    }
+
+    /// The session cookie is set once a session id is accepted, including when the
+    /// route then returns `Err`.
+    fn route(
+        request: &HttpRequest,
+        device: &[u8],
+    ) -> (Result<(u16, Option<Vec<u8>>), u16>, Option<String>) {
+        let mut session_cookie = None;
+        let result = (|| -> Result<(u16, Option<Vec<u8>>), u16> {
+            let path = request.path();
+            let path = path.as_ref();
+            if request.method == "OPTIONS" && is_storage_path(path) {
+                return Ok((204, None));
+            }
+
+            if request.method == "GET" {
+                if let Some(key) = path.strip_prefix("/kv/persistent/") {
+                    return read_stored(key, |key| read_persistent(device, key));
+                }
+                if let Some(key) = path.strip_prefix("/kv/session/") {
+                    let session = session_id(request).ok_or(400u16)?;
+                    session_cookie = Some(hex_encode(&session));
+                    return read_stored(key, |key| read_session(device, &session, key));
+                }
+            }
+
+            if request.method == "POST" && path == "/kv/batch" {
+                let changes = parse_batch(&request.body.0).ok_or(400u16)?;
+                let session = if changes.iter().any(Change::is_session) {
+                    let session = session_id(request).ok_or(400u16)?;
+                    session_cookie = Some(hex_encode(&session));
+                    Some(session)
+                } else {
+                    None
+                };
+                apply_changes(device, session.as_deref(), &changes);
+                return Ok((204, None));
+            }
+
+            Ok((404, None))
+        })();
+        (result, session_cookie)
+    }
+
+    fn read_stored(
+        key: &str,
+        lookup: impl FnOnce(&[u8]) -> Option<Vec<u8>>,
+    ) -> Result<(u16, Option<Vec<u8>>), u16> {
+        let key = decode_fixed_hex(key, KEY_LEN).ok_or(400u16)?;
+        let value = lookup(&key);
+        Ok(value.map_or((404, None), |body| (200, Some(body))))
+    }
+
+    fn read_persistent(device: &[u8], key: &[u8]) -> Option<Vec<u8>> {
+        subjective_tx! {
+            KvTable::new()
+                .get_index_pk()
+                .get(&(device.to_vec(), key.to_vec()))
+                .map(|row| row.value)
+        }
+    }
+
+    fn read_session(device: &[u8], session: &[u8], key: &[u8]) -> Option<Vec<u8>> {
+        subjective_tx! {
+            let table = SessionKvTable::new();
+            let pk = (device.to_vec(), session.to_vec(), key.to_vec());
+            match table.get_index_pk().get(&pk) {
+                Some(mut row) => {
+                    row.last_access = wall_time_ns();
+                    let value = row.value.clone();
+                    table.put(&row).unwrap();
+                    Some(value)
+                }
+                None => None,
+            }
+        }
+    }
+
+    fn apply_changes(device: &[u8], session: Option<&[u8]>, changes: &[Change]) {
+        let gc = changes.iter().any(Change::is_session_put);
+        subjective_tx! {
+            let now = wall_time_ns();
+            let persistent = KvTable::new();
+            let sessions = SessionKvTable::new();
+            for change in changes {
+                match change {
+                    Change::Put {
+                        duration: Duration::Persistent,
+                        key,
+                        value,
+                    } => {
+                        persistent
+                            .put(&KvRow {
+                                device: device.to_vec(),
+                                key: key.clone(),
+                                value: value.clone(),
+                            })
+                            .unwrap();
+                    }
+                    Change::Delete {
+                        duration: Duration::Persistent,
+                        key,
+                    } => {
+                        persistent.erase(&(device.to_vec(), key.clone()));
+                    }
+                    Change::Put {
+                        duration: Duration::Session,
+                        key,
+                        value,
+                    } => {
+                        sessions
+                            .put(&SessionKvRow {
+                                device: device.to_vec(),
+                                session: session.unwrap().to_vec(),
+                                key: key.clone(),
+                                value: value.clone(),
+                                last_access: now,
+                            })
+                            .unwrap();
+                    }
+                    Change::Delete {
+                        duration: Duration::Session,
+                        key,
+                    } => {
+                        sessions.erase(&(device.to_vec(), session.unwrap().to_vec(), key.clone()));
+                    }
+                }
+            }
+            if gc {
+                collect_expired_sessions(&sessions, now);
+            }
+        }
     }
 
     fn is_storage_path(path: &str) -> bool {
@@ -633,12 +531,18 @@ mod service {
         request: &HttpRequest,
         origin: &str,
         status: u16,
-        content_type: &str,
-        body: Vec<u8>,
-        preflight: bool,
+        body: Option<Vec<u8>>,
         device_cookie: Option<String>,
         session_cookie: Option<String>,
     ) -> HttpReply {
+        let content_type = if body.is_some() {
+            "application/octet-stream"
+        } else {
+            ""
+        };
+        // Not every OPTIONS response is a preflight: a malformed cookie is 400 and
+        // an unknown path is 404.
+        let preflight = request.method == "OPTIONS" && status == 204;
         let mut headers = vec![
             HttpHeader::new("Access-Control-Allow-Origin", origin),
             HttpHeader::new("Access-Control-Allow-Credentials", "true"),
@@ -666,7 +570,7 @@ mod service {
         HttpReply {
             status,
             contentType: content_type.to_string(),
-            body: body.into(),
+            body: body.unwrap_or_default().into(),
             headers,
         }
     }
