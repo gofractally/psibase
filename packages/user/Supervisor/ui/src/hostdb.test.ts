@@ -12,6 +12,39 @@ function makeValue(size: number): Uint8Array {
     return new Uint8Array(size).fill(0xab);
 }
 
+describe("HostDb negative cache", () => {
+    it("returns null after clear without a second network request", () => {
+        const db = new HostDb();
+        const send = vi.fn(() => ({ status: 404 }));
+
+        expect(db.get(0, HEX_KEY, send)).toBeNull();
+        expect(send).toHaveBeenCalledTimes(1);
+
+        db.clear();
+
+        expect(db.get(0, HEX_KEY, send)).toBeNull();
+        expect(send).toHaveBeenCalledTimes(1);
+    });
+
+    it("set invalidates negative cache so get after clear reads the written value", () => {
+        const db = new HostDb();
+        const value = makeValue(8);
+        const send = vi.fn(() => {
+            if (send.mock.calls.length === 1) {
+                return { status: 404 };
+            }
+            return { status: 200, body: { val: value } };
+        });
+
+        expect(db.get(0, HEX_KEY, send)).toBeNull();
+        db.set(0, HEX_KEY, value);
+        db.clear();
+
+        expect(db.get(0, HEX_KEY, send)).toEqual(value);
+        expect(send).toHaveBeenCalledTimes(2);
+    });
+});
+
 describe("HostDb flush", () => {
     let fetchMock: ReturnType<typeof vi.fn>;
 

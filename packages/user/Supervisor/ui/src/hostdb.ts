@@ -72,6 +72,9 @@ function hostDbError(message: string): RecoverableErrorPayload {
 export class HostDb {
     private cache = new Map<string, Uint8Array | null>();
 
+    // Keys known absent from the node (404). Survives `clear` for this profile.
+    private negativeCache = new Set<string>();
+
     private queue: BatchOp[] = [];
 
     clear(): void {
@@ -87,6 +90,9 @@ export class HostDb {
         send: (req: HttpRequest) => HttpResponse,
     ): Uint8Array | null {
         const path = `${durationName(duration)}/${key}`;
+        if (this.negativeCache.has(path)) {
+            return null;
+        }
         const cached = this.cache.get(path);
         if (cached !== undefined) {
             return cached;
@@ -100,8 +106,10 @@ export class HostDb {
         let value: Uint8Array | null;
         if (res.status === 200) {
             value = res.body ? (res.body.val as Uint8Array) : new Uint8Array();
+            this.negativeCache.delete(path);
         } else if (res.status === 404) {
             value = null;
+            this.negativeCache.add(path);
         } else {
             throw hostDbError(`Read failed: HTTP ${res.status}`);
         }
@@ -111,7 +119,9 @@ export class HostDb {
 
     set(duration: number, key: string, value: Uint8Array): void {
         const name = durationName(duration);
-        this.cache.set(`${name}/${key}`, value);
+        const path = `${name}/${key}`;
+        this.negativeCache.delete(path);
+        this.cache.set(path, value);
         this.queue.push({
             duration: name,
             key,
@@ -121,7 +131,9 @@ export class HostDb {
 
     remove(duration: number, key: string): void {
         const name = durationName(duration);
-        this.cache.set(`${name}/${key}`, null);
+        const path = `${name}/${key}`;
+        this.negativeCache.add(path);
+        this.cache.set(path, null);
         this.queue.push({ duration: name, key, value: null });
     }
 
