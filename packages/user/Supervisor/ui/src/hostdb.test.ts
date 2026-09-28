@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { HttpResponse } from "./host-interface";
 import { HostDb } from "./hostdb";
 
 const HEX_KEY = "a".repeat(64);
@@ -12,10 +13,22 @@ function makeValue(size: number): Uint8Array {
     return new Uint8Array(size).fill(0xab);
 }
 
+function httpNotFound(): HttpResponse {
+    return { status: 404, headers: [], body: null };
+}
+
+function httpOkBytes(value: Uint8Array): HttpResponse {
+    return {
+        status: 200,
+        headers: [],
+        body: { tag: "bytes", val: value },
+    };
+}
+
 describe("HostDb negative cache", () => {
     it("returns null after clear without a second network request", () => {
         const db = new HostDb();
-        const send = vi.fn(() => ({ status: 404 }));
+        const send = vi.fn(() => httpNotFound());
 
         expect(db.get(0, HEX_KEY, send)).toBeNull();
         expect(send).toHaveBeenCalledTimes(1);
@@ -29,11 +42,11 @@ describe("HostDb negative cache", () => {
     it("set invalidates negative cache so get after clear reads the written value", () => {
         const db = new HostDb();
         const value = makeValue(8);
-        const send = vi.fn(() => {
+        const send = vi.fn((): HttpResponse => {
             if (send.mock.calls.length === 1) {
-                return { status: 404 };
+                return httpNotFound();
             }
-            return { status: 200, body: { val: value } };
+            return httpOkBytes(value);
         });
 
         expect(db.get(0, HEX_KEY, send)).toBeNull();
