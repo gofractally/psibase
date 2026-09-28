@@ -35,9 +35,17 @@ export const Legislative = () => {
     const awaitingConsensusReward = !fractal?.fractal?.stream;
 
     const roleId = fractal?.fractal?.legislature.roleId;
-    const { data: role, error: roleError } = useRoleGuild(roleId);
+    const {
+        data: role,
+        error: roleError,
+        isSuccess: roleLoaded,
+    } = useRoleGuild(roleId);
 
-    const { data: guild, error: guildError } = useGuild(role?.guild);
+    const {
+        data: guild,
+        error: guildError,
+        isSuccess: guildLoaded,
+    } = useGuild(role?.guild);
 
     const [showRankGuildsModal, setShowRankGuildsModal] = useState(false);
     const [showTokenModal, setShowTokenModal] = useState(false);
@@ -93,29 +101,37 @@ export const Legislative = () => {
                 <CardFooter className="flex items-center gap-2">
                     <Scale className="size-4 shrink-0" />
                     <p className="text-muted-foreground text-sm">
-                        The{" "}
-                        <span className="text-primary font-medium">
-                            {guild?.account}
-                        </span>{" "}
-                        guild is selected to act as the legislature led by{" "}
-                        {guild?.rep ? (
+                        {roleLoaded && !role ? (
+                            "No guild is assigned to the legislature yet."
+                        ) : roleLoaded && guildLoaded && guild ? (
                             <>
-                                its representative{" "}
+                                The{" "}
                                 <span className="text-primary font-medium">
-                                    {guild.rep.member}
-                                </span>
-                                .
+                                    {guild.displayName ?? guild.account}
+                                </span>{" "}
+                                guild is selected to act as the legislature.{" "}
+                                {guild.rep ? (
+                                    <>
+                                        Led by representative{" "}
+                                        <span className="text-primary font-medium">
+                                            {guild.rep.member}
+                                        </span>
+                                        .
+                                    </>
+                                ) : guild.council ? (
+                                    "Led by council."
+                                ) : (
+                                    "No representative or council yet."
+                                )}
                             </>
-                        ) : (
-                            `its council.`
-                        )}
+                        ) : null}
                     </p>
                 </CardFooter>
             </GlowingCard>
 
-            <GuildOverviewCard guildAccount={guild?.account} />
+            {role && <GuildOverviewCard guildAccount={guild?.account} />}
 
-            {isAdministrativeUser && (
+            {role && isAdministrativeUser && (
                 <GlowingCard>
                     <CardHeader>
                         <CardTitle>Control Panel</CardTitle>

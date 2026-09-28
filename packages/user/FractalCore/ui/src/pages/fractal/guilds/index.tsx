@@ -65,7 +65,7 @@ export const Guilds = () => {
                                         <TableHead className="w-48">
                                             Guild
                                         </TableHead>
-                                        <TableHead className="w-32 text-end">
+                                        <TableHead className="text-end">
                                             Leadership
                                         </TableHead>
                                     </TableRow>
@@ -95,8 +95,10 @@ export const Guilds = () => {
                                                             guild.rep.member
                                                         }
                                                     />
+                                                ) : guild.council ? (
+                                                    "Led by council"
                                                 ) : (
-                                                    "Council"
+                                                    "No representative or council yet"
                                                 )}
                                             </TableCell>
                                         </TableRow>

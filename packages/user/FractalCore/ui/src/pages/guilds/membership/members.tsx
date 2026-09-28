@@ -30,10 +30,11 @@ import {
 function getGuildMemberRoleLabel(
     memberAccount: string,
     guild: Guild | null | undefined,
+    isCandidate: boolean,
 ): "Representative" | "Councilor" | "Candidate" | null {
-    if (!guild) return null;
-    if (guild.rep?.member === memberAccount) return "Representative";
-    if (guild.council?.includes(memberAccount)) return "Councilor";
+    if (guild?.rep?.member === memberAccount) return "Representative";
+    if (guild?.council?.includes(memberAccount)) return "Councilor";
+    if (isCandidate) return "Candidate";
     return null;
 }
 
@@ -41,7 +42,7 @@ export const GuildMembers = () => {
     const { data: guild } = useGuild();
     const { data: scores } = useScores(guild?.account);
 
-    const sortedScores = (scores || []).sort(
+    const sortedScores = [...(scores ?? [])].sort(
         (a, b) =>
             new Date(a.createdAt).valueOf() - new Date(b.createdAt).valueOf(),
     );
@@ -70,10 +71,11 @@ export const GuildMembers = () => {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {sortedScores?.map((member: Score) => {
+                        {sortedScores.map((member: Score) => {
                             const roleLabel = getGuildMemberRoleLabel(
                                 member.member,
                                 guild,
+                                member.isCandidate,
                             );
                             return (
                                 <TableRow key={member.member}>

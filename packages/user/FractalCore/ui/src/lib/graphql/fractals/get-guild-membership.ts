@@ -15,7 +15,7 @@ const GuildSchema = z.object({
     displayName: z.string(),
     candidacyCooldown: z.number().int(),
     council: zAccount.array().nullable(),
-    rep: RepSchema,
+    rep: RepSchema.nullable(),
 });
 
 const NodeSchema = z

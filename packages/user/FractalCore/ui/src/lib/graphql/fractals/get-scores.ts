@@ -9,6 +9,7 @@ export const zScore = z.object({
     member: zAccount,
     score: z.number(),
     createdAt: zDateTime,
+    isCandidate: z.boolean(),
 });
 
 export type Score = z.infer<typeof zScore>;
@@ -23,6 +24,7 @@ export const getScores = async (guild: Account) => {
                 member
                 score
                 createdAt
+                isCandidate
             } 
         }
     }`,

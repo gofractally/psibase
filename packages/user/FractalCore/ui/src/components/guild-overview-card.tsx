@@ -24,7 +24,6 @@ const getLeadershipStatus = (
     if (guild.rep && guild.council) return zLeadership.Enum.RepAndCouncil;
     if (guild.rep) return zLeadership.Enum.RepOnly;
     if (guild.council) return zLeadership.Enum.CouncilOnly;
-    throw new Error("Cannot determine leadership status");
 };
 
 export const GuildOverviewCard = ({
@@ -123,8 +122,10 @@ export const GuildOverviewCard = ({
                                 {guild.rep.member}
                             </span>
                         </>
-                    ) : (
+                    ) : guild?.council ? (
                         "Led by council"
+                    ) : (
+                        "No representative or council yet"
                     )}
                 </div>
             </CardFooter>

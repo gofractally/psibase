@@ -11,7 +11,10 @@ const zMapping = z.object({
 });
 export type Mapping = z.infer<typeof zMapping>;
 
-export const getRoleMap = async (fractalAccount: Account, roleId: number): Promise<Mapping> => {
+export const getRoleMap = async (
+    fractalAccount: Account,
+    roleId: number,
+): Promise<Mapping | null> => {
     const res = await callGraphqlViaPlugin(
         guilds.authorized.graphql,
         `
@@ -40,5 +43,7 @@ export const getRoleMap = async (fractalAccount: Account, roleId: number): Promi
         .parse(res);
 
 
-    return zMapping.parse(parsed.roleMap.edges[0].node)
+    const node = parsed.roleMap.edges[0]?.node;
+    if (!node) return null;
+    return node;
 };

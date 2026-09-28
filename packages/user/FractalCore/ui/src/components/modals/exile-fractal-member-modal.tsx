@@ -5,7 +5,6 @@ import { useExile } from "@/hooks/fractals/use-exile";
 import { useAppForm } from "@shared/components/form/app-form";
 import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
 import { zAccount } from "@shared/lib/schemas/account";
-import { supervisor } from "@shared/lib/supervisor";
 import {
     Dialog,
     DialogContent,
@@ -51,7 +50,7 @@ export const ExileFractalMemberModal = ({
         <Dialog open={show} onOpenChange={openChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Exile guild member</DialogTitle>
+                    <DialogTitle>Exile fractal member</DialogTitle>
                     <form
                         onSubmit={(e) => {
                             e.preventDefault();
@@ -62,11 +61,11 @@ export const ExileFractalMemberModal = ({
                         <FieldAccountExisting
                             form={form}
                             fields={{ account: "exile.member" }}
-                            label="Recipient Account"
+                            label="Member"
                             description={undefined}
                             placeholder="Enter account name"
                             disabled={false}
-                            supervisor={supervisor}
+                            onValidate={undefined}
                         />
 
                         <form.AppForm>

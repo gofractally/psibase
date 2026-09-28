@@ -51,7 +51,7 @@ export const SetGuildRepModal = ({
         <Dialog open={show} onOpenChange={openChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Update guild metadata</DialogTitle>
+                    <DialogTitle>Set representative</DialogTitle>
                     <form.AppForm>
                         <form
                             onSubmit={(e) => {

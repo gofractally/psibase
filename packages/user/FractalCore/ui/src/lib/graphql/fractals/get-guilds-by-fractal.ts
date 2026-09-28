@@ -9,9 +9,12 @@ const NodeSchema = z.object({
     account: z.string(),
     description: z.string(),
     displayName: z.string(),
-    rep: z.object({
-        member: z.string()
-    })
+    rep: z
+        .object({
+            member: z.string(),
+        })
+        .nullable(),
+    council: z.array(z.string()).nullable(),
 });
 
 const GuildMembershipsSchema = z.object({
@@ -35,6 +38,7 @@ export const getGuildsByFractal = async (member: Account) => {
                 rep {
                     member
                 }
+                council
                 }
             }
 
