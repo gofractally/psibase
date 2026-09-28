@@ -155,6 +155,18 @@ mod tests {
     }
 
     #[psibase::test_case(packages("Banx"))]
+    fn test_compound_amount_saturates_at_u64_max(
+        _chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        assert_eq!(compound_amount(u64::MAX, 1, 1), u64::MAX);
+        assert_eq!(
+            compound_amount(u64::MAX, 1, SECONDS_PER_DAY as u64),
+            u64::MAX
+        );
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
     fn test_path_pay_same_asset_hops(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
 
@@ -2745,6 +2757,33 @@ mod tests {
                 .is_err(),
             "nothing left to forgive"
         );
+        Ok(())
+    }
+
+    /// Principal at the u64 ceiling compounds to the cap and can still be forgiven.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_deposit_max_principal_can_be_forgiven(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, alice)
+            .deposit(bob, usd, Quantity::new(u64::MAX), 1, 0)
+            .get()?;
+        assert_eq!(exp(&chain, bob, alice, usd), u64::MAX);
+
+        chain.start_block_after(Seconds::new(1).into());
+        assert_eq!(exp(&chain, bob, alice, usd), u64::MAX);
+
+        Wrapper::push_from(&chain, bob)
+            .forgive(alice, usd, Quantity::new(u64::MAX))
+            .get()?;
+        assert_eq!(exp(&chain, bob, alice, usd), 0);
         Ok(())
     }
 
