@@ -35,7 +35,7 @@ mod service {
     use psibase::*;
 
     const SYS_FRACTAL: AccountNumber = account!("core-fract");
-    const SYS_GUILD: AccountNumber = account!("guild-one");
+    const SYS_GUILD: AccountNumber = account!("core-gld-1");
     const ROOT: AccountNumber = account!("root");
 
     #[action]
@@ -52,12 +52,14 @@ mod service {
 
         Fractals::call_from(*producer).create_frac(
             SYS_FRACTAL,
-            "Network Governance".into(),
-            "To establish, maintain, and grow the network.".into(),
+            "Core".into(),
+            "To establish, sustain, and cultivate the network.".into(),
         );
 
         let guilds = Guilds::call_from(*producer);
-        guilds.create_guild(SYS_FRACTAL, SYS_GUILD, "Genesis".into());
+        guilds.create_guild(SYS_FRACTAL, SYS_GUILD, "Guild One".into());
+        Guilds::call_as(SYS_GUILD)
+            .set_g_desc("Coordinates community efforts in service of the fractal's mission".into());
 
         let map_sys_guild_to_role_occ = |role: FractalRole| {
             Guilds::call_as(SYS_FRACTAL).set_role_map(role.into(), SYS_GUILD);
