@@ -1669,6 +1669,7 @@ dependencies = [
 name = "hostdb"
 version = "0.29.0"
 dependencies = [
+ "base64 0.22.1",
  "psibase",
  "psibase-user-workspace-hack",
  "psibase_service",

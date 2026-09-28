@@ -13,6 +13,7 @@ flags = ["isPrivileged"]
 server = "hostdb"
 
 [dependencies]
+base64 = { version = "0.22" }
 psibase.workspace = true
 psibase_service.workspace = true
 serde.workspace = true

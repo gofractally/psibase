@@ -2,7 +2,7 @@
 ///
 /// `GET /kv/persistent/<key>` and `GET /kv/session/<key>` return the raw value
 /// (`application/octet-stream`), or 404 when it is absent. `POST /kv/batch`
-/// applies `{"ops":[{"duration":"persistent"|"session","key":<hex>,"value":<base64url>|null}]}`
+/// applies `{"ops":[{"duration":"persistent"|"session","key":<hex>,"value":<unpadded base64url>|null}]}`
 /// in one subjective transaction and returns 204; a null value deletes the key.
 /// An invalid op returns 400 and writes nothing. `OPTIONS` on these paths is the
 /// CORS preflight. Only `Origin: supervisor.{root}` is accepted.
@@ -65,6 +65,8 @@ mod tables {
 #[psibase::service(name = "hostdb", tables = "tables")]
 mod service {
     use crate::tables::{KvRow, KvTable, SessionKvRow, SessionKvTable};
+    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    use base64::Engine;
     use psibase::native_raw;
     use psibase::services::http_server::Wrapper as HttpServer;
     use psibase::*;
@@ -82,6 +84,13 @@ mod service {
     const SESSION_IDLE_NS: u64 = 7 * 24 * 60 * 60 * 1_000_000_000;
     const SESSION_GC_LIMIT: usize = 16;
 
+    #[derive(Clone, Copy, Deserialize)]
+    #[serde(rename_all = "lowercase")]
+    enum Duration {
+        Persistent,
+        Session,
+    }
+
     #[derive(Deserialize)]
     #[serde(deny_unknown_fields)]
     struct BatchBody {
@@ -91,51 +100,15 @@ mod service {
     #[derive(Deserialize)]
     #[serde(deny_unknown_fields)]
     struct BatchOp {
-        duration: String,
+        duration: Duration,
         key: String,
         value: Option<String>,
     }
 
-    enum Duration {
-        Persistent,
-        Session,
-    }
-
-    enum Change {
-        Put {
-            duration: Duration,
-            key: Vec<u8>,
-            value: Vec<u8>,
-        },
-        Delete {
-            duration: Duration,
-            key: Vec<u8>,
-        },
-    }
-
-    impl Change {
-        fn is_session(&self) -> bool {
-            matches!(
-                self,
-                Change::Put {
-                    duration: Duration::Session,
-                    ..
-                } | Change::Delete {
-                    duration: Duration::Session,
-                    ..
-                }
-            )
-        }
-
-        fn is_session_put(&self) -> bool {
-            matches!(
-                self,
-                Change::Put {
-                    duration: Duration::Session,
-                    ..
-                }
-            )
-        }
+    struct Change {
+        duration: Duration,
+        key: Vec<u8>,
+        value: Option<Vec<u8>>,
     }
 
     #[action]
@@ -203,7 +176,10 @@ mod service {
 
             if request.method == "POST" && path == "/kv/batch" {
                 let changes = parse_batch(&request.body.0).ok_or(400u16)?;
-                let session = if changes.iter().any(Change::is_session) {
+                let session = if changes
+                    .iter()
+                    .any(|change| matches!(change.duration, Duration::Session))
+                {
                     let session = session_id(request).ok_or(400u16)?;
                     session_cookie = Some(hex_encode(&session));
                     Some(session)
@@ -254,52 +230,44 @@ mod service {
     }
 
     fn apply_changes(device: &[u8], session: Option<&[u8]>, changes: &[Change]) {
-        let gc = changes.iter().any(Change::is_session_put);
+        let gc = changes
+            .iter()
+            .any(|change| matches!(change.duration, Duration::Session) && change.value.is_some());
         subjective_tx! {
             let now = wall_time_ns();
             let persistent = KvTable::new();
             let sessions = SessionKvTable::new();
             for change in changes {
-                match change {
-                    Change::Put {
-                        duration: Duration::Persistent,
-                        key,
-                        value,
-                    } => {
+                match (change.duration, change.value.as_deref()) {
+                    (Duration::Persistent, Some(value)) => {
                         persistent
                             .put(&KvRow {
                                 device: device.to_vec(),
-                                key: key.clone(),
-                                value: value.clone(),
+                                key: change.key.clone(),
+                                value: value.to_vec(),
                             })
                             .unwrap();
                     }
-                    Change::Delete {
-                        duration: Duration::Persistent,
-                        key,
-                    } => {
-                        persistent.erase(&(device.to_vec(), key.clone()));
+                    (Duration::Persistent, None) => {
+                        persistent.erase(&(device.to_vec(), change.key.clone()));
                     }
-                    Change::Put {
-                        duration: Duration::Session,
-                        key,
-                        value,
-                    } => {
+                    (Duration::Session, Some(value)) => {
                         sessions
                             .put(&SessionKvRow {
                                 device: device.to_vec(),
                                 session: session.unwrap().to_vec(),
-                                key: key.clone(),
-                                value: value.clone(),
+                                key: change.key.clone(),
+                                value: value.to_vec(),
                                 last_access: now,
                             })
                             .unwrap();
                     }
-                    Change::Delete {
-                        duration: Duration::Session,
-                        key,
-                    } => {
-                        sessions.erase(&(device.to_vec(), session.unwrap().to_vec(), key.clone()));
+                    (Duration::Session, None) => {
+                        sessions.erase(&(
+                            device.to_vec(),
+                            session.unwrap().to_vec(),
+                            change.key.clone(),
+                        ));
                     }
                 }
             }
@@ -415,28 +383,22 @@ mod service {
         let body: BatchBody = serde_json::from_slice(body).ok()?;
         let mut changes = Vec::with_capacity(body.ops.len());
         for op in body.ops {
-            let duration = match op.duration.as_str() {
-                "persistent" => Duration::Persistent,
-                "session" => Duration::Session,
-                _ => return None,
-            };
-            let Some(key) = decode_fixed_hex(&op.key, KEY_LEN) else {
-                return None;
-            };
-            match op.value {
-                None => changes.push(Change::Delete { duration, key }),
+            let key = decode_fixed_hex(&op.key, KEY_LEN)?;
+            let value = match op.value {
+                None => None,
                 Some(value) => {
-                    let value = decode_base64url(&value)?;
+                    let value = URL_SAFE_NO_PAD.decode(value).ok()?;
                     if value.len() > MAX_VALUE_LEN {
                         return None;
                     }
-                    changes.push(Change::Put {
-                        duration,
-                        key,
-                        value,
-                    });
+                    Some(value)
                 }
-            }
+            };
+            changes.push(Change {
+                duration: op.duration,
+                key,
+                value,
+            });
         }
         Some(changes)
     }
@@ -463,59 +425,9 @@ mod service {
         }
     }
 
+    /// Cookie values are lowercase hex.
     fn hex_encode(bytes: &[u8]) -> String {
-        const HEX: &[u8; 16] = b"0123456789abcdef";
-        let mut out = String::with_capacity(bytes.len() * 2);
-        for byte in bytes {
-            out.push(HEX[(byte >> 4) as usize] as char);
-            out.push(HEX[(byte & 0xf) as usize] as char);
-        }
-        out
-    }
-
-    fn decode_base64url(input: &str) -> Option<Vec<u8>> {
-        fn val(byte: u8) -> Option<u8> {
-            match byte {
-                b'A'..=b'Z' => Some(byte - b'A'),
-                b'a'..=b'z' => Some(byte - b'a' + 26),
-                b'0'..=b'9' => Some(byte - b'0' + 52),
-                b'-' => Some(62),
-                b'_' => Some(63),
-                _ => None,
-            }
-        }
-        let stripped = input.trim_end_matches('=');
-        if input.len() - stripped.len() > 2 || stripped.bytes().any(|b| b == b'=') {
-            return None;
-        }
-        let bytes = stripped.as_bytes();
-        if bytes.len() % 4 == 1 {
-            return None;
-        }
-        let mut out = Vec::with_capacity(bytes.len() * 3 / 4);
-        let mut i = 0;
-        while i + 4 <= bytes.len() {
-            let a = val(bytes[i])?;
-            let b = val(bytes[i + 1])?;
-            let c = val(bytes[i + 2])?;
-            let d = val(bytes[i + 3])?;
-            out.push((a << 2) | (b >> 4));
-            out.push((b << 4) | (c >> 2));
-            out.push((c << 6) | d);
-            i += 4;
-        }
-        if bytes.len() - i == 2 {
-            let a = val(bytes[i])?;
-            let b = val(bytes[i + 1])?;
-            out.push((a << 2) | (b >> 4));
-        } else if bytes.len() - i == 3 {
-            let a = val(bytes[i])?;
-            let b = val(bytes[i + 1])?;
-            let c = val(bytes[i + 2])?;
-            out.push((a << 2) | (b >> 4));
-            out.push((b << 4) | (c >> 2));
-        }
-        Some(out)
+        Hex(bytes).to_string().to_ascii_lowercase()
     }
 
     fn status_reply(status: u16) -> HttpReply {
