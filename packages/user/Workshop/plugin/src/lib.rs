@@ -12,8 +12,8 @@ use exports::workshop::plugin::{
 };
 use host::types::types::Error;
 use psibase::MethodNumber;
-use transact::plugin::intf::set_propose_latch;
 use std::str::FromStr;
+use transact::plugin::intf::set_propose_latch;
 
 use crate::trust::*;
 
@@ -30,11 +30,10 @@ psibase::define_trust! {
         ",
     }
     functions {
-        None => [],
         Low => [],
         Medium => [create_app, set_cache_mode],
         High => [set_app_metadata, publish_app, unpublish_app, upload, upload_tree, enable_spa, set_csp, delete_csp, remove, set_service_code],
-        Max => [send, archive, save],
+        Max => [send, archive, save, get_msgs],
     }
 }
 
@@ -110,6 +109,11 @@ impl Mail for WorkshopPlugin {
         assert_authorized(FunctionName::save)?;
         set_propose_latch(Some(&app)).unwrap();
         chainmail::plugin::api::save(msg_id)
+    }
+
+    fn get_msgs(app: String) -> Result<Vec<chainmail::plugin::types::Message>, Error> {
+        assert_authorized(FunctionName::get_msgs)?;
+        chainmail::plugin::queries::get_msgs(None, Some(&app))
     }
 }
 

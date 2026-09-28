@@ -65,12 +65,19 @@ struct BillingConfigData {
 #[serde(rename_all = "camelCase")]
 struct InternalBillingConfig {
     enabled: bool,
+    fee_receiver: Option<String>,
 }
 
-pub fn billing_enabled() -> Result<bool, Error> {
+pub struct BillingConfig {
+    pub enabled: bool,
+    pub fee_receiver: Option<String>,
+}
+
+pub fn get_billing_config() -> Result<BillingConfig, Error> {
     let query = r#"query {
         getBillingConfig {
             enabled
+            feeReceiver
         }
     }"#;
 
@@ -80,9 +87,20 @@ pub fn billing_enabled() -> Result<bool, Error> {
             ErrorType::QueryError(format!("Failed to parse GraphQL response: {}", e)).into()
         })?;
 
-    Ok(response
+    let config = response
         .data
         .get_billing_config
-        .unwrap_or(InternalBillingConfig { enabled: false })
-        .enabled)
+        .unwrap_or(InternalBillingConfig {
+            enabled: false,
+            fee_receiver: None,
+        });
+
+    Ok(BillingConfig {
+        enabled: config.enabled,
+        fee_receiver: config.fee_receiver.filter(|s| !s.trim().is_empty()),
+    })
+}
+
+pub fn billing_enabled() -> Result<bool, Error> {
+    Ok(get_billing_config()?.enabled)
 }

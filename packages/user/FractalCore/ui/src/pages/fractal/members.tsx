@@ -84,9 +84,7 @@ export const Members = () => {
                                                 </TooltipContent>
                                             </Tooltip>
                                         )}
-                                        <Badge variant="default">
-                                            Member
-                                        </Badge>
+                                        <Badge variant="default">Member</Badge>
                                     </TableCell>
                                     <TableCell className="text-end">
                                         {dayjs(member.createdAt).format(

@@ -22,10 +22,10 @@ export const useMessages = (app: string | undefined) =>
         enabled: !!app,
         queryFn: async () => {
             const res = await supervisor.functionCall({
-                service: "chainmail",
-                intf: "queries",
+                service: "workshop",
+                intf: "mail",
                 method: "getMsgs",
-                params: [undefined, app],
+                params: [app],
             });
             return Message.array().parse(res);
         },

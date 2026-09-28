@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 
 import { getStagedTx } from "@/lib/get-staged-tx";
+import { CONFIG } from "@/lib/services";
 
 import { usePluginMutation } from "./use-plugin-mutation";
 
@@ -9,9 +10,9 @@ export const useRejectStaged = () => {
 
     return usePluginMutation<[number]>(
         {
-            intf: "respondent",
+            intf: "staged",
             method: "reject",
-            service: "staged-tx",
+            service: CONFIG,
         },
         {
             error: "Failed rejecting proposal",

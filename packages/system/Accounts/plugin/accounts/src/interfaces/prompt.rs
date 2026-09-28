@@ -2,11 +2,12 @@ use crate::bindings::accounts::query::api as AccountsQuery;
 use crate::bindings::auth_sig::plugin as AuthSig;
 use crate::bindings::exports::accounts::plugin::prompt::{Credential, Guest as Prompt};
 use crate::bindings::host::{
-    crypto::keyvault as HostCrypto, client::api as Client, auth::api as HostAuth,
+    auth::api as HostAuth, client::api as Client, crypto::keyvault as HostCrypto,
     types::types::Error,
 };
 use crate::bindings::invite::plugin::redemption as Invites;
-use crate::bindings::name_market::plugin::api as NameMarket;
+use crate::bindings::name_market::plugin::{self as NameMarketPlugin, api as NameMarket};
+use crate::bindings::tokens::plugin as TokensPlugin;
 use crate::bindings::transact::plugin::intf as Transact;
 use crate::db::{apps_table::AppsTable, user_table::UserTable};
 use crate::errors::ErrorType;
@@ -154,5 +155,25 @@ impl Prompt for AccountsPlugin {
         if let Some(_) = Invites::get_active_invite() {
             Invites::accept();
         }
+    }
+
+    fn get_system_token() -> Result<Option<TokensPlugin::types::SystemTokenInfo>, Error> {
+        assert_eq!(Client::get_sender(), Client::get_receiver());
+        TokensPlugin::helpers::get_system_token()
+    }
+
+    fn get_user_balances(user: String) -> Result<Vec<TokensPlugin::types::UserBalance>, Error> {
+        assert_eq!(Client::get_sender(), Client::get_receiver());
+        TokensPlugin::helpers::get_user_balances(&user)
+    }
+
+    fn can_buy_account() -> bool {
+        assert_eq!(Client::get_sender(), Client::get_receiver());
+        NameMarket::can_create_account()
+    }
+
+    fn get_markets_overview() -> Result<NameMarketPlugin::types::MarketsOverview, Error> {
+        assert_eq!(Client::get_sender(), Client::get_receiver());
+        NameMarket::get_markets_overview()
     }
 }

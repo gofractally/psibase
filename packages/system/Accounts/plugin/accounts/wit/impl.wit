@@ -11,6 +11,7 @@ world impl {
     include accounts:query/imports;
     include auth-sig:plugin/imports;
     include name-market:plugin/imports;
+    include tokens:plugin/imports;
     include host:crypto/imports;
 
     import invite:plugin/redemption;

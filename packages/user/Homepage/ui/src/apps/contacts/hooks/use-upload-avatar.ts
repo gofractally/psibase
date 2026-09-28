@@ -22,8 +22,8 @@ export const useUploadAvatar = () =>
             void (await supervisor.functionCall({
                 method: "uploadAvatar",
                 params: [avatar],
-                service: "profiles",
-                intf: "api",
+                service: "homepage",
+                intf: "contacts",
             }));
         },
         onSuccess: (_, __, toastId) => {

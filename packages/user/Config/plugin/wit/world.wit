@@ -12,19 +12,53 @@ interface branding {
 
 interface packaging {
     use host:types/types.{error};
+    use packages:plugin/types.{meta, package-info, package-preference, package-source};
 
     set-account-sources: func(accounts: list<string>) -> result<_, error>;
+
+    get-sources: func(owner: string) -> result<list<package-source>, error>;
+    get-installed-packages: func() -> result<list<meta>, error>;
+    get-available-packages: func(owner: string) -> result<list<package-info>, error>;
+
+    /// Resolve, fetch, and propose installation of the named packages.
+    install-packages: func(owner: string, packages: list<string>, request-pref: package-preference, non-request-pref: package-preference) -> result<_, error>;
+}
+
+interface staged {
+    use host:types/types.{error};
+
+    accept: func(id: u32) -> result<_, error>;
+    reject: func(id: u32) -> result<_, error>;
+    execute: func(id: u32) -> result<_, error>;
+    remove: func(id: u32) -> result<_, error>;
+    graphql: func(query: string) -> result<string, error>;
+}
+
+interface sites {
+    use host:types/types.{error};
+
+    graphql: func(query: string) -> result<string, error>;
+}
+
+interface transact {
+    use host:types/types.{error};
+
+    graphql: func(query: string) -> result<string, error>;
 }
 
 interface name-market {
     use host:types/types.{error};
     use name-market:plugin/market-admin.{market-config};
+    use name-market:plugin/types.{markets-overview};
 
     /// Batch create or update name markets.
     /// * For lengths with no existing market: creates the market; `initial-price` must be set.
     /// * For existing markets: updates params and enabled status; `initial-price` is ignored.
     /// * Skips entries whose params match current on-chain state (no-op).
     configure-markets: func(configs: list<market-config>) -> result<_, error>;
+
+    get-markets-overview: func() -> result<markets-overview, error>;
+    graphql: func(query: string) -> result<string, error>;
 }
 
 interface settings {
@@ -40,6 +74,7 @@ interface settings {
 interface producers {
     use host:types/types.{error};
     use sites:plugin/types.{file};
+    use producers:plugin/types.{claim-type};
 
     /// Set the producers for CFT consensus.
     /// This also changes the current consensus mode to CFT (crash fault tolerant).
@@ -55,6 +90,10 @@ interface producers {
 
     /// Sets the maximum number of producers for the network
     set-max-prods: func(max-prods: u8) -> result<_, error>;
+
+    register-candidate: func(endpoint: string, claim: claim-type) -> result<_, error>;
+    unregister-candidate: func() -> result<_, error>;
+    graphql: func(query: string) -> result<string, error>;
 }
 
 interface symbol {
@@ -86,6 +125,7 @@ interface virtual-server {
         cpu-pricing-params,
         net-pricing-params
     };
+    use virtual-server:plugin/types.{billing-config};
 
     /// Initialize the billing system
     /// A system token must have already been set to enable billing.
@@ -124,6 +164,16 @@ interface virtual-server {
     /// Parameters:
     /// * `params` - The network pricing parameters
     set-net-pricing-params: func(params: net-pricing-params) -> result<_, error>;
+
+    get-billing-config: func() -> result<billing-config, error>;
+    graphql: func(query: string) -> result<string, error>;
+}
+
+interface tokens {
+    use host:types/types.{error};
+    use tokens:plugin/types.{system-token-info};
+
+    get-system-token: func() -> result<option<system-token-info>, error>;
 }
 
 world imports {
@@ -134,4 +184,8 @@ world imports {
     import settings;
     import symbol;
     import virtual-server;
+    import staged;
+    import sites;
+    import transact;
+    import tokens;
 }

@@ -30,9 +30,9 @@ export const useToggleUserAutoDebit = (user: string | null) => {
             const { enable } = Args.parse(vars);
 
             return supervisor.functionCall({
-                service: "tokens",
+                service: "homepage",
                 plugin: "plugin",
-                intf: "userConfig",
+                intf: "tokens",
                 method: "enableUserAutoDebit",
                 params: [enable],
             });

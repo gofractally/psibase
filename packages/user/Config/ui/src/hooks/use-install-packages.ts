@@ -5,6 +5,7 @@ import { z } from "zod";
 import { checkLastTx } from "@/lib/check-staging";
 import QueryKey from "@/lib/query-keys";
 
+import { callPluginFunction, config } from "@shared/lib/plugins";
 import { queryClient } from "@shared/lib/query-client";
 import { supervisor } from "@shared/lib/supervisor";
 import { toast } from "@shared/shadcn/ui/sonner";
@@ -16,31 +17,19 @@ const zPackageOp = z.object({
     new: zPackageSchemaWithSha.nullish(),
 });
 
-type PackageOp = z.infer<typeof zPackageOp>;
-
-type PackageInstallOp = {
-    old?: unknown;
-    new?: ArrayBuffer;
-};
-
-async function getAvailablePackageIndex(owner: string) {
-    return zPackageSchemaWithSha.array().parse(
-        await supervisor.functionCall({
-            service: "packages",
-            intf: "queries",
-            method: "getAvailablePackages",
-            params: [owner],
-        }),
-    );
-}
+type PackagePreference = "best" | "compatible" | "current";
 
 async function resolvePackageOps(
     owner: string,
     packages: string[],
-    requestPref: string,
-    nonRequestPref: string,
-): Promise<PackageOp[]> {
-    const index = await getAvailablePackageIndex(owner);
+    requestPref: PackagePreference,
+    nonRequestPref: PackagePreference,
+) {
+    const index = zPackageSchemaWithSha.array().parse(
+        await callPluginFunction(config.packaging.getAvailablePackages, [
+            owner,
+        ]),
+    );
     return zPackageOp.array().parse(
         await supervisor.functionCall({
             service: "packages",
@@ -54,46 +43,15 @@ async function resolvePackageOps(
 async function installPackages(
     owner: string,
     packages: string[],
-    request_pref: string,
-    non_request_pref: string,
+    requestPref: PackagePreference,
+    nonRequestPref: PackagePreference,
 ) {
-    const resolved = await resolvePackageOps(
+    await callPluginFunction(config.packaging.installPackages, [
         owner,
         packages,
-        request_pref,
-        non_request_pref,
-    );
-
-    const ops = (await supervisor.functionCall({
-        service: "packages",
-        intf: "privateApi",
-        method: "loadPackageOps",
-        params: [resolved],
-    })) as PackageInstallOp[];
-
-    const [data, install] = (await supervisor.functionCall({
-        service: "packages",
-        intf: "privateApi",
-        method: "buildTransactions",
-        params: [owner, ops, 4],
-    })) as [ArrayBuffer[], ArrayBuffer[]];
-
-    for (const tx of data) {
-        await supervisor.functionCall({
-            service: "packages",
-            intf: "privateApi",
-            method: "pushData",
-            params: [tx],
-        });
-    }
-    for (const tx of install) {
-        await supervisor.functionCall({
-            service: "packages",
-            intf: "privateApi",
-            method: "proposeInstall",
-            params: [tx],
-        });
-    }
+        requestPref,
+        nonRequestPref,
+    ]);
 }
 
 export async function resolveRequiredPackageNames(

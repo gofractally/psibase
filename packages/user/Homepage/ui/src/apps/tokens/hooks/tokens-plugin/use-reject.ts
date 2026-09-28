@@ -20,9 +20,9 @@ export const useReject = (user: string | null, counterParty: string) =>
             const { creditor, memo, tokenId } = Args.parse(vars);
 
             return supervisor.functionCall({
-                service: "tokens",
+                service: "homepage",
                 plugin: "plugin",
-                intf: "user",
+                intf: "tokens",
                 method: "reject",
                 params: [tokenId, creditor, memo],
             });

@@ -1,8 +1,13 @@
+import type { SystemTokenInfo as PluginSystemTokenInfo } from "@shared/lib/plugins/tokens";
+
 import { useQuery } from "@tanstack/react-query";
 
-import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { hostingAppCall } from "@shared/lib/plugins/host-app";
+import {
+    type PluginCall,
+    callPluginFunction,
+} from "@shared/lib/plugins/lib/call-plugin-function";
 import QueryKey from "@shared/lib/query-keys";
-import { tokens } from "@shared/lib/plugins";
 
 export interface SystemTokenInfo {
     id: string;
@@ -12,70 +17,28 @@ export interface SystemTokenInfo {
     precision: number;
 }
 
-interface ConfigResponse {
-    config: {
-        sysTid: number | null;
-    } | null;
+export function toSystemTokenInfo(
+    token: PluginSystemTokenInfo | null | undefined,
+): SystemTokenInfo | null {
+    if (!token) {
+        return null;
+    }
+    const symbol = token.symbol?.trim();
+    return {
+        id: String(token.id),
+        symbol: symbol ? symbol : `ID: ${token.id}`,
+        precision: token.precision,
+    };
 }
 
-interface TokenResponse {
-    token: {
-        id: string;
-        precision: number;
-        /** Symbol is the account name (symbol id) returned by the Tokens GraphQL API */
-        symbol?: string | null;
-    } | null;
-}
-
-export const useSystemToken = () => {
-    return useQuery<SystemTokenInfo | null>({
+export const useSystemToken = (
+    call: PluginCall<[], PluginSystemTokenInfo | undefined> = hostingAppCall(
+        "tokens",
+        "getSystemToken",
+    ),
+) =>
+    useQuery<SystemTokenInfo | null>({
         queryKey: QueryKey.systemToken(),
-        queryFn: async (): Promise<SystemTokenInfo | null> => {
-            const configQuery = `
-                    query {
-                        config {
-                            sysTid
-                        }
-                    }
-                `;
-
-            const configRes = await callGraphqlViaPlugin<ConfigResponse>(
-                tokens.authorized.graphql,
-                configQuery,
-            );
-
-            if (!configRes.config?.sysTid) {
-                return null;
-            }
-
-            const sysTid = configRes.config.sysTid;
-            const tokenQuery = `
-                    query {
-                        token(tokenId: "${sysTid}") {
-                            id
-                            precision
-                            symbol
-                        }
-                    }
-                `;
-
-            const tokenRes = await callGraphqlViaPlugin<TokenResponse>(
-                tokens.authorized.graphql,
-                tokenQuery,
-            );
-
-            if (!tokenRes.token) {
-                return null;
-            }
-
-            const idStr = tokenRes.token.id.toString();
-            const symbol = tokenRes.token.symbol?.trim() ?? `ID: ${idStr}`;
-
-            return {
-                id: idStr,
-                symbol,
-                precision: tokenRes.token.precision,
-            };
-        },
+        queryFn: async () =>
+            toSystemTokenInfo(await callPluginFunction(call, [])),
     });
-};

@@ -6,9 +6,9 @@ export const useRemoveStaged = () => {
     const navigate = useNavigate();
     return usePluginMutation<[number]>(
         {
-            intf: "proposer",
+            intf: "staged",
             method: "remove",
-            service: "staged-tx",
+            service: "config",
         },
         {
             error: "Failed removing proposal",

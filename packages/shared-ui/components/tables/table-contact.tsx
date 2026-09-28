@@ -9,14 +9,12 @@ export const TableContact = ({ account }: { account: string }) => {
         data: currentUser,
         isPending: isPendingCurrentUser,
         isError: isErrorCurrentUser,
-        error: errorCurrentUser,
     } = useCurrentUser();
 
     const {
         data: hasProfilesReadPermission,
         isPending: isPendingHasProfilesReadPermission,
         isError: isErrorHasProfilesReadPermission,
-        error: errorHasProfilesReadPermission,
     } = useHasProfilesReadPermission({
         enabled: !!currentUser,
     });
@@ -25,8 +23,13 @@ export const TableContact = ({ account }: { account: string }) => {
         data: contacts,
         isLoading: isLoadingContacts,
         isError: isErrorContacts,
-        error: errorContacts,
-    } = useContacts(currentUser, { enabled: !!hasProfilesReadPermission });
+    } = useContacts(currentUser, {
+        enabled: !!hasProfilesReadPermission,
+    });
+
+    const nickname = contacts?.find(
+        (contact) => contact.account === account,
+    )?.nickname;
 
     if (
         isPendingCurrentUser ||
@@ -46,16 +49,9 @@ export const TableContact = ({ account }: { account: string }) => {
         isErrorHasProfilesReadPermission ||
         isErrorContacts
     ) {
-        console.error("Error fetching current user:", errorCurrentUser);
-        console.error("Error fetching contacts:", errorContacts);
-        console.error(
-            "Error fetching profiles read permission:",
-            errorHasProfilesReadPermission,
-        );
         return <div>{account}</div>;
     }
 
-    const contact = contacts?.find((contact) => contact.account === account);
     return (
         <div className="@lg:h-auto flex h-10 items-center gap-2">
             <Avatar
@@ -63,9 +59,9 @@ export const TableContact = ({ account }: { account: string }) => {
                 className="@lg:h-5 @lg:w-5 h-8 w-8"
                 alt="Contact avatar"
             />
-            {contact?.nickname ? (
+            {nickname ? (
                 <div className="@lg:flex-row @lg:gap-1 flex flex-col">
-                    <div className="font-medium">{contact.nickname}</div>
+                    <div className="font-medium">{nickname}</div>
                     <div className="text-muted-foreground italic">
                         {account}
                     </div>
