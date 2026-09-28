@@ -18,6 +18,12 @@ const AppConfigSchema = z.object({
     description: z.string(),
     isLoginRequired: z.boolean(),
     showLoginLoadingSpinner: z.boolean(),
+    /**
+     * Apps that manage their own scrolling (e.g. two-pane mail/contacts
+     * layouts) are given the full viewport height instead of a padded,
+     * page-scrolling container.
+     */
+    fill: z.boolean().optional(),
     children: z.array(
         z.object({
             path: z.string(),

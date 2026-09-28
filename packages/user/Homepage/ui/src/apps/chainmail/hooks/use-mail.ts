@@ -1,14 +1,7 @@
-import type {
-    DraftMessage,
-    Message,
-    QueryableMailbox,
-    RawMessage,
-} from "../types";
+import type { Message, QueryableMailbox, RawMessage } from "../types";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { atom, useAtom } from "jotai";
 import { useCallback } from "react";
-import { useLocalStorage } from "usehooks-ts";
 import { z } from "zod";
 
 import QueryKey from "@/lib/query-keys";
@@ -16,13 +9,10 @@ import QueryKey from "@/lib/query-keys";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { supervisor } from "@shared/lib/supervisor";
 
-import { zSendMessageSchema } from "../components/compose-dialog";
-import { zMailbox, zRawMessage } from "../types";
+import { zMailbox, zRawMessage, zSendMessageSchema } from "../types";
 
-const composeAtom = atom(false);
-export function useCompose() {
-    return useAtom(composeAtom);
-}
+/** How often mailboxes are re-read so new messages surface in the top bar. */
+const MAILBOX_REFETCH_MS = 15_000;
 
 const transformRawMessagesToMessages = (
     rawMessages: RawMessage[],
@@ -59,27 +49,6 @@ const getIncomingMessages = async (account: string) => {
     return transformRawMessagesToMessages(rawMessages, account);
 };
 
-const incomingMsgAtom = atom<Message["id"]>("");
-export function useIncomingMessages() {
-    const { data: user } = useCurrentUser();
-    const query = useQuery({
-        queryKey: QueryKey.mailbox("inbox", user!),
-        queryFn: () => getIncomingMessages(user!),
-        enabled: Boolean(user),
-    });
-
-    const [selectedMessageId, setSelectedMessageId] = useAtom(incomingMsgAtom);
-    const selectedMessage = query.data?.find(
-        (msg) => msg.id === selectedMessageId,
-    );
-
-    return {
-        query,
-        selectedMessage,
-        setSelectedMessageId,
-    };
-}
-
 const getSentMessages = async (account: string) => {
     const rawMessages = zRawMessage.array().parse(
         await supervisor.functionCall({
@@ -89,73 +58,40 @@ const getSentMessages = async (account: string) => {
             params: [account],
         }),
     );
-
     return transformRawMessagesToMessages(rawMessages, account);
 };
 
-const sentMsgAtom = atom<Message["id"]>("");
+export function useIncomingMessages() {
+    const { data: user } = useCurrentUser();
+    return useQuery({
+        queryKey: QueryKey.mailbox("inbox", user!),
+        queryFn: () => getIncomingMessages(user!),
+        enabled: Boolean(user),
+        refetchInterval: MAILBOX_REFETCH_MS,
+    });
+}
+
 export function useSentMessages() {
     const { data: user } = useCurrentUser();
-    const query = useQuery({
+    return useQuery({
         queryKey: QueryKey.mailbox("sent", user!),
         queryFn: () => getSentMessages(user!),
         enabled: Boolean(user),
+        refetchInterval: MAILBOX_REFETCH_MS,
     });
-
-    const [selectedMessageId, setSelectedMessageId] = useAtom(sentMsgAtom);
-    const selectedMessage = query.data?.find(
-        (msg) => msg.id === selectedMessageId,
-    );
-
-    return {
-        query,
-        selectedMessage,
-        setSelectedMessageId,
-    };
-}
-
-const draftMsgAtom = atom<DraftMessage["id"]>("");
-export function useDraftMessages() {
-    const { data: user } = useCurrentUser();
-
-    const [allDrafts, setDrafts] = useLocalStorage<DraftMessage[]>(
-        "drafts",
-        [],
-    );
-
-    const deleteDraftById = (id: string) => {
-        const remainingDrafts = allDrafts.filter((d) => d.id !== id);
-        setDrafts(remainingDrafts);
-    };
-
-    const userDrafts = allDrafts?.filter((d) => d.from === user);
-
-    const [selectedMessageId, setSelectedMessageId] = useAtom(draftMsgAtom);
-    const selectedMessage = userDrafts?.find(
-        (msg) => msg.id === selectedMessageId,
-    );
-
-    return {
-        allDrafts,
-        userDrafts,
-        setDrafts,
-        deleteDraftById,
-        selectedMessage,
-        setSelectedMessageId,
-    };
 }
 
 export const useInvalidateMailboxQueries = () => {
     const queryClient = useQueryClient();
     const { data: user } = useCurrentUser();
 
-    const all = [
-        zMailbox.Values.inbox,
-        zMailbox.Values.sent,
-    ] as QueryableMailbox[];
-
-    const invalidate = useCallback(
-        (mailboxes = all) => {
+    return useCallback(
+        (
+            mailboxes: QueryableMailbox[] = [
+                zMailbox.Values.inbox,
+                zMailbox.Values.sent,
+            ] as QueryableMailbox[],
+        ) => {
             if (!user) return;
             mailboxes.forEach((mailbox) => {
                 queryClient.invalidateQueries({
@@ -165,8 +101,6 @@ export const useInvalidateMailboxQueries = () => {
         },
         [queryClient, user],
     );
-
-    return invalidate;
 };
 
 export const useSendMessage = () => {

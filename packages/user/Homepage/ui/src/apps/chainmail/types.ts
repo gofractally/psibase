@@ -36,6 +36,12 @@ export const zRawMessage = z.object({
     subject: z.string(),
 });
 
+export const zSendMessageSchema = z.object({
+    to: zAccount,
+    subject: z.string().min(1),
+    message: z.string().min(1),
+});
+
 export type Mailbox = z.infer<typeof zMailbox>;
 export type QueryableMailbox = Exclude<Mailbox, "drafts">;
 export type Message = z.infer<typeof zMessage>;

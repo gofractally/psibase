@@ -1,17 +1,34 @@
-import { Terminal } from "lucide-react";
+import { ExternalLink, Terminal } from "lucide-react";
 
 import { siblingUrl } from "@psibase/common-lib";
 
+import {
+    SidebarMenu,
+    SidebarMenuButton,
+    SidebarMenuItem,
+} from "@shared/shadcn/ui/sidebar";
+
 export const Developers = () => {
     return (
-        <a
-            href={siblingUrl(null, "workshop", null)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-muted-foreground hover:text-primary flex items-center gap-2 p-2 text-sm underline-offset-2 hover:underline"
-        >
-            <Terminal className="size-4" />
-            <span>Developers</span>
-        </a>
+        <SidebarMenu>
+            <SidebarMenuItem>
+                <SidebarMenuButton
+                    asChild
+                    size="sm"
+                    tooltip="Developers"
+                    className="text-muted-foreground"
+                >
+                    <a
+                        href={siblingUrl(null, "workshop", null)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        <Terminal />
+                        <span>Developers</span>
+                        <ExternalLink className="ml-auto !size-3" />
+                    </a>
+                </SidebarMenuButton>
+            </SidebarMenuItem>
+        </SidebarMenu>
     );
 };
