@@ -67,6 +67,24 @@ class TestSetCookie(unittest.TestCase):
                 '__Host-SESSION=plain; Path=/; SameSite=Strict; Secure; Max-Age=60;',
             )
 
+        hostdb_max_age = 400 * 24 * 60 * 60
+        with a.post(
+            ENDPOINT,
+            service='accounts',
+            json={
+                'name': 'HOSTDB-KEY',
+                'value': 'dGVzdC1rZXk',
+                'maxAge': hostdb_max_age,
+                'httpOnly': False,
+            },
+            headers=headers,
+        ) as reply:
+            reply.raise_for_status()
+            self.assertEqual(
+                reply.headers.get('Set-Cookie'),
+                f'__Host-HOSTDB-KEY=dGVzdC1rZXk; Path=/; SameSite=Strict; Secure; Max-Age={hostdb_max_age};',
+            )
+
         with a.post(
             ENDPOINT,
             service='accounts',

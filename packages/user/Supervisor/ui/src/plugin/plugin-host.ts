@@ -5,6 +5,7 @@ import {
     assertTruthy,
 } from "@psibase/common-lib";
 
+import { getClientKeyBytes } from "../client-key";
 import {
     BridgeImports,
     HostInterface,
@@ -266,6 +267,7 @@ export class PluginHost implements HostInterface {
                     this.supervisor.importKey(privateKey),
                 importKeyTransient: (privateKey) =>
                     this.supervisor.importKeyTransient(privateKey),
+                getClientKey: () => getClientKeyBytes(),
             },
             "supervisor:bridge/database": {
                 get: (duration, key) => this.dbGet(duration, key),
