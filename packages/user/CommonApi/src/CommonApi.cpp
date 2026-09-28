@@ -14,17 +14,17 @@ using namespace psibase;
 
 namespace SystemService
 {
-   struct TokenData
+   struct CookieData
    {
-      std::string accessToken;
+      std::string name;
+      std::string value;
+      int         maxAge   = 0;
+      bool        httpOnly = false;
    };
-   PSIO_REFLECT(TokenData, accessToken);
+   PSIO_REFLECT(CookieData, name, value, maxAge, httpOnly);
 
    namespace
    {
-      constexpr auto cookieMaxAge =
-          std::chrono::duration_cast<std::chrono::seconds>(std::chrono::days(30)).count();
-
       template <typename T>
       T extractData(HttpRequest& request)
       {
@@ -35,18 +35,47 @@ namespace SystemService
          return result;
       }
 
-      HttpHeader authCookie(const HttpRequest& req, const std::string& accessToken, int maxAge)
+      bool isValidCookieName(const std::string& name)
       {
-         std::string cookieName = "__Host-SESSION";
+         if (name.empty())
+            return false;
+         for (char c : name)
+         {
+            if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') ||
+                c == '-')
+               continue;
+            return false;
+         }
+         return true;
+      }
+
+      bool isValidCookieValue(const std::string& value)
+      {
+         for (unsigned char c : value)
+         {
+            if (c == ';' || c == ',' || c <= ' ' || c == 127)
+               return false;
+         }
+         return true;
+      }
+
+      HttpHeader setCookieHeader(const std::string& name,
+                                 const std::string& value,
+                                 int                maxAge,
+                                 bool               httpOnly)
+      {
+         std::string cookieName = "__Host-" + name;
 
          std::string cookieAttribs;
          cookieAttribs += "Path=/; ";
-         cookieAttribs += "HttpOnly; ";
          cookieAttribs += "SameSite=Strict; ";
+         cookieAttribs += "Secure; ";
          cookieAttribs += "Max-Age=" + std::to_string(maxAge);
-         cookieAttribs += "; Secure; ";
+         cookieAttribs += "; ";
+         if (httpOnly)
+            cookieAttribs += "HttpOnly; ";
 
-         std::string cookieValue = cookieName + "=" + accessToken + "; " + cookieAttribs;
+         std::string cookieValue = cookieName + "=" + value + "; " + cookieAttribs;
          return HttpHeader{"Set-Cookie", cookieValue};
       }
 
@@ -125,8 +154,7 @@ namespace SystemService
 
       if (request.method == "OPTIONS")
       {
-         if (request.target == "/common/set-auth-cookie" ||
-             request.target == "/common/remove-auth-cookie")
+         if (request.target == "/common/set-cookie")
          {
             auto headers = allowCorsFrom(request, "supervisor"_a);
             headers.push_back(allowCredentials());
@@ -154,24 +182,24 @@ namespace SystemService
                 .headers     = allowCors(),
             };
          }
-         if (request.target == "/common/set-auth-cookie")
+         if (request.target == "/common/set-cookie")
          {
-            auto data = extractData<TokenData>(request);
+            auto data = extractData<CookieData>(request);
 
             auto headers = allowCorsFrom(request, "supervisor"_a);
             headers.push_back(allowCredentials());
-            headers.push_back(authCookie(request, data.accessToken, cookieMaxAge));
 
-            return HttpReply{.status      = HttpStatus::ok,
-                             .contentType = "text/plain",
-                             .body        = {},
-                             .headers     = headers};
-         }
-         if (request.target == "/common/remove-auth-cookie")
-         {
-            auto headers = allowCorsFrom(request, "supervisor"_a);
-            headers.push_back(allowCredentials());
-            headers.push_back(authCookie(request, "", 0));
+            if (!isValidCookieName(data.name) || !isValidCookieValue(data.value) ||
+                data.maxAge < 0)
+            {
+               return HttpReply{.status      = HttpStatus::badRequest,
+                                .contentType = "text/plain",
+                                .body        = {},
+                                .headers     = headers};
+            }
+
+            headers.push_back(
+                setCookieHeader(data.name, data.value, data.maxAge, data.httpOnly));
 
             return HttpReply{.status      = HttpStatus::ok,
                              .contentType = "text/plain",

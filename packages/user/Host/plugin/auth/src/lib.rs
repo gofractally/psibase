@@ -45,11 +45,16 @@ fn post_to_app(app: &str, endpoint: &str, body: String) -> HttpRequest {
     }
 }
 
+const COOKIE_MAX_AGE: u64 = 30 * 24 * 60 * 60;
+
 fn set_active_query_token(query_token: &str, app: &str, user: &str) {
     let req = post_to_app(
         app,
-        "/common/set-auth-cookie",
-        format!("{{\"accessToken\": \"{}\"}}", query_token),
+        "/common/set-cookie",
+        format!(
+            "{{\"name\": \"SESSION\", \"value\": \"{}\", \"maxAge\": {}, \"httpOnly\": true}}",
+            query_token, COOKIE_MAX_AGE
+        ),
     );
     Supervisor::send_request(&req, true).unwrap();
 
@@ -57,7 +62,11 @@ fn set_active_query_token(query_token: &str, app: &str, user: &str) {
 }
 
 fn remove_active_query_token(app: &str, user: &str) {
-    let req = post_to_app(app, "/common/remove-auth-cookie", "{}".to_string());
+    let req = post_to_app(
+        app,
+        "/common/set-cookie",
+        r#"{"name": "SESSION", "value": "", "maxAge": 0, "httpOnly": true}"#.to_string(),
+    );
     Supervisor::send_request(&req, true).unwrap();
 
     Bucket::new(DB, &bucket_id(user)).delete(&&app);
