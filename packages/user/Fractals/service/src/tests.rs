@@ -114,7 +114,7 @@ mod chain {
     use crate::helpers::donation_sub_account;
     use crate::Wrapper;
     use psibase::services::nft::Wrapper as Nfts;
-    use psibase::services::tokens::{BalanceFlags, Quantity, Wrapper as Tokens};
+    use psibase::services::tokens::{BalanceFlags, Decimal, Quantity, Wrapper as Tokens};
     use psibase::*;
 
     const ALICE: AccountNumber = account!("alice");
@@ -173,18 +173,6 @@ mod chain {
             .unwrap();
     }
 
-    fn parse_token_amount(amount: &str) -> u64 {
-        let (whole, frac) = amount.split_once('.').unwrap_or((amount, ""));
-        assert!(frac.len() <= 4, "unexpected token amount {amount}");
-        let scale = 10u64.pow(4 - frac.len() as u32);
-        let frac_value = if frac.is_empty() {
-            0
-        } else {
-            frac.parse::<u64>().unwrap()
-        };
-        whole.parse::<u64>().unwrap() * 10_000 + frac_value * scale
-    }
-
     fn total_earned(chain: &Chain, member: AccountNumber) -> u64 {
         let reply: serde_json::Value = chain
             .graphql(
@@ -197,7 +185,7 @@ mod chain {
         let earned = reply["data"]["member"]["totalEarned"]
             .as_str()
             .unwrap_or_else(|| panic!("missing totalEarned: {reply}"));
-        parse_token_amount(earned)
+        earned.parse::<Decimal>().unwrap().quantity.value
     }
 
     fn drain_stream(chain: &Chain) {
