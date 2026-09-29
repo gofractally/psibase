@@ -119,10 +119,6 @@ mod chain {
 
     const ALICE: AccountNumber = account!("alice");
     const FRACTAL: AccountNumber = account!("testfrac");
-    const LEG: AccountNumber = account!("tlegisla");
-    const JUD: AccountNumber = account!("tjudicia");
-    const EXE: AccountNumber = account!("texecuti");
-    const REC: AccountNumber = account!("trecruit");
 
     fn assert_error(result: ChainEmptyResult, message: &str) {
         let err = result.trace.error.unwrap();
@@ -190,7 +186,7 @@ mod chain {
             .unwrap();
 
         Wrapper::push_from(chain, ALICE)
-            .create_frac(FRACTAL, LEG, JUD, EXE, REC, "Test".into(), "Mission".into())
+            .create_frac(FRACTAL, "Test".into(), "Mission".into())
             .get()
             .unwrap();
         chain.start_block();
