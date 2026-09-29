@@ -4,9 +4,8 @@ mod bindings;
 use bindings::*;
 use exports::credentials::plugin::api::Guest as Api;
 use host::crypto::keyvault as HostCrypto;
-use host::types::types::Pem;
+use host::types::types::{Claim, Pem};
 use transact::plugin::intf as Transact;
-use transact::plugin::types::Claim;
 
 struct Credentials;
 

@@ -28,7 +28,7 @@ export const useImportAccount = () =>
 
             await supervisor.functionCall({
                 service: "accounts",
-                plugin: "plugin",
+                plugin: "prompt",
                 intf: "prompt",
                 method: "importExisting",
                 params: [[validatedCredential]],

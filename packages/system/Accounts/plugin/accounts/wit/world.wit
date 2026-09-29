@@ -1,5 +1,23 @@
 package accounts:plugin;
 
+/// This interface is only callable by the user's auth-service plugin
+interface auth-svc {
+    use host:types/types.{claim, error};
+
+
+    /// An account's auth service may call this to log `account` into the active app.
+    /// If this device is holding an invite to the active app, it will be accepted.
+    ///
+    /// If no valid session token for `(account, app)` yet exists, then this function
+    /// will attempt to mint a new one.
+    ///
+    /// The specified account must be imported on this device before this call.
+    login: func(
+        account: string,
+        claim: option<claim>,
+    ) -> result<_, error>;
+}
+
 /// This interface is only available to the top-level app, or its plugin.
 /// The "top-level" app is the app with which the user is directly interacting.
 interface active-app {

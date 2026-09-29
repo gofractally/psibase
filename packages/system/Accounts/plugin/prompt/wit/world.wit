@@ -1,4 +1,4 @@
-package accounts:plugin;
+package accounts:prompt;
 
 interface prompt {
     use host:types/types.{error, pem};
@@ -9,6 +9,8 @@ interface prompt {
         /// The private key in PEM format used to authorize the account
         key: pem,
     }
+
+    type credential-errors = list<tuple<string, error>>;
 
     /// Returns whether or not an account can currently be created.
     ///
@@ -29,7 +31,7 @@ interface prompt {
     ///   and the error that caused the failure.
     ///
     /// Any credentials that fails validation will not be imported.
-    import-existing: func(credentials: list<credential>) -> result<_, list<tuple<string, error>>>;
+    import-existing: func(credentials: list<credential>) -> result<_, credential-errors>;
 
     /// Creates a new account, returns the private key used to authorize it.
     ///
@@ -47,8 +49,13 @@ interface prompt {
     /// The account is not imported onto this device.
     create-premium: func(account-name: string, max-cost: string) -> result<string, error>;
 
-    /// Will connect the specified account with the active app, if not already
-    ///   connected, and login.
-    /// If there is currently an active invite, calling this will automatically accept it.
-    connect-account: func(account: string);
+    /// Logs `account` into the currently active app.
+    ///
+    /// Resolves the account's auth service and delegates to that service's
+    /// session login. Can only be called by the accounts app.
+    login: func(account: string) -> result<_, error>;
+}
+
+world imports {
+    import prompt;
 }

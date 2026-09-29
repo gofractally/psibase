@@ -6,6 +6,7 @@ use bindings::*;
 mod errors;
 use errors::ErrorType::*;
 use exports::auth_delegate::plugin::api::{Error, Guest as Api};
+use exports::auth_delegate::plugin::session::Guest as Session;
 use exports::transact_hook_user_auth::{Claim, Guest as HookUserAuth, Proof};
 use transact::plugin::intf::add_action_to_transaction;
 
@@ -49,6 +50,12 @@ impl HookUserAuth for AuthDelegate {
         _transaction_hash: Vec<u8>,
     ) -> Result<Option<Proof>, Error> {
         Err(NotYetImplemented("get_proofs"))?
+    }
+}
+
+impl Session for AuthDelegate {
+    fn login(_account_name: String) -> Result<(), Error> {
+        Err(NotYetImplemented("session::login"))?
     }
 }
 

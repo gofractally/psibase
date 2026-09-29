@@ -23,3 +23,4 @@ world = "impl"
 "host:http" = { path = "../../../user/Host/plugin/http/wit/world.wit" }
 "host:types" = { path = "../../../user/Host/plugin/types/wit/world.wit" }
 "transact:plugin" = { path = "../../Transact/plugin/wit/world.wit" }
+"accounts:plugin" = { path = "../../Accounts/plugin/accounts/wit/world.wit" }

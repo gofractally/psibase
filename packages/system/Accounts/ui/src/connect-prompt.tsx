@@ -10,7 +10,7 @@ import { CardContent, CardTitle } from "@shared/shadcn/ui/card";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 import { AccountListItem } from "./components/account-list-item";
-import { useConnectAccount } from "./hooks/use-connect-account";
+import { useLogin } from "./hooks/use-connect-account";
 import { useGetAllAccounts } from "./hooks/use-get-all-accounts";
 import { useRemoveAccount } from "./hooks/use-remove-account";
 
@@ -21,7 +21,7 @@ export const ConnectPrompt = ({ isPrompt }: { isPrompt?: boolean }) => {
     const { data: accounts, isPending, isSuccess, error } = useGetAllAccounts();
 
     // mutations
-    const connectAccountMutation = useConnectAccount();
+    const loginAccountMutation = useLogin();
     const removeAccountMutation = useRemoveAccount();
 
     const accountsList = Array.isArray(accounts) ? accounts : [];
@@ -35,7 +35,7 @@ export const ConnectPrompt = ({ isPrompt }: { isPrompt?: boolean }) => {
     const handleLogin = async (accountName: string) => {
         if (!isPrompt) return;
         try {
-            await connectAccountMutation.mutateAsync(accountName);
+            await loginAccountMutation.mutateAsync(accountName);
             prompt.finished();
         } catch (e) {
             console.error("Login failed");
@@ -63,7 +63,7 @@ export const ConnectPrompt = ({ isPrompt }: { isPrompt?: boolean }) => {
         );
     }
 
-    if (connectAccountMutation.error) {
+    if (loginAccountMutation.error) {
         return (
             <ErrorCard
                 error={

@@ -2,16 +2,16 @@ import { type UseMutationOptions, useMutation } from "@tanstack/react-query";
 
 import { supervisor } from "@shared/lib/supervisor";
 
-export const useConnectAccount = (
+export const useLogin = (
     options: UseMutationOptions<void, Error, string> = {},
 ) => {
     return useMutation({
         mutationFn: async (accountName: string) => {
             await supervisor.functionCall({
                 service: "accounts",
-                plugin: "plugin",
+                plugin: "prompt",
                 intf: "prompt",
-                method: "connectAccount",
+                method: "login",
                 params: [accountName],
             });
         },

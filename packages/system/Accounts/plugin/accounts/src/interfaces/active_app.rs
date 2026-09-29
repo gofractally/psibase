@@ -28,8 +28,9 @@ impl ActiveApp for AccountsPlugin {
         }
 
         AppsTable::new(&app).login(&user);
-        if HostAuth::set_logged_in_user(&user, &app).is_err() {
+        if let Err(e) = HostAuth::set_logged_in_user(&user, &app, None) {
             AppsTable::new(&app).logout();
+            return Err(e);
         }
         Ok(())
     }

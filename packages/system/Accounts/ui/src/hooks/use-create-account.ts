@@ -9,7 +9,7 @@ export const useCreateAccount = (
         mutationFn: async (accountName: string) => {
             return await supervisor.functionCall({
                 service: "accounts",
-                plugin: "plugin",
+                plugin: "prompt",
                 intf: "prompt",
                 method: "createAccount",
                 params: [accountName],

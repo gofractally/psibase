@@ -14,9 +14,9 @@ interface intf {
     /// Returns the corresponding public key in PEM format.
     import-key: func(private-key: pem) -> result<pem, error>;
 
-    /// Imports a PEM-encoded private key into a transient keyvault that
-    /// is automatically cleared at the end of the current transaction
-    /// context. Returns the corresponding public key in PEM format.
+    /// Imports a PEM-encoded private key into a transient keyvault. The key
+    /// is only usable for the current transaction. Returns the corresponding
+    /// public key in PEM format.
     import-key-transient: func(private-key: pem) -> result<pem, error>;
 }
 

@@ -9,15 +9,11 @@ world impl {
     include transact:plugin/imports;
     include permissions:plugin/imports;
     include accounts:query/imports;
-    include auth-sig:plugin/imports;
-    include name-market:plugin/imports;
-    include host:crypto/imports;
-
     import invite:plugin/redemption;
 
     export api;
     export active-app;
+    export auth-svc;
 
-    export prompt;
     export admin;
 }
