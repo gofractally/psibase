@@ -41,6 +41,7 @@ export const Panel = ({
     actions,
     children,
     className,
+    headerClassName,
     bodyClassName,
 }: {
     title?: ReactNode;
@@ -48,6 +49,7 @@ export const Panel = ({
     actions?: ReactNode;
     children: ReactNode;
     className?: string;
+    headerClassName?: string;
     bodyClassName?: string;
 }) => (
     <section
@@ -57,7 +59,12 @@ export const Panel = ({
         )}
     >
         {(title || actions) && (
-            <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b px-4 py-2.5">
+            <header
+                className={cn(
+                    "flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b px-4 py-2.5",
+                    headerClassName,
+                )}
+            >
                 <div className="min-w-0 flex-1 basis-40">
                     {title && (
                         <h2 className="truncate text-sm font-semibold">

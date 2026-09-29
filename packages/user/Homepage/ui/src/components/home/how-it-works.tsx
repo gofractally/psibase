@@ -32,15 +32,15 @@ export const HowItWorks = () => (
     <section aria-labelledby="how-heading">
         <h2
             id="how-heading"
-            className="text-muted-foreground mb-2 text-[11px] font-medium uppercase tracking-wider"
+            className="text-muted-foreground mb-3 text-[11px] font-medium uppercase tracking-wider"
         >
             What comes with your account
         </h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {ITEMS.map(({ icon: Icon, accent, title, body }) => (
                 <div
                     key={title}
-                    className="bg-card/70 relative overflow-hidden rounded-xl border p-4 shadow-sm"
+                    className="bg-card/70 relative overflow-hidden rounded-xl border p-5 shadow-sm"
                 >
                     <span
                         aria-hidden
@@ -57,8 +57,8 @@ export const HowItWorks = () => (
                     >
                         <Icon className="size-4" />
                     </span>
-                    <div className="mt-3 text-sm font-semibold">{title}</div>
-                    <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+                    <div className="mt-4 text-sm font-semibold">{title}</div>
+                    <p className="text-muted-foreground mt-1.5 text-xs leading-relaxed">
                         {body}
                     </p>
                 </div>

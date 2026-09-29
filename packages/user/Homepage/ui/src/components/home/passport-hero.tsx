@@ -34,8 +34,8 @@ export const PassportHero = ({ user }: { user: string }) => {
     const bio = profile?.profile?.bio?.trim();
 
     return (
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center">
-            <div className="flex min-w-0 flex-1 items-center gap-4">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-center">
+            <div className="flex min-w-0 flex-1 items-center gap-5">
                 <button
                     type="button"
                     onClick={() => open("profile")}
@@ -44,7 +44,7 @@ export const PassportHero = ({ user }: { user: string }) => {
                 >
                     <Avatar
                         account={user}
-                        className="bg-card size-20 rounded-2xl border-2 object-cover shadow-md"
+                        className="bg-card size-24 rounded-2xl border-2 object-cover shadow-md"
                         style={{ borderColor: colorFor(user) }}
                         alt=""
                     />
@@ -57,22 +57,22 @@ export const PassportHero = ({ user }: { user: string }) => {
                         {greeting()} · {networkName || "psibase"}
                     </div>
                     {isPending ? (
-                        <Skeleton className="mt-1 h-9 w-56" />
+                        <Skeleton className="mt-1.5 h-9 w-56" />
                     ) : (
                         <h1
-                            className="truncate text-3xl font-semibold tracking-tight"
+                            className="mt-1 truncate text-3xl font-semibold tracking-tight"
                             title={displayName || user}
                         >
                             {displayName || user}
                         </h1>
                     )}
-                    <div className="text-muted-foreground mt-0.5 flex items-center gap-1 font-mono text-xs">
+                    <div className="text-muted-foreground mt-1 flex items-center gap-1 font-mono text-xs">
                         @{user}
                         <CopyIcon value={user} />
                     </div>
                     {bio ? (
                         <p
-                            className="text-muted-foreground mt-1.5 line-clamp-2 max-w-2xl text-sm"
+                            className="text-muted-foreground mt-3 line-clamp-2 max-w-2xl text-sm leading-relaxed"
                             title={bio}
                         >
                             {bio}
@@ -82,7 +82,7 @@ export const PassportHero = ({ user }: { user: string }) => {
                             <button
                                 type="button"
                                 onClick={() => open("profile")}
-                                className="text-muted-foreground hover:text-foreground mt-1.5 text-sm underline-offset-4 hover:underline"
+                                className="text-muted-foreground hover:text-foreground mt-3 text-left text-sm underline-offset-4 hover:underline"
                             >
                                 {displayName
                                     ? "Add a short bio so people know who you are →"
@@ -92,26 +92,21 @@ export const PassportHero = ({ user }: { user: string }) => {
                     )}
                 </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-                <Button asChild size="sm" className="h-8">
+            <div className="flex flex-wrap items-center gap-2.5">
+                <Button asChild>
                     <Link to="/tokens">
-                        <Coins className="size-3.5" />
+                        <Coins className="size-4" />
                         Send tokens
                     </Link>
                 </Button>
-                <Button asChild size="sm" variant="outline" className="h-8">
+                <Button asChild variant="outline">
                     <Link to="/chainmail?new=1">
-                        <SquarePen className="size-3.5" />
+                        <SquarePen className="size-4" />
                         New chat
                     </Link>
                 </Button>
-                <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8"
-                    onClick={() => open("profile")}
-                >
-                    <PencilLine className="size-3.5" />
+                <Button variant="outline" onClick={() => open("profile")}>
+                    <PencilLine className="size-4" />
                     Edit profile
                 </Button>
             </div>
@@ -128,15 +123,15 @@ export const GuestHero = () => {
     const network = networkName || "psibase";
 
     return (
-        <div className="flex flex-col gap-5 py-2 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-6 py-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-2xl">
                 <div className="text-muted-foreground text-[11px] font-medium uppercase tracking-[0.2em]">
                     {network}
                 </div>
-                <h1 className="mt-1 text-3xl font-semibold tracking-tight sm:text-4xl">
+                <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
                     One account for every app on {network}
                 </h1>
-                <p className="text-muted-foreground mt-2 text-sm leading-relaxed sm:text-base">
+                <p className="text-muted-foreground mt-3 text-sm leading-relaxed sm:text-base">
                     Sign up once and use it everywhere. Your profile, tokens,
                     contacts and chats come with you into every app on the
                     network.

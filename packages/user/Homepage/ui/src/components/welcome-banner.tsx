@@ -32,7 +32,7 @@ export const WelcomeBanner = () => {
     return (
         <section
             aria-label={`Welcome to ${network}`}
-            className="relative flex flex-col gap-3 overflow-hidden rounded-xl border bg-[color-mix(in_oklch,var(--brand)_7%,var(--card))] p-4 pr-12 shadow-sm sm:flex-row sm:items-center sm:gap-4"
+            className="relative flex flex-col gap-3 overflow-hidden rounded-xl border bg-[color-mix(in_oklch,var(--brand)_7%,var(--card))] p-5 pr-12 shadow-sm sm:flex-row sm:items-center sm:gap-5"
         >
             <span
                 aria-hidden
@@ -42,8 +42,10 @@ export const WelcomeBanner = () => {
                 <Sparkles className="size-5" />
             </span>
             <div className="relative min-w-0 flex-1">
-                <h2 className="text-sm font-semibold">Welcome to {network}!</h2>
-                <p className="text-muted-foreground mt-0.5 max-w-3xl text-sm leading-relaxed">
+                <h2 className="text-base font-semibold">
+                    Welcome to {network}!
+                </h2>
+                <p className="text-muted-foreground mt-1 max-w-3xl text-sm leading-relaxed">
                     One account works across every app here. Your profile,
                     tokens, contacts and chats come with you wherever you go, so
                     there&apos;s nothing to set up twice. This page is your home
@@ -52,18 +54,12 @@ export const WelcomeBanner = () => {
             </div>
             <div className="relative flex shrink-0 items-center gap-2">
                 {isPending ? null : user ? (
-                    <Button
-                        size="sm"
-                        className="h-8"
-                        onClick={() => open("profile")}
-                    >
+                    <Button onClick={() => open("profile")}>
                         Set up your profile
-                        <ArrowRight className="size-3.5" />
+                        <ArrowRight className="size-4" />
                     </Button>
                 ) : (
                     <Button
-                        size="sm"
-                        className="h-8"
                         disabled={loggingIn}
                         onClick={() =>
                             login({
@@ -72,7 +68,7 @@ export const WelcomeBanner = () => {
                             })
                         }
                     >
-                        <LogIn className="size-3.5" />
+                        <LogIn className="size-4" />
                         Log in to get started
                     </Button>
                 )}
@@ -82,7 +78,7 @@ export const WelcomeBanner = () => {
                 size="icon-sm"
                 aria-label="Dismiss welcome message"
                 onClick={() => setDismissed(true)}
-                className="text-muted-foreground absolute right-2 top-2"
+                className="text-muted-foreground absolute right-3 top-3"
             >
                 <X className="size-4" />
             </Button>

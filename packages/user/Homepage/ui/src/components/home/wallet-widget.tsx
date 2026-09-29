@@ -34,6 +34,7 @@ export const WalletWidget = ({ user }: { user: string }) => {
         <Panel
             title="Wallet"
             description="Tokens you can use anywhere on the network"
+            headerClassName="px-5 py-4"
             actions={
                 <Button
                     asChild
@@ -51,7 +52,7 @@ export const WalletWidget = ({ user }: { user: string }) => {
             {incoming.length > 0 && (
                 <Link
                     to="/tokens/Pending"
-                    className="flex items-center gap-3 border-b bg-emerald-500/10 px-4 py-2.5 text-sm transition-colors hover:bg-emerald-500/15"
+                    className="flex items-center gap-3.5 border-b bg-emerald-500/10 px-5 py-3.5 text-sm transition-colors hover:bg-emerald-500/15"
                 >
                     <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
                         <ArrowDownLeft className="size-3.5" />
@@ -70,7 +71,7 @@ export const WalletWidget = ({ user }: { user: string }) => {
                 </Link>
             )}
             {isPending ? (
-                <div className="flex flex-col gap-2 p-4">
+                <div className="flex flex-col gap-3 p-5">
                     {Array.from({ length: 3 }).map((_, i) => (
                         <Skeleton key={i} className="h-6 w-full" />
                     ))}
@@ -78,6 +79,7 @@ export const WalletWidget = ({ user }: { user: string }) => {
             ) : shown.length === 0 ? (
                 <EmptyState
                     icon={Coins}
+                    className="min-h-40"
                     detail="Tokens you receive land here, and you can use them in any app."
                 >
                     No tokens yet
@@ -89,7 +91,7 @@ export const WalletWidget = ({ user }: { user: string }) => {
                         return (
                             <li
                                 key={t.id}
-                                className="flex items-center gap-3 px-4 py-2"
+                                className="flex items-center gap-3.5 px-5 py-3"
                             >
                                 <span
                                     className="flex size-7 shrink-0 items-center justify-center rounded-full border font-mono text-[10px] font-semibold"
@@ -122,7 +124,7 @@ export const WalletWidget = ({ user }: { user: string }) => {
                         <li>
                             <Link
                                 to="/tokens"
-                                className="text-muted-foreground hover:text-foreground block px-4 py-2 text-xs"
+                                className="text-muted-foreground hover:text-foreground block px-5 py-3 text-xs"
                             >
                                 +{more} more
                             </Link>
