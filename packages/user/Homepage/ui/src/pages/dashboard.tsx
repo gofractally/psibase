@@ -1,4 +1,3 @@
-import { AtAGlance } from "@/components/home/at-a-glance";
 import { EverywhereStats } from "@/components/home/everywhere-stats";
 import { HowItWorks } from "@/components/home/how-it-works";
 import { LatestChats } from "@/components/home/latest-chats";
@@ -36,21 +35,11 @@ const Dashboard = () => {
                     <EverywhereStats user={user} />
                     <div className="grid gap-4 xl:grid-cols-3">
                         <LatestChats className="xl:col-span-2" />
-                        <div className="flex flex-col gap-4">
-                            <WalletWidget user={user} />
-                            <AtAGlance user={user} />
-                        </div>
+                        <WalletWidget user={user} />
                     </div>
                 </>
             ) : (
-                !isPending && (
-                    <>
-                        <HowItWorks />
-                        <div className="grid gap-4 lg:grid-cols-3">
-                            <AtAGlance user={null} />
-                        </div>
-                    </>
-                )
+                !isPending && <HowItWorks />
             )}
         </div>
     );
