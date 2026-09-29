@@ -67,11 +67,15 @@ describe("HostDb negative cache", () => {
         expect(info).toHaveBeenCalledWith(
             `host:db missing key: ${PLAINTEXT_KEY}`,
         );
-        const req = send.mock.calls[0][0];
-        expect(req.uri).not.toContain(PLAINTEXT_KEY);
-        expect(req.headers).toEqual([
-            { key: "Accept", value: "application/octet-stream" },
-        ]);
+        expect(send).toHaveBeenCalledWith(
+            expect.objectContaining({
+                uri: expect.not.stringContaining(PLAINTEXT_KEY),
+                method: "GET",
+                headers: [
+                    { key: "Accept", value: "application/octet-stream" },
+                ],
+            }),
+        );
 
         db.clear();
         expect(db.get(0, HEX_KEY, PLAINTEXT_KEY, send)).toBeNull();
