@@ -71,7 +71,7 @@ pub mod service {
         // we are NOT executing speculatively.
         if (flags & FIRST_AUTH_FLAG) != 0
             && VirtualServer::call().is_billing_enabled()
-            && get_sender() == psibase::services::verify_sig::SERVICE
+            && get_sender() == psibase::services::transact::SERVICE
         {
             VirtualServer::call_as(CRED_SYS).bill_to_sub(credential.id.to_string());
         }
