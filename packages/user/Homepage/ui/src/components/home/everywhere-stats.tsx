@@ -42,7 +42,7 @@ const Tile = ({
 }) => (
     <Link
         to={to}
-        className="bg-card/70 hover:bg-card group relative flex flex-col overflow-hidden rounded-xl border p-4 shadow-sm backdrop-blur transition-colors"
+        className="bg-card/70 hover:bg-card group relative flex flex-col overflow-hidden rounded-xl border p-5 shadow-sm backdrop-blur transition-colors"
     >
         <span
             aria-hidden
@@ -58,11 +58,11 @@ const Tile = ({
                 style={{ color: accent }}
             />
         </span>
-        <FitValue className="mt-1 text-2xl font-semibold tabular-nums tracking-tight">
+        <FitValue className="mt-3 text-2xl font-semibold tabular-nums tracking-tight">
             {value}
         </FitValue>
         {children}
-        <span className="text-muted-foreground mt-0.5 text-xs">{sub}</span>
+        <span className="text-muted-foreground mt-1 text-xs">{sub}</span>
     </Link>
 );
 
@@ -91,7 +91,7 @@ export const EverywhereStats = ({ user }: { user: string }) => {
 
     return (
         <section aria-labelledby="everywhere-heading">
-            <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3">
+            <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                 <h2
                     id="everywhere-heading"
                     className="text-muted-foreground text-[11px] font-medium uppercase tracking-wider"
@@ -103,7 +103,7 @@ export const EverywhereStats = ({ user }: { user: string }) => {
                     your permission), so you never start from scratch.
                 </p>
             </div>
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
                 <Tile
                     to="/tokens"
                     label="Balance"
@@ -164,7 +164,7 @@ export const EverywhereStats = ({ user }: { user: string }) => {
                         <UsageMeter
                             level={credits.level}
                             size="sm"
-                            className="mb-1 mt-1.5"
+                            className="mb-1 mt-2"
                         />
                     )}
                 </Tile>

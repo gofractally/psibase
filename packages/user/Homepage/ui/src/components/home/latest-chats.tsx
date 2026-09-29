@@ -31,6 +31,7 @@ export const LatestChats = ({ className }: { className?: string }) => {
                     : "Pick up where you left off"
             }
             className={className}
+            headerClassName="px-5 py-4"
             actions={
                 <>
                     <Button
@@ -65,9 +66,9 @@ export const LatestChats = ({ className }: { className?: string }) => {
                     {Array.from({ length: 3 }).map((_, i) => (
                         <div
                             key={i}
-                            className="flex items-center gap-3 border-b px-4 py-3 last:border-b-0"
+                            className="flex items-center gap-3.5 border-b px-5 py-3.5 last:border-b-0"
                         >
-                            <Skeleton className="size-9 rounded-full" />
+                            <Skeleton className="size-10 rounded-full" />
                             <div className="flex flex-1 flex-col gap-1.5">
                                 <Skeleton className="h-3.5 w-1/3" />
                                 <Skeleton className="h-3 w-2/3" />
@@ -78,7 +79,7 @@ export const LatestChats = ({ className }: { className?: string }) => {
             ) : shown.length === 0 ? (
                 <EmptyState
                     icon={MessagesSquare}
-                    className="min-h-48"
+                    className="min-h-56"
                     detail="Chats you start here show up in every app that uses Chain mail."
                     action={
                         <Button asChild size="sm" className="h-7 text-xs">
@@ -115,19 +116,19 @@ const ChatRow = ({
         <li>
             <Link
                 to={`/chainmail?with=${encodeURIComponent(peer)}`}
-                className="hover:bg-accent/40 group flex items-center gap-3 px-4 py-2.5 transition-colors"
+                className="hover:bg-accent/40 group flex items-center gap-3.5 px-5 py-3.5 transition-colors"
             >
                 <span className="relative shrink-0">
                     <Avatar
                         account={peer}
-                        className="size-9 border-0 shadow-none"
+                        className="size-10 border-0 shadow-none"
                         alt=""
                     />
                     {unread > 0 && (
                         <span className="ring-card absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-[var(--brand)] ring-2" />
                     )}
                 </span>
-                <span className="flex min-w-0 flex-1 flex-col">
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span className="flex items-baseline gap-2">
                         <span
                             className={cn(
