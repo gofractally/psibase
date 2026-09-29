@@ -114,8 +114,6 @@ export const useConversations = () => {
     return {
         conversations,
         unreadTotal,
-        receivedCount: inbox.data?.length ?? 0,
-        sentCount: sent.data?.length ?? 0,
         isLoading: inbox.isLoading || sent.isLoading,
         isError: inbox.isError || sent.isError,
         error: inbox.error ?? sent.error,

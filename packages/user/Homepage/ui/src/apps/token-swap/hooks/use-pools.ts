@@ -43,11 +43,10 @@ export const PoolsResponseSchema = z.object({
     }),
 });
 
-export const usePools = (refetchInterval = 12000, enabled = true) => {
+export const usePools = (refetchInterval = 12000) => {
     return useQuery<EnrichedPool[]>({
         queryKey: ["pools"],
         refetchInterval,
-        enabled,
         queryFn: async () => {
             const res = await callGraphqlViaPlugin(
                 tokenSwap.authorized.graphql,
