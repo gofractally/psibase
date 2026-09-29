@@ -13,8 +13,9 @@ interface api {
 interface admin {
     use host:types/types.{error};
 
-    /// Logs the user into the specified app and connects them to it
-    login: func(user: string, app: string) -> result<_, error>;
+    /// Logs the user into the specified app and connects them to it.
+    /// `auth-service` signs the login tx on a cache miss.
+    login: func(user: string, app: string, auth-service: string) -> result<_, error>;
 
     /// Logs out the user logged into the specified app
     logout: func(app: string);

@@ -1,0 +1,12 @@
+package transact:query-auth;
+
+interface api {
+    use host:types/types.{error};
+
+    /// Build and sign a packed loginSys transaction. No HTTP.
+    build-query-token-tx: func(app: string, user: string, root-host: string, auth-service: string) -> result<list<u8>, error>;
+}
+
+world imports {
+    import api;
+}

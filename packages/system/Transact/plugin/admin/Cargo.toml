@@ -31,6 +31,7 @@ world = "impl"
 "host:accounts" = { path = "../../../../user/Host/plugin/accounts/wit/world.wit" }
 "permissions:plugin" = { path = "../../../../user/Permissions/plugin/wit/world.wit" }
 "transact:plugin" = { path = "../transact/wit/world.wit" }
+"transact:types" = { path = "../types/wit/world.wit" }
 "virtual-server:plugin" = { path = "../../../VirtualServer/plugin/wit/transact.wit" }
 
 [package.metadata.component.bindings]

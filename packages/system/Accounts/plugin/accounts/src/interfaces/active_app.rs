@@ -16,6 +16,7 @@ impl ActiveApp for AccountsPlugin {
         if account_details.is_none() {
             return Err(InvalidAccountName(user).into());
         }
+        let auth_service = account_details.unwrap().auth_service;
 
         let app = get_assert_top_level_app("login", &vec![])?;
 
@@ -26,7 +27,7 @@ impl ActiveApp for AccountsPlugin {
             }
         }
 
-        HostAccountsAdmin::login(&user, &app)
+        HostAccountsAdmin::login(&user, &app, &auth_service)
     }
 
     fn logout() -> Result<(), Error> {

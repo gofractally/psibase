@@ -42,6 +42,7 @@ interface intf {
     use types.{http-request, http-response, error, plugin-id};
 
     send-request: func(req: http-request, with-credentials: bool) -> result<http-response, error>;
+    get-root-domain: func() -> string;
 }
 
 world imports {

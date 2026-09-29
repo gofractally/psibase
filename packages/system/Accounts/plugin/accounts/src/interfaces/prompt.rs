@@ -145,9 +145,13 @@ impl Prompt for AccountsPlugin {
         );
 
         let app = Client::get_active_app();
+        let auth_service = AccountsQuery::get_account(&account)
+            .expect("Get account failed")
+            .expect("Account not found")
+            .auth_service;
         HostAccountsAdmin::add_connected_app(&account, &app);
 
-        if HostAccountsAdmin::login(&account, &app).is_err() {
+        if HostAccountsAdmin::login(&account, &app, &auth_service).is_err() {
             HostAccountsAdmin::remove_connected_app(&account, &app);
         }
 
