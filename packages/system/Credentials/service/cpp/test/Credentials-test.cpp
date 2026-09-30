@@ -94,5 +94,5 @@ TEST_CASE("Steal resources")
             .bill(bobPub, ServiceMethod{Invite::service, MethodNumber{"createAccount"}}),
         expensiveAction});
    expect(t.pushTransaction(std::move(tx), aliceKeys),
-          "cred-sys has insufficient resource balance");
+          "cred-sys.0 has insufficient resource balance");
 }
