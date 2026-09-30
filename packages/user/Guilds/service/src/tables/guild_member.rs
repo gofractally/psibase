@@ -33,6 +33,7 @@ impl GuildMember {
             is_candidate: false,
             candidacy_eligible_from: now,
             attendance: RollingBits16::new().value(),
+            evaluations_participated: 0,
         }
     }
 
@@ -104,6 +105,11 @@ impl GuildMember {
         // Mark the members attendance by adding a bit to their bitset.
         self.attendance = RollingBits16::from(self.attendance).push(attended).value();
         let pending_level = self.pending_level.take().unwrap();
+
+        // Level 0 is what a missed or failed evaluation leaves in place.
+        if pending_level > 0 {
+            self.evaluations_participated = self.evaluations_participated.saturating_add(1);
+        }
 
         self.score = calculate_ema_u32(
             pending_level as u32 * SCORE_SCALE,

@@ -41,7 +41,7 @@ export const GuildMembers = () => {
     const { data: guild } = useGuild();
     const { data: scores } = useScores(guild?.account);
 
-    const sortedScores = (scores || []).sort(
+    const sortedScores = [...(scores ?? [])].sort(
         (a, b) =>
             new Date(a.createdAt).valueOf() - new Date(b.createdAt).valueOf(),
     );
@@ -64,6 +64,9 @@ export const GuildMembers = () => {
                         <TableRow>
                             <TableHead>Account</TableHead>
                             <TableHead>Reputation</TableHead>
+                            <TableHead className="text-end">
+                                Evaluations
+                            </TableHead>
                             <TableHead className="text-end">
                                 Member since
                             </TableHead>
@@ -90,6 +93,9 @@ export const GuildMembers = () => {
                                         </div>
                                     </TableCell>
                                     <TableCell>{member.score}</TableCell>
+                                    <TableCell className="text-end tabular-nums">
+                                        {member.evaluationsParticipated}
+                                    </TableCell>
                                     <TableCell className="text-end">
                                         {dayjs(member.createdAt).format("ll")}
                                     </TableCell>

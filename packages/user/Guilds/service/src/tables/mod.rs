@@ -71,6 +71,7 @@ pub mod tables {
         pub is_candidate: bool,
         pub candidacy_eligible_from: psibase::TimePointSec,
         pub attendance: u16,
+        pub evaluations_participated: u32,
     }
 
     impl GuildMember {

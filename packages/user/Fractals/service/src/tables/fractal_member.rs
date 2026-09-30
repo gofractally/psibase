@@ -1,7 +1,8 @@
+use psibase::services::tokens::{Decimal, Precision, Quantity};
 use psibase::{AccountNumber, ServiceWrapper, Table};
 
 use crate::{
-    constants::DEFAULT_RECRUITMENT_PPM,
+    constants::{DEFAULT_RECRUITMENT_PPM, TOKEN_PRECISION},
     tables::tables::{
         Fractal, FractalExile, FractalMember, FractalMemberTable, FractalTable, Levy, RewardStream,
     },
@@ -18,6 +19,14 @@ impl FractalMember {
             .get(&self.fractal)
             .unwrap()
     }
+
+    /// Net fractal-token amount credited to this member.
+    pub async fn total_earned(&self) -> Decimal {
+        Decimal::new(
+            self.total_earned,
+            Precision::new(TOKEN_PRECISION).unwrap(),
+        )
+    }
 }
 
 impl FractalMember {
@@ -28,7 +37,20 @@ impl FractalMember {
             account,
             fractal,
             created_at: now,
+            total_earned: 0.into(),
         }
+    }
+
+    pub fn add_earned(&mut self, amount: Quantity) {
+        if amount.value == 0 {
+            return;
+        }
+        self.total_earned = self
+            .total_earned
+            .value
+            .saturating_add(amount.value)
+            .into();
+        self.save();
     }
 
     pub fn get_all(fractal: AccountNumber) -> Vec<Self> {
