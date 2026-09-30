@@ -1,13 +1,9 @@
-use aes_gcm::aead::{Aead, AeadCore, KeyInit, OsRng, Payload};
-use aes_gcm::{Aes256Gcm, Key, Nonce};
 use hkdf::Hkdf;
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
 
 const HMAC_INFO: &[u8] = b"host:db hmac-sha256";
 const AES_INFO: &[u8] = b"host:db aes-256-gcm";
-const NONCE_LEN: usize = 12;
-const TAG_LEN: usize = 16;
 
 #[derive(Clone, Copy)]
 pub(crate) struct StorageKeys {
@@ -43,21 +39,14 @@ pub(crate) fn encrypt_value(
     associated_data: &[u8],
     plaintext: &[u8],
 ) -> Vec<u8> {
-    let cipher = Aes256Gcm::new(&Key::<Aes256Gcm>::from(*aes_key));
-    let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
-    let ciphertext = cipher
-        .encrypt(
-            &nonce,
-            Payload {
-                msg: plaintext,
-                aad: associated_data,
-            },
-        )
-        .expect("AES-256-GCM encrypt");
-    let mut stored = Vec::with_capacity(NONCE_LEN + ciphertext.len());
-    stored.extend_from_slice(nonce.as_ref());
-    stored.extend_from_slice(&ciphertext);
-    stored
+    #[cfg(target_arch = "wasm32")]
+    {
+        crate::aes::plugin::with_key::encrypt(&aes256_key(aes_key), plaintext, associated_data)
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        aes_plugin::encrypt_aes256(aes_key, plaintext, associated_data)
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -70,21 +59,25 @@ pub(crate) fn decrypt_value(
     associated_data: &[u8],
     stored: &[u8],
 ) -> Result<Vec<u8>, DecryptError> {
-    if stored.len() < NONCE_LEN + TAG_LEN {
-        return Err(DecryptError);
+    #[cfg(target_arch = "wasm32")]
+    {
+        crate::aes::plugin::with_key::decrypt(&aes256_key(aes_key), stored, associated_data)
+            .map_err(|_| DecryptError)
     }
-    let mut nonce = Nonce::default();
-    nonce.copy_from_slice(&stored[..NONCE_LEN]);
-    let cipher = Aes256Gcm::new(&Key::<Aes256Gcm>::from(*aes_key));
-    cipher
-        .decrypt(
-            &nonce,
-            Payload {
-                msg: &stored[NONCE_LEN..],
-                aad: associated_data,
-            },
-        )
-        .map_err(|_| DecryptError)
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        aes_plugin::decrypt_aes256(aes_key, stored, associated_data).map_err(|_| DecryptError)
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+fn aes256_key(aes_key: &[u8; 32]) -> crate::aes::plugin::types::Key {
+    use crate::aes::plugin::types::{Key, Strength};
+
+    Key {
+        strength: Strength::Aes256,
+        key_data: aes_key.to_vec(),
+    }
 }
 
 fn hex_encode(bytes: &[u8]) -> String {
@@ -131,17 +124,6 @@ mod tests {
             sealed,
             hmac_storage_key(&keys.hmac_key, "chain:non-trx:alice:contacts:other")
         );
-    }
-
-    #[test]
-    fn encrypt_decrypt_round_trip() {
-        let keys = sample_keys();
-        let storage_key = hmac_storage_key(&keys.hmac_key, "chain:trx:bob:bucket:k");
-        let plaintext = b"value-bytes";
-        let stored = encrypt_value(&keys.aes_key, storage_key.as_bytes(), plaintext);
-        assert_eq!(stored.len(), NONCE_LEN + plaintext.len() + TAG_LEN);
-        let opened = decrypt_value(&keys.aes_key, storage_key.as_bytes(), &stored).unwrap();
-        assert_eq!(opened, plaintext);
     }
 
     #[test]

@@ -6,12 +6,14 @@ edition.workspace = true
 [dependencies]
 wit-bindgen-rt.workspace = true
 psibase.workspace = true
-aes-gcm = "0.10.3"
 hkdf = "0.12"
 hmac = "0.12"
 sha2 = "0.10"
 regex = "1.0"
 psibase-plugin-workspace-hack.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+aes_plugin = { package = "aes", path = "../../../Aes/plugin" }
 
 [lib]
 crate-type = ["cdylib"]
@@ -26,3 +28,4 @@ world = "impl"
 "supervisor:bridge" = { path = "./wit/deps/supervisor.wit" }
 "host:types" = { path = "../types/wit/world.wit" }
 "host:client" = { path = "../client/wit/world.wit" }
+"aes:plugin" = { path = "../../../Aes/plugin/wit/world.wit" }

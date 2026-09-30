@@ -1406,7 +1406,7 @@ dependencies = [
 name = "host-db"
 version = "0.29.0"
 dependencies = [
- "aes-gcm",
+ "aes 0.29.0",
  "hkdf",
  "hmac",
  "psibase",
