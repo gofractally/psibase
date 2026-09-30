@@ -33,7 +33,7 @@ export const useSystemToken = () =>
         queryKey: QueryKey.systemToken(),
         queryFn: async () =>
             toSystemTokenInfo(
-                await callPluginFunction(accounts.tokens.getSystemToken, []),
+                await callPluginFunction(accounts.prompt.getSystemToken, []),
             ),
     });
 
@@ -48,7 +48,7 @@ export const useUserTokenBalances = (
         queryKey: QueryKey.userTokenBalances(username),
         queryFn: async (): Promise<UserTokenBalance[]> => {
             const nodes = await callPluginFunction(
-                accounts.tokens.getUserBalances,
+                accounts.prompt.getUserBalances,
                 [zAccount.parse(username)],
             );
             return toUserTokenBalances(nodes);
@@ -62,7 +62,7 @@ export const useAccountMarkets = (options?: UseAccountMarketsOptions) =>
         queryKey: QueryKey.nameMarketsOverview(),
         queryFn: async (): Promise<AccountMarketOverviewRow[]> => {
             const overview = await callPluginFunction(
-                accounts.nameMarket.getMarketsOverview,
+                accounts.prompt.getMarketsOverview,
                 [],
             );
             return buildAccountMarketOverviewRows(
@@ -75,4 +75,4 @@ export const useAccountMarkets = (options?: UseAccountMarketsOptions) =>
     });
 
 export const useCanBuyAccount = (options?: { enabled?: boolean }) =>
-    useCanBuyAccountShared(accounts.nameMarket.canCreateAccount, options);
+    useCanBuyAccountShared(accounts.prompt.nameMarketCanCreateAccount, options);

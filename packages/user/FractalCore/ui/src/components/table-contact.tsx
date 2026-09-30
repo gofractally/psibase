@@ -16,7 +16,7 @@ export const TableContact = ({ account }: { account: string }) => {
         isPending: isPendingHasProfilesReadPermission,
         isError: isErrorHasProfilesReadPermission,
     } = useHasProfilesReadPermission(
-        fractalCorePlugin.contacts.hasReadPermission,
+        fractalCorePlugin.embedded.canReadContacts,
         {
             enabled: !!currentUser,
         },
@@ -26,7 +26,7 @@ export const TableContact = ({ account }: { account: string }) => {
         data: contacts,
         isLoading: isLoadingContacts,
         isError: isErrorContacts,
-    } = useContacts(fractalCorePlugin.contacts.get, currentUser, {
+    } = useContacts(fractalCorePlugin.embedded.getContacts, currentUser, {
         enabled: !!hasProfilesReadPermission,
     });
 

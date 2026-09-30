@@ -11,13 +11,13 @@ export const ShowContactsButton = ({
 }) => {
     const { data: currentUser } = useCurrentUser();
     const { data: hasProfilesReadPermission } = useHasProfilesReadPermission(
-        fractalCorePlugin.contacts.hasReadPermission,
+        fractalCorePlugin.embedded.canReadContacts,
         {
             enabled: !!currentUser,
         },
     );
     const { refetch: prompt } = useContacts(
-        fractalCorePlugin.contacts.get,
+        fractalCorePlugin.embedded.getContacts,
         currentUser,
         { enabled: false },
         returnPath ? { enabled: true, returnPath } : undefined,
