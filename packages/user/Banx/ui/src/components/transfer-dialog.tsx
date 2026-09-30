@@ -11,7 +11,12 @@ import {
     usePayInvoice,
     useQuotePath,
 } from "@/hooks/use-banx-mutations";
-import { amountPlaceholder, displayAmount } from "@/lib/amount";
+import {
+    amountPlaceholder,
+    displayAmount,
+    formatRawAmount,
+    humanToRaw,
+} from "@/lib/amount";
 import { amountFieldValidator, useAppForm } from "@/lib/form";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
@@ -37,14 +42,48 @@ type Hop = { account: string; assetId: number | undefined };
 type QuoteSummary = {
     amountIn: string;
     amountOut: string;
-    exactOut: boolean;
     hops: PathHopQuote[];
 };
+
+function amountUnit(symbol: string | undefined) {
+    if (!symbol) return undefined;
+    return (
+        <span className="text-foreground flex h-full shrink-0 items-center border-l px-3 text-sm">
+            {symbol}
+        </span>
+    );
+}
 
 function feeIsPositive(fee: string | undefined): boolean {
     if (!fee) return false;
     const n = Number(fee);
     return Number.isFinite(n) ? n > 0 : displayAmount(fee) !== "0";
+}
+
+/** Caption under the amount. The typed amount is what the payee receives. */
+function transferCostNote(
+    quote: QuoteSummary,
+    fromAsset: number | undefined,
+    toAsset: number | undefined,
+    symbolOf: (id: number) => string,
+    precisionOf: (id: number) => number,
+): string | null {
+    if (fromAsset === undefined || toAsset === undefined) return null;
+    const send = `${displayAmount(quote.amountIn)} ${symbolOf(fromAsset)}`;
+    if (fromAsset !== toAsset) {
+        const charged = quote.hops.some(
+            (h) => feeIsPositive(h.hopFee) || feeIsPositive(h.fxFee),
+        );
+        return charged
+            ? `Fee + conversion · you send ${send}`
+            : `Conversion · you send ${send}`;
+    }
+    const precision = precisionOf(fromAsset);
+    const extra =
+        humanToRaw(quote.amountIn, precision) -
+        humanToRaw(quote.amountOut, precision);
+    if (extra <= 0n) return null;
+    return `Fee ${formatRawAmount(extra.toString(), precision)} ${symbolOf(fromAsset)}`;
 }
 
 export type TransferPrefill = {
@@ -86,7 +125,6 @@ type FindValues = {
     toAsset: number | undefined;
     maxHops: string;
     amount: string;
-    feeMode: "send" | "receive";
 };
 
 function findQuoteKey(user: string, v: FindValues): string {
@@ -97,7 +135,6 @@ function findQuoteKey(user: string, v: FindValues): string {
         v.toAsset ?? "",
         v.amount.trim(),
         v.maxHops.trim() || "6",
-        v.feeMode,
     ].join("|");
 }
 
@@ -184,14 +221,19 @@ export function TransferDialog({
     open,
     onOpenChange,
     prefill,
+    defaultAsset,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     prefill?: TransferPrefill | null;
+    /** Accounts passes the selected currency. That locks From, which is not shown. To defaults to it and is edited under Advanced. */
+    defaultAsset?: number;
 }) {
     const { data: user } = useCurrentUser();
     const { assets, byId, precisionOf, symbolOf, isSuccess: assetsReady } =
         useAssetMap();
+    // Present only on the accounts page, where the header already chose the currency.
+    const lockedFrom = parseAssetId(defaultAsset, assets);
     const pathPay = usePathPay();
     const payInvoice = usePayInvoice();
     const quotePath = useQuotePath();
@@ -227,14 +269,6 @@ export function TransferDialog({
             toAsset: undefined as number | undefined,
             maxHops: "6",
             amount: prefill?.amount ?? "1",
-            /**
-             * Fee mode:
-             * - `send`  = exact-in: amount is what you send (payee covers fees)
-             * - `receive` = exact-out: amount is what payee gets (you cover fees)
-             */
-            feeMode: (prefill?.requestId
-                ? "receive"
-                : "send") as "send" | "receive",
         },
         onSubmit: async ({ value }) => {
             if (!canFindPath(user, value)) return;
@@ -249,20 +283,24 @@ export function TransferDialog({
             quotingKeyRef.current = key;
             const seq = ++quoteSeq.current;
             const hopsN = Math.min(12, Math.max(1, Number(value.maxHops) || 6));
-            // `receive` ⇒ you cover fees (exact-out). `send` ⇒ payee covers (exact-in).
-            const exactOut = value.feeMode === "receive";
-            const typedAmount = value.amount.trim();
+            rememberQuotedKey(null);
+            rememberFailedKey(null);
+            setQuoteError(null);
+            setQuote(null);
+            execForm.setFieldValue("hops", [
+                { account: "", assetId: undefined },
+            ]);
             try {
                 await new Promise<void>((resolve, reject) => {
                     quotePath.mutate(
                         {
                             fromAccount: user!,
                             toAccount: value.payee.trim(),
-                            amount: typedAmount,
+                            amount: value.amount.trim(),
                             fromAsset: value.fromAsset!,
                             toAsset: value.toAsset!,
                             maxHops: hopsN,
-                            exactOut,
+                            exactOut: true,
                         },
                         {
                             onSuccess: (q) => {
@@ -279,23 +317,17 @@ export function TransferDialog({
                                             | undefined,
                                     })),
                                 );
-                                execForm.setFieldValue(
-                                    "amount",
-                                    exactOut ? q.amountIn : typedAmount,
-                                );
+                                execForm.setFieldValue("amount", q.amountIn);
                                 execForm.setFieldValue(
                                     "minReturn",
-                                    exactOut ? q.minReturn : q.amountOut,
+                                    q.minReturn,
                                 );
                                 rememberQuotedKey(key);
                                 rememberFailedKey(null);
                                 setQuoteError(null);
                                 setQuote({
-                                    amountIn: exactOut
-                                        ? q.amountIn
-                                        : typedAmount,
+                                    amountIn: q.amountIn,
                                     amountOut: q.amountOut,
-                                    exactOut,
                                     hops: q.hops,
                                 });
                                 resolve();
@@ -306,6 +338,11 @@ export function TransferDialog({
                                     rememberFailedKey(key);
                                     setQuote(null);
                                     setQuoteError(e.message);
+                                    execForm.setFieldValue("hops", [
+                                        { account: "", assetId: undefined },
+                                    ]);
+                                    execForm.setFieldValue("amount", "");
+                                    execForm.setFieldValue("minReturn", "");
                                 }
                                 reject(e);
                             },
@@ -397,9 +434,14 @@ export function TransferDialog({
         const payee = prefill?.payee;
         const amount = prefill?.amount;
         const toAsset =
-            parseAssetId(prefill?.toAsset, assets) ?? defaultAssetId(assets);
+            parseAssetId(prefill?.toAsset, assets) ??
+            lockedFrom ??
+            defaultAssetId(assets);
+        // A set page currency wins over an invoice's from-asset. To still follows the invoice.
         const fromAsset =
-            parseAssetId(prefill?.fromAsset, assets) ?? toAsset;
+            lockedFrom ??
+            parseAssetId(prefill?.fromAsset, assets) ??
+            toAsset;
         findForm.setFieldValue("payee", payee?.trim() ?? "");
         findForm.setFieldValue("amount", amount ?? "1");
         if (amount) {
@@ -412,7 +454,6 @@ export function TransferDialog({
         if (fromAsset !== undefined) {
             findForm.setFieldValue("fromAsset", fromAsset);
         }
-        findForm.setFieldValue("feeMode", requestId ? "receive" : "send");
         rememberQuotedKey(null);
         rememberFailedKey(null);
         setQuoteError(null);
@@ -422,7 +463,7 @@ export function TransferDialog({
         quotingKeyRef.current = null;
         quoteSeq.current += 1;
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [open, prefill, assetsReady, assets, requestId]);
+    }, [open, prefill, assetsReady, assets, requestId, defaultAsset, lockedFrom]);
 
     const addHop = () => {
         const hops = execForm.state.values.hops;
@@ -431,7 +472,10 @@ export function TransferDialog({
             ...hops,
             {
                 account: "",
-                assetId: prevAsset ?? defaultAssetId(assets),
+                assetId:
+                    prevAsset ??
+                    findForm.state.values.fromAsset ??
+                    defaultAssetId(assets),
             },
         ]);
         // Hop list no longer matches the last quote fee breakdown.
@@ -473,6 +517,16 @@ export function TransferDialog({
     const findNow = () => {
         void findForm.handleSubmit().catch(() => undefined);
     };
+
+    const confirmNote = quote
+        ? transferCostNote(
+              quote,
+              findForm.state.values.fromAsset,
+              findForm.state.values.toAsset,
+              symbolOf,
+              precisionOf,
+          )
+        : null;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -520,108 +574,49 @@ export function TransferDialog({
                             />
                         )}
                     />
-                    <div className="grid gap-3 sm:grid-cols-2">
-                        <findForm.Field
-                            name="fromAsset"
-                            children={(field) => (
-                                <AssetField
-                                    label="From asset"
-                                    assets={assets}
-                                    value={field.state.value}
-                                    onChange={(id) => field.handleChange(id)}
-                                />
-                            )}
-                        />
-                        <findForm.Field
-                            name="toAsset"
-                            children={(field) => (
-                                <AssetField
-                                    label="To asset"
-                                    assets={assets}
-                                    value={field.state.value}
-                                    onChange={(id) => field.handleChange(id)}
-                                />
-                            )}
-                        />
-                    </div>
-                    <findForm.Subscribe
-                        selector={(s) => s.values.feeMode}
-                        children={(feeMode) => (
-                            <div className="grid gap-2">
-                                <p className="text-sm font-medium">
-                                    Amount means
-                                </p>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        variant={
-                                            feeMode === "send"
-                                                ? "default"
-                                                : "outline"
+                    {lockedFrom === undefined ? (
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            <findForm.Field
+                                name="fromAsset"
+                                children={(field) => (
+                                    <AssetField
+                                        label="From asset"
+                                        assets={assets}
+                                        value={field.state.value}
+                                        onChange={(id) =>
+                                            field.handleChange(id)
                                         }
-                                        onClick={() => {
-                                            findForm.setFieldValue(
-                                                "feeMode",
-                                                "send",
-                                            );
-                                            rememberQuotedKey(null);
-                                            rememberFailedKey(null);
-                                            setQuoteError(null);
-                                            setQuote(null);
-                                        }}
-                                    >
-                                        You send
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        variant={
-                                            feeMode === "receive"
-                                                ? "default"
-                                                : "outline"
+                                    />
+                                )}
+                            />
+                            <findForm.Field
+                                name="toAsset"
+                                children={(field) => (
+                                    <AssetField
+                                        label="To asset"
+                                        assets={assets}
+                                        value={field.state.value}
+                                        onChange={(id) =>
+                                            field.handleChange(id)
                                         }
-                                        onClick={() => {
-                                            findForm.setFieldValue(
-                                                "feeMode",
-                                                "receive",
-                                            );
-                                            rememberQuotedKey(null);
-                                            rememberFailedKey(null);
-                                            setQuoteError(null);
-                                            setQuote(null);
-                                        }}
-                                    >
-                                        Payee receives
-                                    </Button>
-                                </div>
-                                <p className="text-muted-foreground text-xs">
-                                    {feeMode === "receive"
-                                        ? "You cover hop fees — amount is what the payee gets; quote finds how much you send."
-                                        : "Payee covers hop fees — amount is what you send; they receive less after fees."}
-                                </p>
-                            </div>
-                        )}
-                    />
+                                    />
+                                )}
+                            />
+                        </div>
+                    ) : null}
                     <findForm.Subscribe
-                        selector={(s) => ({
-                            fromAsset: s.values.fromAsset,
-                            toAsset: s.values.toAsset,
-                            feeMode: s.values.feeMode,
-                        })}
-                        children={({ fromAsset, toAsset, feeMode }) => {
-                            const amountAsset =
-                                feeMode === "receive" ? toAsset : fromAsset;
+                        selector={(s) => s.values}
+                        children={(values) => {
+                            const amountAsset = values.toAsset;
                             const known =
                                 amountAsset !== undefined &&
                                 byId.has(amountAsset);
                             const precision = known
                                 ? precisionOf(amountAsset)
                                 : 0;
-                            const amountLabel =
-                                feeMode === "receive"
-                                    ? "Payee receives"
-                                    : "You send";
+                            const amountSymbol = known
+                                ? symbolOf(amountAsset)
+                                : undefined;
                             const amountValidators = known
                                 ? {
                                       onChange: amountFieldValidator(
@@ -640,104 +635,43 @@ export function TransferDialog({
                                       ),
                                   }
                                 : undefined;
+                            const note =
+                                user &&
+                                quote &&
+                                quotedKey === findQuoteKey(user, values)
+                                    ? transferCostNote(
+                                          quote,
+                                          values.fromAsset,
+                                          values.toAsset,
+                                          symbolOf,
+                                          precisionOf,
+                                      )
+                                    : null;
                             return (
-                                <findForm.AppField
-                                    name="amount"
-                                    validators={amountValidators}
-                                    listeners={{
-                                        onBlur: () => findNow(),
-                                    }}
-                                    children={(field) => (
-                                        <field.TextField
-                                            label={amountLabel}
-                                            inputMode="decimal"
-                                            placeholder={amountPlaceholder(
-                                                precision,
-                                            )}
-                                        />
-                                    )}
-                                />
-                            );
-                        }}
-                    />
-                    <findForm.Subscribe
-                        selector={(s) => ({
-                            fromAsset: s.values.fromAsset,
-                            toAsset: s.values.toAsset,
-                        })}
-                        children={({ fromAsset, toAsset }) => {
-                            if (!quote && !quotePath.isPending) return null;
-                            const feeParts = quote
-                                ? quote.hops.flatMap((h, i) => {
-                                      const parts: string[] = [];
-                                      if (feeIsPositive(h.hopFee)) {
-                                          parts.push(
-                                              `hop ${i + 1}: ${displayAmount(h.hopFee)} ${symbolOf(h.assetId)}`,
-                                          );
-                                      }
-                                      if (
-                                          feeIsPositive(h.fxFee) &&
-                                          h.fxFromAsset !== undefined
-                                      ) {
-                                          parts.push(
-                                              `FX→hop ${i + 1}: ${displayAmount(h.fxFee)} ${symbolOf(h.fxFromAsset)}`,
-                                          );
-                                      }
-                                      return parts;
-                                  })
-                                : [];
-                            return (
-                                <div className="text-muted-foreground space-y-0.5 text-sm font-mono">
-                                    {quote ? (
-                                        <>
-                                            <p>
-                                                {quote.exactOut ? (
-                                                    <>
-                                                        You send:{" "}
-                                                        {displayAmount(
-                                                            quote.amountIn,
-                                                        )}
-                                                        {fromAsset !==
-                                                        undefined
-                                                            ? ` ${symbolOf(fromAsset)}`
-                                                            : ""}
-                                                        {" · "}
-                                                        Payee gets ≥{" "}
-                                                        {displayAmount(
-                                                            quote.amountOut,
-                                                        )}
-                                                        {toAsset !== undefined
-                                                            ? ` ${symbolOf(toAsset)}`
-                                                            : ""}
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        You send:{" "}
-                                                        {displayAmount(
-                                                            quote.amountIn,
-                                                        )}
-                                                        {fromAsset !==
-                                                        undefined
-                                                            ? ` ${symbolOf(fromAsset)}`
-                                                            : ""}
-                                                        {" · "}
-                                                        Est. out:{" "}
-                                                        {displayAmount(
-                                                            quote.amountOut,
-                                                        )}
-                                                        {toAsset !== undefined
-                                                            ? ` ${symbolOf(toAsset)}`
-                                                            : ""}
-                                                    </>
+                                <div className="grid gap-2">
+                                    <findForm.AppField
+                                        name="amount"
+                                        validators={amountValidators}
+                                        listeners={{
+                                            onBlur: () => findNow(),
+                                        }}
+                                        children={(field) => (
+                                            <field.TextField
+                                                label="Amount"
+                                                inputMode="decimal"
+                                                placeholder={amountPlaceholder(
+                                                    precision,
                                                 )}
-                                            </p>
-                                            <p className="text-xs">
-                                                Expected fees:{" "}
-                                                {feeParts.length > 0
-                                                    ? feeParts.join(" · ")
-                                                    : "none"}
-                                            </p>
-                                        </>
+                                                endContent={amountUnit(
+                                                    amountSymbol,
+                                                )}
+                                            />
+                                        )}
+                                    />
+                                    {note ? (
+                                        <p className="text-muted-foreground text-sm">
+                                            {note}
+                                        </p>
                                     ) : null}
                                 </div>
                             );
@@ -825,6 +759,19 @@ export function TransferDialog({
                     }}
                     className="grid gap-4"
                 >
+                {lockedFrom !== undefined ? (
+                    <findForm.Field
+                        name="toAsset"
+                        children={(field) => (
+                            <AssetField
+                                label="To asset"
+                                assets={assets}
+                                value={field.state.value}
+                                onChange={(id) => field.handleChange(id)}
+                            />
+                        )}
+                    />
+                ) : null}
                 <findForm.AppField
                     name="maxHops"
                     listeners={{
@@ -976,66 +923,92 @@ export function TransferDialog({
                             : "grid gap-2 sm:grid-cols-2 sm:gap-4"
                     }
                 >
-                    <execForm.Subscribe
-                        selector={(s) => s.values.hops[0]?.assetId}
-                        children={(firstAsset) => {
-                            const known =
-                                firstAsset !== undefined &&
-                                byId.has(firstAsset);
-                            const precision = known
-                                ? precisionOf(firstAsset)
-                                : 0;
-                            const amountValidators = known
-                                ? {
-                                      onChange: amountFieldValidator(
-                                          precision,
-                                          {
-                                              allowEmpty: true,
-                                              allowZero: false,
-                                          },
-                                      ),
-                                      onSubmit: amountFieldValidator(
-                                          precision,
-                                          {
-                                              allowEmpty: true,
-                                              allowZero: false,
-                                          },
-                                      ),
-                                  }
-                                : undefined;
-                            return (
-                                <execForm.AppField
-                                    name="amount"
-                                    validators={amountValidators}
-                                    children={(field) => (
-                                        <field.TextField
-                                            label={
-                                                requestId
-                                                    ? "Max spend"
-                                                    : "You send"
-                                            }
-                                            inputMode="decimal"
-                                            placeholder={amountPlaceholder(
-                                                precision,
+                    <findForm.Subscribe
+                        selector={(s) => s.values.fromAsset}
+                        children={(fromAsset) => (
+                            <execForm.Subscribe
+                                selector={(s) => s.values.hops[0]}
+                                children={(firstHop) => {
+                                    const hopChosen =
+                                        !!firstHop?.account.trim() &&
+                                        firstHop.assetId !== undefined;
+                                    const sendAsset = hopChosen
+                                        ? firstHop.assetId
+                                        : fromAsset;
+                                    const known =
+                                        sendAsset !== undefined &&
+                                        byId.has(sendAsset);
+                                    const precision = known
+                                        ? precisionOf(sendAsset)
+                                        : 0;
+                                    const amountValidators = known
+                                        ? {
+                                              onChange: amountFieldValidator(
+                                                  precision,
+                                                  {
+                                                      allowEmpty: true,
+                                                      allowZero: false,
+                                                  },
+                                              ),
+                                              onSubmit: amountFieldValidator(
+                                                  precision,
+                                                  {
+                                                      allowEmpty: true,
+                                                      allowZero: false,
+                                                  },
+                                              ),
+                                          }
+                                        : undefined;
+                                    return (
+                                        <execForm.AppField
+                                            name="amount"
+                                            validators={amountValidators}
+                                            children={(field) => (
+                                                <field.TextField
+                                                    label={
+                                                        requestId
+                                                            ? "Max spend"
+                                                            : "You send"
+                                                    }
+                                                    inputMode="decimal"
+                                                    placeholder={amountPlaceholder(
+                                                        precision,
+                                                    )}
+                                                    endContent={amountUnit(
+                                                        known
+                                                            ? symbolOf(
+                                                                  sendAsset,
+                                                              )
+                                                            : undefined,
+                                                    )}
+                                                />
                                             )}
                                         />
-                                    )}
-                                />
-                            );
-                        }}
+                                    );
+                                }}
+                            />
+                        )}
                     />
                     {requestId ? null : (
+                        <findForm.Subscribe
+                            selector={(s) => s.values.toAsset}
+                            children={(toAsset) => (
                         <execForm.Subscribe
                             selector={(s) =>
                                 s.values.hops[s.values.hops.length - 1]
-                                    ?.assetId
                             }
-                            children={(lastAsset) => {
+                            children={(lastHop) => {
+                                const hopChosen =
+                                    !!lastHop?.account.trim() &&
+                                    lastHop.assetId !== undefined;
+                                const receiveAsset = hopChosen
+                                    ? lastHop.assetId
+                                    : toAsset;
                                 const known =
-                                    lastAsset !== undefined &&
-                                    byId.has(lastAsset);
+                                    receiveAsset !== undefined &&
+                                    byId.has(receiveAsset);
                                 const precision = known
-                                    ? precisionOf(lastAsset)
+                                    ? precisionOf(receiveAsset)
                                     : 0;
                                 const minValidators = known
                                     ? {
@@ -1066,11 +1039,20 @@ export function TransferDialog({
                                                 placeholder={amountPlaceholder(
                                                     precision,
                                                 )}
+                                                endContent={amountUnit(
+                                                    known
+                                                        ? symbolOf(
+                                                              receiveAsset,
+                                                          )
+                                                        : undefined,
+                                                )}
                                             />
                                         )}
                                     />
                                 );
                             }}
+                        />
+                            )}
                         />
                     )}
                 </div>
@@ -1107,6 +1089,7 @@ export function TransferDialog({
                                             ? ` ${symbolOf(findForm.state.values.toAsset)}`
                                             : ""}
                                         .
+                                        {confirmNote ? ` ${confirmNote}.` : ""}
                                     </>
                                 ) : (
                                     "Review the path, then confirm."

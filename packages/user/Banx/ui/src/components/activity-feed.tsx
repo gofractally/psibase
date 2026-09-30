@@ -8,6 +8,7 @@ import {
     activityMatches,
     describeEvent,
     eventKey,
+    eventTouchesAsset,
     formatWhen,
     kindLabel,
     type ActivityFilter,
@@ -38,8 +39,11 @@ const FILTERS: { id: ActivityFilter; label: string }[] = [
 
 export function ActivityFeed({
     counterparty,
+    assetId,
 }: {
     counterparty?: string;
+    /** When set, only events in this currency (including FX that touches it). */
+    assetId?: number;
 } = {}) {
     const { data: user } = useCurrentUser();
     const { symbolOf, precisionOf } = useAssetMap();
@@ -53,9 +57,18 @@ export function ActivityFeed({
     const seenKey = useRef<string | null>(null);
 
     const rows = useMemo(
-        () => events.filter((e) => activityMatches(e.kind, filter)),
-        [events, filter],
+        () =>
+            events.filter(
+                (e) =>
+                    activityMatches(e.kind, filter) &&
+                    (assetId === undefined || eventTouchesAsset(e, assetId)),
+            ),
+        [events, filter, assetId],
     );
+    const currencyEmpty =
+        assetId !== undefined &&
+        events.length > 0 &&
+        !events.some((e) => eventTouchesAsset(e, assetId));
 
     useEffect(() => {
         if (counterparty || !user || events.length === 0) return;
@@ -104,7 +117,9 @@ export function ActivityFeed({
                         ? counterparty
                             ? "No activity with this account yet."
                             : "No activity yet. Path pays, invoices, booked expenses, and claim transfers show up here."
-                        : "Nothing in this filter."}
+                        : currencyEmpty
+                          ? "Nothing in this currency yet."
+                          : "Nothing in this filter."}
                 </p>
             ) : (
                 <>

@@ -1,7 +1,6 @@
 import {
     ArrowLeftRight,
     Banknote,
-    Coins,
     Contact,
     Inbox,
     ScrollText,
@@ -29,7 +28,6 @@ const items: {
     { to: "/invites", label: "Invites", icon: UserPlus },
     { to: "/cash", label: "Cash", icon: Banknote },
     { to: "/policies", label: "Policies", icon: ArrowLeftRight },
-    { to: "/assets", label: "Assets", icon: Coins },
 ];
 
 export function NavMain() {

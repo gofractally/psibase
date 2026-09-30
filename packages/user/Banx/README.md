@@ -183,7 +183,8 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 - `/requests` — invoices and please-book
 - `/cash` — Tokens cash window: post quotes, fund/withdraw vault, cash in/out
 - `/policies` — path-forward offers, buy-claim offers, and currency policies
-- `/assets` — registered assets; add a new one
+
+New assets are registered from the currency picker on Accounts. `/assets` redirects there.
 
 `/obligations` and `/history` redirect to `/accounts`.
 

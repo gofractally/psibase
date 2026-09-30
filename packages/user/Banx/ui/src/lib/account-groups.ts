@@ -95,6 +95,42 @@ export function filterGroups(
     return groups.filter((g) => !isFacilityOnly(g));
 }
 
+/** One currency. `undefined` leaves the list unscoped. */
+export function groupsInAsset(
+    groups: GroupedAccount[],
+    assetId: number | undefined,
+): GroupedAccount[] {
+    if (assetId === undefined) return groups;
+    return groups.filter((g) => g.assetId === assetId);
+}
+
+/** Claim balances only. Undrawn facilities stay at zero and do not move the net. */
+export function positionTotals(
+    savings: GroupedAccount[],
+    loans: GroupedAccount[],
+): { assets: bigint; liabilities: bigint; net: bigint } {
+    const assets = savings.reduce((sum, g) => sum + g.total, 0n);
+    const liabilities = loans.reduce((sum, g) => sum + g.total, 0n);
+    return { assets, liabilities, net: assets - liabilities };
+}
+
+/**
+ * Credit-line limits extended to the user, in one currency.
+ * `loans` must already be that currency: every limit is scaled with `precision`.
+ * Undrawn facilities count. Lines the user extended to others do not.
+ */
+export function creditExtendedRaw(
+    loans: GroupedAccount[],
+    precision: number,
+): bigint {
+    return loans.reduce((sum, g) => {
+        const limit = g.creditLine?.limit;
+        if (!limit) return sum;
+        const raw = humanToRaw(limit, precision);
+        return raw > 0n ? sum + raw : sum;
+    }, 0n);
+}
+
 /** Attach lines; also add undrawn facilities so limits show with 0 balance. */
 export function mergeCreditLines(
     groups: Map<string, GroupedAccount>,

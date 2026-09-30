@@ -42,6 +42,7 @@ export function AssetSelect({
     itemActive,
     /** Overrides the closed-trigger dot (e.g. the Enabled switch). */
     selectedActive,
+    className,
 }: {
     assets: Asset[];
     value?: number;
@@ -49,6 +50,7 @@ export function AssetSelect({
     placeholder?: string;
     itemActive?: (asset: Asset) => boolean;
     selectedActive?: boolean;
+    className?: string;
 }) {
     const ordered = useMemo(() => {
         if (!itemActive) return assets;
@@ -101,7 +103,7 @@ export function AssetSelect({
             }
             onValueChange={(v) => onChange(Number(v))}
         >
-            <SelectTrigger>
+            <SelectTrigger className={className}>
                 <SelectValue placeholder={placeholder}>
                     {selected ? row(selected, triggerActive) : undefined}
                 </SelectValue>

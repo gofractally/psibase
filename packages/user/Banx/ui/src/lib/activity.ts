@@ -30,6 +30,17 @@ const REQUEST_KINDS = new Set([
 ]);
 const LINE_KINDS = new Set(["credit_line", "rm_credit_line"]);
 
+/** FX rows name a second asset. A zero `otherAssetId` is unset. */
+export function eventTouchesAsset(
+    event: ActivityEvent,
+    assetId: number,
+): boolean {
+    return (
+        event.assetId === assetId ||
+        (event.otherAssetId !== 0 && event.otherAssetId === assetId)
+    );
+}
+
 export function activityMatches(
     kind: string,
     filter: ActivityFilter,

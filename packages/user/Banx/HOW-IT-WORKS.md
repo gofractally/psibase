@@ -383,7 +383,8 @@ Off-chain path search lives in the service crate (`path_find`) and is called fro
 - `/accounts` — claims you hold and liabilities you owe; offer/edit lines; transfer dialog; activity feed below. Old `/path-pay` links redirect here.
 - `/requests` — invoices, deposit requests
 - `/policies` — path-forward, claim offers, currency
-- `/assets` — registered assets
+
+New assets are registered from the currency picker on Accounts. `/assets` redirects there.
 
 `/obligations` redirects to `/accounts`.
 

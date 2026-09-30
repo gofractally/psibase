@@ -23,6 +23,8 @@ import {
 import { BookAuthDialog } from "@/components/book-auth-dialog";
 import { NewDepositLoanDialog } from "@/components/new-deposit-loan-dialog";
 import { PageHeader } from "@/components/page-header";
+import { PositionSummary } from "@/components/position-summary";
+import { defaultAssetId } from "@/components/asset-select";
 import {
     RoutingPolicyDialog,
     type RoutingPolicyPrefill,
@@ -37,8 +39,11 @@ import { useBanxContacts } from "@/hooks/use-banx-contacts";
 import { useForwardOffers, useBuyClaimOffers } from "@/hooks/use-banx-data";
 import {
     accountHref,
+    creditExtendedRaw,
     filterGroups,
+    groupsInAsset,
     isFacilityOnly,
+    positionTotals,
     type GroupedAccount,
 } from "@/lib/account-groups";
 import { formatRawAmount, humanToRaw, lineAvailableRaw } from "@/lib/amount";
@@ -74,13 +79,6 @@ export function ObligationsPage() {
     const { assets, symbolOf, precisionOf } = useAssetMap();
 
     const nowSec = Math.floor(Date.now() / 1000);
-    const globalForwardOn = useMemo(
-        () =>
-            forwardOffers.some(
-                (p) => p.isGlobal && (p.expiresAt === 0 || p.expiresAt >= nowSec),
-            ),
-        [forwardOffers, nowSec],
-    );
     const globalBuyClaimOn = useMemo(
         () =>
             buyClaimOffers.some(
@@ -114,6 +112,34 @@ export function ObligationsPage() {
         "banx.accounts.hideEmptyLoans",
         true,
     );
+    const [storedAssetId, setStoredAssetId] = useLocalStorage<number | null>(
+        "banx.accounts.assetId",
+        null,
+    );
+    const selectedAssetId = useMemo(() => {
+        if (
+            storedAssetId != null &&
+            assets.some((a) => a.id === storedAssetId)
+        ) {
+            return storedAssetId;
+        }
+        return defaultAssetId(assets);
+    }, [assets, storedAssetId]);
+    const currencySymbol =
+        selectedAssetId !== undefined ? symbolOf(selectedAssetId) : "";
+    const currencyPrecision =
+        selectedAssetId !== undefined ? precisionOf(selectedAssetId) : 0;
+    const globalForwardOn = useMemo(
+        () =>
+            selectedAssetId !== undefined &&
+            forwardOffers.some(
+                (p) =>
+                    p.isGlobal &&
+                    p.assetId === selectedAssetId &&
+                    (p.expiresAt === 0 || p.expiresAt >= nowSec),
+            ),
+        [forwardOffers, nowSec, selectedAssetId],
+    );
 
     const openRouting = (prefill?: RoutingPolicyPrefill | null) => {
         setRoutingPrefill(prefill ?? null);
@@ -125,29 +151,45 @@ export function ObligationsPage() {
         setBuyClaimOpen(true);
     };
 
+    const savingsInCurrency = useMemo(
+        () => groupsInAsset(savingsGroupsAll, selectedAssetId),
+        [savingsGroupsAll, selectedAssetId],
+    );
+    const loansInCurrency = useMemo(
+        () => groupsInAsset(loanGroupsAll, selectedAssetId),
+        [loanGroupsAll, selectedAssetId],
+    );
     const savingsGroups = useMemo(
-        () => filterGroups(savingsGroupsAll, hideEmptySavings),
-        [savingsGroupsAll, hideEmptySavings],
+        () => filterGroups(savingsInCurrency, hideEmptySavings),
+        [savingsInCurrency, hideEmptySavings],
     );
     const loanGroups = useMemo(
-        () => filterGroups(loanGroupsAll, hideEmptyLoans),
-        [loanGroupsAll, hideEmptyLoans],
+        () => filterGroups(loansInCurrency, hideEmptyLoans),
+        [loansInCurrency, hideEmptyLoans],
     );
+    const position = useMemo(
+        () => positionTotals(savingsInCurrency, loansInCurrency),
+        [savingsInCurrency, loansInCurrency],
+    );
+    const creditLimit = useMemo(() => {
+        if (selectedAssetId === undefined) return 0n;
+        return creditExtendedRaw(loansInCurrency, currencyPrecision);
+    }, [loansInCurrency, currencyPrecision, selectedAssetId]);
 
     const savingsFacilityCount = useMemo(
-        () => savingsGroupsAll.filter(isFacilityOnly).length,
-        [savingsGroupsAll],
+        () => savingsInCurrency.filter(isFacilityOnly).length,
+        [savingsInCurrency],
     );
     const loanFacilityCount = useMemo(
-        () => loanGroupsAll.filter(isFacilityOnly).length,
-        [loanGroupsAll],
+        () => loansInCurrency.filter(isFacilityOnly).length,
+        [loansInCurrency],
     );
 
     return (
         <div className="space-y-6 overflow-x-hidden sm:space-y-10">
             <PageHeader
                 title="Accounts"
-                description="Open obligations as banking products: claims you hold act like savings; amounts you owe act like loans. Grouped by counterparty and currency."
+                description="Claims you hold act like savings; amounts you owe act like loans. Totals and lists stay in the selected currency."
                 action={
                     <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
                         <Button
@@ -175,7 +217,13 @@ export function ObligationsPage() {
                                             ? "Global path-forward offer is on — click to edit"
                                             : "Global path-forward offer is off — click to post one"
                                     }
-                                    onClick={() => openRouting(null)}
+                                    onClick={() =>
+                                        openRouting(
+                                            selectedAssetId !== undefined
+                                                ? { assetId: selectedAssetId }
+                                                : null,
+                                        )
+                                    }
                                 >
                                     <Route className="size-4" />
                                 </Button>
@@ -218,6 +266,20 @@ export function ObligationsPage() {
                 }
             />
 
+            <PositionSummary
+                assets={assets}
+                assetId={selectedAssetId}
+                onAssetId={setStoredAssetId}
+                held={position.assets}
+                owed={position.liabilities}
+                limit={creditLimit}
+                precision={currencyPrecision}
+                symbol={currencySymbol}
+                savings={savingsGroupsAll}
+                loans={loanGroupsAll}
+                isLoading={isLoading}
+            />
+
             <TransferDialog
                 open={transferOpen}
                 onOpenChange={(open) => {
@@ -227,6 +289,7 @@ export function ObligationsPage() {
                     }
                 }}
                 prefill={urlTransferPrefill}
+                defaultAsset={selectedAssetId}
             />
 
             <RoutingPolicyDialog
@@ -256,7 +319,7 @@ export function ObligationsPage() {
                     icon={PiggyBank}
                     title="Savings & deposits"
                     description="You are the creditor — balances others owe you, like funds on deposit. Offer a credit line so they can draw."
-                    count={savingsGroupsAll.length}
+                    count={savingsInCurrency.length}
                     countLabel="account"
                     action={
                         <>
@@ -301,7 +364,11 @@ export function ObligationsPage() {
                     <EmptyAccounts
                         icon={PiggyBank}
                         tone="savings"
-                        title="No deposit balances yet"
+                        title={
+                            currencySymbol
+                                ? `No ${currencySymbol} deposits yet`
+                                : "No deposit balances yet"
+                        }
                         body="Offer a credit line with +, or wait for someone to deposit with you / draw on a line you extend."
                     />
                 ) : (
@@ -313,6 +380,7 @@ export function ObligationsPage() {
                                 title={label(g.counterparty)}
                                 counterparty={g.counterparty}
                                 symbol={symbolOf(g.assetId)}
+                                showSymbol={selectedAssetId === undefined}
                                 precision={precisionOf(g.assetId)}
                                 total={g.total}
                                 creditLine={g.creditLine}
@@ -332,7 +400,7 @@ export function ObligationsPage() {
                     icon={Building2}
                     title="Loans & liabilities"
                     description="You are the debtor — what you owe, presented like a home loan or line of credit."
-                    count={loanGroupsAll.length}
+                    count={loansInCurrency.length}
                     countLabel="loan"
                     action={
                         <>
@@ -396,7 +464,11 @@ export function ObligationsPage() {
                     <EmptyAccounts
                         icon={Building2}
                         tone="loan"
-                        title="No open loans"
+                        title={
+                            currencySymbol
+                                ? `No open ${currencySymbol} loans`
+                                : "No open loans"
+                        }
                         body="Draws against credit lines and path payments that leave you owing show up here."
                     />
                 ) : (
@@ -408,6 +480,7 @@ export function ObligationsPage() {
                                 title={label(g.counterparty)}
                                 counterparty={g.counterparty}
                                 symbol={symbolOf(g.assetId)}
+                                showSymbol={selectedAssetId === undefined}
                                 precision={precisionOf(g.assetId)}
                                 total={g.total}
                                 creditLine={g.creditLine}
@@ -431,11 +504,13 @@ export function ObligationsPage() {
                         </h2>
                         <p className="text-muted-foreground hidden text-sm sm:block">
                             Payments, claim takes, booked expenses, invoices,
-                            and line changes. Newest first.
+                            and line changes
+                            {currencySymbol ? ` in ${currencySymbol}` : ""}.
+                            Newest first.
                         </p>
                     </div>
                 </div>
-                <ActivityFeed />
+                <ActivityFeed assetId={selectedAssetId} />
             </section>
         </div>
     );
@@ -546,6 +621,7 @@ function AccountGroupRow({
     title,
     counterparty,
     symbol,
+    showSymbol = true,
     precision,
     total,
     creditLine,
@@ -555,6 +631,8 @@ function AccountGroupRow({
     title: string;
     counterparty: string;
     symbol: string;
+    /** Hide the currency badge when the page is already scoped to one currency. */
+    showSymbol?: boolean;
     precision: number;
     total: bigint;
     creditLine?: GroupedAccount["creditLine"];
@@ -613,12 +691,14 @@ function AccountGroupRow({
                             {counterparty}
                         </span>
                     ) : null}
-                    <Badge
-                        variant="outline"
-                        className={cn("font-mono text-xs", badgeBorder)}
-                    >
-                        {symbol}
-                    </Badge>
+                    {showSymbol ? (
+                        <Badge
+                            variant="outline"
+                            className={cn("font-mono text-xs", badgeBorder)}
+                        >
+                            {symbol}
+                        </Badge>
+                    ) : null}
                     {creditLine && total === 0n ? (
                         <span className="text-muted-foreground text-xs">
                             Credit facility
@@ -655,9 +735,11 @@ function AccountGroupRow({
                     )}
                 >
                     {amount}
-                    <span className="text-muted-foreground ml-1 text-xs font-normal sm:ml-1.5 sm:text-sm">
-                        {symbol}
-                    </span>
+                    {showSymbol ? (
+                        <span className="text-muted-foreground ml-1 text-xs font-normal sm:ml-1.5 sm:text-sm">
+                            {symbol}
+                        </span>
+                    ) : null}
                 </p>
             </div>
         </Link>
