@@ -7,6 +7,9 @@
 #include <services/system/HttpServer.hpp>
 #include <services/system/Transact.hpp>
 
+#include <algorithm>
+#include <string_view>
+
 static constexpr bool enable_print = false;
 
 using namespace psibase;
@@ -34,28 +37,32 @@ namespace SystemService
          return result;
       }
 
-      bool isValidCookieName(const std::string& name)
+      bool isAllowedChar(char ch, std::string_view excluded)
       {
-         if (name.empty())
-            return false;
-         for (char c : name)
-         {
-            if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') ||
-                c == '-')
-               continue;
-            return false;
-         }
-         return true;
+         auto c = static_cast<unsigned char>(ch);
+         return c >= 0x21 && c <= 0x7E && excluded.find(ch) == std::string_view::npos;
       }
 
-      bool isValidCookieValue(const std::string& value)
+      bool isTokenChar(char ch)
       {
-         for (unsigned char c : value)
-         {
-            if (c == ';' || c == ',' || c <= ' ' || c == 127)
-               return false;
-         }
-         return true;
+         return isAllowedChar(ch, "()<>@,;:\\\"/[]?={} \t");
+      }
+
+      bool isCookieOctet(char ch)
+      {
+         return isAllowedChar(ch, "\",;\\");
+      }
+
+      bool isValidCookieName(std::string_view name)
+      {
+         return !name.empty() && std::ranges::all_of(name, isTokenChar);
+      }
+
+      bool isValidCookieValue(std::string_view value)
+      {
+         if (value.size() >= 2 && value.front() == '"' && value.back() == '"')
+            value = value.substr(1, value.size() - 2);
+         return std::ranges::all_of(value, isCookieOctet);
       }
 
       HttpHeader setCookieHeader(const std::string& name,
@@ -188,8 +195,8 @@ namespace SystemService
             auto headers = allowCorsFrom(request, "supervisor"_a);
             headers.push_back(allowCredentials());
 
-            if (!isValidCookieName(data.name) || !isValidCookieValue(data.value) ||
-                data.maxAge < 0)
+            // cookie-name and cookie-value per RFC 6265; maxAge must be non-negative.
+            if (!isValidCookieName(data.name) || !isValidCookieValue(data.value) || data.maxAge < 0)
             {
                return HttpReply{.status      = HttpStatus::badRequest,
                                 .contentType = "text/plain",

@@ -102,6 +102,40 @@ class TestSetCookie(unittest.TestCase):
                 '__Host-SESSION=; Path=/; SameSite=Strict; Secure; Max-Age=0; HttpOnly;',
             )
 
+        with a.post(
+            ENDPOINT,
+            service='accounts',
+            json={
+                'name': 'KEY_1',
+                'value': 'v.1',
+                'maxAge': 60,
+                'httpOnly': False,
+            },
+            headers=headers,
+        ) as reply:
+            reply.raise_for_status()
+            self.assertEqual(
+                reply.headers.get('Set-Cookie'),
+                '__Host-KEY_1=v.1; Path=/; SameSite=Strict; Secure; Max-Age=60;',
+            )
+
+        with a.post(
+            ENDPOINT,
+            service='accounts',
+            json={
+                'name': 'SESSION',
+                'value': '"quoted"',
+                'maxAge': 60,
+                'httpOnly': False,
+            },
+            headers=headers,
+        ) as reply:
+            reply.raise_for_status()
+            self.assertEqual(
+                reply.headers.get('Set-Cookie'),
+                '__Host-SESSION="quoted"; Path=/; SameSite=Strict; Secure; Max-Age=60;',
+            )
+
         with a.request(
             'OPTIONS',
             ENDPOINT,
@@ -145,11 +179,15 @@ class TestSetCookie(unittest.TestCase):
 
         invalid_bodies = [
             {'name': '', 'value': 'x', 'maxAge': 1, 'httpOnly': False},
-            {'name': 'bad_name', 'value': 'x', 'maxAge': 1, 'httpOnly': False},
+            {'name': 'bad name', 'value': 'x', 'maxAge': 1, 'httpOnly': False},
+            {'name': 'bad=name', 'value': 'x', 'maxAge': 1, 'httpOnly': False},
             {'name': 'SESSION', 'value': 'has;semi', 'maxAge': 1, 'httpOnly': False},
             {'name': 'SESSION', 'value': 'has,comma', 'maxAge': 1, 'httpOnly': False},
             {'name': 'SESSION', 'value': 'has space', 'maxAge': 1, 'httpOnly': False},
             {'name': 'SESSION', 'value': 'tab\there', 'maxAge': 1, 'httpOnly': False},
+            {'name': 'SESSION', 'value': 'has\\slash', 'maxAge': 1, 'httpOnly': False},
+            {'name': 'SESSION', 'value': 'has"quote', 'maxAge': 1, 'httpOnly': False},
+            {'name': 'SESSION', 'value': 'café', 'maxAge': 1, 'httpOnly': False},
             {'name': 'SESSION', 'value': 'ok', 'maxAge': -1, 'httpOnly': False},
         ]
         for body in invalid_bodies:
