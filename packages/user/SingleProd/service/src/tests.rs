@@ -175,7 +175,6 @@ mod tests {
         assert_eq!(billing.fee_receiver, producer);
         assert!(!billing.enabled);
 
-        // ProducerQuery implements maxProds, but the GraphQL schema does not reflect it.
         assert_eq!(Producers::push(chain).getMaxProds().get()?, 3);
 
         Ok(())
