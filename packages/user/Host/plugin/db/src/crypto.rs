@@ -1,8 +1,22 @@
+//! Given a 32-byte client key, derives sealing keys and applies host:db's
+//! at-rest crypto.
+//!
+//! HKDF-SHA256 expands the client key into separate HMAC and AES-256-GCM keys
+//! using distinct `info` strings (`HMAC_INFO`, `AES_INFO`).
+//!
+//! Storage keys are HMAC-SHA256 of the plaintext host:db key, encoded as
+//! lowercase hex (64 characters). Values are AES-256-GCM with associated data
+//! set to the HMAC'd storage key; ciphertext layout is `nonce || ciphertext ||
+//! tag` (12-byte nonce). Decryption fails when authentication fails, including
+//! when AAD does not match the key the value was stored under.
+
 use hkdf::Hkdf;
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
 
+/// HKDF info for the HMAC sealing key.
 const HMAC_INFO: &[u8] = b"host:db hmac-sha256";
+/// HKDF info for the AES-256-GCM key.
 const AES_INFO: &[u8] = b"host:db aes-256-gcm";
 
 #[derive(Clone, Copy)]
@@ -33,7 +47,6 @@ pub(crate) fn hmac_storage_key(hmac_key: &[u8; 32], plaintext_key: &str) -> Stri
     hex::encode(&mac.finalize().into_bytes())
 }
 
-/// `nonce || ciphertext || tag`. `associated_data` is authenticated with the value.
 pub(crate) fn encrypt_value(
     aes_key: &[u8; 32],
     associated_data: &[u8],
@@ -52,8 +65,6 @@ pub(crate) fn encrypt_value(
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct DecryptError;
 
-/// Decrypts a stored value. Fails when authentication fails, including when
-/// `associated_data` is not the HMAC'd key the value was encrypted under.
 pub(crate) fn decrypt_value(
     aes_key: &[u8; 32],
     associated_data: &[u8],
@@ -89,7 +100,7 @@ mod tests {
     }
 
     #[test]
-    fn derivation_is_stable_and_separates_keys() {
+    fn hkdf_stable_and_separate() {
         let client_key = [7u8; 32];
         let first = derive_storage_keys(&client_key);
         let second = derive_storage_keys(&client_key);
@@ -103,7 +114,7 @@ mod tests {
     }
 
     #[test]
-    fn hmac_is_lowercase_hex_of_the_plaintext_key() {
+    fn hmac_storage_key_hex() {
         let keys = sample_keys();
         let plaintext = "chain:non-trx:alice:contacts:id";
         let sealed = hmac_storage_key(&keys.hmac_key, plaintext);
@@ -117,7 +128,7 @@ mod tests {
     }
 
     #[test]
-    fn decrypt_fails_under_a_different_hmac_key() {
+    fn aad_mismatch_fails_decrypt() {
         let keys = sample_keys();
         let storage_key = hmac_storage_key(&keys.hmac_key, "chain:trx:bob:bucket:k");
         let other_key = hmac_storage_key(&keys.hmac_key, "chain:trx:bob:bucket:other");
