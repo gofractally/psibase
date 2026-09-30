@@ -5,7 +5,6 @@ use crate::crypto::{
 };
 use crate::supervisor::bridge::{database as HostDb, intf::get_client_key};
 
-// The supervisor never replaces the client key, so derive it once per thread.
 thread_local! {
     static DERIVED_KEYS: RefCell<Option<StorageKeys>> = RefCell::new(None);
 }
@@ -19,11 +18,11 @@ fn derived_keys() -> StorageKeys {
     keys
 }
 
-pub(crate) struct SealedStore {
+pub(crate) struct EncryptedStore {
     keys: StorageKeys,
 }
 
-impl SealedStore {
+impl EncryptedStore {
     pub(crate) fn open() -> Self {
         Self {
             keys: derived_keys(),
