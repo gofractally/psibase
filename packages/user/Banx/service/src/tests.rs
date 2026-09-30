@@ -2314,8 +2314,9 @@ mod tests {
             .is_err());
         let bob = account!("bob");
         chain.new_account(bob).unwrap();
+        let missing = crate::iso4217::SEEDED_ASSETS.len() as u16 + 1;
         assert!(Wrapper::push_from(&chain, alice)
-            .st_crd_lne(bob, 99, Quantity::new(100), false, 0, 0)
+            .st_crd_lne(bob, missing, Quantity::new(100), false, 0, 0)
             .get()
             .is_err());
         assert!(Wrapper::push_from(&chain, alice)
