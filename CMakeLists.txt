@@ -1031,7 +1031,6 @@ psibase_package(
         "Transact(^${PSIBASE_VERSION})"
         "SetCode(^${PSIBASE_VERSION})"
         "Symbol(^${PSIBASE_VERSION})"
-        "Banx(^${PSIBASE_VERSION})"
         "Tokens(^${PSIBASE_VERSION})"
         "VirtualServer(^${PSIBASE_VERSION})"
         "Chainmail(^${PSIBASE_VERSION})"
