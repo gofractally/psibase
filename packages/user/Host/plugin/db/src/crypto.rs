@@ -30,7 +30,7 @@ pub(crate) fn hmac_storage_key(hmac_key: &[u8; 32], plaintext_key: &str) -> Stri
     let mut mac =
         <Hmac<Sha256> as Mac>::new_from_slice(hmac_key).expect("HMAC-SHA256 accepts a 32-byte key");
     mac.update(plaintext_key.as_bytes());
-    hex_encode(&mac.finalize().into_bytes())
+    hex::encode(&mac.finalize().into_bytes())
 }
 
 /// `nonce || ciphertext || tag`. `associated_data` is authenticated with the value.
@@ -78,16 +78,6 @@ fn aes256_key(aes_key: &[u8; 32]) -> crate::aes::plugin::types::Key {
         strength: Strength::Aes256,
         key_data: aes_key.to_vec(),
     }
-}
-
-fn hex_encode(bytes: &[u8]) -> String {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    let mut out = String::with_capacity(bytes.len() * 2);
-    for byte in bytes {
-        out.push(HEX[(byte >> 4) as usize] as char);
-        out.push(HEX[(byte & 0xf) as usize] as char);
-    }
-    out
 }
 
 #[cfg(test)]
