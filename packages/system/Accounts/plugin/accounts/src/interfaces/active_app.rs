@@ -7,8 +7,8 @@ use crate::plugin::AccountsPlugin;
 use accounts::chain_query::api as AccountsQuery;
 use bindings::*;
 use exports::accounts::plugin::active_app::{Guest as ActiveApp, *};
-use host::client::api as client;
 use host::auth::api as HostAuth;
+use host::client::api as client;
 use host::prompt::api as Prompt;
 
 impl ActiveApp for AccountsPlugin {
@@ -17,6 +17,7 @@ impl ActiveApp for AccountsPlugin {
         if account_details.is_none() {
             return Err(InvalidAccountName(user).into());
         }
+        let auth_service = account_details.unwrap().auth_service;
 
         let app = get_assert_top_level_app("login", &vec![])?;
 
@@ -28,7 +29,7 @@ impl ActiveApp for AccountsPlugin {
         }
 
         AppsTable::new(&app).login(&user);
-        if HostAuth::set_logged_in_user(&user, &app).is_err() {
+        if HostAuth::set_logged_in_user(&user, &app, &auth_service).is_err() {
             AppsTable::new(&app).logout();
         }
         Ok(())
