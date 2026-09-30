@@ -47,14 +47,18 @@ fn post_to_app(app: &str, endpoint: &str, body: String) -> HttpRequest {
 
 const COOKIE_MAX_AGE: u64 = 30 * 24 * 60 * 60;
 
+fn session_cookie_body(value: &str, max_age: u64) -> String {
+    format!(
+        r#"{{"name": "SESSION", "value": "{}", "maxAge": {}, "httpOnly": true}}"#,
+        value, max_age
+    )
+}
+
 fn set_active_query_token(query_token: &str, app: &str, user: &str) {
     let req = post_to_app(
         app,
         "/common/set-cookie",
-        format!(
-            "{{\"name\": \"SESSION\", \"value\": \"{}\", \"maxAge\": {}, \"httpOnly\": true}}",
-            query_token, COOKIE_MAX_AGE
-        ),
+        session_cookie_body(query_token, COOKIE_MAX_AGE),
     );
     Supervisor::send_request(&req, true).unwrap();
 
@@ -65,7 +69,7 @@ fn remove_active_query_token(app: &str, user: &str) {
     let req = post_to_app(
         app,
         "/common/set-cookie",
-        r#"{"name": "SESSION", "value": "", "maxAge": 0, "httpOnly": true}"#.to_string(),
+        session_cookie_body("", 0),
     );
     Supervisor::send_request(&req, true).unwrap();
 
