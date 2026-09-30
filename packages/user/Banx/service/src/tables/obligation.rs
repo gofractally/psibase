@@ -112,10 +112,7 @@ impl Obligation {
         if PairCycle::pair_in_grace(self.creditor, self.debtor, self.asset_id, now) {
             // No new compounding. Keep finalized interest already on the row
             // (e.g. transferred from an aged claim).
-            return (
-                self.remaining_principal.value,
-                self.accrued_interest.value,
-            );
+            return (self.remaining_principal.value, self.accrued_interest.value);
         }
         let base = self
             .remaining_principal
@@ -147,8 +144,8 @@ impl Obligation {
             return;
         }
         let (principal, accrued) = self.live_parts_at(now);
-        let unchanged = principal == self.remaining_principal.value
-            && accrued == self.accrued_interest.value;
+        let unchanged =
+            principal == self.remaining_principal.value && accrued == self.accrued_interest.value;
         if unchanged && now.seconds <= self.last_interest_accrual.seconds {
             return;
         }

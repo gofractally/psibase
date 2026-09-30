@@ -140,10 +140,7 @@ fn note_payee(
     }
 }
 
-fn visited_subset(
-    a: &HashSet<(AccountNumber, u16)>,
-    b: &HashSet<(AccountNumber, u16)>,
-) -> bool {
+fn visited_subset(a: &HashSet<(AccountNumber, u16)>, b: &HashSet<(AccountNumber, u16)>) -> bool {
     a.iter().all(|x| b.contains(x))
 }
 
@@ -1529,7 +1526,16 @@ mod tests {
         ];
         assert!(
             find(
-                &lines, &routing, &[], "alice", "dave", 200, aud, Some(aud), 4, 0,
+                &lines,
+                &routing,
+                &[],
+                "alice",
+                "dave",
+                200,
+                aud,
+                Some(aud),
+                4,
+                0,
             )
             .is_none(),
             "returning to hub in AUD must not shrink 200 down to dave's line"

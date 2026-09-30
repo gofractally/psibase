@@ -5,7 +5,8 @@ mod tests {
     use crate::interest::{compound_amount, interest_for, SECONDS_PER_DAY, SECONDS_PER_YEAR};
     use crate::tables::{
         Asset, BanxInvite, BanxInviteTable, BookAuth, CashQuote, ClaimOffer, CreditLine,
-        CurrencyPolicy, Obligation, PairCycle, PathHop, PayRequest, PPM_SCALE, RATE_SCALE,
+        CurrencyPolicy, InitTable, Obligation, PairCycle, PathHop, PayRequest, PPM_SCALE,
+        RATE_SCALE,
     };
     use crate::Wrapper;
     use psibase::fracpack::Pack;
@@ -37,56 +38,40 @@ mod tests {
     fn test_init_seeds_default_assets(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
 
-        let fiat = [
-            (account!("usd"), "United States dollar"),
-            (account!("aud"), "Australian dollar"),
-            (account!("gbp"), "British pound sterling"),
-            (account!("euro"), "Euro"),
-        ];
-        for (i, (symbol, description)) in fiat.into_iter().enumerate() {
+        let seeded = crate::iso4217::SEEDED_ASSETS;
+        assert_eq!(
+            InitTable::read()
+                .get_index_pk()
+                .get(&())
+                .unwrap()
+                .next_asset_id,
+            seeded.len() as u16 + 1
+        );
+        for (i, &(symbol, precision, description)) in seeded.iter().enumerate() {
             let asset = Asset::get_by_symbol_assert(symbol);
             assert_eq!(asset.id, (i as u16) + 1);
-            assert_eq!(asset.symbol, symbol);
-            assert_eq!(asset.precision.value(), 4);
+            assert_eq!(asset.precision.value(), precision);
             assert_eq!(asset.description.to_string(), description);
-            assert_eq!(Asset::get_assert(asset.id).symbol, symbol);
+            assert!(
+                !description.to_ascii_lowercase().contains("ounce"),
+                "{description}"
+            );
         }
-
-        let gold = Asset::get_by_symbol_assert(account!("gold"));
-        assert_eq!(gold.id, 5);
-        assert_eq!(gold.precision.value(), 6);
-        assert_eq!(gold.description.to_string(), "1.000000 = 1 gram of gold");
-
-        let silver = Asset::get_by_symbol_assert(account!("silver"));
-        assert_eq!(silver.id, 6);
-        assert_eq!(silver.precision.value(), 6);
-        assert_eq!(
-            silver.description.to_string(),
-            "1.000000 = 1 gram of silver"
-        );
-
-        let more_fiat = [
-            (account!("cad"), 7u16, 4u8, "Canadian dollar"),
-            (account!("chf"), 8, 4, "Swiss franc"),
-            (account!("jpy"), 9, 2, "Japanese yen"),
-            (account!("nzd"), 10, 4, "New Zealand dollar"),
-        ];
-        for (symbol, id, prec, description) in more_fiat {
-            let asset = Asset::get_by_symbol_assert(symbol);
-            assert_eq!(asset.id, id);
-            assert_eq!(asset.precision.value(), prec);
-            assert_eq!(asset.description.to_string(), description);
+        for symbol in [
+            account!("euro"),
+            account!("ved"),
+            account!("svc"),
+            account!("xau"),
+            account!("xag"),
+            account!("xpt"),
+            account!("xpd"),
+            account!("bov"),
+            account!("xdr"),
+            account!("xts"),
+            account!("xxx"),
+        ] {
+            assert!(Asset::get_by_symbol(symbol).is_none());
         }
-
-        let btc = Asset::get_by_symbol_assert(account!("btc"));
-        assert_eq!(btc.id, 11);
-        assert_eq!(btc.precision.value(), 8);
-        assert_eq!(btc.description.to_string(), "1.00000000 = 1 Bitcoin");
-
-        let eth = Asset::get_by_symbol_assert(account!("eth"));
-        assert_eq!(eth.id, 12);
-        assert_eq!(eth.precision.value(), 8);
-        assert_eq!(eth.description.to_string(), "1.00000000 = 1 Ethereum");
 
         Ok(())
     }
@@ -101,26 +86,31 @@ mod tests {
         chain.new_account(bob).unwrap();
 
         let prec = Precision::new(2).unwrap();
+        let next = InitTable::read()
+            .get_index_pk()
+            .get(&())
+            .unwrap()
+            .next_asset_id;
         let id = Wrapper::push_from(&chain, alice)
-            .add_asset(account!("cny"), prec, "Chinese yuan".into())
+            .add_asset(account!("foo"), prec, "Test foo".into())
             .get()?;
-        assert_eq!(id, 13);
+        assert_eq!(id, next);
         let asset = Asset::get_assert(id);
-        assert_eq!(asset.symbol, account!("cny"));
+        assert_eq!(asset.symbol, account!("foo"));
         assert_eq!(asset.precision.value(), 2);
 
         let id2 = Wrapper::push_from(&chain, bob)
             .add_asset(
-                account!("krw"),
+                account!("bar"),
                 Precision::new(0).unwrap(),
-                "Korean won".into(),
+                "Test bar".into(),
             )
             .get()?;
-        assert_eq!(id2, 14);
+        assert_eq!(id2, next + 1);
         assert_eq!(Asset::get_assert(id2).precision.value(), 0);
 
         let dup = Wrapper::push_from(&chain, alice)
-            .add_asset(account!("cny"), prec, "duplicate".into())
+            .add_asset(account!("foo"), prec, "duplicate".into())
             .get();
         assert!(dup.is_err());
 
@@ -165,7 +155,10 @@ mod tests {
         );
         // 10% decay for one day truncates the same 273 fee as the growth above.
         assert_eq!(compound_amount(1_000_000, -100_000, 1), 1_000_000);
-        assert_eq!(compound_amount(1_000_000, -100_000, SECONDS_PER_DAY as u64), 999_727);
+        assert_eq!(
+            compound_amount(1_000_000, -100_000, SECONDS_PER_DAY as u64),
+            999_727
+        );
         assert_eq!(compound_amount(1, -1_000_000, SECONDS_PER_DAY as u64), 1);
         assert_eq!(compound_amount(1_000_000, -100_000, 0), 1_000_000);
         Ok(())
@@ -1050,7 +1043,13 @@ mod tests {
             .get()?;
         // Global buy-claim: 5% take fee (no forward offer needed).
         Wrapper::push_from(&chain, peter)
-            .st_glb_buy(usd, Quantity::new(0), (PPM_SCALE * 5 / 100) as i32, Quantity::new(u64::MAX), never())
+            .st_glb_buy(
+                usd,
+                Quantity::new(0),
+                (PPM_SCALE * 5 / 100) as i32,
+                Quantity::new(u64::MAX),
+                never(),
+            )
             .get()?;
         Wrapper::push_from(&chain, bob)
             .st_crd_lne(peter, usd, Quantity::new(0), false, 0, 0)
@@ -1133,7 +1132,14 @@ mod tests {
             .get()?;
         // Specific buy-claim must not affect path forward.
         Wrapper::push_from(&chain, gary)
-            .st_buy_clm(steve, usd, Quantity::new(0), 0, Quantity::new(u64::MAX), never())
+            .st_buy_clm(
+                steve,
+                usd,
+                Quantity::new(0),
+                0,
+                Quantity::new(u64::MAX),
+                never(),
+            )
             .get()?;
         Wrapper::push_from(&chain, gary)
             .st_glb_fwd(
@@ -2344,11 +2350,25 @@ mod tests {
             .get()
             .is_err());
         assert!(Wrapper::push_from(&chain, alice)
-            .st_buy_clm(ghost, usd, Quantity::new(0), 0, Quantity::new(u64::MAX), never())
+            .st_buy_clm(
+                ghost,
+                usd,
+                Quantity::new(0),
+                0,
+                Quantity::new(u64::MAX),
+                never()
+            )
             .get()
             .is_err());
         assert!(Wrapper::push_from(&chain, alice)
-            .st_sell_clm(ghost, usd, Quantity::new(0), 0, Quantity::new(u64::MAX), never())
+            .st_sell_clm(
+                ghost,
+                usd,
+                Quantity::new(0),
+                0,
+                Quantity::new(u64::MAX),
+                never()
+            )
             .get()
             .is_err());
         assert!(Wrapper::push_from(&chain, alice)
@@ -2396,7 +2416,13 @@ mod tests {
             .get();
         assert!(fwd.is_err());
         let buy = Wrapper::push_from(&chain, alice)
-            .st_glb_buy(missing, Quantity::new(0), 0, Quantity::new(u64::MAX), never())
+            .st_glb_buy(
+                missing,
+                Quantity::new(0),
+                0,
+                Quantity::new(u64::MAX),
+                never(),
+            )
             .get();
         assert!(buy.is_err());
         let write_off = Wrapper::push_from(&chain, alice)
@@ -2484,10 +2510,23 @@ mod tests {
             .st_crd_lne(bob, usd, Quantity::new(10_000), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, peter)
-            .st_glb_buy(usd, Quantity::new(0), (PPM_SCALE * 5 / 100) as i32, Quantity::new(u64::MAX), never())
+            .st_glb_buy(
+                usd,
+                Quantity::new(0),
+                (PPM_SCALE * 5 / 100) as i32,
+                Quantity::new(u64::MAX),
+                never(),
+            )
             .get()?;
         Wrapper::push_from(&chain, peter)
-            .st_buy_clm(bob, usd, Quantity::new(0), 0, Quantity::new(u64::MAX), never())
+            .st_buy_clm(
+                bob,
+                usd,
+                Quantity::new(0),
+                0,
+                Quantity::new(u64::MAX),
+                never(),
+            )
             .get()?;
         Wrapper::push_from(&chain, bob)
             .st_crd_lne(peter, usd, Quantity::new(0), false, 0, 0)
@@ -3073,7 +3112,14 @@ mod tests {
         const PETER_PRINCIPAL: u64 = 1_000_000;
 
         Wrapper::push_from(&chain, peter)
-            .st_crd_lne(bob, usd, Quantity::new(10_000_000), false, RATE as u32, WEEK_SECS)
+            .st_crd_lne(
+                bob,
+                usd,
+                Quantity::new(10_000_000),
+                false,
+                RATE as u32,
+                WEEK_SECS,
+            )
             .get()?;
         Wrapper::push_from(&chain, bob)
             .path_pay(
@@ -3092,7 +3138,14 @@ mod tests {
         assert_eq!(exp(&chain, peter, bob, usd), PETER_PRINCIPAL);
 
         Wrapper::push_from(&chain, alice)
-            .st_crd_lne(bob, usd, Quantity::new(10_000_000), false, RATE as u32, WEEK_SECS)
+            .st_crd_lne(
+                bob,
+                usd,
+                Quantity::new(10_000_000),
+                false,
+                RATE as u32,
+                WEEK_SECS,
+            )
             .get()?;
         Wrapper::push_from(&chain, bob)
             .path_pay(
@@ -3223,7 +3276,14 @@ mod tests {
         const DEST_PRINCIPAL: u64 = 500_000;
 
         Wrapper::push_from(&chain, alice)
-            .st_crd_lne(bob, usd, Quantity::new(10_000_000), false, RATE as u32, WEEK_SECS)
+            .st_crd_lne(
+                bob,
+                usd,
+                Quantity::new(10_000_000),
+                false,
+                RATE as u32,
+                WEEK_SECS,
+            )
             .get()?;
         Wrapper::push_from(&chain, bob)
             .path_pay(
@@ -3240,7 +3300,14 @@ mod tests {
         let src_interest = src_face - SRC_PRINCIPAL;
 
         Wrapper::push_from(&chain, peter)
-            .st_crd_lne(bob, usd, Quantity::new(10_000_000), false, RATE as u32, WEEK_SECS)
+            .st_crd_lne(
+                bob,
+                usd,
+                Quantity::new(10_000_000),
+                false,
+                RATE as u32,
+                WEEK_SECS,
+            )
             .get()?;
         Wrapper::push_from(&chain, bob)
             .path_pay(
@@ -3318,7 +3385,14 @@ mod tests {
         const SRC_PRINCIPAL: u64 = 1_000_000;
 
         Wrapper::push_from(&chain, alice)
-            .st_crd_lne(bob, usd, Quantity::new(10_000_000), false, RATE as u32, WEEK_SECS)
+            .st_crd_lne(
+                bob,
+                usd,
+                Quantity::new(10_000_000),
+                false,
+                RATE as u32,
+                WEEK_SECS,
+            )
             .get()?;
         Wrapper::push_from(&chain, bob)
             .path_pay(
@@ -3335,7 +3409,14 @@ mod tests {
         assert!(src_interest > 0, "source already past grace");
 
         Wrapper::push_from(&chain, peter)
-            .st_crd_lne(bob, usd, Quantity::new(10_000_000), false, RATE as u32, WEEK_SECS)
+            .st_crd_lne(
+                bob,
+                usd,
+                Quantity::new(10_000_000),
+                false,
+                RATE as u32,
+                WEEK_SECS,
+            )
             .get()?;
         Wrapper::push_from(&chain, peter)
             .st_glb_buy(usd, Quantity::new(0), 0, Quantity::new(u64::MAX), never())
@@ -4395,10 +4476,26 @@ mod tests {
             .st_crd_lne(alice, usd, Quantity::new(1_000_000), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, bob)
-            .st_csh_qte(usd, gas, true, 0.into(), RATE_SCALE, Quantity::new(u64::MAX), never())
+            .st_csh_qte(
+                usd,
+                gas,
+                true,
+                0.into(),
+                RATE_SCALE,
+                Quantity::new(u64::MAX),
+                never(),
+            )
             .get()?;
         Wrapper::push_from(&chain, bob)
-            .st_csh_qte(usd, gas, false, 0.into(), RATE_SCALE, Quantity::new(u64::MAX), never())
+            .st_csh_qte(
+                usd,
+                gas,
+                false,
+                0.into(),
+                RATE_SCALE,
+                Quantity::new(u64::MAX),
+                never(),
+            )
             .get()?;
 
         Wrapper::push_from(&chain, alice)
@@ -4450,7 +4547,15 @@ mod tests {
             .st_crd_lne(alice, usd, Quantity::new(100_000), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, bob)
-            .st_csh_qte(usd, gas, true, 0.into(), rate, Quantity::new(u64::MAX), never())
+            .st_csh_qte(
+                usd,
+                gas,
+                true,
+                0.into(),
+                rate,
+                Quantity::new(u64::MAX),
+                never(),
+            )
             .get()?;
 
         Wrapper::push_from(&chain, alice)
@@ -4479,7 +4584,15 @@ mod tests {
         let gas = mint_gas(&chain, bob, alice, 500_000);
 
         Wrapper::push_from(&chain, bob)
-            .st_csh_qte(usd, gas, false, 0.into(), RATE_SCALE, Quantity::new(u64::MAX), never())
+            .st_csh_qte(
+                usd,
+                gas,
+                false,
+                0.into(),
+                RATE_SCALE,
+                Quantity::new(u64::MAX),
+                never(),
+            )
             .get()?;
         fund_vault(&chain, alice, gas, 500_000);
         Wrapper::push_from(&chain, alice)
@@ -4514,7 +4627,15 @@ mod tests {
             .st_crd_lne(alice, usd, Quantity::new(100_000), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, bob)
-            .st_csh_qte(usd, gas, true, 0.into(), RATE_SCALE, Quantity::new(u64::MAX), never())
+            .st_csh_qte(
+                usd,
+                gas,
+                true,
+                0.into(),
+                RATE_SCALE,
+                Quantity::new(u64::MAX),
+                never(),
+            )
             .get()?;
         let err = Wrapper::push_from(&chain, alice)
             .cash_out(
@@ -4546,7 +4667,15 @@ mod tests {
         let gas = mint_gas(&chain, bob, alice, 100_000);
 
         Wrapper::push_from(&chain, bob)
-            .st_csh_qte(usd, gas, false, 0.into(), RATE_SCALE, Quantity::new(u64::MAX), never())
+            .st_csh_qte(
+                usd,
+                gas,
+                false,
+                0.into(),
+                RATE_SCALE,
+                Quantity::new(u64::MAX),
+                never(),
+            )
             .get()?;
         psibase::services::tokens::Wrapper::push_from(&chain, alice)
             .credit(
@@ -4615,7 +4744,15 @@ mod tests {
 
         // James lists a rate he's willing to sell his gas tokens for USD.
         Wrapper::push_from(&chain, james)
-            .st_csh_qte(usd, gas, true, 0.into(), out_rate, Quantity::new(u64::MAX), never())
+            .st_csh_qte(
+                usd,
+                gas,
+                true,
+                0.into(),
+                out_rate,
+                Quantity::new(u64::MAX),
+                never(),
+            )
             .get()?;
 
         // James gives his friend Bob a credit line so he can access funds
@@ -4634,7 +4771,15 @@ mod tests {
 
         // James allows his friend to send it back, but only at a 10% worse rate.
         Wrapper::push_from(&chain, james)
-            .st_csh_qte(usd, gas, false, 0.into(), in_rate, Quantity::new(u64::MAX), never())
+            .st_csh_qte(
+                usd,
+                gas,
+                false,
+                0.into(),
+                in_rate,
+                Quantity::new(u64::MAX),
+                never(),
+            )
             .get()?;
 
         fund_vault(&chain, bob, gas, 500);
@@ -5157,23 +5302,11 @@ mod tests {
             .get()?;
 
         assert!(Wrapper::push_from(&chain, alice)
-            .cash_out(
-                bob,
-                usd,
-                gas,
-                Quantity::new(101),
-                Quantity::new(0),
-            )
+            .cash_out(bob, usd, gas, Quantity::new(101), Quantity::new(0),)
             .get()
             .is_err());
         Wrapper::push_from(&chain, alice)
-            .cash_out(
-                bob,
-                usd,
-                gas,
-                Quantity::new(100),
-                Quantity::new(100),
-            )
+            .cash_out(bob, usd, gas, Quantity::new(100), Quantity::new(100))
             .get()?;
         assert_eq!(
             CashQuote::get_assert(bob, usd, gas, true).remaining.value,
@@ -5244,9 +5377,7 @@ mod tests {
 
     /// Creditor-signed −10% decays the claim. One untouched day on 1_000_000 is 999_727.
     #[psibase::test_case(packages("Banx"))]
-    fn test_negative_rate_decays_booked_claim(
-        chain: psibase::Chain,
-    ) -> Result<(), psibase::Error> {
+    fn test_negative_rate_decays_booked_claim(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
         let bob = account!("bob");
@@ -5320,9 +5451,7 @@ mod tests {
 
     /// A 0% deposit stays its own bucket. Reducing the claim retires 0% before −10%.
     #[psibase::test_case(packages("Banx"))]
-    fn test_negative_rate_reduced_after_zero(
-        chain: psibase::Chain,
-    ) -> Result<(), psibase::Error> {
+    fn test_negative_rate_reduced_after_zero(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
         let bob = account!("bob");
@@ -5429,9 +5558,7 @@ mod tests {
 
     /// Grace hides the decay. After the window the whole elapsed time is charged.
     #[psibase::test_case(packages("Banx"))]
-    fn test_negative_rate_paused_during_grace(
-        chain: psibase::Chain,
-    ) -> Result<(), psibase::Error> {
+    fn test_negative_rate_paused_during_grace(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
         let bob = account!("bob");
@@ -5530,7 +5657,10 @@ mod tests {
             1_000_000
         );
         let cycle = PairCycle::get(bob, alice, usd).expect("cycle still open");
-        assert_eq!(cycle.cycle_started_at.seconds, opened.cycle_started_at.seconds);
+        assert_eq!(
+            cycle.cycle_started_at.seconds,
+            opened.cycle_started_at.seconds
+        );
         assert_eq!(cycle.cycle_grace_seconds, WEEK);
         assert_eq!(exp(&chain, bob, alice, usd), 1_000_001);
 
@@ -5577,7 +5707,10 @@ mod tests {
         assert_eq!(row.remaining_principal.value, 1_000_001);
         assert_eq!(row.accrued_interest.value, 0);
         let cycle = PairCycle::get(bob, alice, usd).expect("cycle still open");
-        assert_eq!(cycle.cycle_started_at.seconds, opened.cycle_started_at.seconds);
+        assert_eq!(
+            cycle.cycle_started_at.seconds,
+            opened.cycle_started_at.seconds
+        );
         assert_eq!(cycle.cycle_grace_seconds, WEEK);
 
         chain.start_block_after(Seconds::new(SECONDS_PER_DAY as i64).into());

@@ -1,5 +1,6 @@
 /// Daily compound interest (path-independent closed form).
 pub mod interest;
+mod iso4217;
 /// Shared fee / FX integer math (on-chain and path search).
 pub mod math;
 /// Off-chain path discovery for multi-hop `path_pay` (TokenSwap-style search).
@@ -45,40 +46,13 @@ pub mod service {
                 })
                 .unwrap();
 
-            let fiat4 = Precision::new(4).expect("fiat asset precision");
-            for (symbol, description) in [
-                (account!("usd"), "United States dollar"),
-                (account!("aud"), "Australian dollar"),
-                (account!("gbp"), "British pound sterling"),
-                (account!("euro"), "Euro"),
-            ] {
-                Asset::add(symbol, fiat4, description.into());
+            for &(symbol, precision, description) in crate::iso4217::SEEDED_ASSETS {
+                Asset::add(
+                    symbol,
+                    Precision::new(precision).expect("seed precision"),
+                    description.into(),
+                );
             }
-
-            let metal_precision = Precision::new(6).expect("metal asset precision");
-            Asset::add(
-                account!("gold"),
-                metal_precision,
-                "1.000000 = 1 gram of gold".into(),
-            );
-            Asset::add(
-                account!("silver"),
-                metal_precision,
-                "1.000000 = 1 gram of silver".into(),
-            );
-
-            Asset::add(account!("cad"), fiat4, "Canadian dollar".into());
-            Asset::add(account!("chf"), fiat4, "Swiss franc".into());
-            Asset::add(
-                account!("jpy"),
-                Precision::new(2).expect("jpy precision"),
-                "Japanese yen".into(),
-            );
-            Asset::add(account!("nzd"), fiat4, "New Zealand dollar".into());
-
-            let crypto8 = Precision::new(8).expect("crypto asset precision");
-            Asset::add(account!("btc"), crypto8, "1.00000000 = 1 Bitcoin".into());
-            Asset::add(account!("eth"), crypto8, "1.00000000 = 1 Ethereum".into());
         }
     }
 
