@@ -59,15 +59,16 @@ impl BookAuth {
 
     /// Creditor books `amount` onto this debtor. Spends remaining (kept at 0
     /// so the debtor can top up). Returns auto-netted amount from the deposit.
-    pub fn book(mut self, amount: Quantity, interest_rate: u32) -> Quantity {
+    pub fn book(mut self, amount: Quantity, interest_rate: i32) -> Quantity {
         assert!(amount.value > 0, "book amount must be positive");
+        let bound = PPM_SCALE as i32;
         assert!(
-            interest_rate <= PPM_SCALE,
-            "interest_rate exceeds 100% (PPM_SCALE)"
+            (-bound..=bound).contains(&interest_rate),
+            "interest_rate outside ±100% (PPM_SCALE)"
         );
         assert!(self.is_live(), "book-auth expired");
         assert!(
-            interest_rate <= self.max_interest_rate,
+            interest_rate <= self.max_interest_rate as i32,
             "interest_rate exceeds book-auth max"
         );
         assert!(
@@ -77,6 +78,6 @@ impl BookAuth {
         self.remaining = (self.remaining.value - amount.value).into();
         self.save();
         Connection::get_live(self.creditor, self.debtor, self.asset_id)
-            .deposit(amount, interest_rate)
+            .credit_at_rate(amount, interest_rate)
     }
 }

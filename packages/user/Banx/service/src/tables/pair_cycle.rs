@@ -67,8 +67,9 @@ impl PairCycle {
     }
 
     /// Open a cycle when the pair goes empty → occupied (if posted grace > 0);
-    /// close when it is empty again. Occupied = any principal or stored
-    /// interest. No-op when there is no row.
+    /// close when it is empty again. Occupied means stored principal or
+    /// interest, so callers delete decayed rows before sampling. No-op when
+    /// there is no row.
     pub fn sync_cycle(
         creditor: AccountNumber,
         debtor: AccountNumber,

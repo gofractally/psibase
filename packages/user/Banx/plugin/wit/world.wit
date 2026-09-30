@@ -89,12 +89,14 @@ interface api {
     remove-book-auth: func(creditor: string, asset-id: u16) -> result<_, error>;
 
     /// Creditor (sender) books `amount` onto `debtor` under their live
-    /// book-auth. Same book as deposit. `memo` max 80 bytes.
+    /// book-auth. `interest-rate-ppm` is a signed APR (`10_000` = 1%,
+    /// negative decays the claim), within ±1_000_000 and ≤ the auth max.
+    /// `memo` max 80 bytes.
     book: func(
         debtor: string,
         asset-id: u16,
         amount: string,
-        interest-rate-ppm: u32,
+        interest-rate-ppm: s32,
         memo: string,
     ) -> result<_, error>;
 

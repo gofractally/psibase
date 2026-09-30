@@ -163,6 +163,11 @@ mod tests {
             compound_amount(u64::MAX, 1, SECONDS_PER_DAY as u64),
             u64::MAX
         );
+        // 10% decay for one day truncates the same 273 fee as the growth above.
+        assert_eq!(compound_amount(1_000_000, -100_000, 1), 1_000_000);
+        assert_eq!(compound_amount(1_000_000, -100_000, SECONDS_PER_DAY as u64), 999_727);
+        assert_eq!(compound_amount(1, -1_000_000, SECONDS_PER_DAY as u64), 1);
+        assert_eq!(compound_amount(1_000_000, -100_000, 0), 1_000_000);
         Ok(())
     }
 
@@ -2548,7 +2553,7 @@ mod tests {
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
-        const RATE: u32 = 100_000;
+        const RATE: i32 = 100_000;
         const PRINCIPAL: u64 = 1_000_000;
 
         Wrapper::push_from(&chain, bob)
@@ -2557,7 +2562,7 @@ mod tests {
                 usd,
                 Quantity::new(10_000_000),
                 false,
-                RATE,
+                RATE as u32,
                 WEEK_SECS,
             )
             .get()?;
@@ -2615,7 +2620,7 @@ mod tests {
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
-        const RATE: u32 = 100_000;
+        const RATE: i32 = 100_000;
         const PRINCIPAL: u64 = 1_000_000;
 
         Wrapper::push_from(&chain, bob)
@@ -2624,7 +2629,7 @@ mod tests {
                 usd,
                 Quantity::new(10_000_000),
                 false,
-                RATE,
+                RATE as u32,
                 WEEK_SECS,
             )
             .get()?;
@@ -2752,13 +2757,12 @@ mod tests {
             .forgive(bob, usd, Quantity::new(0))
             .get()
             .is_err());
-        assert!(
-            Wrapper::push_from(&chain, alice)
-                .forgive(bob, usd, Quantity::new(1))
-                .get()
-                .is_err(),
-            "nothing left to forgive"
-        );
+        // Already empty. This still succeeds: accrue may have deleted a
+        // decayed row, and a failed action would put that row back.
+        Wrapper::push_from(&chain, alice)
+            .forgive(bob, usd, Quantity::new(1))
+            .get()?;
+        assert_eq!(exp(&chain, alice, bob, usd), 0);
         Ok(())
     }
 
@@ -3065,11 +3069,11 @@ mod tests {
             chain.new_account(a).unwrap();
         }
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
-        const RATE: u32 = 100_000;
+        const RATE: i32 = 100_000;
         const PETER_PRINCIPAL: u64 = 1_000_000;
 
         Wrapper::push_from(&chain, peter)
-            .st_crd_lne(bob, usd, Quantity::new(10_000_000), false, RATE, WEEK_SECS)
+            .st_crd_lne(bob, usd, Quantity::new(10_000_000), false, RATE as u32, WEEK_SECS)
             .get()?;
         Wrapper::push_from(&chain, bob)
             .path_pay(
@@ -3088,7 +3092,7 @@ mod tests {
         assert_eq!(exp(&chain, peter, bob, usd), PETER_PRINCIPAL);
 
         Wrapper::push_from(&chain, alice)
-            .st_crd_lne(bob, usd, Quantity::new(10_000_000), false, RATE, WEEK_SECS)
+            .st_crd_lne(bob, usd, Quantity::new(10_000_000), false, RATE as u32, WEEK_SECS)
             .get()?;
         Wrapper::push_from(&chain, bob)
             .path_pay(
@@ -3214,12 +3218,12 @@ mod tests {
             chain.new_account(a).unwrap();
         }
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
-        const RATE: u32 = 100_000;
+        const RATE: i32 = 100_000;
         const SRC_PRINCIPAL: u64 = 1_000_000;
         const DEST_PRINCIPAL: u64 = 500_000;
 
         Wrapper::push_from(&chain, alice)
-            .st_crd_lne(bob, usd, Quantity::new(10_000_000), false, RATE, WEEK_SECS)
+            .st_crd_lne(bob, usd, Quantity::new(10_000_000), false, RATE as u32, WEEK_SECS)
             .get()?;
         Wrapper::push_from(&chain, bob)
             .path_pay(
@@ -3236,7 +3240,7 @@ mod tests {
         let src_interest = src_face - SRC_PRINCIPAL;
 
         Wrapper::push_from(&chain, peter)
-            .st_crd_lne(bob, usd, Quantity::new(10_000_000), false, RATE, WEEK_SECS)
+            .st_crd_lne(bob, usd, Quantity::new(10_000_000), false, RATE as u32, WEEK_SECS)
             .get()?;
         Wrapper::push_from(&chain, bob)
             .path_pay(
@@ -3310,11 +3314,11 @@ mod tests {
             chain.new_account(a).unwrap();
         }
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
-        const RATE: u32 = 100_000;
+        const RATE: i32 = 100_000;
         const SRC_PRINCIPAL: u64 = 1_000_000;
 
         Wrapper::push_from(&chain, alice)
-            .st_crd_lne(bob, usd, Quantity::new(10_000_000), false, RATE, WEEK_SECS)
+            .st_crd_lne(bob, usd, Quantity::new(10_000_000), false, RATE as u32, WEEK_SECS)
             .get()?;
         Wrapper::push_from(&chain, bob)
             .path_pay(
@@ -3331,7 +3335,7 @@ mod tests {
         assert!(src_interest > 0, "source already past grace");
 
         Wrapper::push_from(&chain, peter)
-            .st_crd_lne(bob, usd, Quantity::new(10_000_000), false, RATE, WEEK_SECS)
+            .st_crd_lne(bob, usd, Quantity::new(10_000_000), false, RATE as u32, WEEK_SECS)
             .get()?;
         Wrapper::push_from(&chain, peter)
             .st_glb_buy(usd, Quantity::new(0), 0, Quantity::new(u64::MAX), never())
@@ -5222,6 +5226,441 @@ mod tests {
         assert_eq!(
             CashQuote::get_assert(bob, usd, gas, false).remaining.value,
             0
+        );
+        Ok(())
+    }
+
+    fn allow_book(
+        chain: &psibase::Chain,
+        debtor: AccountNumber,
+        creditor: AccountNumber,
+        asset: u16,
+    ) {
+        Wrapper::push_from(chain, debtor)
+            .st_bk_ath(creditor, asset, Quantity::new(u64::MAX), 0, never())
+            .get()
+            .unwrap();
+    }
+
+    /// Creditor-signed −10% decays the claim. One untouched day on 1_000_000 is 999_727.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_negative_rate_decays_booked_claim(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        allow_book(&chain, alice, bob, usd);
+
+        Wrapper::push_from(&chain, bob)
+            .book(alice, usd, Quantity::new(1_000_000), -100_000, "".into())
+            .get()?;
+        assert_eq!(exp(&chain, bob, alice, usd), 1_000_000);
+
+        chain.start_block_after(Seconds::new(SECONDS_PER_DAY as i64).into());
+        assert_eq!(exp(&chain, bob, alice, usd), 999_727);
+        Wrapper::push_from(&chain, bob)
+            .net(alice, usd, Quantity::new(0))
+            .get()?;
+        let row = Obligation::get_by_interest_rate(bob, alice, usd, -100_000).unwrap();
+        assert_eq!(row.remaining_principal.value, 999_727);
+        assert_eq!(row.accrued_interest.value, 0);
+        Ok(())
+    }
+
+    /// −1% on 10_000 raw is a fraction of a unit per day. Truncate that fee.
+    /// One evaluation of the day and 24 hourly accruals must charge the same amount.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_negative_rate_fractional_day_fee_matches_hourly(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        const PRINCIPAL: u64 = 10_000;
+        const RATE: i32 = -10_000;
+        let day = SECONDS_PER_DAY as u64;
+        let one_day_math = compound_amount(PRINCIPAL, RATE, day);
+        let mut hourly_math = PRINCIPAL;
+        for _ in 0..24 {
+            hourly_math = compound_amount(hourly_math, RATE, 3600);
+        }
+
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        allow_book(&chain, alice, bob, usd);
+        allow_book(&chain, alice, bob, aud);
+        Wrapper::push_from(&chain, bob)
+            .book(alice, usd, Quantity::new(PRINCIPAL), RATE, "".into())
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .book(alice, aud, Quantity::new(PRINCIPAL), RATE, "".into())
+            .get()?;
+
+        for _ in 0..24 {
+            chain.start_block_after(Seconds::new(3600).into());
+            Wrapper::push_from(&chain, bob)
+                .net(alice, usd, Quantity::new(0))
+                .get()?;
+        }
+
+        let on_chain_hourly = exp(&chain, bob, alice, usd);
+        let on_chain_untouched = exp(&chain, bob, alice, aud);
+        assert!(
+            on_chain_hourly == on_chain_untouched && on_chain_untouched == PRINCIPAL,
+            "fractional −1% day fee charged as a whole unit: compound hourly={hourly_math}, compound one-day={one_day_math}, on-chain hourly={on_chain_hourly}, on-chain untouched={on_chain_untouched}"
+        );
+        Ok(())
+    }
+
+    /// A 0% deposit stays its own bucket. Reducing the claim retires 0% before −10%.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_negative_rate_reduced_after_zero(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        allow_book(&chain, alice, bob, usd);
+
+        Wrapper::push_from(&chain, bob)
+            .book(alice, usd, Quantity::new(100), 0, "".into())
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .book(alice, usd, Quantity::new(100), -10_000, "".into())
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .deposit(bob, usd, Quantity::new(50), 0, 0)
+            .get()?;
+        assert_eq!(exp(&chain, bob, alice, usd), 250);
+        assert_eq!(
+            Obligation::get_by_interest_rate(bob, alice, usd, 0)
+                .unwrap()
+                .remaining_principal
+                .value,
+            150
+        );
+        assert_eq!(
+            Obligation::get_by_interest_rate(bob, alice, usd, -10_000)
+                .unwrap()
+                .remaining_principal
+                .value,
+            100
+        );
+
+        Wrapper::push_from(&chain, bob)
+            .forgive(alice, usd, Quantity::new(150))
+            .get()?;
+        assert!(Obligation::get_by_interest_rate(bob, alice, usd, 0).is_none());
+        assert_eq!(
+            Obligation::get_by_interest_rate(bob, alice, usd, -10_000)
+                .unwrap()
+                .remaining_principal
+                .value,
+            100
+        );
+        Ok(())
+    }
+
+    /// −100% on 1 raw unit is below one day's fee, so the claim stays until forgiven.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_negative_rate_sub_unit_fee_keeps_claim(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        allow_book(&chain, alice, bob, usd);
+
+        Wrapper::push_from(&chain, bob)
+            .book(alice, usd, Quantity::new(1), -1_000_000, "".into())
+            .get()?;
+        chain.start_block_after(Seconds::new(SECONDS_PER_DAY as i64).into());
+        assert_eq!(exp(&chain, bob, alice, usd), 1);
+        assert!(Obligation::get_by_interest_rate(bob, alice, usd, -1_000_000).is_some());
+        Wrapper::push_from(&chain, bob)
+            .forgive(alice, usd, Quantity::new(1))
+            .get()?;
+        assert!(Obligation::get_by_interest_rate(bob, alice, usd, -1_000_000).is_none());
+        Ok(())
+    }
+
+    /// A later top-up is not decayed for the interval before it arrived.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_negative_rate_top_up_not_backdated(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        allow_book(&chain, alice, bob, usd);
+        const RATE: i32 = -100_000;
+
+        Wrapper::push_from(&chain, bob)
+            .book(alice, usd, Quantity::new(1_000_000), RATE, "".into())
+            .get()?;
+        chain.start_block_after(Seconds::new(SECONDS_PER_DAY as i64).into());
+        Wrapper::push_from(&chain, bob)
+            .book(alice, usd, Quantity::new(1_000_000), RATE, "".into())
+            .get()?;
+        assert_eq!(exp(&chain, bob, alice, usd), 999_727 + 1_000_000);
+
+        chain.start_block_after(Seconds::new(SECONDS_PER_DAY as i64).into());
+        assert_eq!(
+            exp(&chain, bob, alice, usd),
+            compound_amount(999_727 + 1_000_000, RATE, SECONDS_PER_DAY as u64)
+        );
+        Ok(())
+    }
+
+    /// Grace hides the decay. After the window the whole elapsed time is charged.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_negative_rate_paused_during_grace(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, usd, Quantity::new(0), false, 0, 7 * 86_400)
+            .get()?;
+        allow_book(&chain, alice, bob, usd);
+        Wrapper::push_from(&chain, bob)
+            .book(alice, usd, Quantity::new(1_000_000), -100_000, "".into())
+            .get()?;
+
+        chain.start_block_after(Seconds::new(SECONDS_PER_DAY as i64).into());
+        assert_eq!(exp(&chain, bob, alice, usd), 1_000_000);
+
+        chain.start_block_after(Seconds::new(7 * 86_400).into());
+        assert_eq!(
+            exp(&chain, bob, alice, usd),
+            compound_amount(1_000_000, -100_000, 8 * SECONDS_PER_DAY as u64)
+        );
+        Ok(())
+    }
+
+    /// max 0 still allows a negative rate. Past −100% is rejected.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_book_negative_rate_bounds(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        allow_book(&chain, alice, bob, usd);
+
+        assert!(Wrapper::push_from(&chain, bob)
+            .book(alice, usd, Quantity::new(10), -1_000_001, "".into())
+            .get()
+            .is_err());
+        assert!(Wrapper::push_from(&chain, bob)
+            .book(alice, usd, Quantity::new(10), 1, "".into())
+            .get()
+            .is_err());
+        Wrapper::push_from(&chain, bob)
+            .book(alice, usd, Quantity::new(10), -1_000_000, "".into())
+            .get()?;
+        assert_eq!(
+            Obligation::get_by_interest_rate(bob, alice, usd, -1_000_000)
+                .unwrap()
+                .interest_rate,
+            -1_000_000
+        );
+        Ok(())
+    }
+
+    /// A 1-unit claim below one day's fee stays owed, so the pair stays occupied
+    /// and a later claim does not open a fresh grace window.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_negative_rate_dust_keeps_pair_occupied(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        const WEEK: u32 = 7 * 86_400;
+        const POSITIVE: i32 = 100_000;
+
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, usd, Quantity::new(0), false, 0, WEEK)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .st_bk_ath(bob, usd, Quantity::new(u64::MAX), POSITIVE as u32, never())
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .book(alice, usd, Quantity::new(1), -1_000_000, "".into())
+            .get()?;
+        let opened = PairCycle::get(bob, alice, usd).expect("cycle opened on the decay");
+
+        chain.start_block_after(Seconds::new(8 * SECONDS_PER_DAY as i64).into());
+        assert_eq!(exp(&chain, bob, alice, usd), 1);
+        assert!(Obligation::get_by_interest_rate(bob, alice, usd, -1_000_000).is_some());
+
+        Wrapper::push_from(&chain, bob)
+            .book(alice, usd, Quantity::new(1_000_000), POSITIVE, "".into())
+            .get()?;
+        assert!(Obligation::get_by_interest_rate(bob, alice, usd, -1_000_000).is_some());
+        assert_eq!(
+            Obligation::get_by_interest_rate(bob, alice, usd, POSITIVE)
+                .unwrap()
+                .remaining_principal
+                .value,
+            1_000_000
+        );
+        let cycle = PairCycle::get(bob, alice, usd).expect("cycle still open");
+        assert_eq!(cycle.cycle_started_at.seconds, opened.cycle_started_at.seconds);
+        assert_eq!(cycle.cycle_grace_seconds, WEEK);
+        assert_eq!(exp(&chain, bob, alice, usd), 1_000_001);
+
+        chain.start_block_after(Seconds::new(SECONDS_PER_DAY as i64).into());
+        assert_eq!(
+            exp(&chain, bob, alice, usd),
+            1 + compound_amount(1_000_000, POSITIVE, SECONDS_PER_DAY as u64),
+            "dust kept the expired cycle; the new claim was charged"
+        );
+        Ok(())
+    }
+
+    /// Topping up adds onto the unit that survived, and does not decay the new
+    /// principal for the interval before it arrived.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_negative_rate_top_up_keeps_surviving_unit(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        const WEEK: u32 = 7 * 86_400;
+        const RATE: i32 = -1_000_000;
+
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, usd, Quantity::new(0), false, 0, WEEK)
+            .get()?;
+        allow_book(&chain, alice, bob, usd);
+        Wrapper::push_from(&chain, bob)
+            .book(alice, usd, Quantity::new(1), RATE, "".into())
+            .get()?;
+        let opened = PairCycle::get(bob, alice, usd).expect("cycle opened");
+
+        chain.start_block_after(Seconds::new(8 * SECONDS_PER_DAY as i64).into());
+        assert_eq!(exp(&chain, bob, alice, usd), 1);
+
+        Wrapper::push_from(&chain, bob)
+            .book(alice, usd, Quantity::new(1_000_000), RATE, "".into())
+            .get()?;
+        let row = Obligation::get_by_interest_rate(bob, alice, usd, RATE).unwrap();
+        assert_eq!(row.remaining_principal.value, 1_000_001);
+        assert_eq!(row.accrued_interest.value, 0);
+        let cycle = PairCycle::get(bob, alice, usd).expect("cycle still open");
+        assert_eq!(cycle.cycle_started_at.seconds, opened.cycle_started_at.seconds);
+        assert_eq!(cycle.cycle_grace_seconds, WEEK);
+
+        chain.start_block_after(Seconds::new(SECONDS_PER_DAY as i64).into());
+        assert_eq!(
+            exp(&chain, bob, alice, usd),
+            compound_amount(1_000_001, RATE, SECONDS_PER_DAY as u64)
+        );
+        Ok(())
+    }
+
+    /// A 1-unit claim below one day's fee still occupies the destination, so a
+    /// sale does not inherit the source grace window.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_negative_rate_dust_blocks_transfer_grace(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        let peter = account!("peter");
+        for a in [alice, bob, peter] {
+            chain.new_account(a).unwrap();
+        }
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        const WEEK: u32 = 7 * 86_400;
+        const RATE: i32 = 100_000;
+
+        allow_book(&chain, bob, peter, usd);
+        Wrapper::push_from(&chain, peter)
+            .book(bob, usd, Quantity::new(1), -1_000_000, "".into())
+            .get()?;
+        chain.start_block_after(Seconds::new(SECONDS_PER_DAY as i64).into());
+        assert_eq!(exp(&chain, peter, bob, usd), 1);
+        assert!(Obligation::get_by_interest_rate(peter, bob, usd, -1_000_000).is_some());
+
+        Wrapper::push_from(&chain, alice)
+            .st_crd_lne(
+                bob,
+                usd,
+                Quantity::new(10_000_000),
+                false,
+                RATE as u32,
+                WEEK,
+            )
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .path_pay(
+                vec![hop(alice, usd)],
+                Quantity::new(1_000_000),
+                Quantity::new(1_000_000),
+                0,
+            )
+            .get()?;
+        assert_eq!(exp(&chain, alice, bob, usd), 1_000_000);
+
+        Wrapper::push_from(&chain, peter)
+            .st_crd_lne(bob, usd, Quantity::new(10_000_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, peter)
+            .st_glb_buy(usd, Quantity::new(0), 0, Quantity::new(u64::MAX), never())
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(peter, usd, Quantity::new(0), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .sell_claim(peter, bob, usd, Quantity::new(1_000_000))
+            .get()?;
+
+        assert_eq!(exp(&chain, alice, bob, usd), 0);
+        assert_eq!(exp(&chain, peter, bob, usd), 1_000_001);
+        assert!(Obligation::get_by_interest_rate(peter, bob, usd, -1_000_000).is_some());
+        assert_eq!(
+            PairCycle::get(peter, bob, usd)
+                .map(|c| c.cycle_started_at.seconds)
+                .unwrap_or(0),
+            0
+        );
+
+        chain.start_block_after(Seconds::new(SECONDS_PER_DAY as i64).into());
+        assert_eq!(
+            exp(&chain, peter, bob, usd),
+            1 + compound_amount(1_000_000, RATE, SECONDS_PER_DAY as u64),
+            "destination was occupied, so the transferred claim was charged"
         );
         Ok(())
     }

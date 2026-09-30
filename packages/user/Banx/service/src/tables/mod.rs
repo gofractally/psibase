@@ -232,8 +232,9 @@ pub mod tables {
         /// Interest finalized at the last principal/rate change. Compounds
         /// with principal (see [`crate::interest`]).
         pub accrued_interest: Quantity,
-        /// Compound APR in ppm per year (`10_000` = 1%). See [`crate::interest`].
-        pub interest_rate: u32,
+        /// Compound APR in ppm per year (`10_000` = 1%, `-10_000` decays).
+        /// See [`crate::interest`].
+        pub interest_rate: i32,
 
         /// Start of the current principal/rate epoch.
         pub last_interest_accrual: TimePointSec,

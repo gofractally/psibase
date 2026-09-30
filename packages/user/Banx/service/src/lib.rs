@@ -229,14 +229,15 @@ pub mod service {
 
     /// Creditor (sender) books `amount` onto `debtor` under their live
     /// book-auth. Same ledger as [`deposit`], spends remaining (row stays at
-    /// 0 so it can be topped up), auto-nets. `interest_rate` must be ≤ the
-    /// auth's max. Memo is stored on activity.
+    /// 0 so it can be topped up), auto-nets. `interest_rate` must be within
+    /// ±100% and ≤ the auth's max. A negative rate decays the claim; the
+    /// creditor signs it. Memo is stored on activity.
     #[action]
     fn book(
         debtor: AccountNumber,
         asset_id: u16,
         amount: Quantity,
-        interest_rate: u32,
+        interest_rate: i32,
         memo: Memo,
     ) {
         let creditor = get_sender();
@@ -651,6 +652,8 @@ pub mod service {
             interest_rate <= crate::tables::PPM_SCALE,
             "interest_rate exceeds 100% (PPM_SCALE)"
         );
+        // Unsigned on purpose: the debtor signs `deposit` and the creditor
+        // does not. A negative rate is only available through `book`.
         let req_memo = if request_id != 0 {
             PayRequest::fulfill_please_book(request_id, receiver, depositor, asset_id, amount)
         } else {
@@ -695,13 +698,16 @@ pub mod service {
     ///
     /// Capped at live exposure. Same waterfall as net. Partial does **not**
     /// reset an open grace cycle; emptying the pair (principal and interest)
-    /// closes it.
+    /// closes it. An already-zero balance succeeds so accrual's delete commits.
     #[action]
     fn forgive(debtor: AccountNumber, asset_id: u16, amount: Quantity) {
         let creditor = get_sender();
         assert_account_exists(debtor);
         Asset::get_assert(asset_id);
         let take = Obligation::forgive_pair(creditor, debtor, asset_id, amount);
+        if take.value == 0 {
+            return;
+        }
         emit_pair_activity(
             creditor,
             debtor,

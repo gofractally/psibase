@@ -81,7 +81,7 @@ impl Connection {
     }
 
     /// Credit this directed claim, then auto-net. Returns the amount netted.
-    fn credit_and_net(&self, amount: Quantity, interest_rate: u32) -> Quantity {
+    fn credit_and_net(&self, amount: Quantity, interest_rate: i32) -> Quantity {
         Obligation::credit_pair(
             self.creditor,
             self.debtor,
@@ -108,8 +108,17 @@ impl Connection {
 
     /// Book a deposit: this creditor is owed `amount` by this debtor, then
     /// auto-net. No line required.
+    /// Debtor-signed deposit. The rate cannot be negative: the creditor does
+    /// not sign, and a negative rate would shrink their claim.
     pub fn deposit(self, amount: Quantity, interest_rate: u32) -> Quantity {
         assert!(amount.value > 0, "deposit amount must be positive");
+        self.credit_and_net(amount, interest_rate as i32)
+    }
+
+    /// Creditor-signed credit. A negative rate is the creditor agreeing that
+    /// this claim decays.
+    pub fn credit_at_rate(self, amount: Quantity, interest_rate: i32) -> Quantity {
+        assert!(amount.value > 0, "credit amount must be positive");
         self.credit_and_net(amount, interest_rate)
     }
 
@@ -133,7 +142,7 @@ impl Connection {
             self.debtor,
             to_asset,
             to_qty,
-            to_interest_rate,
+            to_interest_rate as i32,
         );
         Obligation::net_pair(self.creditor, self.debtor, to_asset, u64::MAX.into());
         to_qty
@@ -184,9 +193,12 @@ impl Connection {
                 .as_mut()
                 .expect("credit line required for new path draw");
             line.consume_remaining(Quantity::new(new_draw));
-            line.interest_rate
+            line.interest_rate as i32
         } else {
-            self.line.as_ref().map(|l| l.interest_rate).unwrap_or(0)
+            self.line
+                .as_ref()
+                .map(|l| l.interest_rate as i32)
+                .unwrap_or(0)
         };
         self.credit_and_net(amount, rate)
     }

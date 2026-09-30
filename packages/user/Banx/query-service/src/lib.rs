@@ -136,7 +136,7 @@ mod service {
         assetId: u16,
         remainingPrincipal: Decimal,
         accruedInterest: Decimal,
-        interestRatePpm: u32,
+        interestRatePpm: i32,
         createdAt: i64,
         lastInterestAccrual: i64,
     }
@@ -144,13 +144,14 @@ mod service {
     impl From<Obligation> for ObligationView {
         fn from(o: Obligation) -> Self {
             let p = asset_precision(o.asset_id);
+            let (principal, accrued) = o.live_parts();
             Self {
                 id: o.id,
                 creditor: o.creditor,
                 debtor: o.debtor,
                 assetId: o.asset_id,
-                remainingPrincipal: Decimal::new(o.remaining_principal, p),
-                accruedInterest: Decimal::new(o.live_accrued(), p),
+                remainingPrincipal: Decimal::new(principal, p),
+                accruedInterest: Decimal::new(accrued, p),
                 interestRatePpm: o.interest_rate,
                 createdAt: time_sec(o.created_at),
                 lastInterestAccrual: time_sec(o.last_interest_accrual),

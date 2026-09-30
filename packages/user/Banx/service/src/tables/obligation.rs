@@ -18,12 +18,13 @@ impl Obligation {
             .collect()
     }
 
-    /// Total exposure: Σ(principal + live accrued interest).
+    /// Total exposure: Σ live balance (principal + interest, after decay).
     pub fn exposure(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) -> Quantity {
         Self::obligations(creditor, debtor, asset_id)
             .into_iter()
             .fold(Quantity::new(0), |acc, o| {
-                acc + o.remaining_principal + o.live_accrued()
+                let (principal, accrued) = o.live_parts();
+                acc + principal + accrued
             })
     }
 
@@ -31,7 +32,7 @@ impl Obligation {
         creditor: AccountNumber,
         debtor: AccountNumber,
         asset_id: u16,
-        interest_rate: u32,
+        interest_rate: i32,
     ) -> Option<Self> {
         Self::obligations(creditor, debtor, asset_id)
             .into_iter()
@@ -42,7 +43,7 @@ impl Obligation {
         creditor: AccountNumber,
         debtor: AccountNumber,
         asset_id: u16,
-        interest_rate: u32,
+        interest_rate: i32,
     ) -> Self {
         Self::get_by_interest_rate(creditor, debtor, asset_id, interest_rate)
             .unwrap_or_else(|| Self::new(creditor, debtor, asset_id, interest_rate))
@@ -59,7 +60,7 @@ impl Obligation {
         creditor: AccountNumber,
         debtor: AccountNumber,
         asset_id: u16,
-        interest_rate: u32,
+        interest_rate: i32,
     ) -> Self {
         let now = Self::now();
         Self {
@@ -100,16 +101,21 @@ impl Obligation {
         }
     }
 
-    /// Accrued interest including this epoch (does not persist).
-    pub fn live_accrued(&self) -> Quantity {
-        self.live_accrued_at(Self::now())
+    /// `(principal, accrued interest)` after this epoch. Decay below the
+    /// stored principal is returned as a smaller principal and zero interest.
+    pub fn live_parts(&self) -> (Quantity, Quantity) {
+        let (principal, accrued) = self.live_parts_at(Self::now());
+        (principal.into(), accrued.into())
     }
 
-    pub fn live_accrued_at(&self, now: TimePointSec) -> Quantity {
+    fn live_parts_at(&self, now: TimePointSec) -> (u64, u64) {
         if PairCycle::pair_in_grace(self.creditor, self.debtor, self.asset_id, now) {
             // No new compounding. Keep finalized interest already on the row
             // (e.g. transferred from an aged claim).
-            return self.accrued_interest;
+            return (
+                self.remaining_principal.value,
+                self.accrued_interest.value,
+            );
         }
         let base = self
             .remaining_principal
@@ -118,30 +124,47 @@ impl Obligation {
             .expect("interest base overflow");
         let total =
             crate::interest::compound_amount(base, self.interest_rate, self.dt_since_epoch(now));
-        total
-            .checked_sub(self.remaining_principal.value)
-            .expect("compound total below principal")
-            .into()
+        if total >= self.remaining_principal.value {
+            (
+                self.remaining_principal.value,
+                total - self.remaining_principal.value,
+            )
+        } else {
+            (total, 0)
+        }
     }
 
-    /// Finalize live interest and start a new epoch.
+    /// Finalize the live balance and start a new epoch.
     ///
     /// No-op during grace. A touch must not move the epoch, or post-grace
     /// compound starts at the touch instead of the last balance change.
     /// Callers that change principal or stored interest slide the epoch
-    /// via [`Self::note_grace_change`].
+    /// via [`Self::note_grace_change`]. A negative rate may shrink principal
+    /// once stored interest is gone; a zero balance deletes the row.
     pub fn accrue(&mut self) {
         let now = Self::now();
         if PairCycle::pair_in_grace(self.creditor, self.debtor, self.asset_id, now) {
             return;
         }
-        let live = self.live_accrued_at(now);
-        if live == self.accrued_interest && now.seconds <= self.last_interest_accrual.seconds {
+        let (principal, accrued) = self.live_parts_at(now);
+        let unchanged = principal == self.remaining_principal.value
+            && accrued == self.accrued_interest.value;
+        if unchanged && now.seconds <= self.last_interest_accrual.seconds {
             return;
         }
-        self.accrued_interest = live;
+        self.remaining_principal = principal.into();
+        self.accrued_interest = accrued.into();
         self.last_interest_accrual = now;
-        if !self.is_clear() {
+        if self.is_clear() {
+            self.delete();
+            PairCycle::sync_cycle(
+                self.creditor,
+                self.debtor,
+                self.asset_id,
+                false,
+                Self::pair_clear(self.creditor, self.debtor, self.asset_id),
+            );
+        } else {
             self.save();
         }
     }
@@ -161,6 +184,26 @@ impl Obligation {
         Self::obligations(creditor, debtor, asset_id)
             .iter()
             .all(|o| o.is_clear())
+    }
+
+    /// Delete rows whose live balance has reached zero.
+    ///
+    /// [`Self::pair_clear`] reads stored principal. A negative-rate row keeps
+    /// that principal until accrue deletes it, so a later credit at another
+    /// rate still looks occupied and posted grace does not open. Live rows
+    /// stay untouched: accruing them would move an epoch whose floored
+    /// balance did not change.
+    fn delete_decayed(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) {
+        let now = Self::now();
+        if PairCycle::pair_in_grace(creditor, debtor, asset_id, now) {
+            return;
+        }
+        for mut row in Self::obligations(creditor, debtor, asset_id) {
+            let (principal, accrued) = row.live_parts_at(now);
+            if principal == 0 && accrued == 0 && !row.is_clear() {
+                row.accrue();
+            }
+        }
     }
 
     /// Accrue every obligation on this directed pair/asset.
@@ -212,7 +255,7 @@ impl Obligation {
     /// `obs` is already [`Self::sort_for_net`] order. Interest, then principal.
     /// `on_take(rate, interest, principal)` runs only for a positive take.
     /// Returns the unconsumed remainder.
-    fn reduce_sorted(obs: &mut [Self], amount: u64, mut on_take: impl FnMut(u32, u64, u64)) -> u64 {
+    fn reduce_sorted(obs: &mut [Self], amount: u64, mut on_take: impl FnMut(i32, u64, u64)) -> u64 {
         let mut left = amount;
         for o in obs.iter_mut() {
             if left == 0 {
@@ -259,6 +302,9 @@ impl Obligation {
         );
         assert!(amount > 0, "transfer amount must be positive");
         Self::accrue_pair(from_creditor, debtor, asset_id);
+        // A live-zero destination still stores principal. Sample occupancy
+        // only after that row is gone, or the source window is not inherited.
+        Self::delete_decayed(to_creditor, debtor, asset_id);
         let now = Self::now();
         let src_cycle = PairCycle::get(from_creditor, debtor, asset_id);
         let dest_occupied = !Self::pair_clear(to_creditor, debtor, asset_id);
@@ -271,7 +317,7 @@ impl Obligation {
 
         let mut obs = Self::obligations(from_creditor, debtor, asset_id);
         Self::sort_for_net(&mut obs);
-        let mut dest_delta: Vec<(u32, u64, u64)> = Vec::new();
+        let mut dest_delta: Vec<(i32, u64, u64)> = Vec::new();
         let left = Self::reduce_sorted(&mut obs, amount, |rate, interest, principal| {
             Self::add_rate_delta(&mut dest_delta, rate, interest, principal);
         });
@@ -300,7 +346,7 @@ impl Obligation {
         );
     }
 
-    fn add_rate_delta(deltas: &mut Vec<(u32, u64, u64)>, rate: u32, interest: u64, principal: u64) {
+    fn add_rate_delta(deltas: &mut Vec<(i32, u64, u64)>, rate: i32, interest: u64, principal: u64) {
         if interest == 0 && principal == 0 {
             return;
         }
@@ -319,7 +365,7 @@ impl Obligation {
         creditor: AccountNumber,
         debtor: AccountNumber,
         asset_id: u16,
-        rate: u32,
+        rate: i32,
         interest: u64,
         principal: u64,
     ) {
@@ -401,14 +447,32 @@ impl Obligation {
         let take = Self::exposure(creditor, debtor, asset_id)
             .value
             .min(amount.value);
-        assert!(take > 0, "nothing to forgive");
+        // Nothing left, including a claim that just decayed to zero.
+        // Returning commits that delete; failing the action would roll it back.
+        if take == 0 {
+            return 0.into();
+        }
         Self::apply_reduction(creditor, debtor, asset_id, take);
         take.into()
     }
 
     /// Grow principal on this claim (shared by deposit and line draws).
-    /// Accrues first so interest is finalized on the prior principal balance.
+    /// Decayed rows on the pair are removed first, then this bucket is
+    /// accrued, so new principal is not back-dated and occupancy is sampled
+    /// after a zero balance is gone.
     fn credit(&mut self, amount: Quantity) {
+        Self::delete_decayed(self.creditor, self.debtor, self.asset_id);
+        // Accrue deleted this row on a copy. Drop the pre-decay principal
+        // before accruing again, or the stale balance is written back.
+        match Self::get(self.id) {
+            Some(row) => *self = row,
+            None if !self.is_clear() => {
+                self.remaining_principal = 0.into();
+                self.accrued_interest = 0.into();
+                self.last_interest_accrual = Self::now();
+            }
+            None => {}
+        }
         self.accrue();
         let before_clear = Self::pair_clear(self.creditor, self.debtor, self.asset_id);
         self.remaining_principal = self
@@ -435,8 +499,13 @@ impl Obligation {
         debtor: AccountNumber,
         asset_id: u16,
         amount: Quantity,
-        interest_rate: u32,
+        interest_rate: i32,
     ) {
+        let bound = crate::math::PPM_SCALE as i32;
+        assert!(
+            (-bound..=bound).contains(&interest_rate),
+            "interest_rate outside ±100% (PPM_SCALE)"
+        );
         Self::get_existing_or_new(creditor, debtor, asset_id, interest_rate).credit(amount);
     }
 

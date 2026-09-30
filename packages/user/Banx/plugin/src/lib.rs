@@ -269,7 +269,7 @@ impl Api for BanxPlugin {
         debtor: String,
         asset_id: u16,
         amount: String,
-        interest_rate_ppm: u32,
+        interest_rate_ppm: i32,
         memo: String,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::book)?;
