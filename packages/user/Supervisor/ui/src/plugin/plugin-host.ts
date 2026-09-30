@@ -7,7 +7,6 @@ import {
     bytesToBase64,
 } from "@psibase/common-lib";
 
-import { getClientKeyBytes } from "../client-key";
 import {
     BridgeImports,
     HostInterface,
@@ -257,7 +256,7 @@ export class PluginHost implements HostInterface {
                     this.supervisor.importKey(privateKey),
                 importKeyTransient: (privateKey) =>
                     this.supervisor.importKeyTransient(privateKey),
-                getClientKey: () => getClientKeyBytes(),
+                getClientKey: () => this.supervisor.getClientKey(),
             },
             "supervisor:bridge/database": {
                 get: (duration, key) => this.dbGet(duration, key),
