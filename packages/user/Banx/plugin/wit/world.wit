@@ -75,8 +75,8 @@ interface api {
     remove-credit-line: func(debtor: string, asset-id: u16) -> result<_, error>;
 
     /// Debtor (sender) lets `creditor` book deposits onto them, up to
-    /// `remaining` (human decimal). `max-interest-rate-ppm` 0 = interest-free
-    /// only. `expires-at-seconds` 0 = never.
+    /// `remaining` (human decimal). `max-interest-rate-ppm` is a ceiling; 0
+    /// still allows a negative rate. `expires-at-seconds` 0 = never.
     set-book-auth: func(
         creditor: string,
         asset-id: u16,

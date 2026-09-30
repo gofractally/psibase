@@ -382,7 +382,7 @@ pub mod tables {
         pub asset_id: u16,
         /// Live budget the creditor may still book. 0 means spent; row stays so it can be topped up.
         pub remaining: Quantity,
-        /// Max APR ppm the creditor may apply on a book (`0` = interest-free only).
+        /// Ceiling on the booked APR ppm. 0 still allows a negative rate.
         pub max_interest_rate: u32,
         /// Absolute expiry (`seconds == 0` → never).
         pub expires_at: TimePointSec,

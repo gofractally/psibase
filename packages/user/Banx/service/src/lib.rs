@@ -177,8 +177,8 @@ pub mod service {
 
     /// Debtor (sender) lets `creditor` book deposits onto them in `asset_id`,
     /// up to `remaining`. Dual of a credit line: they may *write* that you
-    /// owe them. `max_interest_rate` 0 = interest-free only. `expires_at`
-    /// 0 = never. Replaces any existing row for this pair/asset.
+    /// owe them. `max_interest_rate` is a ceiling; 0 still allows a negative
+    /// rate. `expires_at` 0 = never. Replaces any existing row for this pair/asset.
     #[action]
     fn st_bk_ath(
         creditor: AccountNumber,
