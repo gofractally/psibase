@@ -12,7 +12,7 @@ import { cn } from "@shared/lib/utils";
  * Resolves the local nickname (if any) for an account without triggering a
  * permission prompt: contacts are only read once we know we're allowed to.
  */
-export const useNickname = (account: string | null | undefined) => {
+const useNickname = (account: string | null | undefined) => {
     const { data: currentUser } = useCurrentUser();
     const { data: hasPermission } = useHasProfilesReadPermission({
         enabled: !!currentUser,

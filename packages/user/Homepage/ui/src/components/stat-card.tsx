@@ -22,7 +22,7 @@ const MIN_VALUE_SCALE = 0.5;
  * the card's width. Long numbers (e.g. "999,999.9999 PSI") would otherwise
  * be clipped at narrow card widths.
  */
-export const FitValue = ({
+const FitValue = ({
     children,
     className,
 }: {

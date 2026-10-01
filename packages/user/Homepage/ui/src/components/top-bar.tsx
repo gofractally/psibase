@@ -5,6 +5,7 @@ import { Link, useLocation } from "react-router-dom";
 import { useConversations } from "@/apps/chainmail/hooks/use-conversations";
 import { useUserTokenBalances } from "@/apps/tokens/hooks/tokens-plugin/use-user-token-balances";
 
+import { AccountMenu } from "@/components/account-menu";
 import { NotificationsSheet } from "@/components/notifications-sheet";
 
 import { useNotifications } from "@/hooks/use-notifications";
@@ -22,7 +23,7 @@ import {
     TooltipTrigger,
 } from "@shared/shadcn/ui/tooltip";
 
-/** Right-hand cluster of the top bar: balance, chats, notifications. */
+/** Right-hand cluster of the top bar: balance, chats, notifications, account. */
 export const TopBarActions = () => {
     const { data: user, isPending } = useCurrentUser();
 
@@ -30,13 +31,19 @@ export const TopBarActions = () => {
         return <Skeleton className="size-8 rounded-full" />;
     }
     if (!user) {
-        return <LoginButton />;
+        return (
+            <div className="flex items-center gap-2">
+                <LoginButton />
+                <AccountMenu />
+            </div>
+        );
     }
     return (
         <div className="flex items-center gap-1 sm:gap-1.5">
             <BalancePill user={user} />
             <ChatsButton />
             <NotificationsButton />
+            <AccountMenu />
         </div>
     );
 };

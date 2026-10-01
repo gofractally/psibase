@@ -4,7 +4,7 @@ import { useBoolean } from "usehooks-ts";
 import z from "zod";
 
 import { EmptyState } from "@/components/empty-state";
-import { PageHeader, Panel } from "@/components/page-header";
+import { Panel } from "@/components/page-header";
 import { DataTable, THead, Table, Td, Th, Tr } from "@/components/table";
 
 import { colorFor } from "@/lib/colors";
@@ -176,44 +176,13 @@ export const SwapPage = () => {
     const { value: showSettingsModal, setValue: setShowSettingsModal } =
         useBoolean();
 
-    const description =
-        currentTab == zCurrentTab.Values.Swap
-            ? "Trade between tokens using the pools on this network."
-            : "Add liquidity to an existing pool or create a new one.";
-
     return (
-        <div className="flex flex-col gap-4">
+        <>
             <TradeSettingsModal
                 openChange={(e) => {
                     setShowSettingsModal(e);
                 }}
                 show={showSettingsModal}
-            />
-
-            <PageHeader
-                title="Swap"
-                description={description}
-                actions={
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button
-                                onClick={() => {
-                                    setShowSettingsModal(true);
-                                }}
-                                variant="outline"
-                                size="sm"
-                                className="h-7 text-xs"
-                            >
-                                <Settings className="size-3.5" />
-                                Slippage{" "}
-                                <span className="font-mono tabular-nums">
-                                    {slippage * 100}%
-                                </span>
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Transaction settings</TooltipContent>
-                    </Tooltip>
-                }
             />
 
             <div className="grid gap-4 lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)]">
@@ -237,6 +206,29 @@ export const SwapPage = () => {
                             ))}
                         </div>
                     }
+                    actions={
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    onClick={() => {
+                                        setShowSettingsModal(true);
+                                    }}
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 text-xs"
+                                >
+                                    <Settings className="size-3.5" />
+                                    Slippage{" "}
+                                    <span className="font-mono tabular-nums">
+                                        {slippage * 100}%
+                                    </span>
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                Transaction settings
+                            </TooltipContent>
+                        </Tooltip>
+                    }
                 >
                     {currentTab == zCurrentTab.Values.Swap && (
                         <Swap
@@ -252,6 +244,6 @@ export const SwapPage = () => {
 
                 <PoolsPanel />
             </div>
-        </div>
+        </>
     );
 };

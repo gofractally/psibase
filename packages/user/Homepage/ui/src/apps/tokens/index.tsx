@@ -1,6 +1,8 @@
 import { defineAppConfig } from "@/app-config";
 import { Coins } from "lucide-react";
 
+import { SwapPage } from "@/apps/token-swap/page";
+
 import { zAccount } from "@shared/lib/schemas/account";
 
 import { TokensLayout } from "./layout";
@@ -10,11 +12,8 @@ import { TransferPage } from "./transfer";
 export const tokensConfig = defineAppConfig({
     service: zAccount.parse("tokens"),
     name: "Wallet",
-    description: "Send tokens and manage balances.",
+    description: "Send, receive and swap tokens.",
     icon: <Coins className="h-6 w-6" />,
-    isMore: false,
-    isLoginRequired: true,
-    showLoginLoadingSpinner: true,
     element: <TokensLayout />,
     children: [
         {
@@ -26,6 +25,11 @@ export const tokensConfig = defineAppConfig({
             path: "Pending",
             element: <PendingPage />,
             name: "Pending",
+        },
+        {
+            path: "swap",
+            element: <SwapPage />,
+            name: "Swap",
         },
     ],
 });

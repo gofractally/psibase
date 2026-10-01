@@ -1,5 +1,3 @@
-import { EverywhereStats } from "@/components/home/everywhere-stats";
-import { HowItWorks } from "@/components/home/how-it-works";
 import { LatestChats } from "@/components/home/latest-chats";
 import { GuestHero, PassportHero } from "@/components/home/passport-hero";
 import { WalletWidget } from "@/components/home/wallet-widget";
@@ -30,16 +28,11 @@ const Dashboard = () => {
                 )}
             </div>
 
-            {user ? (
-                <>
-                    <EverywhereStats user={user} />
-                    <div className="grid gap-6 xl:grid-cols-3">
-                        <LatestChats className="xl:col-span-2" />
-                        <WalletWidget user={user} />
-                    </div>
-                </>
-            ) : (
-                !isPending && <HowItWorks />
+            {user && (
+                <div className="grid gap-6 xl:grid-cols-3">
+                    <LatestChats className="xl:col-span-2" />
+                    <WalletWidget user={user} />
+                </div>
             )}
         </div>
     );

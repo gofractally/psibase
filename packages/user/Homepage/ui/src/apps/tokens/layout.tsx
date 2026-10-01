@@ -1,5 +1,6 @@
+import { ArrowRightLeft, Clock, Send } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useMatch } from "react-router-dom";
 
 import {
     type Token,
@@ -26,11 +27,41 @@ export interface TokensOutletContext {
 }
 
 const tabs = [
-    { to: "/tokens", label: "Send", end: true },
-    { to: "/tokens/Pending", label: "Pending", end: false },
+    { to: "/tokens", label: "Send", icon: Send, end: true },
+    { to: "/tokens/Pending", label: "Pending", icon: Clock, end: false },
+    { to: "/tokens/swap", label: "Swap", icon: ArrowRightLeft, end: false },
 ];
 
+const WalletTabs = ({ pendingCount }: { pendingCount: number }) => (
+    <nav className="-mt-1 flex gap-1 border-b" aria-label="Wallet sections">
+        {tabs.map(({ to, label, icon: Icon, end }) => (
+            <NavLink
+                key={to}
+                to={to}
+                end={end}
+                className={({ isActive }) =>
+                    cn(
+                        "-mb-px inline-flex items-center gap-1.5 border-b-2 px-2.5 pb-2.5 pt-1 text-sm font-medium transition-colors",
+                        isActive
+                            ? "text-foreground border-[var(--brand)]"
+                            : "text-muted-foreground hover:text-foreground border-transparent",
+                    )
+                }
+            >
+                <Icon className="size-3.5" />
+                {label}
+                {label === "Pending" && pendingCount > 0 && (
+                    <span className="rounded bg-amber-500/15 px-1 font-mono text-[10px] tabular-nums text-amber-600 dark:text-amber-400">
+                        {pendingCount}
+                    </span>
+                )}
+            </NavLink>
+        ))}
+    </nav>
+);
+
 export const TokensLayout = () => {
+    const isSwap = useMatch("/tokens/swap") !== null;
     const { data: currentUserData, isSuccess } = useCurrentUser();
     const { data, isLoading: isLoadingBalances } =
         useUserTokenBalances(currentUserData);
@@ -82,58 +113,45 @@ export const TokensLayout = () => {
         <div className="flex flex-col gap-4">
             <PageHeader
                 title="Wallet"
-                description="Send tokens, review activity and manage pending transfers."
+                description="Send, receive and swap tokens."
                 actions={<AutoDebitSwitch currentUser={currentUser} />}
             />
+            <WalletTabs pendingCount={incomingCount} />
 
-            <WalletStats
-                selectedToken={selectedToken}
-                tokens={tokens}
-                pending={pendingForToken}
-                currentUser={currentUser}
-                onClickAvailable={handleSetMaxAmount ?? undefined}
-            />
-
-            <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
-                <TokenBalances
-                    tokens={tokens}
-                    selectedToken={selectedToken}
-                    onSelect={handleTokenSelect}
-                />
-
-                <div className="flex min-w-0 flex-col gap-4">
-                    <div className="flex items-center gap-1">
-                        {tabs.map((tab) => (
-                            <NavLink
-                                key={tab.to}
-                                to={tab.to}
-                                end={tab.end}
-                                className={({ isActive }) =>
-                                    cn(
-                                        "text-muted-foreground hover:bg-accent/60 hover:text-foreground inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors",
-                                        isActive &&
-                                            "bg-accent text-foreground shadow-sm",
-                                    )
-                                }
-                            >
-                                {tab.label}
-                                {tab.label === "Pending" &&
-                                    incomingCount > 0 && (
-                                        <span className="rounded bg-amber-500/15 px-1 font-mono text-[10px] tabular-nums text-amber-600 dark:text-amber-400">
-                                            {incomingCount}
-                                        </span>
-                                    )}
-                            </NavLink>
-                        ))}
-                    </div>
-                    {selectedToken?.isTransferable === false && (
-                        <UntransferableTokenWarning />
-                    )}
-                    <Outlet
-                        context={{ selectedToken, currentUser, isLoading }}
+            {isSwap ? (
+                <Outlet />
+            ) : (
+                <>
+                    <WalletStats
+                        selectedToken={selectedToken}
+                        tokens={tokens}
+                        pending={pendingForToken}
+                        currentUser={currentUser}
+                        onClickAvailable={handleSetMaxAmount ?? undefined}
                     />
-                </div>
-            </div>
+
+                    <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
+                        <TokenBalances
+                            tokens={tokens}
+                            selectedToken={selectedToken}
+                            onSelect={handleTokenSelect}
+                        />
+
+                        <div className="flex min-w-0 flex-col gap-4">
+                            {selectedToken?.isTransferable === false && (
+                                <UntransferableTokenWarning />
+                            )}
+                            <Outlet
+                                context={{
+                                    selectedToken,
+                                    currentUser,
+                                    isLoading,
+                                }}
+                            />
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
     );
 };

@@ -10,10 +10,7 @@ export const chainMailConfig = defineAppConfig({
     name: "Chain mail",
     description: "Chat with anyone on the network.",
     icon: <MessageCircle className="h-6 w-6" />,
-    isMore: false,
     fill: true,
-    showLoginLoadingSpinner: true,
-    isLoginRequired: true,
     children: [
         {
             path: "",
