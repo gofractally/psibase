@@ -104,6 +104,39 @@ impl HttpRequest {
             .find(|h| h.matches(name))
             .map(|h| h.value.as_str())
     }
+
+    /// Every `Cookie` header value, in header order, split on `;`.
+    ///
+    /// Segments without `=` yield [`CookiePart::Malformed`]. Empty segments
+    /// (including from `;;`) are skipped. Names and values are trimmed; values
+    /// are not URL-decoded.
+    pub fn cookies(&self) -> impl Iterator<Item = CookiePart<'_>> + '_ {
+        self.headers
+            .iter()
+            .filter(|h| h.matches("cookie"))
+            .flat_map(|h| h.value.split(';').filter_map(parse_cookie_segment))
+    }
+}
+
+/// One name/value pair from a `Cookie` header, or a malformed segment.
+#[derive(Debug, PartialEq, Eq)]
+pub enum CookiePart<'a> {
+    Pair { name: &'a str, value: &'a str },
+    Malformed,
+}
+
+fn parse_cookie_segment(segment: &str) -> Option<CookiePart<'_>> {
+    let segment = segment.trim();
+    if segment.is_empty() {
+        return None;
+    }
+    let Some((name, value)) = segment.split_once('=') else {
+        return Some(CookiePart::Malformed);
+    };
+    Some(CookiePart::Pair {
+        name: name.trim(),
+        value: value.trim(),
+    })
 }
 
 pub struct HttpBody {
@@ -277,4 +310,120 @@ pub fn allow_cors_with_origin(origin: &str) -> Vec<HttpHeader> {
         HttpHeader::new("Access-Control-Allow-Methods", "POST, GET, OPTIONS, HEAD"),
         HttpHeader::new("Access-Control-Allow-Headers", "*"),
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn cookie_parts(request: &HttpRequest) -> Vec<CookiePart<'_>> {
+        request.cookies().collect()
+    }
+
+    #[test]
+    fn cookies_single_header() {
+        let request = HttpRequest {
+            headers: vec![HttpHeader::new(
+                "Cookie",
+                "foo=10; bar=27; session=xxx",
+            )],
+            ..Default::default()
+        };
+        assert_eq!(
+            cookie_parts(&request),
+            vec![
+                CookiePart::Pair {
+                    name: "foo",
+                    value: "10"
+                },
+                CookiePart::Pair {
+                    name: "bar",
+                    value: "27"
+                },
+                CookiePart::Pair {
+                    name: "session",
+                    value: "xxx"
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn cookies_multiple_headers() {
+        let request = HttpRequest {
+            headers: vec![
+                HttpHeader::new("CooKiE", "foo=10; bar=27"),
+                HttpHeader::new("cookie", "bar=7"),
+                HttpHeader::new("cookie", "bar=17; extra=9"),
+            ],
+            ..Default::default()
+        };
+        assert_eq!(
+            cookie_parts(&request),
+            vec![
+                CookiePart::Pair {
+                    name: "foo",
+                    value: "10"
+                },
+                CookiePart::Pair {
+                    name: "bar",
+                    value: "27"
+                },
+                CookiePart::Pair {
+                    name: "bar",
+                    value: "7"
+                },
+                CookiePart::Pair {
+                    name: "bar",
+                    value: "17"
+                },
+                CookiePart::Pair {
+                    name: "extra",
+                    value: "9"
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn cookies_trims_and_skips_empty() {
+        let request = HttpRequest {
+            headers: vec![HttpHeader::new(
+                "cookie",
+                "  foo = 10 ; ; bar=27  ",
+            )],
+            ..Default::default()
+        };
+        assert_eq!(
+            cookie_parts(&request),
+            vec![
+                CookiePart::Pair {
+                    name: "foo",
+                    value: "10"
+                },
+                CookiePart::Pair {
+                    name: "bar",
+                    value: "27"
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn cookies_malformed() {
+        let request = HttpRequest {
+            headers: vec![HttpHeader::new("cookie", "foo=10; badsegment")],
+            ..Default::default()
+        };
+        assert_eq!(
+            cookie_parts(&request),
+            vec![
+                CookiePart::Pair {
+                    name: "foo",
+                    value: "10"
+                },
+                CookiePart::Malformed,
+            ]
+        );
+    }
 }

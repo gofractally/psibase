@@ -326,24 +326,19 @@ mod service {
 
     fn cookie_id(request: &HttpRequest, name: &str, byte_len: usize) -> CookieValue {
         let mut found = None;
-        for header in &request.headers {
-            if !header.matches("cookie") {
-                continue;
-            }
-            for part in header.value.split(';') {
-                let part = part.trim();
-                if part.is_empty() {
-                    continue;
-                }
-                let Some((cookie_name, value)) = part.split_once('=') else {
-                    return CookieValue::Malformed;
-                };
-                if cookie_name.trim() == name {
+        for part in request.cookies() {
+            match part {
+                CookiePart::Malformed => return CookieValue::Malformed,
+                CookiePart::Pair {
+                    name: cookie_name,
+                    value,
+                } if cookie_name == name => {
                     if found.is_some() {
                         return CookieValue::Malformed;
                     }
                     found = Some(value);
                 }
+                _ => {}
             }
         }
         match found {
