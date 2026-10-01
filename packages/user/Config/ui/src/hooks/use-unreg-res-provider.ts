@@ -16,7 +16,7 @@ export const useUnregResProvider = () =>
             error: "Failed unregistering resource provider",
             loading: "Unregistering resource provider",
             success: "Unregistered resource provider",
-            isStagable: true,
+            isStagable: false,
             onSuccess: () => {
                 void queryClient.invalidateQueries({
                     queryKey: QueryKey.resourceProviders(),

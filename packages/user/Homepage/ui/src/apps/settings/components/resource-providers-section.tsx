@@ -1,5 +1,8 @@
-import { siblingUrl } from "@psibase/common-lib";
 import { useEffect, useState } from "react";
+
+import { siblingUrl } from "@psibase/common-lib";
+
+import { useIsPrivateNetwork } from "@shared/hooks/use-is-private-network";
 
 import {
     type ResourceProvider,
@@ -36,6 +39,7 @@ function purchaseUrl(provider: ResourceProvider): string {
 
 export const ResourceProvidersSection = () => {
     const { data: providers, isLoading } = useResourceProviders();
+    const { isPrivateNetwork } = useIsPrivateNetwork();
     const [ordered, setOrdered] = useState<ResourceProvider[]>([]);
 
     useEffect(() => {
@@ -56,12 +60,12 @@ export const ResourceProvidersSection = () => {
         setOrdered([...pinned, ...rest]);
     }, [providers]);
 
-    if (isLoading || ordered.length === 0) {
+    if (!isPrivateNetwork && (isLoading || ordered.length === 0)) {
         return null;
     }
 
     return (
-        <div className="space-y-4 border-t pt-8">
+        <div id="resource-providers" className="space-y-4 border-t pt-8">
             <div>
                 <h2 className="mb-2 text-2xl font-bold">Resource providers</h2>
                 <p className="text-muted-foreground text-sm">
@@ -69,42 +73,52 @@ export const ResourceProvidersSection = () => {
                 </p>
             </div>
 
-            <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                    <thead>
-                        <tr className="border-b">
-                            <th className="py-2 pr-4 font-medium">Provider</th>
-                            <th className="py-2 pr-4 font-medium">Currencies</th>
-                            <th className="py-2 font-medium">Purchase</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {ordered.map((provider) => (
-                            <tr
-                                key={provider.producer}
-                                className="border-b last:border-0"
-                            >
-                                <td className="py-2 pr-4">
-                                    {provider.producer}
-                                </td>
-                                <td className="py-2 pr-4">
-                                    {provider.accepted.join(", ")}
-                                </td>
-                                <td className="py-2">
-                                    <a
-                                        className="text-primary underline underline-offset-2"
-                                        href={purchaseUrl(provider)}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                    >
-                                        Buy resources
-                                    </a>
-                                </td>
+            {isLoading ? null : ordered.length === 0 ? (
+                <p className="text-muted-foreground text-sm">
+                    No resource providers are registered on this network.
+                </p>
+            ) : (
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                        <thead>
+                            <tr className="border-b">
+                                <th className="py-2 pr-4 font-medium">
+                                    Provider
+                                </th>
+                                <th className="py-2 pr-4 font-medium">
+                                    Currencies
+                                </th>
+                                <th className="py-2 font-medium">Purchase</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+                        </thead>
+                        <tbody>
+                            {ordered.map((provider) => (
+                                <tr
+                                    key={provider.producer}
+                                    className="border-b last:border-0"
+                                >
+                                    <td className="py-2 pr-4">
+                                        {provider.producer}
+                                    </td>
+                                    <td className="py-2 pr-4">
+                                        {provider.accepted.join(", ")}
+                                    </td>
+                                    <td className="py-2">
+                                        <a
+                                            className="text-primary underline underline-offset-2"
+                                            href={purchaseUrl(provider)}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                        >
+                                            Buy resources
+                                        </a>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
         </div>
     );
 };

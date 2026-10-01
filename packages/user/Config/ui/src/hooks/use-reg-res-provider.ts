@@ -16,7 +16,7 @@ export const useRegResProvider = () =>
             error: "Failed registering resource provider",
             loading: "Registering resource provider",
             success: "Registered resource provider",
-            isStagable: true,
+            isStagable: false,
             onSuccess: () => {
                 void queryClient.invalidateQueries({
                     queryKey: QueryKey.resourceProviders(),

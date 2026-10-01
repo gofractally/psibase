@@ -1,6 +1,25 @@
 use crate::tables::tables::*;
+use async_graphql::ComplexObject;
 use psibase::services::producers::Wrapper as Producers;
 use psibase::*;
+
+#[ComplexObject]
+impl ResourceProvider {
+    /// Producer candidate HTTP endpoint (root origin), if registered.
+    async fn endpoint(&self) -> Option<String> {
+        Producers::call()
+            .getCandidate(self.provider)
+            .map(|c| c.endpoint)
+    }
+
+    /// Whether this producer is currently in the active producer set.
+    async fn active_infra_provider(&self) -> bool {
+        Producers::call()
+            .getProducers()
+            .into_iter()
+            .any(|p| p == self.provider)
+    }
+}
 
 impl ResourceProvider {
     pub fn get(provider: AccountNumber) -> Option<Self> {
