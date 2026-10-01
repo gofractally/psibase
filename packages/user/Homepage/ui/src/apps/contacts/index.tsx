@@ -15,7 +15,6 @@ export const contactsConfig = defineAppConfig({
         {
             path: "",
             element: <ContactsPage />,
-            name: "Home",
         },
     ],
 });

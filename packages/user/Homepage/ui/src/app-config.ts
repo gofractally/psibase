@@ -21,7 +21,6 @@ const AppConfigSchema = z.object({
         z.object({
             path: z.string(),
             element: z.any(),
-            name: z.string(),
         }),
     ),
 });

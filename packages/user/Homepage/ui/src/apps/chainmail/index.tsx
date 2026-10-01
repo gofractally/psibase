@@ -15,7 +15,6 @@ export const chainMailConfig = defineAppConfig({
         {
             path: "",
             element: <ChatPage />,
-            name: "Chats",
         },
     ],
 });

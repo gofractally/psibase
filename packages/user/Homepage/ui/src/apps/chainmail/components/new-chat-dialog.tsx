@@ -88,7 +88,8 @@ export const NewChatDialog = ({ open, onOpenChange, onStart }: Props) => {
                                 onValidate={undefined}
                             />
                         </div>
-                        <Button type="submit" className="shrink-0">
+                        {/* TextField keeps an empty label row (plus gap) above its input. */}
+                        <Button type="submit" className="mt-2 shrink-0">
                             Start
                         </Button>
                     </form>
