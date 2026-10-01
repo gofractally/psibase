@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 
-import { Check, ChevronDown, Loader2, XCircle } from "lucide-react";
+import { ChevronDown, Loader2, XCircle } from "lucide-react";
 
 import { defaultAssetId } from "@/components/asset-select";
 import { AssetField, amountUnit } from "@/components/form-fields";
+import { PathRoute } from "@/components/path-route";
 import { useAssetMap } from "@/hooks/use-assets";
+import { useBanxContacts } from "@/hooks/use-banx-contacts";
 import {
     type PathHopQuote,
     usePathPay,
@@ -198,13 +200,11 @@ const QUOTE_STALE =
 
 function PathStatus({
     pending,
-    found,
     failed,
     error,
     onRetry,
 }: {
     pending: boolean;
-    found: boolean;
     failed: boolean;
     error?: string | null;
     onRetry?: () => void;
@@ -214,14 +214,6 @@ function PathStatus({
             <span className="text-muted-foreground inline-flex items-center gap-1.5 text-sm">
                 <Loader2 className="size-4 animate-spin" />
                 Loading
-            </span>
-        );
-    }
-    if (found) {
-        return (
-            <span className="inline-flex items-center gap-1.5 text-sm text-emerald-700 dark:text-emerald-400">
-                <Check className="size-4" strokeWidth={2.5} />
-                Path Found
             </span>
         );
     }
@@ -274,6 +266,7 @@ export function TransferDialog({
     defaultAsset?: number;
 }) {
     const { data: user } = useCurrentUser();
+    const { label } = useBanxContacts("/accounts");
     const { assets, byId, precisionOf, symbolOf, isSuccess: assetsReady } =
         useAssetMap();
     // Present only on the accounts page, where the header already chose the currency.
@@ -794,7 +787,6 @@ export function TransferDialog({
                                     </Button>
                                     <PathStatus
                                         pending={quotePath.isPending}
-                                        found={found}
                                         failed={failed}
                                         error={quoteError}
                                         onRetry={() => {
@@ -803,6 +795,15 @@ export function TransferDialog({
                                             findNow();
                                         }}
                                     />
+                                    {found && quote && user ? (
+                                        <PathRoute
+                                            className="basis-full"
+                                            user={user}
+                                            hops={quote.hops}
+                                            symbolOf={symbolOf}
+                                            labelOf={label}
+                                        />
+                                    ) : null}
                                     </>
                                 );
                             }}
@@ -1156,7 +1157,7 @@ export function TransferDialog({
                 </Collapsible>
 
                 <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-                    <DialogContent className="sm:max-w-md">
+                    <DialogContent className="sm:max-w-xl">
                         <DialogHeader>
                             <DialogTitle>
                                 {requestId
@@ -1213,60 +1214,24 @@ export function TransferDialog({
                             </DialogDescription>
                         </DialogHeader>
                         <execForm.Subscribe
-                            selector={(s) => s.values.hops}
-                            children={(hops) => {
-                                const path = hops.filter(
-                                    (h) =>
-                                        h.account.trim() &&
-                                        h.assetId !== undefined,
+                            selector={(s) => s.values}
+                            children={(exec) => {
+                                const matched = quoteStillCurrent(
+                                    user,
+                                    findForm.state.values,
+                                    quotedKey,
+                                    quote,
+                                    exec,
+                                    requestId > 0,
                                 );
-                                if (path.length === 0) {
-                                    return (
-                                        <p className="text-muted-foreground text-sm">
-                                            No hops on this path.
-                                        </p>
-                                    );
-                                }
+                                if (!matched || !quote || !user) return null;
                                 return (
-                                    <ol className="space-y-2 text-sm">
-                                        {path.map((h, i) => {
-                                            const quoted = quote?.hops[i];
-                                            const same =
-                                                quoted &&
-                                                quoted.account ===
-                                                    h.account.trim() &&
-                                                quoted.assetId === h.assetId;
-                                            return (
-                                                <li
-                                                    key={`${h.account}-${h.assetId}-${i}`}
-                                                    className="flex items-baseline justify-between gap-3"
-                                                >
-                                                    <span>
-                                                        <span className="text-muted-foreground mr-2 font-mono text-xs">
-                                                            {i + 1}.
-                                                        </span>
-                                                        <span className="font-medium">
-                                                            {h.account.trim()}
-                                                        </span>
-                                                        <span className="text-muted-foreground">
-                                                            {" "}
-                                                            ·{" "}
-                                                            {symbolOf(
-                                                                h.assetId!,
-                                                            )}
-                                                        </span>
-                                                    </span>
-                                                    {same && quoted?.amount ? (
-                                                        <span className="text-muted-foreground font-mono text-xs">
-                                                            {displayAmount(
-                                                                quoted.amount,
-                                                            )}
-                                                        </span>
-                                                    ) : null}
-                                                </li>
-                                            );
-                                        })}
-                                    </ol>
+                                    <PathRoute
+                                        user={user}
+                                        hops={quote.hops}
+                                        symbolOf={symbolOf}
+                                        labelOf={label}
+                                    />
                                 );
                             }}
                         />

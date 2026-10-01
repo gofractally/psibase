@@ -84,6 +84,40 @@ function holdAt(node: GNode, x: number, y: number) {
     node.fy = y;
 }
 
+function nodeAtPoint(
+    nodes: readonly GNode[],
+    x: number,
+    y: number,
+    scale: number,
+    labelShown: (id: string) => boolean,
+): string | null {
+    const pad = 10 / (scale || 1);
+    const font = 11 / (scale || 1);
+    let best: { id: string; dist: number } | null = null;
+    for (const node of nodes) {
+        if (node.x == null || node.y == null) continue;
+        const id = String(node.id ?? "");
+        if (!id) continue;
+        const radius = nodeRadius(node);
+        const halfW = labelShown(id)
+            ? Math.max(
+                  radius + pad,
+                  (shortLabel(node.label).length * font * 0.55) / 2 + pad,
+              )
+            : radius + pad;
+        const top = node.y - radius - pad;
+        const bottom = labelShown(id)
+            ? node.y + radius + font + pad
+            : node.y + radius + pad;
+        if (x < node.x - halfW || x > node.x + halfW || y < top || y > bottom) {
+            continue;
+        }
+        const dist = Math.hypot(node.x - x, node.y - y);
+        if (!best || dist < best.dist) best = { id, dist };
+    }
+    return best?.id ?? null;
+}
+
 function dropTargetId(
     nodes: readonly GNode[],
     selfId: string,
@@ -382,6 +416,7 @@ export function NetworkPage() {
     const nodesRef = useRef<GNode[]>([]);
     // A finished drag still emits a click on the next frame.
     const swallowClick = useRef(false);
+    const hitLabels = useRef<(id: string) => boolean>(() => false);
     if (typeof document !== "undefined") colorsRef.current = themeColors();
     const assetShown = useRef(assetId);
     if (assetShown.current !== assetId) {
@@ -498,21 +533,39 @@ export function NetworkPage() {
         [focusIds, hover, selected, showAllLabels],
     );
 
+    hitLabels.current = (id: string) => showAllLabels || focusIds.has(id);
+
+    const labelShown = useCallback(
+        (id: string) => showAllLabels || focusIds.has(id),
+        [focusIds, showAllLabels],
+    );
+
     const paintPointer = useCallback(
-        (node: GNode, color: string, ctx: CanvasRenderingContext2D) => {
+        (
+            node: GNode,
+            color: string,
+            ctx: CanvasRenderingContext2D,
+            globalScale: number,
+        ) => {
             if (node.x == null || node.y == null) return;
+            const id = String(node.id ?? "");
+            const radius = nodeRadius(node);
+            const pad = 10 / (globalScale || 1);
+            const font = 11 / (globalScale || 1);
+            const halfW = labelShown(id)
+                ? Math.max(
+                      radius + pad,
+                      (shortLabel(node.label).length * font * 0.55) / 2 + pad,
+                  )
+                : radius + pad;
+            const top = node.y - radius - pad;
+            const height = labelShown(id)
+                ? radius + pad + font + pad + radius
+                : radius * 2 + pad * 2;
             ctx.fillStyle = color;
-            ctx.beginPath();
-            ctx.arc(
-                node.x,
-                node.y,
-                nodeRadius(node) + (node.you ? 8 : 2),
-                0,
-                2 * Math.PI,
-            );
-            ctx.fill();
+            ctx.fillRect(node.x - halfW, top, halfW * 2, height);
         },
-        [],
+        [labelShown],
     );
 
     const linkColor = useCallback((link: GLink) => {
@@ -525,6 +578,47 @@ export function NetworkPage() {
     const fit = () => {
         fgRef.current?.zoomToFit(400, 56);
     };
+
+    useEffect(() => {
+        const frame = frameRef.current;
+        if (!frame) return;
+        let down: { x: number; y: number } | null = null;
+        const onDown = (event: PointerEvent) => {
+            if (event.button !== 0) return;
+            down = { x: event.clientX, y: event.clientY };
+        };
+        const onUp = (event: PointerEvent) => {
+            if (event.button !== 0 || !down) return;
+            const moved = Math.hypot(event.clientX - down.x, event.clientY - down.y);
+            down = null;
+            // A drag repositions a node or draws a credit line. Those already
+            // choose the account. A click has to, because the graph treats any
+            // mouse movement as a pan and then drops the click.
+            if (moved > 8 || swallowClick.current || linkDrag.current) return;
+            const canvas = frame.querySelector("canvas");
+            const api = fgRef.current;
+            if (!canvas || !api) return;
+            const rect = canvas.getBoundingClientRect();
+            const point = api.screen2GraphCoords(
+                event.clientX - rect.left,
+                event.clientY - rect.top,
+            );
+            const id = nodeAtPoint(
+                nodesRef.current,
+                point.x,
+                point.y,
+                api.zoom() || 1,
+                (account) => hitLabels.current(account),
+            );
+            setSelected(id);
+        };
+        frame.addEventListener("pointerdown", onDown, true);
+        frame.addEventListener("pointerup", onUp, true);
+        return () => {
+            frame.removeEventListener("pointerdown", onDown, true);
+            frame.removeEventListener("pointerup", onUp, true);
+        };
+    }, []);
 
     const paintDraft = useCallback(
         (ctx: CanvasRenderingContext2D, globalScale: number) => {
@@ -606,8 +700,19 @@ export function NetworkPage() {
     };
 
     const onYouDragEnd = (raw: GNode) => {
+        const id = String(raw.id ?? "");
         const draft = linkDrag.current;
-        if (!raw.you || !draft) return;
+        // A small pointer move is still a click. Node drag eats that click,
+        // so the account is focused here unless this was a line dropped on someone.
+        if (!raw.you || !draft) {
+            if (id) setSelected(id);
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    swallowClick.current = false;
+                });
+            });
+            return;
+        }
         for (const pinned of draft.pinned) {
             pinned.node.fx = pinned.fx;
             pinned.node.fy = pinned.fy;
@@ -618,6 +723,8 @@ export function NetworkPage() {
         if (targetId && user) {
             setSelected(targetId);
             setOffer(offerFromDrop(lines, user, targetId, assetId));
+        } else if (id) {
+            setSelected(id);
         }
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
@@ -695,21 +802,16 @@ export function NetworkPage() {
                             nodeCanvasObjectMode={() => "replace"}
                             nodeCanvasObject={paintNode}
                             nodePointerAreaPaint={paintPointer}
-                            onNodeClick={(node) => {
-                                if (swallowClick.current) return;
-                                setSelected(String(node.id ?? ""));
-                            }}
                             onNodeHover={(node) => {
                                 if (linkDrag.current) return;
                                 setHover(node ? String(node.id ?? "") : null);
                             }}
-                            onNodeDrag={(node) => onYouDrag(node as GNode)}
+                            onNodeDrag={(node) => {
+                                swallowClick.current = true;
+                                onYouDrag(node as GNode);
+                            }}
                             onNodeDragEnd={(node) => onYouDragEnd(node as GNode)}
                             onRenderFramePost={paintDraft}
-                            onBackgroundClick={() => {
-                                if (swallowClick.current) return;
-                                setSelected(null);
-                            }}
                             onEngineStop={() => {
                                 if (fitted.current) return;
                                 fitted.current = true;
@@ -747,24 +849,26 @@ export function NetworkPage() {
                 </div>
 
                 <aside className="bg-card h-64 w-full shrink-0 overflow-y-auto rounded-xl border p-4 lg:h-auto lg:min-h-0 lg:w-80">
+                    <AccountList
+                        nodes={graph.nodes}
+                        lines={visibleLines}
+                        selected={selected}
+                        onSelect={setSelected}
+                    />
                     {selected ? (
-                        <AccountPanel
-                            account={selected}
-                            user={user ?? undefined}
-                            lines={lines}
-                            labelOf={label}
-                            symbolOf={symbolOf}
-                            precisionOf={precisionOf}
-                            visibleIds={visibleIds}
-                            onSelect={setSelected}
-                        />
-                    ) : (
-                        <AccountList
-                            nodes={graph.nodes}
-                            lines={visibleLines}
-                            onSelect={setSelected}
-                        />
-                    )}
+                        <div className="mt-4 border-t pt-4">
+                            <AccountPanel
+                                account={selected}
+                                user={user ?? undefined}
+                                lines={lines}
+                                labelOf={label}
+                                symbolOf={symbolOf}
+                                precisionOf={precisionOf}
+                                visibleIds={visibleIds}
+                                onSelect={setSelected}
+                            />
+                        </div>
+                    ) : null}
                 </aside>
             </div>
             <CreditLineDialog
@@ -810,12 +914,15 @@ function Legend() {
 function AccountList({
     nodes,
     lines,
+    selected,
     onSelect,
 }: {
     nodes: NetNode[];
     lines: CreditLine[];
+    selected: string | null;
     onSelect: (account: string) => void;
 }) {
+    const selectedRef = useRef<HTMLButtonElement>(null);
     const degree = useMemo(() => {
         const counts = new Map<string, number>();
         for (const line of lines) {
@@ -824,6 +931,10 @@ function AccountList({
         }
         return counts;
     }, [lines]);
+
+    useEffect(() => {
+        selectedRef.current?.scrollIntoView({ block: "nearest" });
+    }, [selected]);
 
     if (nodes.length === 0) {
         return (
@@ -839,11 +950,16 @@ function AccountList({
             <ul className="space-y-0.5">
                 {nodes.map((node) => {
                     const count = degree.get(node.id) ?? 0;
+                    const focused = node.id === selected;
                     return (
                         <li key={node.id}>
                             <button
                                 type="button"
-                                className="hover:bg-muted flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm"
+                                ref={focused ? selectedRef : undefined}
+                                aria-current={focused ? "true" : undefined}
+                                className={`hover:bg-muted flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm ${
+                                    focused ? "bg-muted" : ""
+                                }`}
                                 onClick={() => onSelect(node.id)}
                             >
                                 <span className="truncate font-medium">
