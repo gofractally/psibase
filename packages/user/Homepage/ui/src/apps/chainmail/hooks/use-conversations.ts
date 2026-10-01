@@ -22,7 +22,7 @@ type ReadState = Record<string, number>;
  * Chain mail has no read receipts, so "read" is tracked per device: the
  * timestamp of the newest incoming message the user has seen, per peer.
  */
-export const useReadState = () => {
+const useReadState = () => {
     const { data: user } = useCurrentUser();
     const [lastRead, setLastRead] = useLocalStorage<ReadState>(
         `chainmail:last-read:${user ?? ""}`,
@@ -49,7 +49,7 @@ export const useReadState = () => {
     return { lastRead, markRead };
 };
 
-export const peerOf = (message: Message) =>
+const peerOf = (message: Message) =>
     message.type === "outgoing" ? message.to : message.from;
 
 export const useConversations = () => {

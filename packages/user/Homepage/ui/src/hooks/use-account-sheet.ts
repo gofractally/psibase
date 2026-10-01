@@ -6,10 +6,6 @@ export type AccountTab = (typeof ACCOUNT_TABS)[number];
 
 const PARAM = "account";
 
-/** Link to the account drawer from anywhere, e.g. `/?account=credits`. */
-export const accountSheetHref = (tab: AccountTab = "profile") =>
-    `?${PARAM}=${tab}`;
-
 /**
  * The account drawer's open tab lives in the URL so any page (or another
  * app) can deep-link to it without leaving what the user was doing.

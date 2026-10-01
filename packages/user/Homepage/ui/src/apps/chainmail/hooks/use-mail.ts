@@ -1,4 +1,4 @@
-import type { Message, QueryableMailbox, RawMessage } from "../types";
+import type { Message, RawMessage } from "../types";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
@@ -26,11 +26,7 @@ const transformRawMessagesToMessages = (
                 from: msg.sender,
                 to: msg.receiver,
                 datetime: new Date(msg.datetime).getTime(),
-                isDraft: false,
                 type: msg.sender === currentUser ? "outgoing" : "incoming",
-                read: false,
-                saved: msg.isSavedMsg,
-                inReplyTo: null,
                 subject: msg.subject,
                 body: msg.body,
             }) as Message,
@@ -85,22 +81,14 @@ export const useInvalidateMailboxQueries = () => {
     const queryClient = useQueryClient();
     const { data: user } = useCurrentUser();
 
-    return useCallback(
-        (
-            mailboxes: QueryableMailbox[] = [
-                zMailbox.Values.inbox,
-                zMailbox.Values.sent,
-            ] as QueryableMailbox[],
-        ) => {
-            if (!user) return;
-            mailboxes.forEach((mailbox) => {
-                queryClient.invalidateQueries({
-                    queryKey: QueryKey.mailbox(mailbox, user),
-                });
+    return useCallback(() => {
+        if (!user) return;
+        zMailbox.options.forEach((mailbox) => {
+            queryClient.invalidateQueries({
+                queryKey: QueryKey.mailbox(mailbox, user),
             });
-        },
-        [queryClient, user],
-    );
+        });
+    }, [queryClient, user]);
 };
 
 export const useSendMessage = () => {
