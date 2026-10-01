@@ -4219,6 +4219,59 @@ mod tests {
         Ok(())
     }
 
+    /// A revolving line keeps remaining equal to its limit, including after the
+    /// limit changes, so the first switch to depleting can still be drawn.
+    /// Spending that budget is permanent: repayment does not restore it.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_revolving_first_deplete_has_budget(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, usd, Quantity::new(100), false, 0, 0)
+            .get()?;
+        let line = CreditLine::get_assert(bob, alice, usd);
+        assert!(!line.deplete_on_debit);
+        assert_eq!(line.remaining.value, 100);
+
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, usd, Quantity::new(200), false, 0, 0)
+            .get()?;
+        assert_eq!(CreditLine::get_assert(bob, alice, usd).remaining.value, 200);
+
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, usd, Quantity::new(200), true, 0, 0)
+            .get()?;
+        assert_eq!(CreditLine::get_assert(bob, alice, usd).remaining.value, 200);
+
+        Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(bob, usd)],
+                Quantity::new(200),
+                Quantity::new(200),
+                0,
+            )
+            .get()?;
+        assert_eq!(exp(&chain, bob, alice, usd), 200);
+        assert_eq!(CreditLine::get_assert(bob, alice, usd).remaining.value, 0);
+
+        Wrapper::push_from(&chain, bob)
+            .deposit(alice, usd, Quantity::new(200), 0, 0)
+            .get()?;
+        assert_eq!(exp(&chain, bob, alice, usd), 0);
+        let over = Wrapper::push_from(&chain, alice)
+            .path_pay(vec![hop(bob, usd)], Quantity::new(1), Quantity::new(1), 0)
+            .get();
+        assert!(over.is_err());
+        Ok(())
+    }
+
     /// Full unwind on hop 0 is not an unfinished path: FX still forwards the
     /// hop notional (min_return 0 must not look like a prefix-only settlement).
     #[psibase::test_case(packages("Banx"))]

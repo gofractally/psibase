@@ -282,8 +282,8 @@ pub mod tables {
     /// `limit` is a stable cap on outstanding exposure (principal + interest).
     /// A draw of `amount` requires `exposure + amount <= limit`.
     /// When `deplete_on_debit`, `remaining` shrinks on new_draw / claim take
-    /// (unwind does not; repayment does not restore it). Revolving lines
-    /// ignore `remaining`.
+    /// (unwind does not; repayment does not restore it). While revolving,
+    /// `remaining` tracks `limit` and headroom ignores it.
     ///
     /// Interest-free grace lives on [`PairCycle`], not this row.
     #[table(name = "CreditLineTable", index = 3)]
@@ -302,7 +302,7 @@ pub mod tables {
         pub deplete_on_debit: bool,
         /// Rate applied to new draws on this line (ppm APR); see [`crate::interest`].
         pub interest_rate: u32,
-        /// When `deplete_on_debit`. Ignored for revolving lines.
+        /// Budget consumed only while `deplete_on_debit`. Tracks `limit` on a revolving line.
         pub remaining: Quantity,
     }
 

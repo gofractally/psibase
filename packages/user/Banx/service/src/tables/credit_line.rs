@@ -24,7 +24,7 @@ impl CreditLine {
             limit,
             deplete_on_debit,
             interest_rate,
-            remaining: if deplete_on_debit { limit } else { 0.into() },
+            remaining: limit,
         }
     }
 
@@ -72,11 +72,17 @@ impl CreditLine {
             "interest_rate exceeds 100% (PPM_SCALE)"
         );
         if let Some(mut line) = Self::get(creditor, debtor, asset_id) {
+            // While revolving, remaining tracks the limit so the first
+            // depleting switch still has a budget. Once the line is depleting,
+            // or remaining has moved off the limit, only clamp it down.
+            // remaining == 0 is a spent budget, not an unset one.
+            let track = !line.deplete_on_debit && line.remaining.value == line.limit.value;
             line.limit = amount;
             line.deplete_on_debit = deplete_on_debit;
             line.interest_rate = interest_rate;
-            // Upsert never restores spent remaining.
-            if line.remaining.value > amount.value {
+            if track {
+                line.remaining = amount;
+            } else if line.remaining.value > amount.value {
                 line.remaining = amount;
             }
             line.save();
