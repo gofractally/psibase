@@ -1,23 +1,7 @@
-/// `host:db` storage on `hostdb.{root}`.
-///
-/// `GET /kv/persistent/<key>` and `GET /kv/session/<key>` return the raw value
-/// (`application/octet-stream`), or 404 when it is absent. `POST /kv/batch`
-/// applies `{"ops":[{"duration":"persistent"|"session","key":<hex>,"value":<unpadded base64url>|null}]}`
-/// in one subjective transaction and returns 204; a null value deletes the key.
-/// An invalid op returns 400 and writes nothing. `OPTIONS` on these paths is the
-/// CORS preflight. Only `Origin: supervisor.{root}` is accepted.
-///
-/// The device id is the `__Host-HOSTDB-DEVICE` cookie. Session rows are keyed by
-/// that device, the `__Host-HOSTDB-SESSION` cookie, and the key. A session
-/// request that lacks a session cookie starts an empty session. Each session
-/// row records `lastAccess`, updated on get and put. A batch that puts a session
-/// row also deletes up to 16 session rows on the node whose `lastAccess` is more
-/// than 7 days old.
-///
-/// Each device records `lastSeen`, refreshed at most once a day by its gets and
-/// batches. A batch that puts a persistent row also deletes up to 16 persistent
-/// rows on the node belonging to devices whose `lastSeen` is older than the
-/// device cookie's `Max-Age` plus that refresh interval.
+//! `host:db` storage on `hostdb.{root}`.
+//!
+//! Persistent and session key-value rows are scoped to the `__Host-HOSTDB-DEVICE`
+//! cookie; session rows also use the `__Host-HOSTDB-SESSION` cookie.
 #[psibase::service_tables]
 mod tables {
     use psibase::{Pack, ToSchema, Unpack};
@@ -142,6 +126,7 @@ mod service {
         value: Option<Vec<u8>>,
     }
 
+    /// Serves HTTP for `host:db`. Only `Origin: supervisor.{root}` is accepted.
     #[action]
     #[allow(non_snake_case)]
     fn serveSys(
@@ -180,8 +165,10 @@ mod service {
         ))
     }
 
-    /// The session cookie is set once a session id is accepted, including when the
-    /// route then returns `Err`.
+    /// Routes storage requests. `OPTIONS` on storage paths is the CORS preflight.
+    /// `POST /kv/batch` returns 204. An invalid op returns 400 and writes nothing.
+    /// The session cookie is set once a session id is accepted, including on error
+    /// responses such as 400.
     fn route(
         request: &HttpRequest,
         device: &[u8],
@@ -226,6 +213,8 @@ mod service {
         (result, session_cookie)
     }
 
+    /// GET response for `/kv/persistent/<key>` and `/kv/session/<key>`: raw value as
+    /// `application/octet-stream` on 200, 404 when absent, 400 on a bad key.
     fn read_stored(
         key: &str,
         lookup: impl FnOnce(&[u8]) -> Option<Vec<u8>>,
@@ -235,6 +224,7 @@ mod service {
         Ok(value.map_or((404, None), |body| (200, Some(body))))
     }
 
+    /// Persistent lookup for `GET /kv/persistent/<key>`.
     fn read_persistent(device: &[u8], key: &[u8]) -> Option<Vec<u8>> {
         subjective_tx! {
             record_seen(&DeviceTable::new(), device, wall_time_ns());
@@ -245,6 +235,7 @@ mod service {
         }
     }
 
+    /// Session lookup for `GET /kv/session/<key>`.
     fn read_session(device: &[u8], session: &[u8], key: &[u8]) -> Option<Vec<u8>> {
         subjective_tx! {
             let now = wall_time_ns();
@@ -263,6 +254,9 @@ mod service {
         }
     }
 
+    /// Applies batch ops from `POST /kv/batch`:
+    /// `{"ops":[{"duration":"persistent"|"session","key":<hex>,"value":<unpadded base64url>|null}]}`.
+    /// A null value deletes the key.
     fn apply_changes(device: &[u8], session: Option<&[u8]>, changes: &[Change]) {
         let puts = |duration: Duration| {
             changes
