@@ -46,11 +46,11 @@ impl SealedStore {
     pub(crate) fn set(&self, duration: u8, plaintext_key: &str, value: &[u8]) {
         let storage_key = self.storage_key(plaintext_key);
         let stored = encrypt_value(&self.keys.aes_key, storage_key.as_bytes(), value);
-        HostDb::set(duration, &storage_key, &stored);
+        HostDb::set(duration, &storage_key, &stored, plaintext_key);
     }
 
     pub(crate) fn remove(&self, duration: u8, plaintext_key: &str) {
-        HostDb::remove(duration, &self.storage_key(plaintext_key));
+        HostDb::remove(duration, &self.storage_key(plaintext_key), plaintext_key);
     }
 
     pub(crate) fn exists(&self, duration: u8, plaintext_key: &str) -> bool {

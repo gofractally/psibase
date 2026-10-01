@@ -4,12 +4,11 @@ interface intf {
     get-client-key: func() -> list<u8>;
 }
 
+/// Extra debug data the platform may print when a database operation fails.
 interface database {
-    /// `debug-key` is the plaintext `{mode}:{service}:{identifier}:{key}`.
-    /// The host may name it when the key is absent. It is not sent to the node.
-    get: func(duration: u8, key: string, debug-key: string) -> option<list<u8>>;
-    set: func(duration: u8, key: string, value: list<u8>);
-    remove: func(duration: u8, key: string);
+    get: func(duration: u8, key: string, debug-data: string) -> option<list<u8>>;
+    set: func(duration: u8, key: string, value: list<u8>, debug-data: string);
+    remove: func(duration: u8, key: string, debug-data: string);
 }
 
 world imports {
