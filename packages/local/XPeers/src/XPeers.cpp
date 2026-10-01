@@ -562,7 +562,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
       {
          if (auto origin = request.getHeader("origin"))
          {
-            if (allowCorsSubdomains(request).empty())
+            if (!subdomainOrigin(request, rootHost(request)))
             {
                std::string_view msg{"Cross-origin request refused"};
                return HttpReply{.status      = HttpStatus::badRequest,

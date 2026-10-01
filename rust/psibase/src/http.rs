@@ -213,28 +213,38 @@ pub fn root_host(req: &HttpRequest, host_is_subdomain: bool) -> &str {
     }
 }
 
+pub fn service_origin<'a>(
+    req: &'a HttpRequest,
+    account: AccountNumber,
+    root_host: &str,
+) -> Option<&'a str> {
+    let origin = req.get_header("origin")?;
+    Origin::new(origin)
+        .is_service(root_host, account)
+        .then_some(origin)
+}
+
+pub fn subdomain_origin<'a>(req: &'a HttpRequest, root_host: &str) -> Option<&'a str> {
+    let origin = req.get_header("origin")?;
+    Origin::new(origin)
+        .is_subdomain(root_host)
+        .then_some(origin)
+}
+
 pub fn allow_cors_for_account(
     req: &HttpRequest,
     account: AccountNumber,
     host_is_subdomain: bool,
 ) -> Vec<HttpHeader> {
-    if let Some(o) = req.get_header("origin") {
-        let origin = Origin::new(o);
-        if origin.is_service(root_host(req, host_is_subdomain), account) {
-            return allow_cors_with_origin(o);
-        }
-    }
-    Vec::new()
+    service_origin(req, account, root_host(req, host_is_subdomain))
+        .map(allow_cors_with_origin)
+        .unwrap_or_default()
 }
 
 pub fn allow_cors_for_subdomains(req: &HttpRequest, host_is_subdomain: bool) -> Vec<HttpHeader> {
-    if let Some(origin) = req.get_header("origin") {
-        let origin_obj = Origin::new(origin);
-        if origin_obj.is_subdomain(root_host(req, host_is_subdomain)) {
-            return allow_cors_with_origin(origin);
-        }
-    }
-    Vec::new()
+    subdomain_origin(req, root_host(req, host_is_subdomain))
+        .map(allow_cors_with_origin)
+        .unwrap_or_default()
 }
 
 pub fn allow_cors_with_origin(origin: &str) -> Vec<HttpHeader> {

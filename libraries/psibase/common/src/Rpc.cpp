@@ -284,6 +284,29 @@ namespace psibase
       return host;
    }
 
+   std::optional<std::string_view> serviceOrigin(const HttpRequest& req,
+                                                 AccountNumber      account,
+                                                 std::string_view   rootHost)
+   {
+      if (auto origin = req.getHeader("origin");
+          origin && Origin(*origin).isService(rootHost, account))
+      {
+         return *origin;
+      }
+      return std::nullopt;
+   }
+
+   std::optional<std::string_view> subdomainOrigin(const HttpRequest& req,
+                                                   std::string_view   rootHost)
+   {
+      if (auto origin = req.getHeader("origin");
+          origin && Origin(*origin).isSubdomain(rootHost))
+      {
+         return *origin;
+      }
+      return std::nullopt;
+   }
+
    std::vector<HttpHeader> allowCors(std::string_view origin /* = "*" */)
    {
       return {
@@ -297,11 +320,8 @@ namespace psibase
                                      AccountNumber      account,
                                      bool               hostIsSubdomain)
    {
-      if (auto origin = req.getHeader("origin");
-          origin && Origin(*origin).isService(rootHost(req, hostIsSubdomain), account))
-      {
+      if (auto origin = serviceOrigin(req, account, rootHost(req, hostIsSubdomain)))
          return allowCors(*origin);
-      }
       return {};
    }
 
@@ -320,11 +340,8 @@ namespace psibase
 
    std::vector<HttpHeader> allowCorsSubdomains(const HttpRequest& req, bool hostIsSubdomain)
    {
-      if (auto origin = req.getHeader("origin");
-          origin && Origin(*origin).isSubdomain(rootHost(req, hostIsSubdomain)))
-      {
+      if (auto origin = subdomainOrigin(req, rootHost(req, hostIsSubdomain)))
          return allowCors(*origin);
-      }
       return {};
    }
 

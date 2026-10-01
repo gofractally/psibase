@@ -135,10 +135,7 @@ mod service {
         _user: Option<AccountNumber>,
     ) -> Option<HttpReply> {
         let root = HttpServer::call().rootHost(request.host.clone());
-        let Some(origin) = request.get_header("origin") else {
-            return Some(status_reply(403));
-        };
-        if !is_supervisor_origin(origin, &root) {
+        let Some(origin) = service_origin(&request, account!("supervisor"), &root) else {
             return Some(status_reply(403));
         };
 
@@ -318,27 +315,6 @@ mod service {
         path == "/kv/batch"
             || path.starts_with("/kv/persistent/")
             || path.starts_with("/kv/session/")
-    }
-
-    fn is_supervisor_origin(origin: &str, root: &str) -> bool {
-        let Some(rest) = origin
-            .strip_prefix("https://")
-            .or(origin.strip_prefix("http://"))
-        else {
-            return false;
-        };
-        let host = rest.split(['/', '?', '#']).next().unwrap_or(rest);
-        let host = match host.rsplit_once(':') {
-            Some((host, port))
-                if !host.is_empty()
-                    && !host.contains(']')
-                    && port.chars().all(|c| c.is_ascii_digit()) =>
-            {
-                host
-            }
-            _ => host,
-        };
-        host == format!("supervisor.{root}")
     }
 
     enum CookieValue {
