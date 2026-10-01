@@ -9,6 +9,7 @@ import {
     fetchCashQuotes,
     fetchCashVault,
     fetchCreditLines,
+    fetchNetworkLines,
     fetchCurrencyPolicies,
     fetchObligations,
     fetchForwardOffers,
@@ -46,6 +47,15 @@ export function useCreditLines(): UseQueryResult<CreditLine[], Error> {
     return useQuery({
         queryKey: QueryKey.creditLines(user),
         queryFn: () => fetchCreditLines(user!),
+        enabled: !!user,
+    });
+}
+
+export function useNetworkLines(): UseQueryResult<CreditLine[], Error> {
+    const { data: user } = useCurrentUser();
+    return useQuery({
+        queryKey: QueryKey.networkLines(),
+        queryFn: fetchNetworkLines,
         enabled: !!user,
     });
 }

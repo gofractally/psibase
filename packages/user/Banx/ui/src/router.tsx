@@ -6,6 +6,7 @@ import { CashPage } from "@/pages/cash";
 import { InvitePage } from "@/pages/invite";
 import { InvitesPage } from "@/pages/invites";
 import { AccountDetailPage } from "@/pages/account-detail";
+import { NetworkPage } from "@/pages/network";
 import { ObligationsPage } from "@/pages/obligations";
 import { PayeesPage } from "@/pages/payees";
 import { PoliciesPage } from "@/pages/policies";
@@ -22,6 +23,7 @@ export const router = createBrowserRouter([
         children: [
             { index: true, element: <Navigate to="/accounts" replace /> },
             { path: "accounts", element: withGate(<ObligationsPage />) },
+            { path: "network", element: withGate(<NetworkPage />) },
             {
                 path: "accounts/:account",
                 element: withGate(<AccountDetailPage />),

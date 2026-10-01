@@ -192,6 +192,16 @@ export async function fetchCreditLines(account: string): Promise<CreditLine[]> {
     return zCreditLine.array().parse(data.creditLines);
 }
 
+export async function fetchNetworkLines(): Promise<CreditLine[]> {
+    const data = await gql<{ networkLines: CreditLine[] }>(
+        `{ networkLines {
+            creditor debtor assetId limit depleteOnDebit interestRatePpm
+            graceSeconds cycleStartedAt cycleGraceSeconds exposure remaining
+        } }`,
+    );
+    return zCreditLine.array().parse(data.networkLines);
+}
+
 export async function fetchObligations(account: string): Promise<Obligation[]> {
     const data = await gql<{ obligations: Obligation[] }>(
         `{ obligations(account: "${account}") {

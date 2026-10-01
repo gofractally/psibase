@@ -5,6 +5,7 @@ import {
     Inbox,
     ScrollText,
     UserPlus,
+    Waypoints,
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
@@ -23,6 +24,7 @@ const items: {
     end?: boolean;
 }[] = [
     { to: "/accounts", label: "Accounts", icon: ScrollText },
+    { to: "/network", label: "Network", icon: Waypoints },
     { to: "/requests", label: "Requests", icon: Inbox },
     { to: "/payees", label: "Payees", icon: Contact },
     { to: "/invites", label: "Invites", icon: UserPlus },

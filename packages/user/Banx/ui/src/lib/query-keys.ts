@@ -2,6 +2,7 @@ export const QueryKey = {
     assets: () => ["banx", "assets"] as const,
     creditLines: (account: string | null | undefined) =>
         ["banx", "creditLines", account ?? ""] as const,
+    networkLines: () => ["banx", "networkLines"] as const,
     bookAuths: (account: string | null | undefined) =>
         ["banx", "bookAuths", account ?? ""] as const,
     obligations: (account: string | null | undefined) =>

@@ -17,6 +17,7 @@
     "qrcode.react": "^4.2.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-force-graph-2d": "^1.29.2",
     "react-router-dom": "^6.26.1",
     "usehooks-ts": "^3.1.1",
     "zod": "^3.24.2"

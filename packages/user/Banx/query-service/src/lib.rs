@@ -493,6 +493,16 @@ mod service {
                 .collect()
         }
 
+        /// Every posted credit line. The network view draws one edge per row.
+        /// `limit` / `exposure` are human decimals for the line's asset.
+        async fn networkLines(&self) -> Vec<CreditLineView> {
+            CreditLineTable::with_service(banx::SERVICE)
+                .get_index_pk()
+                .iter()
+                .map(CreditLineView::from_line)
+                .collect()
+        }
+
         /// Credit lines where `account` is creditor and/or debtor.
         /// `limit` / `exposure` are human decimals for the line's asset.
         async fn creditLines(

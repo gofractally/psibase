@@ -19,6 +19,7 @@ import {
 
 const titles: Record<string, string> = {
     "/accounts": "Accounts",
+    "/network": "Network",
     "/requests": "Requests",
     "/payees": "Payees",
     "/cash": "Cash",
@@ -29,6 +30,9 @@ const titles: Record<string, string> = {
 
 export const Layout = () => {
     const { pathname } = useLocation();
+    // The network canvas used to sit in normal flow. Lock this route to the
+    // viewport so a resize measurement cannot grow the document.
+    const network = pathname === "/network";
     const accountMatch = pathname.match(/^\/accounts\/([^/]+)$/);
     const accountName = accountMatch
         ? decodeURIComponent(accountMatch[1])
@@ -38,9 +42,11 @@ export const Layout = () => {
         : (titles[pathname] ?? "Banx");
 
     return (
-        <SidebarProvider>
+        <SidebarProvider
+            className={network ? "h-svh overflow-hidden" : undefined}
+        >
             <AppSidebar variant="inset" />
-            <SidebarInset>
+            <SidebarInset className={network ? "min-h-0" : undefined}>
                 <header className="flex h-14 shrink-0 items-center gap-2 transition-[width,height] ease-linear sm:h-16 group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
                     <div className="flex items-center gap-2 px-3 sm:px-4">
                         <SidebarTrigger className="-ml-1" />
@@ -81,7 +87,13 @@ export const Layout = () => {
                         </Breadcrumb>
                     </div>
                 </header>
-                <div className="mx-auto flex w-full max-w-screen-xl flex-1 flex-col gap-4 p-3 sm:p-4">
+                <div
+                    className={`mx-auto flex w-full flex-1 flex-col gap-4 p-3 sm:p-4 ${
+                        network
+                            ? "min-h-0 max-w-none overflow-y-auto"
+                            : "max-w-screen-xl"
+                    }`}
+                >
                     <Outlet />
                 </div>
             </SidebarInset>
