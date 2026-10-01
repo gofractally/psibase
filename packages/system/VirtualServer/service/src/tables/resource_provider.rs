@@ -1,0 +1,49 @@
+use crate::tables::tables::*;
+use psibase::services::producers::Wrapper as Producers;
+use psibase::*;
+
+impl ResourceProvider {
+    pub fn get(provider: AccountNumber) -> Option<Self> {
+        ResourceProviderTable::read().get_index_pk().get(&provider)
+    }
+
+    pub fn register(app: String, accepted: Vec<String>) {
+        let sender = get_sender();
+        let producers = Producers::call().getProducers();
+        assert!(
+            producers.contains(&sender),
+            "only active producers may register as a resource provider"
+        );
+
+        let candidate = Producers::call()
+            .getCandidate(sender)
+            .expect("producer must be registered as a candidate");
+        assert!(
+            !candidate.endpoint.is_empty(),
+            "candidate endpoint must be non-empty"
+        );
+
+        AccountNumber::from_exact(&app).expect("app must be a valid account name");
+        assert!(app.starts_with("x-"), "app must start with the x- prefix");
+        assert!(
+            !accepted.is_empty(),
+            "accepted currencies must be non-empty"
+        );
+
+        ResourceProviderTable::read_write()
+            .put(&ResourceProvider {
+                provider: sender,
+                app,
+                accepted,
+            })
+            .unwrap();
+    }
+
+    pub fn unregister() {
+        let sender = get_sender();
+        let Some(row) = Self::get(sender) else {
+            return;
+        };
+        ResourceProviderTable::read_write().remove(&row);
+    }
+}
