@@ -1,5 +1,6 @@
-use crate::errors::ErrorType;
 use crate::Error;
+use crate::bindings::tokens::plugin as TokensPlugin;
+use crate::errors::ErrorType;
 use psibase::services::tokens::Decimal;
 use psibase_plugin::host::server;
 use serde::Deserialize;
@@ -85,4 +86,17 @@ pub fn billing_enabled() -> Result<bool, Error> {
         .get_billing_config
         .unwrap_or(InternalBillingConfig { enabled: false })
         .enabled)
+}
+
+/// Private network: billing is enabled and the system token is not transferable.
+pub fn is_private_network() -> Result<bool, Error> {
+    if !billing_enabled()? {
+        return Ok(false);
+    }
+
+    let Some(sys_id) = TokensPlugin::helpers::fetch_network_token()? else {
+        return Ok(false);
+    };
+
+    Ok(!TokensPlugin::helpers::is_token_transferable(sys_id)?)
 }
