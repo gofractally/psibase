@@ -4,6 +4,7 @@ import {
     AssetField,
     ExpiresField,
     UsingGlobalSettingsOverlay,
+    amountUnit,
 } from "@/components/form-fields";
 import { useBuyClaimOffers } from "@/hooks/use-banx-data";
 import {
@@ -404,6 +405,10 @@ export function BuyClaimOfferDialog({
     ) => {
         const precision =
             assetId !== undefined ? precisionOf(assetId) : 0;
+        const symbol =
+            assetId !== undefined
+                ? assets.find((a) => a.id === assetId)?.symbol.toUpperCase()
+                : undefined;
         const locked = !enabled || assetId === undefined;
         return (
             <div
@@ -429,6 +434,7 @@ export function BuyClaimOfferDialog({
                                 inputMode="decimal"
                                 placeholder={amountPlaceholder(precision)}
                                 disabled={locked}
+                                endContent={amountUnit(symbol)}
                             />
                         )}
                     />
@@ -463,6 +469,7 @@ export function BuyClaimOfferDialog({
                             inputMode="decimal"
                             placeholder={amountPlaceholder(precision)}
                             disabled={locked}
+                            endContent={amountUnit(symbol)}
                         />
                     )}
                 />
@@ -610,6 +617,13 @@ export function BuyClaimOfferDialog({
     }
 
     const globalPending = setGlobal.isPending || removeGlobal.isPending;
+    const lockedSymbol =
+        prefill?.assetId !== undefined
+            ? assets
+                  .find((asset) => asset.id === prefill.assetId)
+                  ?.symbol.toUpperCase()
+            : undefined;
+
     const loadGlobalForAsset = (assetId: number) => {
         const existing = liveGlobalByAsset.get(assetId);
         if (existing) {
@@ -640,8 +654,8 @@ export function BuyClaimOfferDialog({
                     </DialogTitle>
                     <DialogDescription>
                         {isSell
-                            ? "Sell claims you hold in this asset. Positive spread is your profit (1 = 1% over face); negative is a discount. Buyers hit this offer."
-                            : "Buy claims in this asset at this rate. Spread is signed: positive haircuts the seller, negative is a premium. At take the debtor must know you, and new exposure needs your credit line to them with enough capacity."}
+                            ? `Sell claims you hold${lockedSymbol ? ` in ${lockedSymbol}` : " in this asset"}. Positive spread is your profit (1 = 1% over face); negative is a discount. Buyers hit this offer.`
+                            : `Buy claims${lockedSymbol ? ` in ${lockedSymbol}` : " in this asset"} at this rate. Spread is signed: positive haircuts the seller, negative is a premium. At take the debtor must know you, and new exposure needs your credit line to them with enough capacity.`}
                     </DialogDescription>
                 </DialogHeader>
                 <form
@@ -652,34 +666,25 @@ export function BuyClaimOfferDialog({
                         void globalForm.handleSubmit();
                     }}
                 >
-                    <globalForm.Subscribe
-                        selector={(s) => s.values.enabled}
-                        children={(enabled) => (
-                            <globalForm.Field
-                                name="assetId"
-                                listeners={{
-                                    onChange: ({ value }) => {
-                                        if (value === undefined) return;
-                                        loadGlobalForAsset(value);
-                                    },
-                                }}
-                                children={(field) => (
-                                    <AssetField
-                                        label="Asset"
-                                        assets={assets}
-                                        value={field.state.value}
-                                        onChange={(id) =>
-                                            field.handleChange(id)
-                                        }
-                                        itemActive={(a) =>
-                                            liveGlobalByAsset.has(a.id)
-                                        }
-                                        selectedActive={enabled}
-                                    />
-                                )}
-                            />
-                        )}
-                    />
+                    {prefill?.assetId === undefined ? (
+                        <globalForm.Field
+                            name="assetId"
+                            listeners={{
+                                onChange: ({ value }) => {
+                                    if (value === undefined) return;
+                                    loadGlobalForAsset(value);
+                                },
+                            }}
+                            children={(field) => (
+                                <AssetField
+                                    label="Asset"
+                                    assets={assets}
+                                    value={field.state.value}
+                                    onChange={(id) => field.handleChange(id)}
+                                />
+                            )}
+                        />
+                    ) : null}
                     <globalForm.AppField
                         name="enabled"
                         children={(field) => (

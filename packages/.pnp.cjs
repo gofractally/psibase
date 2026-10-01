@@ -2479,10 +2479,10 @@ const RAW_RUNTIME_STATE =
         ],\
         "linkType": "SOFT"\
       }],\
-      ["virtual:d218e5f3d4216aaa908fc8ceaaa5f455662c2db910e961bfbbbccb1dcd7b297cbc7d6b31d892745238221b5bb12af089d96b5a575a1067cb2994183d9e125ea9#npm:0.5.14", {\
-        "packageLocation": "./.yarn/__virtual__/@number-flow-react-virtual-a3aed33c5b/2/.caches/yarn/@number-flow-react-npm-0.5.14-c9a1d472d7-5109d7c97f.zip/node_modules/@number-flow/react/",\
+      ["virtual:9b2962d1a1994349b2b4cec56f6c0cac7a661faff04782717b4ad0dae75658fce4119ca07ad4daad897343809e16aa49dc3768310beaecdf5dc4ddb8881e07e7#npm:0.5.14", {\
+        "packageLocation": "./.yarn/__virtual__/@number-flow-react-virtual-7be87c3d75/2/.caches/yarn/@number-flow-react-npm-0.5.14-c9a1d472d7-5109d7c97f.zip/node_modules/@number-flow/react/",\
         "packageDependencies": [\
-          ["@number-flow/react", "virtual:d218e5f3d4216aaa908fc8ceaaa5f455662c2db910e961bfbbbccb1dcd7b297cbc7d6b31d892745238221b5bb12af089d96b5a575a1067cb2994183d9e125ea9#npm:0.5.14"],\
+          ["@number-flow/react", "virtual:9b2962d1a1994349b2b4cec56f6c0cac7a661faff04782717b4ad0dae75658fce4119ca07ad4daad897343809e16aa49dc3768310beaecdf5dc4ddb8881e07e7#npm:0.5.14"],\
           ["@types/react", "npm:19.2.17"],\
           ["@types/react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.2.3"],\
           ["esm-env", "npm:1.2.2"],\
@@ -2717,6 +2717,7 @@ const RAW_RUNTIME_STATE =
       ["workspace:user/Banx/ui", {\
         "packageLocation": "./user/Banx/ui/",\
         "packageDependencies": [\
+          ["@number-flow/react", "virtual:9b2962d1a1994349b2b4cec56f6c0cac7a661faff04782717b4ad0dae75658fce4119ca07ad4daad897343809e16aa49dc3768310beaecdf5dc4ddb8881e07e7#npm:0.5.14"],\
           ["@psibase/banx-ui", "workspace:user/Banx/ui"],\
           ["@psibase/common-lib", "workspace:user/CommonApi/common/packages/common-lib"],\
           ["@tanstack/react-form", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:1.33.0"],\
@@ -17444,7 +17445,7 @@ const RAW_RUNTIME_STATE =
       ["workspace:user/TokenStream/ui", {\
         "packageLocation": "./user/TokenStream/ui/",\
         "packageDependencies": [\
-          ["@number-flow/react", "virtual:d218e5f3d4216aaa908fc8ceaaa5f455662c2db910e961bfbbbccb1dcd7b297cbc7d6b31d892745238221b5bb12af089d96b5a575a1067cb2994183d9e125ea9#npm:0.5.14"],\
+          ["@number-flow/react", "virtual:9b2962d1a1994349b2b4cec56f6c0cac7a661faff04782717b4ad0dae75658fce4119ca07ad4daad897343809e16aa49dc3768310beaecdf5dc4ddb8881e07e7#npm:0.5.14"],\
           ["@psibase/common-lib", "workspace:user/CommonApi/common/packages/common-lib"],\
           ["@tanstack/react-form", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:1.33.0"],\
           ["@tanstack/react-query", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:5.101.0"],\

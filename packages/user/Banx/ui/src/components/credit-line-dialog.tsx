@@ -1,6 +1,10 @@
 import { useEffect } from "react";
 
-import { AssetField, GracePeriodField } from "@/components/form-fields";
+import {
+    AssetField,
+    GracePeriodField,
+    amountUnit,
+} from "@/components/form-fields";
 import { useForwardOffers } from "@/hooks/use-banx-data";
 import {
     useRemoveCreditLine,
@@ -45,6 +49,7 @@ export function CreditLineDialog({
     precisionOf,
     editing,
     prefillDebtor,
+    assetId: lockedAssetId,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -54,6 +59,8 @@ export function CreditLineDialog({
     editing: CreditLine | null;
     /** Prefill debtor when creating a new line. */
     prefillDebtor?: string;
+    /** Page currency. Hides the picker on a new line. */
+    assetId?: number;
 }) {
     const setLine = useSetCreditLine();
     const removeLine = useRemoveCreditLine();
@@ -138,7 +145,7 @@ export function CreditLineDialog({
         } else {
             form.reset({
                 debtor: prefillDebtor ?? "",
-                assetId: undefined,
+                assetId: lockedAssetId,
                 limit: "100",
                 interestPct: "0",
                 deplete: false,
@@ -148,7 +155,7 @@ export function CreditLineDialog({
             });
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [open, editing, precisionOf, prefillDebtor]);
+    }, [open, editing, precisionOf, prefillDebtor, lockedAssetId]);
 
     const editSymbol =
         isEdit && editing
@@ -192,18 +199,20 @@ export function CreditLineDialog({
                                     />
                                 )}
                             />
-                            <form.Field
-                                name="assetId"
-                                children={(field) => (
-                                    <AssetField
-                                        assets={assets}
-                                        value={field.state.value}
-                                        onChange={(id) =>
-                                            field.handleChange(id)
-                                        }
-                                    />
-                                )}
-                            />
+                            {lockedAssetId === undefined ? (
+                                <form.Field
+                                    name="assetId"
+                                    children={(field) => (
+                                        <AssetField
+                                            assets={assets}
+                                            value={field.state.value}
+                                            onChange={(id) =>
+                                                field.handleChange(id)
+                                            }
+                                        />
+                                    )}
+                                />
+                            ) : null}
                         </>
                     ) : null}
                     <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
@@ -213,6 +222,9 @@ export function CreditLineDialog({
                                 const aid = isEdit
                                     ? editing!.assetId
                                     : assetId;
+                                const symbol = assets
+                                    .find((asset) => asset.id === aid)
+                                    ?.symbol.toUpperCase();
                                 return (
                                     <form.AppField
                                         name="limit"
@@ -241,6 +253,7 @@ export function CreditLineDialog({
                                                 label="Limit"
                                                 inputMode="decimal"
                                                 required
+                                                endContent={amountUnit(symbol)}
                                             />
                                         )}
                                     />

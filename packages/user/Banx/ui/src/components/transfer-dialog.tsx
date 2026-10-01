@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, Loader2, XCircle } from "lucide-react";
 
 import { defaultAssetId } from "@/components/asset-select";
-import { AssetField } from "@/components/form-fields";
+import { AssetField, amountUnit } from "@/components/form-fields";
 import { useAssetMap } from "@/hooks/use-assets";
 import {
     type PathHopQuote,
@@ -44,15 +44,6 @@ type QuoteSummary = {
     amountOut: string;
     hops: PathHopQuote[];
 };
-
-function amountUnit(symbol: string | undefined) {
-    if (!symbol) return undefined;
-    return (
-        <span className="text-foreground flex h-full shrink-0 items-center border-l px-3 text-sm">
-            {symbol}
-        </span>
-    );
-}
 
 function feeIsPositive(fee: string | undefined): boolean {
     if (!fee) return false;

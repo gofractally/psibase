@@ -1,15 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronsUpDown, Plus } from "lucide-react";
 
 import { AddAssetForm } from "@/components/add-asset-dialog";
+import { defaultAssetId } from "@/components/asset-select";
 
+import { useAccountGroups } from "@/hooks/use-account-groups";
 import { useActivityFeed } from "@/hooks/use-banx-data";
-import type { GroupedAccount } from "@/lib/account-groups";
-import { formatRawAmount } from "@/lib/amount";
+import { currencyGlyph, formatRawAmount } from "@/lib/amount";
 import {
     currencyMatches,
     currencyNet,
-    currencyStatus,
     currencyUsage,
     precisionLabel,
     splitCurrencyUsage,
@@ -32,36 +32,52 @@ export function CurrencyPicker({
     assets,
     assetId,
     onAssetId,
-    savings,
-    loans,
-    isLoading,
+    variant = "summary",
 }: {
     assets: Asset[];
     assetId?: number;
     onAssetId: (id: number) => void;
-    savings: GroupedAccount[];
-    loans: GroupedAccount[];
-    isLoading: boolean;
+    /** `summary` is the accounts header. `field` matches a form control. */
+    variant?: "summary" | "field";
 }) {
     const [open, setOpen] = useState(false);
     const [createOpen, setCreateOpen] = useState(false);
     const [createdSymbol, setCreatedSymbol] = useState<string | null>(null);
     const [query, setQuery] = useState("");
+    const { savings, loans, isLoading: groupsLoading } = useAccountGroups();
     const { data: events = [], isLoading: activityLoading } = useActivityFeed();
-    const selected = assets.find((asset) => asset.id === assetId);
+    const fallbackId = useMemo(() => defaultAssetId(assets), [assets]);
+    const valueInList =
+        assetId !== undefined && assets.some((asset) => asset.id === assetId);
+    const shownId =
+        variant === "field" && !valueInList ? fallbackId : assetId;
+    const pushedFallback = useRef<number | undefined>(undefined);
+    const selected = assets.find((asset) => asset.id === shownId);
+    const glyph = selected ? currencyGlyph(selected.symbol) : null;
     const usage = useMemo(
         () => currencyUsage(assets, savings, loans, events),
         [assets, savings, loans, events],
     );
     const filtered = usage.filter((row) => currencyMatches(row, query));
     const { active, unused } = splitCurrencyUsage(filtered);
-    const waiting = isLoading || activityLoading;
+    const waiting = groupsLoading || activityLoading;
 
     const choose = (id: number) => {
         onAssetId(id);
         setOpen(false);
         setQuery("");
     };
+
+    useEffect(() => {
+        if (variant !== "field" || valueInList || fallbackId === undefined) {
+            return;
+        }
+        if (assetId === fallbackId || pushedFallback.current === fallbackId) {
+            return;
+        }
+        pushedFallback.current = fallbackId;
+        onAssetId(fallbackId);
+    }, [variant, valueInList, assetId, fallbackId, onAssetId]);
 
     useEffect(() => {
         if (!createdSymbol) return;
@@ -80,7 +96,11 @@ export function CurrencyPicker({
             <Button
                 type="button"
                 variant="outline"
-                className="h-auto w-full justify-between gap-3 px-3 py-2 text-left sm:w-56"
+                className={
+                    variant === "field"
+                        ? "h-9 w-full justify-between px-3 font-normal"
+                        : "h-auto w-full justify-between gap-3 px-3 py-2 text-left sm:w-56"
+                }
                 aria-haspopup="dialog"
                 aria-label={
                     selected
@@ -89,14 +109,36 @@ export function CurrencyPicker({
                 }
                 onClick={() => setOpen(true)}
             >
-                <span className="min-w-0">
-                    <span className="block font-mono text-sm font-semibold tracking-tight">
-                        {selected ? selected.symbol.toUpperCase() : "Currency"}
+                {variant === "field" ? (
+                    <span className="flex min-w-0 items-center gap-1.5">
+                        {glyph ? (
+                            <span className="text-sm font-semibold" aria-hidden>
+                                {glyph}
+                            </span>
+                        ) : null}
+                        <span className="truncate font-mono text-sm font-medium">
+                            {selected
+                                ? selected.symbol.toUpperCase()
+                                : "Currency"}
+                        </span>
                     </span>
-                    <span className="text-muted-foreground block truncate text-xs font-normal">
-                        {selected?.description || "Choose a currency"}
+                ) : (
+                    <span className="min-w-0">
+                        <span className="flex items-baseline gap-1.5 font-mono text-sm font-semibold tracking-tight">
+                            {glyph ? (
+                                <span className="font-sans" aria-hidden>
+                                    {glyph}
+                                </span>
+                            ) : null}
+                            {selected
+                                ? selected.symbol.toUpperCase()
+                                : "Currency"}
+                        </span>
+                        <span className="text-muted-foreground block truncate text-xs font-normal">
+                            {selected?.description || "Choose a currency"}
+                        </span>
                     </span>
-                </span>
+                )}
                 <ChevronsUpDown className="size-4 shrink-0 opacity-60" />
             </Button>
             <Dialog
@@ -162,13 +204,13 @@ export function CurrencyPicker({
                                         <CurrencySection
                                             title="In use"
                                             rows={active}
-                                            selectedId={assetId}
+                                            selectedId={shownId}
                                             onChoose={choose}
                                         />
                                         <CurrencySection
                                             title="No activity"
                                             rows={unused}
-                                            selectedId={assetId}
+                                            selectedId={shownId}
                                             onChoose={choose}
                                             quiet
                                         />
@@ -233,7 +275,6 @@ function CurrencyRow({
     onChoose: (id: number) => void;
 }) {
     const symbol = row.asset.symbol.toUpperCase();
-    const status = currencyStatus(row);
     const net = currencyNet(row);
     const netText =
         net === null
@@ -281,11 +322,6 @@ function CurrencyRow({
                     <span className="mx-1.5 opacity-40">·</span>
                     {precisionLabel(row.asset.precision)}
                 </span>
-                {status ? (
-                    <span className="mt-0.5 block text-xs leading-snug">
-                        {status}
-                    </span>
-                ) : null}
             </span>
             {selected ? (
                 <Check className="mt-0.5 size-4 shrink-0" aria-hidden />

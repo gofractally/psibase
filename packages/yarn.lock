@@ -1835,6 +1835,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@psibase/banx-ui@workspace:user/Banx/ui"
   dependencies:
+    "@number-flow/react": "npm:^0.5.10"
     "@psibase/common-lib": "workspace:*"
     "@tanstack/react-form": "npm:^1.19.3"
     "@tanstack/react-query": "npm:^5.90.6"

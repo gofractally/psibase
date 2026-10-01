@@ -4,6 +4,7 @@ import {
     AssetField,
     ExpiresField,
     UsingGlobalSettingsOverlay,
+    amountUnit,
 } from "@/components/form-fields";
 import { useForwardOffers } from "@/hooks/use-banx-data";
 import {
@@ -558,6 +559,13 @@ export function RoutingPolicyDialog({
 
     const globalPending = setGlobal.isPending || removeGlobal.isPending;
 
+    const lockedSymbol =
+        prefill?.assetId !== undefined
+            ? assets
+                  .find((asset) => asset.id === prefill.assetId)
+                  ?.symbol.toUpperCase()
+            : undefined;
+
     const loadGlobalForAsset = (assetId: number) => {
         const existing = liveGlobalByAsset.get(assetId);
         if (existing) {
@@ -587,9 +595,17 @@ export function RoutingPolicyDialog({
                 <DialogHeader>
                     <DialogTitle>Path-forward offer</DialogTitle>
                     <DialogDescription>
-                        Sit in the middle of a path pay for this asset. Post
-                        anytime; at pay time the next creditor still needs a
-                        line to you.
+                        Sit in the middle of a path pay
+                        {lockedSymbol ? (
+                            <>
+                                {" "}
+                                for <strong>{lockedSymbol}</strong>
+                            </>
+                        ) : (
+                            " for this asset"
+                        )}
+                        . Post anytime; at pay time the next creditor still
+                        needs a line to you.
                     </DialogDescription>
                 </DialogHeader>
                 <form
@@ -600,34 +616,25 @@ export function RoutingPolicyDialog({
                         void globalForm.handleSubmit();
                     }}
                 >
-                    <globalForm.Subscribe
-                        selector={(s) => s.values.enabled}
-                        children={(enabled) => (
-                            <globalForm.Field
-                                name="assetId"
-                                listeners={{
-                                    onChange: ({ value }) => {
-                                        if (value === undefined) return;
-                                        loadGlobalForAsset(value);
-                                    },
-                                }}
-                                children={(field) => (
-                                    <AssetField
-                                        label="Asset"
-                                        assets={assets}
-                                        value={field.state.value}
-                                        onChange={(id) =>
-                                            field.handleChange(id)
-                                        }
-                                        itemActive={(a) =>
-                                            liveGlobalByAsset.has(a.id)
-                                        }
-                                        selectedActive={enabled}
-                                    />
-                                )}
-                            />
-                        )}
-                    />
+                    {prefill?.assetId === undefined ? (
+                        <globalForm.Field
+                            name="assetId"
+                            listeners={{
+                                onChange: ({ value }) => {
+                                    if (value === undefined) return;
+                                    loadGlobalForAsset(value);
+                                },
+                            }}
+                            children={(field) => (
+                                <AssetField
+                                    label="Asset"
+                                    assets={assets}
+                                    value={field.state.value}
+                                    onChange={(id) => field.handleChange(id)}
+                                />
+                            )}
+                        />
+                    ) : null}
 
                     <globalForm.AppField
                         name="enabled"
@@ -654,6 +661,12 @@ export function RoutingPolicyDialog({
                                 assetId !== undefined
                                     ? precisionOf(assetId)
                                     : 0;
+                            const symbol =
+                                assetId !== undefined
+                                    ? assets
+                                          .find((a) => a.id === assetId)
+                                          ?.symbol.toUpperCase()
+                                    : undefined;
                             const locked = !enabled || assetId === undefined;
                             return (
                                 <div
@@ -683,6 +696,9 @@ export function RoutingPolicyDialog({
                                                         precision,
                                                     )}
                                                     disabled={locked}
+                                                    endContent={amountUnit(
+                                                        symbol,
+                                                    )}
                                                 />
                                             )}
                                         />

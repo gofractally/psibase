@@ -4,7 +4,7 @@
  *
  * Prefer `form.AppField` + `TextField` / `NumberField` / `CheckboxField` /
  * `SwitchField` for standard inputs. Use `form.Field` for Banx-specific
- * controls (`AssetSelect`, `ExpiresAtPicker`) that are not registered on the
+ * controls (`AssetField`, `ExpiresAtPicker`) that are not registered on the
  * shared form.
  */
 import { getAccount } from "@shared/lib/get-account";

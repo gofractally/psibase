@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useLocalStorage } from "usehooks-ts";
+import NumberFlow from "@number-flow/react";
 
 import {
     Building2,
@@ -8,7 +9,6 @@ import {
     History,
     PiggyBank,
     Handshake,
-    KeyRound,
     Plus,
     Route,
 } from "lucide-react";
@@ -20,7 +20,6 @@ import {
     TransferDialog,
     transferPrefillFromSearch,
 } from "@/components/transfer-dialog";
-import { BookAuthDialog } from "@/components/book-auth-dialog";
 import { NewDepositLoanDialog } from "@/components/new-deposit-loan-dialog";
 import { PageHeader } from "@/components/page-header";
 import { PositionSummary } from "@/components/position-summary";
@@ -46,8 +45,14 @@ import {
     positionTotals,
     type GroupedAccount,
 } from "@/lib/account-groups";
-import { formatRawAmount, humanToRaw, lineAvailableRaw } from "@/lib/amount";
-import type { BookAuth, CreditLine } from "@/lib/graphql";
+import {
+    formatRawAmount,
+    humanToRaw,
+    isIsoCurrency,
+    moneyFormatOptions,
+    rawToNumber,
+} from "@/lib/amount";
+import type { CreditLine } from "@/lib/graphql";
 
 import { cn } from "@shared/lib/utils";
 import { Badge } from "@shared/shadcn/ui/badge";
@@ -79,13 +84,6 @@ export function ObligationsPage() {
     const { assets, symbolOf, precisionOf } = useAssetMap();
 
     const nowSec = Math.floor(Date.now() / 1000);
-    const globalBuyClaimOn = useMemo(
-        () =>
-            buyClaimOffers.some(
-                (p) => p.isGlobal && (p.expiresAt === 0 || p.expiresAt >= nowSec),
-            ),
-        [buyClaimOffers, nowSec],
-    );
 
     const [createOpen, setCreateOpen] = useState(false);
     const [creditLineOpen, setCreditLineOpen] = useState(false);
@@ -96,14 +94,6 @@ export function ObligationsPage() {
     const [buyClaimOpen, setBuyClaimOpen] = useState(false);
     const [buyClaimPrefill, setBuyClaimPrefill] =
         useState<BuyClaimPrefill | null>(null);
-    const [bookAuthOpen, setBookAuthOpen] = useState(false);
-    const [bookAuthPrefill, setBookAuthPrefill] = useState<{
-        creditor?: string;
-        assetId?: number;
-    } | null>(null);
-    const [editingBookAuth, setEditingBookAuth] = useState<BookAuth | null>(
-        null,
-    );
     const [hideEmptySavings, setHideEmptySavings] = useLocalStorage(
         "banx.accounts.hideEmptySavings",
         true,
@@ -139,6 +129,18 @@ export function ObligationsPage() {
                     (p.expiresAt === 0 || p.expiresAt >= nowSec),
             ),
         [forwardOffers, nowSec, selectedAssetId],
+    );
+    const globalBuyClaimOn = useMemo(
+        () =>
+            selectedAssetId !== undefined &&
+            buyClaimOffers.some(
+                (p) =>
+                    p.isGlobal &&
+                    p.isBuy &&
+                    p.assetId === selectedAssetId &&
+                    (p.expiresAt === 0 || p.expiresAt >= nowSec),
+            ),
+        [buyClaimOffers, nowSec, selectedAssetId],
     );
 
     const openRouting = (prefill?: RoutingPolicyPrefill | null) => {
@@ -251,7 +253,13 @@ export function ObligationsPage() {
                                             ? "Global buy-claim offer is on — click to edit"
                                             : "Global buy-claim offer is off — click to post one"
                                     }
-                                    onClick={() => openBuyClaim(null)}
+                                    onClick={() =>
+                                        openBuyClaim(
+                                            selectedAssetId !== undefined
+                                                ? { assetId: selectedAssetId }
+                                                : null,
+                                        )
+                                    }
                                 >
                                     <Handshake className="size-4" />
                                 </Button>
@@ -275,8 +283,6 @@ export function ObligationsPage() {
                 limit={creditLimit}
                 precision={currencyPrecision}
                 symbol={currencySymbol}
-                savings={savingsGroupsAll}
-                loans={loanGroupsAll}
                 isLoading={isLoading}
             />
 
@@ -356,6 +362,7 @@ export function ObligationsPage() {
                     assets={assets}
                     precisionOf={precisionOf}
                     editing={editingLine}
+                    assetId={selectedAssetId}
                 />
 
                 {isLoading ? (
@@ -412,20 +419,6 @@ export function ObligationsPage() {
                             />
                             <Button
                                 type="button"
-                                variant="outline"
-                                size="sm"
-                                className="h-9 gap-1.5"
-                                onClick={() => {
-                                    setEditingBookAuth(null);
-                                    setBookAuthPrefill(null);
-                                    setBookAuthOpen(true);
-                                }}
-                            >
-                                <KeyRound className="size-4" />
-                                Allow booking
-                            </Button>
-                            <Button
-                                type="button"
                                 size="icon"
                                 className="size-11 shrink-0 rounded-full bg-amber-800 text-white hover:bg-amber-900 dark:bg-amber-600 dark:hover:bg-amber-500 sm:size-9"
                                 aria-label="Book a deposit"
@@ -437,25 +430,12 @@ export function ObligationsPage() {
                     }
                 />
 
-                <BookAuthDialog
-                    open={bookAuthOpen}
-                    onOpenChange={(open) => {
-                        setBookAuthOpen(open);
-                        if (!open) {
-                            setEditingBookAuth(null);
-                            setBookAuthPrefill(null);
-                        }
-                    }}
-                    assets={assets}
-                    precisionOf={precisionOf}
-                    prefill={bookAuthPrefill ?? undefined}
-                    existing={editingBookAuth}
-                />
                 <NewDepositLoanDialog
                     open={createOpen}
                     onOpenChange={setCreateOpen}
                     assets={assets}
                     precisionOf={precisionOf}
+                    assetId={selectedAssetId}
                 />
 
                 {isLoading ? (
@@ -638,28 +618,16 @@ function AccountGroupRow({
     creditLine?: GroupedAccount["creditLine"];
     balanceLabel: string;
 }) {
-    const amount = formatRawAmount(total.toString(), precision);
     const limitRaw = creditLine
         ? humanToRaw(creditLine.limit || "0", precision)
         : null;
-    const exposureRaw = creditLine
-        ? humanToRaw(creditLine.exposure || "0", precision)
-        : null;
-    const remainingRaw = creditLine
-        ? humanToRaw(creditLine.remaining || "0", precision)
-        : null;
-    const availableRaw =
-        creditLine &&
-        limitRaw !== null &&
-        exposureRaw !== null &&
-        remainingRaw !== null
-            ? lineAvailableRaw(
-                  limitRaw,
-                  exposureRaw,
-                  remainingRaw,
-                  creditLine.depleteOnDebit,
-              )
-            : null;
+    const format = moneyFormatOptions(symbol, precision);
+    const ticker =
+        !isIsoCurrency(symbol) && symbol ? (
+            <span className="text-muted-foreground ml-1 text-xs font-sans font-normal sm:ml-1.5 sm:text-sm">
+                {symbol}
+            </span>
+        ) : null;
 
     const rowBg =
         tone === "savings"
@@ -705,21 +673,11 @@ function AccountGroupRow({
                         </span>
                     ) : null}
                 </div>
-                {creditLine &&
-                limitRaw !== null &&
-                availableRaw !== null ? (
+                {creditLine && limitRaw !== null ? (
                     <p className="text-muted-foreground mt-1 text-xs sm:text-sm">
                         Limit{" "}
                         <span className="text-foreground font-mono tabular-nums">
                             {formatRawAmount(limitRaw.toString(), precision)}
-                        </span>
-                        <span className="mx-1.5 opacity-40">·</span>
-                        Available{" "}
-                        <span className="text-foreground font-mono tabular-nums">
-                            {formatRawAmount(
-                                availableRaw.toString(),
-                                precision,
-                            )}
                         </span>
                     </p>
                 ) : null}
@@ -728,18 +686,14 @@ function AccountGroupRow({
                 <p className="text-muted-foreground text-[10px] font-medium tracking-wide uppercase sm:text-xs">
                     {balanceLabel}
                 </p>
-                <p
-                    className={cn(
-                        "font-mono text-lg font-semibold tracking-tight tabular-nums sm:text-2xl",
-                        amountCls,
-                    )}
-                >
-                    {amount}
-                    {showSymbol ? (
-                        <span className="text-muted-foreground ml-1 text-xs font-normal sm:ml-1.5 sm:text-sm">
-                            {symbol}
-                        </span>
-                    ) : null}
+                <p className="text-lg font-semibold tracking-tight sm:text-2xl">
+                    <NumberFlow
+                        value={rawToNumber(total, precision)}
+                        locales="en"
+                        format={format}
+                        className={cn("whitespace-nowrap", amountCls)}
+                    />
+                    {ticker}
                 </p>
             </div>
         </Link>

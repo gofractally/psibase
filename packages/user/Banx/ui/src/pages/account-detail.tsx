@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import NumberFlow from "@number-flow/react";
 
 import {
     ArrowLeft,
@@ -58,7 +59,13 @@ import {
     totalRaw,
     type GroupedAccount,
 } from "@/lib/account-groups";
-import { formatRawAmount, humanToRaw, lineAvailableRaw } from "@/lib/amount";
+import {
+    formatRawAmount,
+    humanToRaw,
+    isIsoCurrency,
+    moneyFormatOptions,
+    rawToNumber,
+} from "@/lib/amount";
 import { formatGracePeriod, ppmToPercent } from "@/lib/constants";
 import {
     REQUEST_INVOICE,
@@ -547,29 +554,17 @@ function AssetRelationCard({
     onBookExpense?: () => void;
     onEditBookAuth?: () => void;
 }) {
-    const amount = formatRawAmount(g.total.toString(), precision);
     const creditLine = g.creditLine;
+    const format = moneyFormatOptions(symbol, precision);
+    const ticker =
+        !isIsoCurrency(symbol) && symbol ? (
+            <span className="text-muted-foreground ml-1 text-xs font-sans font-normal">
+                {symbol}
+            </span>
+        ) : null;
     const limitRaw = creditLine
         ? humanToRaw(creditLine.limit || "0", precision)
         : null;
-    const exposureRaw = creditLine
-        ? humanToRaw(creditLine.exposure || "0", precision)
-        : null;
-    const remainingRaw = creditLine
-        ? humanToRaw(creditLine.remaining || "0", precision)
-        : null;
-    const availableRaw =
-        creditLine &&
-        limitRaw !== null &&
-        exposureRaw !== null &&
-        remainingRaw !== null
-            ? lineAvailableRaw(
-                  limitRaw,
-                  exposureRaw,
-                  remainingRaw,
-                  creditLine.depleteOnDebit,
-              )
-            : null;
 
     const border =
         tone === "savings" ? "border-emerald-500/20" : "border-amber-500/25";
@@ -592,22 +587,12 @@ function AssetRelationCard({
                             </span>
                         ) : null}
                     </div>
-                    {creditLine &&
-                    limitRaw !== null &&
-                    availableRaw !== null ? (
+                    {creditLine && limitRaw !== null ? (
                         <p className="text-muted-foreground mt-1 text-xs sm:text-sm">
                             Limit{" "}
                             <span className="text-foreground font-mono tabular-nums">
                                 {formatRawAmount(
                                     limitRaw.toString(),
-                                    precision,
-                                )}
-                            </span>
-                            <span className="mx-1.5 opacity-40">·</span>
-                            Available{" "}
-                            <span className="text-foreground font-mono tabular-nums">
-                                {formatRawAmount(
-                                    availableRaw.toString(),
                                     precision,
                                 )}
                             </span>
@@ -640,16 +625,14 @@ function AssetRelationCard({
                     <p className="text-muted-foreground text-[10px] font-medium tracking-wide uppercase">
                         {tone === "savings" ? "Balance" : "Outstanding"}
                     </p>
-                    <p
-                        className={cn(
-                            "font-mono text-lg font-semibold tabular-nums sm:text-xl",
-                            amountCls,
-                        )}
-                    >
-                        {amount}
-                        <span className="text-muted-foreground ml-1 text-xs font-normal">
-                            {symbol}
-                        </span>
+                    <p className="text-lg font-semibold sm:text-xl">
+                        <NumberFlow
+                            value={rawToNumber(g.total, precision)}
+                            locales="en"
+                            format={format}
+                            className={cn("whitespace-nowrap", amountCls)}
+                        />
+                        {ticker}
                     </p>
                 </div>
             </div>

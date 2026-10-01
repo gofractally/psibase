@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-import { AssetField } from "@/components/form-fields";
+import { AssetField, amountUnit } from "@/components/form-fields";
 import { useDeposit } from "@/hooks/use-banx-mutations";
 import {
     MAX_PERCENT,
@@ -34,12 +34,15 @@ export function NewDepositLoanDialog({
     assets,
     precisionOf,
     initialAccount,
+    assetId: lockedAssetId,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     assets: Asset[];
     precisionOf: (id: number) => number;
     initialAccount?: string;
+    /** Page currency. Hides the picker. */
+    assetId?: number;
 }) {
     const deposit = useDeposit();
 
@@ -79,12 +82,12 @@ export function NewDepositLoanDialog({
         if (!open) return;
         form.reset({
             depositor: initialAccount?.trim() ?? "",
-            assetId: undefined,
+            assetId: lockedAssetId,
             amount: "1.00",
             aprPct: "0",
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [open, initialAccount]);
+    }, [open, initialAccount, lockedAssetId]);
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -116,20 +119,26 @@ export function NewDepositLoanDialog({
                             />
                         )}
                     />
-                    <form.Field
-                        name="assetId"
-                        children={(field) => (
-                            <AssetField
-                                assets={assets}
-                                value={field.state.value}
-                                onChange={(id) => field.handleChange(id)}
-                            />
-                        )}
-                    />
+                    {lockedAssetId === undefined ? (
+                        <form.Field
+                            name="assetId"
+                            children={(field) => (
+                                <AssetField
+                                    assets={assets}
+                                    value={field.state.value}
+                                    onChange={(id) => field.handleChange(id)}
+                                />
+                            )}
+                        />
+                    ) : null}
                     <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
                         <form.Subscribe
                             selector={(s) => s.values.assetId}
-                            children={(assetId) => (
+                            children={(assetId) => {
+                                const symbol = assets
+                                    .find((asset) => asset.id === assetId)
+                                    ?.symbol.toUpperCase();
+                                return (
                                 <form.AppField
                                     name="amount"
                                     validators={
@@ -157,10 +166,12 @@ export function NewDepositLoanDialog({
                                             label="Amount"
                                             inputMode="decimal"
                                             required
+                                            endContent={amountUnit(symbol)}
                                         />
                                     )}
                                 />
-                            )}
+                                );
+                            }}
                         />
                         <form.AppField
                             name="aprPct"

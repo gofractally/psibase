@@ -4,7 +4,7 @@
  */
 import type { ReactNode } from "react";
 
-import { AssetSelect } from "@/components/asset-select";
+import { CurrencyPicker } from "@/components/currency-picker";
 import { ExpiresAtPicker } from "@/components/expires-at-picker";
 import type { Asset } from "@/lib/graphql";
 import {
@@ -22,6 +22,15 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@shared/shadcn/ui/select";
+
+export function amountUnit(symbol: string | undefined) {
+    if (!symbol) return undefined;
+    return (
+        <span className="text-foreground flex h-full shrink-0 items-center border-l px-3 text-sm">
+            {symbol}
+        </span>
+    );
+}
 
 /** Cover a locked specific-offer form when a live global offer is in effect. */
 export function UsingGlobalSettingsOverlay({
@@ -60,18 +69,12 @@ export function AssetField({
     value,
     onChange,
     disabled,
-    itemActive,
-    selectedActive,
 }: {
     label?: string;
     assets: Asset[];
     value: number | undefined;
     onChange: (id: number) => void;
     disabled?: boolean;
-    /** Green/red status dots + sort actives first (see AssetSelect). */
-    itemActive?: (asset: Asset) => boolean;
-    /** Closed-trigger dot, e.g. the Enabled switch. */
-    selectedActive?: boolean;
 }) {
     return (
         <div className="grid gap-2">
@@ -82,12 +85,11 @@ export function AssetField({
                         `Asset #${value}`}
                 </div>
             ) : (
-                <AssetSelect
+                <CurrencyPicker
+                    variant="field"
                     assets={assets}
-                    value={value}
-                    onChange={onChange}
-                    itemActive={itemActive}
-                    selectedActive={selectedActive}
+                    assetId={value}
+                    onAssetId={onChange}
                 />
             )}
         </div>

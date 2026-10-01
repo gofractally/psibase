@@ -1,6 +1,7 @@
+import NumberFlow from "@number-flow/react";
+
 import { CurrencyPicker } from "@/components/currency-picker";
-import type { GroupedAccount } from "@/lib/account-groups";
-import { formatRawAmount } from "@/lib/amount";
+import { formatMoney, isIsoCurrency, moneyFormatOptions, rawToNumber } from "@/lib/amount";
 import type { Asset } from "@/lib/graphql";
 
 import { cn } from "@shared/lib/utils";
@@ -14,8 +15,6 @@ export function PositionSummary({
     limit,
     precision,
     symbol,
-    savings,
-    loans,
     isLoading,
 }: {
     assets: Asset[];
@@ -29,10 +28,6 @@ export function PositionSummary({
     limit: bigint;
     precision: number;
     symbol: string;
-    /** All savings groups, every currency. Used to rank the picker. */
-    savings: GroupedAccount[];
-    /** All loan groups, every currency. Used to rank the picker. */
-    loans: GroupedAccount[];
     isLoading: boolean;
 }) {
     const net = held - owed;
@@ -44,23 +39,18 @@ export function PositionSummary({
             className="bg-card rounded-xl border px-4 py-4 sm:px-5"
         >
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <dl className="grid min-w-0 flex-1 grid-cols-3 gap-2 sm:gap-6">
+                <dl className="grid min-w-0 flex-1 grid-cols-3 items-start gap-x-3 sm:gap-x-6">
                     <Stat
-                        label="Total liability"
+                        label="Liability"
                         amount={owed}
                         limit={hasLimit ? limit : undefined}
                         precision={precision}
                         symbol={symbol}
                         isLoading={isLoading}
-                        hint={
-                            !isLoading && hasLimit
-                                ? "of your credit limit"
-                                : undefined
-                        }
                         amountClass="text-amber-900 dark:text-amber-300"
                     />
                     <Stat
-                        label="Total assets"
+                        label="Assets"
                         amount={held}
                         precision={precision}
                         symbol={symbol}
@@ -87,9 +77,6 @@ export function PositionSummary({
                     assets={assets}
                     assetId={assetId}
                     onAssetId={onAssetId}
-                    savings={savings}
-                    loans={loans}
-                    isLoading={isLoading}
                 />
             </div>
         </section>
@@ -116,47 +103,56 @@ function Stat({
     hint?: string;
     amountClass?: string;
 }) {
-    const shown = isLoading
-        ? "…"
-        : formatRawAmount(amount.toString(), precision);
+    const format = moneyFormatOptions(symbol, precision);
+    const value = rawToNumber(amount, precision);
+    const limitValue =
+        limit !== undefined ? rawToNumber(limit, precision) : undefined;
+    const shown = formatMoney(amount, precision, symbol);
     const limitShown =
-        !isLoading && limit !== undefined
-            ? formatRawAmount(limit.toString(), precision)
-            : undefined;
-    const symbolEl = symbol ? (
-        <span className="text-muted-foreground ml-1 text-xs font-sans font-normal sm:ml-1.5 sm:text-sm">
-            {symbol}
-        </span>
-    ) : null;
+        limit !== undefined ? formatMoney(limit, precision, symbol) : undefined;
+    const ticker =
+        !isIsoCurrency(symbol) && symbol ? (
+            <span className="text-muted-foreground ml-1 text-xs font-sans font-normal sm:ml-1.5 sm:text-sm">
+                {symbol}
+            </span>
+        ) : null;
     return (
         <div className="min-w-0">
             <dt className="text-muted-foreground text-[10px] font-medium tracking-wide uppercase sm:text-xs">
                 {label}
             </dt>
             <dd
-                className="mt-1 font-mono text-base font-semibold tracking-tight tabular-nums sm:text-2xl"
+                className="mt-1 text-base font-semibold tracking-tight sm:text-2xl"
                 aria-label={
                     limitShown !== undefined
-                        ? `${shown} of ${limitShown} ${symbol} credit limit`.trim()
+                        ? `${shown} of ${limitShown} credit limit`
                         : undefined
                 }
             >
-                {limitShown !== undefined ? (
-                    <>
-                        <span className={cn("whitespace-nowrap", amountClass)}>
-                            {shown}
-                        </span>
-                        <span className="text-muted-foreground font-medium whitespace-nowrap">
-                            {" / "}
-                            {limitShown}
-                        </span>
-                    </>
+                {isLoading ? (
+                    "…"
                 ) : (
-                    <span className={cn("whitespace-nowrap", amountClass)}>
-                        {shown}
-                    </span>
+                    <>
+                        <NumberFlow
+                            value={value}
+                            locales="en"
+                            format={format}
+                            className={cn("whitespace-nowrap", amountClass)}
+                        />
+                        {ticker}
+                        {limitValue !== undefined ? (
+                            <span className="text-muted-foreground mt-0.5 block text-xs font-medium whitespace-nowrap sm:mt-0 sm:ml-1.5 sm:inline sm:text-lg">
+                                {"/ "}
+                                <NumberFlow
+                                    value={limitValue}
+                                    locales="en"
+                                    format={format}
+                                    className="font-medium"
+                                />
+                            </span>
+                        ) : null}
+                    </>
                 )}
-                {symbolEl}
             </dd>
             {hint ? (
                 <p className="text-muted-foreground mt-1 text-[11px] leading-snug sm:text-xs">

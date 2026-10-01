@@ -51,6 +51,87 @@ export function displayAmount(amount: string): string {
     return s.replace(/(\.\d*?[1-9])0+$/, "$1").replace(/\.0+$/, "");
 }
 
+/** Human number for a raw ledger balance. Safe for header-sized amounts. */
+export function rawToNumber(raw: bigint, precision: number): number {
+    const neg = raw < 0n;
+    const abs = neg ? -raw : raw;
+    const scale = 10 ** Math.min(Math.max(precision, 0), 8);
+    const scaleInt = BigInt(scale);
+    const whole = abs / scaleInt;
+    const frac = abs % scaleInt;
+    const value = Number(whole) + Number(frac) / scale;
+    return neg ? -value : value;
+}
+
+const isoCurrency = new Map<string, boolean>();
+
+/** True when `symbol` is a code `Intl.NumberFormat` will format as currency. */
+export function isIsoCurrency(symbol: string): boolean {
+    const code = symbol.trim().toUpperCase();
+    if (!/^[A-Z]{3}$/.test(code)) return false;
+    const cached = isoCurrency.get(code);
+    if (cached !== undefined) return cached;
+    let ok = false;
+    try {
+        new Intl.NumberFormat("en", { style: "currency", currency: code }).format(0);
+        ok = true;
+    } catch {
+        ok = false;
+    }
+    isoCurrency.set(code, ok);
+    return ok;
+}
+
+const currencyGlyphs = new Map<string, string | null>();
+
+/** Narrow currency glyph, such as `$` or `£`. Empty when the glyph is just the code. */
+export function currencyGlyph(symbol: string): string | null {
+    const code = symbol.trim().toUpperCase();
+    if (!isIsoCurrency(code)) return null;
+    const cached = currencyGlyphs.get(code);
+    if (cached !== undefined) return cached;
+    const parts = new Intl.NumberFormat("en", {
+        style: "currency",
+        currency: code,
+        currencyDisplay: "narrowSymbol",
+    }).formatToParts(0);
+    const glyph = parts.find((part) => part.type === "currency")?.value ?? "";
+    const distinct =
+        glyph.replace(/[\s\u00a0]/g, "").toUpperCase() !== code ? glyph : null;
+    currencyGlyphs.set(code, distinct);
+    return distinct;
+}
+
+/** NumberFlow rejects scientific and engineering notation. */
+type MoneyFormat = Omit<Intl.NumberFormatOptions, "notation">;
+
+/** `Intl` options for a header amount. ISO codes include their symbol. */
+export function moneyFormatOptions(symbol: string, precision: number): MoneyFormat {
+    const digits = Math.min(Math.max(precision, 0), 8);
+    if (isIsoCurrency(symbol)) {
+        return {
+            style: "currency",
+            currency: symbol.trim().toUpperCase(),
+            currencyDisplay: "symbol",
+            minimumFractionDigits: 0,
+            maximumFractionDigits: digits,
+        };
+    }
+    return {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: digits,
+    };
+}
+
+/** Header amount, with an ISO symbol when the code is a currency. */
+export function formatMoney(raw: bigint, precision: number, symbol: string): string {
+    const text = new Intl.NumberFormat("en", moneyFormatOptions(symbol, precision)).format(
+        rawToNumber(raw, precision),
+    );
+    if (isIsoCurrency(symbol) || !symbol) return text;
+    return `${text} ${symbol}`;
+}
+
 /** Format raw ledger units as a fixed-point decimal using asset precision. */
 export function formatRawAmount(raw: string | number, precision: number): string {
     const value =

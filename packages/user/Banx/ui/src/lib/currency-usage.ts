@@ -3,7 +3,6 @@ import {
     type GroupedAccount,
 } from "@/lib/account-groups";
 import { eventTouchesAsset } from "@/lib/activity";
-import { formatRawAmount } from "@/lib/amount";
 import type { ActivityEvent, Asset } from "@/lib/graphql";
 
 /** One registered currency, plus whether this account has touched it. */
@@ -83,27 +82,6 @@ export function currencyMatches(row: CurrencyUsage, query: string): boolean {
 
 export function precisionLabel(precision: number): string {
     return precision === 1 ? "1 decimal" : `${precision} decimals`;
-}
-
-/** Position line for an in-use currency. Unused currencies omit it. */
-export function currencyStatus(row: CurrencyUsage): string | undefined {
-    const fmt = (amount: bigint) =>
-        formatRawAmount(amount.toString(), row.asset.precision);
-    const bits: string[] = [];
-    if (row.owed > 0n && row.limit > 0n) {
-        bits.push(`Owe ${fmt(row.owed)} of ${fmt(row.limit)}`);
-    } else if (row.owed > 0n) {
-        bits.push(`Owe ${fmt(row.owed)}`);
-    } else if (row.limit > 0n) {
-        bits.push(`Limit ${fmt(row.limit)}, undrawn`);
-    }
-    if (row.held > 0n) bits.push(`Hold ${fmt(row.held)}`);
-    if (bits.length === 0 && row.offered > 0n) {
-        bits.push(`Credit offered ${fmt(row.offered)}`);
-    }
-    if (bits.length > 0) return bits.join(" · ");
-    if (row.inUse) return "No open balance";
-    return undefined;
 }
 
 /** Signed net when there is a balance. `null` when both sides are zero. */
