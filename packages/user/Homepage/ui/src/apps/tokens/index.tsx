@@ -19,17 +19,14 @@ export const tokensConfig = defineAppConfig({
         {
             path: "",
             element: <TransferPage />,
-            name: "Transfer",
         },
         {
             path: "Pending",
             element: <PendingPage />,
-            name: "Pending",
         },
         {
             path: "swap",
             element: <SwapPage />,
-            name: "Swap",
         },
     ],
 });

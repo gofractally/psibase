@@ -20,17 +20,14 @@ export const accountMarketplaceConfig = defineAppConfig({
         {
             path: "",
             element: <BuyPage />,
-            name: "Buy",
         },
         {
             path: "claim",
             element: <ClaimPage />,
-            name: "Claim",
         },
         {
             path: "history",
             element: <HistoryPage />,
-            name: "History",
         },
     ],
 });

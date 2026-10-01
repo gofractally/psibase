@@ -37,7 +37,7 @@ export const LatestChats = ({ className }: { className?: string }) => {
                     <Button
                         asChild
                         size="sm"
-                        variant="ghost"
+                        variant="outline"
                         className="h-7 text-xs"
                     >
                         <Link to="/chainmail?new=1">
@@ -81,14 +81,6 @@ export const LatestChats = ({ className }: { className?: string }) => {
                     icon={MessagesSquare}
                     className="min-h-56"
                     detail="Chats you start here show up in every app that uses Chain mail."
-                    action={
-                        <Button asChild size="sm" className="h-7 text-xs">
-                            <Link to="/chainmail?new=1">
-                                <SquarePen className="size-3.5" />
-                                Start a chat
-                            </Link>
-                        </Button>
-                    }
                 >
                     No chats yet
                 </EmptyState>
