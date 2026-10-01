@@ -66,14 +66,26 @@ namespace
          return scheme == "https" || host == "localhost" || host.ends_with(".localhost");
       }
 
-      bool isService(std::string_view rootHost, psibase::AccountNumber account)
+      bool isService(std::string_view rootHost, psibase::AccountNumber account) const
       {
-         return isSecure() && account.str() + '.' + std::string(rootHost) == host;
+         if (!isSecure())
+            return false;
+         auto dot = host.find('.');
+         if (dot == std::string_view::npos || dot == 0)
+            return false;
+         if (host.substr(dot + 1) != rootHost)
+            return false;
+         return psibase::AccountNumber(host.substr(0, dot)) == account;
       }
 
-      bool isSubdomain(std::string_view rootHost)
+      bool isSubdomain(std::string_view rootHost) const
       {
-         return isSecure() && host == rootHost || host.ends_with('.' + std::string(rootHost));
+         if (!isSecure())
+            return false;
+         return host == rootHost
+             || (host.size() > rootHost.size() + 1
+                 && host[host.size() - rootHost.size() - 1] == '.'
+                 && host.ends_with(rootHost));
       }
    };
 }  // namespace
@@ -284,26 +296,37 @@ namespace psibase
       return host;
    }
 
+   std::optional<std::string_view> serviceOrigin(std::string_view origin,
+                                                 AccountNumber      account,
+                                                 std::string_view   rootHost)
+   {
+      if (Origin(origin).isService(rootHost, account))
+         return origin;
+      return std::nullopt;
+   }
+
    std::optional<std::string_view> serviceOrigin(const HttpRequest& req,
                                                  AccountNumber      account,
                                                  std::string_view   rootHost)
    {
-      if (auto origin = req.getHeader("origin");
-          origin && Origin(*origin).isService(rootHost, account))
-      {
-         return *origin;
-      }
+      if (auto origin = req.getHeader("origin"))
+         return serviceOrigin(*origin, account, rootHost);
+      return std::nullopt;
+   }
+
+   std::optional<std::string_view> subdomainOrigin(std::string_view origin,
+                                                   std::string_view   rootHost)
+   {
+      if (Origin(origin).isSubdomain(rootHost))
+         return origin;
       return std::nullopt;
    }
 
    std::optional<std::string_view> subdomainOrigin(const HttpRequest& req,
                                                    std::string_view   rootHost)
    {
-      if (auto origin = req.getHeader("origin");
-          origin && Origin(*origin).isSubdomain(rootHost))
-      {
-         return *origin;
-      }
+      if (auto origin = req.getHeader("origin"))
+         return subdomainOrigin(*origin, rootHost);
       return std::nullopt;
    }
 

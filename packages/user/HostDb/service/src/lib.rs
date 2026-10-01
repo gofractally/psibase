@@ -126,7 +126,8 @@ mod service {
         value: Option<Vec<u8>>,
     }
 
-    /// Serves HTTP for `host:db`. Only `Origin: supervisor.{root}` is accepted.
+    /// Serves HTTP for `host:db`. Only a secure `Origin` for `supervisor.{root}`
+    /// (https, or http on localhost / `*.localhost`) is accepted.
     #[action]
     #[allow(non_snake_case)]
     fn serveSys(

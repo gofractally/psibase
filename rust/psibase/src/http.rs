@@ -165,27 +165,27 @@ impl HttpReply {
     }
 }
 
-struct Origin {
-    scheme: String,
-    host: String,
+struct Origin<'a> {
+    scheme: &'a str,
+    host: &'a str,
 }
 
-impl Origin {
-    fn new(url: &str) -> Self {
-        let mut scheme = String::new();
-        let mut host = String::new();
+impl<'a> Origin<'a> {
+    fn new(url: &'a str) -> Self {
+        let mut scheme = "";
+        let mut host = "";
         if let Some(pos) = url.find("://") {
-            scheme = url[..pos].to_string();
+            scheme = &url[..pos];
             let after_scheme = &url[pos + 3..];
-            if let Some(colon_pos) = after_scheme.rfind(':') {
+            host = if let Some(colon_pos) = after_scheme.rfind(':') {
                 if !after_scheme[..colon_pos].contains(']') {
-                    host = after_scheme[..colon_pos].to_string();
+                    &after_scheme[..colon_pos]
                 } else {
-                    host = after_scheme.to_string();
+                    after_scheme
                 }
             } else {
-                host = after_scheme.to_string();
-            }
+                after_scheme
+            };
         }
         Origin { scheme, host }
     }
@@ -195,12 +195,24 @@ impl Origin {
     }
 
     fn is_service(&self, root_host: &str, account: AccountNumber) -> bool {
-        self.is_secure() && self.host == format!("{}.{}", account, root_host)
+        if !self.is_secure() {
+            return false;
+        }
+        let Some((prefix, suffix)) = self.host.split_once('.') else {
+            return false;
+        };
+        suffix == root_host && prefix.parse::<AccountNumber>().ok() == Some(account)
     }
 
     fn is_subdomain(&self, root_host: &str) -> bool {
-        self.is_secure()
-            && (self.host == root_host || self.host.ends_with(&format!(".{}", root_host)))
+        if !self.is_secure() {
+            return false;
+        }
+        self.host == root_host
+            || self
+                .host
+                .strip_suffix(root_host)
+                .is_some_and(|prefix| prefix.ends_with('.'))
     }
 }
 
@@ -213,22 +225,34 @@ pub fn root_host(req: &HttpRequest, host_is_subdomain: bool) -> &str {
     }
 }
 
-pub fn service_origin<'a>(
-    req: &'a HttpRequest,
+pub fn service_origin_str<'a>(
+    origin: &'a str,
     account: AccountNumber,
     root_host: &str,
 ) -> Option<&'a str> {
-    let origin = req.get_header("origin")?;
     Origin::new(origin)
         .is_service(root_host, account)
         .then_some(origin)
 }
 
-pub fn subdomain_origin<'a>(req: &'a HttpRequest, root_host: &str) -> Option<&'a str> {
-    let origin = req.get_header("origin")?;
+pub fn subdomain_origin_str<'a>(origin: &'a str, root_host: &str) -> Option<&'a str> {
     Origin::new(origin)
         .is_subdomain(root_host)
         .then_some(origin)
+}
+
+pub fn service_origin<'a>(
+    req: &'a HttpRequest,
+    account: AccountNumber,
+    root_host: &str,
+) -> Option<&'a str> {
+    req.get_header("origin")
+        .and_then(|origin| service_origin_str(origin, account, root_host))
+}
+
+pub fn subdomain_origin<'a>(req: &'a HttpRequest, root_host: &str) -> Option<&'a str> {
+    req.get_header("origin")
+        .and_then(|origin| subdomain_origin_str(origin, root_host))
 }
 
 pub fn allow_cors_for_account(
