@@ -135,6 +135,12 @@ mod service {
         _socket: Option<i32>,
         _user: Option<AccountNumber>,
     ) -> Option<HttpReply> {
+        assert_eq!(
+            get_sender(),
+            HttpServer::SERVICE,
+            "permission denied: hostdb::serveSys only callable by 'http-server'",
+        );
+
         let root = HttpServer::call().rootHost(request.host.clone());
         let Some(origin) = service_origin(&request, account!("supervisor"), &root) else {
             return Some(status_reply(403));
