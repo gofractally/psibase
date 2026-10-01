@@ -3,15 +3,19 @@ use crate::{
     resource_type::ResourceType,
     tables::tables::{
         BillingConfig, BillingConfigTable, CapacityPricing, InitRow, NetworkSpecs,
-        NetworkSpecsTable, NetworkVariables, RateLimitPricing, ServerSpecs as InternalServerSpecs,
-        UserSettings,
+        NetworkSpecsTable, NetworkVariables, RateLimitPricing, ResourceProviderTable,
+        ServerSpecs as InternalServerSpecs, UserSettings,
     },
 };
 
-use async_graphql::*;
+use async_graphql::{
+    connection::{Connection, Edge},
+    *,
+};
 use psibase::{
     is_auth,
     services::{
+        producers::Wrapper as Producers,
         tokens::{Decimal, Quantity, Wrapper as Tokens},
         transact::ServiceMethod,
     },
@@ -19,6 +23,7 @@ use psibase::{
 };
 use serde::Deserialize;
 use serde_aux::field_attributes::deserialize_number_from_string;
+use std::collections::HashSet;
 
 #[derive(Deserialize, SimpleObject)]
 #[graphql(complex)]
@@ -138,6 +143,19 @@ pub struct UserResources {
     /// The percentage at which client-side tooling should attempt to refill the user's
     /// resource buffer. A value of 0 means that the client should not auto refill.
     auto_fill_threshold_percent: u8,
+}
+
+/// An active resource provider and the payment portal used to purchase resources.
+#[derive(SimpleObject, Clone)]
+pub struct ResourceProviderNode {
+    /// Producer account that provides resources
+    producer: AccountNumber,
+    /// Node-local app account that accepts payments
+    app: String,
+    /// Currencies the provider accepts (free-form)
+    accepted: Vec<String>,
+    /// Producer candidate HTTP endpoint (root origin)
+    endpoint: String,
 }
 
 //  Derived from expected 80% of reads/writes in 20% of the total storage, targeting
@@ -388,5 +406,89 @@ impl Query {
             .before(before)
             .after(after)
             .query()
+    }
+
+    /// Active resource providers and their payment portals.
+    ///
+    /// Providers that are no longer in the active producer set are omitted.
+    /// `endpoint` is taken from the producer's candidate registration.
+    async fn resource_providers(
+        &self,
+        first: Option<i32>,
+        last: Option<i32>,
+        before: Option<String>,
+        after: Option<String>,
+    ) -> async_graphql::Result<Connection<String, ResourceProviderNode>> {
+        if first.is_some() && last.is_some() {
+            return Err("cannot specify both `first` and `last`".into());
+        }
+
+        let active: HashSet<_> = Producers::call().getProducers().into_iter().collect();
+        let mut nodes: Vec<ResourceProviderNode> = ResourceProviderTable::read()
+            .get_index_pk()
+            .iter()
+            .filter_map(|row| {
+                if !active.contains(&row.provider) {
+                    return None;
+                }
+                let candidate = Producers::call().getCandidate(row.provider)?;
+                if candidate.endpoint.is_empty() {
+                    return None;
+                }
+                Some(ResourceProviderNode {
+                    producer: row.provider,
+                    app: row.app,
+                    accepted: row.accepted,
+                    endpoint: candidate.endpoint,
+                })
+            })
+            .collect();
+        nodes.sort_by(|a, b| a.producer.to_string().cmp(&b.producer.to_string()));
+
+        let start = after
+            .as_ref()
+            .and_then(|cursor| {
+                nodes
+                    .iter()
+                    .position(|n| n.producer.to_string() == *cursor)
+                    .map(|i| i + 1)
+            })
+            .unwrap_or(0);
+        let end_exclusive = before
+            .as_ref()
+            .and_then(|cursor| nodes.iter().position(|n| n.producer.to_string() == *cursor))
+            .unwrap_or(nodes.len());
+
+        if start > end_exclusive {
+            return Ok(Connection::new(false, false));
+        }
+
+        let window = &nodes[start..end_exclusive];
+        let (slice_start, has_previous, has_next) = if let Some(n) = last {
+            let n = n.max(0) as usize;
+            let slice_start = window.len().saturating_sub(n);
+            (
+                slice_start,
+                start + slice_start > 0,
+                end_exclusive < nodes.len(),
+            )
+        } else {
+            let n = first.unwrap_or(100).max(0) as usize;
+            let take = n.min(window.len());
+            (0, start > 0, start + take < nodes.len())
+        };
+
+        let take = if let Some(n) = last {
+            n.max(0) as usize
+        } else {
+            first.unwrap_or(100).max(0) as usize
+        };
+
+        let mut conn = Connection::new(has_previous, has_next);
+        for node in window.iter().skip(slice_start).take(take) {
+            conn.edges
+                .push(Edge::new(node.producer.to_string(), node.clone()));
+        }
+        Ok(conn)
     }
 }
