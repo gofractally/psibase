@@ -9,6 +9,7 @@ import { useUnregResProvider } from "@/hooks/use-unreg-res-provider";
 import { PageContainer } from "@shared/components/page-container";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { getProducers } from "@shared/lib/get-producers";
+import { zLocalAccount } from "@shared/lib/schemas/account";
 import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
@@ -61,17 +62,50 @@ export const ResourceProviders = () => {
 
     const isLoading =
         candidatesLoading || providersLoading || producersLoading;
+
+    // Same gates as the disabled inputs — keep reason and canSubmit in lockstep.
+    const submitBlockReason = !currentUser
+        ? "Log in as a producer to register."
+        : !isActiveProducer
+          ? "Only active producers can register. Unregister remains available if you previously registered."
+          : !candidate?.endpoint
+            ? "Register as a block-production candidate with a non-empty endpoint first (Block production)."
+            : null;
+
+    const paymentAppError = useMemo(() => {
+        const trimmed = app.trim();
+        if (!trimmed) {
+            return null;
+        }
+        const result = zLocalAccount.safeParse(trimmed);
+        if (result.success) {
+            return null;
+        }
+        return (
+            result.error.issues[0]?.message ?? "Invalid payment app account."
+        );
+    }, [app]);
+
     const canSubmit =
-        Boolean(currentUser) &&
-        isActiveProducer &&
-        Boolean(candidate?.endpoint) &&
+        !submitBlockReason &&
         !isRegistering &&
-        !isUnregistering;
+        !isUnregistering &&
+        !paymentAppError &&
+        Boolean(app.trim()) &&
+        parseAccepted(accepted).length > 0;
 
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
+        const trimmedApp = app.trim();
+        const parsedApp = zLocalAccount.safeParse(trimmedApp);
+        if (!parsedApp.success) {
+            return;
+        }
         const acceptedList = parseAccepted(accepted);
-        await regResProvider([app.trim(), acceptedList]);
+        if (acceptedList.length === 0) {
+            return;
+        }
+        await regResProvider([parsedApp.data, acceptedList]);
     };
 
     const handleUnregister = async () => {
@@ -95,37 +129,20 @@ export const ResourceProviders = () => {
                     <p className="text-muted-foreground text-sm">Loading...</p>
                 ) : (
                     <>
-                        <div className="space-y-1 text-sm">
-                            {!currentUser && (
-                                <p className="text-muted-foreground">
-                                    Log in as a producer to register.
-                                </p>
-                            )}
-                            {currentUser && !candidate?.endpoint && (
-                                <p className="text-muted-foreground">
-                                    Register as a block-production candidate
-                                    with a non-empty endpoint first.
-                                </p>
-                            )}
-                            {currentUser &&
-                                candidate?.endpoint &&
-                                !isActiveProducer && (
-                                    <p className="text-muted-foreground">
-                                        Only active producers can register.
-                                        Unregister remains available if you
-                                        previously registered.
-                                    </p>
-                                )}
-                            {existing && (
-                                <p>
-                                    Currently registered:{" "}
-                                    <span className="font-medium">
-                                        {existing.app}
-                                    </span>{" "}
-                                    ({existing.accepted.join(", ")})
-                                </p>
-                            )}
-                        </div>
+                        {submitBlockReason && (
+                            <p className="text-sm text-amber-700 dark:text-amber-400">
+                                Registration is disabled: {submitBlockReason}
+                            </p>
+                        )}
+                        {existing && (
+                            <p className="text-sm">
+                                Currently registered:{" "}
+                                <span className="font-medium">
+                                    {existing.app}
+                                </span>{" "}
+                                ({existing.accepted.join(", ")})
+                            </p>
+                        )}
 
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div className="space-y-2">
@@ -139,12 +156,23 @@ export const ResourceProviders = () => {
                                         setApp(event.target.value)
                                     }
                                     placeholder="x-portal"
-                                    disabled={!canSubmit}
+                                    disabled={
+                                        Boolean(submitBlockReason) ||
+                                        isRegistering ||
+                                        isUnregistering
+                                    }
+                                    aria-invalid={Boolean(paymentAppError)}
                                 />
-                                <p className="text-muted-foreground text-xs">
-                                    Must be a valid account name starting with
-                                    x-.
-                                </p>
+                                {paymentAppError ? (
+                                    <p className="text-destructive text-xs">
+                                        {paymentAppError}
+                                    </p>
+                                ) : (
+                                    <p className="text-muted-foreground text-xs">
+                                        Must be a valid account name starting
+                                        with x-.
+                                    </p>
+                                )}
                             </div>
 
                             <div className="space-y-2">
@@ -158,7 +186,11 @@ export const ResourceProviders = () => {
                                         setAccepted(event.target.value)
                                     }
                                     placeholder="USD, EUR"
-                                    disabled={!canSubmit}
+                                    disabled={
+                                        Boolean(submitBlockReason) ||
+                                        isRegistering ||
+                                        isUnregistering
+                                    }
                                 />
                                 <p className="text-muted-foreground text-xs">
                                     Comma-separated list. Values are free-form.
@@ -166,14 +198,7 @@ export const ResourceProviders = () => {
                             </div>
 
                             <div className="flex flex-wrap gap-2">
-                                <Button
-                                    type="submit"
-                                    disabled={
-                                        !canSubmit ||
-                                        !app.trim() ||
-                                        parseAccepted(accepted).length === 0
-                                    }
-                                >
+                                <Button type="submit" disabled={!canSubmit}>
                                     {existing ? "Update" : "Register"}
                                 </Button>
                                 <Button

@@ -99,7 +99,8 @@ export const UserSettingsSection = ({
                 {readOnly && (
                     <p className="text-muted-foreground text-sm">
                         Resource self-service isn&apos;t available on this
-                        network. Purchase resources from a provider.
+                        network. Purchase resources from a provider (just
+                        below).
                     </p>
                 )}
             </div>

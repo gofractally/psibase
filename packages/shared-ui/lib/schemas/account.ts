@@ -21,21 +21,34 @@ function accountNameSchema(minLength: number, minMessage: string) {
         })
         .refine((val) => !val.includes("--"), {
             message: "Account may not contain consecutive hyphens.",
-        })
-        .refine((val) => !val.startsWith("x-"), {
-            message: "Account may not start with 'x-'.",
         });
 }
 
-export const zAccount = accountNameSchema(
-    MIN_ACCOUNT_NAME_LENGTH,
-    `Account must be at least ${MIN_ACCOUNT_NAME_LENGTH} characters.`,
+const rejectInfraPrefix = (schema: ReturnType<typeof accountNameSchema>) =>
+    schema.refine((val) => !val.startsWith("x-"), {
+        message: "Account may not start with 'x-'.",
+    });
+
+export const zAccount = rejectInfraPrefix(
+    accountNameSchema(
+        MIN_ACCOUNT_NAME_LENGTH,
+        `Account must be at least ${MIN_ACCOUNT_NAME_LENGTH} characters.`,
+    ),
 );
 
-export const zAccountFree = accountNameSchema(
-    MIN_FREE_ACCOUNT_NAME_LENGTH,
-    `Account must be at least ${MIN_FREE_ACCOUNT_NAME_LENGTH} characters.`,
+export const zAccountFree = rejectInfraPrefix(
+    accountNameSchema(
+        MIN_FREE_ACCOUNT_NAME_LENGTH,
+        `Account must be at least ${MIN_FREE_ACCOUNT_NAME_LENGTH} characters.`,
+    ),
 );
+
+export const zLocalAccount = accountNameSchema(
+    MIN_ACCOUNT_NAME_LENGTH,
+    `Account must be at least ${MIN_ACCOUNT_NAME_LENGTH} characters.`,
+).refine((val) => val.startsWith("x-"), {
+    message: "Account must start with 'x-'.",
+});
 
 export type Account = z.infer<typeof zAccount>;
 export type AccountFree = z.infer<typeof zAccountFree>;

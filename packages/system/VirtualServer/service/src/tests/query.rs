@@ -5,7 +5,7 @@ use crate::tables::tables::{NetworkVariables, ServerSpecs};
 use crate::Wrapper;
 
 /// Runs a GraphQL query against `service` and deserializes `data[field]` into `T`.
-pub(super) fn query_field<T: DeserializeOwned>(
+pub(super) fn query<T: DeserializeOwned>(
     chain: &psibase::Chain,
     service: AccountNumber,
     field: &str,
@@ -13,16 +13,6 @@ pub(super) fn query_field<T: DeserializeOwned>(
 ) -> Result<T, psibase::Error> {
     let mut v: serde_json::Value = chain.graphql(service, query)?;
     Ok(serde_json::from_value(v["data"][field].take())?)
-}
-
-/// Runs a GraphQL query against `service` and deserializes `data[field]` into `T`.
-fn query<T: DeserializeOwned>(
-    chain: &psibase::Chain,
-    service: AccountNumber,
-    field: &str,
-    query: &str,
-) -> Result<T, psibase::Error> {
-    query_field(chain, service, field, query)
 }
 
 /// Same as `query`, but with a bearer auth token.
