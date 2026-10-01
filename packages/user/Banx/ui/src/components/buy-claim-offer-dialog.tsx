@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 
 import {
     AssetField,
@@ -362,38 +362,53 @@ export function BuyClaimOfferDialog({
         },
     });
 
-    // `isSuccess` stays true across background refetch; only `open` flipping
-    // (or the first success) should load the form. Do not depend on offer rows.
-    useEffect(() => {
+    // Load on open, not on every offer refetch, so a background refresh does
+    // not wipe an edit. keepDefaultValues: FormApi.update reapplies hook
+    // defaultValues when they differ and the form is untouched, and reset()
+    // clears touched. Without the flag, the next update turns Enabled off.
+    useLayoutEffect(() => {
         if (!open || !offersReady) return;
+        const keep = { keepDefaultValues: true } as const;
         if (isSpecific) {
             if (existingSpecific) {
-                specificForm.reset({
-                    enabled: true,
-                    ...feesFromOffer(existingSpecific),
-                });
+                specificForm.reset(
+                    {
+                        enabled: true,
+                        ...feesFromOffer(existingSpecific),
+                    },
+                    keep,
+                );
             } else {
                 const globalOffer =
                     prefill?.assetId !== undefined
                         ? liveGlobalByAsset.get(prefill.assetId)
                         : undefined;
-                specificForm.reset({
-                    enabled: false,
-                    ...(globalOffer
-                        ? feesFromOffer(globalOffer)
-                        : defaultFees(prefill?.assetId)),
-                });
+                specificForm.reset(
+                    {
+                        enabled: false,
+                        ...(globalOffer
+                            ? feesFromOffer(globalOffer)
+                            : defaultFees(prefill?.assetId)),
+                    },
+                    keep,
+                );
             }
         } else if (existingGlobal) {
-            globalForm.reset({
-                enabled: true,
-                ...feesFromOffer(existingGlobal),
-            });
+            globalForm.reset(
+                {
+                    enabled: true,
+                    ...feesFromOffer(existingGlobal),
+                },
+                keep,
+            );
         } else {
-            globalForm.reset({
-                enabled: false,
-                ...defaultFees(prefill?.assetId),
-            });
+            globalForm.reset(
+                {
+                    enabled: false,
+                    ...defaultFees(prefill?.assetId),
+                },
+                keep,
+            );
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, offersReady]);
@@ -725,7 +740,10 @@ export function BuyClaimOfferDialog({
                                 children={(assetId) => (
                                     <field.SwitchField
                                         label="Enabled"
-                                        disabled={assetId === undefined}
+                                        disabled={
+                                            (assetId ?? prefill?.assetId) ===
+                                            undefined
+                                        }
                                     />
                                 )}
                             />
@@ -736,7 +754,7 @@ export function BuyClaimOfferDialog({
                         children={(values) =>
                             feeFields(
                                 globalForm,
-                                values.assetId,
+                                values.assetId ?? prefill?.assetId,
                                 values.enabled,
                             )
                         }
@@ -752,7 +770,8 @@ export function BuyClaimOfferDialog({
                         <globalForm.Subscribe
                             selector={(s) => s.values}
                             children={(values) => {
-                                const assetId = values.assetId;
+                                const assetId =
+                                    values.assetId ?? prefill?.assetId;
                                 const hasLive =
                                     assetId !== undefined &&
                                     liveGlobalByAsset.has(assetId);

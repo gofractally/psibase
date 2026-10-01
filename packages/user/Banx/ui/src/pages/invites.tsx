@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { Copy, Plus, UserPlus } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 
 import { ClaimedInviteNicks } from "@/components/claimed-invite-nicks";
 
@@ -57,6 +58,8 @@ import {
     TableRow,
 } from "@shared/shadcn/ui/table";
 import { toast } from "@shared/shadcn/ui/sonner";
+
+const QR_SIZE = 224;
 
 async function copyText(text: string) {
     if ("clipboard" in navigator) {
@@ -462,40 +465,58 @@ export function InvitesPage() {
                     if (!open) setShare(null);
                 }}
             >
-                <DialogContent className="sm:max-w-md">
+                <DialogContent className="sm:max-w-xl">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <UserPlus className="size-5" />
                             Share invite
                         </DialogTitle>
                         <DialogDescription>
-                            Send this link. The recipient can create a network
-                            account if they need one, then they land in Banx
-                            with your credit line.
+                            Anyone with this link or who scans the code can
+                            create a network account if they need one, then
+                            they land in Banx with your credit line.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="flex items-center space-x-2">
-                        <div className="grid flex-1 gap-2">
-                            <Label htmlFor="invite-link" className="sr-only">
-                                Link
-                            </Label>
-                            <Input
-                                id="invite-link"
-                                value={share?.url ?? ""}
-                                readOnly
-                            />
+                    <div className="flex flex-col items-center gap-6">
+                        <div className="bg-white p-4">
+                            {share?.url ? (
+                                <QRCodeSVG
+                                    value={share.url}
+                                    size={QR_SIZE}
+                                    marginSize={0}
+                                    title="Invite QR code"
+                                />
+                            ) : (
+                                <div
+                                    className="bg-muted"
+                                    style={{ width: QR_SIZE, height: QR_SIZE }}
+                                    aria-hidden
+                                />
+                            )}
                         </div>
-                        <Button
-                            type="button"
-                            size="sm"
-                            className="px-3"
-                            onClick={() =>
-                                share ? void copyText(share.url) : undefined
-                            }
-                        >
-                            <span className="sr-only">Copy</span>
-                            <Copy className="h-4 w-4" />
-                        </Button>
+                        <div className="flex w-full items-center space-x-2">
+                            <div className="grid flex-1 gap-2">
+                                <Label htmlFor="invite-link" className="sr-only">
+                                    Link
+                                </Label>
+                                <Input
+                                    id="invite-link"
+                                    value={share?.url ?? ""}
+                                    readOnly
+                                />
+                            </div>
+                            <Button
+                                type="button"
+                                size="sm"
+                                className="px-3"
+                                onClick={() =>
+                                    share ? void copyText(share.url) : undefined
+                                }
+                            >
+                                <span className="sr-only">Copy</span>
+                                <Copy className="h-4 w-4" />
+                            </Button>
+                        </div>
                     </div>
                     <DialogFooter className="sm:justify-start">
                         <DialogClose asChild>

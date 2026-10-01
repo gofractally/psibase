@@ -41,14 +41,45 @@ export function humanToRaw(amount: string, precision: number): bigint {
 }
 
 /**
- * Display a GraphQL `Decimal` string (already human). Trims trailing zeros.
- * Prefer this over {@link formatRawAmount} for Banx query fields.
+ * Fraction digits for a shown amount. Two is the floor whenever the asset
+ * has a fraction, so `$1.20` does not collapse to `$1.2`. Extra places up to
+ * the asset precision stay visible.
+ */
+function shownFractionDigits(precision: number): { min: number; max: number } {
+    const max = Math.min(Math.max(precision, 0), 8);
+    if (max === 0) return { min: 0, max: 0 };
+    return { min: 2, max: Math.max(max, 2) };
+}
+
+/**
+ * Drop trailing fraction zeros, but not below `minDigits`.
+ * `1.2000` with min 2 is `1.20`. `1.2340` is `1.234`.
+ */
+function withMinFraction(amount: string, minDigits: number): string {
+    const neg = amount.startsWith("-");
+    const unsigned = neg ? amount.slice(1) : amount;
+    const [wholeRaw, fracRaw = ""] = unsigned.includes(".")
+        ? unsigned.split(".", 2)
+        : [unsigned, ""];
+    const whole = wholeRaw.replace(/^0+(?=\d)/, "") || "0";
+    let end = fracRaw.length;
+    while (end > minDigits && fracRaw[end - 1] === "0") end--;
+    let frac = fracRaw.slice(0, end);
+    if (frac.length < minDigits) frac = frac.padEnd(minDigits, "0");
+    const text = frac.length === 0 ? whole : `${whole}.${frac}`;
+    return neg ? `-${text}` : text;
+}
+
+/**
+ * Display a GraphQL `Decimal` string (already human).
+ * A fraction keeps at least two digits (`1.20`) and any further non-zero
+ * digits (`1.234`). Whole numbers stay whole. Prefer this over
+ * {@link formatRawAmount} for Banx query fields.
  */
 export function displayAmount(amount: string): string {
     const s = amount.trim();
     if (!s) return "0";
-    if (!s.includes(".")) return s;
-    return s.replace(/(\.\d*?[1-9])0+$/, "$1").replace(/\.0+$/, "");
+    return withMinFraction(s, s.includes(".") ? 2 : 0);
 }
 
 /** Human number for a raw ledger balance. Safe for header-sized amounts. */
@@ -107,19 +138,19 @@ type MoneyFormat = Omit<Intl.NumberFormatOptions, "notation">;
 
 /** `Intl` options for a header amount. ISO codes include their symbol. */
 export function moneyFormatOptions(symbol: string, precision: number): MoneyFormat {
-    const digits = Math.min(Math.max(precision, 0), 8);
+    const { min, max } = shownFractionDigits(precision);
     if (isIsoCurrency(symbol)) {
         return {
             style: "currency",
             currency: symbol.trim().toUpperCase(),
             currencyDisplay: "symbol",
-            minimumFractionDigits: 0,
-            maximumFractionDigits: digits,
+            minimumFractionDigits: min,
+            maximumFractionDigits: max,
         };
     }
     return {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: digits,
+        minimumFractionDigits: min,
+        maximumFractionDigits: max,
     };
 }
 
@@ -149,10 +180,7 @@ export function formatRawAmount(raw: string | number, precision: number): string
     const fracStr = frac.toString().padStart(precision, "0");
     const body =
         precision > 0 ? `${whole.toString()}.${fracStr}` : whole.toString();
-    // Trim trailing zeros after decimal for readability, keep at least one digit if needed
-    const trimmed =
-        precision > 0 ? body.replace(/(\.\d*?[1-9])0+$/, "$1").replace(/\.0+$/, "") : body;
-    return neg ? `-${trimmed}` : trimmed;
+    return withMinFraction(neg ? `-${body}` : body, precision > 0 ? 2 : 0);
 }
 
 /**

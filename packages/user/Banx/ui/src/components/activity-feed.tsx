@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useAssetMap } from "@/hooks/use-assets";
 import { useBanxContacts } from "@/hooks/use-banx-contacts";
 import { useActivityFeed, useActivityWith } from "@/hooks/use-banx-data";
+import { useInvalidateLedger } from "@/hooks/use-banx-mutations";
 import { isNamedAccount } from "@/lib/contacts";
 import {
     activityMatches,
@@ -54,7 +55,9 @@ export function ActivityFeed({
         ? withParty
         : feed;
     const [filter, setFilter] = useState<ActivityFilter>("all");
+    const refreshLedger = useInvalidateLedger();
     const seenKey = useRef<string | null>(null);
+    const seenFor = useRef<string | null>(null);
 
     const rows = useMemo(
         () =>
@@ -71,23 +74,36 @@ export function ActivityFeed({
         !events.some((e) => eventTouchesAsset(e, assetId));
 
     useEffect(() => {
-        if (counterparty || !user || events.length === 0) return;
+        if (!user || events.length === 0) return;
+        const scope = counterparty ?? "";
         const newest = eventKey(events[0]);
-        if (seenKey.current === null) {
+        if (seenFor.current !== scope || seenKey.current === null) {
+            seenFor.current = scope;
             seenKey.current = newest;
             return;
         }
         if (newest === seenKey.current) return;
-        const fresh: typeof events = [];
+        const incoming: typeof events = [];
+        let anyNew = false;
         for (const e of events) {
             if (eventKey(e) === seenKey.current) break;
-            if (e.actor !== user) fresh.push(e);
+            anyNew = true;
+            if (!counterparty && e.actor !== user) incoming.push(e);
         }
         seenKey.current = newest;
-        for (const e of fresh.reverse()) {
+        if (anyNew) refreshLedger();
+        for (const e of incoming.reverse()) {
             toast(describeEvent(e, user, symbolOf, precisionOf, label).title);
         }
-    }, [counterparty, events, user, symbolOf, precisionOf, label]);
+    }, [
+        counterparty,
+        events,
+        user,
+        symbolOf,
+        precisionOf,
+        label,
+        refreshLedger,
+    ]);
 
     return (
         <div>

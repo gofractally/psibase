@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { BANX_SERVICE } from "@/lib/constants";
@@ -7,38 +8,48 @@ import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { supervisor } from "@shared/lib/supervisor";
 import { toast } from "@shared/shadcn/ui/sonner";
 
+/** Balances and lines. Skips activity queries so a feed poll cannot refetch itself. */
+export function useInvalidateLedger() {
+    const qc = useQueryClient();
+    const { data: user } = useCurrentUser();
+    return useCallback(() => {
+        void qc.invalidateQueries({ queryKey: QueryKey.assets() });
+        if (!user) return;
+        void qc.invalidateQueries({ queryKey: QueryKey.creditLines(user) });
+        void qc.invalidateQueries({ queryKey: QueryKey.bookAuths(user) });
+        void qc.invalidateQueries({ queryKey: QueryKey.obligations(user) });
+        void qc.invalidateQueries({
+            queryKey: QueryKey.forwardOffers(user),
+        });
+        void qc.invalidateQueries({
+            queryKey: QueryKey.claimOffers(user),
+        });
+        void qc.invalidateQueries({
+            queryKey: QueryKey.currencyPolicies(user),
+        });
+        void qc.invalidateQueries({
+            queryKey: QueryKey.requests(user),
+        });
+        void qc.invalidateQueries({ queryKey: QueryKey.invites(user) });
+        void qc.invalidateQueries({ queryKey: ["banx", "cashQuotes"] });
+        void qc.invalidateQueries({
+            queryKey: QueryKey.cashVault(user),
+        });
+    }, [qc, user]);
+}
+
 function useInvalidateBanx() {
     const qc = useQueryClient();
     const { data: user } = useCurrentUser();
+    const invalidateLedger = useInvalidateLedger();
     return () => {
-        void qc.invalidateQueries({ queryKey: QueryKey.assets() });
-        if (user) {
-            void qc.invalidateQueries({ queryKey: QueryKey.creditLines(user) });
-            void qc.invalidateQueries({ queryKey: QueryKey.bookAuths(user) });
-            void qc.invalidateQueries({ queryKey: QueryKey.obligations(user) });
-            void qc.invalidateQueries({
-                queryKey: QueryKey.forwardOffers(user),
-            });
-            void qc.invalidateQueries({
-                queryKey: QueryKey.claimOffers(user),
-            });
-            void qc.invalidateQueries({
-                queryKey: QueryKey.currencyPolicies(user),
-            });
-            void qc.invalidateQueries({
-                queryKey: QueryKey.requests(user),
-            });
-            void qc.invalidateQueries({ queryKey: QueryKey.invites(user) });
-            void qc.invalidateQueries({
-                queryKey: QueryKey.activityFeed(user),
-            });
-            void qc.invalidateQueries({ queryKey: ["banx", "activityWith"] });
-            void qc.invalidateQueries({ queryKey: ["banx", "activity"] });
-            void qc.invalidateQueries({ queryKey: ["banx", "cashQuotes"] });
-            void qc.invalidateQueries({
-                queryKey: QueryKey.cashVault(user),
-            });
-        }
+        invalidateLedger();
+        if (!user) return;
+        void qc.invalidateQueries({
+            queryKey: QueryKey.activityFeed(user),
+        });
+        void qc.invalidateQueries({ queryKey: ["banx", "activityWith"] });
+        void qc.invalidateQueries({ queryKey: ["banx", "activity"] });
     };
 }
 
