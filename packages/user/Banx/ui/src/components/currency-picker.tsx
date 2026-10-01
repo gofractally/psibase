@@ -44,7 +44,12 @@ export function CurrencyPicker({
     const [createOpen, setCreateOpen] = useState(false);
     const [createdSymbol, setCreatedSymbol] = useState<string | null>(null);
     const [query, setQuery] = useState("");
-    const { savings, loans, isLoading: groupsLoading } = useAccountGroups();
+    const {
+        savings,
+        loans,
+        isLoading: groupsLoading,
+        isError: groupsError,
+    } = useAccountGroups();
     const { data: events = [], isLoading: activityLoading } = useActivityFeed();
     const fallbackId = useMemo(() => defaultAssetId(assets), [assets]);
     const valueInList =
@@ -190,8 +195,20 @@ export function CurrencyPicker({
                                 aria-label="Search currencies"
                             />
                             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
-                                {waiting &&
-                                usage.every((row) => !row.inUse) ? (
+                                {groupsError ? (
+                                    <>
+                                        <p className="text-destructive text-sm">
+                                            Could not load balances.
+                                        </p>
+                                        <CurrencySection
+                                            title="Currencies"
+                                            rows={filtered}
+                                            selectedId={shownId}
+                                            onChoose={choose}
+                                        />
+                                    </>
+                                ) : waiting &&
+                                  usage.every((row) => !row.inUse) ? (
                                     <p className="text-muted-foreground text-sm">
                                         Loading…
                                     </p>

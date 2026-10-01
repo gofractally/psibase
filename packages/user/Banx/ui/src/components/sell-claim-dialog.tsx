@@ -30,6 +30,7 @@ import {
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { useHasProfilesReadPermission } from "@shared/hooks/use-has-profiles-read-permission";
 import { Button } from "@shared/shadcn/ui/button";
+import { toast } from "@shared/shadcn/ui/sonner";
 import {
     Dialog,
     DialogContent,
@@ -72,60 +73,101 @@ function obligationRaw(o: Obligation, precision: number): bigint {
     );
 }
 
-/** Same as on-chain `Connection::knows(who, them)`: line who→them, or a live claim either way. */
-function pairKnows(
+/** `Connection::knows(debtor, buyer)`: the debtor lined the buyer, or the debtor already owes the buyer. */
+function debtorKnowsBuyer(
     lines: CreditLine[],
     obligations: Obligation[],
-    who: string,
-    them: string,
+    debtor: string,
+    buyer: string,
     assetId: number,
     precision: number,
 ): boolean {
     if (
         lines.some(
             (l) =>
-                l.creditor === who &&
-                l.debtor === them &&
+                l.creditor === debtor &&
+                l.debtor === buyer &&
                 l.assetId === assetId,
         )
     ) {
         return true;
     }
-    return obligations.some((o) => {
-        if (o.assetId !== assetId || obligationRaw(o, precision) <= 0n) {
-            return false;
-        }
-        return (
-            (o.creditor === who && o.debtor === them) ||
-            (o.creditor === them && o.debtor === who)
-        );
-    });
+    return obligations.some(
+        (o) =>
+            o.assetId === assetId &&
+            o.creditor === buyer &&
+            o.debtor === debtor &&
+            obligationRaw(o, precision) > 0n,
+    );
 }
 
-/** Buyer→debtor line capacity, or `null` if they posted no line (no size cap). */
-function buyerLineCap(
-    lines: CreditLine[],
+/** What the buyer already owes the debtor. A take can unwind this with no line. */
+function reverseClaimRaw(
+    obligations: Obligation[],
+    debtor: string,
+    buyer: string,
+    assetId: number,
+    precision: number,
+): bigint {
+    let sum = 0n;
+    for (const o of obligations) {
+        if (
+            o.assetId === assetId &&
+            o.creditor === debtor &&
+            o.debtor === buyer
+        ) {
+            sum += obligationRaw(o, precision);
+        }
+    }
+    return sum;
+}
+
+/**
+ * Face the buyer can take: reverse claim, plus line headroom only when a
+ * buyer→debtor line exists and the debtor knows the buyer.
+ */
+function claimCapacityRaw(
+    buyerLines: CreditLine[],
+    debtorLines: CreditLine[],
+    obligations: Obligation[],
     buyer: string,
     debtor: string,
     assetId: number,
     precision: number,
-): bigint | null {
-    const line = lines.find(
+): bigint {
+    const reverse = reverseClaimRaw(
+        obligations,
+        debtor,
+        buyer,
+        assetId,
+        precision,
+    );
+    const line = buyerLines.find(
         (l) =>
             l.creditor === buyer &&
             l.debtor === debtor &&
             l.assetId === assetId,
     );
-    if (!line) return null;
-    const limit = humanToRaw(line.limit || "0", precision);
-    const exposure = humanToRaw(line.exposure || "0", precision);
-    const remaining = humanToRaw(line.remaining || "0", precision);
-    return lineAvailableRaw(
-        limit,
-        exposure,
-        remaining,
+    if (
+        !line ||
+        !debtorKnowsBuyer(
+            debtorLines,
+            obligations,
+            debtor,
+            buyer,
+            assetId,
+            precision,
+        )
+    ) {
+        return reverse;
+    }
+    const headroom = lineAvailableRaw(
+        humanToRaw(line.limit || "0", precision),
+        humanToRaw(line.exposure || "0", precision),
+        humanToRaw(line.remaining || "0", precision),
         line.depleteOnDebit,
     );
+    return reverse + (headroom > 0n ? headroom : 0n);
 }
 
 function claimHeldRaw(
@@ -308,30 +350,20 @@ export function SellClaimDialog({
             ) {
                 return;
             }
-            if (
-                !pairKnows(
-                    debtorLines,
-                    debtorObs,
-                    target.debtor,
-                    buyer,
-                    target.assetId,
-                    target.precision,
-                )
-            ) {
-                return;
-            }
             const capLines = takingAsk
                 ? buyerLinesForCap
                 : lineQueries[i]?.data;
             if (!capLines) return;
-            const lineCap = buyerLineCap(
+            const capacity = claimCapacityRaw(
                 capLines,
+                debtorLines,
+                debtorObs,
                 buyer,
                 target.debtor,
                 target.assetId,
                 target.precision,
             );
-            if (lineCap !== null && lineCap <= 0n) return;
+            if (capacity <= 0n) return;
             const offerLeft = humanToRaw(
                 offer.remaining || "0",
                 target.precision,
@@ -347,7 +379,7 @@ export function SellClaimDialog({
                   )
                 : maxClaim;
             if (held <= 0n) return;
-            let maxFace = lineCap !== null && lineCap < held ? lineCap : held;
+            let maxFace = capacity < held ? capacity : held;
             if (offerLeft < maxFace) maxFace = offerLeft;
             if (maxFace <= 0n) return;
             const contact = (contacts as LocalContact[]).find(
@@ -394,6 +426,13 @@ export function SellClaimDialog({
         onSubmit: async ({ value }) => {
             if (!target || !selected) return;
             const amount = value.amount.trim();
+            const amountRaw = humanToRaw(amount, target.precision);
+            if (amountRaw <= 0n || amountRaw > selected.maxFaceRaw) {
+                toast.error(
+                    "Amount is larger than this offer can take.",
+                );
+                return;
+            }
             await new Promise<void>((resolve, reject) => {
                 const done = {
                     onSuccess: () => {
@@ -455,11 +494,14 @@ export function SellClaimDialog({
                                 <span className="text-foreground font-medium">
                                     {target.debtor}
                                 </span>{" "}
-                                ({target.symbol}). New exposure
-                                needs your credit line to them with enough
-                                capacity. You get the claim on{" "}
-                                {target.debtor}; the seller receives face
-                                after their spread as a claim on you.
+                                ({target.symbol}). A new draw needs{" "}
+                                {target.debtor} to know you — a line from
+                                them to you, or they already owe you — and
+                                your credit line to them. Unwinding what
+                                you already owe them needs neither. You get
+                                the claim on {target.debtor}; the seller
+                                receives face after their spread as a claim
+                                on you.
                             </>
                             ) : (
                             <>
@@ -468,12 +510,14 @@ export function SellClaimDialog({
                                     {target.debtor}
                                 </span>{" "}
                                 ({target.symbol}) to a buyer with a live
-                                buy-claim offer. {target.debtor} must know
-                                the buyer (a line to them, or a live
-                                claim). New exposure needs the buyer's
-                                credit line to them with enough capacity.
-                                You receive a claim on the buyer for face
-                                after their spread.
+                                buy-claim offer. A new draw needs{" "}
+                                {target.debtor} to know the buyer — a line
+                                from {target.debtor} to them, or{" "}
+                                {target.debtor} already owes them — and the
+                                buyer's credit line. Unwinding what the
+                                buyer already owes needs neither. You
+                                receive a claim on the buyer for face after
+                                their spread.
                             </>
                             )
                         ) : (
@@ -528,8 +572,8 @@ export function SellClaimDialog({
                             ) : options.length === 0 ? (
                                 <p className="text-muted-foreground text-sm">
                                     {takingAsk
-                                        ? `No contacts (or typed account) currently have a live sell-claim offer on ${target.debtor} in ${target.symbol} that you can take (${target.debtor} must know you).`
-                                        : `No contacts (or typed account) currently have a live buy-claim offer on ${target.debtor} in ${target.symbol} that you can take (${target.debtor} must know the buyer).`}
+                                        ? `No contacts (or typed account) currently have a live sell-claim offer on ${target.debtor} in ${target.symbol} you can take. A new draw needs ${target.debtor} to know you; unwinding what you already owe them does not.`
+                                        : `No contacts (or typed account) currently have a live buy-claim offer on ${target.debtor} in ${target.symbol} you can fill. A new draw needs ${target.debtor} to know the buyer; unwinding what the buyer already owes does not.`}
                                 </p>
                             ) : (
                                 <ul className="max-h-48 space-y-1.5 overflow-y-auto">

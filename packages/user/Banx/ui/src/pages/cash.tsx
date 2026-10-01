@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { useStore } from "@tanstack/react-form";
 import { ArrowDownUp } from "lucide-react";
 
 import { AssetField, ExpiresField } from "@/components/form-fields";
@@ -21,9 +22,13 @@ import {
 import {
     amountPlaceholder,
     applyQuotedRate,
+    convertAtQuotedRate,
+    flipLeftTyped,
+    keptOnFlip,
     displayAmount,
     formatFxToRate,
     formatToPrecision,
+    invertQuotedRate,
 } from "@/lib/amount";
 import { amountFieldValidator, useAppForm } from "@/lib/form";
 import type { CashQuote } from "@/lib/graphql";
@@ -31,6 +36,7 @@ import type { CashQuote } from "@/lib/graphql";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { cn } from "@shared/lib/utils";
 import { Button } from "@shared/shadcn/ui/button";
+import { toast } from "@shared/shadcn/ui/sonner";
 import { Label } from "@shared/shadcn/ui/label";
 import {
     Select,
@@ -58,9 +64,41 @@ function quoteLive(q: CashQuote, nowSec: number): boolean {
     return q.expiresAt === 0 || q.expiresAt >= nowSec;
 }
 
+function precisionGapMessage(
+    tokenId: number | undefined,
+    tokenMissing: boolean,
+    pending: ReadonlySet<number>,
+    failed: ReadonlySet<number>,
+): string {
+    if (tokenMissing && tokenId !== undefined) {
+        if (failed.has(tokenId)) {
+            return `Couldn't load precision for token #${tokenId}.`;
+        }
+        if (pending.has(tokenId)) {
+            return `Token #${tokenId} precision is still loading.`;
+        }
+        return `Couldn't load precision for token #${tokenId}.`;
+    }
+    return "Asset precision isn't loaded yet.";
+}
+
 export function CashPage() {
     const { data: user } = useCurrentUser();
-    const { assets, symbolOf, precisionOf } = useAssetMap();
+    const { assets, byId, symbolOf, precisionOf } = useAssetMap();
+    const quoteCtxRef = useRef({
+        assetPrecision: (_id: number): number | undefined => undefined,
+        tokenPrecision: new Map<number, number>(),
+        tokenPending: new Set<number>() as ReadonlySet<number>,
+        tokenFailed: new Set<number>() as ReadonlySet<number>,
+    });
+    const takeCtxRef = useRef({
+        liveDesk: [] as CashQuote[],
+        tokenPrecision: new Map<number, number>(),
+        tokenPending: new Set<number>() as ReadonlySet<number>,
+        tokenFailed: new Set<number>() as ReadonlySet<number>,
+        assetPrecision: (_id: number): number | undefined => undefined,
+        cashier: "",
+    });
     const { data: myQuotes = [] } = useCashQuotes(user ?? null);
     const { data: allQuotes = [] } = useCashQuotes();
     const { data: vault = [] } = useCashVault();
@@ -85,6 +123,26 @@ export function CashPage() {
         onSubmit: async ({ value }) => {
             const tokenId = parseTokenId(value.tokenId);
             if (value.assetId === undefined || tokenId === undefined) return;
+            const ctx = quoteCtxRef.current;
+            const fromPrec = value.isOut
+                ? ctx.assetPrecision(value.assetId)
+                : ctx.tokenPrecision.get(tokenId);
+            const toPrec = value.isOut
+                ? ctx.tokenPrecision.get(tokenId)
+                : ctx.assetPrecision(value.assetId);
+            if (fromPrec === undefined || toPrec === undefined) {
+                toast.error(
+                    precisionGapMessage(
+                        tokenId,
+                        value.isOut
+                            ? toPrec === undefined
+                            : fromPrec === undefined,
+                        ctx.tokenPending,
+                        ctx.tokenFailed,
+                    ),
+                );
+                return;
+            }
             await new Promise<void>((resolve, reject) => {
                 setQuote.mutate(
                     {
@@ -136,9 +194,59 @@ export function CashPage() {
             minOut: "",
         },
         onSubmit: async ({ value }) => {
+            const ctx = takeCtxRef.current;
             const tokenId = parseTokenId(value.tokenId);
-            if (!cashier || value.assetId === undefined || tokenId === undefined)
+            if (
+                !ctx.cashier ||
+                value.assetId === undefined ||
+                tokenId === undefined
+            ) {
                 return;
+            }
+            const quote = ctx.liveDesk.find(
+                (x) =>
+                    x.isOut === value.isOut &&
+                    x.assetId === value.assetId &&
+                    x.tokenId === tokenId,
+            );
+            const assetPrec = ctx.assetPrecision(value.assetId);
+            const tokenP = ctx.tokenPrecision.get(tokenId);
+            const fromPrec = value.isOut ? assetPrec : tokenP;
+            const toPrec = value.isOut ? tokenP : assetPrec;
+            if (quote && (fromPrec === undefined || toPrec === undefined)) {
+                toast.error(
+                    precisionGapMessage(
+                        tokenId,
+                        value.isOut
+                            ? toPrec === undefined
+                            : fromPrec === undefined,
+                        ctx.tokenPending,
+                        ctx.tokenFailed,
+                    ),
+                );
+                return;
+            }
+            let minOut = value.minOut.trim();
+            if (
+                !minOut &&
+                quote &&
+                fromPrec !== undefined &&
+                toPrec !== undefined
+            ) {
+                const quoted = applyQuotedRate(
+                    value.amount,
+                    quote.feeFixed,
+                    quote.fxRate,
+                    fromPrec,
+                    toPrec,
+                );
+                if (!quoted) {
+                    toast.error("This quote can't price that amount.");
+                    return;
+                }
+                minOut = quoted;
+            }
+            if (!minOut) minOut = "0";
             await new Promise<void>((resolve, reject) => {
                 const opts = {
                     onSuccess: () => resolve(),
@@ -147,22 +255,22 @@ export function CashPage() {
                 if (value.isOut) {
                     cashOut.mutate(
                         {
-                            cashier,
+                            cashier: ctx.cashier,
                             assetId: value.assetId!,
                             tokenId,
                             amountBanx: value.amount.trim(),
-                            minTokens: value.minOut.trim() || "0",
+                            minTokens: minOut,
                         },
                         opts,
                     );
                 } else {
                     cashIn.mutate(
                         {
-                            cashier,
+                            cashier: ctx.cashier,
                             assetId: value.assetId!,
                             tokenId,
                             amountTokens: value.amount.trim(),
-                            minBanx: value.minOut.trim() || "0",
+                            minBanx: minOut,
                         },
                         opts,
                     );
@@ -171,13 +279,106 @@ export function CashPage() {
         },
     });
 
-    const tokenPrec = useTokenPrecisionMap([
+    const quoteTokenRaw = useStore(quoteForm.store, (s) => s.values.tokenId);
+    const takeTokenRaw = useStore(takeForm.store, (s) => s.values.tokenId);
+    const editingTokenIds = [quoteTokenRaw, takeTokenRaw].flatMap((raw) => {
+        const id = parseTokenId(raw);
+        return id === undefined ? [] : [id];
+    });
+    const {
+        precision: tokenPrec,
+        pending: tokenPending,
+        failed: tokenFailed,
+    } = useTokenPrecisionMap([
         ...myQuotes.map((q) => q.tokenId),
         ...deskQuotes.map((q) => q.tokenId),
         ...vault.map((v) => v.tokenId),
+        ...editingTokenIds,
     ]);
-    const tokPrec = (id: number | undefined) =>
-        id !== undefined ? (tokenPrec.get(id) ?? 4) : 4;
+    const assetPrecision = (id: number | undefined): number | undefined =>
+        id !== undefined && byId.has(id) ? precisionOf(id) : undefined;
+    const tokPrec = (id: number | undefined): number | undefined =>
+        id !== undefined ? tokenPrec.get(id) : undefined;
+    quoteCtxRef.current = {
+        assetPrecision: (id) => assetPrecision(id),
+        tokenPrecision: tokenPrec,
+        tokenPending,
+        tokenFailed,
+    };
+    takeCtxRef.current = {
+        liveDesk,
+        tokenPrecision: tokenPrec,
+        tokenPending,
+        tokenFailed,
+        assetPrecision: (id) => assetPrecision(id),
+        cashier,
+    };
+
+    const applyDirection = (nextIsOut: boolean) => {
+        const values = quoteForm.state.values;
+        if (values.isOut === nextIsOut) return;
+        const tokenId = parseTokenId(values.tokenId);
+        const banxPrec = assetPrecision(values.assetId);
+        const tokenP = tokPrec(tokenId);
+        const fromPrec = values.isOut ? banxPrec : tokenP;
+        const toPrec = values.isOut ? tokenP : banxPrec;
+        if (fromPrec === undefined || toPrec === undefined) {
+            const rate = values.toRate.trim();
+            const fee = values.feeFixed.trim();
+            const budget = values.remaining.trim();
+            const needsConvert =
+                (rate !== "" && rate !== "1") ||
+                (fee !== "" && fee !== "0") ||
+                budget !== "";
+            if (needsConvert) {
+                toast.error(
+                    tokenId !== undefined && tokenP === undefined
+                        ? precisionGapMessage(
+                              tokenId,
+                              true,
+                              tokenPending,
+                              tokenFailed,
+                          )
+                        : values.assetId !== undefined &&
+                            banxPrec === undefined
+                          ? "Asset precision isn't loaded yet."
+                          : "Pick both sides before flipping a rate.",
+                );
+                return;
+            }
+            quoteForm.setFieldValue("isOut", nextIsOut);
+            return;
+        }
+        quoteForm.setFieldValue("isOut", nextIsOut);
+        const inverted = invertQuotedRate(values.toRate, fromPrec, toPrec);
+        const fee = convertAtQuotedRate(
+            values.feeFixed,
+            values.toRate,
+            fromPrec,
+            toPrec,
+        );
+        const budget = convertAtQuotedRate(
+            values.remaining,
+            values.toRate,
+            fromPrec,
+            toPrec,
+        );
+        const nextRate = keptOnFlip(values.toRate, inverted, "");
+        const nextFee = keptOnFlip(values.feeFixed, fee, "0");
+        const nextBudget = keptOnFlip(values.remaining, budget, "");
+        if (
+            flipLeftTyped(values.toRate, inverted, nextRate) ||
+            flipLeftTyped(values.feeFixed, fee, nextFee) ||
+            flipLeftTyped(values.remaining, budget, nextBudget)
+        ) {
+            toast.error(
+                "That amount is too small to convert at this rate, so it was left as typed.",
+            );
+        }
+        quoteForm.setFieldValue("toRate", nextRate);
+        quoteForm.setFieldValue("feeFixed", nextFee);
+        quoteForm.setFieldValue("remaining", nextBudget);
+    };
 
     const desks = useMemo(() => {
         const names = new Set<string>();
@@ -226,17 +427,23 @@ export function CashPage() {
                             const getLabel = values.isOut
                                 ? tokenLabel
                                 : banxSym;
-                            const rateShown = values.isOut
-                                ? (formatToPrecision(
-                                      values.toRate,
-                                      tokPrec(parseTokenId(values.tokenId)),
-                                  ) ?? values.toRate)
-                                : (formatToPrecision(
-                                      values.toRate,
-                                      values.assetId !== undefined
-                                          ? precisionOf(values.assetId)
-                                          : 4,
-                                  ) ?? values.toRate);
+                            const tokenId = parseTokenId(values.tokenId);
+                            const ratePrecision = values.isOut
+                                ? tokPrec(tokenId)
+                                : assetPrecision(values.assetId);
+                            const ratePending = values.isOut
+                                ? tokenId !== undefined &&
+                                  ratePrecision === undefined
+                                : values.assetId !== undefined &&
+                                  ratePrecision === undefined;
+                            const rateShown = ratePending
+                                ? "…"
+                                : ratePrecision === undefined
+                                  ? values.toRate
+                                  : (formatToPrecision(
+                                        values.toRate,
+                                        ratePrecision,
+                                    ) ?? values.toRate);
                             return (
                                 <>
                                     <quoteForm.Field
@@ -252,7 +459,7 @@ export function CashPage() {
                                                             : "text-muted-foreground hover:text-foreground",
                                                     )}
                                                     onClick={() =>
-                                                        field.handleChange(true)
+                                                        applyDirection(true)
                                                     }
                                                 >
                                                     Banx → Token
@@ -266,9 +473,7 @@ export function CashPage() {
                                                             : "text-muted-foreground hover:text-foreground",
                                                     )}
                                                     onClick={() =>
-                                                        field.handleChange(
-                                                            false,
-                                                        )
+                                                        applyDirection(false)
                                                     }
                                                 >
                                                     Token → Banx
@@ -325,10 +530,7 @@ export function CashPage() {
                                                 className="bg-background size-9 rounded-full border-2"
                                                 aria-label="Flip direction"
                                                 onClick={() =>
-                                                    quoteForm.setFieldValue(
-                                                        "isOut",
-                                                        !values.isOut,
-                                                    )
+                                                    applyDirection(!values.isOut)
                                                 }
                                             >
                                                 <ArrowDownUp className="size-4" />
@@ -434,73 +636,71 @@ export function CashPage() {
                                                 label={`Fee (taken from ${payLabel})`}
                                                 inputMode="decimal"
                                                 placeholder={
-                                                    values.isOut &&
-                                                    values.assetId !==
-                                                        undefined
-                                                        ? amountPlaceholder(
-                                                              precisionOf(
-                                                                  values.assetId,
-                                                              ),
+                                                    values.isOut
+                                                        ? values.assetId !==
+                                                          undefined
+                                                            ? amountPlaceholder(
+                                                                  assetPrecision(
+                                                                      values.assetId,
+                                                                  ) ?? 0,
+                                                              )
+                                                            : "0"
+                                                        : amountPlaceholder(
+                                                              tokPrec(
+                                                                  parseTokenId(
+                                                                      values.tokenId,
+                                                                  ),
+                                                              ) ?? 0,
                                                           )
-                                                        : "0"
                                                 }
                                             />
                                         )}
                                     />
                                     <quoteForm.AppField
                                         name="remaining"
-                                        validators={{
-                                            onChange: amountFieldValidator(
-                                                values.isOut
-                                                    ? values.assetId !==
-                                                      undefined
-                                                        ? precisionOf(
-                                                              values.assetId,
-                                                          )
-                                                        : 0
-                                                    : tokPrec(
-                                                          parseTokenId(
-                                                              values.tokenId,
-                                                          ),
+                                        validators={(() => {
+                                            const budgetPrec = values.isOut
+                                                ? assetPrecision(
+                                                      values.assetId,
+                                                  )
+                                                : tokPrec(
+                                                      parseTokenId(
+                                                          values.tokenId,
                                                       ),
-                                                { allowZero: false },
-                                            ),
-                                            onSubmit: amountFieldValidator(
-                                                values.isOut
-                                                    ? values.assetId !==
-                                                      undefined
-                                                        ? precisionOf(
-                                                              values.assetId,
-                                                          )
-                                                        : 0
-                                                    : tokPrec(
-                                                          parseTokenId(
-                                                              values.tokenId,
-                                                          ),
+                                                  );
+                                            if (budgetPrec === undefined) {
+                                                return undefined;
+                                            }
+                                            const validate =
+                                                amountFieldValidator(
+                                                    budgetPrec,
+                                                    { allowZero: false },
+                                                );
+                                            return {
+                                                onChange: validate,
+                                                onSubmit: validate,
+                                            };
+                                        })()}
+                                        children={(field) => {
+                                            const budgetPrec = values.isOut
+                                                ? assetPrecision(
+                                                      values.assetId,
+                                                  )
+                                                : tokPrec(
+                                                      parseTokenId(
+                                                          values.tokenId,
                                                       ),
-                                                { allowZero: false },
-                                            ),
-                                        }}
-                                        children={(field) => (
+                                                  );
+                                            return (
                                             <field.TextField
                                                 label={`Budget (${payLabel})`}
                                                 inputMode="decimal"
                                                 placeholder={amountPlaceholder(
-                                                    values.isOut
-                                                        ? values.assetId !==
-                                                          undefined
-                                                            ? precisionOf(
-                                                                  values.assetId,
-                                                              )
-                                                            : 0
-                                                        : tokPrec(
-                                                              parseTokenId(
-                                                                  values.tokenId,
-                                                              ),
-                                                          ),
+                                                    budgetPrec ?? 0,
                                                 )}
                                             />
-                                        )}
+                                            );
+                                        }}
                                     />
                                 </>
                             );
@@ -644,8 +844,8 @@ export function CashPage() {
                     <QuoteTable
                         quotes={myQuotes}
                         symbolOf={symbolOf}
-                        precisionOf={precisionOf}
-                        tokenPrecision={tokPrec}
+                        precisionOf={(id) => assetPrecision(id)}
+                        tokenPrecision={(id) => tokPrec(id)}
                         onRemove={(q) =>
                             removeQuote.mutate({
                                 assetId: q.assetId,
@@ -784,17 +984,16 @@ export function CashPage() {
                                     x.tokenId === tokenId,
                             );
                             const fromPrec = values.isOut
-                                ? values.assetId !== undefined
-                                    ? precisionOf(values.assetId)
-                                    : 0
+                                ? assetPrecision(values.assetId)
                                 : tokPrec(tokenId);
                             const toPrec = values.isOut
                                 ? tokPrec(tokenId)
-                                : values.assetId !== undefined
-                                  ? precisionOf(values.assetId)
-                                  : 0;
+                                : assetPrecision(values.assetId);
                             const quoted =
-                                q && values.amount.trim()
+                                q &&
+                                values.amount.trim() &&
+                                fromPrec !== undefined &&
+                                toPrec !== undefined
                                     ? applyQuotedRate(
                                           values.amount,
                                           q.feeFixed,
@@ -837,9 +1036,12 @@ export function CashPage() {
                                     {q ? (
                                         <p className="text-muted-foreground font-mono text-xs">
                                             Quote{" "}
-                                            {values.isOut
-                                                ? `1 ${symbolOf(q.assetId)} → ${formatFxToRate(q.fxRate, precisionOf(q.assetId), tokPrec(q.tokenId))} token`
-                                                : `1 token → ${formatFxToRate(q.fxRate, tokPrec(q.tokenId), precisionOf(q.assetId))} ${symbolOf(q.assetId)}`}
+                                            {fromPrec === undefined ||
+                                            toPrec === undefined
+                                                ? "…"
+                                                : values.isOut
+                                                  ? `1 ${symbolOf(q.assetId)} → ${formatFxToRate(q.fxRate, fromPrec, toPrec)} token`
+                                                  : `1 token → ${formatFxToRate(q.fxRate, fromPrec, toPrec)} ${symbolOf(q.assetId)}`}
                                             {quoted
                                                 ? ` · this size → ${quoted}`
                                                 : ""}
@@ -888,8 +1090,8 @@ function QuoteTable({
 }: {
     quotes: CashQuote[];
     symbolOf: (id: number) => string;
-    precisionOf: (id: number) => number;
-    tokenPrecision: (id: number) => number;
+    precisionOf: (id: number) => number | undefined;
+    tokenPrecision: (id: number) => number | undefined;
     onRemove?: (q: CashQuote) => void;
     removing?: boolean;
 }) {
@@ -924,9 +1126,19 @@ function QuoteTable({
                                 {displayAmount(q.feeFixed)}
                             </TableCell>
                             <TableCell className="font-mono text-xs">
-                                {q.isOut
-                                    ? `1 ${symbolOf(q.assetId)} → ${formatFxToRate(q.fxRate, precisionOf(q.assetId), tokenPrecision(q.tokenId))} tok`
-                                    : `1 tok → ${formatFxToRate(q.fxRate, tokenPrecision(q.tokenId), precisionOf(q.assetId))} ${symbolOf(q.assetId)}`}
+                                {(() => {
+                                    const assetP = precisionOf(q.assetId);
+                                    const tokenP = tokenPrecision(q.tokenId);
+                                    if (
+                                        assetP === undefined ||
+                                        tokenP === undefined
+                                    ) {
+                                        return "…";
+                                    }
+                                    return q.isOut
+                                        ? `1 ${symbolOf(q.assetId)} → ${formatFxToRate(q.fxRate, assetP, tokenP)} tok`
+                                        : `1 tok → ${formatFxToRate(q.fxRate, tokenP, assetP)} ${symbolOf(q.assetId)}`;
+                                })()}
                             </TableCell>
                             <TableCell className="text-right font-mono">
                                 {displayAmount(q.remaining)}

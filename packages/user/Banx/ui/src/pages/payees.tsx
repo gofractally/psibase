@@ -39,15 +39,15 @@ function bookAuthSpendable(auth: BookAuth): boolean {
 function PayeeRow({
     contact,
     onPay,
-    onBook,
+    books,
 }: {
     contact: LocalContact;
     onPay: () => void;
-    onBook?: () => void;
+    books: { assetId: number; label: string; onClick: () => void }[];
 }) {
     const nickname = contact.nickname?.trim();
     return (
-        <div className="flex items-center gap-3 px-4 py-3">
+        <div className="flex flex-wrap items-center gap-3 px-4 py-3">
             <Avatar account={contact.account} className="size-10 shrink-0" />
             <div className="min-w-0 flex-1">
                 <p className="truncate font-medium">
@@ -59,27 +59,30 @@ function PayeeRow({
                     </p>
                 ) : null}
             </div>
-            {onBook ? (
+            <div className="flex flex-wrap items-center justify-end gap-2">
+                {books.map((book) => (
+                    <Button
+                        key={book.assetId}
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0 gap-1.5"
+                        onClick={book.onClick}
+                    >
+                        <Receipt className="size-4" />
+                        {book.label}
+                    </Button>
+                ))}
                 <Button
                     type="button"
                     size="sm"
-                    variant="outline"
                     className="shrink-0 gap-1.5"
-                    onClick={onBook}
+                    onClick={onPay}
                 >
-                    <Receipt className="size-4" />
-                    Book
+                    <HandCoins className="size-4" />
+                    Deposit
                 </Button>
-            ) : null}
-            <Button
-                type="button"
-                size="sm"
-                className="shrink-0 gap-1.5"
-                onClick={onPay}
-            >
-                <HandCoins className="size-4" />
-                Deposit
-            </Button>
+            </div>
         </div>
     );
 }
@@ -264,23 +267,23 @@ export function PayeesPage() {
                         <div className="divide-y overflow-hidden rounded-xl border">
                             {payees.map((c) => {
                                 const inbound = user
-                                    ? bookAuths.find(
+                                    ? bookAuths.filter(
                                           (a) =>
                                               a.creditor === user &&
                                               a.debtor === c.account &&
                                               bookAuthSpendable(a),
                                       )
-                                    : undefined;
+                                    : [];
                                 return (
                                     <PayeeRow
                                         key={c.account}
                                         contact={c}
                                         onPay={() => openPay(c.account)}
-                                        onBook={
-                                            inbound
-                                                ? () => setBookAuth(inbound)
-                                                : undefined
-                                        }
+                                        books={inbound.map((auth) => ({
+                                            assetId: auth.assetId,
+                                            label: `Book ${symbolOf(auth.assetId)}`,
+                                            onClick: () => setBookAuth(auth),
+                                        }))}
                                     />
                                 );
                             })}

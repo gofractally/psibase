@@ -109,38 +109,53 @@ impl Obligation {
     }
 
     fn live_parts_at(&self, now: TimePointSec) -> (u64, u64) {
+        // A stored split past u64::MAX trims accrued so forgive and net can
+        // still reduce the row. The cap is the largest settleable balance.
+        let (principal, accrued) =
+            Self::capped_parts(self.remaining_principal.value, self.accrued_interest.value);
         if PairCycle::pair_in_grace(self.creditor, self.debtor, self.asset_id, now) {
             // No new compounding. Keep finalized interest already on the row
             // (e.g. transferred from an aged claim).
-            return (self.remaining_principal.value, self.accrued_interest.value);
+            return (principal, accrued);
         }
-        let base = self
-            .remaining_principal
-            .value
-            .checked_add(self.accrued_interest.value)
-            .expect("interest base overflow");
+        let base = principal.saturating_add(accrued);
         let total =
             crate::interest::compound_amount(base, self.interest_rate, self.dt_since_epoch(now));
-        if total >= self.remaining_principal.value {
-            (
-                self.remaining_principal.value,
-                total - self.remaining_principal.value,
-            )
+        if total >= principal {
+            (principal, total - principal)
         } else {
             (total, 0)
         }
     }
 
+    /// Stored principal and accrued that sum to at most `u64::MAX`.
+    /// Principal is kept; accrued is what still fits under the cap.
+    fn capped_parts(principal: u64, accrued: u64) -> (u64, u64) {
+        let base = principal.saturating_add(accrued);
+        (principal, base - principal)
+    }
+
     /// Finalize the live balance and start a new epoch.
     ///
-    /// No-op during grace. A touch must not move the epoch, or post-grace
-    /// compound starts at the touch instead of the last balance change.
-    /// Callers that change principal or stored interest slide the epoch
-    /// via [`Self::note_grace_change`]. A negative rate may shrink principal
+    /// During grace, compound does not run and the epoch does not move.
+    /// An over-cap split is still written down to the settleable cap, so a
+    /// later forgive or net spends that balance. Callers that change
+    /// principal or stored interest slide the epoch via
+    /// [`Self::note_grace_change`]. A negative rate may shrink principal
     /// once stored interest is gone; a zero balance deletes the row.
     pub fn accrue(&mut self) {
         let now = Self::now();
         if PairCycle::pair_in_grace(self.creditor, self.debtor, self.asset_id, now) {
+            // The trim is not a balance change. Moving the epoch would drop
+            // the deferred charge grace is supposed to bill later.
+            let (principal, accrued) =
+                Self::capped_parts(self.remaining_principal.value, self.accrued_interest.value);
+            if principal != self.remaining_principal.value || accrued != self.accrued_interest.value
+            {
+                self.remaining_principal = principal.into();
+                self.accrued_interest = accrued.into();
+                self.save();
+            }
             return;
         }
         let (principal, accrued) = self.live_parts_at(now);
@@ -369,23 +384,29 @@ impl Obligation {
         let mut dest = Self::get_existing_or_new(creditor, debtor, asset_id, rate);
         dest.accrue();
         let mut changed = false;
-        if interest > 0 {
-            dest.accrued_interest = dest
+        if interest > 0 || principal > 0 {
+            let next_interest = dest
                 .accrued_interest
                 .value
                 .checked_add(interest)
-                .expect("accrued overflow")
-                .into();
-            changed = true;
-        }
-        if principal > 0 {
-            dest.remaining_principal = dest
+                .expect("obligation balance overflow");
+            let next_principal = dest
                 .remaining_principal
                 .value
                 .checked_add(principal)
-                .expect("obligation principal overflow")
-                .into();
-            changed = true;
+                .expect("obligation balance overflow");
+            assert!(
+                next_principal.checked_add(next_interest).is_some(),
+                "obligation balance overflow"
+            );
+            if interest > 0 {
+                dest.accrued_interest = next_interest.into();
+                changed = true;
+            }
+            if principal > 0 {
+                dest.remaining_principal = next_principal.into();
+                changed = true;
+            }
         }
         if changed {
             dest.note_grace_change();
@@ -472,12 +493,18 @@ impl Obligation {
         }
         self.accrue();
         let before_clear = Self::pair_clear(self.creditor, self.debtor, self.asset_id);
-        self.remaining_principal = self
+        let next_principal = self
             .remaining_principal
             .value
             .checked_add(amount.value)
-            .expect("obligation principal overflow")
-            .into();
+            .expect("obligation balance overflow");
+        assert!(
+            next_principal
+                .checked_add(self.accrued_interest.value)
+                .is_some(),
+            "obligation balance overflow"
+        );
+        self.remaining_principal = next_principal.into();
         self.note_grace_change();
         self.save();
         let after_clear = Self::pair_clear(self.creditor, self.debtor, self.asset_id);

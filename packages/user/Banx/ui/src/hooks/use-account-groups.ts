@@ -15,44 +15,63 @@ export function useAccountGroups(): {
     savings: GroupedAccount[];
     loans: GroupedAccount[];
     isLoading: boolean;
+    isError: boolean;
 } {
     const { data: user } = useCurrentUser();
-    const { precisionOf } = useAssetMap();
+    const {
+        byId,
+        precisionOf,
+        isSuccess: assetsReady,
+        isLoading: assetsLoading,
+        isError: assetsError,
+    } = useAssetMap();
     const { data: obs = [], isLoading: obsLoading } = useObligations();
     const { data: lines = [], isLoading: linesLoading } = useCreditLines();
 
+    const knownLines = useMemo(
+        () => lines.filter((line) => byId.has(line.assetId)),
+        [lines, byId],
+    );
+
     const savings = useMemo(() => {
-        if (!user) return [];
+        if (!user || !assetsReady) return [];
         return mergeCreditLines(
             groupByCounterpartyAndAsset(
-                obs.filter((o) => o.creditor === user),
+                obs.filter(
+                    (o) => o.creditor === user && byId.has(o.assetId),
+                ),
                 (o) => o.debtor,
                 precisionOf,
             ),
-            lines,
+            knownLines,
             "savings",
             user,
         );
-    }, [obs, lines, user, precisionOf]);
+    }, [obs, knownLines, user, precisionOf, assetsReady, byId]);
 
     const loans = useMemo(() => {
-        if (!user) return [];
+        if (!user || !assetsReady) return [];
         return mergeCreditLines(
             groupByCounterpartyAndAsset(
-                obs.filter((o) => o.debtor === user),
+                obs.filter((o) => o.debtor === user && byId.has(o.assetId)),
                 (o) => o.creditor,
                 precisionOf,
             ),
-            lines,
+            knownLines,
             "loan",
             user,
         );
-    }, [obs, lines, user, precisionOf]);
+    }, [obs, knownLines, user, precisionOf, assetsReady, byId]);
 
     return {
         user,
         savings,
         loans,
-        isLoading: obsLoading || linesLoading,
+        isLoading:
+            obsLoading ||
+            linesLoading ||
+            assetsLoading ||
+            (!assetsReady && !assetsError),
+        isError: assetsError,
     };
 }

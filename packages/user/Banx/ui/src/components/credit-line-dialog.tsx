@@ -15,7 +15,7 @@ import { liveGlobalForward } from "@/lib/account-groups";
 import { formatRawAmount } from "@/lib/amount";
 import {
     DEFAULT_GRACE_SECONDS,
-    daysToGraceSeconds,
+    graceSecondsFromFields,
     graceSecondsToPreset,
     ppmToPercentInput,
     type GracePreset,
@@ -84,6 +84,11 @@ export function CreditLineDialog({
             const debtor = isEdit ? editing!.debtor : value.debtor.trim();
             const assetId = isEdit ? editing!.assetId : value.assetId;
             if (assetId === undefined || !debtor) return;
+            const graceSeconds = graceSecondsFromFields(
+                value.gracePreset,
+                value.graceDays,
+            );
+            if (graceSeconds === null) return;
             await setLine.mutateAsync({
                 debtor,
                 assetId,
@@ -93,14 +98,7 @@ export function CreditLineDialog({
                     value.interestPct,
                     PPM_SCALE,
                 ),
-                graceSeconds:
-                    value.gracePreset === "none"
-                        ? 0
-                        : daysToGraceSeconds(
-                              value.gracePreset === "custom"
-                                  ? Number(value.graceDays.trim())
-                                  : Number(value.gracePreset),
-                          ),
+                graceSeconds,
             });
             if (
                 value.allowForward &&

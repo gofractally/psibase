@@ -13,9 +13,32 @@ export type GracePreset =
     | `${(typeof GRACE_PRESET_DAYS)[number]}`
     | "custom";
 
-export function daysToGraceSeconds(days: number): number {
-    if (!Number.isFinite(days) || days <= 0) return 0;
-    return Math.floor(days) * SECONDS_PER_DAY;
+/** Whole non-negative day count. Null for empty, fractional, or non-numeric text. */
+export function parseGraceDays(text: string): number | null {
+    const t = text.trim();
+    if (!/^\d+$/.test(t)) return null;
+    const n = Number(t);
+    if (!Number.isSafeInteger(n)) return null;
+    return n;
+}
+
+/**
+ * Grace seconds for a preset. Custom text must be a whole day count;
+ * invalid custom text returns null so the form does not submit `0`.
+ */
+export function graceSecondsFromFields(
+    preset: GracePreset,
+    customDays: string,
+): number | null {
+    if (preset === "none") return 0;
+    if (preset === "custom") {
+        const days = parseGraceDays(customDays);
+        if (days === null) return null;
+        return days * SECONDS_PER_DAY;
+    }
+    const days = Number(preset);
+    if (!Number.isInteger(days) || days < 0) return null;
+    return days * SECONDS_PER_DAY;
 }
 
 export function graceSecondsToDays(seconds: number): number {
@@ -106,7 +129,7 @@ export function percentToPpm(
     return capped;
 }
 
-/** Human percent → signed ppm, clamped to (-maxAbsPpm, maxAbsPpm). */
+/** Human percent → signed ppm, clamped to ±maxAbsPpm inclusive. */
 export function signedPercentStringToPpm(
     pct: string,
     maxAbsPpm: number = MAX_HOP_FEE_PPM,
@@ -114,8 +137,8 @@ export function signedPercentStringToPpm(
     const n = Number(String(pct).trim());
     if (!Number.isFinite(n) || n === 0) return 0;
     const ppm = Math.round(n * PPM_PER_PERCENT);
-    if (ppm >= maxAbsPpm) return maxAbsPpm - 1;
-    if (ppm <= -maxAbsPpm) return -(maxAbsPpm - 1);
+    if (ppm >= maxAbsPpm) return maxAbsPpm;
+    if (ppm <= -maxAbsPpm) return -maxAbsPpm;
     return ppm;
 }
 

@@ -9,6 +9,7 @@ import { ExpiresAtPicker } from "@/components/expires-at-picker";
 import type { Asset } from "@/lib/graphql";
 import {
     GRACE_PRESET_DAYS,
+    parseGraceDays,
     type GracePreset,
 } from "@/lib/constants";
 
@@ -125,6 +126,8 @@ export function GracePeriodField({
     onPresetChange: (preset: GracePreset) => void;
     onDaysChange: (days: string) => void;
 }) {
+    const customInvalid =
+        preset === "custom" && parseGraceDays(days) === null;
     return (
         <div className="grid gap-2">
             <Label>Interest-free period</Label>
@@ -146,13 +149,21 @@ export function GracePeriodField({
                 </SelectContent>
             </Select>
             {preset === "custom" ? (
-                <Input
-                    inputMode="numeric"
-                    value={days}
-                    onChange={(e) => onDaysChange(e.target.value)}
-                    placeholder="Days"
-                    aria-label="Custom interest-free days"
-                />
+                <div className="grid gap-1">
+                    <Input
+                        inputMode="numeric"
+                        value={days}
+                        onChange={(e) => onDaysChange(e.target.value)}
+                        placeholder="Days"
+                        aria-label="Custom interest-free days"
+                        aria-invalid={customInvalid}
+                    />
+                    {customInvalid ? (
+                        <p className="text-destructive text-sm">
+                            Enter a whole number of days
+                        </p>
+                    ) : null}
+                </div>
             ) : null}
         </div>
     );

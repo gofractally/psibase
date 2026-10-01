@@ -538,6 +538,19 @@ export function BuyClaimOfferDialog({
                         onSubmit={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
+                            if (!specificForm.state.values.enabled) {
+                                const assetId =
+                                    prefill?.assetId ??
+                                    specificForm.state.values.assetId;
+                                if (assetId === undefined || !debtor) return;
+                                removeSpecific.mutate(
+                                    { debtor, assetId },
+                                    {
+                                        onSuccess: () => onOpenChange(false),
+                                    },
+                                );
+                                return;
+                            }
                             void specificForm.handleSubmit();
                         }}
                     >
@@ -592,18 +605,26 @@ export function BuyClaimOfferDialog({
                                 children={(values) => {
                                     const nothingToDo =
                                         !values.enabled && !existingSpecific;
+                                    const blocked =
+                                        (prefill?.assetId === undefined &&
+                                            values.assetId === undefined) ||
+                                        nothingToDo;
+                                    if (!values.enabled) {
+                                        return (
+                                            <Button
+                                                type="submit"
+                                                disabled={blocked || pending}
+                                            >
+                                                {pending ? "Saving…" : "Save"}
+                                            </Button>
+                                        );
+                                    }
                                     return (
                                         <specificForm.AppForm>
                                             <specificForm.SubmitButton
                                                 labels={["Save", "Saving…"]}
                                                 loading={pending}
-                                                disabled={
-                                                    (prefill?.assetId ===
-                                                        undefined &&
-                                                        values.assetId ===
-                                                            undefined) ||
-                                                    nothingToDo
-                                                }
+                                                disabled={blocked}
                                             />
                                         </specificForm.AppForm>
                                     );
@@ -663,6 +684,17 @@ export function BuyClaimOfferDialog({
                     onSubmit={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
+                        if (!globalForm.state.values.enabled) {
+                            const assetId =
+                                globalForm.state.values.assetId ??
+                                prefill?.assetId;
+                            if (assetId === undefined) return;
+                            removeGlobal.mutate(
+                                { assetId },
+                                { onSuccess: () => onOpenChange(false) },
+                            );
+                            return;
+                        }
                         void globalForm.handleSubmit();
                     }}
                 >
@@ -726,15 +758,26 @@ export function BuyClaimOfferDialog({
                                     liveGlobalByAsset.has(assetId);
                                 const nothingToDo =
                                     !values.enabled && !hasLive;
+                                const blocked =
+                                    assetId === undefined || nothingToDo;
+                                if (!values.enabled) {
+                                    return (
+                                        <Button
+                                            type="submit"
+                                            disabled={blocked || globalPending}
+                                        >
+                                            {globalPending
+                                                ? "Saving…"
+                                                : "Save"}
+                                        </Button>
+                                    );
+                                }
                                 return (
                                     <globalForm.AppForm>
                                         <globalForm.SubmitButton
                                             labels={["Save", "Saving…"]}
                                             loading={globalPending}
-                                            disabled={
-                                                assetId === undefined ||
-                                                nothingToDo
-                                            }
+                                            disabled={blocked}
                                         />
                                     </globalForm.AppForm>
                                 );

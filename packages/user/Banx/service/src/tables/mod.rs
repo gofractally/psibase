@@ -261,7 +261,8 @@ pub mod tables {
         pub creditor: AccountNumber,
         pub debtor: AccountNumber,
         pub asset_id: u16,
-        /// Posted interest-free window for the *next* 0→positive cycle.
+        /// Posted window for the *next* 0→positive cycle. Hides interest, then
+        /// compounds from origination (decay included).
         pub grace_seconds: u32,
         /// When the current cycle opened (`0` = none).
         pub cycle_started_at: TimePointSec,
@@ -285,7 +286,8 @@ pub mod tables {
     /// (unwind does not; repayment does not restore it). While revolving,
     /// `remaining` tracks `limit` and headroom ignores it.
     ///
-    /// Interest-free grace lives on [`PairCycle`], not this row.
+    /// Grace lives on [`PairCycle`], not this row. It hides interest, then
+    /// compounds from origination.
     #[table(name = "CreditLineTable", index = 3)]
     #[derive(
         Default, Clone, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug,

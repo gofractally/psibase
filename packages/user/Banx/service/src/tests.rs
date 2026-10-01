@@ -1,12 +1,18 @@
 #![allow(non_snake_case)]
 
+#[cfg(target_family = "wasm")]
+#[link(wasm_import_module = "psibase")]
+extern "C" {
+    fn commitState(chain: u32);
+}
+
 #[cfg(test)]
 mod tests {
     use crate::interest::{compound_amount, interest_for, SECONDS_PER_DAY, SECONDS_PER_YEAR};
     use crate::tables::{
         Asset, BanxInvite, BanxInviteTable, BookAuth, CashQuote, ClaimOffer, CreditLine,
-        CurrencyPolicy, InitTable, Obligation, PairCycle, PathHop, PayRequest, PPM_SCALE,
-        RATE_SCALE,
+        CurrencyPolicy, InitTable, Obligation, ObligationTable, PairCycle, PathHop, PayRequest,
+        PPM_SCALE, RATE_SCALE,
     };
     use crate::Wrapper;
     use psibase::fracpack::Pack;
@@ -32,6 +38,23 @@ mod tests {
             .get()
             .unwrap()
             .value
+    }
+
+    /// Replay a stored obligation the service can no longer create.
+    ///
+    /// A service-db write is rejected while a block is open. Between blocks
+    /// the write sits in the tester's side session until `commitState`, which
+    /// the Rust `Chain` does not wrap. That commit ends the session, so the
+    /// next block is what makes the row readable again.
+    fn plant_obligation(chain: &psibase::Chain, row: &Obligation) {
+        chain.finish_block();
+        chain.select_chain();
+        ObligationTable::read_write().put(row).unwrap();
+        #[cfg(target_family = "wasm")]
+        unsafe {
+            super::commitState(psibase::tester_raw::get_selected_chain());
+        }
+        chain.start_block();
     }
 
     #[psibase::test_case(packages("Banx"))]
@@ -2644,6 +2667,66 @@ mod tests {
             "no-op net on day 3 must not restart the epoch; day-8 exposure should be \
              8 days from origination ({want}), not 5 days from the poke ({slid}), got {got}"
         );
+        Ok(())
+    }
+
+    /// An over-cap split already stored during grace must be written down to
+    /// the cap without moving the epoch. Forgive then spends that settleable
+    /// balance, not the phantom accrued above the cap.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_grace_over_cap_trim_persists_without_sliding_epoch(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, usd, Quantity::new(10_000), false, 0, WEEK_SECS)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(bob, usd)],
+                Quantity::new(1_000),
+                Quantity::new(1_000),
+                0,
+            )
+            .get()?;
+
+        let mut row = Obligation::get_by_interest_rate(bob, alice, usd, 0).unwrap();
+        let epoch = row.last_interest_accrual.seconds;
+        row.accrued_interest = Quantity::new(u64::MAX - 100);
+        plant_obligation(&chain, &row);
+        let stored = Obligation::get_by_interest_rate(bob, alice, usd, 0).unwrap();
+        assert_eq!(
+            stored.accrued_interest.value,
+            u64::MAX - 100,
+            "over-cap split was not stored"
+        );
+        assert_eq!(exp(&chain, bob, alice, usd), u64::MAX);
+
+        Wrapper::push_from(&chain, alice)
+            .net(bob, usd, Quantity::new(0))
+            .get()?;
+        let row = Obligation::get_by_interest_rate(bob, alice, usd, 0).unwrap();
+        assert_eq!(row.remaining_principal.value, 1_000);
+        assert_eq!(row.accrued_interest.value, u64::MAX - 1_000);
+        assert_eq!(
+            row.last_interest_accrual.seconds, epoch,
+            "writing the cap down during grace moved last_interest_accrual"
+        );
+        assert_eq!(exp(&chain, bob, alice, usd), u64::MAX);
+
+        Wrapper::push_from(&chain, bob)
+            .forgive(alice, usd, Quantity::new(1))
+            .get()?;
+        assert_eq!(exp(&chain, bob, alice, usd), u64::MAX - 1);
+        let row = Obligation::get_by_interest_rate(bob, alice, usd, 0).unwrap();
+        assert_eq!(row.remaining_principal.value, 1_000);
+        assert_eq!(row.accrued_interest.value, u64::MAX - 1_000 - 1);
         Ok(())
     }
 
@@ -5453,6 +5536,53 @@ mod tests {
         let row = Obligation::get_by_interest_rate(bob, alice, usd, -100_000).unwrap();
         assert_eq!(row.remaining_principal.value, 999_727);
         assert_eq!(row.accrued_interest.value, 0);
+        Ok(())
+    }
+
+    /// One day of interest on a near-max principal fills the u64 cap and splits
+    /// it across principal and accrued. Another unit must fail, and the row
+    /// must still forgive.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_saturated_obligation_rejects_top_up_and_forgives(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        let principal = u64::MAX - 5;
+        Wrapper::push_from(&chain, alice)
+            .deposit(bob, usd, Quantity::new(principal), 1, 0)
+            .get()?;
+
+        chain.start_block_after(Seconds::new(SECONDS_PER_DAY as i64).into());
+        Wrapper::push_from(&chain, bob)
+            .net(alice, usd, Quantity::new(0))
+            .get()?;
+        assert_eq!(exp(&chain, bob, alice, usd), u64::MAX);
+        let row = Obligation::get_by_interest_rate(bob, alice, usd, 1).unwrap();
+        assert!(row.remaining_principal.value < u64::MAX);
+        assert!(row.accrued_interest.value > 0);
+        assert_eq!(
+            row.remaining_principal
+                .value
+                .saturating_add(row.accrued_interest.value),
+            u64::MAX
+        );
+
+        let topped = Wrapper::push_from(&chain, alice)
+            .deposit(bob, usd, Quantity::new(1), 1, 0)
+            .get();
+        assert!(topped.is_err());
+        assert_eq!(exp(&chain, bob, alice, usd), u64::MAX);
+
+        Wrapper::push_from(&chain, bob)
+            .forgive(alice, usd, Quantity::new(u64::MAX))
+            .get()?;
+        assert_eq!(exp(&chain, bob, alice, usd), 0);
         Ok(())
     }
 

@@ -11,6 +11,7 @@ use psibase::AccountNumber;
 pub use crate::math::{
     try_apply_hop_fee as apply_hop_fee, try_apply_rate as apply_rate, PPM_SCALE, RATE_SCALE,
 };
+use crate::math::{try_invert_hop_fee, try_invert_rate};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LineEdge {
@@ -168,6 +169,34 @@ fn admit(labels: &mut Vec<Label>, new: Label) -> bool {
     true
 }
 
+struct LineIndex<'a> {
+    by_debtor: HashMap<AccountNumber, Vec<&'a LineEdge>>,
+    known: HashSet<(AccountNumber, AccountNumber, u16)>,
+}
+
+/// Index lines by debtor for expansion. Known matches Connection::knows:
+/// who lined them, or who already owes them. Them owing who is not
+/// enough (anyone can `deposit`); a hop with new_draw == 0 still proceeds.
+fn index_lines(lines: &[LineEdge]) -> LineIndex<'_> {
+    let mut by_debtor: HashMap<AccountNumber, Vec<&LineEdge>> = HashMap::new();
+    let mut known: HashSet<(AccountNumber, AccountNumber, u16)> = HashSet::new();
+    for l in lines {
+        if l.is_line {
+            known.insert((l.creditor, l.debtor, l.asset_id));
+        }
+        if l.exposure > 0 {
+            known.insert((l.debtor, l.creditor, l.asset_id));
+        }
+        if l.reverse_claim > 0 {
+            known.insert((l.creditor, l.debtor, l.asset_id));
+        }
+        if l.capacity > 0 {
+            by_debtor.entry(l.debtor).or_default().push(l);
+        }
+    }
+    LineIndex { by_debtor, known }
+}
+
 /// Find a multi-hop path from `sender` to `payee` maximizing amount_out.
 ///
 /// `max_hops` is the maximum number of path_pay hops (1 = direct line only).
@@ -190,25 +219,10 @@ pub fn find_banx_path(
         return None;
     }
 
-    // Index lines by debtor for expansion. Known matches Connection::knows:
-    // who lined them, or who already owes them. Them owing who is not
-    // enough (anyone can `deposit`); a hop with new_draw == 0 still proceeds.
-    let mut lines_by_debtor: HashMap<AccountNumber, Vec<&LineEdge>> = HashMap::new();
-    let mut known: HashSet<(AccountNumber, AccountNumber, u16)> = HashSet::new();
-    for l in lines {
-        if l.is_line {
-            known.insert((l.creditor, l.debtor, l.asset_id));
-        }
-        if l.exposure > 0 {
-            known.insert((l.debtor, l.creditor, l.asset_id));
-        }
-        if l.reverse_claim > 0 {
-            known.insert((l.creditor, l.debtor, l.asset_id));
-        }
-        if l.capacity > 0 {
-            lines_by_debtor.entry(l.debtor).or_default().push(l);
-        }
-    }
+    let LineIndex {
+        by_debtor: lines_by_debtor,
+        known,
+    } = index_lines(lines);
 
     let mut fx_by_poster_from: HashMap<(AccountNumber, u16), Vec<&FxEdge>> = HashMap::new();
     for e in fx {
@@ -388,14 +402,11 @@ fn simulate_path_fees(
     Some(hops)
 }
 
-/// Find a path that delivers at least `amount_out` to the payee, minimizing
-/// `amount_in` (sender absorbs hop/FX fees).
+/// Smallest send that delivers at least `amount_out`.
 ///
-/// Important: we must **not** probe the full first-hop capacity first. A large
-/// `amount_in` often exceeds intermediate capacity and makes the exact-in
-/// searcher return `None` even when a smaller send works (the exact-in UX
-/// case). Expand upward from a small probe, then binary-search the minimum
-/// send that still clears `amount_out`.
+/// Each hop sequence is monotone, so its fees are inverted on their own.
+/// Output across sequences is not: a larger send can miss a tight cheap hop
+/// and fall through to a worse route, or to no route.
 pub fn find_banx_path_exact_out(
     lines: &[LineEdge],
     routing: &[RoutingEdge],
@@ -412,100 +423,283 @@ pub fn find_banx_path_exact_out(
         return None;
     }
 
-    let max_in = lines
+    let LineIndex {
+        by_debtor: lines_by_debtor,
+        known,
+    } = index_lines(lines);
+    let Some(first_lines) = lines_by_debtor.get(&sender) else {
+        return None;
+    };
+    let first: Vec<(AccountNumber, u16)> = first_lines
         .iter()
-        .filter(|l| l.debtor == sender && l.asset_id == from_asset && l.capacity > 0)
-        .map(|l| l.capacity)
-        .max()
-        .unwrap_or(0);
-    if max_in == 0 {
+        .filter(|l| l.asset_id == from_asset && l.creditor != sender)
+        .map(|l| (l.creditor, l.asset_id))
+        .collect();
+
+    let mut best: Option<PathQuote> = None;
+    for (creditor, asset) in first {
+        let mut path = vec![(creditor, asset)];
+        let mut visited = HashSet::from([(creditor, asset)]);
+        walk_exact_out(
+            &mut path,
+            &mut visited,
+            creditor,
+            asset,
+            max_hops - 1,
+            &lines_by_debtor,
+            &known,
+            lines,
+            routing,
+            fx,
+            sender,
+            payee,
+            amount_out,
+            to_asset,
+            now,
+            &mut best,
+        );
+    }
+    best
+}
+
+fn walk_exact_out(
+    path: &mut Vec<(AccountNumber, u16)>,
+    visited: &mut HashSet<(AccountNumber, u16)>,
+    account: AccountNumber,
+    asset: u16,
+    hops_left: u8,
+    lines_by_debtor: &HashMap<AccountNumber, Vec<&LineEdge>>,
+    known: &HashSet<(AccountNumber, AccountNumber, u16)>,
+    lines: &[LineEdge],
+    routing: &[RoutingEdge],
+    fx: &[FxEdge],
+    sender: AccountNumber,
+    payee: AccountNumber,
+    amount_out: u64,
+    to_asset: Option<u16>,
+    now: i64,
+    best: &mut Option<PathQuote>,
+) {
+    if account == payee && to_asset.map(|want| want == asset).unwrap_or(true) {
+        note_exact_sequence(
+            path, amount_out, sender, lines, routing, fx, known, now, best,
+        );
+    }
+    if hops_left == 0 {
+        return;
+    }
+
+    let mut nexts: Vec<(AccountNumber, u16)> = Vec::new();
+    if let Some(out_lines) = lines_by_debtor.get(&account) {
+        for line in out_lines {
+            if line.asset_id == asset {
+                push_exact_hop(
+                    &mut nexts,
+                    visited,
+                    routing,
+                    now,
+                    sender,
+                    account,
+                    line.creditor,
+                    asset,
+                );
+            }
+        }
+    }
+    for edge in fx {
+        if edge.poster != account
+            || edge.from_asset != asset
+            || edge.fx_rate == 0
+            || !policy_live(edge.expires_at, now)
+        {
+            continue;
+        }
+        let Some(out_lines) = lines_by_debtor.get(&account) else {
+            continue;
+        };
+        for line in out_lines {
+            if line.asset_id != edge.to_asset {
+                continue;
+            }
+            push_exact_hop(
+                &mut nexts,
+                visited,
+                routing,
+                now,
+                sender,
+                account,
+                line.creditor,
+                edge.to_asset,
+            );
+        }
+    }
+
+    for (creditor, hop_asset) in nexts {
+        if !visited.insert((creditor, hop_asset)) {
+            continue;
+        }
+        path.push((creditor, hop_asset));
+        walk_exact_out(
+            path,
+            visited,
+            creditor,
+            hop_asset,
+            hops_left - 1,
+            lines_by_debtor,
+            known,
+            lines,
+            routing,
+            fx,
+            sender,
+            payee,
+            amount_out,
+            to_asset,
+            now,
+            best,
+        );
+        path.pop();
+        visited.remove(&(creditor, hop_asset));
+    }
+}
+
+fn push_exact_hop(
+    nexts: &mut Vec<(AccountNumber, u16)>,
+    visited: &HashSet<(AccountNumber, u16)>,
+    routing: &[RoutingEdge],
+    now: i64,
+    sender: AccountNumber,
+    debtor: AccountNumber,
+    creditor: AccountNumber,
+    asset: u16,
+) {
+    if creditor == debtor || creditor == sender || visited.contains(&(creditor, asset)) {
+        return;
+    }
+    if resolve_routing(routing, creditor, debtor, asset, now).is_none() {
+        return;
+    }
+    nexts.push((creditor, asset));
+}
+
+/// Smallest send on this sequence. Walk fees backward: undo the hop fee, then FX.
+fn required_in(
+    hop_keys: &[(AccountNumber, u16)],
+    mut need: u64,
+    routing: &[RoutingEdge],
+    fx: &[FxEdge],
+    now: i64,
+) -> Option<u64> {
+    if hop_keys.is_empty() || need == 0 {
         return None;
     }
+    for i in (1..hop_keys.len()).rev() {
+        let prev_account = hop_keys[i - 1].0;
+        let prev_asset = hop_keys[i - 1].1;
+        let (next_account, next_asset) = hop_keys[i];
+        let policy = resolve_routing(routing, next_account, prev_account, next_asset, now)?;
+        need = try_invert_hop_fee(need, policy.hop_fee_fixed, policy.hop_fee_percent_ppm)?;
+        if next_asset != prev_asset {
+            let edge = fx.iter().find(|edge| {
+                edge.poster == prev_account
+                    && edge.from_asset == prev_asset
+                    && edge.to_asset == next_asset
+                    && policy_live(edge.expires_at, now)
+                    && edge.fx_rate > 0
+            })?;
+            need = try_invert_rate(need, edge.fee_fixed, edge.fx_rate)?;
+        }
+    }
+    Some(need)
+}
 
-    let try_in = |amount_in: u64| {
-        find_banx_path(
-            lines, routing, fx, sender, payee, amount_in, from_asset, to_asset, max_hops, now,
-        )
+fn note_exact_sequence(
+    hop_keys: &[(AccountNumber, u16)],
+    amount_out: u64,
+    sender: AccountNumber,
+    lines: &[LineEdge],
+    routing: &[RoutingEdge],
+    fx: &[FxEdge],
+    known: &HashSet<(AccountNumber, AccountNumber, u16)>,
+    now: i64,
+    best: &mut Option<PathQuote>,
+) {
+    let Some(amount_in) = required_in(hop_keys, amount_out, routing, fx, now) else {
+        return;
     };
-
-    // Phase 1: find some amount_in that clears `amount_out`.
-    //
-    // Do not probe max first-hop capacity first — large notions often exceed
-    // intermediate capacity and look like "no path". Grow from small values.
-    //
-    // Feasibility is not fully monotonic (fixed hop fees reject tiny notions;
-    // hop capacity rejects huge ones), so when doubling jumps over capacity
-    // we binary-search the gap for the largest still-feasible send.
-    let mut probe = 1u64;
-    let mut upper: Option<PathQuote> = None;
-    let mut last_ok: Option<PathQuote> = None;
-
-    loop {
-        match try_in(probe) {
-            Some(q) if q.amount_out >= amount_out => {
-                upper = Some(q);
-                break;
-            }
-            Some(q) => {
-                last_ok = Some(q);
-            }
-            None => {
-                if let Some(ref ok) = last_ok {
-                    // Doubling jumped past capacity. Search (ok, probe)
-                    // for the largest feasible amount_in — may still be enough.
-                    let mut flo = ok.amount_in.saturating_add(1);
-                    let mut fhi = probe.saturating_sub(1);
-                    let mut max_feas = ok.clone();
-                    while flo <= fhi {
-                        let mid = flo + (fhi - flo) / 2;
-                        match try_in(mid) {
-                            Some(q) => {
-                                max_feas = q;
-                                flo = mid.saturating_add(1);
-                            }
-                            None => {
-                                if mid == 0 {
-                                    break;
-                                }
-                                fhi = mid - 1;
-                            }
-                        }
-                    }
-                    if max_feas.amount_out >= amount_out {
-                        upper = Some(max_feas);
-                    }
-                    break;
-                }
-                // Still no feasible path (e.g. fixed fees need a larger notional).
-            }
-        }
-        if probe >= max_in {
-            break;
-        }
-        let next = probe.saturating_mul(2).max(probe.saturating_add(1));
-        probe = next.min(max_in);
+    let Some(hops) = simulate_path_fees(hop_keys, amount_in, sender, lines, routing, fx, now)
+    else {
+        return;
+    };
+    let out = hops.last().map(|hop| hop.amount).unwrap_or(0);
+    if out < amount_out || !sequence_fits(&hops, sender, lines, routing, known, now) {
+        return;
     }
-
-    let upper = upper?;
-    let mut lo = 1u64;
-    let mut hi = upper.amount_in;
-    let mut best = upper;
-
-    // Phase 2: minimize amount_in while still clearing amount_out.
-    while lo <= hi {
-        let mid = lo + (hi - lo) / 2;
-        match try_in(mid) {
-            Some(q) if q.amount_out >= amount_out => {
-                best = q;
-                if mid == 0 {
-                    break;
-                }
-                hi = mid - 1;
-            }
-            _ => lo = mid.saturating_add(1),
+    let replace = match best {
+        None => true,
+        Some(quote) => {
+            amount_in < quote.amount_in || (amount_in == quote.amount_in && out > quote.amount_out)
         }
+    };
+    if replace {
+        *best = Some(PathQuote {
+            hops,
+            amount_in,
+            amount_out: out,
+        });
     }
-    Some(best)
+}
+
+/// Post-fee draw on every hop fits some line, including APR and knows checks
+/// once the draw is new capacity rather than an unwind.
+fn sequence_fits(
+    hops: &[PathHop],
+    sender: AccountNumber,
+    lines: &[LineEdge],
+    routing: &[RoutingEdge],
+    known: &HashSet<(AccountNumber, AccountNumber, u16)>,
+    now: i64,
+) -> bool {
+    let mut debtor = sender;
+    for (i, hop) in hops.iter().enumerate() {
+        let draw = hop.amount;
+        if draw == 0 {
+            return false;
+        }
+        let ok = lines.iter().any(|line| {
+            if line.creditor != hop.account
+                || line.debtor != debtor
+                || line.asset_id != hop.asset_id
+            {
+                return false;
+            }
+            if draw > line.capacity {
+                return false;
+            }
+            if i == 0 {
+                return true;
+            }
+            let Some(policy) = resolve_routing(routing, hop.account, debtor, hop.asset_id, now)
+            else {
+                return false;
+            };
+            let new_draw = draw.saturating_sub(line.reverse_claim);
+            if !policy.allow_unknown
+                && new_draw > 0
+                && !known.contains(&(debtor, hop.account, hop.asset_id))
+            {
+                return false;
+            }
+            if new_draw > 0 && line.is_line && line.interest_rate_ppm > policy.max_accept_rate_ppm {
+                return false;
+            }
+            true
+        });
+        if !ok {
+            return false;
+        }
+        debtor = hop.account;
+    }
+    true
 }
 
 fn expand_hops(
@@ -965,6 +1159,115 @@ mod tests {
         .expect("grows past fixed fee floor");
         assert_eq!(q.amount_in, 110);
         assert_eq!(q.amount_out, 100);
+    }
+
+    /// Cheap capacity 50 cannot carry 80. The other route charges a fixed fee
+    /// of 100, so the send is 180. Search must not stop when the cheap route
+    /// runs out of capacity.
+    #[test]
+    fn exact_out_uses_larger_send_when_cheap_route_is_short() {
+        let lines = vec![
+            line("gary", "alice", 1, 1_000),
+            line("steve", "gary", 1, 50),
+            line("bob", "alice", 1, 1_000),
+            line("steve", "bob", 1, 1_000),
+        ];
+        let routing = vec![
+            global_rte("gary", 1, 0),
+            RoutingEdge {
+                creditor: AccountNumber::new(0),
+                debtor: acct("bob"),
+                asset_id: 1,
+                hop_fee_fixed: 100,
+                hop_fee_percent_ppm: 0,
+                max_accept_rate_ppm: PPM_SCALE,
+                expires_at: 0,
+                allow_unknown: true,
+            },
+        ];
+        let q = find_out(
+            &lines,
+            &routing,
+            &[],
+            "alice",
+            "steve",
+            80,
+            1,
+            Some(1),
+            4,
+            0,
+        )
+        .expect("fee route delivers 80");
+        assert_eq!(q.hops[0].account, acct("bob"));
+        assert_eq!(q.amount_in, 180);
+        assert!(q.amount_out >= 80);
+    }
+
+    /// Send 100 on the 0% route delivers 100. A 50% route needs about 200.
+    /// The search must keep the smaller send.
+    #[test]
+    fn exact_out_keeps_smaller_send_on_cheap_route() {
+        let lines = vec![
+            line("gary", "alice", 1, 1_000),
+            line("steve", "gary", 1, 100),
+            line("bob", "alice", 1, 1_000),
+            line("steve", "bob", 1, 1_000),
+        ];
+        let routing = vec![
+            global_rte("gary", 1, 0),
+            global_rte("bob", 1, PPM_SCALE / 2),
+        ];
+        let q = find_out(
+            &lines,
+            &routing,
+            &[],
+            "alice",
+            "steve",
+            100,
+            1,
+            Some(1),
+            4,
+            0,
+        )
+        .expect("cheap route");
+        assert_eq!(q.hops[0].account, acct("gary"));
+        assert_eq!(q.amount_in, 100);
+        assert_eq!(q.amount_out, 100);
+    }
+
+    /// 1000 AUD at 0.70 delivers 700 USD, so delivering 700 inverts to send 1000.
+    #[test]
+    fn exact_out_inverts_fx() {
+        let aud = 1u16;
+        let usd = 2u16;
+        let lines = vec![
+            line("gary", "alice", aud, 10_000),
+            line("steve", "gary", usd, 10_000),
+        ];
+        let routing = vec![global_rte("gary", usd, 0)];
+        let fx = vec![FxEdge {
+            poster: acct("gary"),
+            from_asset: aud,
+            to_asset: usd,
+            fee_fixed: 0,
+            fx_rate: RATE_SCALE * 70 / 100,
+            expires_at: 0,
+        }];
+        let q = find_out(
+            &lines,
+            &routing,
+            &fx,
+            "alice",
+            "steve",
+            700,
+            aud,
+            Some(usd),
+            4,
+            0,
+        )
+        .expect("fx invert");
+        assert_eq!(q.amount_in, 1_000);
+        assert_eq!(q.amount_out, 700);
     }
 
     #[test]

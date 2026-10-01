@@ -774,12 +774,32 @@ async function tokensCredit(tokenId: number, amount: string) {
     });
 }
 
+async function tokensUncredit(tokenId: number, amount: string) {
+    await supervisor.functionCall({
+        service: "tokens",
+        intf: "user",
+        method: "uncredit",
+        params: [tokenId, BANX_SERVICE, amount, "csh_fund"],
+    });
+}
+
 export function useCashFund() {
     const invalidate = useInvalidateBanx();
     return useMutation({
         mutationFn: async (p: { tokenId: number; amount: string }) => {
             await tokensCredit(p.tokenId, p.amount);
-            await banxCall("cashFund", [p.tokenId, p.amount]);
+            try {
+                await banxCall("cashFund", [p.tokenId, p.amount]);
+            } catch (e) {
+                try {
+                    await tokensUncredit(p.tokenId, p.amount);
+                } catch {
+                    throw new Error(
+                        `The vault move did not finish. Tokens are still credited to ${BANX_SERVICE} and the rollback failed.`,
+                    );
+                }
+                throw e;
+            }
         },
         onSuccess: () => {
             invalidate();

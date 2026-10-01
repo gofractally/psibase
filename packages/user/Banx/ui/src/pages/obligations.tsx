@@ -77,11 +77,15 @@ export function ObligationsPage() {
     useEffect(() => {
         if (urlTransferPrefill) setTransferOpen(true);
     }, [urlTransferPrefill]);
-    const { savings: savingsGroupsAll, loans: loanGroupsAll, isLoading } =
-        useAccountGroups();
+    const {
+        savings: savingsGroupsAll,
+        loans: loanGroupsAll,
+        isLoading,
+        isError,
+    } = useAccountGroups();
     const { data: forwardOffers = [] } = useForwardOffers();
     const { data: buyClaimOffers = [] } = useBuyClaimOffers();
-    const { assets, symbolOf, precisionOf } = useAssetMap();
+    const { assets, byId, symbolOf, precisionOf } = useAssetMap();
 
     const nowSec = Math.floor(Date.now() / 1000);
 
@@ -130,18 +134,23 @@ export function ObligationsPage() {
             ),
         [forwardOffers, nowSec, selectedAssetId],
     );
-    const globalBuyClaimOn = useMemo(
-        () =>
-            selectedAssetId !== undefined &&
-            buyClaimOffers.some(
-                (p) =>
-                    p.isGlobal &&
-                    p.isBuy &&
-                    p.assetId === selectedAssetId &&
-                    (p.expiresAt === 0 || p.expiresAt >= nowSec),
-            ),
-        [buyClaimOffers, nowSec, selectedAssetId],
-    );
+    const globalBuyClaimOn = useMemo(() => {
+        if (
+            selectedAssetId === undefined ||
+            !byId.has(selectedAssetId)
+        ) {
+            return false;
+        }
+        const precision = precisionOf(selectedAssetId);
+        return buyClaimOffers.some(
+            (p) =>
+                p.isGlobal &&
+                p.isBuy &&
+                p.assetId === selectedAssetId &&
+                (p.expiresAt === 0 || p.expiresAt >= nowSec) &&
+                humanToRaw(p.remaining, precision) > 0n,
+        );
+    }, [buyClaimOffers, byId, nowSec, precisionOf, selectedAssetId]);
 
     const openRouting = (prefill?: RoutingPolicyPrefill | null) => {
         setRoutingPrefill(prefill ?? null);
@@ -283,7 +292,7 @@ export function ObligationsPage() {
                 limit={creditLimit}
                 precision={currencyPrecision}
                 symbol={currencySymbol}
-                isLoading={isLoading}
+                isLoading={isLoading || isError}
             />
 
             <TransferDialog
@@ -367,6 +376,10 @@ export function ObligationsPage() {
 
                 {isLoading ? (
                     <p className="text-muted-foreground text-sm">Loading…</p>
+                ) : isError ? (
+                    <p className="text-destructive text-sm">
+                        Could not load accounts.
+                    </p>
                 ) : savingsGroups.length === 0 ? (
                     <EmptyAccounts
                         icon={PiggyBank}
@@ -440,6 +453,10 @@ export function ObligationsPage() {
 
                 {isLoading ? (
                     <p className="text-muted-foreground text-sm">Loading…</p>
+                ) : isError ? (
+                    <p className="text-destructive text-sm">
+                        Could not load accounts.
+                    </p>
                 ) : loanGroups.length === 0 ? (
                     <EmptyAccounts
                         icon={Building2}

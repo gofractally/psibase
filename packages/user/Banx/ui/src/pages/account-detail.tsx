@@ -83,7 +83,7 @@ import { Separator } from "@shared/shadcn/ui/separator";
 export function AccountDetailPage() {
     const params = useParams();
     const account = decodeURIComponent(params.account ?? "").trim();
-    const { user, savings, loans, isLoading } = useAccountGroups();
+    const { user, savings, loans, isLoading, isError } = useAccountGroups();
     const { label, nicknameOf } = useBanxContacts("/accounts");
     const { assets, symbolOf, precisionOf } = useAssetMap();
     const { data: bookAuths = [] } = useBookAuths();
@@ -303,6 +303,10 @@ export function AccountDetailPage() {
             />
             {isLoading ? (
                 <p className="text-muted-foreground text-sm">Loading…</p>
+            ) : isError ? (
+                <p className="text-destructive text-sm">
+                    Could not load accounts.
+                </p>
             ) : !hasAnything ? (
                 <p className="text-muted-foreground text-sm">
                     No lines or balances with {display} yet. Offer a credit
@@ -350,15 +354,6 @@ export function AccountDetailPage() {
                                             kind: REQUEST_INVOICE,
                                             counterparty: account,
                                             assetId: g.assetId,
-                                            amount:
-                                                g.total > 0n
-                                                    ? formatRawAmount(
-                                                          g.total.toString(),
-                                                          precisionOf(
-                                                              g.assetId,
-                                                          ),
-                                                      )
-                                                    : undefined,
                                         });
                                         setRequestOpen(true);
                                     }}

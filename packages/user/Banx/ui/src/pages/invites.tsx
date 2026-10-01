@@ -13,8 +13,8 @@ import { useCreateInvite, useDeleteInvite } from "@/hooks/use-banx-mutations";
 import { displayAmount } from "@/lib/amount";
 import {
     DEFAULT_GRACE_SECONDS,
-    daysToGraceSeconds,
     formatGracePeriod,
+    graceSecondsFromFields,
     ppmToPercent,
     type GracePreset,
 } from "@/lib/constants";
@@ -201,6 +201,11 @@ export function InvitesPage() {
         },
         onSubmit: async ({ value }) => {
             if (value.assetId === undefined) return;
+            const graceSeconds = graceSecondsFromFields(
+                value.gracePreset,
+                value.graceDays,
+            );
+            if (graceSeconds === null) return;
             const created = await createInvite.mutateAsync({
                 assetId: value.assetId,
                 limit: value.limit.trim(),
@@ -209,14 +214,7 @@ export function InvitesPage() {
                     value.interestPct,
                     PPM_SCALE,
                 ),
-                graceSeconds:
-                    value.gracePreset === "none"
-                        ? 0
-                        : daysToGraceSeconds(
-                              value.gracePreset === "custom"
-                                  ? Number(value.graceDays.trim())
-                                  : Number(value.gracePreset),
-                          ),
+                graceSeconds,
             });
             rememberInviteToken(created.inviteId, created.inviteToken);
             setCreateOpen(false);

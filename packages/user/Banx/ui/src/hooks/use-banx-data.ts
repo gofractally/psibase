@@ -166,7 +166,11 @@ export function useTokenPrecision(
     });
 }
 
-export function useTokenPrecisionMap(tokenIds: number[]): Map<number, number> {
+export function useTokenPrecisionMap(tokenIds: number[]): {
+    precision: Map<number, number>;
+    pending: ReadonlySet<number>;
+    failed: ReadonlySet<number>;
+} {
     const tokenKey = [...new Set(tokenIds.filter((id) => id > 0))]
         .sort((a, b) => a - b)
         .join(",");
@@ -182,12 +186,17 @@ export function useTokenPrecisionMap(tokenIds: number[]): Map<number, number> {
         })),
     });
     return useMemo(() => {
-        const m = new Map<number, number>();
+        const precision = new Map<number, number>();
+        const pending = new Set<number>();
+        const failed = new Set<number>();
         unique.forEach((id, i) => {
-            const v = queries[i]?.data;
-            if (typeof v === "number") m.set(id, v);
+            const query = queries[i];
+            const value = query?.data;
+            if (typeof value === "number") precision.set(id, value);
+            else if (query?.isError) failed.add(id);
+            else pending.add(id);
         });
-        return m;
+        return { precision, pending, failed };
     }, [queries, unique]);
 }
 

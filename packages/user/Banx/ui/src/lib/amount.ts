@@ -221,3 +221,70 @@ export function applyQuotedRate(
     if (out <= 0n) return null;
     return formatRawAmount(out.toString(), toPrecision);
 }
+
+/**
+ * Inverse of a human "to units per 1 from unit" rate, in integer units.
+ * Null when the forward rate is zero or the inverse truncates to zero.
+ */
+export function invertQuotedRate(
+    toRate: string,
+    fromPrecision: number,
+    toPrecision: number,
+): string | null {
+    if (fromPrecision < 0 || toPrecision < 0) return null;
+    const toRaw = humanToRaw(toRate, toPrecision);
+    if (toRaw <= 0n) return null;
+    const inverted = 10n ** BigInt(fromPrecision + toPrecision) / toRaw;
+    if (inverted <= 0n) return null;
+    return formatRawAmount(inverted.toString(), fromPrecision);
+}
+
+/**
+ * Convert a human from-amount through a "to per 1 from" rate.
+ * `"0"` stays `"0"`. Empty input and a positive amount that truncates to
+ * zero return null.
+ */
+export function convertAtQuotedRate(
+    amount: string,
+    toRate: string,
+    fromPrecision: number,
+    toPrecision: number,
+): string | null {
+    if (fromPrecision < 0 || toPrecision < 0) return null;
+    const s = amount.trim();
+    if (!s) return null;
+    const inn = humanToRaw(s, fromPrecision);
+    if (inn < 0n) return null;
+    if (inn === 0n) return "0";
+    const rate = humanToRaw(toRate, toPrecision);
+    if (rate <= 0n) return null;
+    const out = (inn * rate) / 10n ** BigInt(fromPrecision);
+    if (out <= 0n) return null;
+    return formatRawAmount(out.toString(), toPrecision);
+}
+
+function isZeroText(amount: string): boolean {
+    return /^0+(?:\.0+)?$|^\.0+$/.test(amount);
+}
+
+export function keptOnFlip(
+    current: string,
+    converted: string | null,
+    emptyFallback: string,
+): string {
+    const trimmed = current.trim();
+    if (!trimmed) return converted ?? emptyFallback;
+    if (converted === null) return current;
+    if (converted === "0" && !isZeroText(trimmed)) return current;
+    return converted;
+}
+
+export function flipLeftTyped(
+    current: string,
+    converted: string | null,
+    next: string,
+): boolean {
+    const trimmed = current.trim();
+    if (!trimmed || isZeroText(trimmed)) return false;
+    return next === current && converted !== current;
+}

@@ -42,6 +42,7 @@ type Hop = { account: string; assetId: number | undefined };
 type QuoteSummary = {
     amountIn: string;
     amountOut: string;
+    minReturn: string;
     hops: PathHopQuote[];
 };
 
@@ -143,6 +144,58 @@ function canFindPath(
     );
 }
 
+type ExecValues = {
+    hops: Hop[];
+    amount: string;
+    minReturn: string;
+};
+
+/** Payment is allowed only while the exec form still is the stored quote. */
+function quoteMatchesExec(
+    quote: QuoteSummary | null,
+    exec: ExecValues,
+    invoice: boolean,
+): boolean {
+    if (!quote) return false;
+    const cleaned = exec.hops.filter(
+        (h) => h.account.trim() && h.assetId !== undefined,
+    );
+    if (cleaned.length !== quote.hops.length) return false;
+    for (let i = 0; i < cleaned.length; i++) {
+        const hop = cleaned[i]!;
+        const quoted = quote.hops[i]!;
+        if (
+            hop.account.trim() !== quoted.account.trim() ||
+            hop.assetId !== quoted.assetId
+        ) {
+            return false;
+        }
+    }
+    if (exec.amount.trim() !== quote.amountIn.trim()) return false;
+    if (!invoice && exec.minReturn.trim() !== quote.minReturn.trim()) {
+        return false;
+    }
+    return true;
+}
+
+function quoteStillCurrent(
+    user: string | null | undefined,
+    find: FindValues,
+    quotedKey: string | null,
+    quote: QuoteSummary | null,
+    exec: ExecValues,
+    invoice: boolean,
+): boolean {
+    if (!user || quotedKey === null) return false;
+    return (
+        quotedKey === findQuoteKey(user, find) &&
+        quoteMatchesExec(quote, exec, invoice)
+    );
+}
+
+const QUOTE_STALE =
+    "The path changed since it was quoted. Search again before sending.";
+
 function PathStatus({
     pending,
     found,
@@ -235,6 +288,12 @@ export function TransferDialog({
     const [quote, setQuote] = useState<QuoteSummary | null>(null);
     const [quotedKey, setQuotedKey] = useState<string | null>(null);
     const quotedKeyRef = useRef<string | null>(null);
+    const quoteRef = useRef<QuoteSummary | null>(null);
+    quoteRef.current = quote;
+    const requestIdRef = useRef(requestId);
+    requestIdRef.current = requestId;
+    const userRef = useRef(user);
+    userRef.current = user;
     const [failedKey, setFailedKey] = useState<string | null>(null);
     const failedKeyRef = useRef<string | null>(null);
     const [quoteError, setQuoteError] = useState<string | null>(null);
@@ -265,9 +324,18 @@ export function TransferDialog({
             if (!canFindPath(user, value)) return;
             const key = findQuoteKey(user!, value);
             if (
-                key === quotedKeyRef.current ||
                 key === quotingKeyRef.current ||
                 key === failedKeyRef.current
+            ) {
+                return;
+            }
+            if (
+                key === quotedKeyRef.current &&
+                quoteMatchesExec(
+                    quoteRef.current,
+                    execForm.state.values,
+                    requestIdRef.current > 0,
+                )
             ) {
                 return;
             }
@@ -319,6 +387,7 @@ export function TransferDialog({
                                 setQuote({
                                     amountIn: q.amountIn,
                                     amountOut: q.amountOut,
+                                    minReturn: q.minReturn,
                                     hops: q.hops,
                                 });
                                 resolve();
@@ -355,6 +424,20 @@ export function TransferDialog({
             minReturn: "0.01",
         },
         onSubmit: async ({ value }) => {
+            if (
+                !quoteStillCurrent(
+                    userRef.current,
+                    findForm.state.values,
+                    quotedKeyRef.current,
+                    quoteRef.current,
+                    value,
+                    requestIdRef.current > 0,
+                )
+            ) {
+                toast.error(QUOTE_STALE);
+                setConfirmOpen(false);
+                return;
+            }
             const cleaned = value.hops
                 .filter((h) => h.account.trim() && h.assetId !== undefined)
                 .map((h) => ({
@@ -469,7 +552,7 @@ export function TransferDialog({
                     defaultAssetId(assets),
             },
         ]);
-        // Hop list no longer matches the last quote fee breakdown.
+        rememberQuotedKey(null);
         setQuote(null);
     };
 
@@ -477,6 +560,7 @@ export function TransferDialog({
         const hops = execForm.state.values.hops;
         if (hops.length <= 1) return;
         execForm.setFieldValue("hops", hops.slice(0, -1));
+        rememberQuotedKey(null);
         setQuote(null);
     };
 
@@ -509,14 +593,13 @@ export function TransferDialog({
         void findForm.handleSubmit().catch(() => undefined);
     };
 
+    const quotedFrom = quote?.hops[0]?.assetId;
+    const quotedTo =
+        quote && quote.hops.length > 0
+            ? quote.hops[quote.hops.length - 1]?.assetId
+            : undefined;
     const confirmNote = quote
-        ? transferCostNote(
-              quote,
-              findForm.state.values.fromAsset,
-              findForm.state.values.toAsset,
-              symbolOf,
-              precisionOf,
-          )
+        ? transferCostNote(quote, quotedFrom, quotedTo, symbolOf, precisionOf)
         : null;
 
     return (
@@ -673,16 +756,23 @@ export function TransferDialog({
                             selector={(s) => s.values}
                             children={(values) => (
                         <execForm.Subscribe
-                            selector={(s) => s.values.hops}
-                            children={(hops) => {
+                            selector={(s) => s.values}
+                            children={(exec) => {
                                 const key = user
                                     ? findQuoteKey(user, values)
                                     : "";
-                                const live = !!key && quotedKey === key;
+                                const found = quoteStillCurrent(
+                                    user,
+                                    values,
+                                    quotedKey,
+                                    quote,
+                                    exec,
+                                    requestId > 0,
+                                );
                                 const failed = !!key && failedKey === key;
                                 const ready =
-                                    live &&
-                                    hops.some(
+                                    found &&
+                                    exec.hops.some(
                                         (h) =>
                                             h.account.trim() &&
                                             h.assetId !== undefined,
@@ -704,7 +794,7 @@ export function TransferDialog({
                                     </Button>
                                     <PathStatus
                                         pending={quotePath.isPending}
-                                        found={live}
+                                        found={found}
                                         failed={failed}
                                         error={quoteError}
                                         onRetry={() => {
@@ -746,7 +836,20 @@ export function TransferDialog({
                     onSubmit={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        void execForm.handleSubmit();
+                        if (
+                            !quoteStillCurrent(
+                                user,
+                                findForm.state.values,
+                                quotedKeyRef.current,
+                                quoteRef.current,
+                                execForm.state.values,
+                                requestIdRef.current > 0,
+                            )
+                        ) {
+                            toast.error(QUOTE_STALE);
+                            return;
+                        }
+                        setConfirmOpen(true);
                     }}
                     className="grid gap-4"
                 >
@@ -1061,30 +1164,52 @@ export function TransferDialog({
                                     : "Confirm transfer"}
                             </DialogTitle>
                             <DialogDescription>
-                                {quote ? (
-                                    <>
-                                        You send{" "}
-                                        <span className="text-foreground font-medium">
-                                            {displayAmount(quote.amountIn)}
-                                        </span>
-                                        {findForm.state.values.fromAsset !==
-                                        undefined
-                                            ? ` ${symbolOf(findForm.state.values.fromAsset)}`
-                                            : ""}
-                                        . Payee gets{" "}
-                                        <span className="text-foreground font-medium">
-                                            {displayAmount(quote.amountOut)}
-                                        </span>
-                                        {findForm.state.values.toAsset !==
-                                        undefined
-                                            ? ` ${symbolOf(findForm.state.values.toAsset)}`
-                                            : ""}
-                                        .
-                                        {confirmNote ? ` ${confirmNote}.` : ""}
-                                    </>
-                                ) : (
-                                    "Review the path, then confirm."
-                                )}
+                                <execForm.Subscribe
+                                    selector={(s) => s.values}
+                                    children={(exec) => {
+                                        const matched = quoteStillCurrent(
+                                            user,
+                                            findForm.state.values,
+                                            quotedKey,
+                                            quote,
+                                            exec,
+                                            requestId > 0,
+                                        );
+                                        if (!matched || !quote) {
+                                            return QUOTE_STALE;
+                                        }
+                                        const sendAsset = quote.hops[0]?.assetId;
+                                        const receiveAsset =
+                                            quote.hops[quote.hops.length - 1]
+                                                ?.assetId;
+                                        return (
+                                            <>
+                                                You send{" "}
+                                                <span className="text-foreground font-medium">
+                                                    {displayAmount(
+                                                        exec.amount,
+                                                    )}
+                                                </span>
+                                                {sendAsset !== undefined
+                                                    ? ` ${symbolOf(sendAsset)}`
+                                                    : ""}
+                                                . Payee gets{" "}
+                                                <span className="text-foreground font-medium">
+                                                    {displayAmount(
+                                                        quote.amountOut,
+                                                    )}
+                                                </span>
+                                                {receiveAsset !== undefined
+                                                    ? ` ${symbolOf(receiveAsset)}`
+                                                    : ""}
+                                                .
+                                                {confirmNote
+                                                    ? ` ${confirmNote}.`
+                                                    : ""}
+                                            </>
+                                        );
+                                    }}
+                                />
                             </DialogDescription>
                         </DialogHeader>
                         <execForm.Subscribe
@@ -1156,21 +1281,41 @@ export function TransferDialog({
                             >
                                 Cancel
                             </Button>
-                            <Button
-                                type="button"
-                                disabled={
-                                    pathPay.isPending || payInvoice.isPending
-                                }
-                                onClick={() => void execForm.handleSubmit()}
-                            >
-                                {pathPay.isPending || payInvoice.isPending
-                                    ? requestId
-                                        ? "Paying…"
-                                        : "Submitting…"
-                                    : requestId
-                                      ? "Pay invoice"
-                                      : "Transfer"}
-                            </Button>
+                            <execForm.Subscribe
+                                selector={(s) => s.values}
+                                children={(exec) => {
+                                    const matched = quoteStillCurrent(
+                                        user,
+                                        findForm.state.values,
+                                        quotedKey,
+                                        quote,
+                                        exec,
+                                        requestId > 0,
+                                    );
+                                    return (
+                                        <Button
+                                            type="button"
+                                            disabled={
+                                                !matched ||
+                                                pathPay.isPending ||
+                                                payInvoice.isPending
+                                            }
+                                            onClick={() =>
+                                                void execForm.handleSubmit()
+                                            }
+                                        >
+                                            {pathPay.isPending ||
+                                            payInvoice.isPending
+                                                ? requestId
+                                                    ? "Paying…"
+                                                    : "Submitting…"
+                                                : requestId
+                                                  ? "Pay invoice"
+                                                  : "Transfer"}
+                                        </Button>
+                                    );
+                                }}
+                            />
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>

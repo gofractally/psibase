@@ -16,9 +16,13 @@ import {
 } from "@/hooks/use-banx-mutations";
 import {
     amountPlaceholder,
+    convertAtQuotedRate,
+    flipLeftTyped,
+    keptOnFlip,
     displayAmount,
     formatFxToRate,
     formatToPrecision,
+    invertQuotedRate,
 } from "@/lib/amount";
 import { ppmToPercent } from "@/lib/constants";
 import {
@@ -31,6 +35,7 @@ import {
 } from "@/lib/form";
 
 import { Button } from "@shared/shadcn/ui/button";
+import { toast } from "@shared/shadcn/ui/sonner";
 import {
     Table,
     TableBody,
@@ -41,7 +46,7 @@ import {
 } from "@shared/shadcn/ui/table";
 
 export function PoliciesPage() {
-    const { assets, symbolOf, precisionOf } = useAssetMap();
+    const { assets, byId, symbolOf, precisionOf } = useAssetMap();
     const { data: forwardOffers = [] } = useForwardOffers();
     const { data: buyClaimOffers = [] } = useBuyClaimOffers();
     const { data: currency = [] } = useCurrencyPolicies();
@@ -192,26 +197,112 @@ export function PoliciesPage() {
                                                 className="bg-background size-9 rounded-full border-2"
                                                 aria-label="Flip pair"
                                                 onClick={() => {
+                                                    const from =
+                                                        values.fromAsset;
+                                                    const to = values.toAsset;
+                                                    const fromPrec =
+                                                        from !== undefined &&
+                                                        byId.has(from)
+                                                            ? precisionOf(from)
+                                                            : undefined;
+                                                    const toPrec =
+                                                        to !== undefined &&
+                                                        byId.has(to)
+                                                            ? precisionOf(to)
+                                                            : undefined;
+                                                    if (
+                                                        fromPrec ===
+                                                            undefined ||
+                                                        toPrec === undefined
+                                                    ) {
+                                                        const rate =
+                                                            values.toRate.trim();
+                                                        const feeText =
+                                                            values.feeFixed.trim();
+                                                        const needsConvert =
+                                                            (rate !== "" &&
+                                                                rate !==
+                                                                    "1") ||
+                                                            (feeText !== "" &&
+                                                                feeText !==
+                                                                    "0");
+                                                        if (needsConvert) {
+                                                            toast.error(
+                                                                from !==
+                                                                    undefined &&
+                                                                    to !==
+                                                                        undefined
+                                                                    ? "Asset precision isn't loaded yet."
+                                                                    : "Pick both assets before flipping a rate.",
+                                                            );
+                                                            return;
+                                                        }
+                                                        currencyForm.setFieldValue(
+                                                            "fromAsset",
+                                                            to,
+                                                        );
+                                                        currencyForm.setFieldValue(
+                                                            "toAsset",
+                                                            from,
+                                                        );
+                                                        return;
+                                                    }
                                                     currencyForm.setFieldValue(
                                                         "fromAsset",
-                                                        values.toAsset,
+                                                        to,
                                                     );
                                                     currencyForm.setFieldValue(
                                                         "toAsset",
-                                                        values.fromAsset,
+                                                        from,
                                                     );
-                                                    const n = Number(
-                                                        values.toRate,
+                                                    const inverted =
+                                                        invertQuotedRate(
+                                                            values.toRate,
+                                                            fromPrec,
+                                                            toPrec,
+                                                        );
+                                                    const fee =
+                                                        convertAtQuotedRate(
+                                                            values.feeFixed,
+                                                            values.toRate,
+                                                            fromPrec,
+                                                            toPrec,
+                                                        );
+                                                    const nextRate =
+                                                        keptOnFlip(
+                                                            values.toRate,
+                                                            inverted,
+                                                            "",
+                                                        );
+                                                    const nextFee = keptOnFlip(
+                                                        values.feeFixed,
+                                                        fee,
+                                                        "0",
                                                     );
                                                     if (
-                                                        Number.isFinite(n) &&
-                                                        n > 0
+                                                        flipLeftTyped(
+                                                            values.toRate,
+                                                            inverted,
+                                                            nextRate,
+                                                        ) ||
+                                                        flipLeftTyped(
+                                                            values.feeFixed,
+                                                            fee,
+                                                            nextFee,
+                                                        )
                                                     ) {
-                                                        currencyForm.setFieldValue(
-                                                            "toRate",
-                                                            String(1 / n),
+                                                        toast.error(
+                                                            "That amount is too small to convert at this rate, so it was left as typed.",
                                                         );
                                                     }
+                                                    currencyForm.setFieldValue(
+                                                        "toRate",
+                                                        nextRate,
+                                                    );
+                                                    currencyForm.setFieldValue(
+                                                        "feeFixed",
+                                                        nextFee,
+                                                    );
                                                 }}
                                             >
                                                 <ArrowDownUp className="size-4" />

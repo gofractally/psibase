@@ -133,13 +133,15 @@ export function describeEvent(
 
     switch (e.kind) {
         case "path_draw": {
+            // The actor is the path payer on every hop row. Only their own
+            // row is a draw they made; the other side is not a payment.
             const title = you
                 ? `You drew ${qty(e.amount, sym)} on ${other}`
-                : `${actor} paid you ${qty(e.amount, sym)}`;
+                : `Hop draw of ${qty(e.amount, sym)} between you and ${other}`;
             const detail =
                 nettedRaw > 0n
                     ? `Path hop · auto-netted ${qty(e.netted, sym)}`
-                    : `Drew on the credit line · ${other}`;
+                    : "Path hop";
             return { title, detail };
         }
         case "path_pay": {

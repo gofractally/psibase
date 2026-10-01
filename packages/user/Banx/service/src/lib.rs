@@ -1,4 +1,4 @@
-/// Daily compound interest (path-independent closed form).
+/// Daily compound interest (path-independent daily loop, then leftover seconds).
 pub mod interest;
 mod iso4217;
 /// Shared fee / FX integer math (on-chain and path search).

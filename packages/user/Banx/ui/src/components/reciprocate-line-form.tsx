@@ -14,8 +14,8 @@ import {
 import { useSaveContact } from "@/hooks/use-save-contact";
 import { displayAmount } from "@/lib/amount";
 import {
-    daysToGraceSeconds,
     formatGracePeriod,
+    graceSecondsFromFields,
     graceSecondsToPreset,
     ppmToPercent,
     ppmToPercentInput,
@@ -88,6 +88,11 @@ export function ReciprocateLineForm({
         },
         onSubmit: async ({ value }) => {
             if (!skipLine) {
+                const graceSeconds = graceSecondsFromFields(
+                    value.gracePreset,
+                    value.graceDays,
+                );
+                if (graceSeconds === null) return;
                 await setLine.mutateAsync({
                     debtor: terms.inviter,
                     assetId: terms.assetId,
@@ -97,14 +102,7 @@ export function ReciprocateLineForm({
                         value.interestPct,
                         PPM_SCALE,
                     ),
-                    graceSeconds:
-                        value.gracePreset === "none"
-                            ? 0
-                            : daysToGraceSeconds(
-                                  value.gracePreset === "custom"
-                                      ? Number(value.graceDays.trim())
-                                      : Number(value.gracePreset),
-                              ),
+                    graceSeconds,
                 });
                 if (value.allowBook) {
                     await setBookAuth.mutateAsync({
