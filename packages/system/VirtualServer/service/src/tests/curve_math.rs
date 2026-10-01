@@ -56,7 +56,9 @@ fn cost_increases() {
         let amount = (max_capacity / 10).max(1);
 
         let cost_low = c.pos_from_remaining_capacity(remaining_low).cost_of(amount);
-        let cost_high = c.pos_from_remaining_capacity(remaining_high).cost_of(amount);
+        let cost_high = c
+            .pos_from_remaining_capacity(remaining_high)
+            .cost_of(amount);
 
         assert!(
             cost_high > cost_low,
@@ -88,7 +90,8 @@ fn pool_capitalization() {
 
         for remaining_capacity in capacity_checkpoints {
             let pos = c.pos_from_remaining_capacity(remaining_capacity);
-            let xy = (pos.reserves as u128 + c.x0 as u128) * (remaining_capacity as u128 + c.y0 as u128);
+            let xy =
+                (pos.reserves as u128 + c.x0 as u128) * (remaining_capacity as u128 + c.y0 as u128);
             // `X*Y >= k` holds except where reserves is capped at the budget, in
             // which case `X*Y` dips below `k`, which is harmless. Curve is still
             // economically safe.

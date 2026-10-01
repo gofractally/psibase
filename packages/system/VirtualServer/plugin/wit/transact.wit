@@ -5,8 +5,7 @@ interface transact {
 
     /// Fills the specified user's gas tank, if:
     /// * the user is logged-in
-    /// * billing is enabled
-    /// * the system token is transferable (not a private-network token)
+    /// * the network is not private (billing is enabled the system token is not transferable)
     /// * the user is configured for auto-filling
     /// * the user is low enough on resources to need it
     ///

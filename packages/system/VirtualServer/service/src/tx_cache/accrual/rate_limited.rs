@@ -17,12 +17,7 @@ thread_local! {
         RefCell::new(Some(HashMap::new()));
 }
 
-pub fn consume(
-    resource: ResourceType,
-    user: AccountNumber,
-    sub: Option<String>,
-    cost: u64,
-) {
+pub fn consume(resource: ResourceType, user: AccountNumber, sub: Option<String>, cost: u64) {
     if cost == 0 {
         return;
     }

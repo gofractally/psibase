@@ -12,7 +12,8 @@ struct ResourceProviderNode {
     producer: String,
     app: String,
     accepted: Vec<String>,
-    endpoint: String,
+    endpoint: Option<String>,
+    activeInfraProvider: bool,
 }
 
 #[allow(non_snake_case)]
@@ -40,6 +41,7 @@ fn resource_providers(chain: &psibase::Chain) -> Result<Vec<ResourceProviderNode
                         app
                         accepted
                         endpoint
+                        activeInfraProvider
                     }
                 }
             }
@@ -66,7 +68,11 @@ fn register_and_query_resource_provider(chain: psibase::Chain) -> Result<(), psi
     assert_eq!(providers[0].producer, PRODUCER_ACCOUNT.to_string());
     assert_eq!(providers[0].app, "x-portal");
     assert_eq!(providers[0].accepted, vec!["USD", "EUR"]);
-    assert_eq!(providers[0].endpoint, "https://prod.example.com");
+    assert_eq!(
+        providers[0].endpoint.as_deref(),
+        Some("https://prod.example.com")
+    );
+    assert!(providers[0].activeInfraProvider);
 
     // Update (upsert)
     Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
@@ -92,7 +98,7 @@ fn register_and_query_resource_provider(chain: psibase::Chain) -> Result<(), psi
         "only active producers",
     );
 
-    // Inactive producer is filtered from the query but can still unregister
+    // Inactive producer remains in the query with activeInfraProvider=false
     chain.new_account(account!("prod2"))?;
     producers::Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
         .regCandidate("https://prod.example.com".into(), Claim::default())
@@ -119,9 +125,17 @@ fn register_and_query_resource_provider(chain: psibase::Chain) -> Result<(), psi
         !active.contains(&PRODUCER_ACCOUNT),
         "expected producer rotation; still active: {active:?}"
     );
+
+    let providers = resource_providers(&chain)?;
+    assert_eq!(providers.len(), 1);
+    assert_eq!(providers[0].producer, PRODUCER_ACCOUNT.to_string());
     assert!(
-        resource_providers(&chain)?.is_empty(),
-        "inactive producers must be filtered from resourceProviders"
+        !providers[0].activeInfraProvider,
+        "inactive producers must report activeInfraProvider=false"
+    );
+    assert_eq!(
+        providers[0].endpoint.as_deref(),
+        Some("https://prod.example.com")
     );
 
     Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
