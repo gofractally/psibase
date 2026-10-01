@@ -503,6 +503,17 @@ mod service {
                 .collect()
         }
 
+        /// Live path-forward offers. Global covers any next hop who has a line
+        /// to the poster. Expired offers are omitted.
+        async fn networkForwardOffers(&self) -> Vec<ForwardOfferView> {
+            ForwardOfferTab::with_service(banx::SERVICE)
+                .get_index_pk()
+                .iter()
+                .filter(|p| p.is_live())
+                .map(ForwardOfferView::from)
+                .collect()
+        }
+
         /// Credit lines where `account` is creditor and/or debtor.
         /// `limit` / `exposure` are human decimals for the line's asset.
         async fn creditLines(

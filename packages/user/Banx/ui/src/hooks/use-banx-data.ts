@@ -10,6 +10,7 @@ import {
     fetchCashVault,
     fetchCreditLines,
     fetchNetworkLines,
+    fetchNetworkForwardOffers,
     fetchCurrencyPolicies,
     fetchObligations,
     fetchForwardOffers,
@@ -56,6 +57,18 @@ export function useNetworkLines(): UseQueryResult<CreditLine[], Error> {
     return useQuery({
         queryKey: QueryKey.networkLines(),
         queryFn: fetchNetworkLines,
+        enabled: !!user,
+    });
+}
+
+export function useNetworkForwardOffers(): UseQueryResult<
+    ForwardOffer[],
+    Error
+> {
+    const { data: user } = useCurrentUser();
+    return useQuery({
+        queryKey: QueryKey.networkForwardOffers(),
+        queryFn: fetchNetworkForwardOffers,
         enabled: !!user,
     });
 }

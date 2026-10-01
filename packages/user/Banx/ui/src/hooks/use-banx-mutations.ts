@@ -17,6 +17,9 @@ export function useInvalidateLedger() {
         if (!user) return;
         void qc.invalidateQueries({ queryKey: QueryKey.creditLines(user) });
         void qc.invalidateQueries({ queryKey: QueryKey.networkLines() });
+        void qc.invalidateQueries({
+            queryKey: QueryKey.networkForwardOffers(),
+        });
         void qc.invalidateQueries({ queryKey: QueryKey.bookAuths(user) });
         void qc.invalidateQueries({ queryKey: QueryKey.obligations(user) });
         void qc.invalidateQueries({

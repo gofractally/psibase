@@ -202,6 +202,15 @@ export async function fetchNetworkLines(): Promise<CreditLine[]> {
     return zCreditLine.array().parse(data.networkLines);
 }
 
+const forwardOfferFields = `poster nextHop assetId feeFixed feePercentPpm maxLineAprPpm expiresAt isGlobal allowUnknown`;
+
+export async function fetchNetworkForwardOffers(): Promise<ForwardOffer[]> {
+    const data = await gql<{ networkForwardOffers: ForwardOffer[] }>(
+        `{ networkForwardOffers { ${forwardOfferFields} } }`,
+    );
+    return zForwardOffer.array().parse(data.networkForwardOffers);
+}
+
 export async function fetchObligations(account: string): Promise<Obligation[]> {
     const data = await gql<{ obligations: Obligation[] }>(
         `{ obligations(account: "${account}") {
@@ -216,10 +225,7 @@ export async function fetchForwardOffers(
     account: string,
 ): Promise<ForwardOffer[]> {
     const data = await gql<{ forwardOffers: ForwardOffer[] }>(
-        `{ forwardOffers(poster: "${account}") {
-            poster nextHop assetId feeFixed feePercentPpm maxLineAprPpm
-            expiresAt isGlobal allowUnknown
-        } }`,
+        `{ forwardOffers(poster: "${account}") { ${forwardOfferFields} } }`,
     );
     return zForwardOffer.array().parse(data.forwardOffers);
 }

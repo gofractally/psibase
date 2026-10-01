@@ -11,9 +11,14 @@ type ForceGraphHandle = ForceGraphMethods<Record<string, never>, Record<string, 
 
 import { CreditLineDialog } from "@/components/credit-line-dialog";
 import { PageHeader } from "@/components/page-header";
+import { RoutingPolicyDialog } from "@/components/routing-policy-dialog";
+import { TransferDialog } from "@/components/transfer-dialog";
 import { useAssetMap } from "@/hooks/use-assets";
 import { useBanxContacts } from "@/hooks/use-banx-contacts";
-import { useNetworkLines } from "@/hooks/use-banx-data";
+import {
+    useNetworkForwardOffers,
+    useNetworkLines,
+} from "@/hooks/use-banx-data";
 import { accountHref } from "@/lib/account-groups";
 import {
     displayAmount,
@@ -43,6 +48,7 @@ type ThemeColors = {
     received: string;
     both: string;
     other: string;
+    path: string;
     foreground: string;
     ring: string;
 };
@@ -60,6 +66,7 @@ function themeColors(): ThemeColors {
         received: css("--chart-1", "#c2410c"),
         both: css("--chart-4", "#7c3aed"),
         other: css("--muted-foreground", "#737373"),
+        path: css("--chart-5", "#ca8a04"),
         foreground: css("--foreground", "#171717"),
         ring: css("--ring", "#a3a3a3"),
     };
@@ -67,6 +74,100 @@ function themeColors(): ThemeColors {
 
 function nodeRadius(node: { you?: boolean }): number {
     return node.you ? 7 : 4.5;
+}
+
+/** Matches ForceGraph `nodeRelSize`. Arrow inset uses the same radius. */
+const NODE_REL_SIZE = 4;
+const LINK_ARROW = 3.5;
+
+function linkPoint(
+    link: GLink,
+    t: number,
+): { x: number; y: number } | null {
+    const source = endNode(link.source);
+    const target = endNode(link.target);
+    if (!source || !target || source.x == null || target.x == null) return null;
+    const cp = (link as { __controlPoints?: number[] | null }).__controlPoints;
+    if (!cp || cp.length !== 2) {
+        return {
+            x: source.x + (target.x - source.x) * t,
+            y: source.y! + (target.y! - source.y!) * t,
+        };
+    }
+    const mt = 1 - t;
+    return {
+        x: mt * mt * source.x + 2 * mt * t * cp[0]! + t * t * target.x,
+        y: mt * mt * source.y! + 2 * mt * t * cp[1]! + t * t * target.y!,
+    };
+}
+
+function endNode(end: GLink["source"]): GNode | null {
+    if (!end || typeof end !== "object") return null;
+    return end as GNode;
+}
+
+/** Arrow at the source, pointing back at it. The library only draws the target end. */
+function paintSourceArrow(
+    link: GLink,
+    ctx: CanvasRenderingContext2D,
+    color: string,
+) {
+    const samples = 12;
+    const points: { x: number; y: number }[] = [];
+    for (let i = 0; i <= samples; i++) {
+        const point = linkPoint(link, i / samples);
+        if (!point) return;
+        points.push(point);
+    }
+    const lengths: number[] = [];
+    let total = 0;
+    for (let i = 0; i < samples; i++) {
+        const length = Math.hypot(
+            points[i + 1]!.x - points[i]!.x,
+            points[i + 1]!.y - points[i]!.y,
+        );
+        lengths.push(length);
+        total += length;
+    }
+    const headDist = NODE_REL_SIZE;
+    const tailDist = NODE_REL_SIZE + LINK_ARROW;
+    if (total <= tailDist + NODE_REL_SIZE) return;
+    const at = (distance: number) => {
+        let left = distance;
+        for (let i = 0; i < samples; i++) {
+            const span = lengths[i]!;
+            if (left <= span || i === samples - 1) {
+                const start = points[i]!;
+                const end = points[i + 1]!;
+                const t = span === 0 ? 0 : Math.min(1, left / span);
+                return {
+                    x: start.x + (end.x - start.x) * t,
+                    y: start.y + (end.y - start.y) * t,
+                };
+            }
+            left -= span;
+        }
+        return points[0]!;
+    };
+    const head = at(headDist);
+    const tail = at(tailDist);
+    const notch = at(NODE_REL_SIZE + LINK_ARROW * 0.8);
+    const angle =
+        Math.atan2(head.y - tail.y, head.x - tail.x) - Math.PI / 2;
+    const half = LINK_ARROW / 1.6 / 2;
+    ctx.beginPath();
+    ctx.moveTo(head.x, head.y);
+    ctx.lineTo(
+        tail.x + half * Math.cos(angle),
+        tail.y + half * Math.sin(angle),
+    );
+    ctx.lineTo(notch.x, notch.y);
+    ctx.lineTo(
+        tail.x - half * Math.cos(angle),
+        tail.y - half * Math.sin(angle),
+    );
+    ctx.fillStyle = color;
+    ctx.fill();
 }
 
 type DragOrigin = { x: number; y: number; fx?: number; fy?: number };
@@ -235,6 +336,9 @@ function AccountPanel({
     precisionOf,
     visibleIds,
     onSelect,
+    forwardingCount,
+    onForwarding,
+    onTransfer,
 }: {
     account: string;
     user: string | undefined;
@@ -244,6 +348,9 @@ function AccountPanel({
     precisionOf: (id: number) => number;
     visibleIds: ReadonlySet<string>;
     onSelect: (account: string) => void;
+    forwardingCount: number;
+    onForwarding: () => void;
+    onTransfer: () => void;
 }) {
     const you = account === user;
     const extended = lines.filter(
@@ -282,12 +389,41 @@ function AccountPanel({
                     </p>
                 </div>
             </div>
-            <Button asChild variant="outline" size="sm" className="w-fit">
-                <Link to={accountHref(account)}>Open account</Link>
-            </Button>
+            <div className="flex flex-wrap gap-2">
+                {you ? null : (
+                    <Button
+                        type="button"
+                        size="sm"
+                        className="w-fit"
+                        onClick={onTransfer}
+                    >
+                        Transfer
+                    </Button>
+                )}
+                <Button asChild variant="outline" size="sm" className="w-fit">
+                    <Link to={accountHref(account)}>Open account</Link>
+                </Button>
+            </div>
 
             {you ? (
-                <YouSummary lines={lines} user={user} />
+                <>
+                    <YouSummary
+                        lines={lines}
+                        user={user}
+                        forwardingCount={forwardingCount}
+                    />
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-fit"
+                        onClick={onForwarding}
+                    >
+                        {forwardingCount > 0
+                            ? "Edit path forwarding"
+                            : "Turn on path forwarding"}
+                    </Button>
+                </>
             ) : (
                 <>
                     <section className="space-y-2">
@@ -364,9 +500,11 @@ function AccountPanel({
 function YouSummary({
     lines,
     user,
+    forwardingCount,
 }: {
     lines: CreditLine[];
     user: string | undefined;
+    forwardingCount: number;
 }) {
     const extended = new Set<string>();
     const received = new Set<string>();
@@ -374,12 +512,18 @@ function YouSummary({
         if (line.creditor === user) extended.add(line.debtor);
         if (line.debtor === user) received.add(line.creditor);
     }
+    const forwarding =
+        forwardingCount === 0
+            ? "Global path forwarding is off."
+            : `Global path forwarding is on for ${forwardingCount} ${
+                  forwardingCount === 1 ? "currency" : "currencies"
+              }.`;
     return (
         <p className="text-muted-foreground text-sm">
             You have extended lines to {extended.size}{" "}
             {extended.size === 1 ? "account" : "accounts"}. {received.size}{" "}
             {received.size === 1 ? "account has" : "accounts have"} extended
-            you a line.
+            you a line. {forwarding}
         </p>
     );
 }
@@ -389,11 +533,16 @@ export function NetworkPage() {
     const { assets, symbolOf, precisionOf, byId } = useAssetMap();
     const {
         data: lines = [],
-        isLoading,
+        isLoading: linesLoading,
         isError,
     } = useNetworkLines();
+    const { data: offers = [], isLoading: offersLoading } =
+        useNetworkForwardOffers();
+    const isLoading = linesLoading || offersLoading;
     const [assetId, setAssetId] = useState<number | "all">("all");
     const [selected, setSelected] = useState<string | null>(null);
+    const [forwardingOpen, setForwardingOpen] = useState(false);
+    const [transferPayee, setTransferPayee] = useState<string | null>(null);
     const [hover, setHover] = useState<string | null>(null);
     const [offer, setOffer] = useState<{
         debtor: string;
@@ -417,6 +566,10 @@ export function NetworkPage() {
     // A finished drag still emits a click on the next frame.
     const swallowClick = useRef(false);
     const hitLabels = useRef<(id: string) => boolean>(() => false);
+    const userRef = useRef(user);
+    userRef.current = user;
+    // A shaky click on You starts a node drag. Finish it as forwarding settings.
+    const openForwardAfterDrag = useRef(false);
     if (typeof document !== "undefined") colorsRef.current = themeColors();
     const assetShown = useRef(assetId);
     if (assetShown.current !== assetId) {
@@ -439,11 +592,35 @@ export function NetworkPage() {
                 : lines.filter((line) => line.assetId === assetId),
         [lines, assetId],
     );
+    const visibleOffers = useMemo(
+        () =>
+            assetId === "all"
+                ? offers
+                : offers.filter((offer) => offer.assetId === assetId),
+        [offers, assetId],
+    );
 
     const graph = useMemo(
-        () => buildNetworkGraph(visibleLines, user ?? undefined, label),
-        [visibleLines, user, label],
+        () =>
+            buildNetworkGraph(
+                visibleLines,
+                visibleOffers,
+                user ?? undefined,
+                label,
+            ),
+        [visibleLines, visibleOffers, user, label],
     );
+    const myForwarding = useMemo(
+        () =>
+            offers.filter((offer) => offer.isGlobal && offer.poster === user)
+                .length,
+        [offers, user],
+    );
+    const transferPrefill = useMemo(() => {
+        if (!transferPayee) return null;
+        const asset = assetId === "all" ? undefined : assetId;
+        return { payee: transferPayee, fromAsset: asset, toAsset: asset };
+    }, [transferPayee, assetId]);
     const visibleIds = useMemo(
         () => new Set(graph.nodes.map((node) => node.id)),
         [graph.nodes],
@@ -570,8 +747,10 @@ export function NetworkPage() {
 
     const linkColor = useCallback((link: GLink) => {
         const colors = colorsRef.current ?? themeColors();
+        if (link.extended && link.received) return colors.both;
         if (link.extended) return colors.extended;
         if (link.received) return colors.received;
+        if (link.path) return colors.path;
         return colors.other;
     }, []);
 
@@ -594,7 +773,6 @@ export function NetworkPage() {
             // A drag repositions a node or draws a credit line. Those already
             // choose the account. A click has to, because the graph treats any
             // mouse movement as a pan and then drops the click.
-            if (moved > 8 || swallowClick.current || linkDrag.current) return;
             const canvas = frame.querySelector("canvas");
             const api = fgRef.current;
             if (!canvas || !api) return;
@@ -610,7 +788,14 @@ export function NetworkPage() {
                 api.zoom() || 1,
                 (account) => hitLabels.current(account),
             );
+            const youClick = !!id && id === userRef.current;
+            if (moved > 8) return;
+            if (swallowClick.current || linkDrag.current) {
+                if (youClick) openForwardAfterDrag.current = true;
+                return;
+            }
             setSelected(id);
+            if (youClick) setForwardingOpen(true);
         };
         frame.addEventListener("pointerdown", onDown, true);
         frame.addEventListener("pointerup", onUp, true);
@@ -702,8 +887,28 @@ export function NetworkPage() {
     const onYouDragEnd = (raw: GNode) => {
         const id = String(raw.id ?? "");
         const draft = linkDrag.current;
+        const openForward = openForwardAfterDrag.current;
+        openForwardAfterDrag.current = false;
         // A small pointer move is still a click. Node drag eats that click,
         // so the account is focused here unless this was a line dropped on someone.
+        if (openForward) {
+            if (draft) {
+                for (const pinned of draft.pinned) {
+                    pinned.node.fx = pinned.fx;
+                    pinned.node.fy = pinned.fy;
+                }
+                linkDrag.current = null;
+            }
+            setHover(null);
+            if (id) setSelected(id);
+            setForwardingOpen(true);
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    swallowClick.current = false;
+                });
+            });
+            return;
+        }
         if (!raw.you || !draft) {
             if (id) setSelected(id);
             requestAnimationFrame(() => {
@@ -737,7 +942,7 @@ export function NetworkPage() {
         <div className="flex min-h-0 flex-1 flex-col">
             <PageHeader
                 title="Network"
-                description="Every credit line. The arrow points at the account that can draw. Drag from you onto someone to offer them a line."
+                description="Solid lines are credit and point at who can draw. Arrows at both ends mean credit runs both ways. A dashed stroke on that line is path forwarding. Click You to edit path forwarding."
                 action={
                     assetIds.length > 1 ? (
                         <select
@@ -769,7 +974,7 @@ export function NetworkPage() {
                         <p className="text-destructive p-4 text-sm">
                             Could not load the network.
                         </p>
-                    ) : visibleLines.length === 0 ? (
+                    ) : !user && visibleLines.length === 0 ? (
                         <p className="text-muted-foreground p-4 text-sm">
                             No credit lines
                             {assetId === "all" ? " on the network" : " in this currency"}{" "}
@@ -784,18 +989,36 @@ export function NetworkPage() {
                             backgroundColor="rgba(0,0,0,0)"
                             nodeId="id"
                             nodeLabel="label"
-                            nodeRelSize={4}
+                            nodeRelSize={NODE_REL_SIZE}
                             linkCurvature="curve"
                             linkWidth={(link) =>
-                                link.extended || link.received ? 1.6 : 0.65
+                                link.path
+                                    ? 1.1
+                                    : link.extended || link.received
+                                      ? 1.7
+                                      : 1.5
+                            }
+                            linkLineDash={(link) =>
+                                link.path ? [2, 3.5] : null
                             }
                             linkColor={linkColor}
-                            linkDirectionalArrowLength={3.5}
+                            linkDirectionalArrowLength={(link) =>
+                                link.path ? 0 : LINK_ARROW
+                            }
                             linkDirectionalArrowRelPos={1}
                             linkDirectionalArrowColor={linkColor}
                             linkDirectionalParticles={(link) =>
-                                link.extended || link.received ? 2 : 0
+                                !link.both && (link.extended || link.received)
+                                    ? 2
+                                    : 0
                             }
+                            linkCanvasObjectMode={(link) =>
+                                link.both ? "after" : undefined
+                            }
+                            linkCanvasObject={(link, ctx) => {
+                                if (!link.both) return;
+                                paintSourceArrow(link, ctx, linkColor(link));
+                            }}
                             linkDirectionalParticleWidth={1.6}
                             linkDirectionalParticleSpeed={0.004}
                             linkDirectionalParticleColor={linkColor}
@@ -830,11 +1053,20 @@ export function NetworkPage() {
                         />
                     ) : null}
                     </div>
-                    {visibleLines.length > 0 ? (
+                    {(user || visibleLines.length > 0) && !isLoading && !isError ? (
                         <>
                             <div className="bg-card/90 pointer-events-none absolute top-3 left-3 rounded-md border px-2.5 py-2 text-xs shadow-sm">
                                 <Legend />
                             </div>
+                            {visibleLines.length === 0 ? (
+                                <p className="text-muted-foreground pointer-events-none absolute bottom-3 left-3 max-w-xs text-sm">
+                                    No credit lines
+                                    {assetId === "all"
+                                        ? " on the network"
+                                        : " in this currency"}{" "}
+                                    yet. Click You to set path forwarding.
+                                </p>
+                            ) : null}
                             <Button
                                 type="button"
                                 size="sm"
@@ -866,6 +1098,9 @@ export function NetworkPage() {
                                 precisionOf={precisionOf}
                                 visibleIds={visibleIds}
                                 onSelect={setSelected}
+                                forwardingCount={myForwarding}
+                                onForwarding={() => setForwardingOpen(true)}
+                                onTransfer={() => setTransferPayee(selected)}
                             />
                         </div>
                     ) : null}
@@ -881,6 +1116,19 @@ export function NetworkPage() {
                 editing={offer?.editing ?? null}
                 prefillDebtor={offer?.debtor}
                 assetId={offer?.assetId}
+            />
+            <RoutingPolicyDialog
+                open={forwardingOpen}
+                onOpenChange={setForwardingOpen}
+                assets={assets}
+                prefill={assetId === "all" ? null : { assetId }}
+            />
+            <TransferDialog
+                open={transferPayee !== null}
+                onOpenChange={(open) => {
+                    if (!open) setTransferPayee(null);
+                }}
+                prefill={transferPrefill}
             />
         </div>
     );
@@ -903,9 +1151,14 @@ function Legend() {
                         {text}
                     </li>
                 ))}
+                <li className="flex items-center gap-2">
+                    <span className="border-chart-5 w-4 border-t border-dashed" />
+                    Path forwarding
+                </li>
             </ul>
             <p className="text-muted-foreground mt-1.5 max-w-44 leading-snug">
-                Drag You onto an account to offer a line.
+                Solid is a credit line. Arrows at both ends mean credit both
+                ways. Drag You onto an account to offer a line.
             </p>
         </>
     );
