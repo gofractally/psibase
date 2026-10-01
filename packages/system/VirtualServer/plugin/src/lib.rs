@@ -242,7 +242,6 @@ impl TransactInterface for VirtualServerPlugin {
             return Ok(());
         }
 
-        // Private networks: users do not hold transferable system tokens themselves.
         if query::is_private_network()? {
             return Ok(());
         }

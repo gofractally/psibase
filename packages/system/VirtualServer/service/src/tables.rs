@@ -227,9 +227,11 @@ pub mod tables {
     #[table(name = "ResourceProviderTable", index = 8)]
     #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject, Clone)]
     #[serde(rename_all = "camelCase")]
+    #[graphql(complex)]
     pub struct ResourceProvider {
         /// Producer account that provides resources
         #[primary_key]
+        #[graphql(name = "producer")]
         pub provider: AccountNumber,
 
         /// Node-local app account (must start with `x-`) that accepts payments
