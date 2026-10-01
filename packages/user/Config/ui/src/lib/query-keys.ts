@@ -17,6 +17,7 @@ const QueryKey = {
     virtualServer: () => ["virtualServer"] as const,
     virtualServerPricing: () => ["virtualServer", "pricing"] as const,
     virtualServerResources: () => ["virtualServer", "resources"] as const,
+    resourceProviders: () => ["virtualServer", "resourceProviders"] as const,
     nameMarketParams: () => ["nameMarkets", "params"] as const,
 } as const satisfies Record<string, QueryKeyGenerator>;
 
