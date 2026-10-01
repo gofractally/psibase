@@ -276,6 +276,51 @@ class TestHostDb(unittest.TestCase):
             self.assertEqual(reply.status_code, 403)
 
     @testutil.psinode_test
+    def test_gc_spares_active_devices(self, cluster):
+        (a,) = cluster.complete(*testutil.generate_names(1))
+        a.boot(packages=['Minimal', 'Explorer', 'HostDb'])
+        origin = supervisor_origin(a.hostname)
+        api = a.new_api()
+
+        def headers(device=None):
+            result = {'Origin': origin}
+            if device is not None:
+                result['Cookie'] = cookie_header(device)
+            return result
+
+        def put(device, keys, value):
+            with api.post(
+                '/kv/batch',
+                service='hostdb',
+                json={'ops': [
+                    {'duration': 'persistent', 'key': key, 'value': b64url(value)}
+                    for key in keys
+                ]},
+                headers=headers(device),
+            ) as reply:
+                self.assertEqual(reply.status_code, 204)
+                device = set_cookies(reply)['__Host-HOSTDB-DEVICE'][0]
+            api.session.cookies.clear()
+            return device
+
+        def get(device, key):
+            with api.get(f'/kv/persistent/{key}', service='hostdb', headers=headers(device)) as reply:
+                self.assertEqual(reply.status_code, 200)
+                content = reply.content
+            api.session.cookies.clear()
+            return content
+
+        fresh_keys = [hex_key(n) for n in range(20)]
+        fresh = put(None, fresh_keys, b'fresh')
+        other = put(None, [hex_key(100)], b'other')
+        put(other, [hex_key(101)], b'other')
+
+        for key in fresh_keys:
+            self.assertEqual(get(fresh, key), b'fresh')
+        self.assertEqual(get(other, hex_key(100)), b'other')
+        self.assertEqual(get(other, hex_key(101)), b'other')
+
+    @testutil.psinode_test
     def test_session(self, cluster):
         (a,) = cluster.complete(*testutil.generate_names(1))
         a.boot(packages=['Minimal', 'Explorer', 'HostDb'])
