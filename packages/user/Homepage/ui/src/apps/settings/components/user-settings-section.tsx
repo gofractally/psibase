@@ -14,19 +14,26 @@ import {
 import { useUserResources } from "../hooks/use-user-resources";
 import { GasTank } from "./gas-tank";
 
-export const UserSettingsSection = () => {
+interface UserSettingsSectionProps {
+    /** When true, show the meter but disable refill/resize (private network). */
+    readOnly?: boolean;
+}
+
+export const UserSettingsSection = ({
+    readOnly = false,
+}: UserSettingsSectionProps) => {
     const { data: currentUser } = useCurrentUser();
     const { data: billingConfig, isLoading: isLoadingBillingConfig } =
         useBillingConfig();
-    const billingInited =
-        !isLoadingBillingConfig && !!billingConfig?.feeReceiver;
+    const billingEnabled =
+        !isLoadingBillingConfig && !!billingConfig?.enabled;
     const { data: systemToken, isLoading: isLoadingToken } = useSystemToken();
     const {
         data: userResources,
         isLoading: isLoadingResources,
         isError: isUserResourcesError,
         error: userResourcesError,
-    } = useUserResources(currentUser, { enabled: billingInited });
+    } = useUserResources(currentUser, { enabled: billingEnabled });
     const { mutateAsync: fillGasTank, isPending: isFilling } = useFillGasTank();
     const {
         mutateAsync: resizeAndFillGasTank,
@@ -82,12 +89,19 @@ export const UserSettingsSection = () => {
         }
     };
 
-    const isDisabled = !billingInited || isPending || isLoadingResources;
+    const isDisabled =
+        readOnly || !billingEnabled || isPending || isLoadingResources;
 
     return (
         <div className="space-y-6">
             <div>
                 <h2 className="mb-2 text-2xl font-bold">Resources</h2>
+                {readOnly && (
+                    <p className="text-muted-foreground text-sm">
+                        Resource self-service isn&apos;t available on this
+                        network. Purchase resources from a provider.
+                    </p>
+                )}
             </div>
 
             <div className="flex items-stretch gap-6">
