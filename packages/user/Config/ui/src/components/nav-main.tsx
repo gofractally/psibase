@@ -1,6 +1,7 @@
 import {
     DollarSign,
     FolderUp,
+    Handshake,
     ListTodo,
     type LucideIcon,
     Package,
@@ -56,6 +57,11 @@ export const appMenus: Menu[] = [
         title: "Resource Pricing",
         icon: DollarSign,
         path: "resource-pricing",
+    },
+    {
+        title: "Resource providers",
+        icon: Handshake,
+        path: "resource-providers",
     },
     {
         title: "Account Marketplace",
