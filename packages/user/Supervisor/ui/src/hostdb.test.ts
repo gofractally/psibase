@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { bytesToBase64Url } from "@psibase/common-lib";
 
 import { HttpResponse } from "./host-interface";
-import { HostDb, KEEPALIVE_BODY_LIMIT } from "./hostdb";
+import { HostDb, KEEPALIVE_BODY_LIMIT, sha256Hex } from "./hostdb";
 
 const HEX_KEY = "a".repeat(64);
 const PLAINTEXT_KEY = "non-trx:accounts:contacts:alice";
@@ -18,13 +18,6 @@ function makeValue(size: number): Uint8Array {
 
 function httpNotFound(): HttpResponse {
     return { status: 404, headers: [], body: null };
-}
-
-async function sha256Hex(bytes: Uint8Array): Promise<string> {
-    const digest = await crypto.subtle.digest("SHA-256", bytes);
-    return [...new Uint8Array(digest)]
-        .map((byte) => byte.toString(16).padStart(2, "0"))
-        .join("");
 }
 
 function httpOkBytes(value: Uint8Array): HttpResponse {
