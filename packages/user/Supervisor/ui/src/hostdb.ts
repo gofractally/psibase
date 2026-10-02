@@ -68,18 +68,29 @@ function hostDbError(message: string): RecoverableErrorPayload {
 
 // The `supervisor:bridge/database` store for one entry point, backed by the
 //   `hostdb` service. Reads are cached; writes update the cache and are queued
-//   until `flush`. `clear` must be called at the start of every entry point.
+//   until `flush`.
 export class HostDb {
     private cache = new Map<string, Uint8Array | null>();
 
-    // Keys known absent from the node (404). Survives `clear` for this profile.
+    // Keys known absent from the node (404).
     private negativeCache = new Set<string>();
 
     private queue: BatchOp[] = [];
 
+    // Drops in-memory read caches and any queued writes not yet flushed.
     clear(): void {
         this.cache.clear();
+        this.negativeCache.clear();
         this.queue = [];
+    }
+
+    // Flushes queued writes, then drops read caches even when flush fails.
+    async flushAndClear(): Promise<void> {
+        try {
+            await this.flush();
+        } finally {
+            this.clear();
+        }
     }
 
     // `send` is the synchronous request path. Throws on any response other

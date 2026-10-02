@@ -210,7 +210,7 @@ export class Supervisor implements AppInterface {
         txSubmitted: boolean,
     ) {
         try {
-            await this.hostDb.flush();
+            await this.hostDb.flushAndClear();
         } catch (e) {
             const detail = e instanceof Error ? e.message : String(e);
             result = new PluginErrorObject(
@@ -421,7 +421,6 @@ export class Supervisor implements AppInterface {
 
     // This is an entrypoint that returns the JSON interface for a plugin.
     async getJson(callerOrigin: string, id: string, plugin: QualifiedPluginId) {
-        this.hostDb.clear();
         let result: unknown;
         try {
             await networkNamePromise;
@@ -447,7 +446,6 @@ export class Supervisor implements AppInterface {
         id: string,
         plugins: QualifiedPluginId[],
     ) {
-        this.hostDb.clear();
         let result: unknown = null;
         try {
             await networkNamePromise;
@@ -468,7 +466,6 @@ export class Supervisor implements AppInterface {
         id: string,
         args: QualifiedFunctionCallArgs,
     ): Promise<any> {
-        this.hostDb.clear();
         let result: any;
         let txSubmitted = false;
         try {

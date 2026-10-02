@@ -26,8 +26,20 @@ function httpOkBytes(value: Uint8Array): HttpResponse {
     };
 }
 
+describe("HostDb cache", () => {
+    it("get after set hits positive cache without a network request", () => {
+        const db = new HostDb();
+        const value = makeValue(8);
+        const send = vi.fn(() => httpNotFound());
+
+        db.set(0, HEX_KEY, value);
+        expect(db.get(0, HEX_KEY, PLAINTEXT_KEY, send)).toEqual(value);
+        expect(send).not.toHaveBeenCalled();
+    });
+});
+
 describe("HostDb negative cache", () => {
-    it("returns null after clear without a second network request", () => {
+    it("clear resets negative cache so a subsequent get refetches", () => {
         const db = new HostDb();
         const send = vi.fn(() => httpNotFound());
 
@@ -37,10 +49,10 @@ describe("HostDb negative cache", () => {
         db.clear();
 
         expect(db.get(0, HEX_KEY, PLAINTEXT_KEY, send)).toBeNull();
-        expect(send).toHaveBeenCalledTimes(1);
+        expect(send).toHaveBeenCalledTimes(2);
     });
 
-    it("set invalidates negative cache so get after clear reads the written value", () => {
+    it("get after clear refetches from the node and returns the stored value", () => {
         const db = new HostDb();
         const value = makeValue(8);
         const send = vi.fn((): HttpResponse => {
@@ -51,7 +63,6 @@ describe("HostDb negative cache", () => {
         });
 
         expect(db.get(0, HEX_KEY, PLAINTEXT_KEY, send)).toBeNull();
-        db.set(0, HEX_KEY, value);
         db.clear();
 
         expect(db.get(0, HEX_KEY, PLAINTEXT_KEY, send)).toEqual(value);
@@ -77,9 +88,6 @@ describe("HostDb negative cache", () => {
             }),
         );
 
-        db.clear();
-        expect(db.get(0, HEX_KEY, PLAINTEXT_KEY, send)).toBeNull();
-        expect(info).toHaveBeenCalledTimes(1);
         info.mockRestore();
     });
 });
@@ -139,5 +147,18 @@ describe("HostDb flush", () => {
         const init = fetchMock.mock.calls[0][1] as RequestInit;
         expect(init.keepalive).toBeUndefined();
         expect((init.body as string).length).toBeGreaterThan(64 * 1024);
+    });
+
+    it("flushAndClear clears caches when flush fails", async () => {
+        fetchMock.mockRejectedValueOnce(new Error("network error"));
+        const db = new HostDb();
+        const value = makeValue(8);
+        const send = vi.fn(() => httpNotFound());
+
+        db.set(0, HEX_KEY, value);
+        await expect(db.flushAndClear()).rejects.toThrow("network error");
+
+        expect(db.get(0, HEX_KEY, PLAINTEXT_KEY, send)).toBeNull();
+        expect(send).toHaveBeenCalledTimes(1);
     });
 });
