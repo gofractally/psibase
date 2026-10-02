@@ -1,26 +1,16 @@
-#[cfg(target_arch = "wasm32")]
 mod aead;
 #[allow(warnings)]
 mod bindings;
 
-#[cfg(target_arch = "wasm32")]
 use aead::{decrypt, encrypt};
-#[cfg(target_arch = "wasm32")]
 use aes_gcm::{Aes128Gcm, Aes256Gcm};
-#[cfg(target_arch = "wasm32")]
 use bindings::*;
-#[cfg(target_arch = "wasm32")]
 use exports::aes::plugin::types as AesTypes;
-#[cfg(target_arch = "wasm32")]
 use exports::aes::plugin::with_key::Guest as WithKey;
-#[cfg(target_arch = "wasm32")]
 use exports::aes::plugin::with_password::Guest as WithPassword;
-#[cfg(target_arch = "wasm32")]
 use host::types::types::{Error, PluginId};
-#[cfg(target_arch = "wasm32")]
 use kdf::plugin::api as Kdf;
 
-#[cfg(target_arch = "wasm32")]
 fn decrypt_error() -> Error {
     Error {
         code: 0,
@@ -32,10 +22,8 @@ fn decrypt_error() -> Error {
     }
 }
 
-#[cfg(target_arch = "wasm32")]
 struct AesPlugin;
 
-#[cfg(target_arch = "wasm32")]
 impl WithKey for AesPlugin {
     fn encrypt(key: AesTypes::Key, data: Vec<u8>, associated_data: Vec<u8>) -> Vec<u8> {
         match key.strength {
@@ -65,7 +53,6 @@ impl WithKey for AesPlugin {
     }
 }
 
-#[cfg(target_arch = "wasm32")]
 impl WithPassword for AesPlugin {
     fn encrypt(password: Vec<u8>, data: Vec<u8>, salt: String) -> Vec<u8> {
         let aes_key = Kdf::derive_key(Kdf::Keytype::Aes, &password, &salt);
@@ -78,5 +65,4 @@ impl WithPassword for AesPlugin {
     }
 }
 
-#[cfg(target_arch = "wasm32")]
 bindings::export!(AesPlugin with_types_in bindings);
