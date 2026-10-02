@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { HttpResponse } from "./host-interface";
-import { HostDb } from "./hostdb";
+import { HostDb, KEEPALIVE_BODY_LIMIT } from "./hostdb";
 
 const HEX_KEY = "a".repeat(64);
 const PLAINTEXT_KEY = "non-trx:accounts:contacts:alice";
@@ -104,7 +104,21 @@ describe("HostDb flush", () => {
         vi.unstubAllGlobals();
     });
 
-    it("splits large queues into multiple batches with keepalive only on the last", async () => {
+    it("issues one POST with keepalive for a small queue", async () => {
+        const db = new HostDb();
+        db.set(0, HEX_KEY, makeValue(8));
+
+        await db.flush();
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        const init = fetchMock.mock.calls[0][1] as RequestInit;
+        expect(init.keepalive).toBe(true);
+        expect((init.body as string).length).toBeLessThanOrEqual(
+            KEEPALIVE_BODY_LIMIT,
+        );
+    });
+
+    it("issues one POST and omits keepalive over the limit", async () => {
         const db = new HostDb();
         const valueSize = 2000;
         const numOps = 40;
@@ -114,39 +128,12 @@ describe("HostDb flush", () => {
 
         await db.flush();
 
-        expect(fetchMock.mock.calls.length).toBeGreaterThan(1);
-
-        const batchCalls = fetchMock.mock.calls.filter(
-            (call) =>
-                typeof call[0] === "string" &&
-                call[0].includes("/kv/batch"),
-        );
-        expect(batchCalls.length).toBeGreaterThan(1);
-
-        for (let i = 0; i < batchCalls.length; i++) {
-            const init = batchCalls[i][1] as RequestInit;
-            const isLast = i === batchCalls.length - 1;
-            if (isLast) {
-                expect(init.keepalive).toBe(true);
-            } else {
-                expect(init.keepalive).toBeUndefined();
-            }
-            const body = init.body as string;
-            expect(body.length).toBeLessThanOrEqual(64 * 1024);
-        }
-    });
-
-    it("flushes a single op near the service max value", async () => {
-        const db = new HostDb();
-        // 100 KB plaintext + 12-byte nonce + 16-byte GCM tag.
-        db.set(0, HEX_KEY, makeValue(100 * 1024 + 28));
-
-        await db.flush();
-
         expect(fetchMock).toHaveBeenCalledTimes(1);
         const init = fetchMock.mock.calls[0][1] as RequestInit;
         expect(init.keepalive).toBeUndefined();
-        expect((init.body as string).length).toBeGreaterThan(64 * 1024);
+        expect((init.body as string).length).toBeGreaterThan(
+            KEEPALIVE_BODY_LIMIT,
+        );
     });
 
     it("flushAndClear clears caches when flush fails", async () => {
