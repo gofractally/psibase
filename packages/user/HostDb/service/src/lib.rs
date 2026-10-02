@@ -82,6 +82,7 @@ mod service {
     use psibase::services::http_server::Wrapper as HttpServer;
     use psibase::*;
     use serde::Deserialize;
+    use std::str::FromStr;
 
     const DEVICE_COOKIE: &str = "__Host-HOSTDB-DEVICE";
     const SESSION_COOKIE: &str = "__Host-HOSTDB-SESSION";
@@ -146,7 +147,7 @@ mod service {
             return Some(status_reply(403));
         };
 
-        let device = match cookie_id(&request, DEVICE_COOKIE, ID_LEN) {
+        let device = match cookie_id(&request, DEVICE_COOKIE) {
             CookieValue::Id(id) => Some(id),
             CookieValue::Missing => Some(mint_id()),
             CookieValue::Malformed => None,
@@ -223,7 +224,7 @@ mod service {
         key: &str,
         lookup: impl FnOnce(&[u8]) -> Option<Vec<u8>>,
     ) -> Result<(u16, Option<Vec<u8>>), u16> {
-        let key = decode_fixed_hex(key, KEY_LEN).ok_or(400u16)?;
+        let key = decode_fixed_hex::<KEY_LEN>(key).ok_or(400u16)?;
         let value = lookup(&key);
         Ok(value.map_or((404, None), |body| (200, Some(body))))
     }
@@ -330,7 +331,7 @@ mod service {
         Malformed,
     }
 
-    fn cookie_id(request: &HttpRequest, name: &str, byte_len: usize) -> CookieValue {
+    fn cookie_id(request: &HttpRequest, name: &str) -> CookieValue {
         let mut found = None;
         for part in request.cookies() {
             match part {
@@ -349,7 +350,7 @@ mod service {
         }
         match found {
             None => CookieValue::Missing,
-            Some(value) => match decode_fixed_hex(value, byte_len) {
+            Some(value) => match decode_fixed_hex::<ID_LEN>(value) {
                 Some(id) => CookieValue::Id(id),
                 None => CookieValue::Malformed,
             },
@@ -359,7 +360,7 @@ mod service {
     /// Session id for a session read or write. `None` when the cookie is present
     /// and malformed; a missing cookie starts an empty session.
     fn session_id(request: &HttpRequest) -> Option<Vec<u8>> {
-        match cookie_id(request, SESSION_COOKIE, ID_LEN) {
+        match cookie_id(request, SESSION_COOKIE) {
             CookieValue::Id(id) => Some(id),
             CookieValue::Missing => Some(mint_id()),
             CookieValue::Malformed => None,
@@ -448,7 +449,7 @@ mod service {
         let body: BatchBody = serde_json::from_slice(body).ok()?;
         let mut changes = Vec::with_capacity(body.ops.len());
         for op in body.ops {
-            let key = decode_fixed_hex(&op.key, KEY_LEN)?;
+            let key = decode_fixed_hex::<KEY_LEN>(&op.key)?;
             let value = match op.value {
                 None => None,
                 Some(value) => {
@@ -468,26 +469,10 @@ mod service {
         Some(changes)
     }
 
-    fn decode_fixed_hex(input: &str, byte_len: usize) -> Option<Vec<u8>> {
-        if input.len() != byte_len * 2 {
-            return None;
-        }
-        let bytes = input.as_bytes();
-        let mut out = Vec::with_capacity(byte_len);
-        for i in (0..bytes.len()).step_by(2) {
-            let hi = hex_val(bytes[i])?;
-            let lo = hex_val(bytes[i + 1])?;
-            out.push((hi << 4) | lo);
-        }
-        Some(out)
-    }
-
-    fn hex_val(byte: u8) -> Option<u8> {
-        match byte {
-            b'0'..=b'9' => Some(byte - b'0'),
-            b'a'..=b'f' => Some(byte - b'a' + 10),
-            _ => None,
-        }
+    fn decode_fixed_hex<const N: usize>(input: &str) -> Option<Vec<u8>> {
+        Hex::<[u8; N]>::from_str(input)
+            .ok()
+            .map(|hex| hex.0.to_vec())
     }
 
     /// Cookie values are lowercase hex.
@@ -549,6 +534,22 @@ mod service {
             contentType: content_type.to_string(),
             body: body.unwrap_or_default().into(),
             headers,
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use std::str::FromStr;
+
+        #[test]
+        fn uppercase_hex_decodes() {
+            let bytes = [0xab; KEY_LEN];
+            let upper = Hex(bytes).to_string();
+            let lower = upper.to_ascii_lowercase();
+            let expected = bytes.to_vec();
+            assert_eq!(decode_fixed_hex::<KEY_LEN>(&upper), Some(expected.clone()));
+            assert_eq!(decode_fixed_hex::<KEY_LEN>(&lower), Some(expected));
         }
     }
 }
