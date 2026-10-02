@@ -7,7 +7,6 @@ publish.workspace = true
 
 [dependencies]
 wit-bindgen-rt.workspace = true
-aes-aead = { path = "../aead" }
 aes-gcm = "0.10.3"
 psibase-plugin-workspace-hack.workspace = true
 
