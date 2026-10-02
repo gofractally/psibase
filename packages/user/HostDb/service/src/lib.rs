@@ -1,7 +1,10 @@
-//! `host:db` storage on `hostdb.{root}`.
+//! Node-local key-value store for supervisor `host:db` data.
 //!
-//! Persistent and session key-value rows are scoped to the `__Host-HOSTDB-DEVICE`
-//! cookie; session rows also use the `__Host-HOSTDB-SESSION` cookie.
+//! Persistent rows are device-scoped and expire after ~400 days of idle time;
+//! they are not origin-scoped Web Storage.
+//!
+//! Session rows are keyed by the session cookie and expire after 7 days of idle
+//! time.
 #[psibase::service_tables]
 mod tables {
     use psibase::{Pack, ToSchema, Unpack};
