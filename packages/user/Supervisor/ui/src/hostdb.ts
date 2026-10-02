@@ -1,6 +1,5 @@
-import { siblingUrl } from "@psibase/common-lib";
+import { bytesToBase64Url, siblingUrl } from "@psibase/common-lib";
 
-import { bytesToBase64Url } from "./client-key";
 import { HttpRequest, HttpResponse } from "./host-interface";
 import { RecoverableErrorPayload } from "./plugin/errors";
 

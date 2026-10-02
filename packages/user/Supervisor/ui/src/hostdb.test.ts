@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { bytesToBase64Url } from "./client-key";
+import { bytesToBase64Url } from "@psibase/common-lib";
+
 import { HttpResponse } from "./host-interface";
 import { HostDb, KEEPALIVE_BODY_LIMIT } from "./hostdb";
 

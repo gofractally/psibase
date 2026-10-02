@@ -67,9 +67,17 @@ dependencies = [
 name = "aes"
 version = "0.29.0"
 dependencies = [
+ "aes-aead",
  "aes-gcm",
  "psibase-plugin-workspace-hack",
  "wit-bindgen-rt",
+]
+
+[[package]]
+name = "aes-aead"
+version = "0.29.0"
+dependencies = [
+ "aes-gcm",
 ]
 
 [[package]]
@@ -1406,7 +1414,7 @@ dependencies = [
 name = "host-db"
 version = "0.29.0"
 dependencies = [
- "aes-gcm",
+ "hex 0.4.3",
  "hkdf",
  "hmac",
  "psibase",

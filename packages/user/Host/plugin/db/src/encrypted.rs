@@ -1,11 +1,17 @@
 use std::cell::RefCell;
 
-use crate::crypto::{
-    decrypt_value, derive_storage_keys, encrypt_value, hmac_storage_key, StorageKeys,
-};
+use crate::aes::plugin::types::{Key, Strength};
+use crate::aes::plugin::with_key;
+use crate::crypto::{derive_storage_keys, hmac_storage_key, StorageKeys};
 use crate::supervisor::bridge::{database as HostDb, intf::get_client_key};
 
-// The supervisor never replaces the client key, so derive it once per thread.
+fn aes256_key(aes_key: &[u8; 32]) -> Key {
+    Key {
+        strength: Strength::Aes256,
+        key_data: aes_key.to_vec(),
+    }
+}
+
 thread_local! {
     static DERIVED_KEYS: RefCell<Option<StorageKeys>> = RefCell::new(None);
 }
@@ -19,11 +25,11 @@ fn derived_keys() -> StorageKeys {
     keys
 }
 
-pub(crate) struct SealedStore {
+pub(crate) struct EncryptedStore {
     keys: StorageKeys,
 }
 
-impl SealedStore {
+impl EncryptedStore {
     pub(crate) fn open() -> Self {
         Self {
             keys: derived_keys(),
@@ -38,14 +44,22 @@ impl SealedStore {
         let storage_key = self.storage_key(plaintext_key);
         let stored = HostDb::get(duration, &storage_key, plaintext_key)?;
         Some(
-            decrypt_value(&self.keys.aes_key, storage_key.as_bytes(), &stored)
-                .unwrap_or_else(|_| panic!("host:db value failed to decrypt")),
+            with_key::decrypt(
+                &aes256_key(&self.keys.aes_key),
+                &stored,
+                storage_key.as_bytes(),
+            )
+            .unwrap_or_else(|_| panic!("host:db value failed to decrypt")),
         )
     }
 
     pub(crate) fn set(&self, duration: u8, plaintext_key: &str, value: &[u8]) {
         let storage_key = self.storage_key(plaintext_key);
-        let stored = encrypt_value(&self.keys.aes_key, storage_key.as_bytes(), value);
+        let stored = with_key::encrypt(
+            &aes256_key(&self.keys.aes_key),
+            value,
+            storage_key.as_bytes(),
+        );
         HostDb::set(duration, &storage_key, &stored, plaintext_key);
     }
 

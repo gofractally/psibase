@@ -1,26 +1,12 @@
-import { siblingUrl } from "@psibase/common-lib";
+import {
+    base64UrlToBytes,
+    bytesToBase64Url,
+    siblingUrl,
+} from "@psibase/common-lib";
 
 export const HOSTDB_KEY_COOKIE = "__Host-HOSTDB-KEY";
 const HOSTDB_KEY_NAME = "HOSTDB-KEY";
 export const HOSTDB_KEY_MAX_AGE = 400 * 24 * 60 * 60;
-
-export function bytesToBase64Url(bytes: Uint8Array): string {
-    let bin = "";
-    for (let i = 0; i < bytes.length; i++) {
-        bin += String.fromCharCode(bytes[i]);
-    }
-    return btoa(bin)
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_")
-        .replace(/=+$/, "");
-}
-
-export function base64UrlToBytes(str: string): Uint8Array {
-    const base64 = str.replace(/-/g, "+").replace(/_/g, "/");
-    const pad = base64.length % 4;
-    const padded = pad ? base64 + "=".repeat(4 - pad) : base64;
-    return Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
-}
 
 function getCookie(name: string): string | undefined {
     const prefix = `${name}=`;
@@ -40,7 +26,7 @@ function generateClientKey(): string {
 }
 
 async function postClientKeyCookie(value: string): Promise<void> {
-    const url = siblingUrl(null, "supervisor", "/common/set-cookie");
+    const url = siblingUrl(null, "supervisor", "/common/set-host-cookie");
     const response = await fetch(url, {
         method: "POST",
         credentials: "include",

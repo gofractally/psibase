@@ -4,7 +4,7 @@ use bindings::*;
 
 mod bucket;
 mod crypto;
-mod sealed;
+mod encrypted;
 
 use exports::host::db::store::{DbMode, Guest as Store};
 use host::client::api::get_sender;
@@ -29,7 +29,7 @@ impl Store for HostDb {
 
     fn flush_transactional_data() {
         use crate::bucket::host_buffer;
-        use crate::sealed::SealedStore;
+        use crate::encrypted::EncryptedStore;
 
         check_caller(&["transact"], "flush@host:db/store");
 
@@ -38,7 +38,7 @@ impl Store for HostDb {
             return;
         }
 
-        let store = SealedStore::open();
+        let store = EncryptedStore::open();
         for (db, entries) in buffer_data {
             for (key, op) in entries {
                 if let Some(value) = op.0 {
