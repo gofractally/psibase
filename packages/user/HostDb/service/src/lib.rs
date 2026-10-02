@@ -90,10 +90,7 @@ mod service {
     const DAY_SECS: u64 = 24 * 60 * 60;
     /// Device cookie `Max-Age`.
     const DEVICE_MAX_AGE_SECS: u64 = 400 * DAY_SECS;
-    const DEVICE_SEEN_REFRESH_NS: u64 = DAY_SECS * NS_PER_SEC;
-    /// `last_seen` trails the device cookie's last renewal by up to the refresh
-    /// interval, so a device is idle only once both have passed.
-    const DEVICE_IDLE_NS: u64 = DEVICE_MAX_AGE_SECS * NS_PER_SEC + DEVICE_SEEN_REFRESH_NS;
+    const DEVICE_IDLE_NS: u64 = DEVICE_MAX_AGE_SECS * NS_PER_SEC;
     /// `__WASI_CLOCKID_REALTIME`: wall-clock nanoseconds since the unix epoch.
     const CLOCK_REALTIME: u32 = 0;
     const SESSION_IDLE_NS: u64 = 7 * DAY_SECS * NS_PER_SEC;
@@ -394,21 +391,13 @@ mod service {
         }
     }
 
-    /// A `last_seen` ahead of `now` (the wall clock moved back) is rewritten.
     fn record_seen(devices: &DeviceTable, device: &[u8], now: u64) {
-        let device = device.to_vec();
-        let recently_seen = devices.get_index_pk().get(&device).is_some_and(|row| {
-            now.checked_sub(row.last_seen)
-                .is_some_and(|age| age <= DEVICE_SEEN_REFRESH_NS)
-        });
-        if !recently_seen {
-            devices
-                .put(&DeviceRow {
-                    device,
-                    last_seen: now,
-                })
-                .unwrap();
-        }
+        devices
+            .put(&DeviceRow {
+                device: device.to_vec(),
+                last_seen: now,
+            })
+            .unwrap();
     }
 
     /// Deletes up to `GC_LIMIT` persistent rows of idle devices, oldest device
