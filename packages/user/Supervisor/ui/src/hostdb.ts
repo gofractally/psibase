@@ -18,6 +18,38 @@ interface BatchOp {
 // Browsers reject keepalive request bodies larger than 64 KiB.
 export const KEEPALIVE_BODY_LIMIT = 64 * 1024;
 
+const FLUSH_ATTEMPTS = 4;
+const FLUSH_RETRY_BASE_MS = 100;
+
+async function postBatch(body: string): Promise<void> {
+    const init: RequestInit = {
+        method: "POST",
+        credentials: "include",
+        ...(body.length <= KEEPALIVE_BODY_LIMIT ? { keepalive: true } : {}),
+        headers: { "Content-Type": "application/json" },
+        body,
+    };
+    const url = siblingUrl(null, "hostdb", "/kv/batch");
+    for (let attempt = 0; attempt < FLUSH_ATTEMPTS; attempt++) {
+        let res: Response;
+        try {
+            res = await fetch(url, init);
+        } catch (e) {
+            if (attempt + 1 >= FLUSH_ATTEMPTS) {
+                throw e;
+            }
+            await new Promise((resolve) => {
+                setTimeout(resolve, FLUSH_RETRY_BASE_MS * 2 ** attempt);
+            });
+            continue;
+        }
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+        }
+        return;
+    }
+}
+
 function durationName(duration: number): Duration {
     const name = DURATIONS[duration];
     if (name === undefined) {
@@ -123,7 +155,8 @@ export class HostDb {
         this.enqueue({ duration: name, key, value: null });
     }
 
-    // Flushes all queued writes to hostdb; throws on non-OK HTTP response.
+    // Flushes queued writes to hostdb. A rejected POST is retried with
+    // increasing delay; throws after those attempts, or on a non-OK response.
     async flush(): Promise<void> {
         if (this.queue.size === 0) {
             return;
@@ -133,17 +166,7 @@ export class HostDb {
         const ops = await Promise.all(
             queued.map((op) => this.withExpected(op)),
         );
-        const body = JSON.stringify({ ops });
-        const res = await fetch(siblingUrl(null, "hostdb", "/kv/batch"), {
-            method: "POST",
-            credentials: "include",
-            ...(body.length <= KEEPALIVE_BODY_LIMIT ? { keepalive: true } : {}),
-            headers: { "Content-Type": "application/json" },
-            body,
-        });
-        if (!res.ok) {
-            throw new Error(`HTTP ${res.status}`);
-        }
+        await postBatch(JSON.stringify({ ops }));
     }
 
     // Last write for a (duration, key) replaces any earlier op this call.

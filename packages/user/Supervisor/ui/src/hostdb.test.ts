@@ -112,6 +112,7 @@ describe("HostDb flush", () => {
     });
 
     afterEach(() => {
+        vi.useRealTimers();
         vi.unstubAllGlobals();
     });
 
@@ -147,15 +148,65 @@ describe("HostDb flush", () => {
         );
     });
 
+    it("retries a rejected POST with increasing delay and then succeeds", async () => {
+        vi.useFakeTimers();
+        fetchMock
+            .mockRejectedValueOnce(new Error("network error"))
+            .mockRejectedValueOnce(new Error("network error"))
+            .mockResolvedValueOnce({ ok: true });
+        const db = new HostDb();
+        db.set(0, HEX_KEY, makeValue(8));
+
+        const flush = db.flush();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+
+        await vi.advanceTimersByTimeAsync(100);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+
+        await vi.advanceTimersByTimeAsync(199);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+
+        await vi.advanceTimersByTimeAsync(1);
+        await flush;
+
+        expect(fetchMock).toHaveBeenCalledTimes(3);
+        const body = fetchMock.mock.calls[0][1].body;
+        expect(
+            fetchMock.mock.calls
+                .slice(1)
+                .every(([, init]) => init.body === body),
+        ).toBe(true);
+    });
+
+    it("does not retry a non-OK HTTP response", async () => {
+        vi.useFakeTimers();
+        fetchMock.mockResolvedValue({ ok: false, status: 409 });
+        const db = new HostDb();
+        db.set(0, HEX_KEY, makeValue(8));
+
+        const assertion = expect(db.flush()).rejects.toThrow("HTTP 409");
+        await vi.runAllTimersAsync();
+        await assertion;
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
     it("flushAndClear clears caches when flush fails", async () => {
-        fetchMock.mockRejectedValueOnce(new Error("network error"));
+        vi.useFakeTimers();
+        fetchMock.mockRejectedValue(new Error("network error"));
         const db = new HostDb();
         const value = makeValue(8);
         const send = vi.fn(() => httpNotFound());
 
         db.set(0, HEX_KEY, value);
-        await expect(db.flushAndClear()).rejects.toThrow("network error");
+        const assertion = expect(db.flushAndClear()).rejects.toThrow(
+            "network error",
+        );
+        await vi.runAllTimersAsync();
+        await assertion;
 
+        expect(fetchMock).toHaveBeenCalledTimes(4);
         expect(db.get(0, HEX_KEY, PLAINTEXT_KEY, send)).toBeNull();
         expect(send).toHaveBeenCalledTimes(1);
     });
