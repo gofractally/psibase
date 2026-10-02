@@ -40,8 +40,17 @@ describe("HostDb cache", () => {
     });
 });
 
-describe("HostDb negative cache", () => {
-    it("clear resets negative cache so a subsequent get refetches", () => {
+describe("HostDb absent keys", () => {
+    it("get after 404 hits read cache without a network request", () => {
+        const db = new HostDb();
+        const send = vi.fn(() => httpNotFound());
+
+        expect(db.get(0, HEX_KEY, PLAINTEXT_KEY, send)).toBeNull();
+        expect(db.get(0, HEX_KEY, PLAINTEXT_KEY, send)).toBeNull();
+        expect(send).toHaveBeenCalledTimes(1);
+    });
+
+    it("clear drops cached absence so a subsequent get refetches", () => {
         const db = new HostDb();
         const send = vi.fn(() => httpNotFound());
 

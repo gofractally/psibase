@@ -49,9 +49,6 @@ export async function sha256Hex(bytes: Uint8Array): Promise<string> {
 export class HostDb {
     private cache = new Map<string, Uint8Array | null>();
 
-    // Keys known absent from the node (404).
-    private negativeCache = new Set<string>();
-
     private observed = new Map<string, Uint8Array | null>();
 
     private queue = new Map<string, BatchOp>();
@@ -59,7 +56,6 @@ export class HostDb {
     // Drops in-memory read caches and any queued writes not yet flushed.
     clear(): void {
         this.cache.clear();
-        this.negativeCache.clear();
         this.observed.clear();
         this.queue.clear();
     }
@@ -84,9 +80,6 @@ export class HostDb {
         send: (req: HttpRequest) => HttpResponse,
     ): Uint8Array | null {
         const path = `${durationName(duration)}/${key}`;
-        if (this.negativeCache.has(path)) {
-            return null;
-        }
         const cached = this.cache.get(path);
         if (cached !== undefined) {
             return cached;
@@ -100,11 +93,9 @@ export class HostDb {
         let value: Uint8Array | null;
         if (res.status === 200) {
             value = res.body ? (res.body.val as Uint8Array) : new Uint8Array();
-            this.negativeCache.delete(path);
             this.observed.set(path, value.slice());
         } else if (res.status === 404) {
             value = null;
-            this.negativeCache.add(path);
             this.observed.set(path, null);
             console.info(`host:db missing key: ${debugKey}`);
         } else {
@@ -117,7 +108,6 @@ export class HostDb {
     set(duration: number, key: string, value: Uint8Array): void {
         const name = durationName(duration);
         const path = `${name}/${key}`;
-        this.negativeCache.delete(path);
         this.cache.set(path, value);
         this.enqueue({
             duration: name,
@@ -129,7 +119,6 @@ export class HostDb {
     remove(duration: number, key: string): void {
         const name = durationName(duration);
         const path = `${name}/${key}`;
-        this.negativeCache.add(path);
         this.cache.set(path, null);
         this.enqueue({ duration: name, key, value: null });
     }
