@@ -113,18 +113,38 @@ mod service {
         ops: Vec<BatchOp>,
     }
 
+    /// Ciphertext observed by GET: absent, or the SHA-256 of the value returned.
+    #[derive(Clone, Debug, PartialEq)]
+    enum ReadExpect {
+        Absent,
+        Hash(Checksum256),
+    }
+
+    /// Read-time precondition for one batch op.
+    /// Missing `expected` is unconditional. Null means the GET was absent.
+    /// A hex string is the SHA-256 of the ciphertext that GET returned.
+    #[derive(Clone, Debug, Default, PartialEq)]
+    enum Precondition {
+        #[default]
+        Unconditional,
+        Read(ReadExpect),
+    }
+
     #[derive(Deserialize)]
     #[serde(deny_unknown_fields)]
     struct BatchOp {
         duration: Duration,
         key: String,
         value: Option<String>,
+        #[serde(default, deserialize_with = "deserialize_precondition")]
+        expected: Precondition,
     }
 
     struct Change {
         duration: Duration,
         key: Vec<u8>,
         value: Option<Vec<u8>>,
+        expected: Precondition,
     }
 
     /// Serves HTTP for `host:db`. Only a secure `Origin` for `supervisor.{root}`
@@ -172,8 +192,9 @@ mod service {
 
     /// Routes storage requests. `OPTIONS` on storage paths is the CORS preflight.
     /// `POST /kv/batch` returns 204. An invalid op returns 400 and writes nothing.
-    /// The session cookie is set once a session id is accepted, including on error
-    /// responses such as 400.
+    /// An op whose `expected` hash does not match the stored value returns 409
+    /// and writes nothing. The session cookie is set once a session id is
+    /// accepted, including on error responses such as 400 and 409.
     fn route(
         request: &HttpRequest,
         device: &[u8],
@@ -209,7 +230,7 @@ mod service {
                 } else {
                     None
                 };
-                apply_changes(device, session.as_deref(), &changes);
+                apply_changes(device, session.as_deref(), &changes)?;
                 return Ok((204, None));
             }
 
@@ -259,10 +280,11 @@ mod service {
         }
     }
 
-    /// Applies batch ops from `POST /kv/batch`:
-    /// `{"ops":[{"duration":"persistent"|"session","key":<hex>,"value":<unpadded base64url>|null}]}`.
-    /// A null value deletes the key.
-    fn apply_changes(device: &[u8], session: Option<&[u8]>, changes: &[Change]) {
+    /// Applies batch ops from `POST /kv/batch`. A null `value` deletes the key.
+    /// `expected` is the SHA-256 hex of the ciphertext from GET, or null when
+    /// that GET was absent. Omit it to write unconditionally. A mismatch
+    /// returns 409 and writes nothing.
+    fn apply_changes(device: &[u8], session: Option<&[u8]>, changes: &[Change]) -> Result<(), u16> {
         let puts = |duration: Duration| {
             changes
                 .iter()
@@ -277,6 +299,11 @@ mod service {
             let devices = DeviceTable::new();
             record_seen(&devices, device, now);
             for change in changes {
+                if let Precondition::Read(expected) = &change.expected {
+                    let stored =
+                        current_value(&persistent, &sessions, device, session, change);
+                    check_precondition(stored.as_deref(), expected)?;
+                }
                 match (change.duration, change.value.as_deref()) {
                     (Duration::Persistent, Some(value)) => {
                         persistent
@@ -316,6 +343,43 @@ mod service {
             if session_gc {
                 collect_expired_sessions(&sessions, now);
             }
+            Ok(())
+        }
+    }
+
+    fn current_value(
+        persistent: &KvTable,
+        sessions: &SessionKvTable,
+        device: &[u8],
+        session: Option<&[u8]>,
+        change: &Change,
+    ) -> Option<Vec<u8>> {
+        match change.duration {
+            Duration::Persistent => persistent
+                .get_index_pk()
+                .get(&(device.to_vec(), change.key.clone()))
+                .map(|row| row.value),
+            Duration::Session => sessions
+                .get_index_pk()
+                .get(&(
+                    device.to_vec(),
+                    session.unwrap().to_vec(),
+                    change.key.clone(),
+                ))
+                .map(|row| row.value),
+        }
+    }
+
+    /// 409 when the read-time expectation does not describe `stored`.
+    fn check_precondition(stored: Option<&[u8]>, expected: &ReadExpect) -> Result<(), u16> {
+        let matches = match expected {
+            ReadExpect::Absent => stored.is_none(),
+            ReadExpect::Hash(hash) => stored.is_some_and(|value| sha256(value) == *hash),
+        };
+        if matches {
+            Ok(())
+        } else {
+            Err(409)
         }
     }
 
@@ -464,9 +528,22 @@ mod service {
                 duration: op.duration,
                 key,
                 value,
+                expected: op.expected,
             });
         }
         Some(changes)
+    }
+
+    fn deserialize_precondition<'de, D>(deserializer: D) -> Result<Precondition, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        match Option::<String>::deserialize(deserializer)? {
+            None => Ok(Precondition::Read(ReadExpect::Absent)),
+            Some(hex) => Checksum256::from_str(&hex)
+                .map(|hash| Precondition::Read(ReadExpect::Hash(hash)))
+                .map_err(|_| serde::de::Error::custom("expected must be a SHA-256 hex digest")),
+        }
     }
 
     fn decode_fixed_hex<const N: usize>(input: &str) -> Option<Vec<u8>> {
@@ -549,6 +626,63 @@ mod service {
             let expected = bytes.to_vec();
             assert_eq!(decode_fixed_hex::<KEY_LEN>(&upper), Some(expected.clone()));
             assert_eq!(decode_fixed_hex::<KEY_LEN>(&lower), Some(expected));
+        }
+
+        #[test]
+        fn expected_hash_rejects_a_stale_read() {
+            assert_eq!(
+                hex_encode(&sha256(b"").0),
+                "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            );
+            let stored = b"ciphertext-v2";
+            let stale = sha256(b"ciphertext-v1");
+            assert_eq!(
+                check_precondition(Some(stored), &ReadExpect::Hash(stale)),
+                Err(409)
+            );
+            assert_eq!(
+                check_precondition(Some(stored), &ReadExpect::Hash(sha256(stored))),
+                Ok(())
+            );
+            assert_eq!(
+                check_precondition(None, &ReadExpect::Hash(sha256(stored))),
+                Err(409)
+            );
+            assert_eq!(
+                check_precondition(Some(stored), &ReadExpect::Absent),
+                Err(409)
+            );
+            assert_eq!(check_precondition(None, &ReadExpect::Absent), Ok(()));
+        }
+
+        #[test]
+        fn batch_op_parses_expected_hash() {
+            let key = "ab".repeat(32);
+            let hash = hex_encode(&sha256(b"ciphertext").0);
+            let with_hash = format!(
+                r#"{{"ops":[{{"duration":"persistent","key":"{key}","value":"YQ","expected":"{hash}"}}]}}"#
+            );
+            let changes = parse_batch(with_hash.as_bytes()).expect("hash");
+            assert_eq!(
+                changes[0].expected,
+                Precondition::Read(ReadExpect::Hash(sha256(b"ciphertext")))
+            );
+
+            let absent = format!(
+                r#"{{"ops":[{{"duration":"session","key":"{key}","value":null,"expected":null}}]}}"#
+            );
+            let changes = parse_batch(absent.as_bytes()).expect("absent");
+            assert_eq!(changes[0].expected, Precondition::Read(ReadExpect::Absent));
+
+            let unconditional =
+                format!(r#"{{"ops":[{{"duration":"persistent","key":"{key}","value":"YQ"}}]}}"#);
+            let changes = parse_batch(unconditional.as_bytes()).expect("unconditional");
+            assert_eq!(changes[0].expected, Precondition::Unconditional);
+
+            let bad = format!(
+                r#"{{"ops":[{{"duration":"persistent","key":"{key}","value":"YQ","expected":"zz"}}]}}"#
+            );
+            assert!(parse_batch(bad.as_bytes()).is_none());
         }
     }
 }

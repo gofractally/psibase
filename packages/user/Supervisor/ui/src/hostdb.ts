@@ -11,6 +11,9 @@ interface BatchOp {
     duration: Duration;
     key: string;
     value: string | null;
+    // SHA-256 hex of the ciphertext from GET, or null when that GET was absent.
+    // Omitted when this call has not read the key.
+    expected?: string | null;
 }
 
 // Browsers reject keepalive request bodies larger than 64 KiB.
@@ -32,22 +35,34 @@ function hostDbError(message: string): RecoverableErrorPayload {
     };
 }
 
+async function sha256Hex(bytes: Uint8Array): Promise<string> {
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    return [...new Uint8Array(digest)]
+        .map((byte) => byte.toString(16).padStart(2, "0"))
+        .join("");
+}
+
 // The `supervisor:bridge/database` store for one entry point, backed by the
 //   `hostdb` service. Reads are cached; writes update the cache and are queued
-//   until `flush`.
+//   until `flush`. Each read remembers the server ciphertext. Batch ops for a
+//   key that was read send the SHA-256 of that ciphertext (or null when the
+//   read was absent). The queue keeps the last op for each (duration, key).
 export class HostDb {
     private cache = new Map<string, Uint8Array | null>();
 
     // Keys known absent from the node (404).
     private negativeCache = new Set<string>();
 
-    private queue: BatchOp[] = [];
+    private observed = new Map<string, Uint8Array | null>();
+
+    private queue = new Map<string, BatchOp>();
 
     // Drops in-memory read caches and any queued writes not yet flushed.
     clear(): void {
         this.cache.clear();
         this.negativeCache.clear();
-        this.queue = [];
+        this.observed.clear();
+        this.queue.clear();
     }
 
     // Flushes queued writes, then drops read caches even when flush fails.
@@ -87,9 +102,11 @@ export class HostDb {
         if (res.status === 200) {
             value = res.body ? (res.body.val as Uint8Array) : new Uint8Array();
             this.negativeCache.delete(path);
+            this.observed.set(path, value.slice());
         } else if (res.status === 404) {
             value = null;
             this.negativeCache.add(path);
+            this.observed.set(path, null);
             console.info(`host:db missing key: ${debugKey}`);
         } else {
             throw hostDbError(`Read failed: HTTP ${res.status}`);
@@ -103,7 +120,7 @@ export class HostDb {
         const path = `${name}/${key}`;
         this.negativeCache.delete(path);
         this.cache.set(path, value);
-        this.queue.push({
+        this.enqueue({
             duration: name,
             key,
             value: bytesToBase64Url(value),
@@ -115,16 +132,19 @@ export class HostDb {
         const path = `${name}/${key}`;
         this.negativeCache.add(path);
         this.cache.set(path, null);
-        this.queue.push({ duration: name, key, value: null });
+        this.enqueue({ duration: name, key, value: null });
     }
 
     // Flushes all queued writes to hostdb; throws on non-OK HTTP response.
     async flush(): Promise<void> {
-        if (this.queue.length === 0) {
+        if (this.queue.size === 0) {
             return;
         }
-        const ops = this.queue;
-        this.queue = [];
+        const queued = [...this.queue.values()];
+        this.queue.clear();
+        const ops = await Promise.all(
+            queued.map((op) => this.withExpected(op)),
+        );
         const body = JSON.stringify({ ops });
         const res = await fetch(siblingUrl(null, "hostdb", "/kv/batch"), {
             method: "POST",
@@ -136,5 +156,21 @@ export class HostDb {
         if (!res.ok) {
             throw new Error(`HTTP ${res.status}`);
         }
+    }
+
+    // Last write for a (duration, key) replaces any earlier op this call.
+    private enqueue(op: BatchOp): void {
+        this.queue.set(`${op.duration}/${op.key}`, op);
+    }
+
+    private async withExpected(op: BatchOp): Promise<BatchOp> {
+        const observed = this.observed.get(`${op.duration}/${op.key}`);
+        if (observed === undefined) {
+            return op;
+        }
+        return {
+            ...op,
+            expected: observed === null ? null : await sha256Hex(observed),
+        };
     }
 }
