@@ -118,7 +118,9 @@ The psibase plugin host provides a key-value interface for plugins to use for re
 
 ### Host-dependent data backing
 
-It is up to the host platform to determine how to implement the key-value interface. For example, the web platform stores plugin data on the node the browser is connected to, in the `hostdb` service, scoped to the browser by cookies. The client hashes keys and encrypts values before they leave the browser, so the data at rest on the node is opaque.
+It is up to the host platform to determine how to implement the key-value interface. For example, the web platform stores plugin data on the node the browser is connected to, in the `hostdb` service, scoped to the browser by cookies. The client HMACs keys and encrypts values before they leave the browser, so the data at rest on the node is opaque.
+
+HMAC-SHA256 yields a fixed 32-byte digest, encoded as a 64-character lowercase hex string for storage. That keeps keys within the chain's `maxKeySize` limit (128 bytes) even though plugins may use plaintext keys up to 256 bytes.
 
 ### API
 
