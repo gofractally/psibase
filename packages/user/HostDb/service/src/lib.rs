@@ -480,6 +480,18 @@ mod service {
         Hex(bytes).to_string().to_ascii_lowercase()
     }
 
+    /// Set-Cookie value for device/session cookies; pass max_age only for the device cookie.
+    fn set_cookie_value(name: &str, value: &str, max_age: Option<u64>) -> String {
+        match max_age {
+            Some(max_age) => format!(
+                "{name}={value}; Path=/; SameSite=Strict; Secure; Max-Age={max_age}; HttpOnly;"
+            ),
+            None => format!(
+                "{name}={value}; Path=/; SameSite=Strict; Secure; HttpOnly;"
+            ),
+        }
+    }
+
     fn status_reply(status: u16) -> HttpReply {
         HttpReply {
             status,
@@ -518,15 +530,13 @@ mod service {
         if let Some(cookie) = device_cookie {
             headers.push(HttpHeader::new(
                 "Set-Cookie",
-                &format!(
-                    "{DEVICE_COOKIE}={cookie}; Path=/; SameSite=Strict; Secure; Max-Age={DEVICE_MAX_AGE_SECS}; HttpOnly;"
-                ),
+                &set_cookie_value(DEVICE_COOKIE, &cookie, Some(DEVICE_MAX_AGE_SECS)),
             ));
         }
         if let Some(cookie) = session_cookie {
             headers.push(HttpHeader::new(
                 "Set-Cookie",
-                &format!("{SESSION_COOKIE}={cookie}; Path=/; SameSite=Strict; Secure; HttpOnly;"),
+                &set_cookie_value(SESSION_COOKIE, &cookie, None),
             ));
         }
         HttpReply {
@@ -540,7 +550,6 @@ mod service {
     #[cfg(test)]
     mod tests {
         use super::*;
-        use std::str::FromStr;
 
         #[test]
         fn uppercase_hex_decodes() {
