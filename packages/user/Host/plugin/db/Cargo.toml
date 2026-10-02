@@ -14,7 +14,7 @@ hex = "0.4"
 psibase-plugin-workspace-hack.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-aes_plugin = { package = "aes", path = "../../../Aes/plugin" }
+aes-aead = { path = "../../../Aes/aead" }
 
 [lib]
 crate-type = ["cdylib"]

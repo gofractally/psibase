@@ -58,7 +58,7 @@ pub(crate) fn encrypt_value(
     }
     #[cfg(not(target_arch = "wasm32"))]
     {
-        aes_plugin::encrypt_aes256(aes_key, plaintext, associated_data)
+        aes_aead::encrypt_aes256(aes_key, plaintext, associated_data)
     }
 }
 
@@ -77,7 +77,7 @@ pub(crate) fn decrypt_value(
     }
     #[cfg(not(target_arch = "wasm32"))]
     {
-        aes_plugin::decrypt_aes256(aes_key, stored, associated_data).map_err(|_| DecryptError)
+        aes_aead::decrypt_aes256(aes_key, stored, associated_data).map_err(|_| DecryptError)
     }
 }
 

@@ -1,3 +1,4 @@
+#[cfg(target_arch = "wasm32")]
 mod aead;
 #[allow(warnings)]
 mod bindings;
@@ -18,9 +19,6 @@ use exports::aes::plugin::with_password::Guest as WithPassword;
 use host::types::types::{Error, PluginId};
 #[cfg(target_arch = "wasm32")]
 use kdf::plugin::api as Kdf;
-
-#[cfg(not(target_arch = "wasm32"))]
-pub use aead::{decrypt_aes256, encrypt_aes256};
 
 #[cfg(target_arch = "wasm32")]
 fn decrypt_error() -> Error {
