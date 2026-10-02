@@ -1414,7 +1414,6 @@ dependencies = [
 name = "host-db"
 version = "0.29.0"
 dependencies = [
- "aes-aead",
  "hex 0.4.3",
  "hkdf",
  "hmac",

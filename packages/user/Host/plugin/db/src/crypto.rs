@@ -1,14 +1,10 @@
-//! Given a 32-byte client key, derives sealing keys and applies host:db's
-//! at-rest crypto.
+//! Given a 32-byte client key, derives host:db sealing keys.
 //!
 //! HKDF-SHA256 expands the client key into separate HMAC and AES-256-GCM keys
 //! using distinct `info` strings (`HMAC_INFO`, `AES_INFO`).
 //!
 //! Storage keys are HMAC-SHA256 of the plaintext host:db key, encoded as
-//! lowercase hex (64 characters). Values are AES-256-GCM with associated data
-//! set to the HMAC'd storage key; ciphertext layout is `nonce || ciphertext ||
-//! tag` (12-byte nonce). Decryption fails when authentication fails, including
-//! when AAD does not match the key the value was stored under.
+//! lowercase hex (64 characters).
 
 use hkdf::Hkdf;
 use hmac::{Hmac, Mac};
@@ -47,50 +43,6 @@ pub(crate) fn hmac_storage_key(hmac_key: &[u8; 32], plaintext_key: &str) -> Stri
     hex::encode(&mac.finalize().into_bytes())
 }
 
-pub(crate) fn encrypt_value(
-    aes_key: &[u8; 32],
-    associated_data: &[u8],
-    plaintext: &[u8],
-) -> Vec<u8> {
-    #[cfg(target_arch = "wasm32")]
-    {
-        crate::aes::plugin::with_key::encrypt(&aes256_key(aes_key), plaintext, associated_data)
-    }
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        aes_aead::encrypt_aes256(aes_key, plaintext, associated_data)
-    }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub(crate) struct DecryptError;
-
-pub(crate) fn decrypt_value(
-    aes_key: &[u8; 32],
-    associated_data: &[u8],
-    stored: &[u8],
-) -> Result<Vec<u8>, DecryptError> {
-    #[cfg(target_arch = "wasm32")]
-    {
-        crate::aes::plugin::with_key::decrypt(&aes256_key(aes_key), stored, associated_data)
-            .map_err(|_| DecryptError)
-    }
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        aes_aead::decrypt_aes256(aes_key, stored, associated_data).map_err(|_| DecryptError)
-    }
-}
-
-#[cfg(target_arch = "wasm32")]
-fn aes256_key(aes_key: &[u8; 32]) -> crate::aes::plugin::types::Key {
-    use crate::aes::plugin::types::{Key, Strength};
-
-    Key {
-        strength: Strength::Aes256,
-        key_data: aes_key.to_vec(),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -125,14 +77,5 @@ mod tests {
             sealed,
             hmac_storage_key(&keys.hmac_key, "chain:non-trx:alice:contacts:other")
         );
-    }
-
-    #[test]
-    fn aad_mismatch_fails_decrypt() {
-        let keys = sample_keys();
-        let storage_key = hmac_storage_key(&keys.hmac_key, "chain:trx:bob:bucket:k");
-        let other_key = hmac_storage_key(&keys.hmac_key, "chain:trx:bob:bucket:other");
-        let stored = encrypt_value(&keys.aes_key, storage_key.as_bytes(), b"value-bytes");
-        assert!(decrypt_value(&keys.aes_key, other_key.as_bytes(), &stored).is_err());
     }
 }
