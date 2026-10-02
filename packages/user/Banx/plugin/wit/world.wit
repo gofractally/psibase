@@ -305,6 +305,29 @@ interface api {
         request-id: u32,
     ) -> result<_, error>;
 
+    /// Repeating path payment. Sender is the payer. Amounts are human
+    /// decimals in `asset-id`. Times are unix seconds. `ends-at-seconds`
+    /// 0 means no scheduled end. The id is allocated on chain; refetch
+    /// `payAuths` after the transaction.
+    set-pay-auth: func(
+        payee: string,
+        asset-id: u16,
+        amount: string,
+        max-spend: string,
+        period-seconds: u32,
+        next-due-seconds: u32,
+        ends-at-seconds: u32,
+    ) -> result<_, error>;
+
+    /// Pay the oldest due period. Last hop is the payee. Every hop uses
+    /// the series asset. Caller is the payer or the payee. The stored
+    /// payer is drawn.
+    run-pay-auth: func(id: u32, hops: list<path-hop>) -> result<_, error>;
+
+    /// Delete a repeating payment. Payer or payee. `force-cancel` false
+    /// throws when a period is payable. True deletes anyway and does not pay.
+    cancel-pay-auth: func(id: u32, force-cancel: bool) -> result<_, error>;
+
     /// Post a cash quote: Banx `asset-id` ↔ Tokens `token-id`.
     /// `is-out` true: taker draws Banx, receives tokens. False: taker sends
     /// tokens, books Banx onto the poster.

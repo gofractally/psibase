@@ -131,7 +131,33 @@ pub fn emit_pair_activity(
     request_id: u32,
     memo: &str,
 ) {
-    let actor = psibase::get_sender();
+    emit_pair_activity_as(
+        psibase::get_sender(),
+        party_a,
+        party_b,
+        asset_id,
+        kind,
+        amount,
+        netted,
+        other_asset_id,
+        request_id,
+        memo,
+    );
+}
+
+/// Same as [`emit_pair_activity`], with `actor` stored instead of `get_sender()`.
+pub(crate) fn emit_pair_activity_as(
+    actor: AccountNumber,
+    party_a: AccountNumber,
+    party_b: AccountNumber,
+    asset_id: u16,
+    kind: &str,
+    amount: Quantity,
+    netted: Quantity,
+    other_asset_id: u16,
+    request_id: u32,
+    memo: &str,
+) {
     let asset_precision = Asset::get_assert(asset_id).precision;
     let other_asset_precision = if asset_id == other_asset_id {
         asset_precision

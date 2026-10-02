@@ -12,9 +12,11 @@ mod invite;
 mod obligation;
 mod pair_cycle;
 mod path;
+mod pay_auth;
 mod pay_request;
 
 pub use connection::Connection;
+pub(crate) use helpers::emit_pair_activity_as;
 pub(crate) use helpers::{
     apply_hop_fee, apply_rate, apply_spread, expires_live, invert_hop_fee, invert_rate,
     live_specific_or_global,
@@ -45,6 +47,8 @@ pub mod tables {
         pub next_asset_id: u16,
         /// Next primary key for [`PayRequest`] rows.
         pub next_request_id: u32,
+        /// Next primary key for [`PayAuth`] rows.
+        pub next_pay_auth_id: u32,
     }
 
     impl InitRow {
@@ -395,6 +399,33 @@ pub mod tables {
         fn pk(&self) -> (AccountNumber, AccountNumber, u16) {
             (self.debtor, self.creditor, self.asset_id)
         }
+    }
+
+    /// Repeating path payment. The payer signs once. A later `run` draws
+    /// the payer and delivers `amount` to the payee. One row is one series.
+    #[table(name = "PayAuthTab", index = 12)]
+    #[derive(
+        Default, Clone, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug,
+    )]
+    pub struct PayAuth {
+        #[primary_key]
+        pub id: u32,
+        /// Drawn on each paid period. `get_sender()` at create.
+        pub payer: AccountNumber,
+        /// Receives `amount`. Last hop of a run.
+        pub payee: AccountNumber,
+        /// Asset the payee receives. Every hop must use it.
+        pub asset_id: u16,
+        /// Delivered to the payee for one period.
+        pub amount: Quantity,
+        /// Most the payer will be drawn for one period, same asset. At least `amount`.
+        pub max_spend: Quantity,
+        /// Length of one period. Greater than 0.
+        pub period_seconds: u32,
+        /// Start of the oldest period that has not been paid.
+        pub next_due: TimePointSec,
+        /// A period may be paid only when its start is before this. 0 means no scheduled end.
+        pub ends_at: TimePointSec,
     }
 }
 

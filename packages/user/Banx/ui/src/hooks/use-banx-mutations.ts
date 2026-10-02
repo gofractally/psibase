@@ -34,6 +34,9 @@ export function useInvalidateLedger() {
         void qc.invalidateQueries({
             queryKey: QueryKey.requests(user),
         });
+        void qc.invalidateQueries({
+            queryKey: QueryKey.payAuths(user),
+        });
         void qc.invalidateQueries({ queryKey: QueryKey.invites(user) });
         void qc.invalidateQueries({ queryKey: ["banx", "cashQuotes"] });
         void qc.invalidateQueries({
@@ -288,6 +291,70 @@ export function usePathPay() {
         onSuccess: () => {
             invalidate();
             toast.success("Transfer succeeded");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useSetPayAuth() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            payee: string;
+            assetId: number;
+            amount: string;
+            maxSpend: string;
+            periodSeconds: number;
+            nextDueSeconds: number;
+            endsAtSeconds: number;
+        }) =>
+            banxCall("setPayAuth", [
+                p.payee,
+                p.assetId,
+                p.amount,
+                p.maxSpend,
+                p.periodSeconds,
+                p.nextDueSeconds,
+                p.endsAtSeconds,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Repeating payment saved");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useRunPayAuth() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            id: number;
+            hops: { account: string; assetId: number }[];
+        }) =>
+            banxCall("runPayAuth", [
+                p.id,
+                p.hops.map((h) => ({
+                    account: h.account,
+                    assetId: h.assetId,
+                })),
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Repeating payment collected");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useCancelPayAuth() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: { id: number; forceCancel: boolean }) =>
+            banxCall("cancelPayAuth", [p.id, p.forceCancel]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Repeating payment deleted");
         },
         onError: (e: Error) => toast.error(e.message),
     });

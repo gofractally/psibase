@@ -6,7 +6,8 @@ mod service {
         Asset, AssetTable, BanxInvite, BanxInviteTable, BookAuth, BookAuthTab, CashQuote,
         CashQuoteTab, ClaimOffer, ClaimOfferTab, Connection, CreditLine, CreditLineTable,
         CurrencyPolicy, CurrencyPolicyTab, ForwardOffer, ForwardOfferTab, Obligation,
-        ObligationTable, PairCycle, PayRequest, RequestTab, PPM_SCALE, RATE_SCALE,
+        ObligationTable, PairCycle, PayAuth, PayAuthTab, PayRequest, RequestTab, PPM_SCALE,
+        RATE_SCALE,
     };
     use psibase::services::tokens::{Decimal, Precision, Wrapper as Tokens};
     use psibase::*;
@@ -352,6 +353,36 @@ mod service {
         createdAt: i64,
     }
 
+    #[derive(SimpleObject)]
+    struct PayAuthView {
+        id: u32,
+        payer: AccountNumber,
+        payee: AccountNumber,
+        assetId: u16,
+        amount: Decimal,
+        maxSpend: Decimal,
+        periodSeconds: u32,
+        nextDue: i64,
+        endsAt: i64,
+    }
+
+    impl From<PayAuth> for PayAuthView {
+        fn from(row: PayAuth) -> Self {
+            let p = asset_precision(row.asset_id);
+            Self {
+                id: row.id,
+                payer: row.payer,
+                payee: row.payee,
+                assetId: row.asset_id,
+                amount: Decimal::new(row.amount, p),
+                maxSpend: Decimal::new(row.max_spend, p),
+                periodSeconds: row.period_seconds,
+                nextDue: time_sec(row.next_due),
+                endsAt: time_sec(row.ends_at),
+            }
+        }
+    }
+
     impl From<PayRequest> for PayRequestView {
         fn from(r: PayRequest) -> Self {
             let p = asset_precision(r.asset_id);
@@ -614,6 +645,16 @@ mod service {
 
         async fn request(&self, id: u32) -> Option<PayRequestView> {
             PayRequest::get(id).map(PayRequestView::from)
+        }
+
+        /// Repeating payments where `account` is the payer or the payee.
+        async fn payAuths(&self, account: AccountNumber) -> Vec<PayAuthView> {
+            PayAuthTab::with_service(banx::SERVICE)
+                .get_index_pk()
+                .iter()
+                .filter(|row| row.payer == account || row.payee == account)
+                .map(PayAuthView::from)
+                .collect()
         }
 
         /// Tokens precision (for cash-quote rates).

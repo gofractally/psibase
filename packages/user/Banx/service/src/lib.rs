@@ -12,7 +12,7 @@ pub mod service {
     use crate::tables::{
         assert_account_exists, emit_pair_activity, path_required_send, run_path, Asset, BanxInvite,
         BookAuth, CashQuote, ClaimOffer, Connection, CreditLine, CurrencyPolicy, ForwardOffer,
-        InitRow, InitTable, Obligation, PathHop, PayRequest,
+        InitRow, InitTable, Obligation, PathHop, PayAuth, PayRequest,
     };
     use psibase::{
         services::events,
@@ -43,6 +43,7 @@ pub mod service {
                     next_obligation_id: 1,
                     next_asset_id: 1,
                     next_request_id: 1,
+                    next_pay_auth_id: 1,
                 })
                 .unwrap();
 
@@ -721,7 +722,7 @@ pub mod service {
     fn path_pay(hops: Vec<PathHop>, amount: Quantity, min_return: Quantity, request_id: u32) {
         assert!(!hops.is_empty(), "path_pay must include at least one hop");
         assert!(amount.value > 0, "path_pay amount must be positive");
-        run_path(get_sender(), hops, amount, min_return, request_id);
+        run_path(get_sender(), hops, amount, min_return, request_id, "");
     }
 
     /// Pay a live invoice by walking hops **backward** from remaining.
@@ -746,7 +747,49 @@ pub mod service {
             required.value <= max_spend.value,
             "pay_inv max_spend below required send"
         );
-        run_path(get_sender(), hops, required, remaining, request_id);
+        run_path(get_sender(), hops, required, remaining, request_id, "");
+    }
+
+    /// Repeating path payment. Sender is the payer. Returns the series id.
+    ///
+    /// `ends_at` of 0 means no scheduled end. A period is payable when
+    /// `next_due <= now` and (`ends_at` is 0 or `next_due < ends_at`).
+    #[action]
+    fn st_pay_ath(
+        payee: AccountNumber,
+        asset_id: u16,
+        amount: Quantity,
+        max_spend: Quantity,
+        period_seconds: u32,
+        next_due: TimePointSec,
+        ends_at: TimePointSec,
+    ) -> u32 {
+        PayAuth::create(
+            get_sender(),
+            payee,
+            asset_id,
+            amount,
+            max_spend,
+            period_seconds,
+            next_due,
+            ends_at,
+        )
+    }
+
+    /// Pay the oldest due period. Sender is the payer or the payee.
+    /// The stored payer is drawn. This does not fulfill an invoice.
+    #[action]
+    fn run_pay_ath(id: u32, hops: Vec<PathHop>) {
+        PayAuth::run(id, hops, get_sender());
+    }
+
+    /// Delete a repeating payment. Payer or payee.
+    ///
+    /// `force_cancel` false throws when a period is payable. True deletes
+    /// the row anyway and does not pay that period.
+    #[action]
+    fn rm_pay_ath(id: u32, force_cancel: bool) {
+        PayAuth::cancel(id, get_sender(), force_cancel);
     }
 
     /// Post an invoice (`1`) or please-book (`2`).

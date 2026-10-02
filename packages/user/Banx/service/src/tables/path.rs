@@ -1,6 +1,6 @@
 use psibase::{services::tokens::Quantity, AccountNumber};
 
-use super::{emit_pair_activity, invert_hop_fee, invert_rate, Connection};
+use super::{emit_pair_activity_as, invert_hop_fee, invert_rate, Connection};
 use crate::tables::tables::{CurrencyPolicy, ForwardOffer, PathHop, PayRequest};
 
 /// Exact-out send: walk hops backward from `target_out` at the last hop
@@ -60,14 +60,20 @@ pub(crate) fn execute_path(
     forward
 }
 
-/// Execute hops, optionally tick an invoice, emit sender↔payee activity
-/// for multi-hop. Returns last-hop amount. Panics if `forward < min_return`.
+/// Execute hops, optionally tick an invoice, emit sender↔payee activity.
+/// Returns last-hop amount. Panics if `forward < min_return`.
+///
+/// `memo` is stored on the `path_pay` activity. A direct hop emits that
+/// activity only when `memo` is set, so a normal one-hop `path_pay` stays
+/// a `path_draw` and a repeating payment still shows up. The actor is the
+/// drawer (`sender`), not whoever submitted the transaction.
 pub fn run_path(
     sender: AccountNumber,
     hops: Vec<PathHop>,
     amount: Quantity,
     min_return: Quantity,
     request_id: u32,
+    memo: &str,
 ) -> Quantity {
     let hop_count = hops.len();
     let first_asset = hops[0].asset_id;
@@ -86,8 +92,9 @@ pub fn run_path(
             forward,
         );
     }
-    if hop_count >= 2 {
-        emit_pair_activity(
+    if hop_count >= 2 || !memo.is_empty() {
+        emit_pair_activity_as(
+            sender,
             sender,
             last_hop.account,
             first_asset,
@@ -96,7 +103,7 @@ pub fn run_path(
             forward,
             last_hop.asset_id,
             request_id,
-            "",
+            memo,
         );
     }
     forward

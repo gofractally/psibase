@@ -117,6 +117,18 @@ const zPayRequest = z.object({
     createdAt: z.number(),
 });
 
+const zPayAuth = z.object({
+    id: z.number(),
+    payer: z.string(),
+    payee: z.string(),
+    assetId: z.number(),
+    amount: z.string(),
+    maxSpend: z.string(),
+    periodSeconds: z.number(),
+    nextDue: z.number(),
+    endsAt: z.number(),
+});
+
 export const REQUEST_INVOICE = 1;
 export const REQUEST_PLEASE_BOOK = 2;
 
@@ -159,6 +171,7 @@ export type CashQuote = z.infer<typeof zCashQuote>;
 export type CashVault = z.infer<typeof zCashVault>;
 export type CurrencyPolicy = z.infer<typeof zCurrencyPolicy>;
 export type PayRequest = z.infer<typeof zPayRequest>;
+export type PayAuth = z.infer<typeof zPayAuth>;
 export type BanxInvite = z.infer<typeof zBanxInvite>;
 export type ActivityEvent = z.infer<typeof zActivity>;
 
@@ -275,6 +288,15 @@ export async function fetchRequests(account: string): Promise<PayRequest[]> {
         } }`,
     );
     return zPayRequest.array().parse(data.requests);
+}
+
+const payAuthFields = `id payer payee assetId amount maxSpend periodSeconds nextDue endsAt`;
+
+export async function fetchPayAuths(account: string): Promise<PayAuth[]> {
+    const data = await gql<{ payAuths: PayAuth[] }>(
+        `{ payAuths(account: "${account}") { ${payAuthFields} } }`,
+    );
+    return zPayAuth.array().parse(data.payAuths);
 }
 
 const cashQuoteFields = `poster assetId tokenId isOut feeFixed fxRate remaining expiresAt`;

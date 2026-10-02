@@ -33,6 +33,7 @@ define_trust! {
             - Post or remove credit lines, book-auths, forward offers, claim offers, and currency policies
             - Deposit, book an authorized expense, net, and forgive (write off) obligations
             - Create or cancel invoices and please-book requests
+            - Create or cancel a repeating payment
             - Convert debt between assets
             - Buy or sell claims under a posted claim offer
             - Post cash quotes, fund/withdraw the cash vault, cash_in (from your vault)
@@ -42,6 +43,7 @@ define_trust! {
         High => "
             - Path-pay (draw on others' credit along a path)
             - Pay an invoice along a path (max spend)
+            - Run a repeating payment (draws the payer)
             - cash_out (draw Banx, receive tokens)
         ",
     }
@@ -71,6 +73,8 @@ define_trust! {
             remove_currency_policy,
             create_request,
             cancel_request,
+            set_pay_auth,
+            cancel_pay_auth,
             deposit,
             net,
             forgive,
@@ -86,7 +90,7 @@ define_trust! {
             delete_invite,
             add_asset,
         ],
-        High => [path_pay, pay_inv, cash_out],
+        High => [path_pay, pay_inv, run_pay_auth, cash_out],
     }
 }
 
@@ -712,6 +716,55 @@ impl Api for BanxPlugin {
         }
         .packed();
         add_action_to_transaction(banx::action_structs::pay_inv::ACTION_NAME, &packed)
+    }
+
+    fn set_pay_auth(
+        payee: String,
+        asset_id: u16,
+        amount: String,
+        max_spend: String,
+        period_seconds: u32,
+        next_due_seconds: u32,
+        ends_at_seconds: u32,
+    ) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::set_pay_auth)?;
+        let amount = parse_amount_nonzero(asset_id, &amount)?;
+        let max_spend = parse_amount_nonzero(asset_id, &max_spend)?;
+        let packed = banx::action_structs::st_pay_ath {
+            payee: parse_account(&payee)?,
+            asset_id,
+            amount,
+            max_spend,
+            period_seconds,
+            next_due: time_point(next_due_seconds),
+            ends_at: time_point(ends_at_seconds),
+        }
+        .packed();
+        add_action_to_transaction(banx::action_structs::st_pay_ath::ACTION_NAME, &packed)
+    }
+
+    fn run_pay_auth(id: u32, hops: Vec<WitPathHop>) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::run_pay_auth)?;
+        if hops.is_empty() {
+            return Err(
+                ErrorType::ConversionError("path must have at least one hop".into()).into(),
+            );
+        }
+        let mut path = Vec::with_capacity(hops.len());
+        for h in hops {
+            path.push(banx::tables::PathHop {
+                account: parse_account(&h.account)?,
+                asset_id: h.asset_id,
+            });
+        }
+        let packed = banx::action_structs::run_pay_ath { id, hops: path }.packed();
+        add_action_to_transaction(banx::action_structs::run_pay_ath::ACTION_NAME, &packed)
+    }
+
+    fn cancel_pay_auth(id: u32, force_cancel: bool) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::cancel_pay_auth)?;
+        let packed = banx::action_structs::rm_pay_ath { id, force_cancel }.packed();
+        add_action_to_transaction(banx::action_structs::rm_pay_ath::ACTION_NAME, &packed)
     }
 
     fn quote_path(

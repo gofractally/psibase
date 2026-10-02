@@ -14,6 +14,7 @@ import {
     fetchCurrencyPolicies,
     fetchObligations,
     fetchForwardOffers,
+    fetchPayAuths,
     fetchRequests,
     fetchClaimOffers,
     fetchInvites,
@@ -28,6 +29,7 @@ import {
     type CurrencyPolicy,
     type ForwardOffer,
     type Obligation,
+    type PayAuth,
     type PayRequest,
 } from "@/lib/graphql";
 import { QueryKey } from "@/lib/query-keys";
@@ -153,6 +155,15 @@ export function useRequests(): UseQueryResult<PayRequest[], Error> {
     return useQuery({
         queryKey: QueryKey.requests(user),
         queryFn: () => fetchRequests(user!),
+        enabled: !!user,
+    });
+}
+
+export function usePayAuths(): UseQueryResult<PayAuth[], Error> {
+    const { data: user } = useCurrentUser();
+    return useQuery({
+        queryKey: QueryKey.payAuths(user),
+        queryFn: () => fetchPayAuths(user!),
         enabled: !!user,
     });
 }

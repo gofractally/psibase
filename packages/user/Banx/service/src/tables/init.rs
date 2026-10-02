@@ -46,4 +46,16 @@ impl InitRow {
         row.save();
         id
     }
+
+    /// Allocate a unique pay-auth primary key.
+    pub fn alloc_pay_auth_id() -> u32 {
+        let mut row = Self::get_assert();
+        let id = row.next_pay_auth_id;
+        row.next_pay_auth_id = row
+            .next_pay_auth_id
+            .checked_add(1)
+            .expect("pay auth id overflow");
+        row.save();
+        id
+    }
 }

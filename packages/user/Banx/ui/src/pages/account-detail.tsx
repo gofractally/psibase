@@ -16,6 +16,7 @@ import {
     PiggyBank,
     Plus,
     Receipt,
+    Repeat,
     Route,
     ShoppingCart,
     Store,
@@ -48,6 +49,7 @@ import {
     type SellClaimTarget,
 } from "@/components/sell-claim-dialog";
 import { NewDepositLoanDialog } from "@/components/new-deposit-loan-dialog";
+import { PayAuthDialog } from "@/components/pay-auth-dialog";
 import { TransferDialog } from "@/components/transfer-dialog";
 import { useAssetMap } from "@/hooks/use-assets";
 import { useAccountGroups } from "@/hooks/use-account-groups";
@@ -98,6 +100,7 @@ export function AccountDetailPage() {
     );
 
     const [transferOpen, setTransferOpen] = useState(false);
+    const [payAuthOpen, setPayAuthOpen] = useState(false);
     const [depositOpen, setDepositOpen] = useState(false);
     const [creditLineOpen, setCreditLineOpen] = useState(false);
     const [editingLine, setEditingLine] = useState<CreditLine | null>(null);
@@ -184,6 +187,17 @@ export function AccountDetailPage() {
                                 <Plus className="size-4" />
                                 Credit line
                             </Button>
+                            {user && account !== user ? (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="gap-1.5"
+                                    onClick={() => setPayAuthOpen(true)}
+                                >
+                                    <Repeat className="size-4" />
+                                    Repeating payment
+                                </Button>
+                            ) : null}
                         </div>
                     }
                 />
@@ -215,6 +229,13 @@ export function AccountDetailPage() {
                 assets={assets}
                 precisionOf={precisionOf}
                 initialAccount={account}
+            />
+            <PayAuthDialog
+                open={payAuthOpen}
+                onOpenChange={setPayAuthOpen}
+                payee={account}
+                assets={assets}
+                precisionOf={precisionOf}
             />
             <CreditLineDialog
                 open={creditLineOpen}

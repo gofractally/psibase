@@ -150,10 +150,11 @@ export function describeEvent(
             const title = you
                 ? `You paid ${other} ${qty(e.netted, gotSym)}`
                 : `${actor} paid you ${qty(e.netted, gotSym)}`;
+            const repeating = memo?.startsWith("pay-auth ");
             const bits = [
                 you ? `To ${other}` : `From ${actor}`,
                 !same || amt !== netted ? `sent ${qty(e.amount, sym)}` : "",
-                req,
+                repeating ? "Repeating payment" : req,
             ].filter(Boolean);
             return { title, detail: bits.join(" · ") };
         }

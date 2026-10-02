@@ -24,6 +24,8 @@ export const QueryKey = {
         ["banx", "tokenPrecision", tokenId] as const,
     requests: (account: string | null | undefined) =>
         ["banx", "requests", account ?? ""] as const,
+    payAuths: (account: string | null | undefined) =>
+        ["banx", "payAuths", account ?? ""] as const,
     invites: (account: string | null | undefined) =>
         ["banx", "invites", account ?? ""] as const,
     activity: (

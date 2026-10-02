@@ -11,8 +11,8 @@ mod tests {
     use crate::interest::{compound_amount, interest_for, SECONDS_PER_DAY, SECONDS_PER_YEAR};
     use crate::tables::{
         Asset, BanxInvite, BanxInviteTable, BookAuth, CashQuote, ClaimOffer, CreditLine,
-        CurrencyPolicy, InitTable, Obligation, ObligationTable, PairCycle, PathHop, PayRequest,
-        PPM_SCALE, RATE_SCALE,
+        CurrencyPolicy, InitTable, Obligation, ObligationTable, PairCycle, PathHop, PayAuth,
+        PayAuthTab, PayRequest, PPM_SCALE, RATE_SCALE,
     };
     use crate::Wrapper;
     use psibase::fracpack::Pack;
@@ -5979,6 +5979,318 @@ mod tests {
             1 + compound_amount(1_000_000, RATE, SECONDS_PER_DAY as u64),
             "destination was occupied, so the transferred claim was charged"
         );
+        Ok(())
+    }
+
+    fn pin(chain: &psibase::Chain, seconds: i64) {
+        chain.start_block_at(TimePointUSec {
+            microseconds: seconds * 1_000_000,
+        });
+    }
+
+    fn pay_row(id: u32) -> PayAuth {
+        PayAuthTab::read().get_index_pk().get(&id).unwrap()
+    }
+
+    fn schedule(
+        chain: &psibase::Chain,
+        payer: AccountNumber,
+        payee: AccountNumber,
+        asset: u16,
+        amount: u64,
+        max_spend: u64,
+        period: u32,
+        next_due: i64,
+        ends_at: i64,
+    ) -> u32 {
+        Wrapper::push_from(chain, payer)
+            .st_pay_ath(
+                payee,
+                asset,
+                Quantity::new(amount),
+                Quantity::new(max_spend),
+                period,
+                TimePointSec { seconds: next_due },
+                TimePointSec { seconds: ends_at },
+            )
+            .get()
+            .unwrap()
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_pay_auth_create_rejects(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        assert_eq!(
+            InitTable::read()
+                .get_index_pk()
+                .get(&())
+                .unwrap()
+                .next_pay_auth_id,
+            1
+        );
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        let now = TimePointSec {
+            seconds: 1_700_000_000,
+        };
+        pin(&chain, now.seconds);
+
+        let rejected = Wrapper::push_from(&chain, alice).st_pay_ath(
+            alice,
+            usd,
+            Quantity::new(100),
+            Quantity::new(100),
+            100,
+            now,
+            never(),
+        );
+        assert!(rejected.get().is_err());
+
+        let rejected = Wrapper::push_from(&chain, alice).st_pay_ath(
+            bob,
+            usd,
+            Quantity::new(0),
+            Quantity::new(100),
+            100,
+            now,
+            never(),
+        );
+        assert!(rejected.get().is_err());
+
+        let rejected = Wrapper::push_from(&chain, alice).st_pay_ath(
+            bob,
+            usd,
+            Quantity::new(100),
+            Quantity::new(50),
+            100,
+            now,
+            never(),
+        );
+        assert!(rejected.get().is_err());
+
+        let rejected = Wrapper::push_from(&chain, alice).st_pay_ath(
+            bob,
+            usd,
+            Quantity::new(100),
+            Quantity::new(100),
+            0,
+            now,
+            never(),
+        );
+        assert!(rejected.get().is_err());
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_pay_auth_pays_due_period_without_sliding(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, usd, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+
+        const START: i64 = 1_700_000_000;
+        pin(&chain, START);
+        let id = schedule(&chain, alice, bob, usd, 100, 100, 100, START, 0);
+        assert_eq!(id, 1);
+
+        pin(&chain, START + 40);
+        Wrapper::push_from(&chain, alice)
+            .run_pay_ath(id, vec![hop(bob, usd)])
+            .get()?;
+        assert_eq!(exp(&chain, bob, alice, usd), 100);
+        assert_eq!(pay_row(id).next_due.seconds, START + 100);
+
+        let early = Wrapper::push_from(&chain, alice).run_pay_ath(id, vec![hop(bob, usd)]);
+        assert!(early.get().is_err());
+        assert_eq!(pay_row(id).next_due.seconds, START + 100);
+        assert_eq!(exp(&chain, bob, alice, usd), 100);
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_pay_auth_stacked_periods_pay_one_at_a_time(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, usd, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+
+        const START: i64 = 1_700_000_000;
+        pin(&chain, START);
+        let id = schedule(&chain, alice, bob, usd, 100, 100, 100, START - 250, 0);
+
+        Wrapper::push_from(&chain, alice)
+            .run_pay_ath(id, vec![hop(bob, usd)])
+            .get()?;
+        assert_eq!(exp(&chain, bob, alice, usd), 100);
+        assert_eq!(pay_row(id).next_due.seconds, START - 150);
+
+        Wrapper::push_from(&chain, alice)
+            .run_pay_ath(id, vec![hop(bob, usd)])
+            .get()?;
+        assert_eq!(exp(&chain, bob, alice, usd), 200);
+        assert_eq!(pay_row(id).next_due.seconds, START - 50);
+
+        Wrapper::push_from(&chain, alice)
+            .run_pay_ath(id, vec![hop(bob, usd)])
+            .get()?;
+        assert_eq!(exp(&chain, bob, alice, usd), 300);
+        assert_eq!(pay_row(id).next_due.seconds, START + 50);
+
+        let extra = Wrapper::push_from(&chain, alice).run_pay_ath(id, vec![hop(bob, usd)]);
+        assert!(extra.get().is_err());
+        assert_eq!(exp(&chain, bob, alice, usd), 300);
+        assert_eq!(pay_row(id).next_due.seconds, START + 50);
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_pay_auth_rejects_bad_path(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        let carol = account!("carol");
+        let dave = account!("dave");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        chain.new_account(carol).unwrap();
+        chain.new_account(dave).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+
+        Wrapper::push_from(&chain, dave)
+            .st_crd_lne(alice, usd, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(dave, usd, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, dave)
+            .st_fwd_ofr(bob, usd, Quantity::new(10), 0, PPM_SCALE, never(), true)
+            .get()?;
+
+        const START: i64 = 1_700_000_000;
+        pin(&chain, START);
+        let id = schedule(&chain, alice, bob, usd, 100, 100, 100, START, 0);
+
+        let wrong_payee = Wrapper::push_from(&chain, alice).run_pay_ath(id, vec![hop(carol, usd)]);
+        assert!(wrong_payee.get().is_err());
+        let wrong_asset = Wrapper::push_from(&chain, alice).run_pay_ath(id, vec![hop(bob, aud)]);
+        assert!(wrong_asset.get().is_err());
+        let over_ceiling =
+            Wrapper::push_from(&chain, alice).run_pay_ath(id, vec![hop(dave, usd), hop(bob, usd)]);
+        assert!(over_ceiling.get().is_err());
+
+        assert_eq!(pay_row(id).next_due.seconds, START);
+        assert_eq!(exp(&chain, dave, alice, usd), 0);
+        assert_eq!(exp(&chain, bob, dave, usd), 0);
+        assert_eq!(exp(&chain, bob, alice, usd), 0);
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_pay_auth_payee_runs_third_party_cannot(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        let carol = account!("carol");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        chain.new_account(carol).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, usd, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+
+        const START: i64 = 1_700_000_000;
+        pin(&chain, START);
+        let id = schedule(&chain, alice, bob, usd, 100, 100, 100, START, 0);
+
+        let third = Wrapper::push_from(&chain, carol).run_pay_ath(id, vec![hop(bob, usd)]);
+        assert!(third.get().is_err());
+        let third_cancel = Wrapper::push_from(&chain, carol).rm_pay_ath(id, true);
+        assert!(third_cancel.get().is_err());
+        assert_eq!(pay_row(id).next_due.seconds, START);
+
+        Wrapper::push_from(&chain, bob)
+            .run_pay_ath(id, vec![hop(bob, usd)])
+            .get()?;
+        assert_eq!(exp(&chain, bob, alice, usd), 100);
+        assert_eq!(exp(&chain, alice, bob, usd), 0);
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_pay_auth_cancel_deletes_without_paying(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, usd, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+
+        const START: i64 = 1_700_000_000;
+        pin(&chain, START);
+        let due = schedule(&chain, alice, bob, usd, 100, 100, 100, START, 0);
+        let blocked = Wrapper::push_from(&chain, alice).rm_pay_ath(due, false);
+        assert!(blocked.get().is_err());
+        assert!(pay_row(due).id == due);
+        assert_eq!(exp(&chain, bob, alice, usd), 0);
+
+        Wrapper::push_from(&chain, bob)
+            .rm_pay_ath(due, true)
+            .get()?;
+        assert!(PayAuth::get(due).is_none());
+        assert_eq!(exp(&chain, bob, alice, usd), 0);
+        let gone = Wrapper::push_from(&chain, alice).run_pay_ath(due, vec![hop(bob, usd)]);
+        assert!(gone.get().is_err());
+
+        let payer_cancels = schedule(&chain, alice, bob, usd, 100, 100, 100, START + 500, 0);
+        Wrapper::push_from(&chain, alice)
+            .rm_pay_ath(payer_cancels, false)
+            .get()?;
+        assert!(PayAuth::get(payer_cancels).is_none());
+
+        let payee_cancels = schedule(&chain, alice, bob, usd, 100, 100, 100, START + 500, 0);
+        Wrapper::push_from(&chain, bob)
+            .rm_pay_ath(payee_cancels, false)
+            .get()?;
+        assert!(PayAuth::get(payee_cancels).is_none());
+
+        let ending = schedule(&chain, alice, bob, usd, 100, 100, 100, START, START + 50);
+        Wrapper::push_from(&chain, alice)
+            .run_pay_ath(ending, vec![hop(bob, usd)])
+            .get()?;
+        assert_eq!(pay_row(ending).next_due.seconds, START + 100);
+        let after_end = Wrapper::push_from(&chain, alice).run_pay_ath(ending, vec![hop(bob, usd)]);
+        assert!(after_end.get().is_err());
+        Wrapper::push_from(&chain, alice)
+            .rm_pay_ath(ending, false)
+            .get()?;
+        assert!(PayAuth::get(ending).is_none());
+        assert_eq!(exp(&chain, bob, alice, usd), 100);
         Ok(())
     }
 }

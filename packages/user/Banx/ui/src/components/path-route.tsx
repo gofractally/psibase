@@ -11,6 +11,8 @@ type PathRouteProps = {
     hops: PathHopQuote[];
     symbolOf: (id: number) => string;
     labelOf: (account: string) => string;
+    /** Label the sender "You". Turn off when the viewer is not the drawer. */
+    senderIsYou?: boolean;
     className?: string;
 };
 
@@ -32,21 +34,23 @@ export function PathRoute({
     hops,
     symbolOf,
     labelOf,
+    senderIsYou = true,
     className,
 }: PathRouteProps) {
     if (hops.length === 0) return null;
 
+    const senderYou = (account: string) => senderIsYou && account === user;
     const stops = [
-        { account: user, you: true },
+        { account: user, you: senderIsYou },
         ...hops.map((hop) => ({
             account: hop.account,
-            you: hop.account === user,
+            you: senderYou(hop.account),
         })),
     ];
     const summary = [
-        "Path: You",
+        `Path: ${shownName(user, senderIsYou, labelOf)}`,
         ...hops.map((hop) => {
-            const name = shownName(hop.account, hop.account === user, labelOf);
+            const name = shownName(hop.account, senderYou(hop.account), labelOf);
             const spoken =
                 name === hop.account ? name : `${name} (${hop.account})`;
             return `${displayAmount(hop.amount)} ${symbolOf(hop.assetId)} to ${spoken}`;
