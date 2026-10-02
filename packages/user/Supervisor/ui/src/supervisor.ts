@@ -203,8 +203,7 @@ export class Supervisor implements AppInterface {
         );
     }
 
-    // The reply can navigate to a page that reads the queued host:db writes,
-    //   so they must be stored first. If they are not, the reply is an error.
+    // Flush queued host:db writes to the node before replying to the app.
     private async flushAndReply(
         id: string,
         result: any,
