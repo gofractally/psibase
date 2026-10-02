@@ -46,6 +46,7 @@ fn post_to_app(app: &str, endpoint: &str, body: String) -> HttpRequest {
 }
 
 const COOKIE_MAX_AGE: u64 = 30 * 24 * 60 * 60;
+const SET_HOST_COOKIE_PATH: &str = "/common/set-host-cookie";
 
 fn session_cookie_body(value: &str, max_age: u64) -> String {
     format!(
@@ -57,7 +58,7 @@ fn session_cookie_body(value: &str, max_age: u64) -> String {
 fn set_active_query_token(query_token: &str, app: &str, user: &str) {
     let req = post_to_app(
         app,
-        "/common/set-cookie",
+        SET_HOST_COOKIE_PATH,
         session_cookie_body(query_token, COOKIE_MAX_AGE),
     );
     Supervisor::send_request(&req, true).unwrap();
@@ -68,7 +69,7 @@ fn set_active_query_token(query_token: &str, app: &str, user: &str) {
 fn remove_active_query_token(app: &str, user: &str) {
     let req = post_to_app(
         app,
-        "/common/set-cookie",
+        SET_HOST_COOKIE_PATH,
         session_cookie_body("", 0),
     );
     Supervisor::send_request(&req, true).unwrap();

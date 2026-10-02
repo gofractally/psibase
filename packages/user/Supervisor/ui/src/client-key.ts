@@ -26,7 +26,7 @@ function generateClientKey(): string {
 }
 
 async function postClientKeyCookie(value: string): Promise<void> {
-    const url = siblingUrl(null, "supervisor", "/common/set-cookie");
+    const url = siblingUrl(null, "supervisor", "/common/set-host-cookie");
     const response = await fetch(url, {
         method: "POST",
         credentials: "include",

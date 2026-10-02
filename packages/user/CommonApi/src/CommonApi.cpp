@@ -160,7 +160,7 @@ namespace SystemService
 
       if (request.method == "OPTIONS")
       {
-         if (request.target == "/common/set-cookie")
+         if (request.target == "/common/set-host-cookie")
          {
             auto headers = allowCorsFrom(request, "supervisor"_a);
             headers.push_back(allowCredentials());
@@ -188,7 +188,7 @@ namespace SystemService
                 .headers     = allowCors(),
             };
          }
-         if (request.target == "/common/set-cookie")
+         if (request.target == "/common/set-host-cookie")
          {
             auto data = extractData<CookieData>(request);
 
