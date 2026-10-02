@@ -5,147 +5,19 @@
 //!
 //! Session rows are keyed by the session cookie and expire after 7 days of idle
 //! time.
-#[psibase::service_tables]
-mod tables {
-    use psibase::{Pack, ToSchema, Unpack};
+mod helpers;
+mod tables;
 
-    #[table(name = "KvTable", index = 0, db = "Subjective")]
-    #[derive(Pack, Unpack, ToSchema)]
-    pub struct KvRow {
-        pub device: Vec<u8>,
-        pub key: Vec<u8>,
-        pub value: Vec<u8>,
-    }
-
-    impl KvRow {
-        #[primary_key]
-        fn by_device_key(&self) -> (Vec<u8>, Vec<u8>) {
-            (self.device.clone(), self.key.clone())
-        }
-    }
-
-    #[table(name = "SessionKvTable", index = 1, db = "Subjective")]
-    #[derive(Pack, Unpack, ToSchema)]
-    pub struct SessionKvRow {
-        pub device: Vec<u8>,
-        pub session: Vec<u8>,
-        pub key: Vec<u8>,
-        pub value: Vec<u8>,
-        pub last_access: u64,
-    }
-
-    impl SessionKvRow {
-        #[primary_key]
-        fn by_device_session_key(&self) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
-            (self.device.clone(), self.session.clone(), self.key.clone())
-        }
-
-        /// `last_access` leads so the index is oldest-first. The row identity
-        /// follows so each row has its own index entry.
-        #[secondary_key(1)]
-        fn by_last_access(&self) -> (u64, Vec<u8>, Vec<u8>, Vec<u8>) {
-            (
-                self.last_access,
-                self.device.clone(),
-                self.session.clone(),
-                self.key.clone(),
-            )
-        }
-    }
-
-    #[table(name = "DeviceTable", index = 2, db = "Subjective")]
-    #[derive(Pack, Unpack, ToSchema)]
-    pub struct DeviceRow {
-        pub device: Vec<u8>,
-        pub last_seen: u64,
-    }
-
-    impl DeviceRow {
-        #[primary_key]
-        fn by_device(&self) -> Vec<u8> {
-            self.device.clone()
-        }
-
-        #[secondary_key(1)]
-        fn by_last_seen(&self) -> (u64, Vec<u8>) {
-            (self.last_seen, self.device.clone())
-        }
-    }
-}
-
-#[psibase::service(name = "hostdb", tables = "tables")]
+#[psibase::service(name = "hostdb", tables = "tables::tables")]
 mod service {
-    use crate::tables::{DeviceRow, DeviceTable, KvRow, KvTable, SessionKvRow, SessionKvTable};
-    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-    use base64::Engine;
-    use psibase::native_raw;
+    use crate::helpers::{
+        check_precondition, cookie_or_mint, decode_fixed_hex, hex_encode, parse_batch,
+        reply, session_id, status_reply, wall_time_ns, Change, Duration, Precondition,
+        DEVICE_COOKIE, DEVICE_IDLE_NS, GC_LIMIT, KEY_LEN, SESSION_IDLE_NS,
+    };
+    use crate::tables::tables::{DeviceRow, DeviceTable, KvRow, KvTable, SessionKvRow, SessionKvTable};
     use psibase::services::http_server::Wrapper as HttpServer;
     use psibase::*;
-    use serde::Deserialize;
-    use std::str::FromStr;
-
-    const DEVICE_COOKIE: &str = "__Host-HOSTDB-DEVICE";
-    const SESSION_COOKIE: &str = "__Host-HOSTDB-SESSION";
-    const ID_LEN: usize = 16;
-    const KEY_LEN: usize = 32;
-    /// 100 KB plaintext plus the 12-byte nonce and 16-byte GCM tag `host:db` stores.
-    const MAX_VALUE_LEN: usize = 100 * 1024 + 28;
-    const NS_PER_SEC: u64 = 1_000_000_000;
-    const DAY_SECS: u64 = 24 * 60 * 60;
-    /// Device cookie `Max-Age`.
-    const DEVICE_MAX_AGE_SECS: u64 = 400 * DAY_SECS;
-    const DEVICE_IDLE_NS: u64 = DEVICE_MAX_AGE_SECS * NS_PER_SEC;
-    /// `__WASI_CLOCKID_REALTIME`: wall-clock nanoseconds since the unix epoch.
-    const CLOCK_REALTIME: u32 = 0;
-    const SESSION_IDLE_NS: u64 = 7 * DAY_SECS * NS_PER_SEC;
-    const GC_LIMIT: usize = 16;
-
-    #[derive(Clone, Copy, PartialEq, Deserialize)]
-    #[serde(rename_all = "lowercase")]
-    enum Duration {
-        Persistent,
-        Session,
-    }
-
-    #[derive(Deserialize)]
-    #[serde(deny_unknown_fields)]
-    struct BatchBody {
-        ops: Vec<BatchOp>,
-    }
-
-    /// Ciphertext observed by GET: absent, or the SHA-256 of the value returned.
-    #[derive(Clone, Debug, PartialEq)]
-    enum ReadExpect {
-        Absent,
-        Hash(Checksum256),
-    }
-
-    /// Read-time precondition for one batch op.
-    /// Missing `expected` is unconditional. Null means the GET was absent.
-    /// A hex string is the SHA-256 of the ciphertext that GET returned.
-    #[derive(Clone, Debug, Default, PartialEq)]
-    enum Precondition {
-        #[default]
-        Unconditional,
-        Read(ReadExpect),
-    }
-
-    #[derive(Deserialize)]
-    #[serde(deny_unknown_fields)]
-    struct BatchOp {
-        duration: Duration,
-        key: String,
-        value: Option<String>,
-        #[serde(default, deserialize_with = "deserialize_precondition")]
-        expected: Precondition,
-    }
-
-    struct Change {
-        duration: Duration,
-        key: Vec<u8>,
-        value: Option<Vec<u8>>,
-        expected: Precondition,
-    }
 
     /// Serves HTTP for `host:db`. Only a secure `Origin` for `supervisor.{root}`
     /// (https, or http on localhost / `*.localhost`) is accepted.
@@ -167,11 +39,7 @@ mod service {
             return Some(status_reply(403));
         };
 
-        let device = match cookie_id(&request, DEVICE_COOKIE) {
-            CookieValue::Id(id) => Some(id),
-            CookieValue::Missing => Some(mint_id()),
-            CookieValue::Malformed => None,
-        };
+        let device = cookie_or_mint(&request, DEVICE_COOKIE);
         let (result, device_cookie, session_cookie) = match device {
             Some(device) => {
                 let (result, session_cookie) = route(&request, &device);
@@ -370,80 +238,10 @@ mod service {
         }
     }
 
-    /// 409 when the read-time expectation does not describe `stored`.
-    fn check_precondition(stored: Option<&[u8]>, expected: &ReadExpect) -> Result<(), u16> {
-        let matches = match expected {
-            ReadExpect::Absent => stored.is_none(),
-            ReadExpect::Hash(hash) => stored.is_some_and(|value| sha256(value) == *hash),
-        };
-        if matches {
-            Ok(())
-        } else {
-            Err(409)
-        }
-    }
-
     fn is_storage_path(path: &str) -> bool {
         path == "/kv/batch"
             || path.starts_with("/kv/persistent/")
             || path.starts_with("/kv/session/")
-    }
-
-    enum CookieValue {
-        Id(Vec<u8>),
-        Missing,
-        Malformed,
-    }
-
-    fn cookie_id(request: &HttpRequest, name: &str) -> CookieValue {
-        let mut found = None;
-        for part in request.cookies() {
-            match part {
-                CookiePart::Malformed => return CookieValue::Malformed,
-                CookiePart::Pair {
-                    name: cookie_name,
-                    value,
-                } if cookie_name == name => {
-                    if found.is_some() {
-                        return CookieValue::Malformed;
-                    }
-                    found = Some(value);
-                }
-                _ => {}
-            }
-        }
-        match found {
-            None => CookieValue::Missing,
-            Some(value) => match decode_fixed_hex::<ID_LEN>(value) {
-                Some(id) => CookieValue::Id(id),
-                None => CookieValue::Malformed,
-            },
-        }
-    }
-
-    /// Session id for a session read or write. `None` when the cookie is present
-    /// and malformed; a missing cookie starts an empty session.
-    fn session_id(request: &HttpRequest) -> Option<Vec<u8>> {
-        match cookie_id(request, SESSION_COOKIE) {
-            CookieValue::Id(id) => Some(id),
-            CookieValue::Missing => Some(mint_id()),
-            CookieValue::Malformed => None,
-        }
-    }
-
-    fn mint_id() -> Vec<u8> {
-        let mut id = vec![0u8; ID_LEN];
-        unsafe { native_raw::getRandom(id.as_mut_ptr(), id.len()) };
-        id
-    }
-
-    fn wall_time_ns() -> u64 {
-        let mut time = 0u64;
-        let err = unsafe { native_raw::clockTimeGet(CLOCK_REALTIME, &mut time) };
-        if err != 0 {
-            abort_message("clockTimeGet failed");
-        }
-        time
     }
 
     fn collect_expired_sessions(table: &SessionKvTable, now: u64) {
@@ -508,181 +306,7 @@ mod service {
         }
         (keys.len(), drained)
     }
-
-    fn parse_batch(body: &[u8]) -> Option<Vec<Change>> {
-        let body: BatchBody = serde_json::from_slice(body).ok()?;
-        let mut changes = Vec::with_capacity(body.ops.len());
-        for op in body.ops {
-            let key = decode_fixed_hex::<KEY_LEN>(&op.key)?;
-            let value = match op.value {
-                None => None,
-                Some(value) => {
-                    let value = URL_SAFE_NO_PAD.decode(value).ok()?;
-                    if value.len() > MAX_VALUE_LEN {
-                        return None;
-                    }
-                    Some(value)
-                }
-            };
-            changes.push(Change {
-                duration: op.duration,
-                key,
-                value,
-                expected: op.expected,
-            });
-        }
-        Some(changes)
-    }
-
-    fn deserialize_precondition<'de, D>(deserializer: D) -> Result<Precondition, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        match Option::<String>::deserialize(deserializer)? {
-            None => Ok(Precondition::Read(ReadExpect::Absent)),
-            Some(hex) => Checksum256::from_str(&hex)
-                .map(|hash| Precondition::Read(ReadExpect::Hash(hash)))
-                .map_err(|_| serde::de::Error::custom("expected must be a SHA-256 hex digest")),
-        }
-    }
-
-    fn decode_fixed_hex<const N: usize>(input: &str) -> Option<Vec<u8>> {
-        Hex::<[u8; N]>::from_str(input)
-            .ok()
-            .map(|hex| hex.0.to_vec())
-    }
-
-    /// Cookie values are lowercase hex.
-    fn hex_encode(bytes: &[u8]) -> String {
-        Hex(bytes).to_string().to_ascii_lowercase()
-    }
-
-    fn status_reply(status: u16) -> HttpReply {
-        HttpReply {
-            status,
-            contentType: String::new(),
-            body: Vec::new().into(),
-            headers: Vec::new(),
-        }
-    }
-
-    fn reply(
-        request: &HttpRequest,
-        origin: &str,
-        status: u16,
-        body: Option<Vec<u8>>,
-        device_cookie: Option<String>,
-        session_cookie: Option<String>,
-    ) -> HttpReply {
-        let content_type = if body.is_some() {
-            "application/octet-stream"
-        } else {
-            ""
-        };
-        // Not every OPTIONS response is a preflight: a malformed cookie is 400 and
-        // an unknown path is 404.
-        let preflight = request.method == "OPTIONS" && status == 204;
-        let mut headers = vec![
-            HttpHeader::new("Access-Control-Allow-Origin", origin),
-            HttpHeader::new("Access-Control-Allow-Credentials", "true"),
-        ];
-        if preflight {
-            headers.push(HttpHeader::new("Access-Control-Allow-Methods", "GET, POST"));
-            if let Some(requested) = request.get_header("access-control-request-headers") {
-                headers.push(HttpHeader::new("Access-Control-Allow-Headers", requested));
-            }
-        }
-        if let Some(cookie) = device_cookie {
-            headers.push(HttpHeader::new(
-                "Set-Cookie",
-                &format!(
-                    "{DEVICE_COOKIE}={cookie}; Path=/; SameSite=Strict; Secure; Max-Age={DEVICE_MAX_AGE_SECS}; HttpOnly;"
-                ),
-            ));
-        }
-        if let Some(cookie) = session_cookie {
-            headers.push(HttpHeader::new(
-                "Set-Cookie",
-                &format!("{SESSION_COOKIE}={cookie}; Path=/; SameSite=Strict; Secure; HttpOnly;"),
-            ));
-        }
-        HttpReply {
-            status,
-            contentType: content_type.to_string(),
-            body: body.unwrap_or_default().into(),
-            headers,
-        }
-    }
-
-    #[cfg(test)]
-    mod tests {
-        use super::*;
-
-        #[test]
-        fn uppercase_hex_decodes() {
-            let bytes = [0xab; KEY_LEN];
-            let upper = Hex(bytes).to_string();
-            let lower = upper.to_ascii_lowercase();
-            let expected = bytes.to_vec();
-            assert_eq!(decode_fixed_hex::<KEY_LEN>(&upper), Some(expected.clone()));
-            assert_eq!(decode_fixed_hex::<KEY_LEN>(&lower), Some(expected));
-        }
-
-        #[test]
-        fn expected_hash_rejects_a_stale_read() {
-            assert_eq!(
-                hex_encode(&sha256(b"").0),
-                "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-            );
-            let stored = b"ciphertext-v2";
-            let stale = sha256(b"ciphertext-v1");
-            assert_eq!(
-                check_precondition(Some(stored), &ReadExpect::Hash(stale)),
-                Err(409)
-            );
-            assert_eq!(
-                check_precondition(Some(stored), &ReadExpect::Hash(sha256(stored))),
-                Ok(())
-            );
-            assert_eq!(
-                check_precondition(None, &ReadExpect::Hash(sha256(stored))),
-                Err(409)
-            );
-            assert_eq!(
-                check_precondition(Some(stored), &ReadExpect::Absent),
-                Err(409)
-            );
-            assert_eq!(check_precondition(None, &ReadExpect::Absent), Ok(()));
-        }
-
-        #[test]
-        fn batch_op_parses_expected_hash() {
-            let key = "ab".repeat(32);
-            let hash = hex_encode(&sha256(b"ciphertext").0);
-            let with_hash = format!(
-                r#"{{"ops":[{{"duration":"persistent","key":"{key}","value":"YQ","expected":"{hash}"}}]}}"#
-            );
-            let changes = parse_batch(with_hash.as_bytes()).expect("hash");
-            assert_eq!(
-                changes[0].expected,
-                Precondition::Read(ReadExpect::Hash(sha256(b"ciphertext")))
-            );
-
-            let absent = format!(
-                r#"{{"ops":[{{"duration":"session","key":"{key}","value":null,"expected":null}}]}}"#
-            );
-            let changes = parse_batch(absent.as_bytes()).expect("absent");
-            assert_eq!(changes[0].expected, Precondition::Read(ReadExpect::Absent));
-
-            let unconditional =
-                format!(r#"{{"ops":[{{"duration":"persistent","key":"{key}","value":"YQ"}}]}}"#);
-            let changes = parse_batch(unconditional.as_bytes()).expect("unconditional");
-            assert_eq!(changes[0].expected, Precondition::Unconditional);
-
-            let bad = format!(
-                r#"{{"ops":[{{"duration":"persistent","key":"{key}","value":"YQ","expected":"zz"}}]}}"#
-            );
-            assert!(parse_batch(bad.as_bytes()).is_none());
-        }
-    }
 }
+
+#[cfg(test)]
+mod tests;
