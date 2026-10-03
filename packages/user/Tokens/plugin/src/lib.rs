@@ -4,21 +4,22 @@ mod bindings;
 mod errors;
 use errors::ErrorType;
 
-use bindings::exports::tokens::plugin as Exports;
 use Exports::{
     admin::Guest as Admin, authorized::Guest as Authorized, helpers::Guest as Helpers,
     issuer::Guest as Issuer, user::Guest as User, user_config::Guest as UserConfig,
 };
+use bindings::exports::tokens::plugin as Exports;
 
-use psibase::services::tokens::{Decimal, Precision, Quantity};
 use psibase::FlagsType;
+use psibase::services::tokens::{Decimal, Precision, Quantity};
 use psibase_plugin::{trust::*, *};
 
-use tokens::{service::BalanceFlags, service::TokenFlags, Wrapper as Tokens};
+use tokens::{Wrapper as Tokens, service::BalanceFlags, service::TokenFlags};
 
 pub mod query {
     pub mod fetch_network_token;
     pub mod fetch_token;
+    pub mod is_token_transferable;
 }
 
 struct TokensPlugin;
@@ -117,6 +118,13 @@ impl Helpers for TokensPlugin {
     #[psibase_plugin::authorized(None)]
     fn fetch_network_token() -> Result<Option<u32>, Error> {
         Ok(query::fetch_network_token::fetch_network_token()?)
+    }
+
+    #[psibase_plugin::authorized(None)]
+    fn is_token_transferable(token_id: u32) -> Result<bool, Error> {
+        Ok(query::is_token_transferable::is_token_transferable(
+            token_id,
+        )?)
     }
 
     #[psibase_plugin::authorized(None)]

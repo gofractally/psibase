@@ -39,12 +39,7 @@ pub fn get_collateral(resource: ResourceType) -> u64 {
     (actual + pending).max(0) as u64
 }
 
-pub fn consume(
-    resource: ResourceType,
-    user: AccountNumber,
-    sub: Option<String>,
-    cost: u64,
-) {
+pub fn consume(resource: ResourceType, user: AccountNumber, sub: Option<String>, cost: u64) {
     if is_system_user(user) || cost == 0 {
         return;
     }
