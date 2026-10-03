@@ -61,12 +61,18 @@ export const ResourceProviders = () => {
 
     const isLoading =
         candidatesLoading || providersLoading || producersLoading;
+
+    // Same gates as the disabled inputs — keep reason and canSubmit in lockstep.
+    const submitBlockReason = !currentUser
+        ? "Log in as a producer to register."
+        : !isActiveProducer
+          ? "Only active producers can register. Unregister remains available if you previously registered."
+          : !candidate?.endpoint
+            ? "Register as a block-production candidate with a non-empty endpoint first (Block production)."
+            : null;
+
     const canSubmit =
-        Boolean(currentUser) &&
-        isActiveProducer &&
-        Boolean(candidate?.endpoint) &&
-        !isRegistering &&
-        !isUnregistering;
+        !submitBlockReason && !isRegistering && !isUnregistering;
 
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
@@ -95,37 +101,20 @@ export const ResourceProviders = () => {
                     <p className="text-muted-foreground text-sm">Loading...</p>
                 ) : (
                     <>
-                        <div className="space-y-1 text-sm">
-                            {!currentUser && (
-                                <p className="text-muted-foreground">
-                                    Log in as a producer to register.
-                                </p>
-                            )}
-                            {currentUser && !candidate?.endpoint && (
-                                <p className="text-muted-foreground">
-                                    Register as a block-production candidate
-                                    with a non-empty endpoint first.
-                                </p>
-                            )}
-                            {currentUser &&
-                                candidate?.endpoint &&
-                                !isActiveProducer && (
-                                    <p className="text-muted-foreground">
-                                        Only active producers can register.
-                                        Unregister remains available if you
-                                        previously registered.
-                                    </p>
-                                )}
-                            {existing && (
-                                <p>
-                                    Currently registered:{" "}
-                                    <span className="font-medium">
-                                        {existing.app}
-                                    </span>{" "}
-                                    ({existing.accepted.join(", ")})
-                                </p>
-                            )}
-                        </div>
+                        {submitBlockReason && (
+                            <p className="text-sm text-amber-700 dark:text-amber-400">
+                                Registration is disabled: {submitBlockReason}
+                            </p>
+                        )}
+                        {existing && (
+                            <p className="text-sm">
+                                Currently registered:{" "}
+                                <span className="font-medium">
+                                    {existing.app}
+                                </span>{" "}
+                                ({existing.accepted.join(", ")})
+                            </p>
+                        )}
 
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div className="space-y-2">
