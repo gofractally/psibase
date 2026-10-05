@@ -66,27 +66,6 @@ struct ActionQuery
    PSIO_REFLECT(ActionQuery, method(sender), method(service), method(method), method(rawData))
 };
 
-struct ActionFilter
-{
-   std::optional<AccountNumber> sender;
-   std::optional<AccountNumber> service;
-   bool                         operator()(psio::view<const Action> action)
-   {
-      return action.sender().unpack() == sender || action.service().unpack() == service;
-   }
-   bool operator()(psio::view<const Transaction> transaction)
-   {
-      for (auto action : transaction.actions())
-      {
-         if ((*this)(action))
-         {
-            return true;
-         }
-      }
-      return false;
-   }
-};
-
 struct TransactionQuery
 {
    psio::view<const Transaction> transaction;
