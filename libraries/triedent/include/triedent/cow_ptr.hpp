@@ -82,6 +82,7 @@ namespace triedent
             p = nullptr;
             return result;
          }
+         p = nullptr;
          return nullptr;
       }
       friend bool operator==(const cow_ptr& lhs, std::nullptr_t) { return lhs.p == nullptr; }
