@@ -1,7 +1,6 @@
 //! Node-local key-value store for supervisor `host:db` data.
 //!
-//! Persistent rows are device-scoped and expire after ~400 days of idle time;
-//! they are not origin-scoped Web Storage.
+//! Persistent rows are device-scoped and expire after ~400 days of idle time.
 //!
 //! Session rows are keyed by the session cookie and expire after 7 days of idle
 //! time.
