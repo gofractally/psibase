@@ -39,7 +39,7 @@ where
         return Err(DecryptError::Malformed);
     }
 
-    let nonce = Nonce::<C>::from_slice(&encrypted_data[..nonce_len]);
+    let nonce: &Nonce<C> = (&encrypted_data[..nonce_len]).into();
     let cipher = C::new_from_slice(key)
         .expect("AES-GCM key length matches the selected cipher");
     cipher
