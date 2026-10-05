@@ -327,8 +327,7 @@ namespace SystemService
       std::vector<char> runAs(psibase::Action action, std::vector<ServiceMethod> allowedActions);
 
       /// Returns true if all the actions can be authorized by authorizers.
-      /// This always invokes the auth service. It does not include any of the
-      /// special rules of `runAs`.
+      /// This does not include any of the special rules of `runAs`.
       bool isAuth(std::vector<AuthTarget> actions, std::vector<psibase::AccountNumber> authorizers);
 
       /// Checks authorization for the sender of the first action
