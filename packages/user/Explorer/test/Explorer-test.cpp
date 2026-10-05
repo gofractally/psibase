@@ -22,7 +22,7 @@ struct BlocksTransaction
 };
 struct BlocksSignedTransaction
 {
-   BlocksTransaction transaction;
+   std::optional<BlocksTransaction> transaction;
    PSIO_REFLECT(BlocksSignedTransaction, transaction)
 };
 struct BlocksNode
@@ -71,14 +71,21 @@ TEST_CASE("test authenticated user")
    {
       auto reply = t.post<BlocksRoot>(Explorer::service, "/graphql", GraphQLBody{query});
       REQUIRE(reply.data.blocks.edges.size() == 1);
-      REQUIRE(reply.data.blocks.edges[0].node.transactions.size() == 0);
+      REQUIRE(reply.data.blocks.edges[0].node.transactions.size() == 3);
+      for (const auto& tx : reply.data.blocks.edges[0].node.transactions)
+      {
+         REQUIRE(!tx.transaction.has_value());
+      }
    }
    {
       auto reply = t.post<BlocksRoot>(Explorer::service, "/graphql", GraphQLBody{query}, token);
       REQUIRE(reply.data.blocks.edges.size() == 1);
-      REQUIRE(reply.data.blocks.edges[0].node.transactions.size() == 1);
-      REQUIRE(reply.data.blocks.edges[0].node.transactions[0].transaction.actions.size() == 1);
-      auto act = reply.data.blocks.edges[0].node.transactions[0].transaction.actions[0];
+      const auto& transactions = reply.data.blocks.edges[0].node.transactions;
+      REQUIRE(transactions.size() == 3);
+      CHECK(!transactions[0].transaction.has_value());
+      CHECK(!transactions[2].transaction.has_value());
+      REQUIRE(transactions[1].transaction.has_value());
+      auto act = transactions[1].transaction->actions[0];
       CHECK(act.sender == alice);
       CHECK(act.service == Nop::service);
       CHECK(act.method == MethodNumber{"nop"});
