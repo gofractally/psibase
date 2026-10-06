@@ -3,9 +3,7 @@ package accounts:plugin;
 world impl {
     include host:client/imports;
     include host:http/imports;
-    include host:auth/imports;
     include host:prompt/imports;
-    include host:db/imports;
     include transact:plugin/imports;
     include permissions:plugin/imports;
     include accounts:query/imports;
@@ -14,6 +12,7 @@ world impl {
     include name-market:plugin/imports;
     include host:crypto/imports;
 
+    import host:accounts/admin;
     import invite:plugin/redemption;
 
     export api;

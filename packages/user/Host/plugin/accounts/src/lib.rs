@@ -1,30 +1,17 @@
 #[allow(warnings)]
 mod bindings;
 
+mod db;
 mod helpers;
+use db::{apps_table::AppsTable, user_table::UserTable};
 use helpers::*;
 
+use bindings::exports::host::accounts::admin::Guest as Admin;
 use bindings::exports::host::accounts::api::Guest as API;
 use bindings::host::client::api as Client;
-use bindings::host::db::store::{Bucket, Database, DbMode, StorageDuration};
+use bindings::host::types::types::Error;
 
 struct HostAccounts;
-
-fn logged_in_user_table() -> Bucket {
-    Bucket::new(
-        Database {
-            mode: DbMode::NonTransactional,
-            duration: StorageDuration::Persistent,
-        },
-        "logged_in_user",
-    )
-}
-
-fn user_for_app(app: &str) -> Option<String> {
-    logged_in_user_table()
-        .get(app)
-        .map(|a| String::from_utf8(a).unwrap())
-}
 
 impl API for HostAccounts {
     fn is_logged_in() -> bool {
@@ -32,30 +19,49 @@ impl API for HostAccounts {
     }
 
     fn get_current_user() -> Option<String> {
-        user_for_app(&Client::get_active_app())
+        AppsTable::new(&Client::get_active_app()).get_logged_in_user()
+    }
+}
+
+impl Admin for HostAccounts {
+    fn login(user: String, app: String) -> Result<(), Error> {
+        check_caller(&["accounts"], "login@host:accounts/admin");
+        AppsTable::new(&app).login(&user)
     }
 
-    fn set_current_user(user: String, app: String) {
-        check_caller(&["accounts"], "set-current-user@host:accounts/api");
-        logged_in_user_table().set(&app, user.as_bytes());
+    fn logout(app: String) {
+        check_caller(&["accounts"], "logout@host:accounts/admin");
+        AppsTable::new(&app).logout();
     }
 
-    fn clear_current_user(app: String) -> Option<String> {
-        check_caller(&["accounts"], "clear-current-user@host:accounts/api");
-        let user = user_for_app(&app)?;
-        logged_in_user_table().delete(&app);
-        Some(user)
+    fn connect(account: String, app: String) {
+        check_caller(&["accounts"], "connect@host:accounts/admin");
+        AppsTable::new(&app).connect(&account);
     }
 
-    fn revoke_login(user: String, app: String) -> bool {
-        check_caller(&["accounts"], "revoke-login@host:accounts/api");
-        match user_for_app(&app) {
-            Some(current) if current == user => {
-                logged_in_user_table().delete(&app);
-                true
-            }
-            _ => false,
-        }
+    fn disconnect(account: String, app: String) {
+        check_caller(&["accounts"], "disconnect@host:accounts/admin");
+        AppsTable::new(&app).disconnect(&account);
+    }
+
+    fn get_connected_accounts(app: String) -> Vec<String> {
+        check_caller(&["accounts"], "get-connected-accounts@host:accounts/admin");
+        AppsTable::new(&app).get_connected_accounts()
+    }
+
+    fn add_connected_app(user: String, app: String) {
+        check_caller(&["accounts"], "add-connected-app@host:accounts/admin");
+        UserTable::new(&user).add_connected_app(&app);
+    }
+
+    fn remove_connected_app(user: String, app: String) {
+        check_caller(&["accounts"], "remove-connected-app@host:accounts/admin");
+        UserTable::new(&user).remove_connected_app(&app);
+    }
+
+    fn get_connected_apps(user: String) -> Vec<String> {
+        check_caller(&["accounts"], "get-connected-apps@host:accounts/admin");
+        UserTable::new(&user).get_connected_apps()
     }
 }
 

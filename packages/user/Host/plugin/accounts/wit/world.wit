@@ -7,15 +7,35 @@ interface api {
     /// Gets the account name of the user logged into the active application.
     /// May also return None if no user is logged in.
     get-current-user: func() -> option<string>;
+}
 
-    /// Sets the logged-in user for the specified app
-    set-current-user: func(user: string, app: string);
+/// This interface is only callable by the accounts plugin.
+interface admin {
+    use host:types/types.{error};
 
-    /// Clears the logged-in user for the specified app; returns the user if any
-    clear-current-user: func(app: string) -> option<string>;
+    /// Logs the user into the specified app and connects them to it
+    login: func(user: string, app: string) -> result<_, error>;
 
-    /// Clears the logged-in user for app if it matches `user`; returns whether cleared
-    revoke-login: func(user: string, app: string) -> bool;
+    /// Logs out the user logged into the specified app
+    logout: func(app: string);
+
+    /// Connects the account to the specified app
+    connect: func(account: string, app: string);
+
+    /// Disconnects the account from the specified app, logging it out if logged in
+    disconnect: func(account: string, app: string);
+
+    /// Gets the accounts connected to the specified app
+    get-connected-accounts: func(app: string) -> list<string>;
+
+    /// Adds the specified app to the user's connected apps
+    add-connected-app: func(user: string, app: string);
+
+    /// Removes the specified app from the user's connected apps
+    remove-connected-app: func(user: string, app: string);
+
+    /// Gets the names of all apps to which the user has connected
+    get-connected-apps: func(user: string) -> list<string>;
 }
 
 world imports {
