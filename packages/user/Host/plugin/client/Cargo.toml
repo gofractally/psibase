@@ -20,3 +20,4 @@ world = "impl"
 
 [package.metadata.component.target.dependencies]
 "supervisor:bridge" = { path = "./wit/deps/supervisor.wit" }
+"supervisor:callstack" = { path = "./wit/deps/callstack.wit" }
