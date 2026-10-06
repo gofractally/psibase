@@ -1,5 +1,6 @@
 import {
     ARENA,
+    ENEMY_EXPLOSION_DURATION,
     FIRE_COOLDOWN,
     START_LIVES,
     type Block,
@@ -54,6 +55,12 @@ export function createInitialState(): GameState {
         elapsed: 0,
         respawnIn: 0,
         respawnId: null,
+        hitStunIn: 0,
+        radarAlertIn: 0,
+        explosionIn: 0,
+        explosionDuration: ENEMY_EXPLOSION_DURATION,
+        explosionPos: null,
+        explosionHeading: 0,
     };
 }
 

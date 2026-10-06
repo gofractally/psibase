@@ -40,6 +40,8 @@ export function App() {
             if (e.code !== "Enter") return;
             e.preventDefault();
             if (state.phase === "title" || state.phase === "win" || state.phase === "lose") {
+                // Wait out the victory explosion before allowing replay
+                if (state.phase === "win" && state.explosionIn > 0) return;
                 Object.assign(state, resetMatch(state));
             }
         };
@@ -74,7 +76,7 @@ export function App() {
                 display: "block",
                 width: "100vw",
                 height: "100vh",
-                background: "#001100",
+                background: "#000000",
                 cursor: "none",
             }}
         />

@@ -1,7 +1,11 @@
 import {
     ARENA,
+    ENEMY_EXPLOSION_DURATION,
+    ENEMY_EXPLOSION_MID,
     FIRE_COOLDOWN,
     MOVE_SPEED,
+    PLAYER_HIT_STUN,
+    RADAR_ALERT_DURATION,
     SHOT_LIFE,
     SHOT_SPEED,
     TANK_RADIUS,
@@ -22,14 +26,8 @@ function clampArena(p: Vec2): void {
 }
 
 function circleHitsBlock(pos: Vec2, radius: number, block: Block): boolean {
-    const dx = Math.max(
-        Math.abs(pos.x - block.pos.x) - block.half,
-        0,
-    );
-    const dy = Math.max(
-        Math.abs(pos.y - block.pos.y) - block.half,
-        0,
-    );
+    const dx = Math.max(Math.abs(pos.x - block.pos.x) - block.half, 0);
+    const dy = Math.max(Math.abs(pos.y - block.pos.y) - block.half, 0);
     return dx * dx + dy * dy < radius * radius;
 }
 
@@ -58,13 +56,16 @@ function tryFire(state: GameState, tank: Tank): void {
         id: state.nextShotId++,
         owner: tank.id,
         pos: {
-            x: tank.pos.x + dir.x * (TANK_RADIUS + 1),
-            y: tank.pos.y + dir.y * (TANK_RADIUS + 1),
+            x: tank.pos.x + dir.x * (TANK_RADIUS + 2.5),
+            y: tank.pos.y + dir.y * (TANK_RADIUS + 2.5),
         },
         vel: { x: dir.x * SHOT_SPEED, y: dir.y * SHOT_SPEED },
         life: SHOT_LIFE,
     };
     state.shots.push(shot);
+    if (tank.id === "ai") {
+        state.radarAlertIn = RADAR_ALERT_DURATION;
+    }
 }
 
 function applyInput(tank: Tank, input: InputState, dt: number, blocks: Block[]): void {
@@ -93,19 +94,42 @@ function onTankHit(state: GameState, victim: Tank, attackerId: Tank["id"]): void
     const attacker = state.tanks.find((t) => t.id === attackerId);
     if (attacker) attacker.score += 1;
 
-    if (victim.lives <= 0) {
-        state.phase = victim.id === "player" ? "lose" : "win";
-        state.message =
-            victim.id === "player" ? "MISSION FAILED" : "ENEMY DESTROYED";
+    if (victim.id === "player") {
         state.shots = [];
-        state.respawnIn = 0;
-        state.respawnId = null;
+        if (victim.lives <= 0) {
+            state.phase = "lose";
+            state.message = "MISSION FAILED";
+            state.hitStunIn = PLAYER_HIT_STUN;
+            state.respawnIn = 0;
+            state.respawnId = null;
+        } else {
+            state.message = "TANK DESTROYED";
+            state.hitStunIn = PLAYER_HIT_STUN;
+            state.respawnIn = PLAYER_HIT_STUN;
+            state.respawnId = "player";
+        }
         return;
     }
 
-    state.message = victim.id === "player" ? "TANK DESTROYED" : "HIT CONFIRMED";
-    state.respawnId = victim.id;
-    state.respawnIn = 1.2;
+    // Enemy hit: always explode at the kill site
+    state.shots = state.shots.filter((s) => s.owner !== "ai");
+    state.explosionPos = { ...victim.pos };
+    state.explosionHeading = victim.heading;
+
+    if (victim.lives <= 0) {
+        state.phase = "win";
+        state.message = "";
+        state.explosionDuration = ENEMY_EXPLOSION_DURATION;
+        state.explosionIn = ENEMY_EXPLOSION_DURATION;
+        state.respawnIn = 0;
+        state.respawnId = null;
+    } else {
+        state.message = "HIT CONFIRMED";
+        state.explosionDuration = ENEMY_EXPLOSION_MID;
+        state.explosionIn = ENEMY_EXPLOSION_MID;
+        state.respawnId = "ai";
+        state.respawnIn = 0; // respawn after explosion finishes
+    }
 }
 
 export function stepGame(
@@ -114,18 +138,45 @@ export function stepGame(
     aiInput: InputState,
     dt: number,
 ): void {
+    if (state.phase === "title") return;
+
+    // Explosion: freeze gameplay, only advance the animation timer
+    if (state.explosionIn > 0) {
+        state.explosionIn = Math.max(0, state.explosionIn - dt);
+        state.elapsed += dt;
+        if (state.explosionIn <= 0) {
+            if (state.phase === "win") {
+                state.message = "Victory!";
+            } else if (state.phase === "playing" && state.respawnId === "ai") {
+                const tank = state.tanks.find((t) => t.id === "ai");
+                if (tank) respawnTank(tank);
+                state.respawnId = null;
+                state.explosionPos = null;
+                state.message = "DESTROY THE ENEMY TANK";
+            }
+        }
+        return;
+    }
+
+    // Freeze everything during player hit-stun so the cracked view is readable
+    if (state.hitStunIn > 0) {
+        state.hitStunIn = Math.max(0, state.hitStunIn - dt);
+        if (state.respawnIn > 0 && state.respawnId === "player") {
+            state.respawnIn = Math.max(0, state.respawnIn - dt);
+            if (state.respawnIn <= 0 && state.phase === "playing") {
+                const tank = state.tanks.find((t) => t.id === "player");
+                if (tank) respawnTank(tank);
+                state.respawnId = null;
+                state.message = "DESTROY THE ENEMY TANK";
+            }
+        }
+        return;
+    }
+
     if (state.phase !== "playing") return;
     state.elapsed += dt;
-
-    if (state.respawnIn > 0 && state.respawnId) {
-        state.respawnIn -= dt;
-        if (state.respawnIn <= 0) {
-            const tank = state.tanks.find((t) => t.id === state.respawnId);
-            if (tank) respawnTank(tank);
-            state.respawnId = null;
-            state.respawnIn = 0;
-            state.message = "DESTROY THE ENEMY TANK";
-        }
+    if (state.radarAlertIn > 0) {
+        state.radarAlertIn = Math.max(0, state.radarAlertIn - dt);
     }
 
     const player = state.tanks.find((t) => t.id === "player")!;
@@ -144,10 +195,7 @@ export function stepGame(
 
         let dead = shot.life <= 0;
         const lim = ARENA * 0.5;
-        if (
-            Math.abs(shot.pos.x) > lim ||
-            Math.abs(shot.pos.y) > lim
-        ) {
+        if (Math.abs(shot.pos.x) > lim || Math.abs(shot.pos.y) > lim) {
             dead = true;
         }
         for (const block of state.blocks) {

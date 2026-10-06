@@ -16,7 +16,7 @@ export function createKeyBits(): KeyBits {
     };
 }
 
-function mapKey(code: string): keyof KeyBits | null {
+function mapKey(code: string, key: string): keyof KeyBits | null {
     switch (code) {
         case "ArrowLeft":
         case "KeyA":
@@ -33,19 +33,20 @@ function mapKey(code: string): keyof KeyBits | null {
         case "Space":
             return "fire";
         default:
+            if (key === " ") return "fire";
             return null;
     }
 }
 
 export function attachKeyboard(keys: KeyBits): () => void {
     const down = (e: KeyboardEvent) => {
-        const k = mapKey(e.code);
+        const k = mapKey(e.code, e.key);
         if (!k) return;
         e.preventDefault();
         keys[k] = true;
     };
     const up = (e: KeyboardEvent) => {
-        const k = mapKey(e.code);
+        const k = mapKey(e.code, e.key);
         if (!k) return;
         e.preventDefault();
         keys[k] = false;
