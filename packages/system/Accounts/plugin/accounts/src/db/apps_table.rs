@@ -43,10 +43,6 @@ impl AppsTable {
         Self { app: app.clone() }
     }
 
-    pub fn get_logged_in_user(&self) -> Option<String> {
-        HostAccounts::get_user(&self.app)
-    }
-
     pub fn login(&self, user: &str) {
         HostAccounts::set_current_user(user, &self.app);
         self.connect(user);
@@ -69,21 +65,17 @@ impl AppsTable {
             .unwrap_or_default();
         connected_accounts.remove(user);
 
-        if self
-            .get_logged_in_user()
-            .is_some_and(|logged_in_user| logged_in_user == user)
-        {
-            self.logout();
+        if HostAccounts::revoke_login(user, &self.app) {
+            HostAuth::log_out_user(user, &self.app);
         }
 
         connected_accounts_table().set(&self.app, &connected_accounts.packed());
     }
 
     pub fn logout(&self) {
-        if let Some(user) = self.get_logged_in_user() {
+        if let Some(user) = HostAccounts::clear_current_user(&self.app) {
             HostAuth::log_out_user(&user, &self.app);
         }
-        HostAccounts::clear_current_user(&self.app);
     }
 
     pub fn get_connected_accounts(&self) -> Vec<String> {

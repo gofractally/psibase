@@ -1,4 +1,4 @@
-use crate::bindings::accounts::chain_query::api as AccountsQuery;
+use crate::bindings::accounts::query::api as AccountsQuery;
 use crate::bindings::auth_sig::plugin as AuthSig;
 use crate::bindings::exports::accounts::plugin::prompt::{Credential, Guest as Prompt};
 use crate::bindings::host::{

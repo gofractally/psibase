@@ -1,7 +1,7 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::exports::accounts::chain_query::api::{Account, Guest as API};
+use bindings::exports::accounts::query::api::{Account, Guest as API};
 use bindings::host::http::api as Server;
 use bindings::host::types::types::Error;
 use psibase::plugin_error;

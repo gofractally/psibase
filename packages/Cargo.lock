@@ -25,7 +25,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "accounts-chain-query"
+name = "accounts-query"
 version = "0.29.0"
 dependencies = [
  "psibase",

@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "system/Accounts/plugin/accounts/",
-    "system/Accounts/plugin/chain-query/",
+    "system/Accounts/plugin/query/",
     "system/AuthAny/plugin/",
     "system/AuthDelegate/plugin/",
     "system/AuthSig/plugin/",

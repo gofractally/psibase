@@ -138,7 +138,7 @@ fn flush_propose_latch() -> Result<(), HostTypes::Error> {
 }
 
 fn user_auth_claim(user: &str) -> Result<Option<ImportClaim>, HostTypes::Error> {
-    let auth_service_acc = accounts::chain_query::api::get_account(&user.to_string())?
+    let auth_service_acc = accounts::query::api::get_account(&user.to_string())?
         .unwrap()
         .auth_service;
     let plugin_ref = PluginRef::new(&auth_service_acc, "plugin", "transact-hook-user-auth");
@@ -149,7 +149,7 @@ fn user_auth_proof(
     user: &str,
     tx_hash: &[u8; 32],
 ) -> Result<Option<transact::plugin::types::Proof>, HostTypes::Error> {
-    let auth_service_acc = accounts::chain_query::api::get_account(&user.to_string())?
+    let auth_service_acc = accounts::query::api::get_account(&user.to_string())?
         .unwrap()
         .auth_service;
     let plugin_ref = PluginRef::new(&auth_service_acc, "plugin", "transact-hook-user-auth");

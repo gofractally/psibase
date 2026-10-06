@@ -1,7 +1,5 @@
 package host:accounts;
 
-/// Platform current-user state for the active (or specified) app.
-/// Leaf: imports only host:client and host:db. Does not mint tokens or set cookies.
 interface api {
     /// Returns true if there is a user logged in to the currently active top-level application.
     is-logged-in: func() -> bool;
@@ -10,16 +8,14 @@ interface api {
     /// May also return None if no user is logged in.
     get-current-user: func() -> option<string>;
 
-    /// Gets the logged-in user for a specific app (bucket key), not necessarily the active app.
-    get-user: func(app: string) -> option<string>;
-
-    /// Sets the logged-in user for the specified app (bucket only).
-    /// Caller-gated to the accounts service.
+    /// Sets the logged-in user for the specified app
     set-current-user: func(user: string, app: string);
 
-    /// Clears the logged-in user for the specified app (bucket only).
-    /// Caller-gated to the accounts service.
-    clear-current-user: func(app: string);
+    /// Clears the logged-in user for the specified app; returns the user if any
+    clear-current-user: func(app: string) -> option<string>;
+
+    /// Clears the logged-in user for app if it matches `user`; returns whether cleared
+    revoke-login: func(user: string, app: string) -> bool;
 }
 
 world imports {

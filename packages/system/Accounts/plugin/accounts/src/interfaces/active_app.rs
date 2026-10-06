@@ -4,11 +4,11 @@ use crate::db::{apps_table::*, user_table::*};
 use crate::errors::ErrorType::*;
 use crate::helpers::*;
 use crate::plugin::AccountsPlugin;
-use accounts::chain_query::api as AccountsQuery;
+use accounts::query::api as AccountsQuery;
 use bindings::*;
 use exports::accounts::plugin::active_app::{Guest as ActiveApp, *};
-use host::client::api as client;
 use host::auth::api as HostAuth;
+use host::client::api as client;
 use host::prompt::api as Prompt;
 
 impl ActiveApp for AccountsPlugin {
@@ -36,12 +36,7 @@ impl ActiveApp for AccountsPlugin {
 
     fn logout() -> Result<(), Error> {
         let app = get_assert_top_level_app("logout", &vec!["supervisor"])?;
-        let apps_table = AppsTable::new(&app);
-
-        if apps_table.get_logged_in_user().is_some() {
-            apps_table.logout();
-        }
-
+        AppsTable::new(&app).logout();
         Ok(())
     }
 

@@ -41,7 +41,7 @@ const rootDomain = siblingUrl();
 //   in a given call context.
 const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("accounts", "plugin"),
-    pluginId("accounts", "chain-query"),
+    pluginId("accounts", "query"),
     pluginId("host", "accounts"),
     pluginId("host", "auth"),
     pluginId("host", "prompt"),

@@ -18,7 +18,7 @@ export const getAccount = async (
                 method: "getAccount",
                 params: [accountName],
                 service: "accounts",
-                plugin: "chain-query",
+                plugin: "query",
                 intf: "api",
             }),
         );

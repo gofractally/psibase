@@ -1,4 +1,4 @@
-package accounts:chain-query;
+package accounts:query;
 
 interface types {
     record account {

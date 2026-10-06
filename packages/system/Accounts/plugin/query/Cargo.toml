@@ -1,5 +1,5 @@
 [package]
-name = "accounts-chain-query"
+name = "accounts-query"
 version.workspace = true
 edition.workspace = true
 
@@ -15,7 +15,7 @@ rand = "0.9.1"
 crate-type = ["cdylib"]
 
 [package.metadata.component]
-package = "accounts:chain-query"
+package = "accounts:query"
 
 [package.metadata.component.target]
 world = "impl"

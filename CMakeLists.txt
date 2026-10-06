@@ -276,7 +276,7 @@ add_dependencies(CommonApiCommonLib_js ComponentParser)
 
 add_rs_component_workspace(packages/:Plugins 
     accounts
-    accounts-chain-query
+    accounts-query
     aes
     auth-any
     auth-delegate
@@ -374,7 +374,7 @@ psibase_package(
     SERVICE accounts
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Accounts/ui/dist/* /
         DATA ${Plugins_OUTPUT_FILE_accounts} /plugin.wasm
-        DATA ${Plugins_OUTPUT_FILE_accounts_chain_query} /chain-query.wasm
+        DATA ${Plugins_OUTPUT_FILE_accounts_query} /query.wasm
         POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Accounts/postinstall-ui.json
     DEPENDS ${Accounts_js_DEP}
     DEPENDS ${Plugins_DEP}
