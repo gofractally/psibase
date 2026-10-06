@@ -2,8 +2,10 @@ import { Outlet } from "react-router-dom";
 
 function Root() {
     return (
-        <div className="mx-auto flex min-h-dvh w-full items-center justify-center">
-            <Outlet />
+        <div className="flex min-h-dvh w-full items-center justify-center p-4">
+            <div className="w-full min-w-0">
+                <Outlet />
+            </div>
         </div>
     );
 }

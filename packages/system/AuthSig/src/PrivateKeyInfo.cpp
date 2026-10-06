@@ -6,6 +6,7 @@
 #include <botan/der_enc.h>
 #include <botan/entropy_src.h>
 #include <botan/pem.h>
+#include <botan/pk_algs.h>
 #include <botan/pk_keys.h>
 #include <botan/pkcs8.h>
 #include <botan/pubkey.h>
@@ -59,6 +60,17 @@ namespace SystemService
          psibase::check(msg.size() == 64, "Signing failed");
 
          return msg;
+      }
+
+      PrivateKeyInfo PrivateKeyInfo::create(std::string_view group)
+      {
+         auto sources = Botan::Entropy_Sources();
+         sources.add_source(Botan::Entropy_Source::create("getentropy"));
+         Botan::AutoSeeded_RNG rng(sources);
+
+         auto key    = Botan::create_private_key("ECDSA", rng, group);
+         auto result = Botan::PKCS8::BER_encode(*key);
+         return PrivateKeyInfo{.data{result.begin(), result.end()}};
       }
 
    }  // namespace AuthSig

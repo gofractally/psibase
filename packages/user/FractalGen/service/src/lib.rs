@@ -50,29 +50,16 @@ mod service {
         let prods = Producers::call().getProducers();
         let producer = prods.first().unwrap();
 
-        let legislature = account!("legislatur");
-        let judiciary = account!("judiciar-a");
-        let executive = account!("executiv-a");
-        let recruitment = account!("recruitm-a");
-
         Fractals::call_from(*producer).create_frac(
             SYS_FRACTAL,
-            legislature,
-            judiciary,
-            executive,
-            recruitment,
-            "Network Governance".into(),
-            "To establish, maintain, and grow the network.".into(),
+            "Core".into(),
+            "To establish, sustain, and cultivate the network.".into(),
         );
 
         let guilds = Guilds::call_from(*producer);
-        guilds.create_guild(
-            SYS_FRACTAL,
-            SYS_GUILD,
-            "Genesis".into(),
-            account!("c-role-001"),
-            account!("r-role-001"),
-        );
+        guilds.create_guild(SYS_FRACTAL, SYS_GUILD, "Guild One".into());
+        Guilds::call_as(SYS_GUILD)
+            .set_g_desc("Coordinates community efforts in service of the fractal's mission".into());
 
         let map_sys_guild_to_role_occ = |role: FractalRole| {
             Guilds::call_as(SYS_FRACTAL).set_role_map(role.into(), SYS_GUILD);

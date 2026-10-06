@@ -300,6 +300,7 @@ add_rs_component_workspace(packages/:Plugins
     host-crypto
     web-crypto
     transact
+    transact-admin
     workshop
     fractal-core
     config
@@ -342,6 +343,7 @@ psibase_package(
     DESCRIPTION "All transactions enter the chain through this service"
     SERVICE transact
         DATA ${Plugins_OUTPUT_FILE_transact} /plugin.wasm
+        DATA ${Plugins_OUTPUT_FILE_transact_admin} /admin.wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "TransactService(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "ClientData(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "VirtualServer(^${PSIBASE_VERSION}.0)"
 )
@@ -552,6 +554,12 @@ cargo_psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/FractalGen.psi
     PATH packages/user/FractalGen
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
+)
+
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/SingleProd.psi
+    PATH packages/user/SingleProd
     TARGET_DIR ${USER_WORKSPACE_TARGET}
 )
 
@@ -1153,6 +1161,19 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/XKeys.psi
+    NAME XKeys
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Allows services to manage keys and sign transactions"
+    LOCAL
+    SERVICE x-keys
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/XKeys.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XKeys-schema.json
+        FLAGS isPrivileged
+    DEPENDS wasm
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/XPackages.psi
     NAME XPackages
     VERSION ${PSIBASE_VERSION}.0
@@ -1296,7 +1317,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Default set of local packages to install on a new server"
     LOCAL
-    PACKAGE_DEPENDS XHttp XAdmin XDb XPackages XPeers XRun XSites XTimer XTransact
+    PACKAGE_DEPENDS XHttp XAdmin XDb XKeys XPackages XPeers XRun XSites XTimer XTransact
 )
 
 function(write_package_index target dir reserve)
@@ -1324,9 +1345,9 @@ endfunction()
 
 write_package_index(package-index ${SERVICE_DIR} 1
     Accounts AccountsService Aes AuthAny AuthDyn AuthDelegate AuthDelegateService AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
-    Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry
+    Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles SingleProd TestDefault HttpServer Registry
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage VirtualServer WebCrypto Workshop Config
-    XAdmin XBasic XDb XDefault XHttp XPackages XPeers XProxy XRun XSites XTimer XTransact)
+    XAdmin XBasic XDb XDefault XHttp XKeys XPackages XPeers XProxy XRun XSites XTimer XTransact)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -1385,6 +1406,7 @@ install(
           ${SERVICE_DIR}/Registry.psi
           ${SERVICE_DIR}/ReservedNames.psi
           ${SERVICE_DIR}/SetCode.psi
+          ${SERVICE_DIR}/SingleProd.psi
           ${SERVICE_DIR}/Sites.psi
           ${SERVICE_DIR}/StagedTx.psi
           ${SERVICE_DIR}/Subgroups.psi
@@ -1406,6 +1428,7 @@ install(
           ${SERVICE_DIR}/XDb.psi
           ${SERVICE_DIR}/XDefault.psi
           ${SERVICE_DIR}/XHttp.psi
+          ${SERVICE_DIR}/XKeys.psi
           ${SERVICE_DIR}/XPackages.psi
           ${SERVICE_DIR}/XPeers.psi
           ${SERVICE_DIR}/XProxy.psi

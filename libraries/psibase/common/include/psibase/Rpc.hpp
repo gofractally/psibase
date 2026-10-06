@@ -1,5 +1,6 @@
 #pragma once
 
+#include <psibase/RpcFwd.hpp>
 #include <psibase/block.hpp>
 #include <psio/nested.hpp>
 #include <string>
@@ -20,23 +21,53 @@ namespace psibase
                                                  std::string_view name);
       static std::vector<std::string_view>   split(const std::vector<HttpHeader>&,
                                                    std::string_view name);
+      static void remove(std::vector<HttpHeader>&, std::string_view name);
+
+      static std::vector<std::string_view> getCookie(const std::vector<HttpHeader>&,
+                                                     std::string_view name);
+      static void removeCookies(std::vector<HttpHeader>&,
+                                const std::function<bool(std::string_view)>& cond);
    };
+   using HttpHeaders = std::vector<HttpHeader>;
+
+   namespace detail
+   {
+      std::pair<std::string, std::string> readQueryItem(std::string_view&);
+
+      std::string targetPath(std::string_view target);
+
+      template <typename T>
+      T targetQuery(std::string_view target)
+      {
+         T    result{};
+         auto pos = target.find('?');
+         if (pos != std::string::npos)
+         {
+            auto query = target.substr(pos + 1);
+            while (!query.empty())
+            {
+               auto [key, value] = readQueryItem(query);
+               psio::get_data_member<T>(key, [&](auto m) { result.*m = std::move(value); });
+            }
+         }
+         return result;
+      }
+   }  // namespace detail
 
    /// An HTTP Request
    ///
    /// Most services receive this via their `serveSys` action.
    /// [SystemService::HttpServer] receives it via its `serve` exported function.
-   struct HttpRequest
+   template <typename Body>
+   struct BasicHttpRequest
    {
       std::string             host;         ///< Fully-qualified domain name
       std::string             method;       ///< "GET", "POST", "OPTIONS", "HEAD"
       std::string             target;       ///< Absolute path, e.g. "/index.js"
       std::string             contentType;  ///< "application/json", "text/html", ...
       std::vector<HttpHeader> headers;      ///< HTTP Headers
-      std::vector<char>       body;         ///< Request body, e.g. POST data
-      PSIO_REFLECT(HttpRequest, host, method, target, contentType, headers, body)
-
-      static std::pair<std::string, std::string> readQueryItem(std::string_view&);
+      Body                    body;         ///< Request body, e.g. POST data
+      PSIO_REFLECT(BasicHttpRequest, host, method, target, contentType, headers, body)
 
       /// Parses the query component
       ///
@@ -48,43 +79,51 @@ namespace psibase
       template <typename T>
       T query() const
       {
-         T    result{};
-         auto pos = target.find('?');
-         if (pos != std::string::npos)
-         {
-            auto query = std::string_view{target}.substr(pos + 1);
-            while (!query.empty())
-            {
-               auto [key, value] = readQueryItem(query);
-               psio::get_data_member<T>(key, [&](auto m) { result.*m = std::move(value); });
-            }
-         }
-         return result;
+         return detail::targetQuery<T>(target);
       }
 
       /// Returns the path component
       ///
       // %XX escapes are decoded.
-      std::string path() const;
+      std::string path() const { return detail::targetPath(target); }
 
       /// Searches for a cookie by name
       ///
       /// The values returned are not validated or decoded
-      std::vector<std::string_view> getCookie(std::string_view name) const;
+      std::vector<std::string_view> getCookie(std::string_view name) const
+      {
+         return HttpHeader::getCookie(headers, name);
+      }
 
       /// Searches for a header by name (case-insensitive)
       ///
       /// The value returned is not validated or decoded
-      std::optional<std::string_view> getHeader(std::string_view name) const;
+      std::optional<std::string_view> getHeader(std::string_view name) const
+      {
+         return HttpHeader::get(headers, name);
+      }
 
       /// Searches for all instances of a header by name and splits at commas
-      std::vector<std::string_view> getHeaderValues(std::string_view name) const;
+      std::vector<std::string_view> getHeaderValues(std::string_view name) const
+      {
+         return HttpHeader::split(headers, name);
+      }
+
+      /// Removes all cookies whose names match a condition
+      void removeCookies(const std::function<bool(std::string_view)>& cond)
+      {
+         return HttpHeader::removeCookies(headers, cond);
+      }
 
       /// Removes a cookie
-      void removeCookie(std::string_view name);
+      void removeCookie(std::string_view name)
+      {
+         return HttpHeader::removeCookies(headers,
+                                          [name](std::string_view key) { return key == name; });
+      }
 
       /// Removes a header
-      void removeHeader(std::string_view name);
+      void removeHeader(std::string_view name) { return HttpHeader::remove(headers, name); }
    };
 
    /// Checks if the host indicates a development chain
@@ -223,4 +262,5 @@ namespace psibase
    template <typename T>
    using JsonHttpReply = BasicHttpReply<psio::nested_json<T>>;
 
+   using HttpReplyRef = BasicHttpReply<std::span<const char>>;
 }  // namespace psibase
