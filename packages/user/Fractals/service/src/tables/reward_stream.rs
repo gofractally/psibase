@@ -73,7 +73,7 @@ impl RewardStream {
         (token_id, remaining_after_levy_payments)
     }
 
-    fn withdraw(&mut self) -> (TID, Quantity) {
+    pub(crate) fn withdraw(&mut self) -> (TID, Quantity) {
         self.check_can_distribute();
 
         let claimable = TokenStream::call().claim(self.stream_id);
