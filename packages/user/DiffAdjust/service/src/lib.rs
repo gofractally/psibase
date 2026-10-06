@@ -160,7 +160,10 @@ pub mod tables {
                     !diff_as_f64.is_nan(),
                     "diffadjust decrease computation resulted in NaN",
                 );
-                difficulty = (diff_as_f64 as u64).max(floor);
+                difficulty = diff_as_f64 as u64;
+                if difficulty <= floor {
+                    return floor;
+                }
             }
             difficulty
         }

@@ -1,8 +1,10 @@
+mod create_managed_account;
 mod misc;
 mod parse_rank_to_accounts;
 mod rolling_bitset;
 mod scoring;
 
+pub use create_managed_account::create_managed_account;
 pub use misc::{assign_decreasing_levels, two_thirds_plus_one};
 pub use parse_rank_to_accounts::parse_rank_to_accounts;
 pub use rolling_bitset::RollingBits16;

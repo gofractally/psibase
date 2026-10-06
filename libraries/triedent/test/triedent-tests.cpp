@@ -166,13 +166,13 @@ TEST_CASE("recover")
    temp_directory dir("triedent-test");
    database::create(dir.path, database::config{1ull << 27, 1ull << 27, 1ull << 27, 1ull << 27});
    {
-      auto db = std::make_shared<database>(dir.path, open_mode::read_write);
-      std::shared_ptr<triedent::root> root;
-      auto                            session = db->start_write_session();
+      auto        db = std::make_shared<database>(dir.path, open_mode::read_write);
+      shared_root root;
+      auto        session = db->start_write_session();
       session->upsert(root, "abc"s, "v0"s);
       session->upsert(root, "abcd"s, "v1"s);
       session->upsert(root, "abce"s, "v2"s);
-      std::shared_ptr<triedent::root> top_root;
+      shared_root top_root;
       session->upsert(top_root, ""s, std::span{&root, 1});
       session->set_top_root(top_root);
    }
@@ -193,10 +193,10 @@ TEST_CASE("recover")
       session->end_collect_garbage();
    }
    {
-      auto db      = std::make_shared<database>(dir.path, open_mode::read_write);
-      auto session = db->start_write_session();
-      auto root    = session->get_top_root();
-      std::vector<std::shared_ptr<triedent::root>> roots;
+      auto                     db = std::make_shared<database>(dir.path, open_mode::read_write);
+      auto                     session = db->start_write_session();
+      auto                     root    = session->get_top_root();
+      std::vector<shared_root> roots;
       REQUIRE(session->get(root, ""s, nullptr, &roots));
       REQUIRE(roots.size() == 1);
       root = roots.front();
@@ -216,10 +216,10 @@ TEST_CASE("many refs")
    // This should be larger than the maximum node refcount
    constexpr int count   = 32768 + 1;
    auto          db      = createDb(database::config{
-                     .hot_bytes  = 1ull << 27,
-                     .warm_bytes = 1ull << 27,
-                     .cool_bytes = 1ull << 27,
-                     .cold_bytes = 1ull << 27,
+       .hot_bytes  = 1ull << 27,
+       .warm_bytes = 1ull << 27,
+       .cool_bytes = 1ull << 27,
+       .cold_bytes = 1ull << 27,
    });
    auto          session = db->start_write_session();
    auto          root    = session->get_top_root();
@@ -236,7 +236,7 @@ TEST_CASE("many refs")
    {
       char key[sizeof(i)];
       std::memcpy(&key, &i, sizeof(i));
-      std::vector<std::shared_ptr<triedent::root>> r;
+      std::vector<shared_root> r;
       session->get(root, {key, sizeof(key)}, nullptr, &r);
       REQUIRE(r.size() == 1);
       REQUIRE(osv(session->get(r.front(), {"k", 1})) == std::optional{std::string_view{"v", 1}});
@@ -253,14 +253,14 @@ struct u64le_span
          value >>= 8;
       }
    }
-   operator std::span<const char>() const { return buf; }
+        operator std::span<const char>() const { return buf; }
    char buf[8];
 };
 
 TEST_CASE("small cache")
 {
    auto            db      = createDb(database::config{
-                       .hot_bytes = 4096, .warm_bytes = 4096, .cool_bytes = 4096, .cold_bytes = 4096});
+       .hot_bytes = 4096, .warm_bytes = 4096, .cool_bytes = 4096, .cold_bytes = 4096});
    auto            session = db->start_write_session();
    auto            root    = session->get_top_root();
    std::mt19937_64 gen;
