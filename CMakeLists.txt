@@ -791,6 +791,13 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/Battlezone.psi
+    PATH packages/user/Battlezone
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
+    DEPENDS ${Battlezone_js_DEP}
+)
+
+cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/NameMarket.psi
     PATH packages/user/NameMarket
     TARGET_DIR ${USER_WORKSPACE_TARGET}
@@ -1371,7 +1378,7 @@ endfunction()
 
 write_package_index(package-index ${SERVICE_DIR} 1
     Accounts AccountsService Aes AuthAny AuthDyn AuthDelegate AuthDelegateService AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
-    Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles SingleProd TestDefault HttpServer Registry
+    Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host Identity Battlezone Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles SingleProd TestDefault HttpServer Registry
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage VirtualServer WebCrypto Workshop Config
     XAdmin XBasic XCommonApi XDb XDefault XHttp XKeys XPackages XPeers XProxy XRun XSites XTimer XTransact XWsAuth)
 
@@ -1416,6 +1423,7 @@ install(
           ${SERVICE_DIR}/HttpServer.psi
           ${SERVICE_DIR}/Homepage.psi
           ${SERVICE_DIR}/Identity.psi
+          ${SERVICE_DIR}/Battlezone.psi
           ${SERVICE_DIR}/Invite.psi
           ${SERVICE_DIR}/InviteService.psi
           ${SERVICE_DIR}/Kdf.psi
