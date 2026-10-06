@@ -818,6 +818,13 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/Battlezone.psi
+    PATH packages/user/Battlezone
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
+    DEPENDS ${Battlezone_js_DEP}
+)
+
+cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/NameMarket.psi
     PATH packages/user/NameMarket
     TARGET_DIR ${USER_WORKSPACE_TARGET}
@@ -1316,6 +1323,11 @@ psibase_package(
     DEPENDS wasm
 )
 
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/XBattlezone.psi
+    PATH packages/local/XBattlezone
+)
+
 psibase_package(
     OUTPUT ${SERVICE_DIR}/DevDefault.psi
     NAME DevDefault
@@ -1395,9 +1407,9 @@ endfunction()
 
 write_package_index(package-index ${SERVICE_DIR} 1
     Accounts AccountsService Aes AuthAny AuthDyn AuthDelegate AuthDelegateService AuthRecover AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
-    Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host HostLoginPrompt Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles SingleProd TestDefault HttpServer Registry
+    Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host HostLoginPrompt Identity Battlezone Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles SingleProd TestDefault HttpServer Registry
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage VirtualServer WebCrypto Workshop WsAuth Config
-    XAdmin XBasic XCommonApi XDb XDefault XHttp XKeys XPackages XPeers XProxy XRun XSites XTimer XTransact)
+    XAdmin XBasic XBattlezone XCommonApi XDb XDefault XHttp XKeys XPackages XPeers XProxy XRun XSites XTimer XTransact)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -1442,6 +1454,7 @@ install(
           ${SERVICE_DIR}/HttpServer.psi
           ${SERVICE_DIR}/Homepage.psi
           ${SERVICE_DIR}/Identity.psi
+          ${SERVICE_DIR}/Battlezone.psi
           ${SERVICE_DIR}/Invite.psi
           ${SERVICE_DIR}/InviteService.psi
           ${SERVICE_DIR}/Kdf.psi
@@ -1478,6 +1491,7 @@ install(
           ${SERVICE_DIR}/Config.psi
           ${SERVICE_DIR}/XAdmin.psi
           ${SERVICE_DIR}/XBasic.psi
+          ${SERVICE_DIR}/XBattlezone.psi
           ${SERVICE_DIR}/XCommonApi.psi
           ${SERVICE_DIR}/XDb.psi
           ${SERVICE_DIR}/XDefault.psi

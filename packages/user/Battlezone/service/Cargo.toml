@@ -1,0 +1,21 @@
+[package]
+name = "battlezone"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[package.metadata.psibase]
+server = "battlezone"
+data = [{ src = "../ui/dist", dst = "/" }]
+postinstall = [
+    { sender = "battlezone", service = "sites", method = "enablespa", data = { enable = true } },
+    { sender = "battlezone", service = "sites", method = "setcsp", data = { path = "*", csp = "default-src 'self';script-src 'self';style-src 'self' 'unsafe-inline';img-src 'self' data: profiles.{{root}}/avatar/ branding.{{root}};font-src 'self';connect-src 'self' x-bzone.{{root}} ws://x-bzone.{{root}} wss://x-bzone.{{root}} profiles.{{root}} tokens.{{root}};frame-src supervisor.{{root}};frame-ancestors 'self';base-uri 'none';form-action 'self';object-src 'none';" } },
+]
+
+[dependencies]
+psibase_macros.workspace = true
+psibase_service.workspace = true
+psibase.workspace = true
+serde.workspace = true
+psibase-user-workspace-hack.workspace = true
