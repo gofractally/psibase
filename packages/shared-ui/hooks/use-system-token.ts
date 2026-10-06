@@ -10,6 +10,7 @@ export interface SystemTokenInfo {
     symbol: string;
     /** Decimal places for the system token. */
     precision: number;
+    untransferable: boolean;
 }
 
 interface ConfigResponse {
@@ -24,6 +25,9 @@ interface TokenResponse {
         precision: number;
         /** Symbol is the account name (symbol id) returned by the Tokens GraphQL API */
         symbol?: string | null;
+        settings?: {
+            untransferable?: boolean;
+        } | null;
     } | null;
 }
 
@@ -55,6 +59,9 @@ export const useSystemToken = () => {
                             id
                             precision
                             symbol
+                            settings {
+                                untransferable
+                            }
                         }
                     }
                 `;
@@ -75,6 +82,7 @@ export const useSystemToken = () => {
                 id: idStr,
                 symbol,
                 precision: tokenRes.token.precision,
+                untransferable: tokenRes.token.settings?.untransferable === true,
             };
         },
     });

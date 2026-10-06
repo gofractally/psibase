@@ -23,6 +23,7 @@ import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 export const BuyPage = () => {
     const { data: systemToken, isPending: isPendingToken } = useSystemToken();
+    const premiumBlocked = systemToken?.untransferable === true;
     const {
         data: markets,
         isPending: isPendingMarkets,
@@ -37,13 +38,16 @@ export const BuyPage = () => {
         [markets],
     );
 
+    const canBuyEnabled = !isPendingToken && !premiumBlocked;
     const { data: canBuyAccount, isPending: isPendingCanBuyAccount } =
-        useCanBuyAccount();
+        useCanBuyAccount({ enabled: canBuyEnabled });
 
     const isLoading =
-        isPendingToken || isPendingMarkets || isPendingCanBuyAccount;
+        isPendingToken ||
+        isPendingMarkets ||
+        (canBuyEnabled && isPendingCanBuyAccount);
 
-    if (canBuyAccount === false) {
+    if (premiumBlocked || canBuyAccount === false) {
         return (
             <ErrorCard
                 title="Not available"

@@ -1,4 +1,5 @@
 import {
+    Building2,
     FlaskConical,
     Key,
     Landmark,
@@ -10,11 +11,13 @@ import { type ReactNode } from "react";
 import { UseFormReturn } from "react-hook-form";
 import { z } from "zod";
 
+import { type BootTemplate } from "@/hooks/use-templated-packages";
+
 import { cn } from "@shared/lib/utils";
 import { Form, FormField, FormItem, FormMessage } from "@shared/shadcn/ui/form";
 
 export const chainTypeSchema = z.object({
-    type: z.enum(["dev", "prod"], {
+    type: z.enum(["dev", "prod", "priv"], {
         required_error: "You need to select a type.",
     }),
 });
@@ -24,6 +27,7 @@ type ChainTypeShape = z.infer<typeof chainTypeSchema>;
 interface Props {
     form: UseFormReturn<ChainTypeShape>;
     next: () => Promise<void>;
+    privAvailable: boolean;
 }
 
 type Spec = {
@@ -38,22 +42,25 @@ const specRows = [
         label: "Security",
         dev: "Keyless accounts",
         prod: "Key-based accounts",
+        priv: "Key-based accounts",
     },
     {
         icon: Landmark,
         label: "Governance",
         dev: "None",
         prod: "Fractal network",
+        priv: "Single provider",
     },
     {
         icon: Key,
         label: "Producer keys",
         dev: "Not required",
         prod: "Security device",
+        priv: "Security device",
     },
 ] as const;
 
-const specsFor = (mode: "dev" | "prod"): Spec[] =>
+const specsFor = (mode: BootTemplate): Spec[] =>
     specRows.map((row) => ({
         icon: row.icon,
         label: row.label,
@@ -117,7 +124,13 @@ const TemplateCard = ({
     </button>
 );
 
-export const ChainTypeForm = ({ form, next }: Props) => {
+export const ChainTypeForm = ({ form, next, privAvailable }: Props) => {
+    const secureContextFooter = !window.isSecureContext ? (
+        <p className="text-muted-foreground pt-3 text-sm">
+            Only available via HTTPS or localhost
+        </p>
+    ) : null;
+
     return (
         <Form {...form}>
             <form className="space-y-6">
@@ -126,7 +139,7 @@ export const ChainTypeForm = ({ form, next }: Props) => {
                     name="type"
                     render={({ field }) => (
                         <FormItem>
-                            <div className="flex w-full flex-col gap-4 sm:flex-row sm:gap-6">
+                            <div className="flex w-full flex-col gap-4 lg:flex-row lg:gap-6">
                                 <TemplateCard
                                     icon={FlaskConical}
                                     title="Development"
@@ -149,11 +162,29 @@ export const ChainTypeForm = ({ form, next }: Props) => {
                                         field.onChange("prod");
                                         void next();
                                     }}
+                                    footer={secureContextFooter}
+                                />
+                                <TemplateCard
+                                    icon={Building2}
+                                    title="Private"
+                                    subtitle="Single-provider network"
+                                    specs={specsFor("priv")}
+                                    selected={field.value === "priv"}
+                                    disabled={
+                                        !window.isSecureContext ||
+                                        !privAvailable
+                                    }
+                                    onSelect={() => {
+                                        field.onChange("priv");
+                                        void next();
+                                    }}
                                     footer={
                                         !window.isSecureContext ? (
+                                            secureContextFooter
+                                        ) : !privAvailable ? (
                                             <p className="text-muted-foreground pt-3 text-sm">
-                                                Only available via HTTPS or
-                                                localhost
+                                                PrivDefault is not available on
+                                                this node
                                             </p>
                                         ) : null
                                     }

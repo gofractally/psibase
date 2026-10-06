@@ -17,6 +17,7 @@ import {
     PopoverTrigger,
 } from "@shared/shadcn/ui/popover";
 
+import { type BootTemplate } from "../hooks/use-templated-packages";
 import { useKeyDevices } from "../hooks/use-key-devices";
 
 interface ChipProps {
@@ -43,7 +44,7 @@ const Chip = ({ label, value, hint }: ChipProps) => (
 );
 
 interface Props {
-    isDev: boolean;
+    template: BootTemplate;
     bpName: string;
     keyDevice: string;
     rows: RowSelectionState;
@@ -51,8 +52,20 @@ interface Props {
     packages: PackageInfo[];
 }
 
+const templateLabel: Record<BootTemplate, string> = {
+    dev: "Developer",
+    prod: "Production",
+    priv: "Private",
+};
+
+const accountTypeHint: Record<BootTemplate, string> = {
+    dev: "Creating a network with the Development template creates your account in an insecure keyless mode. The account is automatically imported into the accounts app in the current device's web browser.",
+    prod: "Creating a network with the Production template automatically generates a keypair for your account. The account is automatically imported into the accounts app in the current device's web browser.",
+    priv: "Creating a network with the Private template automatically generates a keypair for your account. The account is automatically imported into the accounts app in the current device's web browser.",
+};
+
 export const InstallationSummary = ({
-    isDev,
+    template,
     bpName,
     keyDevice,
     rows,
@@ -61,6 +74,7 @@ export const InstallationSummary = ({
 }: Props) => {
     const { data: keyDevices } = useKeyDevices();
     const selectedDevice = keyDevices?.find((d) => d.id === keyDevice);
+    const isDev = template === "dev";
     return (
         <div>
             <div className="grid grid-cols-1 gap-6 py-2 sm:grid-cols-2">
@@ -71,17 +85,13 @@ export const InstallationSummary = ({
                     <div className="flex flex-col gap-3  ">
                         <Chip
                             label="Template"
-                            value={isDev ? "Developer" : "Production"}
+                            value={templateLabel[template]}
                         />
                         <Chip label="Block Producer Name" value={bpName} />
                         <Chip
                             label="Account Type"
                             value={isDev ? "Insecure" : "Secure"}
-                            hint={
-                                isDev
-                                    ? "Creating a network with the Development template creates your account in an insecure keyless mode. The account is automatically imported into the accounts app in the current device's web browser."
-                                    : "Creating a network with the Production template automatically generates a keypair for your account. The account is automatically imported into the accounts app in the current device's web browser."
-                            }
+                            hint={accountTypeHint[template]}
                         />
                         {isDev ? null : (
                             <Chip
