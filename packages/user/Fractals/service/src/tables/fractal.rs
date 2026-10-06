@@ -17,7 +17,7 @@ use psibase::services::fractals::FractalRole::{
     self, Executive, Judiciary, Legislature, Recruitment,
 };
 
-use crate::helpers::{create_managed_account, donation_sub_account};
+use crate::helpers::{create_managed_account, donation_sub_account, link_fractal_core_plugin_deps};
 use crate::tables::tables::{
     Fractal, FractalMember, FractalMemberTable, FractalTable, Occupation, RewardStream, Role,
     RoleTable,
@@ -32,6 +32,10 @@ use psibase::{get_sender, RawKey, TableQuery, TimePointSec};
 
 impl Fractal {
     fn new(account: AccountNumber, name: String, mission: String) -> Self {
+        assert!(
+            !account.is_subaccount(),
+            "fractal account cannot be a subaccount"
+        );
         let now = TransactSvc::call().currentBlock().time.seconds();
 
         let max_supply: Quantity = TOKEN_SUPPLY.into();
@@ -72,15 +76,7 @@ impl Fractal {
         Self::get_assert(sender)
     }
 
-    pub fn add(
-        fractal: AccountNumber,
-        legislature: AccountNumber,
-        judiciary: AccountNumber,
-        executive: AccountNumber,
-        recruitment: AccountNumber,
-        name: String,
-        mission: String,
-    ) -> Self {
+    pub fn add(fractal: AccountNumber, name: String, mission: String) -> Self {
         assert!(Self::get(fractal).is_none(), "fractal already exists");
         let new_instance = Self::new(fractal, name, mission);
 
@@ -91,19 +87,19 @@ impl Fractal {
 
         let defacto_service = account!("fractals+2");
 
-        let create_role = |role_account: AccountNumber, role: FractalRole| {
-            Role::add(fractal, role_account, role, defacto_service)
-        };
-
-        create_role(legislature, Legislature);
-        create_role(judiciary, Judiciary);
-        create_role(executive, Executive);
-        create_role(recruitment, Recruitment);
-
         Occupation::set_ordered_occupations(fractal, vec![defacto_service]);
 
+        // Create the fractal account first so role subaccounts can be
+        // preapproved by the parent. Roles must exist before the AuthDyn
+        // switch because has_policy/auth_policy reads them.
         create_managed_account(fractal, || {
+            Role::add(fractal, Legislature.into(), defacto_service);
+            Role::add(fractal, Judiciary.into(), defacto_service);
+            Role::add(fractal, Executive.into(), defacto_service);
+            Role::add(fractal, Recruitment.into(), defacto_service);
+
             sites::Wrapper::call_as(fractal).setProxy(account!("fractal-cr"));
+            link_fractal_core_plugin_deps(fractal);
         });
 
         FractalMember::add(fractal, get_sender(), None);
@@ -122,7 +118,7 @@ impl Fractal {
     }
 
     fn role_account(&self, role: FractalRole) -> AccountNumber {
-        Role::get_assert(self.account, role).account
+        Role::get_assert(self.account, role.into()).account()
     }
 
     pub fn get(fractal: AccountNumber) -> Option<Self> {
@@ -267,19 +263,19 @@ impl Fractal {
     }
 
     async fn legislature(&self) -> Role {
-        Role::get_assert(self.account, Legislature)
+        Role::get_assert(self.account, Legislature.into())
     }
 
     async fn judiciary(&self) -> Role {
-        Role::get_assert(self.account, Judiciary)
+        Role::get_assert(self.account, Judiciary.into())
     }
 
     async fn executive(&self) -> Role {
-        Role::get_assert(self.account, Executive)
+        Role::get_assert(self.account, Executive.into())
     }
 
     async fn recruitment(&self) -> Role {
-        Role::get_assert(self.account, Recruitment)
+        Role::get_assert(self.account, Recruitment.into())
     }
 
     async fn stream(&self) -> Option<RewardStream> {
