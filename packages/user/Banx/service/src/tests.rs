@@ -2233,6 +2233,174 @@ mod tests {
         Ok(())
     }
 
+    /// John takes 12 weetbix and 80.0g of coffee. Isabelle's later 3 weetbix
+    /// net his biscuit claim to 9. He posts the coffee→AUD price; she accepts
+    /// it. His own convert looks up her policy and does not reprice the claim.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_pantry_open_biscuits_and_debtor_priced_coffee(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let john = account!("john");
+        let isabelle = account!("isabelle");
+        chain.new_account(john).unwrap();
+        chain.new_account(isabelle).unwrap();
+
+        let weetbix = Wrapper::push_from(&chain, john)
+            .add_asset(account!("weetbix"), Precision::new(0).unwrap(), "biscuit".into())
+            .get()?;
+        // Precision 1: 80.0g is 800 raw units.
+        let coffee = Wrapper::push_from(&chain, john)
+            .add_asset(
+                account!("coffee"),
+                Precision::new(1).unwrap(),
+                "0.1g of beans".into(),
+            )
+            .get()?;
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+
+        Wrapper::push_from(&chain, john)
+            .deposit(isabelle, weetbix, Quantity::new(12), 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, john)
+            .deposit(isabelle, coffee, Quantity::new(800), 0, 0)
+            .get()?;
+        assert_eq!(exp(&chain, isabelle, john, weetbix), 12);
+        assert_eq!(exp(&chain, isabelle, john, coffee), 800);
+
+        Wrapper::push_from(&chain, isabelle)
+            .deposit(john, weetbix, Quantity::new(3), 0, 0)
+            .get()?;
+        assert_eq!(exp(&chain, isabelle, john, weetbix), 9);
+        assert_eq!(exp(&chain, john, isabelle, weetbix), 0);
+
+        // 800 raw coffee * 50 / 1 = 40_000 raw AUD = $4.00 at precision 4.
+        Wrapper::push_from(&chain, john)
+            .st_cur_pol(
+                coffee,
+                aud,
+                Quantity::new(0),
+                RATE_SCALE * 50,
+                0,
+                Quantity::new(800),
+                never(),
+            )
+            .get()?;
+        let own = Wrapper::push_from(&chain, john).convert(
+            isabelle,
+            coffee,
+            aud,
+            Quantity::new(800),
+            Quantity::new(40_000),
+        );
+        let err = own
+            .trace
+            .error
+            .as_deref()
+            .unwrap_or("(no error — convert succeeded)");
+        assert!(
+            err.contains("CurrencyPolicy not found"),
+            "john must not reprice coffee with his own policy, got {err}"
+        );
+        assert_eq!(exp(&chain, isabelle, john, coffee), 800);
+        assert_eq!(exp(&chain, isabelle, john, aud), 0);
+
+        Wrapper::push_from(&chain, isabelle)
+            .convert(
+                john,
+                coffee,
+                aud,
+                Quantity::new(800),
+                Quantity::new(40_000),
+            )
+            .get()?;
+        assert_eq!(exp(&chain, isabelle, john, coffee), 0);
+        assert_eq!(exp(&chain, isabelle, john, aud), 40_000);
+        assert_eq!(exp(&chain, isabelle, john, weetbix), 9);
+        assert_eq!(
+            CurrencyPolicy::get(john, coffee, aud).unwrap().remaining.value,
+            0
+        );
+        let aud_claim = Obligation::get_by_interest_rate(isabelle, john, aud, 0).unwrap();
+        assert_eq!(aud_claim.remaining_principal.value, 40_000);
+        Ok(())
+    }
+
+    /// Michelle left 100.0g of merlo at Isabelle's. John takes it. He has no
+    /// line to Michelle, so the draw goes through Isabelle: he owes her the
+    /// beans, and her AUD line to her mum carries the $5.00 on.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_merlo_debt_reaches_michelle_through_isabelle(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let john = account!("john");
+        let isabelle = account!("isabelle");
+        let michelle = account!("michelle");
+        for a in [john, isabelle, michelle] {
+            chain.new_account(a).unwrap();
+        }
+
+        let merlo = Wrapper::push_from(&chain, isabelle)
+            .add_asset(
+                account!("merlo"),
+                Precision::new(1).unwrap(),
+                "special beans, 0.1g".into(),
+            )
+            .get()?;
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let grams = Quantity::new(1_000);
+        let dollars = Quantity::new(50_000);
+
+        // Mum will let Isabelle owe AUD. Isabelle will let John owe the beans
+        // and will price them onto that AUD line.
+        Wrapper::push_from(&chain, michelle)
+            .st_crd_lne(isabelle, aud, dollars, false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, isabelle)
+            .st_crd_lne(john, merlo, grams, false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, isabelle)
+            .st_cur_pol(merlo, aud, Quantity::new(0), RATE_SCALE * 50, 0, grams, never())
+            .get()?;
+        Wrapper::push_from(&chain, isabelle)
+            .st_fwd_ofr(michelle, aud, Quantity::new(0), 0, PPM_SCALE, never(), true)
+            .get()?;
+
+        let direct = Wrapper::push_from(&chain, john)
+            .path_pay(vec![hop(michelle, aud)], dollars, dollars, 0)
+            .get();
+        assert!(
+            direct.is_err(),
+            "john has no line to michelle; isabelle has to sit in the middle"
+        );
+        assert_eq!(exp(&chain, michelle, john, aud), 0);
+        assert_eq!(exp(&chain, isabelle, john, merlo), 0);
+
+        Wrapper::push_from(&chain, john)
+            .path_pay(
+                vec![hop(isabelle, merlo), hop(michelle, aud)],
+                grams,
+                dollars,
+                0,
+            )
+            .get()?;
+        assert_eq!(exp(&chain, isabelle, john, merlo), grams.value);
+        assert_eq!(exp(&chain, michelle, isabelle, aud), dollars.value);
+        assert_eq!(exp(&chain, michelle, john, aud), 0);
+        assert_eq!(exp(&chain, michelle, john, merlo), 0);
+        assert_eq!(exp(&chain, isabelle, john, aud), 0);
+        assert_eq!(exp(&chain, michelle, isabelle, merlo), 0);
+        assert_eq!(
+            CurrencyPolicy::get(isabelle, merlo, aud)
+                .unwrap()
+                .remaining
+                .value,
+            0
+        );
+        Ok(())
+    }
+
     #[psibase::test_case(packages("Banx"))]
     fn test_path_pay_fx_after_full_reverse_net(
         chain: psibase::Chain,
