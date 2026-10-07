@@ -72,8 +72,13 @@ export class BattlezoneRealtime {
 
     close(): void {
         if (this.ws) {
-            this.ws.close();
+            const ws = this.ws;
             this.ws = null;
+            try {
+                ws.close(1000, "leave");
+            } catch {
+                // ignore
+            }
         }
     }
 

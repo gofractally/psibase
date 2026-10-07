@@ -480,7 +480,8 @@ function drawRadar(
     }
 
     for (const tank of state.tanks) {
-        if (!tank.alive) continue;
+        // Dead spectators still see their wreck blip so radar stays useful.
+        if (!tank.alive && tank.id !== player.id) continue;
         const r = toRadar(tank.pos);
         const col = tankColor(tank);
         // Self blip = outline + heading; everyone else = filled dot.
@@ -489,12 +490,14 @@ function drawRadar(
             ctx.beginPath();
             ctx.arc(r.rx, r.ry, 4, 0, Math.PI * 2);
             ctx.stroke();
-            const fx = Math.sin(player.heading) * 8;
-            const fy = -Math.cos(player.heading) * 8;
-            ctx.beginPath();
-            ctx.moveTo(r.rx, r.ry);
-            ctx.lineTo(r.rx + fx * scale * 8, r.ry + fy * scale * 8);
-            ctx.stroke();
+            if (tank.alive) {
+                const fx = Math.sin(player.heading) * 8;
+                const fy = -Math.cos(player.heading) * 8;
+                ctx.beginPath();
+                ctx.moveTo(r.rx, r.ry);
+                ctx.lineTo(r.rx + fx * scale * 8, r.ry + fy * scale * 8);
+                ctx.stroke();
+            }
         } else {
             ctx.fillStyle = col;
             ctx.beginPath();
@@ -864,22 +867,9 @@ function drawTitleScreen(
         const waiting = state.lobbyPlayers
             .filter((p) => !p.ready)
             .map((p) => p.account);
-        const humanSlots = state.enemySlotModes.filter(
-            (m) => m === "human",
-        ).length;
-        const needPeers = Math.max(
-            0,
-            humanSlots + 1 - state.lobbyPlayers.length,
-        );
-        let waitLine = waiting.length
+        const waitLine = waiting.length
             ? `WAITING FOR: ${waiting.join(", ")}`
             : "STARTING…";
-        if (needPeers > 0) {
-            waitLine =
-                needPeers === 1
-                    ? "WAITING FOR ANOTHER LIVE PLAYER TO JOIN"
-                    : `WAITING FOR ${needPeers} MORE LIVE PLAYERS TO JOIN`;
-        }
         ctx.fillText(waitLine, width / 2, height * 0.84);
         ctx.fillText("PRESS ENTER TO UNREADY", width / 2, height * 0.9);
     } else {
@@ -964,19 +954,6 @@ export function renderFrame(
     }
 }
 
-/** Host-centric phases mapped to each client's own outcome. */
-function localPlayerWon(state: GameState, viewTank: Tank): boolean {
-    if (state.phase === "win") {
-        // Green tank wiped the enemies.
-        return viewTank.id === "player";
-    }
-    if (state.phase === "lose") {
-        // Green tank was eliminated — enemy humans win.
-        return viewTank.id !== "player";
-    }
-    return false;
-}
-
 function drawMatchOverScreen(
     ctx: CanvasRenderingContext2D,
     width: number,
@@ -994,11 +971,11 @@ function drawMatchOverScreen(
         return;
     }
 
-    const won = localPlayerWon(state, viewTank);
+    const line = state.message || "Victory!";
     ctx.fillStyle = COLOR;
     ctx.textAlign = "center";
-    ctx.font = "bold 48px monospace";
-    ctx.fillText(won ? "Victory!" : "You lost.", width / 2, height * 0.38);
+    ctx.font = "bold 42px monospace";
+    ctx.fillText(line, width / 2, height * 0.38);
     ctx.font = "20px monospace";
     ctx.fillText(`SCORE  ${viewTank.score}`, width / 2, height * 0.48);
     ctx.font = "16px monospace";

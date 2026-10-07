@@ -112,7 +112,7 @@ export function App() {
                     }
                     break;
                 }
-                case "matchStarted":
+                case "matchStarted": {
                     state.enemyCount = frame.enemyCount;
                     state.enemySlotModes = syncEnemySlotModes(
                         state.enemySlotModes,
@@ -121,27 +121,29 @@ export function App() {
                     state.lobbyPlayers = [];
                     state.lobbyHost = null;
                     state.lobbyReady = false;
+                    const me = String(state.localAccount ?? "");
+                    const hostName = String(frame.host ?? "");
                     // Set role before beginLocalMatch so resetMatch / applyRoster
                     // keep host vs remote (not offline).
-                    if (frame.host === state.localAccount) {
+                    if (me !== "" && me === hostName) {
                         state.netRole = "host";
                         assignedTankId = "player";
                     } else {
                         state.netRole = "remote";
                         assignedTankId =
                             frame.roster.find(
-                                (s) => s.account === state.localAccount,
+                                (s) =>
+                                    s.tankId !== "player" &&
+                                    String(s.account ?? "") === me,
                             )?.tankId ?? null;
                     }
                     state.viewTankId = assignedTankId;
                     beginLocalMatch(frame.roster);
-                    if (
-                        state.netRole === "remote" &&
-                        !assignedTankId
-                    ) {
+                    if (state.netRole === "remote" && !assignedTankId) {
                         state.message = "SPECTATING — NOT IN MATCH";
                     }
                     break;
+                }
                 case "roster":
                     applyRoster(state, frame.roster);
                     for (const slot of frame.roster) {
@@ -170,7 +172,7 @@ export function App() {
                 case "matchEnded":
                     state.phase = "title";
                     state.netRole = "offline";
-                    state.message = "PRESS ENTER TO READY";
+                    state.message = "MATCH ENDED";
                     state.lobbyPlayers = [];
                     state.lobbyHost = null;
                     state.lobbyReady = false;
@@ -301,6 +303,14 @@ export function App() {
         };
         window.addEventListener("keydown", onKey);
 
+        // Drop the x-bzone session as soon as the Battlezone page goes away
+        // (navigate to Homepage, close tab, bfcache). Presence is WS-only.
+        const dropPresence = () => {
+            realtime?.close();
+        };
+        window.addEventListener("pagehide", dropPresence);
+        window.addEventListener("beforeunload", dropPresence);
+
         let last = performance.now();
         let raf = 0;
         const frame = (now: number) => {
@@ -342,7 +352,9 @@ export function App() {
                 if (
                     state.netRole === "host" &&
                     realtime?.connected &&
-                    state.phase === "playing" &&
+                    (state.phase === "playing" ||
+                        state.phase === "win" ||
+                        state.phase === "lose") &&
                     now - lastSnapshot > 1000 / SNAPSHOT_HZ
                 ) {
                     lastSnapshot = now;
@@ -363,6 +375,8 @@ export function App() {
             detachKeys();
             window.removeEventListener("resize", onResize);
             window.removeEventListener("keydown", onKey);
+            window.removeEventListener("pagehide", dropPresence);
+            window.removeEventListener("beforeunload", dropPresence);
             realtime?.close();
         };
     }, []);

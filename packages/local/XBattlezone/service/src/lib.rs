@@ -250,7 +250,7 @@ fn dispatch_frame(socket: i32, user: AccountNumber, frame: ClientFrame) {
 }
 
 fn cleanup_socket(socket: i32) {
-    let (removed, roster_update, host_left, lobby_update) = cleanup_tx(socket);
+    let (removed, match_ended, lobby_update) = cleanup_tx(socket);
 
     let Some(removed) = removed else {
         return;
@@ -270,28 +270,13 @@ fn cleanup_socket(socket: i32) {
         fanout_frames(targets.into_iter().map(|s| (s, lobby.clone())).collect());
     }
 
-    if host_left {
+    if match_ended {
         clear_lobby_tx();
         let targets = all_sockets_except_tx(socket);
         fanout_frames(
             targets
                 .into_iter()
                 .map(|s| (s, ServerFrame::MatchEnded))
-                .collect(),
-        );
-    } else if let Some(roster) = roster_update {
-        let targets = all_sockets_except_tx(socket);
-        fanout_frames(
-            targets
-                .into_iter()
-                .map(|s| {
-                    (
-                        s,
-                        ServerFrame::Roster {
-                            roster: roster.clone(),
-                        },
-                    )
-                })
                 .collect(),
         );
     }

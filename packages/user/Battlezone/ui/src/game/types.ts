@@ -133,17 +133,20 @@ export function syncEnemySlotModes(
 }
 
 /**
- * Labels for enemy slots on the title screen. Human slots bind live peers
- * in join order (same order the server fills the roster).
+ * Labels for enemy slots on the title screen.
+ * Human seats show "Human" until a Battlezone-connected peer fills them
+ * (join order), then that account; empty Human seats stay "Human" and become
+ * AI when the match actually starts.
  */
 export function enemySlotLabels(state: GameState): string[] {
     const peers = state.livePeers
         .filter((p) => p.online)
         .map((p) => p.account);
+    const modes = state.enemySlotModes.slice(0, state.enemyCount);
     let peerIdx = 0;
-    return state.enemySlotModes.slice(0, state.enemyCount).map((mode) => {
+    return modes.map((mode) => {
         if (mode !== "human") return "AI";
-        return peers[peerIdx++] ?? "HUMAN";
+        return peers[peerIdx++] ?? "Human";
     });
 }
 

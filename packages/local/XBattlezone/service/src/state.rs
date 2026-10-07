@@ -252,8 +252,8 @@ pub fn build_roster(
     let count = enemy_count.clamp(1, 5) as usize;
     let mut human_idx = 0usize;
     for i in 0..count {
-        let want_human = slot_wants_human(slot_modes, i);
-        if want_human {
+        // Explicit Human seat: bind next live peer, else fall back to AI.
+        if slot_wants_human(slot_modes, i) {
             if let Some((acct, _)) = available_humans.get(human_idx) {
                 human_idx += 1;
                 roster.push(RosterSlot {
@@ -264,7 +264,6 @@ pub fn build_roster(
                 continue;
             }
         }
-        // AI slot, or human slot with no remaining live peer
         roster.push(RosterSlot {
             tank_id: format!("ai-{i}"),
             controller: "ai".into(),
@@ -401,27 +400,18 @@ pub fn set_ready(
         );
     };
     let slot_modes = slots_from_json(&lobby_row.slots_json);
-    let human_slots = slot_modes
-        .iter()
-        .filter(|m| m.eq_ignore_ascii_case("human"))
-        .count();
 
     let accounts = connected_accounts_ordered();
+    // Start once every Battlezone-connected account has readied. Unfilled
+    // Human seats become AI in build_roster — no wait for placeholders.
     let all_ready = !accounts.is_empty() && accounts.iter().all(|a| is_ready(*a));
-    // Human slots need live peers — do not start a 1-player match that
-    // would skip the waiting room (second player would join mid-game).
-    let enough_players = if human_slots == 0 {
-        true
-    } else {
-        accounts.len() >= 1 + human_slots
-    };
 
     let lobby = lobby_frame().unwrap_or(ServerFrame::Error {
         code: "lobby".into(),
         reason: "lobby missing".into(),
     });
 
-    if !all_ready || !enough_players {
+    if !all_ready {
         return (lobby, None);
     }
 
@@ -524,36 +514,28 @@ pub fn peer_sockets_for_presence(subject: AccountNumber) -> Vec<i32> {
         .collect()
 }
 
-/// On disconnect during a match: convert that human's slot back to AI.
-pub fn revert_slot_to_ai(account: AccountNumber) -> Option<Vec<RosterSlot>> {
-    let Some(mut row) = get_match() else {
-        return None;
+/// If `account` is the host or any rostered human, end the match.
+/// Callers fan out `matchEnded` so remaining clients return to the title screen
+/// instead of fighting an AI that took over the leaver's tank.
+pub fn end_match_if_participant(account: AccountNumber) -> bool {
+    let Some(row) = get_match() else {
+        return false;
     };
-    let mut roster = roster_from_json(&row.roster_json);
-    let mut changed = false;
-    for slot in &mut roster {
-        if slot
-            .account
-            .map(|a| AccountNumber::from(a) == account)
-            .unwrap_or(false)
-            && slot.tank_id != "player"
-        {
-            slot.controller = "ai".into();
-            slot.account = None;
-            changed = true;
-        }
-    }
-    if !changed {
-        return None;
-    }
-    // If host left, end match
     if row.host == account {
         clear_match();
-        return Some(vec![]);
+        return true;
     }
-    row.roster_json = roster_to_json(&roster);
-    MatchTable::read_write().put(&row).unwrap();
-    Some(roster)
+    let in_match = roster_from_json(&row.roster_json).iter().any(|s| {
+        s.account
+            .map(|a| AccountNumber::from(a) == account)
+            .unwrap_or(false)
+    });
+    if in_match {
+        clear_match();
+        true
+    } else {
+        false
+    }
 }
 
 // --- subjective_tx wrappers (macro must be used as a block, not `let x = macro!(...)`) ---
@@ -636,19 +618,11 @@ pub fn is_host_socket_tx(user: AccountNumber, socket: i32) -> bool {
     }
 }
 
-/// Cleanup on socket close. Returns (removed, roster_update, host_left, lobby_frame).
-pub fn cleanup_tx(
-    socket: i32,
-) -> (
-    Option<RemovedSocket>,
-    Option<Vec<RosterSlot>>,
-    bool,
-    Option<ServerFrame>,
-) {
+/// Cleanup on socket close. Returns (removed, match_ended, lobby_frame).
+pub fn cleanup_tx(socket: i32) -> (Option<RemovedSocket>, bool, Option<ServerFrame>) {
     ::psibase::subjective_tx! {
         let removed = close_socket(socket);
-        let mut roster_update = None;
-        let mut host_left = false;
+        let mut match_ended = false;
         let mut lobby_update = None;
         if let Some(ref r) = removed {
             if r.was_final {
@@ -673,16 +647,10 @@ pub fn cleanup_tx(
                         lobby_update = lobby_frame();
                     }
                 }
-            }
-            if let Some(roster) = revert_slot_to_ai(r.user) {
-                if roster.is_empty() {
-                    host_left = true;
-                } else {
-                    roster_update = Some(roster);
-                }
+                match_ended = end_match_if_participant(r.user);
             }
         }
-        (removed, roster_update, host_left, lobby_update)
+        (removed, match_ended, lobby_update)
     }
 }
 

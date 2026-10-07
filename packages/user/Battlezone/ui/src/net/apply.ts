@@ -1,17 +1,24 @@
 import type { GameState, Tank } from "../game/types";
 import type { RosterSlot } from "./protocol";
 
+function accountKey(account: string | undefined | null): string {
+    return account == null ? "" : String(account);
+}
+
 /** Apply match roster controllers/accounts onto an already-spawned tank list. */
 export function applyRoster(state: GameState, roster: RosterSlot[]): void {
     for (const slot of roster) {
         const tank = state.tanks.find((t) => t.id === slot.tankId);
         if (!tank) continue;
-        if (slot.controller === "remote") {
-            tank.controller = "remote";
-            tank.account = slot.account ?? null;
-        } else if (slot.controller === "local") {
+        const account = accountKey(slot.account) || null;
+        // Any enemy seat with a bound account is a human — never leave it on AI
+        // or the remote client will watch an AI drive "their" tank.
+        if (slot.tankId === "player" || slot.controller === "local") {
             tank.controller = state.netRole === "host" ? "local" : "remote";
-            tank.account = slot.account ?? null;
+            tank.account = account;
+        } else if (slot.controller === "remote" || account) {
+            tank.controller = "remote";
+            tank.account = account;
         } else {
             tank.controller = "ai";
             tank.account = null;
@@ -77,15 +84,15 @@ export function applySnapshot(state: GameState, raw: unknown): void {
     if (Array.isArray(snap.blocks)) state.blocks = snap.blocks;
     if (Array.isArray(snap.shots)) state.shots = snap.shots;
     if (Array.isArray(snap.tanks)) {
-        // Preserve local net metadata on tanks we already know
         const prev = new Map(state.tanks.map((t) => [t.id, t]));
         state.tanks = snap.tanks.map((t) => {
             const old = prev.get(t.id);
-            return {
-                ...t,
-                controller: t.controller ?? old?.controller ?? "ai",
-                account: t.account ?? old?.account ?? null,
-            };
+            const account = t.account ?? old?.account ?? null;
+            let controller = t.controller ?? old?.controller ?? "ai";
+            if (t.id !== "player" && account) {
+                controller = "remote";
+            }
+            return { ...t, controller, account };
         });
     }
 }
