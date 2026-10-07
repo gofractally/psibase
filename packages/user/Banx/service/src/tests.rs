@@ -5882,6 +5882,46 @@ mod tests {
         Ok(())
     }
 
+    /// Two buckets that each fit can sum past `u64::MAX` after one day.
+    /// The pair total saturates, so forgive still reduces it. The unit that
+    /// does not fit in one settle is cleared by the next one.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_pair_exposure_past_cap_can_still_be_forgiven(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        // 0% stays put. 10% on 4_000 grows by 1 in one day, so the pair is
+        // u64::MAX + 1 and no longer fits in one Quantity.
+        let low = u64::MAX - 4_000;
+        Wrapper::push_from(&chain, alice)
+            .deposit(bob, usd, Quantity::new(low), 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .deposit(bob, usd, Quantity::new(4_000), 100_000, 0)
+            .get()?;
+        assert_eq!(exp(&chain, bob, alice, usd), u64::MAX);
+
+        chain.start_block_after(Seconds::new(SECONDS_PER_DAY as i64).into());
+        assert_eq!(exp(&chain, bob, alice, usd), u64::MAX);
+
+        Wrapper::push_from(&chain, bob)
+            .forgive(alice, usd, Quantity::new(u64::MAX))
+            .get()?;
+        assert_eq!(exp(&chain, bob, alice, usd), 1);
+
+        Wrapper::push_from(&chain, bob)
+            .forgive(alice, usd, Quantity::new(1))
+            .get()?;
+        assert_eq!(exp(&chain, bob, alice, usd), 0);
+        Ok(())
+    }
+
     /// −1% on 10_000 raw is a fraction of a unit per day. Truncate that fee.
     /// One evaluation of the day and 24 hourly accruals must charge the same amount.
     #[psibase::test_case(packages("Banx"))]

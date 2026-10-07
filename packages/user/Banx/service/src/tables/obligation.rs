@@ -19,13 +19,20 @@ impl Obligation {
     }
 
     /// Total exposure: Σ live balance (principal + interest, after decay).
+    ///
+    /// Each bucket already caps at `u64::MAX`. Two of those can still sum
+    /// past it after interest. A panicking add freezes forgive, net, draw,
+    /// and sale, which all size from this total. The reported value is the
+    /// largest amount one settle can take; a later call clears what did not fit.
     pub fn exposure(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) -> Quantity {
-        Self::obligations(creditor, debtor, asset_id)
+        let total = Self::obligations(creditor, debtor, asset_id)
             .into_iter()
-            .fold(Quantity::new(0), |acc, o| {
+            .fold(0u64, |acc, o| {
                 let (principal, accrued) = o.live_parts();
-                acc + principal + accrued
-            })
+                acc.saturating_add(principal.value)
+                    .saturating_add(accrued.value)
+            });
+        total.into()
     }
 
     pub fn get_by_interest_rate(
