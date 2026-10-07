@@ -9,7 +9,7 @@ interface api {
     get-current-user: func() -> option<string>;
 }
 
-/// This interface is only callable by the accounts plugin.
+/// Callable by the accounts plugin and by host.
 interface admin {
     use host:types/types.{error};
 

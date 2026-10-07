@@ -11,6 +11,7 @@
             "user/CommonApi/common/packages/plugin-tester/ui",
             "local/XAdmin/ui/wasm",
             "system/Accounts/ui",
+            "user/HostLoginPrompt/ui",
             "system/Producers/ui",
             "user/Supervisor/ui",
             "user/Branding/ui",
