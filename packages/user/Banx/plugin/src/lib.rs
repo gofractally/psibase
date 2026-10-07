@@ -534,17 +534,20 @@ impl Api for BanxPlugin {
         fee_fixed: String,
         to_rate: String,
         to_interest_rate_ppm: u32,
+        remaining: String,
         expires_at_seconds: u32,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::set_currency_policy)?;
         let fee_fixed = parse_amount(from_asset, &fee_fixed)?;
         let fx_rate = human_to_fx_rate(from_asset, to_asset, &to_rate)?;
+        let remaining = parse_amount_nonzero(from_asset, &remaining)?;
         let packed = banx::action_structs::st_cur_pol {
             from_asset,
             to_asset,
             fee_fixed,
             fx_rate,
             to_interest_rate: to_interest_rate_ppm,
+            remaining,
             expires_at: time_point(expires_at_seconds),
         }
         .packed();

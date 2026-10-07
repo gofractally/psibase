@@ -478,6 +478,9 @@ pub mod service {
 
     /// Poster posts a from→to FX offer. Others `convert` against it; path
     /// pay uses it to size a hop when the poster is the middle man.
+    ///
+    /// `remaining` is from-asset still accepted. Convert and path FX spend it.
+    /// Posting again replaces what is left.
     #[action]
     fn st_cur_pol(
         from_asset: u16,
@@ -485,6 +488,7 @@ pub mod service {
         fee_fixed: Quantity,
         fx_rate: u64,
         to_interest_rate: u32,
+        remaining: Quantity,
         expires_at: TimePointSec,
     ) {
         CurrencyPolicy::upsert(
@@ -494,6 +498,7 @@ pub mod service {
             fee_fixed,
             fx_rate,
             to_interest_rate,
+            remaining,
             expires_at,
         );
     }

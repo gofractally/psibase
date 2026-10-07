@@ -101,6 +101,7 @@ const zCurrencyPolicy = z.object({
     feeFixed: z.string(),
     fxRate: z.string(),
     toInterestRatePpm: z.number(),
+    remaining: z.string(),
     expiresAt: z.number(),
 });
 
@@ -328,7 +329,7 @@ export async function fetchCurrencyPolicies(
 ): Promise<CurrencyPolicy[]> {
     const data = await gql<{ currencyPolicies: CurrencyPolicy[] }>(
         `{ currencyPolicies(poster: "${account}") {
-            poster fromAsset toAsset feeFixed fxRate toInterestRatePpm expiresAt
+            poster fromAsset toAsset feeFixed fxRate toInterestRatePpm remaining expiresAt
         } }`,
     );
     return zCurrencyPolicy.array().parse(data.currencyPolicies);

@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 
-import { ChevronDown, Loader2, XCircle } from "lucide-react";
+import { ChevronDown, Loader2, QrCode, XCircle } from "lucide-react";
 
 import { defaultAssetId } from "@/components/asset-select";
 import { AssetField, amountUnit } from "@/components/form-fields";
 import { PathRoute } from "@/components/path-route";
+import { TransferQrDialog } from "@/components/transfer-qr-dialog";
 import { useAssetMap } from "@/hooks/use-assets";
 import { useBanxContacts } from "@/hooks/use-banx-contacts";
 import {
@@ -20,6 +21,11 @@ import {
     humanToRaw,
 } from "@/lib/amount";
 import { amountFieldValidator, useAppForm } from "@/lib/form";
+import {
+    assetIdBySymbol,
+    transferSuggestUrl,
+    type TransferPrefill,
+} from "@/lib/transfer-url";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { cn } from "@shared/lib/utils";
@@ -80,30 +86,8 @@ function transferCostNote(
     return `Fee ${formatRawAmount(extra.toString(), precision)} ${symbolOf(fromAsset)}`;
 }
 
-export type TransferPrefill = {
-    payee?: string;
-    amount?: string;
-    fromAsset?: number;
-    toAsset?: number;
-    requestId?: number;
-};
-
-export function transferPrefillFromSearch(
-    params: URLSearchParams,
-): TransferPrefill | null {
-    const requestId = Number(params.get("request") || "") || 0;
-    const payee = params.get("payee")?.trim() || undefined;
-    if (!requestId && !payee) return null;
-    const fromAsset = Number(params.get("fromAsset") || "") || 0;
-    const toAsset = Number(params.get("toAsset") || "") || 0;
-    return {
-        payee,
-        amount: params.get("amount") || undefined,
-        fromAsset: fromAsset > 0 ? fromAsset : undefined,
-        toAsset: toAsset > 0 ? toAsset : undefined,
-        requestId: requestId || undefined,
-    };
-}
+export type { TransferPrefill } from "@/lib/transfer-url";
+export { transferPrefillFromSearch } from "@/lib/transfer-url";
 
 function parseAssetId(
     id: number | undefined,
@@ -271,6 +255,13 @@ export function TransferDialog({
         useAssetMap();
     // Present only on the accounts page, where the header already chose the currency.
     const lockedFrom = parseAssetId(defaultAsset, assets);
+    const currencyWanted = prefill?.currency?.trim() ?? "";
+    const pinnedId = assetIdBySymbol(currencyWanted || undefined, assets);
+    const currencyUnresolved =
+        assetsReady &&
+        assets.length > 0 &&
+        currencyWanted !== "" &&
+        pinnedId === undefined;
     const pathPay = usePathPay();
     const payInvoice = usePayInvoice();
     const quotePath = useQuotePath();
@@ -291,9 +282,12 @@ export function TransferDialog({
     const failedKeyRef = useRef<string | null>(null);
     const [quoteError, setQuoteError] = useState<string | null>(null);
     const [confirmOpen, setConfirmOpen] = useState(false);
+    const [qrOpen, setQrOpen] = useState(false);
     const [advancedOpen, setAdvancedOpen] = useState(false);
     const quotingKeyRef = useRef<string | null>(null);
     const quoteSeq = useRef(0);
+    const currencyUnresolvedRef = useRef(currencyUnresolved);
+    currencyUnresolvedRef.current = currencyUnresolved;
     const clearAfterPayRef = useRef<() => void>(() => {});
 
     const rememberQuotedKey = (key: string | null) => {
@@ -314,6 +308,7 @@ export function TransferDialog({
             amount: prefill?.amount ?? "1",
         },
         onSubmit: async ({ value }) => {
+            if (currencyUnresolvedRef.current) return;
             if (!canFindPath(user, value)) return;
             const key = findQuoteKey(user!, value);
             if (
@@ -417,6 +412,11 @@ export function TransferDialog({
             minReturn: "0.01",
         },
         onSubmit: async ({ value }) => {
+            if (currencyUnresolvedRef.current) {
+                toast.error("This link's currency is not available.");
+                setConfirmOpen(false);
+                return;
+            }
             if (
                 !quoteStillCurrent(
                     userRef.current,
@@ -500,15 +500,24 @@ export function TransferDialog({
         if (!open || !assetsReady || assets.length === 0) return;
         const payee = prefill?.payee;
         const amount = prefill?.amount;
-        const toAsset =
-            parseAssetId(prefill?.toAsset, assets) ??
-            lockedFrom ??
-            defaultAssetId(assets);
-        // A set page currency wins over an invoice's from-asset. To still follows the invoice.
-        const fromAsset =
-            lockedFrom ??
-            parseAssetId(prefill?.fromAsset, assets) ??
-            toAsset;
+        // `currency=usd` is a suggested transfer: both sides use it.
+        // Otherwise a set page currency wins over an invoice's from-asset.
+        // An unknown symbol does not use either fallback.
+        const wanted = prefill?.currency?.trim() ?? "";
+        const pinned = assetIdBySymbol(wanted || undefined, assets);
+        const unresolved = wanted !== "" && pinned === undefined;
+        const toAsset = unresolved
+            ? undefined
+            : (pinned ??
+              parseAssetId(prefill?.toAsset, assets) ??
+              lockedFrom ??
+              defaultAssetId(assets));
+        const fromAsset = unresolved
+            ? undefined
+            : (pinned ??
+              lockedFrom ??
+              parseAssetId(prefill?.fromAsset, assets) ??
+              toAsset);
         findForm.setFieldValue("payee", payee?.trim() ?? "");
         findForm.setFieldValue("amount", amount ?? "1");
         if (amount) {
@@ -517,10 +526,8 @@ export function TransferDialog({
                 execForm.setFieldValue("amount", amount);
             }
         }
-        if (toAsset !== undefined) findForm.setFieldValue("toAsset", toAsset);
-        if (fromAsset !== undefined) {
-            findForm.setFieldValue("fromAsset", fromAsset);
-        }
+        findForm.setFieldValue("toAsset", toAsset);
+        findForm.setFieldValue("fromAsset", fromAsset);
         rememberQuotedKey(null);
         rememberFailedKey(null);
         setQuoteError(null);
@@ -586,6 +593,8 @@ export function TransferDialog({
         void findForm.handleSubmit().catch(() => undefined);
     };
 
+    const pinnedSymbol =
+        pinnedId !== undefined ? symbolOf(pinnedId) : undefined;
     const quotedFrom = quote?.hops[0]?.assetId;
     const quotedTo =
         quote && quote.hops.length > 0
@@ -602,10 +611,18 @@ export function TransferDialog({
                     <DialogTitle>
                         {requestId ? `Pay invoice #${requestId}` : "Transfer"}
                     </DialogTitle>
-                    <DialogDescription>
-                        {requestId
-                            ? "A path is quoted as you fill this in."
-                            : "Send along a path of credit. A route is quoted as you fill this in."}
+                    <DialogDescription
+                        className={
+                            currencyUnresolved ? "text-destructive" : undefined
+                        }
+                    >
+                        {currencyUnresolved
+                            ? `No currency named ${currencyWanted.toUpperCase()}. This transfer will not use another currency.`
+                            : requestId
+                              ? "A path is quoted as you fill this in."
+                              : pinnedSymbol
+                                ? `Send along a path of credit in ${pinnedSymbol}. A route is quoted as you fill this in.`
+                                : "Send along a path of credit. A route is quoted as you fill this in."}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
@@ -616,7 +633,9 @@ export function TransferDialog({
                             quoteKey={
                                 user ? findQuoteKey(user, values) : ""
                             }
-                            enabled={canFindPath(user, values)}
+                            enabled={
+                                canFindPath(user, values) && !currencyUnresolved
+                            }
                             onFind={findNow}
                         />
                     )}
@@ -770,12 +789,27 @@ export function TransferDialog({
                                             h.account.trim() &&
                                             h.assetId !== undefined,
                                     );
+                                const suggestAsset =
+                                    values.toAsset ?? values.fromAsset;
+                                const suggestSymbol =
+                                    suggestAsset !== undefined &&
+                                    byId.has(suggestAsset)
+                                        ? symbolOf(suggestAsset)
+                                        : "";
+                                const suggestUrl = requestId
+                                    ? null
+                                    : transferSuggestUrl(
+                                          values.payee,
+                                          values.amount,
+                                          suggestSymbol,
+                                      );
                                 return (
                                     <>
                                     <Button
                                         type="button"
                                         disabled={
                                             !ready ||
+                                            currencyUnresolved ||
                                             pathPay.isPending ||
                                             payInvoice.isPending
                                         }
@@ -785,6 +819,26 @@ export function TransferDialog({
                                             ? "Pay invoice"
                                             : "Transfer"}
                                     </Button>
+                                    {requestId ? null : (
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            className="gap-2"
+                                            disabled={!suggestUrl}
+                                            onClick={() => setQrOpen(true)}
+                                        >
+                                            <QrCode className="size-4" />
+                                            QR
+                                        </Button>
+                                    )}
+                                    <TransferQrDialog
+                                        open={qrOpen && !requestId}
+                                        onOpenChange={setQrOpen}
+                                        url={suggestUrl}
+                                        payee={values.payee.trim()}
+                                        amount={values.amount.trim()}
+                                        symbol={suggestSymbol}
+                                    />
                                     <PathStatus
                                         pending={quotePath.isPending}
                                         failed={failed}
@@ -837,6 +891,7 @@ export function TransferDialog({
                     onSubmit={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
+                        if (currencyUnresolved) return;
                         if (
                             !quoteStillCurrent(
                                 user,
@@ -1262,6 +1317,7 @@ export function TransferDialog({
                                             type="button"
                                             disabled={
                                                 !matched ||
+                                                currencyUnresolved ||
                                                 pathPay.isPending ||
                                                 payInvoice.isPending
                                             }

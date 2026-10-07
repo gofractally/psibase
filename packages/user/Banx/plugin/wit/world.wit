@@ -222,16 +222,19 @@ interface api {
     ) -> result<_, error>;
 
     /// Post a from→to FX offer. Others take it with `convert`. Path pay uses
-    /// it to size a hop when you are the middle man. Fee is a human decimal in
-    /// **from-asset** units. `to-rate` is how many **to-asset** units you get
-    /// for 1 full **from-asset** unit (e.g. `"0.45"`). The plugin converts this
-    /// to the chain `fx_rate` (RATE_SCALE fixed-point), including precisions.
+    /// it to size a hop when you are the middle man. Fee and `remaining` are
+    /// human decimals in **from-asset** units. `remaining` is how much
+    /// from-asset is still accepted; saving again replaces what is left.
+    /// `to-rate` is how many **to-asset** units you get for 1 full
+    /// **from-asset** unit (e.g. `"0.45"`). The plugin converts this to the
+    /// chain `fx_rate` (RATE_SCALE fixed-point), including precisions.
     set-currency-policy: func(
         from-asset: u16,
         to-asset: u16,
         fee-fixed: string,
         to-rate: string,
         to-interest-rate-ppm: u32,
+        remaining: string,
         expires-at-seconds: u32,
     ) -> result<_, error>;
 

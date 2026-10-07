@@ -771,6 +771,8 @@ export function useSetCurrencyPolicy() {
             /** Human to-asset units per 1 from-asset unit, e.g. `"0.45"`. */
             toRate: string;
             toInterestRatePpm: number;
+            /** From-asset still accepted. Saving replaces what is left. */
+            remaining: string;
             expiresAtSeconds: number;
         }) =>
             banxCall("setCurrencyPolicy", [
@@ -779,6 +781,7 @@ export function useSetCurrencyPolicy() {
                 p.feeFixed,
                 p.toRate,
                 p.toInterestRatePpm,
+                p.remaining,
                 p.expiresAtSeconds,
             ]),
         onSuccess: () => {
@@ -825,7 +828,7 @@ export function useSetCashQuote() {
             ]),
         onSuccess: () => {
             invalidate();
-            toast.success("Cash quote saved");
+            toast.success("Rate saved");
         },
         onError: (e: Error) => toast.error(e.message),
     });
@@ -841,7 +844,7 @@ export function useRemoveCashQuote() {
         }) => banxCall("removeCashQuote", [p.assetId, p.tokenId, p.isOut]),
         onSuccess: () => {
             invalidate();
-            toast.success("Cash quote removed");
+            toast.success("Rate removed");
         },
         onError: (e: Error) => toast.error(e.message),
     });
@@ -885,7 +888,7 @@ export function useCashFund() {
         },
         onSuccess: () => {
             invalidate();
-            toast.success("Vault funded");
+            toast.success("Tokens added");
         },
         onError: (e: Error) => toast.error(e.message),
     });
@@ -898,7 +901,7 @@ export function useCashWithdraw() {
             banxCall("cashWithdraw", [p.tokenId, p.amount]),
         onSuccess: () => {
             invalidate();
-            toast.success("Withdrawn from vault");
+            toast.success("Tokens withdrawn");
         },
         onError: (e: Error) => toast.error(e.message),
     });
@@ -923,7 +926,7 @@ export function useCashOut() {
             ]),
         onSuccess: () => {
             invalidate();
-            toast.success("Cashed out");
+            toast.success("Tokens received");
         },
         onError: (e: Error) => toast.error(e.message),
     });
@@ -948,7 +951,7 @@ export function useCashIn() {
             ]),
         onSuccess: () => {
             invalidate();
-            toast.success("Cashed in");
+            toast.success("Banx received");
         },
         onError: (e: Error) => toast.error(e.message),
     });

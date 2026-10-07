@@ -16,10 +16,8 @@ import {
 import { ActivityFeed } from "@/components/activity-feed";
 import { ClaimedInviteNicks } from "@/components/claimed-invite-nicks";
 import { CreditLineDialog } from "@/components/credit-line-dialog";
-import {
-    TransferDialog,
-    transferPrefillFromSearch,
-} from "@/components/transfer-dialog";
+import { TransferDialog } from "@/components/transfer-dialog";
+import { transferPrefillFromSearch } from "@/lib/transfer-url";
 import { NewDepositLoanDialog } from "@/components/new-deposit-loan-dialog";
 import { PageHeader } from "@/components/page-header";
 import { PositionSummary } from "@/components/position-summary";

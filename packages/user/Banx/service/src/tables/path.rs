@@ -17,6 +17,10 @@ pub fn path_required_send(hops: &[PathHop], target_out: Quantity) -> Quantity {
             let pol = CurrencyPolicy::get_assert(prev.account, prev.asset_id, hop.asset_id);
             pol.assert_live();
             need = invert_rate(need, pol.fee_fixed, pol.fx_rate);
+            assert!(
+                need.value <= pol.remaining.value,
+                "currency policy amount exceeds remaining"
+            );
         }
     }
     need
@@ -33,6 +37,9 @@ pub(crate) fn execute_path(
     let mut path_debtor = sender;
     let mut forward = amount;
     let mut prev_asset = hops[0].asset_id;
+    // Search will not route the same account twice in one asset. A submitted
+    // path must not either, or one payment can draw that line again.
+    let mut seen: Vec<(AccountNumber, u16)> = Vec::new();
 
     for (i, hop) in hops.into_iter().enumerate() {
         let PathHop {
@@ -40,6 +47,11 @@ pub(crate) fn execute_path(
             asset_id,
         } = hop;
         assert!(next_creditor != path_debtor, "path cannot draw on self");
+        assert!(
+            !seen.contains(&(next_creditor, asset_id)),
+            "path cannot revisit an account in the same asset"
+        );
+        seen.push((next_creditor, asset_id));
 
         if i == 0 {
             Connection::get_live(next_creditor, path_debtor, asset_id).draw(forward);
@@ -49,7 +61,9 @@ pub(crate) fn execute_path(
         }
 
         if asset_id != prev_asset {
-            forward = CurrencyPolicy::get_assert(path_debtor, prev_asset, asset_id).apply(forward);
+            let mut pol = CurrencyPolicy::get_assert(path_debtor, prev_asset, asset_id);
+            pol.spend(forward);
+            forward = pol.apply(forward);
         }
         assert!(forward.value > 0, "path hop produced nothing to forward");
         forward = ForwardOffer::get_live(path_debtor, next_creditor, asset_id)

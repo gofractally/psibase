@@ -53,6 +53,8 @@ pub struct FxEdge {
     pub to_asset: u16,
     pub fee_fixed: u64,
     pub fx_rate: u64,
+    /// From-asset still accepted. 0 means the quote is spent.
+    pub remaining: u64,
     pub expires_at: i64,
 }
 
@@ -226,7 +228,7 @@ pub fn find_banx_path(
 
     let mut fx_by_poster_from: HashMap<(AccountNumber, u16), Vec<&FxEdge>> = HashMap::new();
     for e in fx {
-        if policy_live(e.expires_at, now) && e.fx_rate > 0 {
+        if policy_live(e.expires_at, now) && e.fx_rate > 0 && e.remaining > 0 {
             fx_by_poster_from
                 .entry((e.poster, e.from_asset))
                 .or_default()
@@ -281,6 +283,9 @@ pub fn find_banx_path(
             );
             if let Some(fx_list) = fx_by_poster_from.get(&(label.account, label.asset)) {
                 for e in fx_list {
+                    if label.amount > e.remaining {
+                        continue;
+                    }
                     let Some(after_fx) = apply_rate(label.amount, e.fee_fixed, e.fx_rate) else {
                         continue;
                     };
@@ -376,6 +381,7 @@ fn simulate_path_fees(
                     && e.to_asset == asset_id
                     && policy_live(e.expires_at, now)
                     && e.fx_rate > 0
+                    && e.remaining >= forward
             })?;
             fx_fee = e.fee_fixed;
             fx_from_asset = Some(prev_asset);
@@ -510,6 +516,7 @@ fn walk_exact_out(
         if edge.poster != account
             || edge.from_asset != asset
             || edge.fx_rate == 0
+            || edge.remaining == 0
             || !policy_live(edge.expires_at, now)
         {
             continue;
@@ -607,6 +614,9 @@ fn required_in(
                     && edge.fx_rate > 0
             })?;
             need = try_invert_rate(need, edge.fee_fixed, edge.fx_rate)?;
+            if need > edge.remaining {
+                return None;
+            }
         }
     }
     Some(need)
@@ -1251,6 +1261,7 @@ mod tests {
             to_asset: usd,
             fee_fixed: 0,
             fx_rate: RATE_SCALE * 70 / 100,
+            remaining: u64::MAX,
             expires_at: 0,
         }];
         let q = find_out(
@@ -1268,6 +1279,67 @@ mod tests {
         .expect("fx invert");
         assert_eq!(q.amount_in, 1_000);
         assert_eq!(q.amount_out, 700);
+    }
+
+    /// 700 USD needs 1000 AUD. A quote with 999 left cannot deliver it.
+    #[test]
+    fn fx_remaining_blocks_exact_out() {
+        let aud = 1u16;
+        let usd = 2u16;
+        let lines = vec![
+            line("gary", "alice", aud, 10_000),
+            line("steve", "gary", usd, 10_000),
+        ];
+        let routing = vec![global_rte("gary", usd, 0)];
+        let fx = vec![FxEdge {
+            poster: acct("gary"),
+            from_asset: aud,
+            to_asset: usd,
+            fee_fixed: 0,
+            fx_rate: RATE_SCALE * 70 / 100,
+            remaining: 999,
+            expires_at: 0,
+        }];
+        assert!(find_out(
+            &lines,
+            &routing,
+            &fx,
+            "alice",
+            "steve",
+            700,
+            aud,
+            Some(usd),
+            4,
+            0,
+        )
+        .is_none());
+        assert!(find(
+            &lines,
+            &routing,
+            &fx,
+            "alice",
+            "steve",
+            1_000,
+            aud,
+            Some(usd),
+            4,
+            0,
+        )
+        .is_none());
+        let q = find(
+            &lines,
+            &routing,
+            &fx,
+            "alice",
+            "steve",
+            999,
+            aud,
+            Some(usd),
+            4,
+            0,
+        )
+        .expect("999 fits");
+        assert_eq!(q.amount_out, 699);
     }
 
     #[test]
@@ -1291,6 +1363,7 @@ mod tests {
             to_asset: usd,
             fee_fixed: 0,
             fx_rate: RATE_SCALE * 65 / 100,
+            remaining: u64::MAX,
             expires_at: 0,
         }];
 
@@ -1483,6 +1556,7 @@ mod tests {
             to_asset: usd,
             fee_fixed: 0,
             fx_rate: RATE_SCALE * 70 / 100,
+            remaining: u64::MAX,
             expires_at: 0,
         }];
         let q = find(
@@ -1518,6 +1592,7 @@ mod tests {
             to_asset: usd,
             fee_fixed: 0,
             fx_rate: RATE_SCALE * 70 / 100,
+            remaining: u64::MAX,
             expires_at: 0,
         }];
         let q = find(
@@ -1554,6 +1629,7 @@ mod tests {
             to_asset: usd,
             fee_fixed: 0,
             fx_rate: RATE_SCALE * 70 / 100,
+            remaining: u64::MAX,
             expires_at: 0,
         }];
         let q = find(
@@ -1592,6 +1668,7 @@ mod tests {
                 to_asset: usd,
                 fee_fixed: 0,
                 fx_rate: RATE_SCALE * 70 / 100,
+                remaining: u64::MAX,
                 expires_at: 0,
             },
             FxEdge {
@@ -1600,6 +1677,7 @@ mod tests {
                 to_asset: gbp,
                 fee_fixed: 0,
                 fx_rate: RATE_SCALE * 80 / 100,
+                remaining: u64::MAX,
                 expires_at: 0,
             },
         ];
@@ -1774,6 +1852,7 @@ mod tests {
                 to_asset: eur,
                 fee_fixed: 0,
                 fx_rate: RATE_SCALE,
+                remaining: u64::MAX,
                 expires_at: 0,
             },
             FxEdge {
@@ -1782,6 +1861,7 @@ mod tests {
                 to_asset: usd,
                 fee_fixed: 0,
                 fx_rate: RATE_SCALE,
+                remaining: u64::MAX,
                 expires_at: 0,
             },
         ];

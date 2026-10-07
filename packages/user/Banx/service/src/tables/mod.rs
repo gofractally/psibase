@@ -208,6 +208,9 @@ pub mod tables {
         pub fx_rate: u64,
         /// Interest rate (ppm APR) for the new `to_asset` obligation bucket.
         pub to_interest_rate: u32,
+        /// From-asset still accepted. Convert and path FX spend it.
+        /// 0 means spent; the row stays so it can be topped up.
+        pub remaining: Quantity,
         /// Absolute expiry (`seconds == 0` → never). Prefer short TTL for FX.
         pub expires_at: TimePointSec,
     }

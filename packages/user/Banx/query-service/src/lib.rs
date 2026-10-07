@@ -238,6 +238,8 @@ mod service {
         /// Chain `fx_rate` (RATE_SCALE fixed-point), not an asset amount.
         fxRate: String,
         toInterestRatePpm: u32,
+        /// From-asset still accepted (human decimal).
+        remaining: Decimal,
         expiresAt: i64,
     }
 
@@ -251,6 +253,7 @@ mod service {
                 feeFixed: Decimal::new(p.fee_fixed, asset_precision(p.from_asset)),
                 fxRate: p.fx_rate.to_string(),
                 toInterestRatePpm: p.to_interest_rate,
+                remaining: Decimal::new(p.remaining, asset_precision(p.from_asset)),
                 expiresAt: time_sec(p.expires_at),
             }
         }

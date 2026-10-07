@@ -343,6 +343,7 @@ mod tests {
                 Quantity::new(0),
                 RATE_SCALE * 70 / 100,
                 0,
+                Quantity::new(u64::MAX),
                 never(),
             )
             .get()?;
@@ -447,6 +448,7 @@ mod tests {
                 Quantity::new(0),
                 RATE_SCALE * 65 / 100,
                 0,
+                Quantity::new(u64::MAX),
                 never(),
             )
             .get()?;
@@ -665,6 +667,7 @@ mod tests {
                 Quantity::new(0),
                 RATE_SCALE * 65 / 100,
                 0,
+                Quantity::new(u64::MAX),
                 never(),
             )
             .get()?;
@@ -724,6 +727,7 @@ mod tests {
                 Quantity::new(0),
                 RATE_SCALE * 50 / 100,
                 0,
+                Quantity::new(u64::MAX),
                 never(),
             )
             .get()?;
@@ -734,6 +738,237 @@ mod tests {
 
         assert_eq!(exp(&chain, gary, alice, aud), 0);
         assert_eq!(exp(&chain, gary, alice, usd), 50);
+
+        Ok(())
+    }
+
+    /// From-asset `remaining` caps convert and path FX. A take larger than
+    /// what is left is rejected whole. Posting again replaces what is left.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_currency_policy_remaining_caps_convert_and_path(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let gary = account!("gary");
+        let steve = account!("steve");
+        for a in [alice, gary, steve] {
+            chain.new_account(a).unwrap();
+        }
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, gary)
+            .st_crd_lne(alice, aud, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(gary, aud)],
+                Quantity::new(100),
+                Quantity::new(100),
+                0,
+            )
+            .get()?;
+
+        let zero = Wrapper::push_from(&chain, gary).st_cur_pol(
+            aud,
+            usd,
+            Quantity::new(0),
+            RATE_SCALE * 50 / 100,
+            0,
+            Quantity::new(0),
+            never(),
+        );
+        let err = zero.trace.error.as_deref().unwrap_or("(no error)");
+        assert!(
+            err.contains("currency policy remaining must be positive"),
+            "zero remaining: {err}"
+        );
+        assert!(CurrencyPolicy::get(gary, aud, usd).is_none());
+
+        Wrapper::push_from(&chain, gary)
+            .st_cur_pol(
+                aud,
+                usd,
+                Quantity::new(0),
+                RATE_SCALE * 50 / 100,
+                0,
+                Quantity::new(40),
+                never(),
+            )
+            .get()?;
+
+        let over = Wrapper::push_from(&chain, alice).convert(
+            gary,
+            aud,
+            usd,
+            Quantity::new(100),
+            Quantity::new(0),
+        );
+        let err = over.trace.error.as_deref().unwrap_or("(no error)");
+        assert!(
+            err.contains("currency policy amount exceeds remaining"),
+            "convert over remaining: {err}"
+        );
+        assert_eq!(exp(&chain, gary, alice, aud), 100);
+        assert_eq!(exp(&chain, gary, alice, usd), 0);
+        assert_eq!(
+            CurrencyPolicy::get_assert(gary, aud, usd).remaining.value,
+            40
+        );
+
+        Wrapper::push_from(&chain, alice)
+            .convert(gary, aud, usd, Quantity::new(40), Quantity::new(20))
+            .get()?;
+        assert_eq!(exp(&chain, gary, alice, aud), 60);
+        assert_eq!(exp(&chain, gary, alice, usd), 20);
+        assert_eq!(
+            CurrencyPolicy::get_assert(gary, aud, usd).remaining.value,
+            0
+        );
+        assert!(Wrapper::push_from(&chain, alice)
+            .convert(gary, aud, usd, Quantity::new(1), Quantity::new(0))
+            .get()
+            .is_err());
+        assert_eq!(exp(&chain, gary, alice, aud), 60);
+
+        // 60 of exposure against a budget of 50 must not fill 50 and leave 10.
+        Wrapper::push_from(&chain, gary)
+            .st_cur_pol(
+                aud,
+                usd,
+                Quantity::new(0),
+                RATE_SCALE * 50 / 100,
+                0,
+                Quantity::new(50),
+                never(),
+            )
+            .get()?;
+        let partial = Wrapper::push_from(&chain, alice).convert(
+            gary,
+            aud,
+            usd,
+            Quantity::new(100),
+            Quantity::new(0),
+        );
+        let err = partial.trace.error.as_deref().unwrap_or("(no error)");
+        assert!(
+            err.contains("currency policy amount exceeds remaining"),
+            "no partial fill: {err}"
+        );
+        assert_eq!(exp(&chain, gary, alice, aud), 60);
+        assert_eq!(exp(&chain, gary, alice, usd), 20);
+        assert_eq!(
+            CurrencyPolicy::get_assert(gary, aud, usd).remaining.value,
+            50
+        );
+
+        Wrapper::push_from(&chain, gary)
+            .st_cur_pol(
+                aud,
+                usd,
+                Quantity::new(0),
+                RATE_SCALE * 50 / 100,
+                0,
+                Quantity::new(60),
+                never(),
+            )
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .convert(gary, aud, usd, Quantity::new(60), Quantity::new(30))
+            .get()?;
+        assert_eq!(exp(&chain, gary, alice, aud), 0);
+        assert_eq!(exp(&chain, gary, alice, usd), 50);
+        assert_eq!(
+            CurrencyPolicy::get_assert(gary, aud, usd).remaining.value,
+            0
+        );
+
+        // 1000 AUD at 0.70 needs 1000 of budget. 500 delivers 350 USD.
+        Wrapper::push_from(&chain, steve)
+            .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never(), true)
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .st_cur_pol(
+                aud,
+                usd,
+                Quantity::new(0),
+                RATE_SCALE * 70 / 100,
+                0,
+                Quantity::new(500),
+                never(),
+            )
+            .get()?;
+
+        let too_big = Wrapper::push_from(&chain, alice).path_pay(
+            vec![hop(gary, aud), hop(steve, usd)],
+            Quantity::new(1_000),
+            Quantity::new(700),
+            0,
+        );
+        let err = too_big.trace.error.as_deref().unwrap_or("(no error)");
+        assert!(
+            err.contains("currency policy amount exceeds remaining"),
+            "path over remaining: {err}"
+        );
+        assert_eq!(exp(&chain, gary, alice, aud), 0);
+        assert_eq!(exp(&chain, steve, gary, usd), 0);
+        assert_eq!(
+            CurrencyPolicy::get_assert(gary, aud, usd).remaining.value,
+            500
+        );
+
+        let id = Wrapper::push_from(&chain, steve)
+            .st_req(
+                PayRequest::INVOICE,
+                alice,
+                usd,
+                Quantity::new(700),
+                "x".into(),
+                never(),
+            )
+            .get()?;
+        let inv = Wrapper::push_from(&chain, alice).pay_inv(
+            vec![hop(gary, aud), hop(steve, usd)],
+            Quantity::new(2_000),
+            id,
+        );
+        let err = inv.trace.error.as_deref().unwrap_or("(no error)");
+        assert!(
+            err.contains("currency policy amount exceeds remaining"),
+            "invoice over remaining: {err}"
+        );
+        assert_eq!(PayRequest::get_assert(id).remaining.value, 700);
+        assert_eq!(exp(&chain, steve, gary, usd), 0);
+
+        Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(gary, aud), hop(steve, usd)],
+                Quantity::new(500),
+                Quantity::new(350),
+                0,
+            )
+            .get()?;
+        assert_eq!(exp(&chain, gary, alice, aud), 500);
+        assert_eq!(exp(&chain, steve, gary, usd), 350);
+        assert_eq!(
+            CurrencyPolicy::get_assert(gary, aud, usd).remaining.value,
+            0
+        );
+        assert!(Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(gary, aud), hop(steve, usd)],
+                Quantity::new(1),
+                Quantity::new(0),
+                0,
+            )
+            .get()
+            .is_err());
+        assert_eq!(exp(&chain, gary, alice, aud), 500);
+        assert_eq!(exp(&chain, steve, gary, usd), 350);
 
         Ok(())
     }
@@ -760,7 +995,15 @@ mod tests {
             )
             .get()?;
         Wrapper::push_from(&chain, gary)
-            .st_cur_pol(aud, usd, Quantity::new(0), RATE_SCALE, 0, never())
+            .st_cur_pol(
+                aud,
+                usd,
+                Quantity::new(0),
+                RATE_SCALE,
+                0,
+                Quantity::new(u64::MAX),
+                never(),
+            )
             .get()?;
         assert!(CurrencyPolicy::get(gary, aud, usd).is_some());
 
@@ -811,7 +1054,15 @@ mod tests {
         assert_eq!(exp(&chain, alice, gary, aud), 0);
 
         Wrapper::push_from(&chain, gary)
-            .st_cur_pol(aud, usd, Quantity::new(0), RATE_SCALE, 0, never())
+            .st_cur_pol(
+                aud,
+                usd,
+                Quantity::new(0),
+                RATE_SCALE,
+                0,
+                Quantity::new(u64::MAX),
+                never(),
+            )
             .get()?;
         Wrapper::push_from(&chain, alice)
             .convert(gary, aud, usd, Quantity::new(100), Quantity::new(60))
@@ -852,7 +1103,15 @@ mod tests {
         assert_eq!(exp(&chain, alice, gary, usd), 80);
 
         Wrapper::push_from(&chain, gary)
-            .st_cur_pol(aud, usd, Quantity::new(0), RATE_SCALE, 0, never())
+            .st_cur_pol(
+                aud,
+                usd,
+                Quantity::new(0),
+                RATE_SCALE,
+                0,
+                Quantity::new(u64::MAX),
+                never(),
+            )
             .get()?;
         Wrapper::push_from(&chain, alice)
             .convert(gary, aud, usd, Quantity::new(100), Quantity::new(100))
@@ -1949,6 +2208,7 @@ mod tests {
                 Quantity::new(0),
                 RATE_SCALE * 50 / 100,
                 0,
+                Quantity::new(u64::MAX),
                 never(),
             )
             .get()?;
@@ -1959,6 +2219,7 @@ mod tests {
                 Quantity::new(0),
                 RATE_SCALE * 80 / 100,
                 0,
+                Quantity::new(u64::MAX),
                 never(),
             )
             .get()?;
@@ -1998,6 +2259,7 @@ mod tests {
                 Quantity::new(0),
                 RATE_SCALE * 70 / 100,
                 0,
+                Quantity::new(u64::MAX),
                 never(),
             )
             .get()?;
@@ -2051,6 +2313,7 @@ mod tests {
                 Quantity::new(0),
                 RATE_SCALE * 70 / 100,
                 0,
+                Quantity::new(u64::MAX),
                 never(),
             )
             .get()?;
@@ -2118,6 +2381,7 @@ mod tests {
                 Quantity::new(0),
                 RATE_SCALE * 70 / 100,
                 0,
+                Quantity::new(u64::MAX),
                 never(),
             )
             .get()?;
@@ -2129,6 +2393,7 @@ mod tests {
                 Quantity::new(0),
                 RATE_SCALE * 80 / 100,
                 0,
+                Quantity::new(u64::MAX),
                 never(),
             )
             .get()?;
@@ -2215,6 +2480,7 @@ mod tests {
                 Quantity::new(0),
                 RATE_SCALE * 70 / 100,
                 0,
+                Quantity::new(u64::MAX),
                 never(),
             )
             .get()?;
@@ -2273,6 +2539,7 @@ mod tests {
                 Quantity::new(0),
                 RATE_SCALE * 50 / 100,
                 0,
+                Quantity::new(u64::MAX),
                 never(),
             )
             .get()?;
@@ -2297,6 +2564,7 @@ mod tests {
                 Quantity::new(0),
                 RATE_SCALE * 70 / 100,
                 0,
+                Quantity::new(u64::MAX),
                 never(),
             )
             .get()?;
@@ -2425,14 +2693,31 @@ mod tests {
         let alice = account!("alice");
         chain.new_account(alice).unwrap();
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
-        let missing = 99u16;
+        // Ids are 1..=seeded. 99 is a real currency.
+        let missing = crate::iso4217::SEEDED_ASSETS.len() as u16 + 1;
 
         let fx = Wrapper::push_from(&chain, alice)
-            .st_cur_pol(usd, missing, Quantity::new(0), RATE_SCALE, 0, never())
+            .st_cur_pol(
+                usd,
+                missing,
+                Quantity::new(0),
+                RATE_SCALE,
+                0,
+                Quantity::new(u64::MAX),
+                never(),
+            )
             .get();
         assert!(fx.is_err());
         let fx_from = Wrapper::push_from(&chain, alice)
-            .st_cur_pol(missing, usd, Quantity::new(0), RATE_SCALE, 0, never())
+            .st_cur_pol(
+                missing,
+                usd,
+                Quantity::new(0),
+                RATE_SCALE,
+                0,
+                Quantity::new(u64::MAX),
+                never(),
+            )
             .get();
         assert!(fx_from.is_err());
         let fwd = Wrapper::push_from(&chain, alice)
@@ -3885,6 +4170,7 @@ mod tests {
                 Quantity::new(0),
                 RATE_SCALE * 70 / 100,
                 0,
+                Quantity::new(u64::MAX),
                 TimePointSec { seconds: 1 },
             )
             .get()?;
@@ -4142,7 +4428,15 @@ mod tests {
             .path_pay(vec![hop(gary, aud)], 100.into(), 100.into(), 0)
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .st_cur_pol(aud, usd, 0.into(), RATE_SCALE, 0, never())
+            .st_cur_pol(
+                aud,
+                usd,
+                0.into(),
+                RATE_SCALE,
+                0,
+                Quantity::new(u64::MAX),
+                never(),
+            )
             .get()?;
 
         let no_offer =
@@ -4168,6 +4462,7 @@ mod tests {
                 Quantity::new(0),
                 RATE_SCALE * 50 / 100,
                 0,
+                Quantity::new(u64::MAX),
                 never(),
             )
             .get()?;
@@ -4383,6 +4678,7 @@ mod tests {
                 Quantity::new(0),
                 RATE_SCALE * 70 / 100,
                 0,
+                Quantity::new(u64::MAX),
                 never(),
             )
             .get()?;
@@ -6291,6 +6587,70 @@ mod tests {
             .get()?;
         assert!(PayAuth::get(ending).is_none());
         assert_eq!(exp(&chain, bob, alice, usd), 100);
+        Ok(())
+    }
+
+    /// A cycle that returns to the payer is not one authorized period.
+    ///
+    /// `max_spend` is the most that period may draw the payer. Repeating
+    /// Bob in `[Bob, Carol, Alice, Bob]` would draw Alice twice, so the
+    /// run must fail and leave the books untouched.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_pay_auth_cycle_does_not_draw_payer_twice(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        let carol = account!("carol");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        chain.new_account(carol).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        const AMOUNT: u64 = 100;
+        const RATE: u32 = 100_000;
+
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, usd, Quantity::new(AMOUNT * 2), true, RATE, 0)
+            .get()?;
+        Wrapper::push_from(&chain, carol)
+            .st_crd_lne(bob, usd, Quantity::new(AMOUNT), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .deposit(carol, usd, Quantity::new(AMOUNT), 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .st_fwd_ofr(carol, usd, Quantity::new(0), 0, PPM_SCALE, never(), true)
+            .get()?;
+        Wrapper::push_from(&chain, carol)
+            .st_fwd_ofr(alice, usd, Quantity::new(0), 0, PPM_SCALE, never(), false)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .st_fwd_ofr(bob, usd, Quantity::new(0), 0, PPM_SCALE, never(), false)
+            .get()?;
+
+        const START: i64 = 1_700_000_000;
+        pin(&chain, START);
+        let id = schedule(&chain, alice, bob, usd, AMOUNT, AMOUNT, 100, START, 0);
+
+        let cycled = Wrapper::push_from(&chain, bob).run_pay_ath(
+            id,
+            vec![
+                hop(bob, usd),
+                hop(carol, usd),
+                hop(alice, usd),
+                hop(bob, usd),
+            ],
+        );
+        assert!(cycled.get().is_err());
+        assert_eq!(pay_row(id).next_due.seconds, START);
+        assert_eq!(exp(&chain, bob, alice, usd), 0);
+        assert_eq!(exp(&chain, carol, alice, usd), AMOUNT);
+        assert_eq!(exp(&chain, carol, bob, usd), 0);
+        assert_eq!(
+            CreditLine::get_assert(bob, alice, usd).remaining.value,
+            AMOUNT * 2
+        );
         Ok(())
     }
 }

@@ -60,6 +60,7 @@ struct GqlCurrency {
     fee_fixed: Decimal,
     /// Chain RATE_SCALE fixed-point (not an asset amount).
     fx_rate: String,
+    remaining: Decimal,
     expires_at: i64,
 }
 
@@ -93,7 +94,7 @@ pub fn fetch_path_graph(
                     expiresAt allowUnknown
                 }}
                 currencyPolicies {{
-                    poster fromAsset toAsset feeFixed fxRate expiresAt
+                    poster fromAsset toAsset feeFixed fxRate remaining expiresAt
                 }}
             }}
         }}"#
@@ -144,6 +145,7 @@ pub fn fetch_path_graph(
             to_asset: c.to_asset,
             fee_fixed: c.fee_fixed.quantity.value,
             fx_rate: parse_u64(&c.fx_rate)?,
+            remaining: c.remaining.quantity.value,
             expires_at: c.expires_at,
         });
     }

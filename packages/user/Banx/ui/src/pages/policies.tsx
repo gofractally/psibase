@@ -29,6 +29,7 @@ import {
     MAX_PERCENT,
     MIN_PERCENT_STEP,
     PPM_SCALE,
+    amountFieldValidator,
     percentFieldValidator,
     percentStringToPpm,
     useAppForm,
@@ -61,10 +62,15 @@ export function PoliciesPage() {
             feeFixed: "0",
             toRate: "1",
             aprPct: "0",
+            remaining: "",
             expiresAtSeconds: 0,
         },
         onSubmit: async ({ value }) => {
-            if (value.fromAsset === undefined || value.toAsset === undefined)
+            if (
+                value.fromAsset === undefined ||
+                value.toAsset === undefined ||
+                !value.remaining.trim()
+            )
                 return;
             await new Promise<void>((resolve, reject) => {
                 setCurrency.mutate(
@@ -77,6 +83,7 @@ export function PoliciesPage() {
                             value.aprPct,
                             PPM_SCALE,
                         ),
+                        remaining: value.remaining.trim(),
                         expiresAtSeconds: value.expiresAtSeconds,
                     },
                     {
@@ -219,12 +226,17 @@ export function PoliciesPage() {
                                                             values.toRate.trim();
                                                         const feeText =
                                                             values.feeFixed.trim();
+                                                        const openText =
+                                                            values.remaining.trim();
                                                         const needsConvert =
                                                             (rate !== "" &&
                                                                 rate !==
                                                                     "1") ||
                                                             (feeText !== "" &&
                                                                 feeText !==
+                                                                    "0") ||
+                                                            (openText !== "" &&
+                                                                openText !==
                                                                     "0");
                                                         if (needsConvert) {
                                                             toast.error(
@@ -268,6 +280,13 @@ export function PoliciesPage() {
                                                             fromPrec,
                                                             toPrec,
                                                         );
+                                                    const open =
+                                                        convertAtQuotedRate(
+                                                            values.remaining,
+                                                            values.toRate,
+                                                            fromPrec,
+                                                            toPrec,
+                                                        );
                                                     const nextRate =
                                                         keptOnFlip(
                                                             values.toRate,
@@ -279,6 +298,11 @@ export function PoliciesPage() {
                                                         fee,
                                                         "0",
                                                     );
+                                                    const nextOpen = keptOnFlip(
+                                                        values.remaining,
+                                                        open,
+                                                        "",
+                                                    );
                                                     if (
                                                         flipLeftTyped(
                                                             values.toRate,
@@ -289,6 +313,11 @@ export function PoliciesPage() {
                                                             values.feeFixed,
                                                             fee,
                                                             nextFee,
+                                                        ) ||
+                                                        flipLeftTyped(
+                                                            values.remaining,
+                                                            open,
+                                                            nextOpen,
                                                         )
                                                     ) {
                                                         toast.error(
@@ -302,6 +331,10 @@ export function PoliciesPage() {
                                                     currencyForm.setFieldValue(
                                                         "feeFixed",
                                                         nextFee,
+                                                    );
+                                                    currencyForm.setFieldValue(
+                                                        "remaining",
+                                                        nextOpen,
                                                     );
                                                 }}
                                             >
@@ -391,6 +424,52 @@ export function PoliciesPage() {
                                         )}
                                     />
                                     <currencyForm.AppField
+                                        name="remaining"
+                                        validators={
+                                            values.fromAsset === undefined
+                                                ? undefined
+                                                : {
+                                                      onChange:
+                                                          amountFieldValidator(
+                                                              precisionOf(
+                                                                  values.fromAsset,
+                                                              ),
+                                                              {
+                                                                  allowZero:
+                                                                      false,
+                                                              },
+                                                          ),
+                                                      onSubmit:
+                                                          amountFieldValidator(
+                                                              precisionOf(
+                                                                  values.fromAsset,
+                                                              ),
+                                                              {
+                                                                  allowZero:
+                                                                      false,
+                                                              },
+                                                          ),
+                                                  }
+                                        }
+                                        children={(field) => (
+                                            <field.TextField
+                                                label={`Open (${fromSym})`}
+                                                description="From-asset you will still accept. Saving replaces what is left."
+                                                inputMode="decimal"
+                                                placeholder={
+                                                    values.fromAsset !==
+                                                    undefined
+                                                        ? amountPlaceholder(
+                                                              precisionOf(
+                                                                  values.fromAsset,
+                                                              ),
+                                                          )
+                                                        : "0"
+                                                }
+                                            />
+                                        )}
+                                    />
+                                    <currencyForm.AppField
                                         name="aprPct"
                                         validators={{
                                             onChange:
@@ -435,7 +514,8 @@ export function PoliciesPage() {
                                     disabled={
                                         values.fromAsset === undefined ||
                                         values.toAsset === undefined ||
-                                        values.fromAsset === values.toAsset
+                                        values.fromAsset === values.toAsset ||
+                                        !values.remaining.trim()
                                     }
                                 />
                             </currencyForm.AppForm>
@@ -674,6 +754,9 @@ export function PoliciesPage() {
                                         To APR
                                     </TableHead>
                                     <TableHead className="text-right">
+                                        Open
+                                    </TableHead>
+                                    <TableHead className="text-right">
                                         Expires
                                     </TableHead>
                                     <TableHead />
@@ -701,6 +784,10 @@ export function PoliciesPage() {
                                         </TableCell>
                                         <TableCell className="text-right">
                                             {ppmToPercent(p.toInterestRatePpm)}
+                                        </TableCell>
+                                        <TableCell className="text-right font-mono">
+                                            {displayAmount(p.remaining)}{" "}
+                                            {symbolOf(p.fromAsset)}
                                         </TableCell>
                                         <TableCell className="text-right text-sm">
                                             {formatExpiresAt(p.expiresAt)}

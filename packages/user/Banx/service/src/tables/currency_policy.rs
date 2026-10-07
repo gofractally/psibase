@@ -41,6 +41,7 @@ impl CurrencyPolicy {
         fee_fixed: Quantity,
         fx_rate: u64,
         to_interest_rate: u32,
+        remaining: Quantity,
         expires_at: TimePointSec,
     ) {
         assert!(
@@ -54,6 +55,10 @@ impl CurrencyPolicy {
             to_interest_rate <= PPM_SCALE,
             "to_interest_rate exceeds 100% (PPM_SCALE)"
         );
+        assert!(
+            remaining.value > 0,
+            "currency policy remaining must be positive"
+        );
         Self {
             poster,
             from_asset,
@@ -61,9 +66,21 @@ impl CurrencyPolicy {
             fee_fixed,
             fx_rate,
             to_interest_rate,
+            remaining,
             expires_at,
         }
         .save();
+    }
+
+    /// Spend from-asset budget. Posting the policy again replaces what is left.
+    pub(crate) fn spend(&mut self, amount: Quantity) {
+        self.assert_live();
+        assert!(
+            amount.value <= self.remaining.value,
+            "currency policy amount exceeds remaining"
+        );
+        self.remaining = self.remaining - amount;
+        self.save();
     }
 
     pub fn remove(&self) {
@@ -74,7 +91,7 @@ impl CurrencyPolicy {
     /// `to_asset` at this poster's rate. Poster must be a party.
     /// Nets `from_asset` once, then auto-nets `to_asset`.
     pub fn convert(
-        &self,
+        &mut self,
         party_a: AccountNumber,
         party_b: AccountNumber,
         amount_from: Quantity,
@@ -92,6 +109,7 @@ impl CurrencyPolicy {
             .expect("nothing to convert in from_asset");
         let take = amount_from.value.min(conn.forward().value);
         assert!(take > 0, "nothing to convert in from_asset");
+        self.spend(Quantity::new(take));
         let creditor = conn.creditor;
         let debtor = conn.debtor;
         let to_qty = conn.rebook(
