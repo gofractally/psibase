@@ -147,7 +147,7 @@ namespace psibase
          {
             std::vector<char> buf(sz);
             raw::getResult(buf.data(), buf.size(), 0);
-            sz = raw::kvGet(db, key.data(), key.size());
+            sz = raw::kvGet(db, buf.data(), buf.size());
             check(sz != std::uint32_t(-1), "primary key not found");
          }
          p = psio::shared_view_ptr<T>(psio::size_tag{sz});
