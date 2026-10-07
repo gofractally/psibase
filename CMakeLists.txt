@@ -558,6 +558,12 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/SingleProd.psi
+    PATH packages/user/SingleProd
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
+)
+
+cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Guilds.psi
     PATH packages/user/Guilds
     TARGET_DIR ${USER_WORKSPACE_TARGET}
@@ -1109,9 +1115,8 @@ psibase_package(
         FLAGS isPrivileged
         SERVER x-admin
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/local/XAdmin/ui/dist/* /
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/common-lib/dist/common-lib.js /common/common-lib.js
     DEPENDS wasm ${XAdmin_js_DEP}
-    PACKAGE_DEPENDS XHttp XSites XBasic
+    PACKAGE_DEPENDS XHttp XSites XBasic XCommonApi
 )
 
 psibase_package(
@@ -1125,6 +1130,28 @@ psibase_package(
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XBasic-schema.json
         FLAGS isPrivileged
     DEPENDS wasm
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/XCommonApi.psi
+    NAME XCommonApi
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Service that contains the common files and libraries used by apps on psibase"
+    LOCAL
+    SERVICE x-common
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/CommonApi.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/CommonApi-schema.json
+        SERVER x-common
+        DATA      ${COMMON_API}/common/packages/common-lib/dist/common-lib.js common/common-lib.js
+        DATA GLOB ${COMMON_API}/common/resources/*.mjs                        common/
+        DATA GLOB ${THIRD_FILES}                                              common
+        DATA      ${COMPONENT_BIN_DIR}/${ComponentParser_OUTPUT_FILE}         /common/${ComponentParser_OUTPUT_FILE}
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/plugin-tester/ui/dist/* /common/plugin-tester/
+    DEPENDS CommonApiCommonLib_js
+    DEPENDS ${ComponentParser_DEP}
+    DEPENDS ${PluginTester_js_DEP}
+    DEPENDS wasm
+    PACKAGE_DEPENDS "XHttp(^${PSIBASE_VERSION}.0)" "XSites(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -1339,9 +1366,9 @@ endfunction()
 
 write_package_index(package-index ${SERVICE_DIR} 1
     Accounts AccountsService Aes AuthAny AuthDyn AuthDelegate AuthDelegateService AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
-    Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry
+    Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles SingleProd TestDefault HttpServer Registry
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage VirtualServer WebCrypto Workshop Config
-    XAdmin XBasic XDb XDefault XHttp XKeys XPackages XPeers XProxy XRun XSites XTimer XTransact)
+    XAdmin XBasic XCommonApi XDb XDefault XHttp XKeys XPackages XPeers XProxy XRun XSites XTimer XTransact)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -1400,6 +1427,7 @@ install(
           ${SERVICE_DIR}/Registry.psi
           ${SERVICE_DIR}/ReservedNames.psi
           ${SERVICE_DIR}/SetCode.psi
+          ${SERVICE_DIR}/SingleProd.psi
           ${SERVICE_DIR}/Sites.psi
           ${SERVICE_DIR}/StagedTx.psi
           ${SERVICE_DIR}/Subgroups.psi
@@ -1418,6 +1446,7 @@ install(
           ${SERVICE_DIR}/Config.psi
           ${SERVICE_DIR}/XAdmin.psi
           ${SERVICE_DIR}/XBasic.psi
+          ${SERVICE_DIR}/XCommonApi.psi
           ${SERVICE_DIR}/XDb.psi
           ${SERVICE_DIR}/XDefault.psi
           ${SERVICE_DIR}/XHttp.psi

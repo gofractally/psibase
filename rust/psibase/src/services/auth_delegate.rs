@@ -21,9 +21,17 @@ mod service {
         unimplemented!()
     }
 
-    /// Gets the owner account of the specified account
+    /// Returns the owner of `account`, if any
     #[action]
-    fn getOwner(account: AccountNumber) -> AccountNumber {
+    fn getOwner(account: AccountNumber) -> Option<AccountNumber> {
+        unimplemented!()
+    }
+
+    /// Returns the owner of `account`
+    ///
+    /// Aborts if the account has no owner.
+    #[action]
+    fn checkOwner(account: AccountNumber) -> AccountNumber {
         unimplemented!()
     }
 
