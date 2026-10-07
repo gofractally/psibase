@@ -334,4 +334,27 @@ mod tests {
             total_claimed.value
         );
     }
+
+    /// A deposit must not vest principal that is still inside the half-life.
+    #[psibase::test_case(packages("TokenStream"))]
+    fn deposit_after_partial_claim_keeps_unvested_locked(chain: psibase::Chain) {
+        let test = TestHelper::new(chain);
+        let stream = test.create_stream(ALICE, 1000);
+
+        test.pass_time(TestHelper::HALF_LIFE as i64);
+        let claimed = TokenStream::push_from(&test.chain, ALICE)
+            .claim(stream)
+            .get()
+            .unwrap();
+        assert_eq!(claimed, 500.into(), "one half-life vests half of 1000");
+
+        test.deposit(ALICE, stream, 1);
+        let stored = test.stream(stream).claimable_at_last_deposit;
+        assert_eq!(
+            stored,
+            0.into(),
+            "deposit stored {} as already claimable; the unvested remainder must stay locked",
+            stored.value
+        );
+    }
 }
