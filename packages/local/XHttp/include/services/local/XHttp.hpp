@@ -36,6 +36,9 @@ namespace LocalService
    {
       static constexpr auto service = psibase::AccountNumber{"x-http"};
 
+      static constexpr auto commonService = psibase::AccountNumber("x-common");
+      static constexpr auto commonPrefix  = "/common/";
+
       using Subjective = psibase::SubjectiveTables<RegServTable>;
 
       using Session = psibase::SessionTables<PendingRequestTable, ResponseHandlerTable>;
@@ -142,8 +145,8 @@ namespace LocalService
       std::string rootHost(psio::view<const std::string> host);
 
       /// handles requests to the x-http subdomain
-      auto serveSys(psibase::HttpRequest        req,
-                    std::optional<std::int32_t> socket) -> std::optional<psibase::HttpReply>;
+      auto serveSys(psibase::HttpRequest req, std::optional<std::int32_t> socket)
+          -> std::optional<psibase::HttpReply>;
 
       /// Called by the host at the beginning of a session
       void startSession();

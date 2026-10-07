@@ -56,6 +56,10 @@ std::optional<HttpReply> XSites::serveSys(HttpRequest req, std::optional<std::in
    else
    {
       std::optional<ContentRow> row;
+      if (target.starts_with(XHttp::commonPrefix))
+      {
+         service = XHttp::commonService;
+      }
       PSIBASE_SUBJECTIVE_TX
       {
          row = table.get(std::tuple(service, target));
