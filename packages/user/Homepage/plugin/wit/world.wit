@@ -97,15 +97,3 @@ interface token-swap {
 
     graphql: func(query: string) -> result<string, error>;
 }
-
-world imports {
-    import name-market;
-    import tokens;
-    import contacts;
-    import chainmail;
-    import invite;
-    import virtual-server;
-    import swap;
-    import liquidity;
-    import token-swap;
-}
