@@ -28,6 +28,7 @@ import { getRequiredPackages } from "@/lib/get-required-packages";
 import { ErrorCard } from "@shared/components/error-card";
 import { useAppForm } from "@shared/components/form/app-form";
 import { pemToB64 } from "@shared/lib/b64-key-utils";
+import { cn } from "@shared/lib/utils";
 import { zAccount } from "@shared/lib/schemas/account";
 import {
     Card,
@@ -389,11 +390,12 @@ export const CreatePage = () => {
             <div className="relative flex min-h-0 flex-1 flex-col">
                 <div className="min-h-0 flex-1 overflow-y-auto px-4 sm:px-8">
                     <div
-                        className={
+                        className={cn(
+                            "mx-auto flex flex-col pb-6",
                             currentStep === Step.ChainType
-                                ? "mx-auto flex max-w-6xl flex-col pb-6"
-                                : "mx-auto flex max-w-3xl flex-col pb-6"
-                        }
+                                ? "max-w-6xl"
+                                : "max-w-3xl",
+                        )}
                     >
                         <div className="mb-8">
                             <Steps
