@@ -1,17 +1,17 @@
 import {
     ARENA,
+    type Block,
     ENEMY_EXPLOSION_DURATION,
     FIRE_RANGE,
+    type GameState,
     MAX_ENEMY_TANKS,
     MIN_ENEMY_TANKS,
     PLAYER_COLOR,
-    enemySlotLabels,
-    isEnemyId,
-    type Block,
-    type GameState,
     type Shot,
     type Tank,
     type Vec2,
+    enemySlotLabels,
+    isEnemyId,
 } from "./types";
 
 const COLOR = PLAYER_COLOR;
@@ -181,11 +181,7 @@ function rotate2(p: Vec2, yaw: number): Vec2 {
     return { x: p.x * c - p.y * s, y: p.x * s + p.y * c };
 }
 
-function obstacleCorner(
-    block: Block,
-    lx: number,
-    ly: number,
-): Vec2 {
+function obstacleCorner(block: Block, lx: number, ly: number): Vec2 {
     const r = rotate2({ x: lx, y: ly }, block.yaw);
     return { x: block.pos.x + r.x, y: block.pos.y + r.y };
 }
@@ -300,7 +296,13 @@ function drawBlock(
             obstacleCorner(block, -s, s),
         ].map((p) => projectWorld(width, height, cam, p, 0));
         const top = [
-            projectWorld(width, height, cam, obstacleCorner(block, -s, -s), 0.2),
+            projectWorld(
+                width,
+                height,
+                cam,
+                obstacleCorner(block, -s, -s),
+                0.2,
+            ),
             projectWorld(width, height, cam, obstacleCorner(block, s, -s), 0.2),
             projectWorld(width, height, cam, obstacleCorner(block, s, s), h),
             projectWorld(width, height, cam, obstacleCorner(block, -s, s), h),
@@ -410,14 +412,79 @@ function drawTankMesh(
     ctx.strokeStyle = tankColor(tank);
 
     // Lower hull / chassis (boxy body) — translucent fill for silhouette
-    drawBoxEdges(ctx, width, height, cam, tank, -2.1, 2.1, -2.4, 2.4, 0.0, 1.2, true);
+    drawBoxEdges(
+        ctx,
+        width,
+        height,
+        cam,
+        tank,
+        -2.1,
+        2.1,
+        -2.4,
+        2.4,
+        0.0,
+        1.2,
+        true,
+    );
     // Side track sills (extra edges to distinguish from cubes)
-    drawBoxEdges(ctx, width, height, cam, tank, -2.4, -1.7, -2.5, 2.5, 0.0, 0.7, true);
-    drawBoxEdges(ctx, width, height, cam, tank, 1.7, 2.4, -2.5, 2.5, 0.0, 0.7, true);
+    drawBoxEdges(
+        ctx,
+        width,
+        height,
+        cam,
+        tank,
+        -2.4,
+        -1.7,
+        -2.5,
+        2.5,
+        0.0,
+        0.7,
+        true,
+    );
+    drawBoxEdges(
+        ctx,
+        width,
+        height,
+        cam,
+        tank,
+        1.7,
+        2.4,
+        -2.5,
+        2.5,
+        0.0,
+        0.7,
+        true,
+    );
     // Turret
-    drawBoxEdges(ctx, width, height, cam, tank, -1.2, 1.2, -0.9, 1.3, 1.2, 2.2, true);
+    drawBoxEdges(
+        ctx,
+        width,
+        height,
+        cam,
+        tank,
+        -1.2,
+        1.2,
+        -0.9,
+        1.3,
+        1.2,
+        2.2,
+        true,
+    );
     // Gun barrel pointing forward (+Y) — shows facing
-    drawBoxEdges(ctx, width, height, cam, tank, -0.25, 0.25, 1.3, 3.6, 1.55, 1.95, true);
+    drawBoxEdges(
+        ctx,
+        width,
+        height,
+        cam,
+        tank,
+        -0.25,
+        0.25,
+        1.3,
+        3.6,
+        1.55,
+        1.95,
+        true,
+    );
     // Front glacis hint: angled line from hull nose
     const noseL = projectLocal(width, height, cam, tank, -1.5, 2.4, 1.2);
     const noseR = projectLocal(width, height, cam, tank, 1.5, 2.4, 1.2);
@@ -524,7 +591,10 @@ function drawEnemyRangeBox(
     enemy: Tank,
 ): void {
     if (!enemy.alive) return;
-    const dist = Math.hypot(enemy.pos.x - player.pos.x, enemy.pos.y - player.pos.y);
+    const dist = Math.hypot(
+        enemy.pos.x - player.pos.x,
+        enemy.pos.y - player.pos.y,
+    );
     if (dist <= FIRE_RANGE) return;
 
     const v = worldToView(cam, enemy.pos);
@@ -779,7 +849,7 @@ function drawExplosion(
     // Expanding blast rings in world XZ (ground plane)
     ctx.strokeStyle = blastColor;
     for (let ring = 0; ring < 3; ring++) {
-        const radius = (2 + ring * 3) + progress * (18 + ring * 10);
+        const radius = 2 + ring * 3 + progress * (18 + ring * 10);
         const segs = 16;
         const pts: ({ x: number; y: number } | null)[] = [];
         for (let i = 0; i <= segs; i++) {
@@ -793,17 +863,23 @@ function drawExplosion(
     }
 
     // Flying hull fragments
-    const fragments: { lx: number; ly: number; lz: number; vx: number; vy: number; vz: number }[] =
-        [
-            { lx: -1.5, ly: -1, lz: 0.5, vx: -1.2, vy: -0.4, vz: 2.5 },
-            { lx: 1.5, ly: -1, lz: 0.5, vx: 1.3, vy: -0.3, vz: 2.2 },
-            { lx: 0, ly: 2, lz: 0.8, vx: 0.2, vy: 1.5, vz: 3.0 },
-            { lx: -1, ly: 1, lz: 1.5, vx: -0.8, vy: 0.9, vz: 2.8 },
-            { lx: 1, ly: 1, lz: 1.5, vx: 0.9, vy: 0.7, vz: 2.6 },
-            { lx: 0, ly: -2, lz: 0.3, vx: -0.1, vy: -1.4, vz: 1.8 },
-            { lx: -2, ly: 0.5, lz: 1, vx: -1.6, vy: 0.3, vz: 2.0 },
-            { lx: 2, ly: 0.5, lz: 1, vx: 1.5, vy: 0.4, vz: 2.1 },
-        ];
+    const fragments: {
+        lx: number;
+        ly: number;
+        lz: number;
+        vx: number;
+        vy: number;
+        vz: number;
+    }[] = [
+        { lx: -1.5, ly: -1, lz: 0.5, vx: -1.2, vy: -0.4, vz: 2.5 },
+        { lx: 1.5, ly: -1, lz: 0.5, vx: 1.3, vy: -0.3, vz: 2.2 },
+        { lx: 0, ly: 2, lz: 0.8, vx: 0.2, vy: 1.5, vz: 3.0 },
+        { lx: -1, ly: 1, lz: 1.5, vx: -0.8, vy: 0.9, vz: 2.8 },
+        { lx: 1, ly: 1, lz: 1.5, vx: 0.9, vy: 0.7, vz: 2.6 },
+        { lx: 0, ly: -2, lz: 0.3, vx: -0.1, vy: -1.4, vz: 1.8 },
+        { lx: -2, ly: 0.5, lz: 1, vx: -1.6, vy: 0.3, vz: 2.0 },
+        { lx: 2, ly: 0.5, lz: 1, vx: 1.5, vy: 0.4, vz: 2.1 },
+    ];
 
     const t = progress;
     const ease = t * t; // accelerate outward
@@ -816,7 +892,11 @@ function drawExplosion(
             y: pos.y + ry * localX + fy * localY,
         };
         const v = worldToView(cam, world);
-        const p = project(width, height, { x: v.x, y: Math.max(0, localZ), z: v.z });
+        const p = project(width, height, {
+            x: v.x,
+            y: Math.max(0, localZ),
+            z: v.z,
+        });
         if (!p) continue;
         const size = Math.max(2, 10 * (1 - progress * 0.5));
         ctx.beginPath();
@@ -859,13 +939,14 @@ function drawExplosion(
     }
 }
 
+/** Draws the centered ONLINE roster; returns the y just below the box. */
 function drawOnlineBox(
     ctx: CanvasRenderingContext2D,
     width: number,
-    height: number,
     state: GameState,
-): void {
-    const boxW = Math.min(280, width * 0.34);
+    topY: number,
+): number {
+    const boxW = Math.min(320, width * 0.42);
     const pad = 14;
     const lineH = 22;
     type Row = { label: string; ready: boolean };
@@ -885,8 +966,8 @@ function drawOnlineBox(
     }
     const bodyRows = Math.max(1, rows.length);
     const boxH = pad * 2 + 22 + bodyRows * lineH;
-    const x = width - boxW - 24;
-    const y = height * 0.28;
+    const x = (width - boxW) / 2;
+    const y = topY;
 
     ctx.strokeStyle = COLOR;
     ctx.fillStyle = BG;
@@ -894,26 +975,34 @@ function drawOnlineBox(
     ctx.fillRect(x, y, boxW, boxH);
     ctx.strokeRect(x, y, boxW, boxH);
 
+    const headerY = y + pad + 14;
     ctx.fillStyle = COLOR;
     ctx.textAlign = "left";
     ctx.font = "bold 16px monospace";
-    ctx.fillText("ONLINE", x + pad, y + pad + 14);
+    ctx.fillText("ONLINE", x + pad, headerY);
 
+    ctx.fillStyle = DIM;
+    ctx.textAlign = "right";
+    ctx.font = "14px monospace";
+    ctx.fillText(state.netStatus, x + boxW - pad, headerY);
+
+    ctx.textAlign = "left";
     ctx.font = "14px monospace";
     if (rows.length === 0) {
         ctx.fillStyle = DIM;
-        ctx.fillText("(none yet)", x + pad, y + pad + 14 + lineH);
-        return;
+        ctx.fillText("(none yet)", x + pad, headerY + lineH);
+    } else {
+        rows.forEach((row, i) => {
+            ctx.fillStyle = COLOR;
+            const suffix = row.ready ? "  READY" : "";
+            ctx.fillText(
+                `${row.label}${suffix}`,
+                x + pad,
+                headerY + (i + 1) * lineH,
+            );
+        });
     }
-    rows.forEach((row, i) => {
-        ctx.fillStyle = COLOR;
-        const suffix = row.ready ? "  READY" : "";
-        ctx.fillText(
-            `${row.label}${suffix}`,
-            x + pad,
-            y + pad + 14 + (i + 1) * lineH,
-        );
-    });
+    return y + boxH;
 }
 
 function drawTitleScreen(
@@ -928,44 +1017,65 @@ function drawTitleScreen(
     ctx.textAlign = "center";
 
     ctx.font = "bold 42px monospace";
-    ctx.fillText("BATTLEZONE", width / 2, height * 0.18);
+    const titleY = height * 0.12;
+    ctx.fillText("BATTLEZONE", width / 2, titleY);
 
-    ctx.font = "16px monospace";
-    const me = state.localAccount ?? "not logged in";
-    ctx.fillText(`YOU: ${me}`, width / 2, height * 0.26);
-    ctx.fillStyle = DIM;
-    ctx.fillText(state.netStatus, width / 2, height * 0.3);
+    // 2x prior gap under title (was height * 0.04)
+    const onlineBottom = drawOnlineBox(
+        ctx,
+        width,
+        state,
+        titleY + height * 0.08,
+    );
+
+    // Half of prior 160px gap under ONLINE box
+    const tanksHeaderY = onlineBottom + 80;
+    ctx.textAlign = "center";
     ctx.fillStyle = COLOR;
-
+    ctx.font = "16px monospace";
     const n = state.enemyCount;
     const left = n > MIN_ENEMY_TANKS ? "<" : " ";
     const right = n < MAX_ENEMY_TANKS ? ">" : " ";
     ctx.fillText(
         `ENEMY TANKS  ${left}  ${n}  ${right}`,
         width / 2,
-        height * 0.4,
+        tanksHeaderY,
     );
 
     const labels = enemySlotLabels(state);
+    const listLineH = 22;
     labels.forEach((label, i) => {
-        ctx.fillText(`${i + 1}: ${label}`, width / 2, height * 0.46 + i * 22);
+        ctx.fillText(
+            `${i + 1}: ${label}`,
+            width / 2,
+            tanksHeaderY + listLineH + i * listLineH,
+        );
     });
 
-    drawOnlineBox(ctx, width, height, state);
-
-    const controlsY = height * 0.46 + Math.max(1, labels.length) * 22 + 36;
+    const configY =
+        tanksHeaderY + listLineH + Math.max(1, labels.length) * listLineH + 18;
     ctx.font = "14px monospace";
     ctx.fillStyle = DIM;
-    ctx.fillText("LEFT / RIGHT  ADJUST COUNT", width / 2, controlsY);
-    ctx.fillText("1-5  TOGGLE SLOT AI / HUMAN", width / 2, controlsY + 20);
-    ctx.fillText(
-        "WASD / ARROWS  MOVE    SPACE  FIRE",
-        width / 2,
-        controlsY + 40,
-    );
+    ctx.fillText("LEFT / RIGHT  ADJUST COUNT", width / 2, configY);
+    ctx.fillText("1-5  TOGGLE SLOT AI / HUMAN", width / 2, configY + 20);
+
+    // Prior config→CONTROLS gap, then +50%
+    const configBottom = configY + 20;
+    const priorControlsY = height * 0.92 - 72;
+    const controlsGap =
+        Math.max(12, (priorControlsY - configBottom) / 4) * 1.5;
+    const controlsY = configBottom + controlsGap;
+    ctx.fillStyle = DIM;
+    ctx.font = "16px monospace";
+    ctx.fillText("CONTROLS:", width / 2, controlsY);
+    ctx.font = "14px monospace";
+    ctx.fillText("MOVE: W-A-S-D or ARROWS", width / 2, controlsY + 22);
+    ctx.fillText("FIRE: SPACE", width / 2, controlsY + 42);
+
+    // Half of prior 120px gap under CONTROLS
+    const startY = controlsY + 42 + 60;
     ctx.fillStyle = COLOR;
     ctx.font = "16px monospace";
-
     if (state.lobbyReady) {
         const waiting = state.lobbyPlayers
             .filter((p) => !p.ready)
@@ -973,15 +1083,13 @@ function drawTitleScreen(
         const waitLine = waiting.length
             ? `WAITING FOR: ${waiting.join(", ")}`
             : "STARTING…";
-        ctx.fillText(waitLine, width / 2, height * 0.84);
-        ctx.fillText("PRESS ENTER TO UNREADY", width / 2, height * 0.9);
+        ctx.fillText(waitLine, width / 2, startY - 24);
+        ctx.fillText("PRESS ENTER TO UNREADY", width / 2, startY);
     } else {
         ctx.fillText(
-            state.localAccount
-                ? "PRESS ENTER TO READY"
-                : "LOG IN TO PLAY LIVE",
+            state.localAccount ? "ENTER TO START" : "LOG IN TO PLAY LIVE",
             width / 2,
-            height * 0.88,
+            startY,
         );
     }
 }

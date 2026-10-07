@@ -1,25 +1,25 @@
 import {
+    type Block,
     DEFAULT_ENEMY_TANKS,
     ENEMY_COLORS,
     ENEMY_EXPLOSION_DURATION,
     FIELD_LIM,
     FIRE_COOLDOWN,
+    type GameState,
     MAX_ENEMY_TANKS,
     MIN_ENEMY_TANKS,
     MIN_TANK_SEPARATION,
     OBSTACLE_COUNT,
+    type ObstacleShape,
     PLAYER_COLOR,
     SPAWN_NEAR_OBSTACLE,
     START_LIVES,
     TANK_RADIUS,
     TANK_SPAWN_LIM,
-    aiTankId,
-    syncEnemySlotModes,
-    type Block,
-    type GameState,
-    type ObstacleShape,
     type Tank,
     type Vec2,
+    aiTankId,
+    syncEnemySlotModes,
 } from "./types";
 
 const SHAPES: ObstacleShape[] = [
@@ -190,7 +190,7 @@ function spawnTanks(blocks: Block[], enemyCount: number): Tank[] {
     // Keep tanks well apart as count grows (ring circumference / slots)
     const ringSep = Math.max(
         MIN_TANK_SEPARATION,
-        (TANK_SPAWN_LIM * 0.75 * Math.PI * 2) / total * 0.85,
+        ((TANK_SPAWN_LIM * 0.75 * Math.PI * 2) / total) * 0.85,
     );
 
     const slots: Vec2[] = [];
@@ -252,7 +252,7 @@ export function createInitialState(
         shots: [],
         blocks,
         nextShotId: 1,
-        message: "PRESS ENTER TO READY",
+        message: "ENTER TO START",
         elapsed: 0,
         respawnIn: 0,
         respawnId: null,
@@ -267,6 +267,7 @@ export function createInitialState(
         localAccount: null,
         netRole: "offline",
         livePeers: [],
+        optedOutPeers: [],
         lobbyPlayers: [],
         lobbyHost: null,
         lobbyReady: false,
@@ -289,6 +290,7 @@ export function resetMatch(state: GameState): GameState {
     );
     next.localAccount = state.localAccount;
     next.livePeers = state.livePeers;
+    next.optedOutPeers = state.optedOutPeers;
     next.netStatus = state.netStatus;
     // Must keep host/remote — otherwise both clients fall back to offline
     // local sims and never exchange input / snapshots.
@@ -333,10 +335,7 @@ export function respawnTank(
     tank.pos = pos;
     const face = others.find((t) => t.alive);
     if (face) {
-        tank.heading = Math.atan2(
-            face.pos.x - pos.x,
-            -(face.pos.y - pos.y),
-        );
+        tank.heading = Math.atan2(face.pos.x - pos.x, -(face.pos.y - pos.y));
     } else {
         tank.heading = Math.random() * Math.PI * 2;
     }

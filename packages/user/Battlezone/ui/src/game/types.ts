@@ -109,6 +109,11 @@ export type GameState = {
     netRole: NetRole;
     /** Other accounts currently connected to x-bzone */
     livePeers: LivePeer[];
+    /**
+     * Live peers the host opted out of (Human→AI on their seat). They stay
+     * excluded until toggled back in or they leave Battlezone.
+     */
+    optedOutPeers: string[];
     /** Waiting-room roster from server (`lobby` frames) */
     lobbyPlayers: LobbyPeer[];
     lobbyHost: string | null;
@@ -122,6 +127,11 @@ export type GameState = {
     netStatus: string;
 };
 
+/** Player + enemies = 6 max */
+export const MIN_ENEMY_TANKS = 1;
+export const MAX_ENEMY_TANKS = 5;
+export const DEFAULT_ENEMY_TANKS = 1;
+
 /** Keep slot-mode array length in sync with enemyCount; new slots default to AI. */
 export function syncEnemySlotModes(
     modes: EnemySlotMode[],
@@ -132,22 +142,72 @@ export function syncEnemySlotModes(
     return next;
 }
 
+/** Online peers not opted out — join order, same as roster fill order. */
+export function includablePeers(state: GameState): string[] {
+    const opted = new Set(state.optedOutPeers);
+    return state.livePeers
+        .filter((p) => p.online && !opted.has(p.account))
+        .map((p) => p.account);
+}
+
 /**
  * Labels for enemy slots on the title screen.
- * Human seats show "Human" until a Battlezone-connected peer fills them
- * (join order), then that account; empty Human seats stay "Human" and become
- * AI when the match actually starts.
+ * Human seats show the bound peer account, or "Human" if empty; AI seats
+ * show "AI". Empty Human seats become AI when the match starts.
  */
 export function enemySlotLabels(state: GameState): string[] {
-    const peers = state.livePeers
-        .filter((p) => p.online)
-        .map((p) => p.account);
+    const peers = includablePeers(state);
     const modes = state.enemySlotModes.slice(0, state.enemyCount);
     let peerIdx = 0;
     return modes.map((mode) => {
         if (mode !== "human") return "AI";
         return peers[peerIdx++] ?? "Human";
     });
+}
+
+/** Peer account bound to each enemy slot (null if AI or empty Human). */
+export function slotPeerBindings(state: GameState): (string | null)[] {
+    const peers = includablePeers(state);
+    const modes = state.enemySlotModes.slice(0, state.enemyCount);
+    let peerIdx = 0;
+    return modes.map((mode) => {
+        if (mode !== "human") return null;
+        return peers[peerIdx++] ?? null;
+    });
+}
+
+/**
+ * Default: every Battlezone-connected peer gets a human seat. Grows
+ * enemyCount as needed (up to MAX). Never overrides a seat the host set to
+ * AI for an opted-out peer — new seats are added instead when required.
+ */
+export function includeAvailablePeers(state: GameState): void {
+    const online = new Set(
+        state.livePeers.filter((p) => p.online).map((p) => p.account),
+    );
+    state.optedOutPeers = state.optedOutPeers.filter((a) => online.has(a));
+
+    const peerCount = includablePeers(state).length;
+    const modes = syncEnemySlotModes(state.enemySlotModes, state.enemyCount);
+    let humanSeats = modes.filter((m) => m === "human").length;
+    let needMore = peerCount - humanSeats;
+
+    while (needMore > 0) {
+        const aiIdx = modes.findIndex((m) => m === "ai");
+        if (aiIdx >= 0) {
+            modes[aiIdx] = "human";
+            needMore -= 1;
+            humanSeats += 1;
+            continue;
+        }
+        if (state.enemyCount >= MAX_ENEMY_TANKS) break;
+        state.enemyCount += 1;
+        modes.push("human");
+        needMore -= 1;
+        humanSeats += 1;
+    }
+
+    state.enemySlotModes = modes;
 }
 
 /** Playable / obstacle field (~3× linear → ~9× area vs original) */
@@ -189,7 +249,3 @@ export const ENEMY_COLORS = [
     "#66ffcc",
 ] as const;
 
-/** Player + enemies = 6 max; enemies are AI-controlled for now */
-export const MIN_ENEMY_TANKS = 1;
-export const MAX_ENEMY_TANKS = 5;
-export const DEFAULT_ENEMY_TANKS = 1;

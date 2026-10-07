@@ -1,24 +1,24 @@
-import { getSupervisor } from "@psibase/common-lib";
+import type { RosterSlot, ServerFrame } from "./net/protocol";
+
 import { useEffect, useRef } from "react";
 
+import { getSupervisor } from "@psibase/common-lib";
+
 import { computeAllAiInputs } from "./game/ai";
-import {
-    attachKeyboard,
-    createKeyBits,
-    inputFromKeys,
-} from "./game/input";
+import { attachKeyboard, createKeyBits, inputFromKeys } from "./game/input";
 import { renderFrame } from "./game/render";
 import { stepGame } from "./game/sim";
 import {
     DEFAULT_ENEMY_TANKS,
+    type InputState,
     MAX_ENEMY_TANKS,
     MIN_ENEMY_TANKS,
+    includeAvailablePeers,
+    slotPeerBindings,
     syncEnemySlotModes,
-    type InputState,
 } from "./game/types";
 import { createInitialState, resetMatch } from "./game/world";
 import { applyRoster, applySnapshot, serializeSnapshot } from "./net/apply";
-import type { RosterSlot, ServerFrame } from "./net/protocol";
 import { BattlezoneRealtime, ensureLoggedIn } from "./net/realtime";
 
 const SNAPSHOT_HZ = 12;
@@ -71,6 +71,14 @@ export function App() {
                             account: p.account,
                             online: p.presence === "online",
                         }));
+                    if (
+                        state.phase === "title" &&
+                        !state.lobbyReady &&
+                        (!state.lobbyHost ||
+                            state.lobbyHost === state.localAccount)
+                    ) {
+                        includeAvailablePeers(state);
+                    }
                     break;
                 case "presence":
                     if (frame.account === state.localAccount) break;
@@ -86,7 +94,17 @@ export function App() {
                                 online: true,
                             });
                         }
-                        state.livePeers = state.livePeers.filter((p) => p.online);
+                        state.livePeers = state.livePeers.filter(
+                            (p) => p.online,
+                        );
+                        if (
+                            state.phase === "title" &&
+                            !state.lobbyReady &&
+                            (!state.lobbyHost ||
+                                state.lobbyHost === state.localAccount)
+                        ) {
+                            includeAvailablePeers(state);
+                        }
                     }
                     break;
                 case "lobby": {
@@ -97,8 +115,7 @@ export function App() {
                     }));
                     state.lobbyHost = anyoneReady ? frame.host : null;
                     state.lobbyReady = frame.players.some(
-                        (p) =>
-                            p.account === state.localAccount && p.ready,
+                        (p) => p.account === state.localAccount && p.ready,
                     );
                     if (anyoneReady && frame.host !== state.localAccount) {
                         // Non-host sees host's pending match config.
@@ -233,6 +250,7 @@ export function App() {
                             state.enemySlotModes,
                             state.enemyCount,
                         );
+                        includeAvailablePeers(state);
                         return;
                     }
                     if (e.code === "ArrowRight" || e.code === "KeyD") {
@@ -245,6 +263,7 @@ export function App() {
                             state.enemySlotModes,
                             state.enemyCount,
                         );
+                        includeAvailablePeers(state);
                         return;
                     }
                     const digit = /^Digit([1-5])$/.exec(e.code);
@@ -253,9 +272,35 @@ export function App() {
                         if (slot < state.enemyCount) {
                             e.preventDefault();
                             const modes = [...state.enemySlotModes];
-                            modes[slot] =
-                                modes[slot] === "human" ? "ai" : "human";
+                            if (modes[slot] === "human") {
+                                const who = slotPeerBindings(state)[slot];
+                                if (who && !state.optedOutPeers.includes(who)) {
+                                    state.optedOutPeers = [
+                                        ...state.optedOutPeers,
+                                        who,
+                                    ];
+                                }
+                                modes[slot] = "ai";
+                            } else {
+                                modes[slot] = "human";
+                                // Re-include the earliest opted-out peer if any.
+                                const online = new Set(
+                                    state.livePeers
+                                        .filter((p) => p.online)
+                                        .map((p) => p.account),
+                                );
+                                const restore = state.optedOutPeers.find((a) =>
+                                    online.has(a),
+                                );
+                                if (restore) {
+                                    state.optedOutPeers =
+                                        state.optedOutPeers.filter(
+                                            (a) => a !== restore,
+                                        );
+                                }
+                            }
                             state.enemySlotModes = modes;
+                            includeAvailablePeers(state);
                         }
                         return;
                     }
@@ -292,7 +337,7 @@ export function App() {
                 }
                 state.phase = "title";
                 state.netRole = "offline";
-                state.message = "PRESS ENTER TO READY";
+                state.message = "ENTER TO START";
                 state.lobbyPlayers = [];
                 state.lobbyHost = null;
                 state.lobbyReady = false;
@@ -335,7 +380,10 @@ export function App() {
                         fire: playerInput.fire,
                     });
                 }
-            } else if (state.netRole === "host" || state.netRole === "offline") {
+            } else if (
+                state.netRole === "host" ||
+                state.netRole === "offline"
+            ) {
                 const aiInputs = computeAllAiInputs(state);
                 // Overlay remote human inputs on AI map
                 for (const [tankId, input] of remoteInputs) {
