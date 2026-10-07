@@ -42,7 +42,7 @@ const rootDomain = siblingUrl();
 const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("accounts", "plugin"),
     pluginId("accounts", "query"),
-    pluginId("host", "accounts"),
+    pluginId("host", "session"),
     pluginId("host", "auth"),
     pluginId("host", "prompt"),
     pluginId("transact", "plugin"),
@@ -136,7 +136,7 @@ export class Supervisor implements AppInterface {
                 return;
             }
 
-            // Phase 0: Loads systemPlugins, including those needed to get current user, i.e., accounts, host:auth
+            // Phase 0: Loads systemPlugins, including those needed to get current user, i.e., host:session, host:auth
             this.loader.trackPlugins([...systemPlugins]);
             await this.loader.processPlugins();
             await this.loader.awaitReady();
@@ -236,7 +236,7 @@ export class Supervisor implements AppInterface {
         assertTruthy(this.parentOrigination.app, "Root app unrecognized");
 
         const user = this.supervisorCall(
-            getCallArgs("host", "accounts", "api", "get-current-user", []),
+            getCallArgs("host", "session", "api", "get-current-user", []),
         );
 
         if (!user) {

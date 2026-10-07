@@ -6,9 +6,9 @@ use crate::plugin::AccountsPlugin;
 use accounts::query::api as AccountsQuery;
 use bindings::*;
 use exports::accounts::plugin::active_app::{Guest as ActiveApp, *};
-use host::accounts::admin as HostAccountsAdmin;
 use host::client::api as client;
 use host::prompt::api as Prompt;
+use host::session::admin as HostSessionAdmin;
 
 impl ActiveApp for AccountsPlugin {
     fn login(user: String) -> Result<(), Error> {
@@ -20,35 +20,35 @@ impl ActiveApp for AccountsPlugin {
         let app = get_assert_top_level_app("login", &vec![])?;
 
         if *app != psibase::services::accounts::SERVICE.to_string() {
-            let connected_apps = HostAccountsAdmin::get_connected_apps(&user);
+            let connected_apps = HostSessionAdmin::get_connected_apps(&user);
             if !connected_apps.contains(&app) {
                 return Err(NotConnected(user).into());
             }
         }
 
-        HostAccountsAdmin::login(&user, &app)
+        HostSessionAdmin::login(&user, &app)
     }
 
     fn logout() -> Result<(), Error> {
         let app = get_assert_top_level_app("logout", &vec!["supervisor"])?;
-        HostAccountsAdmin::logout(&app);
+        HostSessionAdmin::logout(&app);
         Ok(())
     }
 
     fn disconnect(account: String) -> Result<(), Error> {
         let app = get_assert_top_level_app("disconnect", &vec![client::get_receiver().as_str()])?;
 
-        if !HostAccountsAdmin::get_connected_accounts(&app).contains(&account) {
+        if !HostSessionAdmin::get_connected_accounts(&app).contains(&account) {
             return Ok(());
         }
 
-        HostAccountsAdmin::disconnect(&account, &app);
+        HostSessionAdmin::disconnect(&account, &app);
         Ok(())
     }
 
     fn get_connected_accounts() -> Result<Vec<String>, Error> {
         let app = get_assert_top_level_app("get_connected_accounts", &vec!["supervisor"])?;
-        Ok(HostAccountsAdmin::get_connected_accounts(&app))
+        Ok(HostSessionAdmin::get_connected_accounts(&app))
     }
 
     fn connect_account() -> Result<(), Error> {

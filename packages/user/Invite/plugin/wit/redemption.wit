@@ -1,6 +1,6 @@
 package invite:plugin;
 
-/// An interface for the accounts app to plug into to redeem invites
+/// An interface for the host login prompt to plug into to redeem invites
 interface redemption {
 
     /// If there is an active invite, returns `Some(x)` where `x`

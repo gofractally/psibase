@@ -196,7 +196,7 @@ impl Api for NameMarketPlugin {
         overview.market_params.iter().any(|market| market.enabled)
     }
 
-    #[psibase_plugin::authorized(High, whitelist = ["accounts", "homepage"])]
+    #[psibase_plugin::authorized(High, whitelist = ["host", "homepage"])]
     fn buy(account: String, max_cost: String) -> Result<(), Error> {
         let acct_name = AccountNumber::from_exact(&account)
             .map_err(|err| ErrorType::InvalidAccountName(err.to_string()))?;
@@ -225,7 +225,7 @@ impl Api for NameMarketPlugin {
         Ok(())
     }
 
-    #[psibase_plugin::authorized(Medium, whitelist = ["accounts", "homepage"])]
+    #[psibase_plugin::authorized(Medium, whitelist = ["host", "homepage"])]
     fn claim(account: String) -> Result<(), Error> {
         let account = AccountNumber::from_exact(&account)
             .map_err(|_| ErrorType::InvalidAccountName(account))?;
@@ -348,7 +348,7 @@ fn require_active_market_ask(length: u8, sys_token_id: u32) -> Result<u64, Error
 }
 
 impl Authorized for NameMarketPlugin {
-    #[psibase_plugin::authorized(Medium, whitelist = ["accounts", "homepage", "config"])]
+    #[psibase_plugin::authorized(Medium, whitelist = ["host", "homepage", "config"])]
     fn graphql(query: String) -> Result<String, Error> {
         CommonServer::post_graphql_get_json(&query)
     }

@@ -149,7 +149,7 @@ impl TokensPlugin {
 }
 
 impl User for TokensPlugin {
-    #[psibase_plugin::authorized(High, whitelist = ["homepage", "vserver", "invite", "token-swap", "namemarket", "fractals", "accounts", "config"])]
+    #[psibase_plugin::authorized(High, whitelist = ["homepage", "vserver", "invite", "token-swap", "namemarket", "fractals", "host", "config"])]
     fn credit(token_id: u32, debitor: String, amount: String, memo: String) -> Result<(), Error> {
         let amount = Self::non_zero(token_id, amount)?;
         let memo = memo.try_into().unwrap();
@@ -231,7 +231,7 @@ impl Admin for TokensPlugin {
 }
 
 impl Authorized for TokensPlugin {
-    #[psibase_plugin::authorized(High, whitelist = ["homepage", "accounts", "config"])]
+    #[psibase_plugin::authorized(High, whitelist = ["homepage", "host", "config"])]
     fn graphql(query: String) -> Result<String, Error> {
         host::server::post_graphql_get_json(&query)
     }

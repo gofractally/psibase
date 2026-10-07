@@ -7,12 +7,12 @@ world impl {
     include transact:plugin/imports;
     include permissions:plugin/imports;
     include accounts:query/imports;
-    include host:accounts/imports;
+    include host:session/imports;
     include auth-sig:plugin/imports;
     include name-market:plugin/imports;
     include host:crypto/imports;
 
-    import host:accounts/admin;
+    import host:session/admin;
     import invite:plugin/redemption;
 
     export api;

@@ -7,17 +7,17 @@ use errors::ErrorType;
 
 use serde::{Deserialize, Serialize};
 
-use host::http::api as Server;
 use host::client::api as Client;
+use host::http::api as Server;
 use host::types::types as HostTypes;
 
-use bindings::host::accounts::api as HostAccounts;
-use setcode::plugin::api as SetCode;
-use sites::plugin::api as Sites;
 use crate::bindings::transact::plugin::api::{add_action_to_transaction, propose};
 use crate::packages::plugin::types;
+use bindings::host::session::api as HostSession;
 use exports::packages::plugin::private_api::Guest as PrivateApi;
 use exports::packages::plugin::queries::Guest as Queries;
+use setcode::plugin::api as SetCode;
+use sites::plugin::api as Sites;
 
 use psibase::fracpack::{Pack, Unpack};
 use psibase::services::packages::PackageSource;
@@ -309,8 +309,8 @@ fn read_account_packages(account: &str) -> Result<Vec<types::PackageInfo>, HostT
 
 fn read_url_packages(url: &str) -> Result<Vec<types::PackageInfo>, HostTypes::Error> {
     let index_url = format!("{}/index.json", url.trim_end_matches('/'));
-    let json = Server::fetch_sibling_json(&index_url)
-        .map_err(|e| ErrorType::QueryError(e.message))?;
+    let json =
+        Server::fetch_sibling_json(&index_url).map_err(|e| ErrorType::QueryError(e.message))?;
     let index: Vec<types::PackageInfo> =
         serde_json::from_str(&json).map_err(|e| ErrorType::JsonError(e.to_string()))?;
     Ok(index
@@ -597,7 +597,7 @@ impl PrivateApi for PackagesPlugin {
         // exist have the right owner.
         get_accounts_to_create(&get_package_accounts(&packages)?, sender)?;
 
-        let user = HostAccounts::get_current_user().ok_or(ErrorType::NoLoggedInUser)?;
+        let user = HostSession::get_current_user().ok_or(ErrorType::NoLoggedInUser)?;
         let uploader = StagedUpload::new(id, user.parse().unwrap());
 
         let mut upload_builder = TransactionBuilder::new(

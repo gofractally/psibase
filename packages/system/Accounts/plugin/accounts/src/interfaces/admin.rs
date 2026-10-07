@@ -5,8 +5,8 @@ use crate::errors::ErrorType::*;
 use crate::plugin::AccountsPlugin;
 
 use crate::bindings::exports::accounts::plugin::admin::{Error, Guest as Admin};
-use crate::bindings::host::accounts::admin as HostAccountsAdmin;
 use crate::bindings::host::client::api as Client;
+use crate::bindings::host::session::admin as HostSessionAdmin;
 use crate::bindings::transact::plugin::api as Transact;
 use crate::helpers::assert_valid_account;
 use crate::trust::*;
@@ -17,7 +17,7 @@ use std::collections::HashSet;
 fn prune_invalid_accounts(accounts: Vec<String>) {
     let app = Client::get_receiver();
     for account in accounts {
-        HostAccountsAdmin::disconnect(&account, &app);
+        HostSessionAdmin::disconnect(&account, &app);
     }
 }
 
@@ -25,31 +25,31 @@ impl Admin for AccountsPlugin {
     fn get_connected_apps(user: String) -> Vec<String> {
         assert_authorized_with_whitelist(FunctionName::get_connected_apps, vec!["homepage".into()])
             .unwrap();
-        HostAccountsAdmin::get_connected_apps(&user)
+        HostSessionAdmin::get_connected_apps(&user)
     }
 
     fn import_account(account: String) {
         assert_authorized_with_whitelist(FunctionName::import_account, vec!["x-admin".into()])
             .unwrap();
         assert_valid_account(&account);
-        HostAccountsAdmin::connect(&account, &Client::get_receiver());
+        HostSessionAdmin::connect(&account, &Client::get_receiver());
     }
 
     fn remove_account(account: String) {
         assert_authorized(FunctionName::remove_account).unwrap();
 
-        let connected_apps = HostAccountsAdmin::get_connected_apps(&account);
+        let connected_apps = HostSessionAdmin::get_connected_apps(&account);
         for app in connected_apps {
-            HostAccountsAdmin::disconnect(&account, &app);
+            HostSessionAdmin::disconnect(&account, &app);
         }
 
-        HostAccountsAdmin::disconnect(&account, &Client::get_receiver());
+        HostSessionAdmin::disconnect(&account, &Client::get_receiver());
     }
 
     fn get_all_accounts() -> Vec<String> {
         assert_authorized_with_whitelist(FunctionName::get_all_accounts, vec!["supervisor".into()])
             .unwrap();
-        HostAccountsAdmin::get_connected_accounts(&Client::get_receiver())
+        HostSessionAdmin::get_connected_accounts(&Client::get_receiver())
     }
 
     fn get_auth_services() -> Result<Vec<String>, Error> {

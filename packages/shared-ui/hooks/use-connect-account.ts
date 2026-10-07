@@ -11,7 +11,8 @@ export const useConnectAccount = (
         mutationFn: async (autoRedirectConfig?) => {
             await supervisor.functionCall(
                 {
-                    service: "accounts",
+                    service: "host",
+                    plugin: "session",
                     intf: "activeApp",
                     method: "connectAccount",
                     params: [],

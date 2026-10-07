@@ -19,9 +19,9 @@ export const useImportExisting = (
         mutationFn: async (credential: z.infer<typeof CredentialSchema>) => {
             const validatedCredential = CredentialSchema.parse(credential);
             await supervisor.functionCall({
-                service: "accounts",
-                plugin: "plugin",
-                intf: "prompt",
+                service: "host",
+                plugin: "login-prompt",
+                intf: "api",
                 method: "importExisting",
                 params: [[validatedCredential]],
             });

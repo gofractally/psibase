@@ -18,7 +18,7 @@ use url::Url;
 struct HostHttp;
 
 fn get_auth_token() -> Option<String> {
-    let current_user = host::accounts::api::get_current_user();
+    let current_user = host::session::api::get_current_user();
     if current_user.is_some() {
         HostAuth::get_active_query_token(&CallContext::get_active_app(), &current_user.unwrap())
     } else {
@@ -26,7 +26,11 @@ fn get_auth_token() -> Option<String> {
     }
 }
 
-fn do_post(app: String, endpoint: String, content: BodyTypes) -> Result<BridgeTypes::HttpResponse, Error> {
+fn do_post(
+    app: String,
+    endpoint: String,
+    content: BodyTypes,
+) -> Result<BridgeTypes::HttpResponse, Error> {
     let (ty, content) = content.get_content();
 
     let auth_token = get_auth_token();
@@ -87,8 +91,8 @@ fn do_get_bytes(app: String, endpoint: String) -> Result<BridgeTypes::HttpRespon
 
 fn parse_sibling_url(url: &str) -> Result<(String, String), Error> {
     let parsed = Url::parse(url).map_err(|e| make_error(&e.to_string()))?;
-    let root = Url::parse(&CallContext::get_root_domain())
-        .map_err(|e| make_error(&e.to_string()))?;
+    let root =
+        Url::parse(&CallContext::get_root_domain()).map_err(|e| make_error(&e.to_string()))?;
     let root_host = root
         .host_str()
         .ok_or_else(|| make_error("Invalid root domain"))?;

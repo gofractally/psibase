@@ -1,7 +1,7 @@
-use crate::bindings::host::accounts::api::get_current_user;
 use crate::bindings::accounts::query::api::get_account;
 use crate::bindings::host::crypto::keyvault as HostCrypto;
 use crate::bindings::host::http::api as Server;
+use crate::bindings::host::session::api::get_current_user;
 use crate::bindings::host::types::types::{self as HostTypes, BodyTypes, PluginRef};
 use crate::bindings::transact::admin::hook_handlers::*;
 use crate::bindings::transact::plugin::types::{Claim, Proof};

@@ -4,7 +4,7 @@ world impl {
     include host:client/imports;
     include host:http/imports;
     include transact:plugin/imports;
-    include host:accounts/imports;
+    include host:session/imports;
     include permissions:plugin/imports;
     export api;
     export queries;
