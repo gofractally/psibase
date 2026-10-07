@@ -231,6 +231,7 @@ export function AccountDetailPage() {
                                     <Button
                                         type="button"
                                         size="icon"
+                                        className="bg-[color-mix(in_oklch,var(--primary)_72%,var(--background))] text-primary-foreground hover:bg-[color-mix(in_oklch,var(--primary)_58%,var(--background))]"
                                         aria-label="Request a transfer"
                                         title="Request a transfer"
                                         onClick={() => {
@@ -260,6 +261,7 @@ export function AccountDetailPage() {
                                         type="button"
                                         variant="outline"
                                         size="icon"
+                                        className="bg-foreground/10 hover:bg-foreground/15 dark:bg-foreground/15 dark:hover:bg-foreground/20"
                                         aria-label="Request a deposit"
                                         title="Request a deposit"
                                         onClick={() => {
