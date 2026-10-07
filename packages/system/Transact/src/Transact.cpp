@@ -615,7 +615,7 @@ namespace SystemService
       {
          state.setAuthorized(account);
       }
-      for (auto target : actions)
+      for (auto& target : actions)
       {
          if (std::ranges::contains(authorizers, target.sender))
          {
