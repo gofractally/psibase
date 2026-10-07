@@ -106,9 +106,8 @@ export function BookAuthDialog({
                         {existing ? "Edit book-auth" : "Let them book expenses"}
                     </DialogTitle>
                     <DialogDescription>
-                        They can record that you owe them, up to this remaining
-                        budget — like Splitwise adding an expense. Not a path
-                        payment. You can revoke anytime.
+                        Authorise party to approve deposits on your behalf up to
+                        this remaining budget.
                     </DialogDescription>
                 </DialogHeader>
                 <form

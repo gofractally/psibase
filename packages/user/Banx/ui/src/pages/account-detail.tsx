@@ -11,14 +11,14 @@ import {
     HandCoins,
     Handshake,
     History,
-    Inbox,
     KeyRound,
+    Landmark,
     Pencil,
     PiggyBank,
-    Plus,
     Receipt,
     Repeat,
     Route,
+    Send,
     ShoppingCart,
     Store,
 } from "lucide-react";
@@ -38,7 +38,7 @@ import {
     ForgiveDialog,
     type ForgiveTarget,
 } from "@/components/forgive-dialog";
-import { PageHeader } from "@/components/page-header";
+
 import {
     RequestDialog,
     type RequestPrefill,
@@ -92,13 +92,14 @@ import { Avatar } from "@shared/components/avatar";
 import { cn } from "@shared/lib/utils";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
+import { ButtonGroup } from "@shared/shadcn/ui/button-group";
 import { Separator } from "@shared/shadcn/ui/separator";
 
 export function AccountDetailPage() {
     const params = useParams();
     const account = decodeURIComponent(params.account ?? "").trim();
     const { user, savings, loans, isLoading, isError } = useAccountGroups();
-    const { label, nicknameOf } = useBanxContacts("/accounts");
+    const { label } = useBanxContacts("/accounts");
     const { assets, symbolOf, precisionOf } = useAssetMap();
     const { data: bookAuths = [] } = useBookAuths();
     const { data: myPolicies = [] } = useCurrencyPolicies();
@@ -161,7 +162,6 @@ export function AccountDetailPage() {
         policies: CurrencyPolicy[];
     } | null>(null);
 
-    const nick = nicknameOf(account);
     const display = label(account);
     const hasAnything = savingsHere.length > 0 || loansHere.length > 0;
     const canDeal = !!user && account !== user;
@@ -203,30 +203,77 @@ export function AccountDetailPage() {
                         Accounts
                     </Link>
                 </Button>
-                <PageHeader
-                    title={display}
-                    description={
-                        nick && nick !== account ? account : undefined
-                    }
-                    action={
-                        <div className="flex flex-wrap gap-2">
-                            <Button
-                                type="button"
-                                className="gap-1.5"
-                                onClick={() => setTransferOpen(true)}
-                            >
-                                <GitBranch className="size-4" />
-                                Transfer
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                className="gap-1.5"
-                                onClick={() => setDepositOpen(true)}
-                            >
-                                <HandCoins className="size-4" />
-                                Deposit
-                            </Button>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex items-center gap-3">
+                        <Avatar account={account} className="size-12" />
+                        <div className="min-w-0">
+                            <h1 className="truncate text-2xl font-semibold tracking-tight">
+                                {display}
+                            </h1>
+                            {display !== account ? (
+                                <p className="text-muted-foreground truncate font-mono text-sm">
+                                    {account}
+                                </p>
+                            ) : null}
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                            <ButtonGroup>
+                                <Button
+                                    type="button"
+                                    className="gap-1.5"
+                                    onClick={() => setTransferOpen(true)}
+                                >
+                                    <GitBranch className="size-4" />
+                                    Transfer
+                                </Button>
+                                {user && account !== user ? (
+                                    <Button
+                                        type="button"
+                                        size="icon"
+                                        aria-label="Request a transfer"
+                                        title="Request a transfer"
+                                        onClick={() => {
+                                            setRequestPrefill({
+                                                kind: REQUEST_INVOICE,
+                                                counterparty: account,
+                                            });
+                                            setRequestOpen(true);
+                                        }}
+                                    >
+                                        <Send className="size-4" />
+                                    </Button>
+                                ) : null}
+                            </ButtonGroup>
+                            <ButtonGroup>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="gap-1.5"
+                                    onClick={() => setDepositOpen(true)}
+                                >
+                                    <HandCoins className="size-4" />
+                                    Deposit
+                                </Button>
+                                {user && account !== user ? (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        aria-label="Request a deposit"
+                                        title="Request a deposit"
+                                        onClick={() => {
+                                            setRequestPrefill({
+                                                kind: REQUEST_PLEASE_BOOK,
+                                                counterparty: account,
+                                            });
+                                            setRequestOpen(true);
+                                        }}
+                                    >
+                                        <Send className="size-4" />
+                                    </Button>
+                                ) : null}
+                            </ButtonGroup>
                             <Button
                                 type="button"
                                 variant="outline"
@@ -236,7 +283,7 @@ export function AccountDetailPage() {
                                     setCreditLineOpen(true);
                                 }}
                             >
-                                <Plus className="size-4" />
+                                <Landmark className="size-4" />
                                 Credit line
                             </Button>
                             {user && account !== user ? (
@@ -251,24 +298,8 @@ export function AccountDetailPage() {
                                 </Button>
                             ) : null}
                         </div>
-                    }
-                />
-                <div className="flex items-center gap-3">
-                    <Avatar account={account} className="size-12" />
-                    <div className="min-w-0">
-                        <p className="font-semibold tracking-tight">{display}</p>
-                        {display !== account ? (
-                            <p className="text-muted-foreground font-mono text-sm">
-                                {account}
-                            </p>
-                        ) : (
-                            <p className="text-muted-foreground text-sm">
-                                Counterparty
-                            </p>
-                        )}
                     </div>
                 </div>
-            </div>
 
             <TransferDialog
                 open={transferOpen}
@@ -452,14 +483,6 @@ export function AccountDetailPage() {
                                         });
                                         setBuyClaimOpen(true);
                                     }}
-                                    onRequest={() => {
-                                        setRequestPrefill({
-                                            kind: REQUEST_INVOICE,
-                                            counterparty: account,
-                                            assetId: g.assetId,
-                                        });
-                                        setRequestOpen(true);
-                                    }}
                                     onPostSell={() => {
                                         setBuyClaimPrefill({
                                             debtor: account,
@@ -538,7 +561,7 @@ export function AccountDetailPage() {
                                     quoteNotes={quoteNotes(
                                         theirPolicies,
                                         g.assetId,
-                                        `${display} offers`,
+                                        `${display} offers anyone who holds ${symbolOf(g.assetId)}:`,
                                     )}
                                     onConvert={
                                         canDeal &&
@@ -597,23 +620,6 @@ export function AccountDetailPage() {
                                         });
                                         setRoutingOpen(true);
                                     }}
-                                    onRequest={() => {
-                                        setRequestPrefill({
-                                            kind: REQUEST_PLEASE_BOOK,
-                                            counterparty: account,
-                                            assetId: g.assetId,
-                                            amount:
-                                                g.total > 0n
-                                                    ? formatRawAmount(
-                                                          g.total.toString(),
-                                                          precisionOf(
-                                                              g.assetId,
-                                                          ),
-                                                      )
-                                                    : undefined,
-                                        });
-                                        setRequestOpen(true);
-                                    }}
                                     onEditBookAuth={() => {
                                         const existing = user
                                             ? liveBookAuth(
@@ -633,7 +639,7 @@ export function AccountDetailPage() {
                                     quoteNotes={quoteNotes(
                                         myPolicies,
                                         g.assetId,
-                                        "You offer",
+                                        `You offer anyone who holds ${symbolOf(g.assetId)}:`,
                                         (policy) =>
                                             setOffer({
                                                 fromAsset: g.assetId,
@@ -699,7 +705,6 @@ function AssetRelationCard({
     onEditLine,
     onRouting,
     onBuyClaim,
-    onRequest,
     onPostSell,
     onSell,
     onForgive,
@@ -717,7 +722,6 @@ function AssetRelationCard({
     onEditLine?: () => void;
     onRouting?: () => void;
     onBuyClaim?: () => void;
-    onRequest?: () => void;
     onPostSell?: () => void;
     onSell?: () => void;
     onForgive?: () => void;
@@ -891,14 +895,6 @@ function AssetRelationCard({
                         icon={ArrowDownUp}
                         label="Convert"
                         onClick={onConvert}
-                    />
-                ) : null}
-                {onRequest ? (
-                    <AccountRowAction
-                        tip="Request — invoice or deposit request"
-                        icon={Inbox}
-                        label="Request"
-                        onClick={onRequest}
                     />
                 ) : null}
                 {onPostSell ? (

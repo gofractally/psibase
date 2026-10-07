@@ -81,6 +81,7 @@ export function RequestDialog({
     );
 
     const lockParty = !!prefill?.counterparty?.trim();
+    const lockKind = isKnownKind(prefill?.kind);
 
     const form = useAppForm({
         defaultValues: {
@@ -170,9 +171,24 @@ export function RequestDialog({
             <Dialog open={open} onOpenChange={onOpenChange}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>New request</DialogTitle>
-                        <DialogDescription className="sr-only">
-                            Post an invoice or deposit request.
+                        <DialogTitle>
+                            {lockKind && prefill?.kind === REQUEST_INVOICE
+                                ? "Request a transfer"
+                                : lockKind
+                                  ? "Request a deposit"
+                                  : "New request"}
+                        </DialogTitle>
+                        <DialogDescription
+                            className={lockKind ? undefined : "sr-only"}
+                        >
+                            {lockKind
+                                ? kindHelp(
+                                      prefill?.kind ?? REQUEST_INVOICE,
+                                      lockParty
+                                          ? prefill?.counterparty?.trim()
+                                          : undefined,
+                                  )
+                                : "Post an invoice or deposit request."}
                         </DialogDescription>
                     </DialogHeader>
                     <form
@@ -183,6 +199,7 @@ export function RequestDialog({
                             void form.handleSubmit();
                         }}
                     >
+                        {lockKind ? null : (
                         <form.AppField
                             name="kind"
                             children={(field) => (
@@ -237,6 +254,7 @@ export function RequestDialog({
                                 </div>
                             )}
                         />
+                        )}
                         {lockParty ? null : (
                             <form.Subscribe
                                 selector={(s) => s.values.kind}

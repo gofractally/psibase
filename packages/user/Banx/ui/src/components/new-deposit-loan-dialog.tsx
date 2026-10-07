@@ -30,8 +30,8 @@ import {
 } from "@shared/shadcn/ui/dialog";
 
 /**
- * Book a deposit (you receive funds as debtor). Optional `initialAccount`
- * pre-fills the depositor (e.g. from Payees or account detail).
+ * Book a deposit (you receive funds as debtor). `initialAccount` is the
+ * depositor when the caller already knows them, and the field stays hidden.
  */
 export function NewDepositLoanDialog({
     open,
@@ -50,6 +50,7 @@ export function NewDepositLoanDialog({
     assetId?: number;
 }) {
     const deposit = useDeposit();
+    const lockedDepositor = initialAccount?.trim() || undefined;
     const amountFor = (assetId: number | undefined) =>
         assetId === undefined ? "1" : unitAmount(precisionOf(assetId));
 
@@ -61,11 +62,12 @@ export function NewDepositLoanDialog({
             aprPct: "0",
         },
         onSubmit: async ({ value }) => {
-            if (value.assetId === undefined || !value.depositor.trim()) return;
+            const depositor = (lockedDepositor ?? value.depositor).trim();
+            if (value.assetId === undefined || !depositor) return;
             await new Promise<void>((resolve, reject) => {
                 deposit.mutate(
                     {
-                        depositor: value.depositor.trim(),
+                        depositor,
                         assetId: value.assetId!,
                         amount: value.amount.trim(),
                         interestRatePpm: percentStringToPpm(
@@ -102,9 +104,9 @@ export function NewDepositLoanDialog({
                 <DialogHeader>
                     <DialogTitle>Book a deposit</DialogTitle>
                     <DialogDescription>
-                        You received value off-graph. You become the debtor; the
-                        depositor holds the claim. Mutual claims auto-net when
-                        possible.
+                        {lockedDepositor
+                            ? `You received value off-graph. You become the debtor; ${lockedDepositor} holds the claim. Mutual claims auto-net when possible.`
+                            : "You received value off-graph. You become the debtor; the depositor holds the claim. Mutual claims auto-net when possible."}
                     </DialogDescription>
                 </DialogHeader>
                 <form
@@ -115,17 +117,19 @@ export function NewDepositLoanDialog({
                         void form.handleSubmit();
                     }}
                 >
-                    <form.AppField
-                        name="depositor"
-                        validators={existingAccountValidators()}
-                        children={(field) => (
-                            <field.TextField
-                                label="Depositor account"
-                                placeholder="alice"
-                                required
-                            />
-                        )}
-                    />
+                    {!lockedDepositor ? (
+                        <form.AppField
+                            name="depositor"
+                            validators={existingAccountValidators()}
+                            children={(field) => (
+                                <field.TextField
+                                    label="Depositor account"
+                                    placeholder="alice"
+                                    required
+                                />
+                            )}
+                        />
+                    ) : null}
                     {lockedAssetId === undefined ? (
                         <form.Field
                             name="assetId"

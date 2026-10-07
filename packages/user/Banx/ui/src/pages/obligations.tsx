@@ -7,6 +7,7 @@ import {
     Building2,
     GitBranch,
     History,
+    Landmark,
     PiggyBank,
     Handshake,
     Plus,
@@ -352,7 +353,7 @@ export function ObligationsPage() {
                                     setCreditLineOpen(true);
                                 }}
                             >
-                                <Plus className="size-5" />
+                                <Landmark className="size-5" />
                             </Button>
                         </>
                     }
