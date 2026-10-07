@@ -547,6 +547,109 @@ function drawEnemyRangeBox(
     ctx.restore();
 }
 
+function tankCallsign(tank: Tank): string {
+    if (tank.account) return String(tank.account);
+    if (!isEnemyId(tank.id)) return "HOST";
+    if (tank.controller === "ai") return "AI";
+    return "ENEMY";
+}
+
+/** Fixed HUD callsign size — does not shrink with range. */
+const CALLSIGN_FONT_PX = 14;
+/** Screen-space lift above the turret tip so the plate reads as HUD, not mesh. */
+const CALLSIGN_SCREEN_LIFT = 52;
+
+/**
+ * Wireframe HUD nameplate above a live tank — fixed-size corner brackets,
+ * hairline stem to the subject, monospace callsign in the tank's color.
+ */
+function drawTankCallsign(
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    cam: Cam,
+    tank: Tank,
+): void {
+    if (!tank.alive) return;
+    const v = worldToView(cam, tank.pos);
+    // Same near cut as tank meshes (z > 1); no far cut — if the tank is
+    // drawn in view, the callsign should be too.
+    if (v.z <= 1) return;
+
+    const turret = project(width, height, { x: v.x, y: 2.4, z: v.z });
+    if (!turret) return;
+    // Off-screen tanks (behind / beside the view frustum) skip the plate.
+    if (
+        turret.x < -40 ||
+        turret.x > width + 40 ||
+        turret.y < -80 ||
+        turret.y > height + 40
+    ) {
+        return;
+    }
+
+    const label = tankCallsign(tank).toUpperCase();
+    const col = tankColor(tank);
+    const fontPx = CALLSIGN_FONT_PX;
+    ctx.save();
+    ctx.font = `${fontPx}px monospace`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const textW = ctx.measureText(label).width;
+    const padX = 7;
+    const padY = 4;
+    const boxW = textW + padX * 2;
+    const boxH = fontPx + padY * 2;
+    // Anchor X on the tank; park the plate a fixed HUD offset above it.
+    const cx = turret.x;
+    const cy = turret.y - CALLSIGN_SCREEN_LIFT;
+    const left = cx - boxW / 2;
+    const top = cy - boxH / 2;
+    const right = cx + boxW / 2;
+    const bottom = cy + boxH / 2;
+    const corner = 5;
+
+    ctx.strokeStyle = col;
+    ctx.fillStyle = col;
+    ctx.globalAlpha = 0.95;
+
+    // Hairline leader from turret tip up into the plate
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(turret.x, turret.y);
+    ctx.lineTo(cx, bottom);
+    ctx.stroke();
+
+    // Open wireframe frame (corner ticks)
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(left, top + corner);
+    ctx.lineTo(left, top);
+    ctx.lineTo(left + corner, top);
+    ctx.moveTo(right - corner, top);
+    ctx.lineTo(right, top);
+    ctx.lineTo(right, top + corner);
+    ctx.moveTo(right, bottom - corner);
+    ctx.lineTo(right, bottom);
+    ctx.lineTo(right - corner, bottom);
+    ctx.moveTo(left + corner, bottom);
+    ctx.lineTo(left, bottom);
+    ctx.lineTo(left, bottom - corner);
+    ctx.stroke();
+
+    const railInset = corner + 2;
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(left + railInset, top + 2);
+    ctx.lineTo(right - railInset, top + 2);
+    ctx.moveTo(left + railInset, bottom - 2);
+    ctx.lineTo(right - railInset, bottom - 2);
+    ctx.stroke();
+
+    ctx.fillText(label, cx, cy);
+    ctx.restore();
+}
+
 function drawHud(
     ctx: CanvasRenderingContext2D,
     width: number,
@@ -930,6 +1033,9 @@ export function renderFrame(
         for (const other of others) {
             drawEnemyRangeBox(ctx, width, height, cam, viewTank, other);
         }
+    }
+    for (const other of others) {
+        drawTankCallsign(ctx, width, height, cam, other);
     }
     drawHud(ctx, width, height, state, viewTank);
     drawRadar(ctx, width, height, state, viewTank);
