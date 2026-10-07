@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import NumberFlow from "@number-flow/react";
 
 import {
+    ArrowDownUp,
     ArrowLeft,
     ArrowLeftRight,
     CircleMinus,
@@ -27,6 +28,12 @@ import { ActivityFeed } from "@/components/activity-feed";
 import { BookAuthDialog } from "@/components/book-auth-dialog";
 import { BookExpenseDialog } from "@/components/book-expense-dialog";
 import { CreditLineDialog } from "@/components/credit-line-dialog";
+import {
+    liveFromPolicies,
+    OfferRepayDialog,
+    quoteSummary,
+    TakeConvertDialog,
+} from "@/components/currency-deal-dialog";
 import {
     ForgiveDialog,
     type ForgiveTarget,
@@ -54,7 +61,11 @@ import { TransferDialog } from "@/components/transfer-dialog";
 import { useAssetMap } from "@/hooks/use-assets";
 import { useAccountGroups } from "@/hooks/use-account-groups";
 import { useBanxContacts } from "@/hooks/use-banx-contacts";
-import { useBookAuths } from "@/hooks/use-banx-data";
+import {
+    useBookAuths,
+    useCurrencyPolicies,
+    usePosterCurrencyPolicies,
+} from "@/hooks/use-banx-data";
 import {
     liveBookAuth,
     spendableBookAuth,
@@ -74,6 +85,7 @@ import {
     REQUEST_PLEASE_BOOK,
     type BookAuth,
     type CreditLine,
+    type CurrencyPolicy,
 } from "@/lib/graphql";
 
 import { Avatar } from "@shared/components/avatar";
@@ -89,6 +101,9 @@ export function AccountDetailPage() {
     const { label, nicknameOf } = useBanxContacts("/accounts");
     const { assets, symbolOf, precisionOf } = useAssetMap();
     const { data: bookAuths = [] } = useBookAuths();
+    const { data: myPolicies = [] } = useCurrencyPolicies();
+    const { data: theirPolicies = [] } = usePosterCurrencyPolicies(account);
+    const nowSec = Math.floor(Date.now() / 1000);
 
     const savingsHere = useMemo(
         () => savings.filter((g) => g.counterparty === account),
@@ -131,10 +146,47 @@ export function AccountDetailPage() {
     const [bookExpenseAuth, setBookExpenseAuth] = useState<BookAuth | null>(
         null,
     );
+    const [offer, setOffer] = useState<{
+        fromAsset: number;
+        fromSymbol: string;
+        fromPrecision: number;
+        owedRaw: string;
+        edit?: CurrencyPolicy;
+    } | null>(null);
+    const [take, setTake] = useState<{
+        fromAsset: number;
+        fromSymbol: string;
+        fromPrecision: number;
+        claimRaw: string;
+        policies: CurrencyPolicy[];
+    } | null>(null);
 
     const nick = nicknameOf(account);
     const display = label(account);
     const hasAnything = savingsHere.length > 0 || loansHere.length > 0;
+    const canDeal = !!user && account !== user;
+    const quoteNotes = (
+        policies: CurrencyPolicy[],
+        assetId: number,
+        prefix: string,
+        onEdit?: (policy: CurrencyPolicy) => void,
+    ) =>
+        liveFromPolicies(
+            policies,
+            assetId,
+            precisionOf(assetId),
+            nowSec,
+        ).map((p) => ({
+            key: `${p.fromAsset}-${p.toAsset}`,
+            text: `${prefix} ${quoteSummary(
+                p,
+                symbolOf(assetId),
+                precisionOf(assetId),
+                symbolOf(p.toAsset),
+                precisionOf(p.toAsset),
+            )}`,
+            onEdit: onEdit ? () => onEdit(p) : undefined,
+        }));
 
     if (!account) {
         return (
@@ -322,6 +374,36 @@ export function AccountDetailPage() {
                         : 0
                 }
             />
+            <OfferRepayDialog
+                open={!!offer}
+                onOpenChange={(open) => {
+                    if (!open) setOffer(null);
+                }}
+                counterparty={display}
+                fromAsset={offer?.fromAsset ?? 0}
+                fromSymbol={offer?.fromSymbol ?? ""}
+                fromPrecision={offer?.fromPrecision ?? 0}
+                owedRaw={offer?.owedRaw ?? "0"}
+                assets={assets}
+                precisionOf={precisionOf}
+                policies={myPolicies}
+                editPolicy={offer?.edit}
+            />
+            <TakeConvertDialog
+                open={!!take}
+                onOpenChange={(open) => {
+                    if (!open) setTake(null);
+                }}
+                counterparty={account}
+                counterpartyLabel={display}
+                fromAsset={take?.fromAsset ?? 0}
+                fromSymbol={take?.fromSymbol ?? ""}
+                fromPrecision={take?.fromPrecision ?? 0}
+                claimRaw={take?.claimRaw ?? "0"}
+                policies={take?.policies ?? []}
+                assets={assets}
+                precisionOf={precisionOf}
+            />
             {isLoading ? (
                 <p className="text-muted-foreground text-sm">Loading…</p>
             ) : isError ? (
@@ -453,6 +535,44 @@ export function AccountDetailPage() {
                                               })()
                                             : undefined
                                     }
+                                    quoteNotes={quoteNotes(
+                                        theirPolicies,
+                                        g.assetId,
+                                        `${display} offers`,
+                                    )}
+                                    onConvert={
+                                        canDeal &&
+                                        g.total > 0n &&
+                                        liveFromPolicies(
+                                            theirPolicies,
+                                            g.assetId,
+                                            precisionOf(g.assetId),
+                                            nowSec,
+                                        ).length > 0
+                                            ? () =>
+                                                  setTake({
+                                                      fromAsset: g.assetId,
+                                                      fromSymbol: symbolOf(
+                                                          g.assetId,
+                                                      ),
+                                                      fromPrecision:
+                                                          precisionOf(
+                                                              g.assetId,
+                                                          ),
+                                                      claimRaw:
+                                                          g.total.toString(),
+                                                      policies:
+                                                          liveFromPolicies(
+                                                              theirPolicies,
+                                                              g.assetId,
+                                                              precisionOf(
+                                                                  g.assetId,
+                                                              ),
+                                                              nowSec,
+                                                          ),
+                                                  })
+                                            : undefined
+                                    }
                                 />
                             ))}
                         </section>
@@ -510,6 +630,38 @@ export function AccountDetailPage() {
                                         });
                                         setBookAuthOpen(true);
                                     }}
+                                    quoteNotes={quoteNotes(
+                                        myPolicies,
+                                        g.assetId,
+                                        "You offer",
+                                        (policy) =>
+                                            setOffer({
+                                                fromAsset: g.assetId,
+                                                fromSymbol: symbolOf(g.assetId),
+                                                fromPrecision: precisionOf(
+                                                    g.assetId,
+                                                ),
+                                                owedRaw: g.total.toString(),
+                                                edit: policy,
+                                            }),
+                                    )}
+                                    onOfferRepay={
+                                        canDeal && g.total > 0n
+                                            ? () =>
+                                                  setOffer({
+                                                      fromAsset: g.assetId,
+                                                      fromSymbol: symbolOf(
+                                                          g.assetId,
+                                                      ),
+                                                      fromPrecision:
+                                                          precisionOf(
+                                                              g.assetId,
+                                                          ),
+                                                      owedRaw:
+                                                          g.total.toString(),
+                                                  })
+                                            : undefined
+                                    }
                                 />
                             ))}
                         </section>
@@ -554,6 +706,9 @@ function AssetRelationCard({
     onBuyPosted,
     onBookExpense,
     onEditBookAuth,
+    quoteNotes,
+    onOfferRepay,
+    onConvert,
 }: {
     tone: "savings" | "loan";
     group: GroupedAccount;
@@ -569,6 +724,13 @@ function AssetRelationCard({
     onBuyPosted?: () => void;
     onBookExpense?: () => void;
     onEditBookAuth?: () => void;
+    quoteNotes?: {
+        key: string;
+        text: string;
+        onEdit?: () => void;
+    }[];
+    onOfferRepay?: () => void;
+    onConvert?: () => void;
 }) {
     const creditLine = g.creditLine;
     const format = moneyFormatOptions(symbol, precision);
@@ -653,6 +815,29 @@ function AssetRelationCard({
                 </div>
             </div>
 
+            {quoteNotes && quoteNotes.length > 0 ? (
+                <ul className="text-muted-foreground mt-3 space-y-1 text-xs">
+                    {quoteNotes.map((note) => (
+                        <li key={note.key}>
+                            {note.onEdit ? (
+                                <button
+                                    type="button"
+                                    className="hover:text-foreground text-left"
+                                    onClick={note.onEdit}
+                                >
+                                    {note.text}
+                                    <span className="text-foreground ml-1.5 font-medium">
+                                        Edit
+                                    </span>
+                                </button>
+                            ) : (
+                                note.text
+                            )}
+                        </li>
+                    ))}
+                </ul>
+            ) : null}
+
             <div className="mt-3 flex flex-wrap items-center gap-1.5">
                 {onEditLine ? (
                     <AccountRowAction
@@ -690,6 +875,22 @@ function AssetRelationCard({
                         icon={KeyRound}
                         label="Booking"
                         onClick={onEditBookAuth}
+                    />
+                ) : null}
+                {onOfferRepay ? (
+                    <AccountRowAction
+                        tip="Post a rate so they can turn this debt into another asset. The budget is for everyone who holds it on you."
+                        icon={ArrowDownUp}
+                        label="Offer to convert"
+                        onClick={onOfferRepay}
+                    />
+                ) : null}
+                {onConvert ? (
+                    <AccountRowAction
+                        tip="Take their quote and rebook this claim into the asset they priced"
+                        icon={ArrowDownUp}
+                        label="Convert"
+                        onClick={onConvert}
                     />
                 ) : null}
                 {onRequest ? (

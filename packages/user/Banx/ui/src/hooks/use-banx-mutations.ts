@@ -29,7 +29,7 @@ export function useInvalidateLedger() {
             queryKey: QueryKey.claimOffers(user),
         });
         void qc.invalidateQueries({
-            queryKey: QueryKey.currencyPolicies(user),
+            queryKey: ["banx", "currencyPolicies"],
         });
         void qc.invalidateQueries({
             queryKey: QueryKey.requests(user),

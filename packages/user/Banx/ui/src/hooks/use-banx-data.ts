@@ -239,9 +239,16 @@ export function useCurrencyPolicies(): UseQueryResult<
     Error
 > {
     const { data: user } = useCurrentUser();
+    return usePosterCurrencyPolicies(user);
+}
+
+/** FX quotes posted by `poster`, including another account's desk. */
+export function usePosterCurrencyPolicies(
+    poster: string | null | undefined,
+): UseQueryResult<CurrencyPolicy[], Error> {
     return useQuery({
-        queryKey: QueryKey.currencyPolicies(user),
-        queryFn: () => fetchCurrencyPolicies(user!),
-        enabled: !!user,
+        queryKey: QueryKey.currencyPolicies(poster),
+        queryFn: () => fetchCurrencyPolicies(poster!),
+        enabled: !!poster,
     });
 }
