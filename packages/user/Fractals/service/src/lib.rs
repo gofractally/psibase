@@ -200,6 +200,7 @@ pub mod service {
     /// * `member` - The fractal member claiming rewards.
     #[action]
     fn claim_rew(fractal: AccountNumber, member: AccountNumber) {
+        assert!(member != fractal, "cannot claim the fractal treasury");
         let mut reward_stream = RewardStream::get_assert(fractal, member);
         let (token_id, claimed) = reward_stream.claim();
 
