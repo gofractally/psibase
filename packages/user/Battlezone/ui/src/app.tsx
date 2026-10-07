@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 
-import { computeAiInput } from "./game/ai";
+import { computeAllAiInputs } from "./game/ai";
 import {
     attachKeyboard,
     createKeyBits,
@@ -8,6 +8,11 @@ import {
 } from "./game/input";
 import { renderFrame } from "./game/render";
 import { stepGame } from "./game/sim";
+import {
+    DEFAULT_ENEMY_TANKS,
+    MAX_ENEMY_TANKS,
+    MIN_ENEMY_TANKS,
+} from "./game/types";
 import { createInitialState, resetMatch } from "./game/world";
 
 export function App() {
@@ -21,7 +26,7 @@ export function App() {
 
         const keys = createKeyBits();
         const detachKeys = attachKeyboard(keys);
-        const state = createInitialState();
+        const state = createInitialState(DEFAULT_ENEMY_TANKS);
 
         const onResize = () => {
             const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -37,6 +42,24 @@ export function App() {
         window.addEventListener("resize", onResize);
 
         const onKey = (e: KeyboardEvent) => {
+            if (state.phase === "title") {
+                if (e.code === "ArrowLeft" || e.code === "KeyA") {
+                    e.preventDefault();
+                    state.enemyCount = Math.max(
+                        MIN_ENEMY_TANKS,
+                        state.enemyCount - 1,
+                    );
+                    return;
+                }
+                if (e.code === "ArrowRight" || e.code === "KeyD") {
+                    e.preventDefault();
+                    state.enemyCount = Math.min(
+                        MAX_ENEMY_TANKS,
+                        state.enemyCount + 1,
+                    );
+                    return;
+                }
+            }
             if (e.code !== "Enter") return;
             e.preventDefault();
             if (state.phase === "title" || state.phase === "win" || state.phase === "lose") {
@@ -54,8 +77,8 @@ export function App() {
             last = now;
 
             const playerInput = inputFromKeys(keys);
-            const aiInput = computeAiInput(state);
-            stepGame(state, playerInput, aiInput, dt);
+            const aiInputs = computeAllAiInputs(state);
+            stepGame(state, playerInput, aiInputs, dt);
             renderFrame(ctx, window.innerWidth, window.innerHeight, state);
             raf = requestAnimationFrame(frame);
         };

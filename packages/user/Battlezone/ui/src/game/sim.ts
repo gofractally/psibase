@@ -9,6 +9,7 @@ import {
     SHOT_SPEED,
     TANK_RADIUS,
     TURN_RATE,
+    isEnemyId,
     type Block,
     type GameState,
     type InputState,
@@ -16,7 +17,7 @@ import {
     type Tank,
     type Vec2,
 } from "./types";
-import { respawnTank } from "./world";
+import { missionMessage, respawnTank } from "./world";
 
 function clampArena(p: Vec2): void {
     const lim = ARENA * 0.5 - TANK_RADIUS;
@@ -66,7 +67,7 @@ function tryFire(state: GameState, tank: Tank): void {
         life: SHOT_LIFE,
     };
     state.shots.push(shot);
-    if (tank.id === "ai") {
+    if (isEnemyId(tank.id)) {
         state.radarAlertIn = RADAR_ALERT_DURATION;
     }
 }
@@ -84,11 +85,24 @@ function applyInput(tank: Tank, input: InputState, dt: number, blocks: Block[]):
     tank.cooldown = Math.max(0, tank.cooldown - dt);
 }
 
-function hitTank(shot: Shot, tank: Tank): boolean {
+/** Player hits enemies; enemies hit only the player (no friendly fire). */
+function canHit(shot: Shot, tank: Tank): boolean {
     if (!tank.alive || shot.owner === tank.id) return false;
+    if (shot.owner === "player") return isEnemyId(tank.id);
+    return tank.id === "player";
+}
+
+function hitTank(shot: Shot, tank: Tank): boolean {
+    if (!canHit(shot, tank)) return false;
     const dx = shot.pos.x - tank.pos.x;
     const dy = shot.pos.y - tank.pos.y;
     return dx * dx + dy * dy <= TANK_RADIUS * TANK_RADIUS;
+}
+
+function enemiesDefeated(state: GameState): boolean {
+    return state.tanks
+        .filter((t) => isEnemyId(t.id))
+        .every((t) => t.lives <= 0);
 }
 
 function onTankHit(state: GameState, victim: Tank, attackerId: Tank["id"]): void {
@@ -115,22 +129,31 @@ function onTankHit(state: GameState, victim: Tank, attackerId: Tank["id"]): void
     }
 
     // Enemy hit: always explode at the kill site
-    state.shots = state.shots.filter((s) => s.owner !== "ai");
+    state.shots = state.shots.filter((s) => s.owner !== victim.id);
     state.explosionPos = { ...victim.pos };
     state.explosionHeading = victim.heading;
+    state.explosionColor = victim.color;
 
     if (victim.lives <= 0) {
-        state.phase = "win";
-        state.message = "";
-        state.explosionDuration = ENEMY_EXPLOSION_DURATION;
-        state.explosionIn = ENEMY_EXPLOSION_DURATION;
-        state.respawnIn = 0;
-        state.respawnId = null;
+        if (enemiesDefeated(state)) {
+            state.phase = "win";
+            state.message = "";
+            state.explosionDuration = ENEMY_EXPLOSION_DURATION;
+            state.explosionIn = ENEMY_EXPLOSION_DURATION;
+            state.respawnIn = 0;
+            state.respawnId = null;
+        } else {
+            state.message = "ENEMY DESTROYED";
+            state.explosionDuration = ENEMY_EXPLOSION_MID;
+            state.explosionIn = ENEMY_EXPLOSION_MID;
+            state.respawnId = null;
+            state.respawnIn = 0;
+        }
     } else {
         state.message = "HIT CONFIRMED";
         state.explosionDuration = ENEMY_EXPLOSION_MID;
         state.explosionIn = ENEMY_EXPLOSION_MID;
-        state.respawnId = "ai";
+        state.respawnId = victim.id;
         state.respawnIn = 0; // respawn after explosion finishes
     }
 }
@@ -138,7 +161,7 @@ function onTankHit(state: GameState, victim: Tank, attackerId: Tank["id"]): void
 export function stepGame(
     state: GameState,
     playerInput: InputState,
-    aiInput: InputState,
+    aiInputs: Map<string, InputState>,
     dt: number,
 ): void {
     if (state.phase === "title") return;
@@ -151,13 +174,20 @@ export function stepGame(
             if (state.phase === "win") {
                 // Victory overlay is drawn in player green; keep message empty
                 state.message = "";
-            } else if (state.phase === "playing" && state.respawnId === "ai") {
-                const tank = state.tanks.find((t) => t.id === "ai");
-                const player = state.tanks.find((t) => t.id === "player");
-                if (tank) respawnTank(tank, state.blocks, player);
+            } else if (
+                state.phase === "playing" &&
+                state.respawnId &&
+                isEnemyId(state.respawnId)
+            ) {
+                const tank = state.tanks.find((t) => t.id === state.respawnId);
+                const others = state.tanks.filter((t) => t.id !== state.respawnId);
+                if (tank) respawnTank(tank, state.blocks, others);
                 state.respawnId = null;
                 state.explosionPos = null;
-                state.message = "DESTROY THE ENEMY TANK";
+                state.message = missionMessage(state.enemyCount);
+            } else if (state.phase === "playing") {
+                state.explosionPos = null;
+                state.message = missionMessage(state.enemyCount);
             }
         }
         return;
@@ -170,10 +200,10 @@ export function stepGame(
             state.respawnIn = Math.max(0, state.respawnIn - dt);
             if (state.respawnIn <= 0 && state.phase === "playing") {
                 const tank = state.tanks.find((t) => t.id === "player");
-                const ai = state.tanks.find((t) => t.id === "ai");
-                if (tank) respawnTank(tank, state.blocks, ai);
+                const others = state.tanks.filter((t) => t.id !== "player");
+                if (tank) respawnTank(tank, state.blocks, others);
                 state.respawnId = null;
-                state.message = "DESTROY THE ENEMY TANK";
+                state.message = missionMessage(state.enemyCount);
             }
         }
         return;
@@ -186,12 +216,19 @@ export function stepGame(
     }
 
     const player = state.tanks.find((t) => t.id === "player")!;
-    const ai = state.tanks.find((t) => t.id === "ai")!;
-
     applyInput(player, playerInput, dt, state.blocks);
-    applyInput(ai, aiInput, dt, state.blocks);
     if (playerInput.fire) tryFire(state, player);
-    if (aiInput.fire) tryFire(state, ai);
+
+    for (const tank of state.tanks) {
+        if (!isEnemyId(tank.id)) continue;
+        const input = aiInputs.get(tank.id) ?? {
+            turn: 0,
+            throttle: 0,
+            fire: false,
+        };
+        applyInput(tank, input, dt, state.blocks);
+        if (input.fire) tryFire(state, tank);
+    }
 
     const remaining: Shot[] = [];
     for (const shot of state.shots) {

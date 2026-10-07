@@ -1,8 +1,11 @@
 import {
+    DEFAULT_ENEMY_TANKS,
     ENEMY_COLORS,
     ENEMY_EXPLOSION_DURATION,
     FIELD_LIM,
     FIRE_COOLDOWN,
+    MAX_ENEMY_TANKS,
+    MIN_ENEMY_TANKS,
     MIN_TANK_SEPARATION,
     OBSTACLE_COUNT,
     PLAYER_COLOR,
@@ -10,6 +13,7 @@ import {
     START_LIVES,
     TANK_RADIUS,
     TANK_SPAWN_LIM,
+    aiTankId,
     type Block,
     type GameState,
     type ObstacleShape,
@@ -69,6 +73,34 @@ function nearestObstacleDist(pos: Vec2, blocks: Block[]): number {
     return best;
 }
 
+function clampSpawn(pos: Vec2): Vec2 {
+    return {
+        x: Math.max(-TANK_SPAWN_LIM, Math.min(TANK_SPAWN_LIM, pos.x)),
+        y: Math.max(-TANK_SPAWN_LIM, Math.min(TANK_SPAWN_LIM, pos.y)),
+    };
+}
+
+function isValidSpawn(
+    pos: Vec2,
+    blocks: Block[],
+    avoid: Vec2[],
+    minSep: number,
+    requireNearObstacle: boolean,
+): boolean {
+    if (blocks.some((b) => overlapsObstacle(pos, TANK_RADIUS + 2, b))) {
+        return false;
+    }
+    if (avoid.some((a) => dist(pos, a) < minSep)) return false;
+    // Require being amid the obstacle field, not in an empty fringe pocket
+    if (
+        requireNearObstacle &&
+        nearestObstacleDist(pos, blocks) > SPAWN_NEAR_OBSTACLE
+    ) {
+        return false;
+    }
+    return true;
+}
+
 function findClearSpot(
     blocks: Block[],
     avoid: Vec2[],
@@ -80,13 +112,30 @@ function findClearSpot(
             x: randRange(-TANK_SPAWN_LIM, TANK_SPAWN_LIM),
             y: randRange(-TANK_SPAWN_LIM, TANK_SPAWN_LIM),
         };
-        if (blocks.some((b) => overlapsObstacle(pos, TANK_RADIUS + 2, b))) {
-            continue;
-        }
-        if (avoid.some((a) => dist(pos, a) < minSep)) continue;
-        // Require being amid the obstacle field, not in an empty fringe pocket
-        if (nearestObstacleDist(pos, blocks) > SPAWN_NEAR_OBSTACLE) continue;
-        return pos;
+        if (isValidSpawn(pos, blocks, avoid, minSep, true)) return pos;
+    }
+    return null;
+}
+
+/** Clear spot near a target — jitter grows across tries, then constraints relax. */
+function findClearSpotNear(
+    blocks: Block[],
+    avoid: Vec2[],
+    minSep: number,
+    target: Vec2,
+    tries = 100,
+): Vec2 | null {
+    const aim = clampSpawn(target);
+    for (let i = 0; i < tries; i++) {
+        const t = i / tries;
+        const jitter = TANK_SPAWN_LIM * (0.08 + 0.55 * t);
+        const pos = clampSpawn({
+            x: aim.x + randRange(-jitter, jitter),
+            y: aim.y + randRange(-jitter, jitter),
+        });
+        const sep = minSep * (1 - 0.35 * t);
+        const nearObs = t < 0.7;
+        if (isValidSpawn(pos, blocks, avoid, sep, nearObs)) return pos;
     }
     return null;
 }
@@ -116,45 +165,84 @@ export function createBlocks(): Block[] {
     return blocks;
 }
 
-function spawnTanks(blocks: Block[]): [Tank, Tank] {
-    const playerPos =
-        findClearSpot(blocks, [], MIN_TANK_SEPARATION) ?? {
-            x: 0,
-            y: TANK_SPAWN_LIM * 0.4,
-        };
-    const aiPos =
-        findClearSpot(blocks, [playerPos], MIN_TANK_SEPARATION) ?? {
-            x: 0,
-            y: -TANK_SPAWN_LIM * 0.4,
-        };
+function faceToward(from: Vec2, to: Vec2): number {
+    return Math.atan2(to.x - from.x, -(to.y - from.y));
+}
 
-    const faceToward = (from: Vec2, to: Vec2) =>
-        Math.atan2(to.x - from.x, -(to.y - from.y));
+function clampEnemyCount(n: number): number {
+    return Math.max(MIN_ENEMY_TANKS, Math.min(MAX_ENEMY_TANKS, Math.floor(n)));
+}
 
-    return [
+/**
+ * Place player + enemies on evenly spaced angular slots around the field
+ * so opponents aren't clustered in one corner.
+ */
+function spawnTanks(blocks: Block[], enemyCount: number): Tank[] {
+    const count = clampEnemyCount(enemyCount);
+    const total = count + 1;
+    const angle0 = Math.random() * Math.PI * 2;
+    const playerSlot = Math.floor(Math.random() * total);
+    // Keep tanks well apart as count grows (ring circumference / slots)
+    const ringSep = Math.max(
+        MIN_TANK_SEPARATION,
+        (TANK_SPAWN_LIM * 0.75 * Math.PI * 2) / total * 0.85,
+    );
+
+    const slots: Vec2[] = [];
+    for (let i = 0; i < total; i++) {
+        const angle = angle0 + (i / total) * Math.PI * 2;
+        // Mid–outer ring with light radius jitter (not a perfect circle)
+        const radius = TANK_SPAWN_LIM * randRange(0.55, 0.9);
+        const target = {
+            x: Math.sin(angle) * radius,
+            y: -Math.cos(angle) * radius,
+        };
+        const pos =
+            findClearSpotNear(blocks, slots, ringSep, target) ??
+            findClearSpot(blocks, slots, MIN_TANK_SEPARATION) ??
+            clampSpawn(target);
+        slots.push(pos);
+    }
+
+    const playerPos = slots[playerSlot]!;
+    const enemyPositions = slots.filter((_, i) => i !== playerSlot);
+    const firstEnemy = enemyPositions[0] ?? playerPos;
+
+    const tanks: Tank[] = [
         makeTank(
             "player",
             playerPos.x,
             playerPos.y,
-            faceToward(playerPos, aiPos),
+            faceToward(playerPos, firstEnemy),
             PLAYER_COLOR,
         ),
-        makeTank(
-            "ai",
-            aiPos.x,
-            aiPos.y,
-            faceToward(aiPos, playerPos),
-            enemyColor(0),
-        ),
     ];
+
+    for (let i = 0; i < count; i++) {
+        const pos = enemyPositions[i]!;
+        tanks.push(
+            makeTank(
+                aiTankId(i),
+                pos.x,
+                pos.y,
+                faceToward(pos, playerPos),
+                enemyColor(i),
+            ),
+        );
+    }
+    return tanks;
 }
 
-export function createInitialState(): GameState {
+export function createInitialState(
+    enemyCount: number = DEFAULT_ENEMY_TANKS,
+): GameState {
+    const count = clampEnemyCount(enemyCount);
     const blocks = createBlocks();
-    const [player, ai] = spawnTanks(blocks);
+    const tanks = spawnTanks(blocks, count);
     return {
         phase: "title",
-        tanks: [player, ai],
+        enemyCount: count,
+        tanks,
         shots: [],
         blocks,
         nextShotId: 1,
@@ -168,31 +256,60 @@ export function createInitialState(): GameState {
         explosionDuration: ENEMY_EXPLOSION_DURATION,
         explosionPos: null,
         explosionHeading: 0,
+        explosionColor: ENEMY_COLORS[0]!,
     };
 }
 
-export function resetMatch(_state: GameState): GameState {
-    const next = createInitialState();
+export function missionMessage(enemyCount: number): string {
+    return enemyCount === 1
+        ? "DESTROY THE ENEMY TANK"
+        : "DESTROY THE ENEMY TANKS";
+}
+
+export function resetMatch(state: GameState): GameState {
+    const next = createInitialState(state.enemyCount);
     next.phase = "playing";
-    next.message = "DESTROY THE ENEMY TANK";
+    next.message = missionMessage(state.enemyCount);
     return next;
 }
 
-export function respawnTank(tank: Tank, blocks: Block[], other?: Tank): void {
-    const avoid = other?.alive ? [other.pos] : [];
-    const pos =
-        findClearSpot(blocks, avoid, MIN_TANK_SEPARATION * 0.7) ?? {
-            x: tank.id === "player" ? 0 : 20,
-            y:
-                tank.id === "player"
-                    ? TANK_SPAWN_LIM * 0.4
-                    : -TANK_SPAWN_LIM * 0.4,
+export function respawnTank(
+    tank: Tank,
+    blocks: Block[],
+    others: Tank[] = [],
+): void {
+    const avoid = others.filter((t) => t.alive).map((t) => t.pos);
+    const minSep = MIN_TANK_SEPARATION * 0.7;
+
+    let pos: Vec2 | null = null;
+    if (tank.id !== "player") {
+        // Enemies: random angle/radius on the field, then nearest clear spot
+        const angle = Math.random() * Math.PI * 2;
+        const radius = TANK_SPAWN_LIM * randRange(0.35, 0.9);
+        const target = {
+            x: Math.sin(angle) * radius,
+            y: -Math.cos(angle) * radius,
         };
+        pos =
+            findClearSpotNear(blocks, avoid, minSep, target) ??
+            findClearSpot(blocks, avoid, minSep, 200);
+    } else {
+        pos = findClearSpot(blocks, avoid, minSep, 200);
+    }
+
+    if (!pos) {
+        pos = {
+            x: randRange(-TANK_SPAWN_LIM, TANK_SPAWN_LIM),
+            y: randRange(-TANK_SPAWN_LIM, TANK_SPAWN_LIM),
+        };
+    }
+
     tank.pos = pos;
-    if (other?.alive) {
+    const face = others.find((t) => t.alive);
+    if (face) {
         tank.heading = Math.atan2(
-            other.pos.x - pos.x,
-            -(other.pos.y - pos.y),
+            face.pos.x - pos.x,
+            -(face.pos.y - pos.y),
         );
     } else {
         tank.heading = Math.random() * Math.PI * 2;

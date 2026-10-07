@@ -1,6 +1,7 @@
 import {
     FIRE_RANGE,
     TANK_RADIUS,
+    isEnemyId,
     type GameState,
     type InputState,
     type Tank,
@@ -20,11 +21,19 @@ function facingOf(from: Tank, to: Tank): number {
     return Math.atan2(dx, -dy);
 }
 
-export function computeAiInput(state: GameState): InputState {
-    const ai = state.tanks.find((t) => t.id === "ai");
+const IDLE: InputState = { turn: 0, throttle: 0, fire: false };
+
+/** AI steering for a single enemy tank hunting the player */
+export function computeAiInput(state: GameState, ai: Tank): InputState {
     const player = state.tanks.find((t) => t.id === "player");
-    const idle: InputState = { turn: 0, throttle: 0, fire: false };
-    if (!ai || !player || !ai.alive || state.phase !== "playing") return idle;
+    if (
+        !player ||
+        !ai.alive ||
+        !isEnemyId(ai.id) ||
+        state.phase !== "playing"
+    ) {
+        return IDLE;
+    }
 
     const desired = facingOf(ai, player);
     const err = angleDiff(desired, ai.heading);
@@ -71,8 +80,19 @@ export function computeAiInput(state: GameState): InputState {
         Math.abs(err) < 0.18 &&
         dist < FIRE_RANGE &&
         ai.cooldown <= 0 &&
-        !state.shots.some((s) => s.owner === "ai") &&
+        !state.shots.some((s) => s.owner === ai.id) &&
         Math.random() < 0.045;
 
     return { turn, throttle, fire };
+}
+
+export function computeAllAiInputs(
+    state: GameState,
+): Map<string, InputState> {
+    const inputs = new Map<string, InputState>();
+    for (const tank of state.tanks) {
+        if (!isEnemyId(tank.id)) continue;
+        inputs.set(tank.id, computeAiInput(state, tank));
+    }
+    return inputs;
 }

@@ -2,7 +2,10 @@ import {
     ARENA,
     ENEMY_EXPLOSION_DURATION,
     FIRE_RANGE,
+    MAX_ENEMY_TANKS,
+    MIN_ENEMY_TANKS,
     PLAYER_COLOR,
+    isEnemyId,
     type Block,
     type GameState,
     type Shot,
@@ -433,7 +436,7 @@ function drawRadar(
     const x = width - size - 16;
     const y = height - size - 16;
 
-    const enemyShots = state.shots.filter((s) => s.owner === "ai");
+    const enemyShots = state.shots.filter((s) => isEnemyId(s.owner));
     const alertBlink =
         state.radarAlertIn > 0 && Math.floor(state.elapsed * 8) % 2 === 0;
 
@@ -545,7 +548,6 @@ function drawHud(
     height: number,
     state: GameState,
     player: Tank,
-    enemy: Tank,
 ): void {
     ctx.fillStyle = COLOR;
     ctx.font = "14px monospace";
@@ -553,8 +555,14 @@ function drawHud(
     ctx.fillText(`SCORE ${player.score}`, 16, 24);
     ctx.fillText(`LIVES ${Math.max(0, player.lives)}`, 16, 44);
     ctx.textAlign = "right";
-    ctx.fillStyle = tankColor(enemy);
-    ctx.fillText(`ENEMY ${Math.max(0, enemy.lives)}`, width - 16, 24);
+    const enemies = state.tanks.filter((t) => isEnemyId(t.id));
+    let y = 24;
+    for (const enemy of enemies) {
+        ctx.fillStyle = tankColor(enemy);
+        const label = enemy.lives > 0 ? `ENEMY ${enemy.lives}` : "ENEMY --";
+        ctx.fillText(label, width - 16, y);
+        y += 18;
+    }
 
     const cx = width / 2;
     const cy = height * 0.55;
@@ -652,8 +660,7 @@ function drawExplosion(
     const progress = 1 - state.explosionIn / duration;
     const pos = state.explosionPos;
     const heading = state.explosionHeading;
-    const blastColor =
-        state.tanks.find((t) => t.id === "ai")?.color ?? ENEMY_FALLBACK;
+    const blastColor = state.explosionColor || ENEMY_FALLBACK;
 
     const fx = Math.sin(heading);
     const fy = -Math.cos(heading);
@@ -726,7 +733,7 @@ function drawExplosion(
     // Early frames: flash the intact tank silhouette collapsing
     if (progress < 0.25) {
         const ghost: Tank = {
-            id: "ai",
+            id: "ai-0",
             pos: { ...pos },
             heading,
             alive: true,
@@ -751,7 +758,7 @@ export function renderFrame(
     ctx.fillRect(0, 0, width, height);
 
     const player = state.tanks.find((t) => t.id === "player")!;
-    const enemy = state.tanks.find((t) => t.id === "ai")!;
+    const enemies = state.tanks.filter((t) => isEnemyId(t.id));
     const cam: Cam = { pos: { ...player.pos }, heading: player.heading };
 
     drawHorizon(ctx, width, height, cam.heading);
@@ -765,8 +772,7 @@ export function renderFrame(
             draw: () => drawBlock(ctx, width, height, cam, block),
         });
     }
-    for (const tank of state.tanks) {
-        if (tank.id === "player") continue;
+    for (const tank of enemies) {
         if (!tank.alive) continue;
         const z = worldToView(cam, tank.pos).z;
         depthItems.push({
@@ -782,9 +788,11 @@ export function renderFrame(
     drawShots(ctx, width, height, cam, state);
     drawExplosion(ctx, width, height, cam, state);
     if (state.phase === "playing") {
-        drawEnemyRangeBox(ctx, width, height, cam, player, enemy);
+        for (const enemy of enemies) {
+            drawEnemyRangeBox(ctx, width, height, cam, player, enemy);
+        }
     }
-    drawHud(ctx, width, height, state, player, enemy);
+    drawHud(ctx, width, height, state, player);
     drawRadar(ctx, width, height, state, player);
 
     if (state.hitStunIn > 0) {
@@ -798,11 +806,28 @@ export function renderFrame(
         ctx.fillStyle = COLOR;
         ctx.textAlign = "center";
         ctx.font = "bold 42px monospace";
-        ctx.fillText("BATTLEZONE", width / 2, height * 0.38);
+        ctx.fillText("BATTLEZONE", width / 2, height * 0.32);
         ctx.font = "16px monospace";
-        ctx.fillText("1 PLAYER  +  1 COMPUTER", width / 2, height * 0.48);
-        ctx.fillText("WASD / ARROWS  MOVE    SPACE  FIRE", width / 2, height * 0.55);
-        ctx.fillText("PRESS ENTER TO START", width / 2, height * 0.66);
+        const n = state.enemyCount;
+        const left = n > MIN_ENEMY_TANKS ? "<" : " ";
+        const right = n < MAX_ENEMY_TANKS ? ">" : " ";
+        ctx.fillText(
+            `ENEMY TANKS  ${left}  ${n}  ${right}`,
+            width / 2,
+            height * 0.44,
+        );
+        ctx.fillText("ALL ENEMIES: AI", width / 2, height * 0.5);
+        ctx.fillText(
+            "LEFT / RIGHT  ADJUST COUNT",
+            width / 2,
+            height * 0.58,
+        );
+        ctx.fillText(
+            "WASD / ARROWS  MOVE    SPACE  FIRE",
+            width / 2,
+            height * 0.64,
+        );
+        ctx.fillText("PRESS ENTER TO START", width / 2, height * 0.74);
         return;
     }
 

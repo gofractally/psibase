@@ -1,6 +1,15 @@
 export type Vec2 = { x: number; y: number };
 
-export type TankId = "player" | "ai";
+/** "player" or "ai-0" … "ai-4" */
+export type TankId = string;
+
+export function isEnemyId(id: TankId): boolean {
+    return id !== "player";
+}
+
+export function aiTankId(index: number): TankId {
+    return `ai-${index}`;
+}
 
 export type Tank = {
     id: TankId;
@@ -50,6 +59,8 @@ export type GamePhase = "title" | "playing" | "win" | "lose";
 
 export type GameState = {
     phase: GamePhase;
+    /** Enemy tank count chosen on the title screen (1–5); all are AI for now */
+    enemyCount: number;
     tanks: Tank[];
     shots: Shot[];
     blocks: Block[];
@@ -64,6 +75,7 @@ export type GameState = {
     explosionDuration: number;
     explosionPos: Vec2 | null;
     explosionHeading: number;
+    explosionColor: string;
 };
 
 /** Playable / obstacle field (~3× linear → ~9× area vs original) */
@@ -96,5 +108,16 @@ export const MIN_TANK_SEPARATION = 45;
 export const SPAWN_NEAR_OBSTACLE = 55;
 
 export const PLAYER_COLOR = "#33ff66";
-/** Non-red enemy palette (aqua, yellow, violet) — cycled per AI index */
-export const ENEMY_COLORS = ["#33eeff", "#ffee33", "#cc66ff"] as const;
+/** Non-red enemy palette — cycled per AI index (up to MAX_ENEMY_TANKS) */
+export const ENEMY_COLORS = [
+    "#33eeff",
+    "#ffee33",
+    "#cc66ff",
+    "#ff9933",
+    "#66ffcc",
+] as const;
+
+/** Player + enemies = 6 max; enemies are AI-controlled for now */
+export const MIN_ENEMY_TANKS = 1;
+export const MAX_ENEMY_TANKS = 5;
+export const DEFAULT_ENEMY_TANKS = 1;
