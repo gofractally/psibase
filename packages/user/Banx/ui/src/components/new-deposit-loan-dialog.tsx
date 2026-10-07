@@ -3,6 +3,11 @@ import { useEffect } from "react";
 import { AssetField, amountUnit } from "@/components/form-fields";
 import { useDeposit } from "@/hooks/use-banx-mutations";
 import {
+    amountPlaceholder,
+    isUnitDefault,
+    unitAmount,
+} from "@/lib/amount";
+import {
     MAX_PERCENT,
     MIN_PERCENT_STEP,
     PPM_SCALE,
@@ -45,12 +50,14 @@ export function NewDepositLoanDialog({
     assetId?: number;
 }) {
     const deposit = useDeposit();
+    const amountFor = (assetId: number | undefined) =>
+        assetId === undefined ? "1" : unitAmount(precisionOf(assetId));
 
     const form = useAppForm({
         defaultValues: {
             depositor: "",
-            assetId: undefined as number | undefined,
-            amount: "1.00",
+            assetId: lockedAssetId,
+            amount: amountFor(lockedAssetId),
             aprPct: "0",
         },
         onSubmit: async ({ value }) => {
@@ -83,7 +90,7 @@ export function NewDepositLoanDialog({
         form.reset({
             depositor: initialAccount?.trim() ?? "",
             assetId: lockedAssetId,
-            amount: "1.00",
+            amount: amountFor(lockedAssetId),
             aprPct: "0",
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -126,7 +133,18 @@ export function NewDepositLoanDialog({
                                 <AssetField
                                     assets={assets}
                                     value={field.state.value}
-                                    onChange={(id) => field.handleChange(id)}
+                                    onChange={(id) => {
+                                        field.handleChange(id);
+                                        const current = String(
+                                            form.state.values.amount ?? "",
+                                        );
+                                        if (isUnitDefault(current)) {
+                                            form.setFieldValue(
+                                                "amount",
+                                                amountFor(id),
+                                            );
+                                        }
+                                    }}
                                 />
                             )}
                         />
@@ -166,6 +184,13 @@ export function NewDepositLoanDialog({
                                             label="Amount"
                                             inputMode="decimal"
                                             required
+                                            placeholder={
+                                                assetId !== undefined
+                                                    ? amountPlaceholder(
+                                                          precisionOf(assetId),
+                                                      )
+                                                    : undefined
+                                            }
                                             endContent={amountUnit(symbol)}
                                         />
                                     )}

@@ -7,7 +7,7 @@ use bindings::exports::banx::plugin::api::{
 };
 use bindings::exports::banx::plugin::helpers::Guest as Helpers;
 use bindings::host::types::types::Error;
-use bindings::transact::plugin::intf::add_action_to_transaction;
+use bindings::transact::plugin::api::add_action_to_transaction;
 
 use banx::path_find::{find_banx_path, find_banx_path_exact_out};
 use psibase::define_trust;

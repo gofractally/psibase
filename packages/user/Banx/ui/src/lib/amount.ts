@@ -206,6 +206,21 @@ export function amountPlaceholder(precision: number): string {
 }
 
 /**
+ * One whole unit, with no more fraction digits than `precision` allows.
+ * Precision 0 is `"1"`; the chain rejects `"1.00"` there.
+ */
+export function unitAmount(precision: number): string {
+    const places = Math.min(Math.max(Math.trunc(precision) || 0, 0), 8);
+    if (places === 0) return "1";
+    return `1.${"0".repeat(Math.min(places, 2))}`;
+}
+
+/** Untouched one-unit default (`1`, `1.00`), not a typed amount. */
+export function isUnitDefault(amount: string): boolean {
+    return /^1(?:\.0*)?$/.test(amount.trim());
+}
+
+/**
  * Format a human decimal to full asset precision (pad/truncate fraction).
  * Invalid/empty input returns null so callers can fall back to "?".
  */
