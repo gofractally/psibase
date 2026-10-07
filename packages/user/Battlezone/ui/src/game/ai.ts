@@ -30,6 +30,7 @@ export function computeAiInput(state: GameState, ai: Tank): InputState {
         !player ||
         !ai.alive ||
         !isEnemyId(ai.id) ||
+        ai.controller !== "ai" ||
         state.phase !== "playing"
     ) {
         return IDLE;

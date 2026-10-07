@@ -113,26 +113,31 @@ function onTankHit(state: GameState, victim: Tank, attackerId: Tank["id"]): void
 
     if (victim.id === "player") {
         state.shots = [];
+        state.hitStunIn = PLAYER_HIT_STUN;
+        state.hitStunVictimId = "player";
         if (victim.lives <= 0) {
             state.phase = "lose";
             state.message = "MISSION FAILED";
-            state.hitStunIn = PLAYER_HIT_STUN;
             state.respawnIn = 0;
             state.respawnId = null;
         } else {
             state.message = "TANK DESTROYED";
-            state.hitStunIn = PLAYER_HIT_STUN;
             state.respawnIn = PLAYER_HIT_STUN;
             state.respawnId = "player";
         }
         return;
     }
 
-    // Enemy hit: always explode at the kill site
+    // Enemy hit: explode at the kill site. Human-controlled enemies also get
+    // cockpit hit-stun so only their client shows the cracked windshield.
     state.shots = state.shots.filter((s) => s.owner !== victim.id);
     state.explosionPos = { ...victim.pos };
     state.explosionHeading = victim.heading;
     state.explosionColor = victim.color;
+    if (victim.controller === "remote") {
+        state.hitStunIn = PLAYER_HIT_STUN;
+        state.hitStunVictimId = victim.id;
+    }
 
     if (victim.lives <= 0) {
         if (enemiesDefeated(state)) {
@@ -166,43 +171,41 @@ export function stepGame(
 ): void {
     if (state.phase === "title") return;
 
-    // Explosion: freeze gameplay, only advance the animation timer
-    if (state.explosionIn > 0) {
-        state.explosionIn = Math.max(0, state.explosionIn - dt);
+    // Freeze gameplay while an explosion and/or cockpit hit-stun plays out.
+    if (state.explosionIn > 0 || state.hitStunIn > 0) {
         state.elapsed += dt;
-        if (state.explosionIn <= 0) {
-            if (state.phase === "win") {
-                // Victory overlay is drawn in player green; keep message empty
-                state.message = "";
-            } else if (
-                state.phase === "playing" &&
-                state.respawnId &&
-                isEnemyId(state.respawnId)
-            ) {
-                const tank = state.tanks.find((t) => t.id === state.respawnId);
-                const others = state.tanks.filter((t) => t.id !== state.respawnId);
-                if (tank) respawnTank(tank, state.blocks, others);
-                state.respawnId = null;
-                state.explosionPos = null;
-                state.message = missionMessage(state.enemyCount);
-            } else if (state.phase === "playing") {
-                state.explosionPos = null;
-                state.message = missionMessage(state.enemyCount);
+        if (state.explosionIn > 0) {
+            state.explosionIn = Math.max(0, state.explosionIn - dt);
+        }
+        if (state.hitStunIn > 0) {
+            state.hitStunIn = Math.max(0, state.hitStunIn - dt);
+            if (state.hitStunIn <= 0) {
+                state.hitStunVictimId = null;
             }
         }
-        return;
-    }
-
-    // Freeze everything during player hit-stun so the cracked view is readable
-    if (state.hitStunIn > 0) {
-        state.hitStunIn = Math.max(0, state.hitStunIn - dt);
         if (state.respawnIn > 0 && state.respawnId === "player") {
             state.respawnIn = Math.max(0, state.respawnIn - dt);
-            if (state.respawnIn <= 0 && state.phase === "playing") {
-                const tank = state.tanks.find((t) => t.id === "player");
-                const others = state.tanks.filter((t) => t.id !== "player");
-                if (tank) respawnTank(tank, state.blocks, others);
-                state.respawnId = null;
+        }
+
+        const frozenDone = state.explosionIn <= 0 && state.hitStunIn <= 0;
+        if (frozenDone) {
+            if (state.phase === "win") {
+                state.message = "";
+            } else if (state.phase === "playing") {
+                if (state.respawnId === "player" && state.respawnIn <= 0) {
+                    const tank = state.tanks.find((t) => t.id === "player");
+                    const others = state.tanks.filter((t) => t.id !== "player");
+                    if (tank) respawnTank(tank, state.blocks, others);
+                    state.respawnId = null;
+                } else if (state.respawnId && isEnemyId(state.respawnId)) {
+                    const tank = state.tanks.find((t) => t.id === state.respawnId);
+                    const others = state.tanks.filter(
+                        (t) => t.id !== state.respawnId,
+                    );
+                    if (tank) respawnTank(tank, state.blocks, others);
+                    state.respawnId = null;
+                }
+                state.explosionPos = null;
                 state.message = missionMessage(state.enemyCount);
             }
         }

@@ -14,6 +14,7 @@ import {
     TANK_RADIUS,
     TANK_SPAWN_LIM,
     aiTankId,
+    syncEnemySlotModes,
     type Block,
     type GameState,
     type ObstacleShape,
@@ -35,6 +36,8 @@ function makeTank(
     y: number,
     heading: number,
     color: string,
+    controller: Tank["controller"] = id === "player" ? "local" : "ai",
+    account: string | null = null,
 ): Tank {
     return {
         id,
@@ -45,6 +48,8 @@ function makeTank(
         cooldown: 0,
         score: 0,
         color,
+        controller,
+        account,
     };
 }
 
@@ -242,21 +247,31 @@ export function createInitialState(
     return {
         phase: "title",
         enemyCount: count,
+        enemySlotModes: syncEnemySlotModes([], count),
         tanks,
         shots: [],
         blocks,
         nextShotId: 1,
-        message: "PRESS ENTER TO START",
+        message: "PRESS ENTER TO READY",
         elapsed: 0,
         respawnIn: 0,
         respawnId: null,
         hitStunIn: 0,
+        hitStunVictimId: null,
         radarAlertIn: 0,
         explosionIn: 0,
         explosionDuration: ENEMY_EXPLOSION_DURATION,
         explosionPos: null,
         explosionHeading: 0,
         explosionColor: ENEMY_COLORS[0]!,
+        localAccount: null,
+        netRole: "offline",
+        livePeers: [],
+        lobbyPlayers: [],
+        lobbyHost: null,
+        lobbyReady: false,
+        viewTankId: null,
+        netStatus: "CONNECTING…",
     };
 }
 
@@ -268,6 +283,17 @@ export function missionMessage(enemyCount: number): string {
 
 export function resetMatch(state: GameState): GameState {
     const next = createInitialState(state.enemyCount);
+    next.enemySlotModes = syncEnemySlotModes(
+        state.enemySlotModes,
+        state.enemyCount,
+    );
+    next.localAccount = state.localAccount;
+    next.livePeers = state.livePeers;
+    next.netStatus = state.netStatus;
+    // Must keep host/remote — otherwise both clients fall back to offline
+    // local sims and never exchange input / snapshots.
+    next.netRole = state.netRole;
+    next.viewTankId = state.viewTankId;
     next.phase = "playing";
     next.message = missionMessage(state.enemyCount);
     return next;

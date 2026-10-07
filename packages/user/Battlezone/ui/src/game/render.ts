@@ -5,6 +5,7 @@ import {
     MAX_ENEMY_TANKS,
     MIN_ENEMY_TANKS,
     PLAYER_COLOR,
+    enemySlotLabels,
     isEnemyId,
     type Block,
     type GameState,
@@ -482,7 +483,8 @@ function drawRadar(
         if (!tank.alive) continue;
         const r = toRadar(tank.pos);
         const col = tankColor(tank);
-        if (tank.id === "player") {
+        // Self blip = outline + heading; everyone else = filled dot.
+        if (tank.id === player.id) {
             ctx.strokeStyle = col;
             ctx.beginPath();
             ctx.arc(r.rx, r.ry, 4, 0, Math.PI * 2);
@@ -555,11 +557,12 @@ function drawHud(
     ctx.fillText(`SCORE ${player.score}`, 16, 24);
     ctx.fillText(`LIVES ${Math.max(0, player.lives)}`, 16, 44);
     ctx.textAlign = "right";
-    const enemies = state.tanks.filter((t) => isEnemyId(t.id));
+    const foes = state.tanks.filter((t) => t.id !== player.id);
     let y = 24;
-    for (const enemy of enemies) {
-        ctx.fillStyle = tankColor(enemy);
-        const label = enemy.lives > 0 ? `ENEMY ${enemy.lives}` : "ENEMY --";
+    for (const foe of foes) {
+        ctx.fillStyle = tankColor(foe);
+        const who = foe.account ?? (isEnemyId(foe.id) ? "ENEMY" : "HOST");
+        const label = foe.lives > 0 ? `${who} ${foe.lives}` : `${who} --`;
         ctx.fillText(label, width - 16, y);
         y += 18;
     }
@@ -741,10 +744,152 @@ function drawExplosion(
             cooldown: 0,
             score: 0,
             color: blastColor,
+            controller: "ai",
+            account: null,
         };
         ctx.globalAlpha = 1 - progress / 0.25;
         drawTankMesh(ctx, width, height, cam, ghost);
         ctx.globalAlpha = 1;
+    }
+}
+
+function drawOnlineBox(
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    state: GameState,
+): void {
+    const boxW = Math.min(280, width * 0.34);
+    const pad = 14;
+    const lineH = 22;
+    type Row = { label: string; ready: boolean };
+    const rows: Row[] = [];
+    if (state.localAccount) {
+        rows.push({
+            label: `${state.localAccount} (YOU)`,
+            ready: state.lobbyReady,
+        });
+    }
+    for (const p of state.livePeers.filter((peer) => peer.online)) {
+        const lobby = state.lobbyPlayers.find((l) => l.account === p.account);
+        rows.push({
+            label: p.account,
+            ready: !!lobby?.ready,
+        });
+    }
+    const bodyRows = Math.max(1, rows.length);
+    const boxH = pad * 2 + 22 + bodyRows * lineH;
+    const x = width - boxW - 24;
+    const y = height * 0.28;
+
+    ctx.strokeStyle = COLOR;
+    ctx.fillStyle = BG;
+    ctx.lineWidth = 1;
+    ctx.fillRect(x, y, boxW, boxH);
+    ctx.strokeRect(x, y, boxW, boxH);
+
+    ctx.fillStyle = COLOR;
+    ctx.textAlign = "left";
+    ctx.font = "bold 16px monospace";
+    ctx.fillText("ONLINE", x + pad, y + pad + 14);
+
+    ctx.font = "14px monospace";
+    if (rows.length === 0) {
+        ctx.fillStyle = DIM;
+        ctx.fillText("(none yet)", x + pad, y + pad + 14 + lineH);
+        return;
+    }
+    rows.forEach((row, i) => {
+        ctx.fillStyle = COLOR;
+        const suffix = row.ready ? "  READY" : "";
+        ctx.fillText(
+            `${row.label}${suffix}`,
+            x + pad,
+            y + pad + 14 + (i + 1) * lineH,
+        );
+    });
+}
+
+function drawTitleScreen(
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    state: GameState,
+): void {
+    ctx.fillStyle = BG;
+    ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = COLOR;
+    ctx.textAlign = "center";
+
+    ctx.font = "bold 42px monospace";
+    ctx.fillText("BATTLEZONE", width / 2, height * 0.18);
+
+    ctx.font = "16px monospace";
+    const me = state.localAccount ?? "not logged in";
+    ctx.fillText(`YOU: ${me}`, width / 2, height * 0.26);
+    ctx.fillStyle = DIM;
+    ctx.fillText(state.netStatus, width / 2, height * 0.3);
+    ctx.fillStyle = COLOR;
+
+    const n = state.enemyCount;
+    const left = n > MIN_ENEMY_TANKS ? "<" : " ";
+    const right = n < MAX_ENEMY_TANKS ? ">" : " ";
+    ctx.fillText(
+        `ENEMY TANKS  ${left}  ${n}  ${right}`,
+        width / 2,
+        height * 0.4,
+    );
+
+    const labels = enemySlotLabels(state);
+    labels.forEach((label, i) => {
+        ctx.fillText(`${i + 1}: ${label}`, width / 2, height * 0.46 + i * 22);
+    });
+
+    drawOnlineBox(ctx, width, height, state);
+
+    const controlsY = height * 0.46 + Math.max(1, labels.length) * 22 + 36;
+    ctx.font = "14px monospace";
+    ctx.fillStyle = DIM;
+    ctx.fillText("LEFT / RIGHT  ADJUST COUNT", width / 2, controlsY);
+    ctx.fillText("1-5  TOGGLE SLOT AI / HUMAN", width / 2, controlsY + 20);
+    ctx.fillText(
+        "WASD / ARROWS  MOVE    SPACE  FIRE",
+        width / 2,
+        controlsY + 40,
+    );
+    ctx.fillStyle = COLOR;
+    ctx.font = "16px monospace";
+
+    if (state.lobbyReady) {
+        const waiting = state.lobbyPlayers
+            .filter((p) => !p.ready)
+            .map((p) => p.account);
+        const humanSlots = state.enemySlotModes.filter(
+            (m) => m === "human",
+        ).length;
+        const needPeers = Math.max(
+            0,
+            humanSlots + 1 - state.lobbyPlayers.length,
+        );
+        let waitLine = waiting.length
+            ? `WAITING FOR: ${waiting.join(", ")}`
+            : "STARTING…";
+        if (needPeers > 0) {
+            waitLine =
+                needPeers === 1
+                    ? "WAITING FOR ANOTHER LIVE PLAYER TO JOIN"
+                    : `WAITING FOR ${needPeers} MORE LIVE PLAYERS TO JOIN`;
+        }
+        ctx.fillText(waitLine, width / 2, height * 0.84);
+        ctx.fillText("PRESS ENTER TO UNREADY", width / 2, height * 0.9);
+    } else {
+        ctx.fillText(
+            state.localAccount
+                ? "PRESS ENTER TO READY"
+                : "LOG IN TO PLAY LIVE",
+            width / 2,
+            height * 0.88,
+        );
     }
 }
 
@@ -757,9 +902,13 @@ export function renderFrame(
     ctx.fillStyle = BG;
     ctx.fillRect(0, 0, width, height);
 
-    const player = state.tanks.find((t) => t.id === "player")!;
-    const enemies = state.tanks.filter((t) => isEnemyId(t.id));
-    const cam: Cam = { pos: { ...player.pos }, heading: player.heading };
+    const hostTank = state.tanks.find((t) => t.id === "player")!;
+    const viewTank =
+        (state.viewTankId
+            ? state.tanks.find((t) => t.id === state.viewTankId)
+            : null) ?? hostTank;
+    const others = state.tanks.filter((t) => t.id !== viewTank.id);
+    const cam: Cam = { pos: { ...viewTank.pos }, heading: viewTank.heading };
 
     drawHorizon(ctx, width, height, cam.heading);
     drawReticleGround(ctx, width, height);
@@ -772,7 +921,7 @@ export function renderFrame(
             draw: () => drawBlock(ctx, width, height, cam, block),
         });
     }
-    for (const tank of enemies) {
+    for (const tank of others) {
         if (!tank.alive) continue;
         const z = worldToView(cam, tank.pos).z;
         depthItems.push({
@@ -788,73 +937,70 @@ export function renderFrame(
     drawShots(ctx, width, height, cam, state);
     drawExplosion(ctx, width, height, cam, state);
     if (state.phase === "playing") {
-        for (const enemy of enemies) {
-            drawEnemyRangeBox(ctx, width, height, cam, player, enemy);
+        for (const other of others) {
+            drawEnemyRangeBox(ctx, width, height, cam, viewTank, other);
         }
     }
-    drawHud(ctx, width, height, state, player);
-    drawRadar(ctx, width, height, state, player);
+    drawHud(ctx, width, height, state, viewTank);
+    drawRadar(ctx, width, height, state, viewTank);
 
-    if (state.hitStunIn > 0) {
+    // Only the victim's cockpit cracks — not every client's windshield.
+    if (
+        state.hitStunIn > 0 &&
+        state.hitStunVictimId !== null &&
+        state.hitStunVictimId === viewTank.id
+    ) {
         drawWindshieldCrack(ctx, width, height);
     }
 
     // Title: full black menu
     if (state.phase === "title") {
-        ctx.fillStyle = BG;
-        ctx.fillRect(0, 0, width, height);
-        ctx.fillStyle = COLOR;
-        ctx.textAlign = "center";
-        ctx.font = "bold 42px monospace";
-        ctx.fillText("BATTLEZONE", width / 2, height * 0.32);
-        ctx.font = "16px monospace";
-        const n = state.enemyCount;
-        const left = n > MIN_ENEMY_TANKS ? "<" : " ";
-        const right = n < MAX_ENEMY_TANKS ? ">" : " ";
-        ctx.fillText(
-            `ENEMY TANKS  ${left}  ${n}  ${right}`,
-            width / 2,
-            height * 0.44,
-        );
-        ctx.fillText("ALL ENEMIES: AI", width / 2, height * 0.5);
-        ctx.fillText(
-            "LEFT / RIGHT  ADJUST COUNT",
-            width / 2,
-            height * 0.58,
-        );
-        ctx.fillText(
-            "WASD / ARROWS  MOVE    SPACE  FIRE",
-            width / 2,
-            height * 0.64,
-        );
-        ctx.fillText("PRESS ENTER TO START", width / 2, height * 0.74);
+        drawTitleScreen(ctx, width, height, state);
         return;
     }
 
-    // Win: keep last view; show Victory after explosion finishes
+    if (state.phase === "win" || state.phase === "lose") {
+        drawMatchOverScreen(ctx, width, height, state, viewTank);
+    }
+}
+
+/** Host-centric phases mapped to each client's own outcome. */
+function localPlayerWon(state: GameState, viewTank: Tank): boolean {
     if (state.phase === "win") {
-        ctx.fillStyle = COLOR;
-        ctx.textAlign = "center";
-        if (state.explosionIn > 0) {
-            ctx.font = "18px monospace";
-            ctx.fillText("ENEMY DESTROYED", width / 2, height * 0.16);
-        } else {
-            ctx.font = "bold 48px monospace";
-            ctx.fillText("Victory!", width / 2, height * 0.4);
-            ctx.font = "16px monospace";
-            ctx.fillText("PRESS ENTER TO PLAY AGAIN", width / 2, height * 0.52);
-        }
+        // Green tank wiped the enemies.
+        return viewTank.id === "player";
+    }
+    if (state.phase === "lose") {
+        // Green tank was eliminated — enemy humans win.
+        return viewTank.id !== "player";
+    }
+    return false;
+}
+
+function drawMatchOverScreen(
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    state: GameState,
+    viewTank: Tank,
+): void {
+    const stillAnimating =
+        state.explosionIn > 0 ||
+        (state.hitStunIn > 0 &&
+            state.hitStunVictimId !== null &&
+            state.hitStunVictimId === viewTank.id);
+    if (stillAnimating) {
+        // Keep world + crack/explosion visible until the beat finishes.
         return;
     }
 
-    // Lose: after hit-stun, keep cracked/last view with message (not full title wipe)
-    if (state.phase === "lose") {
-        if (state.hitStunIn > 0) return;
-        ctx.fillStyle = COLOR;
-        ctx.textAlign = "center";
-        ctx.font = "bold 36px monospace";
-        ctx.fillText("MISSION FAILED", width / 2, height * 0.4);
-        ctx.font = "16px monospace";
-        ctx.fillText("PRESS ENTER TO PLAY AGAIN", width / 2, height * 0.52);
-    }
+    const won = localPlayerWon(state, viewTank);
+    ctx.fillStyle = COLOR;
+    ctx.textAlign = "center";
+    ctx.font = "bold 48px monospace";
+    ctx.fillText(won ? "Victory!" : "You lost.", width / 2, height * 0.38);
+    ctx.font = "20px monospace";
+    ctx.fillText(`SCORE  ${viewTank.score}`, width / 2, height * 0.48);
+    ctx.font = "16px monospace";
+    ctx.fillText("PRESS ENTER TO PLAY AGAIN", width / 2, height * 0.58);
 }

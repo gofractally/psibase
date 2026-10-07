@@ -11,6 +11,8 @@ export function aiTankId(index: number): TankId {
     return `ai-${index}`;
 }
 
+export type TankController = "local" | "ai" | "remote";
+
 export type Tank = {
     id: TankId;
     pos: Vec2;
@@ -21,6 +23,9 @@ export type Tank = {
     score: number;
     /** Wireframe / radar color (player green; enemies from ENEMY_COLORS) */
     color: string;
+    controller: TankController;
+    /** Bound account when controlled by a human */
+    account: string | null;
 };
 
 export type Shot = {
@@ -57,10 +62,31 @@ export type InputState = {
 
 export type GamePhase = "title" | "playing" | "win" | "lose";
 
+/** Local host runs the sim; remote clients render snapshots */
+export type NetRole = "offline" | "host" | "remote";
+
+export type LivePeer = {
+    account: string;
+    online: boolean;
+};
+
+export type LobbyPeer = {
+    account: string;
+    ready: boolean;
+};
+
+/** Per enemy tank slot on the title screen */
+export type EnemySlotMode = "ai" | "human";
+
 export type GameState = {
     phase: GamePhase;
-    /** Enemy tank count chosen on the title screen (1–5); all are AI for now */
+    /** Enemy tank count chosen on the title screen (1–5); total tanks = 1 + this */
     enemyCount: number;
+    /**
+     * Controller preference per enemy slot (length == enemyCount).
+     * Only "human" slots are filled from live peers when starting a match.
+     */
+    enemySlotModes: EnemySlotMode[];
     tanks: Tank[];
     shots: Shot[];
     blocks: Block[];
@@ -70,13 +96,56 @@ export type GameState = {
     respawnIn: number;
     respawnId: TankId | null;
     hitStunIn: number;
+    /** Which tank's cockpit is cracked; null when no hit-stun */
+    hitStunVictimId: TankId | null;
     radarAlertIn: number;
     explosionIn: number;
     explosionDuration: number;
     explosionPos: Vec2 | null;
     explosionHeading: number;
     explosionColor: string;
+    /** Logged-in account for this client */
+    localAccount: string | null;
+    netRole: NetRole;
+    /** Other accounts currently connected to x-bzone */
+    livePeers: LivePeer[];
+    /** Waiting-room roster from server (`lobby` frames) */
+    lobbyPlayers: LobbyPeer[];
+    lobbyHost: string | null;
+    /** Local client has pressed Enter and is waiting on peers */
+    lobbyReady: boolean;
+    /**
+     * Tank this client views / controls from ("player" for host, "ai-N" for
+     * a remote human). Null on the title screen.
+     */
+    viewTankId: TankId | null;
+    netStatus: string;
 };
+
+/** Keep slot-mode array length in sync with enemyCount; new slots default to AI. */
+export function syncEnemySlotModes(
+    modes: EnemySlotMode[],
+    enemyCount: number,
+): EnemySlotMode[] {
+    const next = modes.slice(0, enemyCount);
+    while (next.length < enemyCount) next.push("ai");
+    return next;
+}
+
+/**
+ * Labels for enemy slots on the title screen. Human slots bind live peers
+ * in join order (same order the server fills the roster).
+ */
+export function enemySlotLabels(state: GameState): string[] {
+    const peers = state.livePeers
+        .filter((p) => p.online)
+        .map((p) => p.account);
+    let peerIdx = 0;
+    return state.enemySlotModes.slice(0, state.enemyCount).map((mode) => {
+        if (mode !== "human") return "AI";
+        return peers[peerIdx++] ?? "HUMAN";
+    });
+}
 
 /** Playable / obstacle field (~3× linear → ~9× area vs original) */
 export const ARENA = 540;
