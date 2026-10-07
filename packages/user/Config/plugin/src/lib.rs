@@ -28,7 +28,7 @@ use virtual_server::plugin::types::{
 use exports::config::plugin::packaging::{Meta, PackageInfo, PackagePreference, PackageSource};
 use exports::config::plugin::producers::ClaimType;
 
-use transact::plugin::intf::set_propose_latch;
+use transact::plugin::api::set_propose_latch;
 
 const VIRTUAL_SERVER: &'static str = "vserver";
 

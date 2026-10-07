@@ -1,0 +1,13 @@
+package transact:admin;
+
+interface admin {
+    use host:types/types.{error};
+
+    /// Opens a new tx context. Adding actions using add-action-to-transaction will
+    /// refer to this open context.
+    start-tx: func();
+
+    /// Closes the current transaction context, constructs and submits the final
+    /// signed transaction.
+    finish-tx: func() -> result<_, error>;
+}
