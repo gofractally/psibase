@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use crate::bindings;
-use crate::bindings::transact::plugin::intf::add_action_to_transaction;
+use crate::bindings::transact::plugin::api::add_action_to_transaction;
 use crate::errors::ErrorType;
 use crate::key_table;
 use crate::types;

@@ -1,6 +1,6 @@
 package host:http;
 
-/// HTTP to an app's own server, with the current session attached when present.
+/// Common calls related to interactions with the server
 interface api {
     use host:types/types.{error, post-request, body-types};
 
@@ -37,6 +37,9 @@ interface api {
     /// Parameters
     /// * `url` - A full URL whose host is a sibling service on this chain
     fetch-sibling-bytes: func(url: string) -> result<list<u8>, error>;
+
+    // Todo: Probably will need to implement most/all js library functionality:
+    // https://docs.psibase.io/development/front-ends/reference/js-libraries.html
 }
 
 world imports {

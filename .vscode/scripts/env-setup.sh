@@ -16,7 +16,7 @@ done
 # Install dependencies and configure VSCode SDKs
 cd "$WORKSPACE_ROOT/packages"
 yarn
-yarn dlx @yarnpkg/sdks vscode
+yarn dlx @yarnpkg/sdks vscode || echo "warning: yarn sdks generation failed; skipping"
 
 # Update submodules
 git submodule update --init --recursive

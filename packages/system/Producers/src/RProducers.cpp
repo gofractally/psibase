@@ -83,7 +83,8 @@ PSIO_REFLECT(ProducerQuery,
              method(nextProducers),
              method(consensus),
              method(nextConsensus),
-             method(jointStart))
+             method(jointStart),
+             method(maxProds))
 
 std::optional<HttpReply> RProducers::serveSys(HttpRequest request)
 {

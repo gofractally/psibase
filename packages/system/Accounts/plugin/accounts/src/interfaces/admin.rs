@@ -6,7 +6,7 @@ use crate::plugin::AccountsPlugin;
 
 use crate::bindings::exports::accounts::plugin::admin::{Error, Guest as Admin};
 use crate::bindings::host::client::api as Client;
-use crate::bindings::transact::plugin::intf as Transact;
+use crate::bindings::transact::plugin::api as Transact;
 use crate::db::apps_table::*;
 use crate::db::user_table::*;
 use crate::helpers::assert_valid_account;

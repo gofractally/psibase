@@ -37,18 +37,14 @@ namespace SystemService
 
       HttpHeader authCookie(const HttpRequest& req, const std::string& accessToken, int maxAge)
       {
-         bool        isLocalhost = psibase::isLocalhost(req);
-         std::string cookieName  = isLocalhost ? "SESSION" : "__Host-SESSION";
+         std::string cookieName = "__Host-SESSION";
 
          std::string cookieAttribs;
          cookieAttribs += "Path=/; ";
          cookieAttribs += "HttpOnly; ";
          cookieAttribs += "SameSite=Strict; ";
          cookieAttribs += "Max-Age=" + std::to_string(maxAge);
-         if (!isLocalhost)
-         {
-            cookieAttribs += "; Secure; ";
-         }
+         cookieAttribs += "; Secure; ";
 
          std::string cookieValue = cookieName + "=" + accessToken + "; " + cookieAttribs;
          return HttpHeader{"Set-Cookie", cookieValue};

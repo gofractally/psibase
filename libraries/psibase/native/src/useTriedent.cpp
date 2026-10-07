@@ -130,7 +130,7 @@ namespace psibase
    // TODO: move triedent::root destruction to a gc thread
    struct Revision
    {
-      std::shared_ptr<triedent::root> roots[numChainDatabases];
+      triedent::shared_root roots[numChainDatabases];
 
       Revision()                           = default;
       Revision(const Revision&)            = delete;
@@ -149,13 +149,13 @@ namespace psibase
       }
    };  // Revision
 
-   static std::shared_ptr<Revision> loadRevision(triedent::write_session&               s,
-                                                 const std::shared_ptr<triedent::root>& topRoot,
-                                                 std::span<const char>                  key,
+   static std::shared_ptr<Revision> loadRevision(triedent::write_session&     s,
+                                                 const triedent::shared_root& topRoot,
+                                                 std::span<const char>        key,
                                                  bool nullIfNotFound = false)
    {
-      auto                                         revision = std::make_shared<Revision>();
-      std::vector<std::shared_ptr<triedent::root>> roots;
+      auto                               revision = std::make_shared<Revision>();
+      std::vector<triedent::shared_root> roots;
       if (s.get(topRoot, key, nullptr, &roots))
       {
          check(roots.size() == numChainDatabases, "wrong number of roots in database");
@@ -174,8 +174,8 @@ namespace psibase
 
       DatabaseCallbacks* callbacks = nullptr;
 
-      std::mutex                      topMutex;
-      std::shared_ptr<triedent::root> topRoot;
+      std::mutex            topMutex;
+      triedent::shared_root topRoot;
 
       std::mutex                      headMutex;
       std::shared_ptr<const Revision> head;
@@ -204,7 +204,7 @@ namespace psibase
          topRoot = s->get_top_root();
          head    = loadRevision(*s, topRoot, revisionHeadKey);
 
-         std::vector<std::shared_ptr<triedent::root>> roots;
+         std::vector<triedent::shared_root> roots;
          if (s->get(topRoot, subjectiveKey, nullptr, &roots))
          {
             check(roots.size() == numPersistentDatabases, "Wrong number of subjective databases");
@@ -345,9 +345,9 @@ namespace psibase
       {
          // Remove everything with a blockNum > irreversible's which builds on a block
          // no longer present.
-         std::vector<std::shared_ptr<triedent::root>> roots;
-         std::vector<char>                            statusBytes;
-         auto                                         sk = psio::convert_to_key(statusKey());
+         std::vector<triedent::shared_root> roots;
+         std::vector<char>                  statusBytes;
+         auto                               sk = psio::convert_to_key(statusKey());
          while (writer.get_greater_equal(impl->topRoot, key, &key, nullptr, &roots))
          {
             if (key.size() != 1 + irreversible.size() || key[0] != revisionByIdPrefix)

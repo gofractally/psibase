@@ -40,5 +40,6 @@ pub mod virtual_server;
 pub mod x_admin;
 pub mod x_db;
 pub mod x_http;
+pub mod x_keys;
 pub mod x_packages;
 pub mod x_sites;

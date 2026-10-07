@@ -76,7 +76,7 @@ class TestCrash(unittest.TestCase):
     @testutil.psinode_test
     def test_restart_after_disconnect(self, cluster):
         prods = cluster.complete(*testutil.generate_names(4))
-        testutil.boot_with_producers(prods, algorithm='cft', packages=['Minimal', 'Explorer'])
+        testutil.boot_with_producers(prods, algorithm='cft', packages=['Minimal', 'Explorer'], timeout=15)
 
         (a, b, c, d) = prods
         # Stop d, so we have no fault tolerance

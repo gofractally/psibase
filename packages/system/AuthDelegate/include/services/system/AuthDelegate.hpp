@@ -6,6 +6,7 @@
 #include <psibase/Table.hpp>
 #include <psibase/block.hpp>
 #include <psio/reflect.hpp>
+#include <services/system/Accounts.hpp>
 #include <services/system/Transact.hpp>
 #include <vector>
 
@@ -42,10 +43,8 @@ namespace SystemService
       ///
       /// This action forwards verification to the owning account
       bool checkAuthSys(std::uint32_t               flags,
-                        psibase::AccountNumber      requester,
                         psibase::AccountNumber      sender,
                         ServiceMethod               action,
-                        std::vector<ServiceMethod>  allowedActions,
                         std::vector<psibase::Claim> claims);
 
       /// This is an implementation of the standard auth service interface defined in [SystemService::AuthInterface]
@@ -93,10 +92,12 @@ namespace SystemService
 
       /// Create a new account with the specified name, owned by the specified `owner` account.
       ///
-      /// Existing accounts will not be modified. If the `requireMatch` flag
-      /// is set, then the action will fail if the account exists but is not
-      /// already owned by the specified owner.
-      bool newAccount(psibase::AccountNumber name, psibase::AccountNumber owner, bool requireMatch);
+      /// The behavior if the account already exists is determined by `mode`
+      ///
+      /// Returns true if an account was created
+      bool newAccount(psibase::AccountNumber name,
+                      psibase::AccountNumber owner,
+                      NewAccountMode         mode);
 
       /// Gets the owner account of the specified account
       psibase::AccountNumber getOwner(psibase::AccountNumber account);
@@ -105,13 +106,13 @@ namespace SystemService
       psibase::Actor<AuthInterface> authServiceOf(psibase::AccountNumber account);
    };
    PSIO_REFLECT(AuthDelegate,  //
-                method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
+                method(checkAuthSys, flags, sender, action, claims),
                 method(canAuthUserSys, user),
                 method(getDlgsSys, sender),
                 method(isAuthSys, sender, authorizers),
                 method(isRejectSys, sender, rejecters),
                 method(setOwner, owner),
-                method(newAccount, name, owner, requireMatch),
+                method(newAccount, name, owner, mode),
                 method(getOwner, owner)
                 //
    )

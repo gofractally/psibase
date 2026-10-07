@@ -7,7 +7,7 @@ mod errors;
 use errors::ErrorType::*;
 use exports::auth_delegate::plugin::api::{Error, Guest as Api};
 use exports::transact_hook_user_auth::{Claim, Guest as HookUserAuth, Proof};
-use transact::plugin::intf::add_action_to_transaction;
+use transact::plugin::api::add_action_to_transaction;
 
 use crate::trust::*;
 use psibase::fracpack::Pack;
@@ -75,7 +75,7 @@ impl Api for AuthDelegate {
         let new_account = new_account_action {
             name: get_account_number(name.as_str())?,
             owner: get_account_number(owner.as_str())?,
-            require_match: true,
+            mode: psibase::services::accounts::NewAccountMode::REQUIRE_NEW,
         };
         Ok(add_action_to_transaction(
             new_account_action::ACTION_NAME,

@@ -164,9 +164,10 @@ namespace psibase
    template <typename T>
    struct FracPackBody
    {
-      std::string       contentType() const { return "application/octet-stream"; }
-      std::vector<char> body() const { return psio::to_frac(value); }
-      T                 value;
+      static std::string  contentType() { return "application/octet-stream"; }
+      std::vector<char>   body() const { return psio::to_frac(value); }
+      static FracPackBody unpack(std::vector<char> data) { return {psio::from_frac<T>(data)}; }
+      T                   value;
    };
 
    template <typename T>

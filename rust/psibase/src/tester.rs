@@ -531,7 +531,7 @@ impl Chain {
         TransactionTrace::unpacked(&get_result_bytes(size)).unwrap()
     }
 
-    pub fn run_action(&mut self, mode: RunMode, head: bool, action: Action) -> TransactionTrace {
+    pub fn run_action(&self, mode: RunMode, head: bool, action: Action) -> TransactionTrace {
         let packed = action.packed();
         let size = unsafe {
             tester_raw::runAction(self.chain_handle, mode, head, packed.as_ptr(), packed.len())
@@ -612,7 +612,11 @@ impl Chain {
     /// Doesn't fail if the account already exists.
     pub fn new_account(&self, account: AccountNumber) -> Result<(), anyhow::Error> {
         services::accounts::Wrapper::push(self)
-            .newAccount(account, AccountNumber::new(account_raw!("auth-any")), false)
+            .newAccount(
+                account,
+                AccountNumber::new(account_raw!("auth-any")),
+                services::accounts::NewAccountMode::KEEP_EXISTING,
+            )
             .get()?;
         Ok(())
     }
