@@ -268,10 +268,16 @@ mod tests {
 
         test.claim(CHARLIE, stream2);
 
+        let expected_vested = 2735;
         assert_eq!(
             test.get_balance(BOB).value,
+            expected_vested,
+            "regular claims should vest the half-life amount"
+        );
+        assert_eq!(
             test.get_balance(CHARLIE).value,
-            "Balances should match after claims"
+            expected_vested,
+            "one claim at the same time should vest the same amount"
         );
     }
 
