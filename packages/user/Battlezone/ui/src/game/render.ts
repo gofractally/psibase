@@ -1,16 +1,53 @@
 import {
     ARENA,
     ENEMY_EXPLOSION_DURATION,
+    FIRE_RANGE,
+    PLAYER_COLOR,
     type Block,
     type GameState,
+    type Shot,
     type Tank,
     type Vec2,
 } from "./types";
 
-const COLOR = "#33ff66";
+const COLOR = PLAYER_COLOR;
 const DIM = "#1a9944";
 const BG = "#000000";
 const ALERT = "#ff3333";
+const ENEMY_FALLBACK = "#33eeff";
+/** Obstacle stroke/fill at half the player-green intensity */
+const OBSTACLE_STROKE = "#1a7f33";
+const OBSTACLE_FILL = "rgba(26, 127, 51, 0.4)";
+/** Tank face fill opacity */
+const TANK_FILL_ALPHA = 0.3;
+
+function parseHex(hex: string): { r: number; g: number; b: number } {
+    const h = hex.replace("#", "");
+    const full =
+        h.length === 3
+            ? h
+                  .split("")
+                  .map((c) => c + c)
+                  .join("")
+            : h;
+    const n = parseInt(full, 16);
+    return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+    const { r, g, b } = parseHex(hex);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function tankColor(tank: Tank): string {
+    return tank.color;
+}
+
+function shotColor(state: GameState, shot: Shot): string {
+    if (shot.owner === "player") return COLOR;
+    const owner = state.tanks.find((t) => t.id === shot.owner);
+    return owner?.color ?? ENEMY_FALLBACK;
+}
 
 type Cam = {
     pos: Vec2;
@@ -134,6 +171,55 @@ function drawHorizon(
     ctx.stroke();
 }
 
+function rotate2(p: Vec2, yaw: number): Vec2 {
+    const c = Math.cos(yaw);
+    const s = Math.sin(yaw);
+    return { x: p.x * c - p.y * s, y: p.x * s + p.y * c };
+}
+
+function obstacleCorner(
+    block: Block,
+    lx: number,
+    ly: number,
+): Vec2 {
+    const r = rotate2({ x: lx, y: ly }, block.yaw);
+    return { x: block.pos.x + r.x, y: block.pos.y + r.y };
+}
+
+function projectWorld(
+    width: number,
+    height: number,
+    cam: Cam,
+    p: Vec2,
+    y: number,
+): { x: number; y: number } | null {
+    const v = worldToView(cam, p);
+    return project(width, height, { ...v, y });
+}
+
+function drawObstacleFaces(
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    cam: Cam,
+    bottom: ({ x: number; y: number } | null)[],
+    top: ({ x: number; y: number } | null)[],
+): void {
+    ctx.fillStyle = OBSTACLE_FILL;
+    fillPoly(ctx, top);
+    const n = Math.min(bottom.length, top.length);
+    for (let i = 0; i < n; i++) {
+        const j = (i + 1) % n;
+        fillPoly(ctx, [bottom[i], bottom[j], top[j], top[i]]);
+    }
+    ctx.strokeStyle = OBSTACLE_STROKE;
+    strokePoly(ctx, bottom);
+    strokePoly(ctx, top);
+    for (let i = 0; i < n; i++) {
+        strokePoly(ctx, [bottom[i], top[i]], false);
+    }
+}
+
 function drawBlock(
     ctx: CanvasRenderingContext2D,
     width: number,
@@ -141,35 +227,129 @@ function drawBlock(
     cam: Cam,
     block: Block,
 ): void {
-    const h = block.half * 1.4;
-    const corners: Vec2[] = [
-        { x: block.pos.x - block.half, y: block.pos.y - block.half },
-        { x: block.pos.x + block.half, y: block.pos.y - block.half },
-        { x: block.pos.x + block.half, y: block.pos.y + block.half },
-        { x: block.pos.x - block.half, y: block.pos.y + block.half },
-    ];
-    const bottom = corners.map((c) => {
-        const v = worldToView(cam, c);
-        return project(width, height, { ...v, y: 0 });
-    });
-    const top = corners.map((c) => {
-        const v = worldToView(cam, c);
-        return project(width, height, { ...v, y: h });
-    });
+    const s = block.half;
+    const h = s * 1.4 * block.heightScale;
 
-    // 85% transparent fill (15% opaque)
-    ctx.fillStyle = "rgba(51, 255, 102, 0.15)";
-    fillPoly(ctx, top);
-    for (let i = 0; i < 4; i++) {
-        const j = (i + 1) % 4;
-        fillPoly(ctx, [bottom[i], bottom[j], top[j], top[i]]);
+    if (block.shape === "pyramid") {
+        const bottom = [
+            obstacleCorner(block, -s, -s),
+            obstacleCorner(block, s, -s),
+            obstacleCorner(block, s, s),
+            obstacleCorner(block, -s, s),
+        ].map((p) => projectWorld(width, height, cam, p, 0));
+        const apex = projectWorld(width, height, cam, block.pos, h * 1.35);
+        ctx.fillStyle = OBSTACLE_FILL;
+        for (let i = 0; i < 4; i++) {
+            fillPoly(ctx, [bottom[i], bottom[(i + 1) % 4], apex]);
+        }
+        ctx.strokeStyle = OBSTACLE_STROKE;
+        strokePoly(ctx, bottom);
+        for (let i = 0; i < 4; i++) {
+            strokePoly(ctx, [bottom[i], apex], false);
+        }
+        return;
     }
 
-    ctx.strokeStyle = COLOR;
-    strokePoly(ctx, bottom);
-    strokePoly(ctx, top);
-    for (let i = 0; i < 4; i++) {
-        strokePoly(ctx, [bottom[i], top[i]], false);
+    if (block.shape === "column") {
+        // Octagonal prism (columnar)
+        const bottom: ({ x: number; y: number } | null)[] = [];
+        const top: ({ x: number; y: number } | null)[] = [];
+        const r = s * 0.75;
+        const colH = h * 1.6;
+        for (let i = 0; i < 8; i++) {
+            const a = (i / 8) * Math.PI * 2;
+            const local = { x: Math.cos(a) * r, y: Math.sin(a) * r };
+            const world = obstacleCorner(block, local.x, local.y);
+            bottom.push(projectWorld(width, height, cam, world, 0));
+            top.push(projectWorld(width, height, cam, world, colH));
+        }
+        drawObstacleFaces(ctx, width, height, cam, bottom, top);
+        return;
+    }
+
+    if (block.shape === "trapezoid") {
+        // Larger base, smaller top (frustum)
+        const base = s;
+        const topS = s * 0.45;
+        const bottom = [
+            obstacleCorner(block, -base, -base),
+            obstacleCorner(block, base, -base),
+            obstacleCorner(block, base, base),
+            obstacleCorner(block, -base, base),
+        ].map((p) => projectWorld(width, height, cam, p, 0));
+        const top = [
+            obstacleCorner(block, -topS, -topS),
+            obstacleCorner(block, topS, -topS),
+            obstacleCorner(block, topS, topS),
+            obstacleCorner(block, -topS, topS),
+        ].map((p) => projectWorld(width, height, cam, p, h * 1.15));
+        drawObstacleFaces(ctx, width, height, cam, bottom, top);
+        return;
+    }
+
+    if (block.shape === "wedge") {
+        // Triangular prism / ramp
+        const bottom = [
+            obstacleCorner(block, -s, -s),
+            obstacleCorner(block, s, -s),
+            obstacleCorner(block, s, s),
+            obstacleCorner(block, -s, s),
+        ].map((p) => projectWorld(width, height, cam, p, 0));
+        const top = [
+            projectWorld(width, height, cam, obstacleCorner(block, -s, -s), 0.2),
+            projectWorld(width, height, cam, obstacleCorner(block, s, -s), 0.2),
+            projectWorld(width, height, cam, obstacleCorner(block, s, s), h),
+            projectWorld(width, height, cam, obstacleCorner(block, -s, s), h),
+        ];
+        drawObstacleFaces(ctx, width, height, cam, bottom, top);
+        return;
+    }
+
+    // Default box
+    const bottom = [
+        obstacleCorner(block, -s, -s),
+        obstacleCorner(block, s, -s),
+        obstacleCorner(block, s, s),
+        obstacleCorner(block, -s, s),
+    ].map((p) => projectWorld(width, height, cam, p, 0));
+    const top = [
+        obstacleCorner(block, -s, -s),
+        obstacleCorner(block, s, -s),
+        obstacleCorner(block, s, s),
+        obstacleCorner(block, -s, s),
+    ].map((p) => projectWorld(width, height, cam, p, h));
+    drawObstacleFaces(ctx, width, height, cam, bottom, top);
+}
+
+function drawShots(
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    cam: Cam,
+    state: GameState,
+): void {
+    for (const shot of state.shots) {
+        const v = worldToView(cam, shot.pos);
+        const near = shot.owner === "player" ? 0.2 : 0.8;
+        if (v.z < near) continue;
+        const scale = (height * 0.55) / (v.z * 1.05);
+        const p = {
+            x: width * 0.5 + v.x * scale,
+            y: height * 0.55 - 1.2 * scale,
+        };
+        // Slightly heavier than a pixel: filled diamond + outline
+        const size = Math.max(5, 70 / Math.max(v.z, 0.5));
+        const col = shotColor(state, shot);
+        ctx.fillStyle = col;
+        ctx.strokeStyle = col;
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y - size);
+        ctx.lineTo(p.x + size * 0.7, p.y);
+        ctx.lineTo(p.x, p.y + size);
+        ctx.lineTo(p.x - size * 0.7, p.y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
     }
 }
 
@@ -185,6 +365,7 @@ function drawBoxEdges(
     y1: number,
     z0: number,
     z1: number,
+    fill = false,
 ): void {
     const c = [
         projectLocal(width, height, cam, tank, x0, y0, z0),
@@ -196,6 +377,14 @@ function drawBoxEdges(
         projectLocal(width, height, cam, tank, x1, y1, z1),
         projectLocal(width, height, cam, tank, x0, y1, z1),
     ];
+    if (fill) {
+        ctx.fillStyle = hexToRgba(tankColor(tank), TANK_FILL_ALPHA);
+        fillPoly(ctx, [c[4], c[5], c[6], c[7]]);
+        for (let i = 0; i < 4; i++) {
+            const j = (i + 1) % 4;
+            fillPoly(ctx, [c[i], c[j], c[j + 4], c[i + 4]]);
+        }
+    }
     // bottom
     strokePoly(ctx, [c[0], c[1], c[2], c[3]]);
     // top
@@ -214,51 +403,22 @@ function drawTankMesh(
     tank: Tank,
 ): void {
     if (!tank.alive) return;
-    ctx.strokeStyle = COLOR;
+    ctx.strokeStyle = tankColor(tank);
 
-    // Lower hull / chassis (boxy body)
-    drawBoxEdges(ctx, width, height, cam, tank, -2.1, 2.1, -2.4, 2.4, 0.0, 1.2);
+    // Lower hull / chassis (boxy body) — translucent fill for silhouette
+    drawBoxEdges(ctx, width, height, cam, tank, -2.1, 2.1, -2.4, 2.4, 0.0, 1.2, true);
     // Side track sills (extra edges to distinguish from cubes)
-    drawBoxEdges(ctx, width, height, cam, tank, -2.4, -1.7, -2.5, 2.5, 0.0, 0.7);
-    drawBoxEdges(ctx, width, height, cam, tank, 1.7, 2.4, -2.5, 2.5, 0.0, 0.7);
+    drawBoxEdges(ctx, width, height, cam, tank, -2.4, -1.7, -2.5, 2.5, 0.0, 0.7, true);
+    drawBoxEdges(ctx, width, height, cam, tank, 1.7, 2.4, -2.5, 2.5, 0.0, 0.7, true);
     // Turret
-    drawBoxEdges(ctx, width, height, cam, tank, -1.2, 1.2, -0.9, 1.3, 1.2, 2.2);
+    drawBoxEdges(ctx, width, height, cam, tank, -1.2, 1.2, -0.9, 1.3, 1.2, 2.2, true);
     // Gun barrel pointing forward (+Y) — shows facing
-    drawBoxEdges(ctx, width, height, cam, tank, -0.25, 0.25, 1.3, 3.6, 1.55, 1.95);
+    drawBoxEdges(ctx, width, height, cam, tank, -0.25, 0.25, 1.3, 3.6, 1.55, 1.95, true);
     // Front glacis hint: angled line from hull nose
     const noseL = projectLocal(width, height, cam, tank, -1.5, 2.4, 1.2);
     const noseR = projectLocal(width, height, cam, tank, 1.5, 2.4, 1.2);
     const noseTip = projectLocal(width, height, cam, tank, 0, 2.9, 0.5);
     strokePoly(ctx, [noseL, noseTip, noseR], false);
-}
-
-
-function drawShots(
-    ctx: CanvasRenderingContext2D,
-    width: number,
-    height: number,
-    cam: Cam,
-    state: GameState,
-): void {
-    ctx.strokeStyle = COLOR;
-    for (const shot of state.shots) {
-        const v = worldToView(cam, shot.pos);
-        // Own shots start very near the camera; keep a lower near-clip for them
-        const near = shot.owner === "player" ? 0.2 : 0.8;
-        if (v.z < near) continue;
-        const scale = (height * 0.55) / (v.z * 1.05);
-        const p = {
-            x: width * 0.5 + v.x * scale,
-            y: height * 0.55 - 1.2 * scale,
-        };
-        const size = Math.max(3, 48 / Math.max(v.z, 0.5));
-        ctx.beginPath();
-        ctx.moveTo(p.x - size, p.y);
-        ctx.lineTo(p.x + size, p.y);
-        ctx.moveTo(p.x, p.y - size);
-        ctx.lineTo(p.x, p.y + size);
-        ctx.stroke();
-    }
 }
 
 function drawRadar(
@@ -268,17 +428,28 @@ function drawRadar(
     state: GameState,
     player: Tank,
 ): void {
-    const size = Math.min(220, width * 0.36);
+    // 2× prior size (was min(220, width*0.36))
+    const size = Math.min(440, width * 0.72);
     const x = width - size - 16;
     const y = height - size - 16;
 
     const enemyShots = state.shots.filter((s) => s.owner === "ai");
     const alertBlink =
         state.radarAlertIn > 0 && Math.floor(state.elapsed * 8) % 2 === 0;
-    ctx.strokeStyle = alertBlink ? ALERT : DIM;
-    ctx.lineWidth = alertBlink ? 3 : 1;
-    ctx.strokeRect(x, y, size, size);
-    ctx.lineWidth = 1;
+
+    const scale = size / ARENA;
+    const toRadar = (p: Vec2) => ({
+        rx: x + size / 2 + (p.x - player.pos.x) * scale,
+        ry: y + size / 2 + (p.y - player.pos.y) * scale,
+    });
+
+    // Opaque backdrop + clip so the 3D landscape never shows through the radar
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, size, size);
+    ctx.clip();
+    ctx.fillStyle = BG;
+    ctx.fillRect(x, y, size, size);
 
     ctx.strokeStyle = DIM;
     ctx.beginPath();
@@ -288,12 +459,6 @@ function drawRadar(
     ctx.lineTo(x + size, y + size / 2);
     ctx.stroke();
 
-    const scale = size / ARENA;
-    const toRadar = (p: Vec2) => ({
-        rx: x + size / 2 + (p.x - player.pos.x) * scale,
-        ry: y + size / 2 + (p.y - player.pos.y) * scale,
-    });
-
     ctx.fillStyle = DIM;
     for (const block of state.blocks) {
         const r = toRadar(block.pos);
@@ -301,11 +466,10 @@ function drawRadar(
         ctx.fillRect(r.rx - s / 2, r.ry - s / 2, s, s);
     }
 
-    // Enemy projectiles (red)
-    ctx.fillStyle = ALERT;
+    // Enemy projectiles — match firing tank color; alert border stays red
     for (const shot of enemyShots) {
         const r = toRadar(shot.pos);
-        if (r.rx < x || r.rx > x + size || r.ry < y || r.ry > y + size) continue;
+        ctx.fillStyle = shotColor(state, shot);
         ctx.beginPath();
         ctx.arc(r.rx, r.ry, 3, 0, Math.PI * 2);
         ctx.fill();
@@ -314,19 +478,65 @@ function drawRadar(
     for (const tank of state.tanks) {
         if (!tank.alive) continue;
         const r = toRadar(tank.pos);
-        ctx.strokeStyle = COLOR;
-        ctx.beginPath();
-        ctx.arc(r.rx, r.ry, tank.id === "player" ? 4 : 5, 0, Math.PI * 2);
-        ctx.stroke();
+        const col = tankColor(tank);
         if (tank.id === "player") {
+            ctx.strokeStyle = col;
+            ctx.beginPath();
+            ctx.arc(r.rx, r.ry, 4, 0, Math.PI * 2);
+            ctx.stroke();
             const fx = Math.sin(player.heading) * 8;
             const fy = -Math.cos(player.heading) * 8;
             ctx.beginPath();
             ctx.moveTo(r.rx, r.ry);
             ctx.lineTo(r.rx + fx * scale * 8, r.ry + fy * scale * 8);
             ctx.stroke();
+        } else {
+            ctx.fillStyle = col;
+            ctx.beginPath();
+            ctx.arc(r.rx, r.ry, 5, 0, Math.PI * 2);
+            ctx.fill();
         }
     }
+    ctx.restore();
+
+    // Border drawn after clip so it isn't eaten by clipped fills
+    ctx.strokeStyle = alertBlink ? ALERT : DIM;
+    ctx.lineWidth = alertBlink ? 3 : 1;
+    ctx.strokeRect(x, y, size, size);
+    ctx.lineWidth = 1;
+}
+
+/** Thin square marking a distant enemy; hidden once inside FIRE_RANGE */
+function drawEnemyRangeBox(
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    cam: Cam,
+    player: Tank,
+    enemy: Tank,
+): void {
+    if (!enemy.alive) return;
+    const dist = Math.hypot(enemy.pos.x - player.pos.x, enemy.pos.y - player.pos.y);
+    if (dist <= FIRE_RANGE) return;
+
+    const v = worldToView(cam, enemy.pos);
+    if (v.z < 1.5) return;
+    const ground = project(width, height, { x: v.x, y: 0, z: v.z });
+    const top = project(width, height, { x: v.x, y: 2.4, z: v.z });
+    if (!ground || !top) return;
+
+    const halfH = Math.max(10, Math.abs(ground.y - top.y) * 0.85 + 6);
+    const halfW = halfH;
+    const cx = ground.x;
+    const cy = (ground.y + top.y) * 0.5;
+
+    ctx.save();
+    ctx.strokeStyle = tankColor(enemy);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.rect(cx - halfW, cy - halfH, halfW * 2, halfH * 2);
+    ctx.stroke();
+    ctx.restore();
 }
 
 function drawHud(
@@ -343,23 +553,29 @@ function drawHud(
     ctx.fillText(`SCORE ${player.score}`, 16, 24);
     ctx.fillText(`LIVES ${Math.max(0, player.lives)}`, 16, 44);
     ctx.textAlign = "right";
+    ctx.fillStyle = tankColor(enemy);
     ctx.fillText(`ENEMY ${Math.max(0, enemy.lives)}`, width - 16, 24);
 
     const cx = width / 2;
     const cy = height * 0.55;
+    const arm = 28;
+    const gap = 8;
     ctx.strokeStyle = COLOR;
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(cx - 14, cy);
-    ctx.lineTo(cx - 4, cy);
-    ctx.moveTo(cx + 4, cy);
-    ctx.lineTo(cx + 14, cy);
-    ctx.moveTo(cx, cy - 14);
-    ctx.lineTo(cx, cy - 4);
-    ctx.moveTo(cx, cy + 4);
-    ctx.lineTo(cx, cy + 14);
+    ctx.moveTo(cx - arm, cy);
+    ctx.lineTo(cx - gap, cy);
+    ctx.moveTo(cx + gap, cy);
+    ctx.lineTo(cx + arm, cy);
+    ctx.moveTo(cx, cy - arm);
+    ctx.lineTo(cx, cy - gap);
+    ctx.moveTo(cx, cy + gap);
+    ctx.lineTo(cx, cy + arm);
     ctx.stroke();
+    ctx.lineWidth = 1;
 
-    if (state.message) {
+    if (state.message && state.phase !== "win") {
+        ctx.fillStyle = COLOR;
         ctx.textAlign = "center";
         ctx.font = "18px monospace";
         ctx.fillText(state.message, width / 2, height * 0.18);
@@ -436,6 +652,8 @@ function drawExplosion(
     const progress = 1 - state.explosionIn / duration;
     const pos = state.explosionPos;
     const heading = state.explosionHeading;
+    const blastColor =
+        state.tanks.find((t) => t.id === "ai")?.color ?? ENEMY_FALLBACK;
 
     const fx = Math.sin(heading);
     const fy = -Math.cos(heading);
@@ -443,7 +661,7 @@ function drawExplosion(
     const ry = Math.sin(heading);
 
     // Expanding blast rings in world XZ (ground plane)
-    ctx.strokeStyle = COLOR;
+    ctx.strokeStyle = blastColor;
     for (let ring = 0; ring < 3; ring++) {
         const radius = (2 + ring * 3) + progress * (18 + ring * 10);
         const segs = 16;
@@ -515,6 +733,7 @@ function drawExplosion(
             lives: 0,
             cooldown: 0,
             score: 0,
+            color: blastColor,
         };
         ctx.globalAlpha = 1 - progress / 0.25;
         drawTankMesh(ctx, width, height, cam, ghost);
@@ -562,6 +781,9 @@ export function renderFrame(
 
     drawShots(ctx, width, height, cam, state);
     drawExplosion(ctx, width, height, cam, state);
+    if (state.phase === "playing") {
+        drawEnemyRangeBox(ctx, width, height, cam, player, enemy);
+    }
     drawHud(ctx, width, height, state, player, enemy);
     drawRadar(ctx, width, height, state, player);
 

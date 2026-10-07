@@ -1,4 +1,10 @@
-import { TANK_RADIUS, type GameState, type InputState, type Tank } from "./types";
+import {
+    FIRE_RANGE,
+    TANK_RADIUS,
+    type GameState,
+    type InputState,
+    type Tank,
+} from "./types";
 
 function angleDiff(a: number, b: number): number {
     let d = a - b;
@@ -63,8 +69,9 @@ export function computeAiInput(state: GameState): InputState {
 
     const fire =
         Math.abs(err) < 0.18 &&
-        dist < 70 &&
+        dist < FIRE_RANGE &&
         ai.cooldown <= 0 &&
+        !state.shots.some((s) => s.owner === "ai") &&
         Math.random() < 0.045;
 
     return { turn, throttle, fire };

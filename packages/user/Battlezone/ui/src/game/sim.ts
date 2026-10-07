@@ -2,7 +2,6 @@ import {
     ARENA,
     ENEMY_EXPLOSION_DURATION,
     ENEMY_EXPLOSION_MID,
-    FIRE_COOLDOWN,
     MOVE_SPEED,
     PLAYER_HIT_STUN,
     RADAR_ALERT_DURATION,
@@ -48,9 +47,13 @@ function resolveBlockCollision(pos: Vec2, radius: number, blocks: Block[]): void
     }
 }
 
+function hasLiveShot(state: GameState, owner: Tank["id"]): boolean {
+    return state.shots.some((s) => s.owner === owner);
+}
+
 function tryFire(state: GameState, tank: Tank): void {
-    if (!tank.alive || tank.cooldown > 0) return;
-    tank.cooldown = FIRE_COOLDOWN;
+    // One shot in flight at a time — next fire waits for hit or miss
+    if (!tank.alive || tank.cooldown > 0 || hasLiveShot(state, tank.id)) return;
     const dir = { x: Math.sin(tank.heading), y: -Math.cos(tank.heading) };
     const shot: Shot = {
         id: state.nextShotId++,
@@ -146,10 +149,12 @@ export function stepGame(
         state.elapsed += dt;
         if (state.explosionIn <= 0) {
             if (state.phase === "win") {
-                state.message = "Victory!";
+                // Victory overlay is drawn in player green; keep message empty
+                state.message = "";
             } else if (state.phase === "playing" && state.respawnId === "ai") {
                 const tank = state.tanks.find((t) => t.id === "ai");
-                if (tank) respawnTank(tank);
+                const player = state.tanks.find((t) => t.id === "player");
+                if (tank) respawnTank(tank, state.blocks, player);
                 state.respawnId = null;
                 state.explosionPos = null;
                 state.message = "DESTROY THE ENEMY TANK";
@@ -165,7 +170,8 @@ export function stepGame(
             state.respawnIn = Math.max(0, state.respawnIn - dt);
             if (state.respawnIn <= 0 && state.phase === "playing") {
                 const tank = state.tanks.find((t) => t.id === "player");
-                if (tank) respawnTank(tank);
+                const ai = state.tanks.find((t) => t.id === "ai");
+                if (tank) respawnTank(tank, state.blocks, ai);
                 state.respawnId = null;
                 state.message = "DESTROY THE ENEMY TANK";
             }
