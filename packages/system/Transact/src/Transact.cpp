@@ -610,7 +610,6 @@ namespace SystemService
       roots.reserve(actions.size());
       // reserve is required, because the address needs to be stable
       actionRoots.reserve(actions.size());
-      // This should run before addRoot to avoid the need to
       for (auto account : authorizers)
       {
          state.setAuthorized(account);
