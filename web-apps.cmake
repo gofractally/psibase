@@ -26,7 +26,6 @@ ExternalProject_Add(CommonApiCommonLib_js
 
 # Define all UI projects
 set(UI_PROJECTS
-    system/Accounts/ui:Accounts_js
     user/HostLoginPrompt/ui:HostLoginPrompt_js
     user/Evaluations/ui:Evaluations_js
     user/Fractals/ui:Fractals_js

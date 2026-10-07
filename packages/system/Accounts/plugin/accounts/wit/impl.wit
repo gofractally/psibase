@@ -3,21 +3,13 @@ package accounts:plugin;
 world impl {
     include host:client/imports;
     include host:http/imports;
-    include host:prompt/imports;
     include transact:plugin/imports;
     include permissions:plugin/imports;
     include accounts:query/imports;
     include host:session/imports;
-    include auth-sig:plugin/imports;
-    include name-market:plugin/imports;
-    include host:crypto/imports;
 
     import host:session/admin;
-    import invite:plugin/redemption;
 
     export api;
-    export active-app;
-
-    export prompt;
     export admin;
 }

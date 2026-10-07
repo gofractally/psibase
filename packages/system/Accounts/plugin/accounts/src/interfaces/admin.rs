@@ -35,23 +35,6 @@ impl Admin for AccountsPlugin {
         HostSessionAdmin::connect(&account, &Client::get_receiver());
     }
 
-    fn remove_account(account: String) {
-        assert_authorized(FunctionName::remove_account).unwrap();
-
-        let connected_apps = HostSessionAdmin::get_connected_apps(&account);
-        for app in connected_apps {
-            HostSessionAdmin::disconnect(&account, &app);
-        }
-
-        HostSessionAdmin::disconnect(&account, &Client::get_receiver());
-    }
-
-    fn get_all_accounts() -> Vec<String> {
-        assert_authorized_with_whitelist(FunctionName::get_all_accounts, vec!["supervisor".into()])
-            .unwrap();
-        HostSessionAdmin::get_connected_accounts(&Client::get_receiver())
-    }
-
     fn get_auth_services() -> Result<Vec<String>, Error> {
         assert_authorized_with_whitelist(
             FunctionName::get_auth_services,
@@ -59,7 +42,7 @@ impl Admin for AccountsPlugin {
         )
         .unwrap();
 
-        let connected_accounts = Self::get_all_accounts();
+        let connected_accounts = HostSessionAdmin::get_connected_accounts(&Client::get_receiver());
         if connected_accounts.is_empty() {
             return Ok(Vec::new());
         }
