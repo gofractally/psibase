@@ -11,13 +11,6 @@ use crate::trust::*;
 use psibase::fracpack::Pack;
 use psibase::services::accounts as Accounts;
 use psibase::HOST_APP;
-use std::collections::HashSet;
-
-fn prune_invalid_accounts(accounts: Vec<String>, app: &str) {
-    for account in accounts {
-        HostAccountsAdmin::disconnect(&account, app);
-    }
-}
 
 impl Admin for AccountsPlugin {
     fn get_auth_services() -> Result<Vec<String>, Error> {
@@ -33,13 +26,12 @@ impl Admin for AccountsPlugin {
         }
         let accounts = connected_accounts
             .iter()
-            .map(|a| format!("\"{}\"", a))
+            .map(|a| format!("\"{a}\""))
             .collect::<Vec<String>>()
             .join(",");
         let graphql_query = format!(
             "query {{
                 getAccounts(accountNames: [{}]) {{
-                    accountNum,
                     authService
                 }}
             }}",
@@ -60,7 +52,6 @@ impl Admin for AccountsPlugin {
         #[allow(non_snake_case)]
         #[derive(Deserialize, Debug)]
         struct Accnt {
-            accountNum: String,
             authService: String,
         }
 
@@ -68,29 +59,24 @@ impl Admin for AccountsPlugin {
         let response_root = serde_json::from_str::<ResponseRoot>(&auth_services_res)
             .map_err(|e| DeserializationError(e.to_string()))?;
 
-        let valid_account_nums: HashSet<String> = response_root
-            .data
-            .getAccounts
-            .iter()
-            .filter_map(|opt_acc| opt_acc.as_ref().map(|accnt| accnt.accountNum.clone()))
-            .collect();
-
-        let invalid_accounts: Vec<String> = connected_accounts
-            .iter()
-            .filter(|account| !valid_account_nums.contains(*account))
-            .cloned()
-            .collect();
-
-        if !invalid_accounts.is_empty() {
-            prune_invalid_accounts(invalid_accounts, HOST_APP);
+        let rows = response_root.data.getAccounts;
+        if rows.len() != connected_accounts.len() {
+            return Err(
+                DeserializationError(format!(
+                    "getAccounts returned {} rows for {} connected accounts",
+                    rows.len(),
+                    connected_accounts.len()
+                ))
+                .into(),
+            );
         }
-
-        let auth_services: Vec<String> = response_root
-            .data
-            .getAccounts
-            .into_iter()
-            .filter_map(|opt_accnt| opt_accnt.map(|accnt| accnt.authService))
-            .collect();
+        let mut auth_services = Vec::with_capacity(connected_accounts.len());
+        for (name, row) in connected_accounts.iter().zip(rows) {
+            let accnt = row.ok_or(DeserializationError(format!(
+                "getAccounts returned null for connected account {name}"
+            )))?;
+            auth_services.push(accnt.authService);
+        }
         Ok(auth_services)
     }
 

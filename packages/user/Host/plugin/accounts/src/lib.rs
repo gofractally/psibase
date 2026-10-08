@@ -82,54 +82,42 @@ impl Admin for HostAccounts {
     }
 
     fn login(user: String, app: String) -> Result<(), Error> {
-        check_caller(&["accounts", HOST_APP], "login@host:accounts/admin");
+        check_host_admin("login@host:accounts/admin");
         AppsTable::new(&app).login(&user)
     }
 
     fn logout(app: String) {
-        check_caller(&["accounts", HOST_APP], "logout@host:accounts/admin");
+        check_host_admin("logout@host:accounts/admin");
         AppsTable::new(&app).logout();
     }
 
     fn connect(account: String, app: String) {
-        check_caller(&["accounts", HOST_APP], "connect@host:accounts/admin");
+        check_host_admin("connect@host:accounts/admin");
         AppsTable::new(&app).connect(&account);
     }
 
     fn disconnect(account: String, app: String) {
-        check_caller(&["accounts", HOST_APP], "disconnect@host:accounts/admin");
+        check_host_admin("disconnect@host:accounts/admin");
         AppsTable::new(&app).disconnect(&account);
     }
 
     fn get_connected_accounts(app: String) -> Vec<String> {
-        check_caller(
-            &["accounts", HOST_APP],
-            "get-connected-accounts@host:accounts/admin",
-        );
+        check_accounts_host_admin("get-connected-accounts@host:accounts/admin");
         AppsTable::new(&app).get_connected_accounts()
     }
 
     fn add_connected_app(user: String, app: String) {
-        check_caller(
-            &["accounts", HOST_APP],
-            "add-connected-app@host:accounts/admin",
-        );
+        check_host_admin("add-connected-app@host:accounts/admin");
         UserTable::new(&user).add_connected_app(&app);
     }
 
     fn remove_connected_app(user: String, app: String) {
-        check_caller(
-            &["accounts", HOST_APP],
-            "remove-connected-app@host:accounts/admin",
-        );
+        check_host_admin("remove-connected-app@host:accounts/admin");
         UserTable::new(&user).remove_connected_app(&app);
     }
 
     fn get_connected_apps(user: String) -> Vec<String> {
-        check_caller(
-            &["accounts", HOST_APP],
-            "get-connected-apps@host:accounts/admin",
-        );
+        check_host_admin("get-connected-apps@host:accounts/admin");
         UserTable::new(&user).get_connected_apps()
     }
 }
