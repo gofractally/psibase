@@ -10,11 +10,11 @@ use crate::bindings::invite::plugin::redemption as Invites;
 use crate::bindings::name_market::plugin::api as NameMarket;
 use crate::bindings::transact::plugin::api as Transact;
 use crate::errors::ErrorType;
-use crate::helpers::KNOWN_ACCOUNTS_APP;
 use crate::plugin::LoginPrompt;
 use crate::trust::*;
 use psibase::services::accounts as AccountsService;
 use psibase::services::auth_sig;
+use psibase::services::host;
 
 impl Api for LoginPrompt {
     fn can_create_account() -> bool {
@@ -35,12 +35,13 @@ impl Api for LoginPrompt {
         assert_authorized_with_whitelist(FunctionName::import_existing, vec!["homepage".into()])
             .unwrap();
 
+        let known_app = host::Wrapper::SERVICE.to_string();
         let mut invalid_accounts = Vec::new();
         for credential in credentials {
             match AccountsQuery::get_account(&credential.account) {
                 Ok(Some(account)) => match account.auth_service.as_str() {
                     "auth-any" => {
-                        HostAccountsAdmin::connect(&credential.account, KNOWN_ACCOUNTS_APP);
+                        HostAccountsAdmin::connect(&credential.account, &known_app);
                     }
                     "auth-sig" => {
                         let account_str = credential.account.to_string();
@@ -55,7 +56,7 @@ impl Api for LoginPrompt {
                         if let Err(e) = AuthSig::keyvault::import_key(&credential.key) {
                             invalid_accounts.push((credential.account, e));
                         } else {
-                            HostAccountsAdmin::connect(&credential.account, KNOWN_ACCOUNTS_APP);
+                            HostAccountsAdmin::connect(&credential.account, &known_app);
                         }
                     }
                     service => {
@@ -131,7 +132,8 @@ impl Api for LoginPrompt {
         assert_eq!(Client::get_sender(), Client::get_receiver());
 
         // The account must already have been imported
-        assert!(HostAccountsAdmin::get_connected_accounts(KNOWN_ACCOUNTS_APP).contains(&account));
+        let known_app = host::Wrapper::SERVICE.to_string();
+        assert!(HostAccountsAdmin::get_connected_accounts(&known_app).contains(&account));
 
         let app = Client::get_active_app();
         HostAccountsAdmin::add_connected_app(&account, &app);

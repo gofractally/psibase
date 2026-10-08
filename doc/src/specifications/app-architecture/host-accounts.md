@@ -42,4 +42,4 @@ Any plugin may call `host:accounts/api`. It reports the login for the active top
 | `remove-connected-app(user, app)` | Removes that record. |
 | `get-connected-apps(user)` | Apps `user` has connected to. |
 
-Accounts known on this device are the accounts connected to the `accounts` app. The accounts plugin reads that list with `get-connected-accounts`.
+Accounts known on this device are the accounts connected to the `host` app. The accounts plugin reads that list with `get-connected-accounts`.

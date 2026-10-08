@@ -5,6 +5,6 @@ interface admin {
     /// apps so that it can no longer be used on this device.
     remove-account: func(account: string);
 
-    /// Gets a list of all accounts that are known by the accounts app on this device.
+    /// Gets a list of all accounts that are known by the host app on this device.
     get-all-accounts: func() -> list<string>;
 }
