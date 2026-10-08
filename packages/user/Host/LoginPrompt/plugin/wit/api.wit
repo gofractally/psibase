@@ -11,7 +11,9 @@ interface api {
     /// * The user is responding to an invite that can be redeemed to create an account
     can-create-account: func() -> bool;
 
-    /// Import a pre-existing account(s) to this device, as `host:accounts/admin.import-existing`.
+    /// Import a pre-existing account(s) to this device.
+    ///
+    /// Full docs available at `host:accounts/admin.import-existing`.
     import-existing: func(credentials: list<credential>) -> result<_, list<tuple<string, error>>>;
 
     /// Creates a new account, returns the private key used to authorize it.
