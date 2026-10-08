@@ -3,11 +3,14 @@
 mod service {
     use std::sync::OnceLock;
 
-    use async_graphql::{connection::Connection, *};
+    use async_graphql::connection::{Connection, Edge};
+    use async_graphql::*;
     use name_market::tables::{
         Auction as AuctionRow, AuctionsTable, PurchasedAccount, PurchasedAccountsTable,
     };
     use name_market::Wrapper as NameMarketService;
+    use nft::service::NID;
+    use nft::tables::CreditTable;
     use psibase::services::diff_adjust::{RateLimit, Wrapper as DiffAdjust};
     use psibase::services::tokens::{Decimal, Precision, Quantity, Wrapper as TokensWrapper};
     use psibase::*;
@@ -187,7 +190,7 @@ mod service {
                 .collect()
         }
 
-        /// Bought-but-unclaimed account records for the authenticated user
+        /// Unclaimed accounts whose redemption NFT is credited to the authenticated user.
         async fn unclaimed_names(
             &self,
             first: Option<i32>,
@@ -197,16 +200,45 @@ mod service {
         ) -> async_graphql::Result<Connection<RawKey, PurchasedAccount>> {
             let user = self.require_authenticated()?;
 
-            TableQuery::subindex::<AccountNumber>(
-                PurchasedAccountsTable::read().get_index_by_owner(),
-                &user,
+            let credits = TableQuery::subindex::<NID>(
+                CreditTable::with_service(psibase::services::nft::SERVICE).get_index_by_debitor(),
+                &(user),
             )
             .first(first)
             .last(last)
             .before(before)
             .after(after)
             .query()
-            .await
+            .await?;
+
+            let purchased_accounts = PurchasedAccountsTable::read();
+            let mut conn = Connection::new(credits.has_previous_page, credits.has_next_page);
+            conn.edges = credits
+                .edges
+                .into_iter()
+                .filter(|edge| edge.node.creditor == NameMarketService::SERVICE)
+                .map(|edge| {
+                    purchased_accounts
+                        .get_index_by_nft()
+                        .get(&edge.node.nftId)
+                        .map(|purchased| Edge::new(edge.cursor, purchased))
+                        .ok_or_else(|| {
+                            async_graphql::Error::new(format!(
+                                "no purchased account for nft {}",
+                                edge.node.nftId
+                            ))
+                        })
+                })
+                .collect::<async_graphql::Result<_>>()?;
+            Ok(conn)
+        }
+
+        /// NFT id that redeems `account`, if it is still unclaimed.
+        async fn redemption_nft(&self, account: AccountNumber) -> Option<u32> {
+            PurchasedAccountsTable::read()
+                .get_index_pk()
+                .get(&account)
+                .map(|row| row.nft_id)
         }
 
         /// Events: account **name** history for `owner`

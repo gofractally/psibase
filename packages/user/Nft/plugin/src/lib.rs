@@ -48,7 +48,10 @@ impl Issuer for NftPlugin {
 
 impl User for NftPlugin {
     fn credit(nft_id: u32, receiver: String, memo: String) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::credit)?;
+        trust::assert_authorized_with_whitelist(
+            trust::FunctionName::credit,
+            vec!["namemarket".into()],
+        )?;
 
         let packed_args = Nft::action_structs::credit {
             memo: memo.try_into().unwrap(),
@@ -95,7 +98,10 @@ impl User for NftPlugin {
 
 impl UserConfig for NftPlugin {
     fn enable_user_auto_debit(enable: bool) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::enable_user_auto_debit)?;
+        trust::assert_authorized_with_whitelist(
+            trust::FunctionName::enable_user_auto_debit,
+            vec!["namemarket".into()],
+        )?;
 
         let packed_args = Nft::action_structs::setUserConf {
             index: NftHolderFlags::AUTO_DEBIT.index(),
@@ -111,7 +117,7 @@ impl Authorized for NftPlugin {
     fn graphql(query: String) -> Result<String, Error> {
         trust::assert_authorized_with_whitelist(
             trust::FunctionName::graphql,
-            vec!["homepage".into(), "accounts".into()],
+            vec!["homepage".into(), "accounts".into(), "namemarket".into()],
         )?;
 
         post_graphql_get_json(&query)

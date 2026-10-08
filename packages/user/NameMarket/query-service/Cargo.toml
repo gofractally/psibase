@@ -13,5 +13,6 @@ serde.workspace = true
 serde_json.workspace = true
 serde-aux.workspace = true
 name-market = { path = "../service", version = "0.29.0" }
+nft = { path = "../../Nft/service", version = "0.29.0" }
 async-graphql.workspace = true
 psibase-user-workspace-hack.workspace = true

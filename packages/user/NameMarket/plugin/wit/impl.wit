@@ -6,6 +6,8 @@ world impl {
     include host:crypto/imports;
     include tokens:plugin/imports;
     include transact:plugin/imports;
+    include nft:plugin/imports;
+    include accounts:query/imports;
     include permissions:plugin/imports;
 
     export market-admin;

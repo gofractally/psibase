@@ -39,13 +39,13 @@ pub mod tables {
     pub struct PurchasedAccount {
         #[primary_key]
         pub account: AccountNumber,
-        pub owner: AccountNumber,
+        pub nft_id: u32,
     }
 
     impl PurchasedAccount {
         #[secondary_key(1)]
-        fn by_owner(&self) -> (AccountNumber, AccountNumber) {
-            (self.owner, self.account)
+        fn by_nft(&self) -> u32 {
+            self.nft_id
         }
     }
 }
@@ -131,7 +131,10 @@ pub mod service {
         );
     }
 
-    /// Buy a premium account name
+    /// Buy a premium account name.
+    ///
+    /// Mints a redemption NFT, credits it to the buyer, and leaves the new
+    /// account owned by this service until the NFT holder claims it.
     ///
     /// # Arguments
     /// * `account` - The account to purchase
@@ -163,11 +166,11 @@ pub mod service {
             Accounts::NewAccountMode::REQUIRE_NEW,
         );
 
+        let nft_id = Nfts::Wrapper::call().mint();
+        Nfts::Wrapper::call().credit(nft_id, sender, "".into());
+
         PurchasedAccountsTable::new()
-            .put(&PurchasedAccount {
-                account: account,
-                owner: sender,
-            })
+            .put(&PurchasedAccount { account, nft_id })
             .unwrap();
 
         let cost = current_price;
@@ -180,6 +183,7 @@ pub mod service {
             .nameMktEvent(sender, account, BOUGHT);
     }
 
+    /// Claim a purchased account. The sender must own its redemption NFT.
     #[action]
     fn claim(account: AccountNumber) {
         let purchased_accounts_table = PurchasedAccountsTable::new();
@@ -189,19 +193,24 @@ pub mod service {
             .get(&account)
             .expect("account not purchased");
 
+        let sender = get_sender();
+        let nft_id = purchased_account.nft_id;
         assert_eq!(
-            purchased_account.owner,
-            get_sender(),
-            "account not purchased by sender",
+            Nfts::Wrapper::call().getNft(nft_id).owner,
+            sender,
+            "sender does not hold the redemption nft",
         );
 
-        AuthDelegate::Wrapper::call_as(account).setOwner(get_sender());
+        Nfts::Wrapper::call().debit(nft_id, "".into());
+        Nfts::Wrapper::call().burn(nft_id);
+
+        AuthDelegate::Wrapper::call_as(account).setOwner(sender);
 
         purchased_accounts_table.remove(&purchased_account);
 
         crate::Wrapper::emit()
             .history()
-            .nameMktEvent(get_sender(), account.clone(), CLAIMED);
+            .nameMktEvent(sender, account, CLAIMED);
     }
 
     /// Create a new name-length market.

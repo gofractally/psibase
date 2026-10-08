@@ -168,11 +168,6 @@ mod tests {
             "unexpected error: {err}"
         );
 
-        let (pub_pem, _priv_pem) = generate_keypair()?;
-        let _der = pem::parse(pub_pem.trim())
-            .map_err(|e| anyhow::anyhow!(e))?
-            .into_contents();
-
         NameMarket::push_from(&chain, alice)
             .claim(account!("test"))
             .get()?;
