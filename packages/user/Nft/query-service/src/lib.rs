@@ -130,7 +130,7 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, Nft>> {
-            TableQuery::subindex::<NID>(
+            TableQuery::subindex::<(AccountNumber, NID)>(
                 NftTable::with_service(psibase::services::nft::SERVICE).get_index_by_issuer(),
                 &(user),
             )
