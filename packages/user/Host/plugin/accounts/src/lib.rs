@@ -4,12 +4,13 @@ mod bindings;
 mod db;
 mod errors;
 mod helpers;
+mod import;
 use db::{apps_table::AppsTable, user_table::UserTable};
 use errors::ErrorType::NotConnected;
 use helpers::*;
 
 use bindings::exports::host::accounts::active_app::Guest as ActiveApp;
-use bindings::exports::host::accounts::admin::Guest as Admin;
+use bindings::exports::host::accounts::admin::{Credential, Guest as Admin};
 use bindings::exports::host::accounts::api::Guest as API;
 use bindings::host::client::api as Client;
 use bindings::host::prompt::api as Prompt;
@@ -71,6 +72,14 @@ impl ActiveApp for HostAccounts {
 }
 
 impl Admin for HostAccounts {
+    fn import_existing(credentials: Vec<Credential>) -> Result<(), Vec<(String, Error)>> {
+        check_caller(
+            &["host", "homepage"],
+            "import-existing@host:accounts/admin",
+        );
+        import::import_existing(credentials)
+    }
+
     fn login(user: String, app: String) -> Result<(), Error> {
         check_caller(&["accounts", "host"], "login@host:accounts/admin");
         AppsTable::new(&app).login(&user)

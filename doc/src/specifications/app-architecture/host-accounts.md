@@ -29,10 +29,11 @@ Any plugin may call `host:accounts/api`. It reports the login for the active top
 
 ## `admin`
 
-`host:accounts/admin` reads and writes login and connection records for an app the caller names. Only the `accounts` plugin and `host` may call it.
+`host:accounts/admin` reads and writes login and connection records for an app the caller names. Only the `accounts` plugin and `host` may call it, except `import-existing`, which only `host` and `homepage` may call.
 
 | Function | Effect |
 | --- | --- |
+| `import-existing(credentials)` | Checks each credential against its account's auth service, imports `auth-sig` keys into the keyvault, and makes each valid account known on this device. Returns the credentials that failed validation. |
 | `login(user, app)` | Logs `user` in to `app` and connects them to it. |
 | `logout(app)` | Logs out whoever is logged in to `app`. |
 | `connect(account, app)` | Connects `account` to `app`. |

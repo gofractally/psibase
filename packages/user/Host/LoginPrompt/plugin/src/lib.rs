@@ -13,7 +13,7 @@ psibase::define_trust! {
         High => "",
     }
     functions {
-        Max => [import_existing, remove_account, get_all_accounts],
+        Max => [remove_account, get_all_accounts],
     }
 }
 

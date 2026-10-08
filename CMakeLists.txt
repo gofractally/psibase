@@ -471,7 +471,7 @@ psibase_package(
         DATA ${Plugins_OUTPUT_FILE_host_auth} /auth.wasm
         DATA ${Plugins_OUTPUT_FILE_host_crypto} /crypto.wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(

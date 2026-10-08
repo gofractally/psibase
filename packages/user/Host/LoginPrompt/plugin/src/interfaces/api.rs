@@ -1,5 +1,4 @@
 use crate::bindings::accounts::plugin::api as AccountsPlugin;
-use crate::bindings::accounts::query::api as AccountsQuery;
 use crate::bindings::auth_sig::plugin as AuthSig;
 use crate::bindings::exports::host::login_prompt::api::{Credential, Guest as Api};
 use crate::bindings::host::{
@@ -11,7 +10,6 @@ use crate::bindings::name_market::plugin::api as NameMarket;
 use crate::bindings::transact::plugin::api as Transact;
 use crate::errors::ErrorType;
 use crate::plugin::LoginPrompt;
-use crate::trust::*;
 use psibase::services::accounts as AccountsService;
 use psibase::services::auth_sig;
 use psibase::services::host;
@@ -32,58 +30,8 @@ impl Api for LoginPrompt {
     }
 
     fn import_existing(credentials: Vec<Credential>) -> Result<(), Vec<(String, Error)>> {
-        assert_authorized_with_whitelist(FunctionName::import_existing, vec!["homepage".into()])
-            .unwrap();
-
-        let known_app = host::Wrapper::SERVICE.to_string();
-        let mut invalid_accounts = Vec::new();
-        for credential in credentials {
-            match AccountsQuery::get_account(&credential.account) {
-                Ok(Some(account)) => match account.auth_service.as_str() {
-                    "auth-any" => {
-                        HostAccountsAdmin::connect(&credential.account, &known_app);
-                    }
-                    "auth-sig" => {
-                        let account_str = credential.account.to_string();
-                        if !AuthSig::api::can_authorize(&credential.key, &account_str) {
-                            invalid_accounts.push((
-                                credential.account,
-                                ErrorType::AuthorizationFailed(account_str).into(),
-                            ));
-                            continue;
-                        }
-
-                        if let Err(e) = AuthSig::keyvault::import_key(&credential.key) {
-                            invalid_accounts.push((credential.account, e));
-                        } else {
-                            HostAccountsAdmin::connect(&credential.account, &known_app);
-                        }
-                    }
-                    service => {
-                        invalid_accounts.push((
-                            credential.account,
-                            ErrorType::UnsupportedAuthService(service.to_string()).into(),
-                        ));
-                    }
-                },
-                Ok(None) => {
-                    let account_str = credential.account.clone();
-                    invalid_accounts.push((
-                        credential.account,
-                        ErrorType::AccountNotFound(account_str).into(),
-                    ));
-                }
-                Err(e) => {
-                    invalid_accounts.push((credential.account, e));
-                }
-            }
-        }
-
-        if invalid_accounts.is_empty() {
-            Ok(())
-        } else {
-            Err(invalid_accounts)
-        }
+        assert_eq!(Client::get_sender(), Client::get_receiver());
+        HostAccountsAdmin::import_existing(&credentials)
     }
 
     fn create_account(account_name: String) -> Result<String, Error> {

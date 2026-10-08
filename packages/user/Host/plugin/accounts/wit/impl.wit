@@ -5,6 +5,10 @@ world impl {
     include host:db/imports;
     include host:auth/imports;
     include host:prompt/imports;
+    include accounts:query/imports;
+
+    import auth-sig:plugin/api;
+    import auth-sig:plugin/keyvault;
 
     export api;
     export admin;
