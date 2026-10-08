@@ -73,7 +73,6 @@ impl Admin for AccountsPlugin {
             }
         }
 
-        // Stale host connections (no on-chain account) are pruned here instead of failing the call.
         for account in &connected_accounts {
             if !valid_account_nums.contains(account) {
                 HostAccountsAdmin::disconnect(account, HOST_APP);
