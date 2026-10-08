@@ -13,12 +13,6 @@ interface api {
 interface admin {
     use host:types/types.{error};
 
-    /// Gets the names of all apps to which the user has connected
-    get-connected-apps: func(user: string) -> list<string>;
-
-    /// Adds an account into the accounts table so that it can be used on this device.
-    import-account: func(account: string);
-
     /// Get a list of auth accounts
     get-auth-services: func() -> result<list<string>, error>;
 

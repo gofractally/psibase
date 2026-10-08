@@ -1,7 +1,6 @@
 #[allow(warnings)]
 mod bindings;
 mod errors;
-mod helpers;
 mod interfaces;
 mod plugin;
 
@@ -12,7 +11,6 @@ psibase::define_trust! {
         Low => "",
         Medium => "",
         High => "
-            - Get a list of apps to which your account has been connected
             - Set auth service on an account
 
         Warning: This will grant the caller the ability to control how your account is authorized, including the capability to take control of your account! Make sure you completely trust the caller's legitimacy.
@@ -20,8 +18,8 @@ psibase::define_trust! {
     }
     functions {
         None => [],
-        High => [set_auth_service, get_connected_apps],
-        Max => [import_account, get_auth_services, preapprove_account],
+        High => [set_auth_service],
+        Max => [get_auth_services, preapprove_account],
     }
 }
 

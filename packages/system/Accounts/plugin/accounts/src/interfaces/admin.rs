@@ -8,7 +8,6 @@ use crate::bindings::exports::accounts::plugin::admin::{Error, Guest as Admin};
 use crate::bindings::host::client::api as Client;
 use crate::bindings::host::accounts::admin as HostAccountsAdmin;
 use crate::bindings::transact::plugin::api as Transact;
-use crate::helpers::assert_valid_account;
 use crate::trust::*;
 use psibase::fracpack::Pack;
 use psibase::services::accounts as Accounts;
@@ -22,19 +21,6 @@ fn prune_invalid_accounts(accounts: Vec<String>) {
 }
 
 impl Admin for AccountsPlugin {
-    fn get_connected_apps(user: String) -> Vec<String> {
-        assert_authorized_with_whitelist(FunctionName::get_connected_apps, vec!["homepage".into()])
-            .unwrap();
-        HostAccountsAdmin::get_connected_apps(&user)
-    }
-
-    fn import_account(account: String) {
-        assert_authorized_with_whitelist(FunctionName::import_account, vec!["x-admin".into()])
-            .unwrap();
-        assert_valid_account(&account);
-        HostAccountsAdmin::connect(&account, &Client::get_receiver());
-    }
-
     fn get_auth_services() -> Result<Vec<String>, Error> {
         assert_authorized_with_whitelist(
             FunctionName::get_auth_services,

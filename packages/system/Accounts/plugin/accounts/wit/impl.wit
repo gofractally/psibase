@@ -5,7 +5,6 @@ world impl {
     include host:http/imports;
     include transact:plugin/imports;
     include permissions:plugin/imports;
-    include accounts:query/imports;
     include host:accounts/imports;
 
     import host:accounts/admin;
