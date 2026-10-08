@@ -2004,9 +2004,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@psibase/host-login-prompt-ui@workspace:user/HostLoginPrompt/ui":
+"@psibase/host-login-prompt-ui@workspace:user/Host/LoginPrompt/ui":
   version: 0.0.0-use.local
-  resolution: "@psibase/host-login-prompt-ui@workspace:user/HostLoginPrompt/ui"
+  resolution: "@psibase/host-login-prompt-ui@workspace:user/Host/LoginPrompt/ui"
   dependencies:
     "@psibase/common-lib": "workspace:*"
     "@tailwindcss/vite": "npm:^4.1.8"

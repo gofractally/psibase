@@ -480,9 +480,9 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Login prompt served on the host subdomain"
     SERVICE host
-        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/HostLoginPrompt/ui/dist/* /
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Host/LoginPrompt/ui/dist/* /
         DATA ${Plugins_OUTPUT_FILE_login_prompt} /login-prompt.wasm
-        POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/HostLoginPrompt/postinstall.json
+        POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Host/LoginPrompt/postinstall.json
     DEPENDS ${HostLoginPrompt_js_DEP}
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "Host(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)" "NameMarket(^${PSIBASE_VERSION}.0)" "Invite(^${PSIBASE_VERSION}.0)" "Tokens(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)"

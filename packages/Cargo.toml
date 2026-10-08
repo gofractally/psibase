@@ -24,7 +24,7 @@ members = [
     "user/Host/plugin/db",
     "user/Host/plugin/prompt",
     "user/Host/plugin/types",
-    "user/HostLoginPrompt/plugin",
+    "user/Host/LoginPrompt/plugin",
     "user/Invite/plugin",
     "user/Kdf/plugin",
     "user/KvTests/plugin",

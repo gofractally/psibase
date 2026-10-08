@@ -6,7 +6,7 @@ import {
     createSharedViteConfig,
     getSharedUIPlugins,
     verifyViteCache,
-} from "../../../vite.shared";
+} from "../../../../vite.shared";
 
 const appDirectory = path.resolve(__dirname);
 verifyViteCache(appDirectory);

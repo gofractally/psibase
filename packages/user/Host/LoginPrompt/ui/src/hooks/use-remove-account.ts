@@ -1,6 +1,6 @@
 import { type UseMutationOptions, useMutation } from "@tanstack/react-query";
 
-import QueryKey from "@/lib/query-keys";
+import QueryKey from "../lib/query-keys";
 
 import { callLoginPrompt } from "../lib/login-prompt";
 
