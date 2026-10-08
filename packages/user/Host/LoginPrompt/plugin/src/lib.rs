@@ -4,6 +4,8 @@ mod errors;
 mod interfaces;
 mod plugin;
 
+pub(crate) const HOST_APP: &str = "host";
+
 use plugin::LoginPrompt;
 
 psibase::define_trust! {

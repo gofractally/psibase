@@ -2,7 +2,7 @@ use crate::bindings::exports::host::login_prompt::admin::Guest as Admin;
 use crate::bindings::host::accounts::admin as HostAccountsAdmin;
 use crate::plugin::LoginPrompt;
 use crate::trust::*;
-use psibase::HOST_APP;
+use crate::HOST_APP;
 
 impl Admin for LoginPrompt {
     fn remove_account(account: String) {

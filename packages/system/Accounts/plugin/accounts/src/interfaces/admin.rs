@@ -10,8 +10,9 @@ use crate::bindings::transact::plugin::api as Transact;
 use crate::trust::*;
 use psibase::fracpack::Pack;
 use psibase::services::accounts as Accounts;
-use psibase::HOST_APP;
 use std::collections::HashSet;
+
+const HOST_APP: &str = "host";
 
 impl Admin for AccountsPlugin {
     fn get_auth_services() -> Result<Vec<String>, Error> {

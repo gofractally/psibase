@@ -6,7 +6,8 @@ mod errors;
 mod helpers;
 mod import;
 use db::{apps_table::AppsTable, user_table::UserTable};
-pub(crate) use psibase::HOST_APP;
+/// App id for Host plugins and UI (no on-chain service).
+pub(crate) const HOST_APP: &str = "host";
 use errors::ErrorType::NotConnected;
 use helpers::*;
 

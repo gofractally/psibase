@@ -10,10 +10,9 @@ use crate::bindings::name_market::plugin::api as NameMarket;
 use crate::bindings::transact::plugin::api as Transact;
 use crate::errors::ErrorType;
 use crate::plugin::LoginPrompt;
+use crate::HOST_APP;
 use psibase::services::accounts as AccountsService;
 use psibase::services::auth_sig;
-use psibase::HOST_APP;
-
 impl Api for LoginPrompt {
     fn can_create_account() -> bool {
         assert_eq!(Client::get_sender(), Client::get_receiver());
