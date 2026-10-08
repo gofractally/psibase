@@ -47,7 +47,17 @@ impl Issuer for TokensPlugin {
         let precision = Precision::new(precision).unwrap();
         let max_supply = Quantity::from_str(&max_supply, precision)
             .map_err(|e| Error::from(ErrorType::ConversionError(e.to_string())))?;
+
+        let auto_debit = bindings::nft::plugin::user_config::user_auto_debit_enabled()?;
+        if !auto_debit {
+            bindings::nft::plugin::user_config::enable_user_auto_debit(true)?;
+        }
+
         Tokens::add_to_tx().create(precision, max_supply);
+
+        if !auto_debit {
+            bindings::nft::plugin::user_config::enable_user_auto_debit(false)?;
+        }
 
         Ok(())
     }

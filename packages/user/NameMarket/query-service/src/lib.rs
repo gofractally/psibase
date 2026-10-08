@@ -9,9 +9,8 @@ mod service {
         Auction as AuctionRow, AuctionsTable, PurchasedAccount, PurchasedAccountsTable,
     };
     use name_market::Wrapper as NameMarketService;
-    use nft::service::NID;
-    use nft::tables::CreditTable;
     use psibase::services::diff_adjust::{RateLimit, Wrapper as DiffAdjust};
+    use psibase::services::nft::Wrapper as Nfts;
     use psibase::services::tokens::{Decimal, Precision, Quantity, Wrapper as TokensWrapper};
     use psibase::*;
     use serde::Deserialize;
@@ -190,46 +189,37 @@ mod service {
                 .collect()
         }
 
-        /// Unclaimed accounts whose redemption NFT is credited to the authenticated user.
+        /// Unclaimed accounts whose redemption NFT is owned by the authenticated user.
         async fn unclaimed_names(
             &self,
             first: Option<i32>,
-            last: Option<i32>,
-            before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<RawKey, PurchasedAccount>> {
+        ) -> async_graphql::Result<Connection<String, PurchasedAccount>> {
             let user = self.require_authenticated()?;
+            let index = PurchasedAccountsTable::read().get_index_pk();
+            let mut owned = index
+                .iter()
+                .filter(|row| Nfts::call().getNft(row.nft_id).owner == user);
 
-            let credits = TableQuery::subindex::<NID>(
-                CreditTable::with_service(psibase::services::nft::SERVICE).get_index_by_debitor(),
-                &(user),
-            )
-            .first(first)
-            .last(last)
-            .before(before)
-            .after(after)
-            .query()
-            .await?;
+            if let Some(cursor) = after.as_deref() {
+                if owned
+                    .find(|row| row.account.to_string() == cursor)
+                    .is_none()
+                {
+                    return Ok(Connection::new(false, false));
+                }
+            }
 
-            let purchased_accounts = PurchasedAccountsTable::read();
-            let mut conn = Connection::new(credits.has_previous_page, credits.has_next_page);
-            conn.edges = credits
-                .edges
-                .into_iter()
-                .filter(|edge| edge.node.creditor == NameMarketService::SERVICE)
-                .map(|edge| {
-                    purchased_accounts
-                        .get_index_by_nft()
-                        .get(&edge.node.nftId)
-                        .map(|purchased| Edge::new(edge.cursor, purchased))
-                        .ok_or_else(|| {
-                            async_graphql::Error::new(format!(
-                                "no purchased account for nft {}",
-                                edge.node.nftId
-                            ))
-                        })
-                })
-                .collect::<async_graphql::Result<_>>()?;
+            let limit = first.unwrap_or(i32::MAX).max(0) as usize;
+            let mut edges: Vec<_> = owned
+                .take(limit + 1)
+                .map(|row| Edge::new(row.account.to_string(), row))
+                .collect();
+            let has_next = edges.len() > limit;
+            edges.truncate(limit);
+
+            let mut conn = Connection::new(after.is_some(), has_next);
+            conn.edges = edges;
             Ok(conn)
         }
 

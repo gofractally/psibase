@@ -15,6 +15,9 @@ use psibase::{define_trust, FlagsType};
 
 use psibase::services::nft::{self as Nft, NftHolderFlags};
 
+mod errors;
+use errors::ErrorType;
+
 define_trust! {
     descriptions {
         Low => "",
@@ -29,6 +32,7 @@ define_trust! {
         ",
     }
     functions {
+        None => [user_auto_debit_enabled],
         Medium => [mint],
         High => [uncredit, debit, enable_user_auto_debit, credit, burn, graphql],
     }
@@ -100,7 +104,7 @@ impl UserConfig for NftPlugin {
     fn enable_user_auto_debit(enable: bool) -> Result<(), Error> {
         trust::assert_authorized_with_whitelist(
             trust::FunctionName::enable_user_auto_debit,
-            vec!["namemarket".into()],
+            vec!["namemarket".into(), "tokens".into()],
         )?;
 
         let packed_args = Nft::action_structs::setUserConf {
@@ -111,13 +115,29 @@ impl UserConfig for NftPlugin {
 
         add_action_to_transaction(Nft::action_structs::setUserConf::ACTION_NAME, &packed_args)
     }
+
+    fn user_auto_debit_enabled() -> Result<bool, Error> {
+        trust::assert_authorized(trust::FunctionName::user_auto_debit_enabled)?;
+
+        let raw = post_graphql_get_json("query { autoDebit }")?;
+        let value: serde_json::Value = serde_json::from_str(&raw)
+            .map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
+        value["data"]["autoDebit"]
+            .as_bool()
+            .ok_or_else(|| ErrorType::QueryResponseParseError("missing autoDebit".into()).into())
+    }
 }
 
 impl Authorized for NftPlugin {
     fn graphql(query: String) -> Result<String, Error> {
         trust::assert_authorized_with_whitelist(
             trust::FunctionName::graphql,
-            vec!["homepage".into(), "accounts".into(), "namemarket".into()],
+            vec![
+                "homepage".into(),
+                "accounts".into(),
+                "namemarket".into(),
+                "tokens".into(),
+            ],
         )?;
 
         post_graphql_get_json(&query)

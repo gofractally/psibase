@@ -17,6 +17,4 @@ pub enum ErrorType {
     InitialPriceRequired(u8),
     #[error("no redemption nft for account {0}")]
     RedemptionNftNotFound(String),
-    #[error("not logged in")]
-    NotLoggedIn,
 }

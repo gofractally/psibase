@@ -54,6 +54,9 @@ interface user-config {
     /// Arguments
     /// * `enable` - `true` to enable auto debit, `false` to disable auto debit
     enable-user-auto-debit: func(enable: bool) -> result<_, error>;
+
+    /// Whether the logged-in user has auto debit enabled.
+    user-auto-debit-enabled: func() -> result<bool, error>;
 }
 
 /// Interface that makes authorized queries to this app's http server.

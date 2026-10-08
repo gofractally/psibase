@@ -220,9 +220,7 @@ impl Api for NameMarketPlugin {
             "account purchase",
         )?;
 
-        let user =
-            bindings::accounts::query::api::get_current_user().ok_or(ErrorType::NotLoggedIn)?;
-        let auto_debit = nft_auto_debit_enabled(&user)?;
+        let auto_debit = bindings::nft::plugin::user_config::user_auto_debit_enabled()?;
         if !auto_debit {
             bindings::nft::plugin::user_config::enable_user_auto_debit(true)?;
         }
@@ -309,16 +307,6 @@ struct MarketParamsData {
 #[serde(rename_all = "camelCase")]
 struct MarketParamsResponse {
     data: MarketParamsData,
-}
-
-fn nft_auto_debit_enabled(user: &str) -> Result<bool, Error> {
-    let query = format!("query {{ userConf(user: \"{user}\") {{ settings {{ autoDebit }} }} }}");
-    let raw = bindings::nft::plugin::authorized::graphql(&query)?;
-    let value: serde_json::Value = serde_json::from_str(&raw)
-        .map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
-    value["data"]["userConf"]["settings"]["autoDebit"]
-        .as_bool()
-        .ok_or_else(|| ErrorType::QueryResponseParseError("missing autoDebit".into()).into())
 }
 
 fn fetch_redemption_nft(account: &str) -> Result<u32, Error> {

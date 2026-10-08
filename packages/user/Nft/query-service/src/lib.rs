@@ -7,8 +7,8 @@ mod service {
     use nft::{
         service::NID,
         tables::{
-            CreditRecord, CreditTable, Nft, NftHolder, NftHolderTable, NftTable, UserPending,
-            UserPendingTable,
+            CreditRecord, CreditTable, Nft, NftHolder, NftHolderFlags, NftHolderTable, NftTable,
+            UserPending, UserPendingTable,
         },
     };
     use psibase::services::{accounts::Account, http_server};
@@ -109,6 +109,19 @@ mod service {
             .after(after)
             .query()
             .await
+        }
+
+        /// Whether the logged-in user has NFT auto-debit enabled.
+        async fn auto_debit(&self) -> async_graphql::Result<bool> {
+            let user = self
+                .user
+                .ok_or_else(|| async_graphql::Error::new("not logged in"))?;
+            let config = NftHolderTable::with_service(psibase::services::nft::SERVICE)
+                .get_index_pk()
+                .get(&user)
+                .map(|row| row.config)
+                .unwrap_or(0);
+            Ok(Flags::new(config).get(NftHolderFlags::AUTO_DEBIT))
         }
 
         /// Current NFT holder settings for `user` (no history).

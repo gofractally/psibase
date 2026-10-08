@@ -1,6 +1,8 @@
 package tokens:plugin;
 
 world impl {
+    include nft:plugin/imports;
+
     export types;
     export issuer;
     export user;
