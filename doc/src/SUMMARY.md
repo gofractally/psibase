@@ -21,7 +21,6 @@
     - [Events](specifications/app-architecture/events.md)
     - [HTTP Requests](specifications/app-architecture/http-requests.md)
     - [Plugins](specifications/app-architecture/plugins.md)
-    - [Accounts (host plugin)](specifications/app-architecture/host-accounts.md)
     - [Services](specifications/app-architecture/services.md)
     - [Supervisor](specifications/app-architecture/supervisor.md)
   - [High-level concepts]()
