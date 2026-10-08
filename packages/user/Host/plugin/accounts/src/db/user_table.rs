@@ -1,7 +1,8 @@
 use crate::bindings::host::db::store::{Bucket, Database, DbMode, StorageDuration};
 use psibase::fracpack::{Pack, Unpack};
 
-fn connected_apps_table() -> Bucket {
+// Apps each user has connected to; persistent so connections survive sessions
+pub(crate) fn connected_apps_table() -> Bucket {
     Bucket::new(
         Database {
             mode: DbMode::NonTransactional,
@@ -17,7 +18,7 @@ struct ConnectedApps {
 }
 
 impl ConnectedApps {
-    pub fn add(&mut self, app: &str) {
+    pub(crate) fn add(&mut self, app: &str) {
         let app = app.to_string();
         if self.apps.contains(&app) {
             return;
@@ -26,7 +27,7 @@ impl ConnectedApps {
         self.apps.push(app);
     }
 
-    pub fn remove(&mut self, app: &str) {
+    pub(crate) fn remove(&mut self, app: &str) {
         let app = app.to_string();
         if let Some(idx) = self.apps.iter().position(|a| a == &app) {
             self.apps.swap_remove(idx);
@@ -34,18 +35,18 @@ impl ConnectedApps {
     }
 }
 
-// A database with a separate namespace for each user within the `accounts` namespace
+// A database with a separate namespace for each user within the `host` namespace
 pub struct UserTable {
     user: String,
 }
 impl UserTable {
-    pub fn new(user: &str) -> Self {
+    pub(crate) fn new(user: &str) -> Self {
         Self {
             user: user.to_string(),
         }
     }
 
-    pub fn add_connected_app(&self, app: &str) {
+    pub(crate) fn add_connected_app(&self, app: &str) {
         let connected_apps = connected_apps_table().get(&self.user);
         let mut connected_apps = connected_apps
             .map(|c| <ConnectedApps>::unpacked(&c).unwrap())
@@ -57,7 +58,7 @@ impl UserTable {
         connected_apps_table().set(&self.user, &connected_apps.packed());
     }
 
-    pub fn remove_connected_app(&self, app: &str) {
+    pub(crate) fn remove_connected_app(&self, app: &str) {
         let connected_apps = connected_apps_table().get(&self.user);
         let mut connected_apps = connected_apps
             .map(|c| <ConnectedApps>::unpacked(&c).unwrap())
@@ -66,7 +67,7 @@ impl UserTable {
         connected_apps_table().set(&self.user, &connected_apps.packed());
     }
 
-    pub fn get_connected_apps(&self) -> Vec<String> {
+    pub(crate) fn get_connected_apps(&self) -> Vec<String> {
         let connected_apps = connected_apps_table().get(&self.user);
         connected_apps
             .map(|c| <ConnectedApps>::unpacked(&c).unwrap())

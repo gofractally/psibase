@@ -1,10 +1,10 @@
-package host:http;
+package host:accounts;
 
 world impl {
-    include supervisor:bridge/imports;
-    include host:accounts/imports;
     include host:client/imports;
+    include host:db/imports;
     include host:auth/imports;
 
     export api;
+    export admin;
 }

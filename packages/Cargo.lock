@@ -1364,6 +1364,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "host-accounts"
+version = "0.29.0"
+dependencies = [
+ "psibase",
+ "psibase-plugin-workspace-hack",
+ "wit-bindgen-rt",
+]
+
+[[package]]
 name = "host-auth"
 version = "0.29.0"
 dependencies = [

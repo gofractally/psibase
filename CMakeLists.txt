@@ -291,6 +291,7 @@ add_rs_component_workspace(packages/:Plugins
     packages
     permissions
     sites
+    host-accounts
     host-client
     host-http
     host-db
@@ -463,6 +464,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     ACCOUNTS wasi # This name would be overshadowed
     SERVICE host
+        DATA ${Plugins_OUTPUT_FILE_host_accounts} /accounts.wasm
         DATA ${Plugins_OUTPUT_FILE_host_client} /client.wasm
         DATA ${Plugins_OUTPUT_FILE_host_http} /http.wasm
         DATA ${Plugins_OUTPUT_FILE_host_db} /db.wasm

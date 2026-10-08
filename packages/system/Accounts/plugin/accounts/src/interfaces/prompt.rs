@@ -2,13 +2,12 @@ use crate::bindings::accounts::query::api as AccountsQuery;
 use crate::bindings::auth_sig::plugin as AuthSig;
 use crate::bindings::exports::accounts::plugin::prompt::{Credential, Guest as Prompt};
 use crate::bindings::host::{
-    crypto::keyvault as HostCrypto, client::api as Client, auth::api as HostAuth,
-    types::types::Error,
+    accounts::admin as HostAccountsAdmin, accounts::api as HostAccounts, client::api as Client,
+    crypto::keyvault as HostCrypto, types::types::Error,
 };
 use crate::bindings::invite::plugin::redemption as Invites;
 use crate::bindings::name_market::plugin::api as NameMarket;
 use crate::bindings::transact::plugin::api as Transact;
-use crate::db::{apps_table::AppsTable, user_table::UserTable};
 use crate::errors::ErrorType;
 use crate::plugin::AccountsPlugin;
 use crate::trust::*;
@@ -20,7 +19,7 @@ impl Prompt for AccountsPlugin {
     fn can_create_account() -> bool {
         assert_eq!(Client::get_sender(), Client::get_receiver());
 
-        if AccountsQuery::is_logged_in() {
+        if HostAccounts::is_logged_in() {
             return true;
         }
 
@@ -40,7 +39,7 @@ impl Prompt for AccountsPlugin {
             match AccountsQuery::get_account(&credential.account) {
                 Ok(Some(account)) => match account.auth_service.as_str() {
                     "auth-any" => {
-                        AppsTable::new(&Client::get_receiver()).connect(&credential.account);
+                        HostAccountsAdmin::connect(&credential.account, &Client::get_receiver());
                     }
                     "auth-sig" => {
                         let account_str = credential.account.to_string();
@@ -55,7 +54,10 @@ impl Prompt for AccountsPlugin {
                         if let Err(e) = AuthSig::keyvault::import_key(&credential.key) {
                             invalid_accounts.push((credential.account, e));
                         } else {
-                            AppsTable::new(&Client::get_receiver()).connect(&credential.account);
+                            HostAccountsAdmin::connect(
+                                &credential.account,
+                                &Client::get_receiver(),
+                            );
                         }
                     }
                     service => {
@@ -90,7 +92,7 @@ impl Prompt for AccountsPlugin {
 
         let private_key;
 
-        if AccountsQuery::is_logged_in() {
+        if HostAccounts::is_logged_in() {
             private_key = AuthSig::actions::create_account(&account_name)?;
         } else if Invites::get_active_invite().unwrap_or(false) {
             private_key = Invites::create_new_account(&account_name);
@@ -138,17 +140,15 @@ impl Prompt for AccountsPlugin {
         assert_eq!(Client::get_sender(), Client::get_receiver());
 
         // The account must already have been imported
-        assert!(AppsTable::new(&Client::get_receiver())
-            .get_connected_accounts()
-            .contains(&account));
+        assert!(
+            HostAccountsAdmin::get_connected_accounts(&Client::get_receiver()).contains(&account)
+        );
 
         let app = Client::get_active_app();
-        AppsTable::new(&app).login(&account);
-        UserTable::new(&account).add_connected_app(&app);
+        HostAccountsAdmin::add_connected_app(&account, &app);
 
-        if HostAuth::set_logged_in_user(&account, &app).is_err() {
-            AppsTable::new(&app).logout();
-            UserTable::new(&account).remove_connected_app(&app);
+        if HostAccountsAdmin::login(&account, &app).is_err() {
+            HostAccountsAdmin::remove_connected_app(&account, &app);
         }
 
         if let Some(_) = Invites::get_active_invite() {
