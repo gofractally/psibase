@@ -4,7 +4,7 @@ use crate::bindings::exports::host::accounts::admin::Credential;
 use crate::bindings::host::types::types::Error;
 use crate::db::apps_table::AppsTable;
 use crate::errors::ErrorType::{AccountNotFound, AuthorizationFailed, UnsupportedAuthService};
-use psibase::services::host;
+use crate::HOST_APP;
 
 fn import_credential(credential: &Credential, known_accounts: &AppsTable) -> Result<(), Error> {
     let account = &credential.account;
@@ -28,7 +28,7 @@ fn import_credential(credential: &Credential, known_accounts: &AppsTable) -> Res
 }
 
 pub fn import_existing(credentials: Vec<Credential>) -> Result<(), Vec<(String, Error)>> {
-    let known_accounts = AppsTable::new(&host::Wrapper::SERVICE.to_string());
+    let known_accounts = AppsTable::new(HOST_APP);
     let invalid_accounts: Vec<_> = credentials
         .into_iter()
         .filter_map(|credential| {

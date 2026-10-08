@@ -6,6 +6,7 @@ mod errors;
 mod helpers;
 mod import;
 use db::{apps_table::AppsTable, user_table::UserTable};
+pub(crate) use psibase::HOST_APP;
 use errors::ErrorType::NotConnected;
 use helpers::*;
 
@@ -74,35 +75,35 @@ impl ActiveApp for HostAccounts {
 impl Admin for HostAccounts {
     fn import_existing(credentials: Vec<Credential>) -> Result<(), Vec<(String, Error)>> {
         check_caller(
-            &["host", "homepage"],
+            &[HOST_APP, "homepage"],
             "import-existing@host:accounts/admin",
         );
         import::import_existing(credentials)
     }
 
     fn login(user: String, app: String) -> Result<(), Error> {
-        check_caller(&["accounts", "host"], "login@host:accounts/admin");
+        check_caller(&["accounts", HOST_APP], "login@host:accounts/admin");
         AppsTable::new(&app).login(&user)
     }
 
     fn logout(app: String) {
-        check_caller(&["accounts", "host"], "logout@host:accounts/admin");
+        check_caller(&["accounts", HOST_APP], "logout@host:accounts/admin");
         AppsTable::new(&app).logout();
     }
 
     fn connect(account: String, app: String) {
-        check_caller(&["accounts", "host"], "connect@host:accounts/admin");
+        check_caller(&["accounts", HOST_APP], "connect@host:accounts/admin");
         AppsTable::new(&app).connect(&account);
     }
 
     fn disconnect(account: String, app: String) {
-        check_caller(&["accounts", "host"], "disconnect@host:accounts/admin");
+        check_caller(&["accounts", HOST_APP], "disconnect@host:accounts/admin");
         AppsTable::new(&app).disconnect(&account);
     }
 
     fn get_connected_accounts(app: String) -> Vec<String> {
         check_caller(
-            &["accounts", "host"],
+            &["accounts", HOST_APP],
             "get-connected-accounts@host:accounts/admin",
         );
         AppsTable::new(&app).get_connected_accounts()
@@ -110,7 +111,7 @@ impl Admin for HostAccounts {
 
     fn add_connected_app(user: String, app: String) {
         check_caller(
-            &["accounts", "host"],
+            &["accounts", HOST_APP],
             "add-connected-app@host:accounts/admin",
         );
         UserTable::new(&user).add_connected_app(&app);
@@ -118,7 +119,7 @@ impl Admin for HostAccounts {
 
     fn remove_connected_app(user: String, app: String) {
         check_caller(
-            &["accounts", "host"],
+            &["accounts", HOST_APP],
             "remove-connected-app@host:accounts/admin",
         );
         UserTable::new(&user).remove_connected_app(&app);
@@ -126,7 +127,7 @@ impl Admin for HostAccounts {
 
     fn get_connected_apps(user: String) -> Vec<String> {
         check_caller(
-            &["accounts", "host"],
+            &["accounts", HOST_APP],
             "get-connected-apps@host:accounts/admin",
         );
         UserTable::new(&user).get_connected_apps()

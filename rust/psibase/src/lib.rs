@@ -13,6 +13,7 @@ mod flags;
 mod from_bin;
 mod graph_ql;
 mod hex;
+mod host;
 mod http;
 mod internal_macros;
 #[cfg(not(target_family = "wasm"))]
@@ -56,6 +57,7 @@ pub use flags::*;
 pub use from_bin::*;
 pub use graph_ql::*;
 pub use hex::*;
+pub use host::APP as HOST_APP;
 pub use http::*;
 #[cfg(not(target_family = "wasm"))]
 pub use local_socket::*;

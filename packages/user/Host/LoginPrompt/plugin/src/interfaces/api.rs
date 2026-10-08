@@ -12,7 +12,7 @@ use crate::errors::ErrorType;
 use crate::plugin::LoginPrompt;
 use psibase::services::accounts as AccountsService;
 use psibase::services::auth_sig;
-use psibase::services::host;
+use psibase::HOST_APP;
 
 impl Api for LoginPrompt {
     fn can_create_account() -> bool {
@@ -80,8 +80,7 @@ impl Api for LoginPrompt {
         assert_eq!(Client::get_sender(), Client::get_receiver());
 
         // The account must already have been imported
-        let known_app = host::Wrapper::SERVICE.to_string();
-        assert!(HostAccountsAdmin::get_connected_accounts(&known_app).contains(&account));
+        assert!(HostAccountsAdmin::get_connected_accounts(HOST_APP).contains(&account));
 
         let app = Client::get_active_app();
         HostAccountsAdmin::add_connected_app(&account, &app);

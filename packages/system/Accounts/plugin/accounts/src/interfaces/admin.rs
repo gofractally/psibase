@@ -10,7 +10,7 @@ use crate::bindings::transact::plugin::api as Transact;
 use crate::trust::*;
 use psibase::fracpack::Pack;
 use psibase::services::accounts as Accounts;
-use psibase::services::host;
+use psibase::HOST_APP;
 use std::collections::HashSet;
 
 fn prune_invalid_accounts(accounts: Vec<String>, app: &str) {
@@ -27,8 +27,7 @@ impl Admin for AccountsPlugin {
         )
         .unwrap();
 
-        let host_app = host::Wrapper::SERVICE.to_string();
-        let connected_accounts = HostAccountsAdmin::get_connected_accounts(&host_app);
+        let connected_accounts = HostAccountsAdmin::get_connected_accounts(HOST_APP);
         if connected_accounts.is_empty() {
             return Ok(Vec::new());
         }
@@ -83,7 +82,7 @@ impl Admin for AccountsPlugin {
             .collect();
 
         if !invalid_accounts.is_empty() {
-            prune_invalid_accounts(invalid_accounts, &host_app);
+            prune_invalid_accounts(invalid_accounts, HOST_APP);
         }
 
         let auth_services: Vec<String> = response_root
