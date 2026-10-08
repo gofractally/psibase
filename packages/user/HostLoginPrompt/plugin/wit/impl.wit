@@ -2,8 +2,8 @@ package host:login-prompt;
 
 world impl {
     include host:client/imports;
-    include host:session/imports;
-    import host:session/admin;
+    include host:accounts/imports;
+    import host:accounts/admin;
     include host:crypto/imports;
     include transact:plugin/imports;
     include permissions:plugin/imports;

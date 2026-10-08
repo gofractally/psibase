@@ -12,7 +12,7 @@ export const useConnectAccount = (
             await supervisor.functionCall(
                 {
                     service: "host",
-                    plugin: "session",
+                    plugin: "accounts",
                     intf: "activeApp",
                     method: "connectAccount",
                     params: [],

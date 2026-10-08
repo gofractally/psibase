@@ -6,7 +6,7 @@ use crate::plugin::AccountsPlugin;
 
 use crate::bindings::exports::accounts::plugin::admin::{Error, Guest as Admin};
 use crate::bindings::host::client::api as Client;
-use crate::bindings::host::session::admin as HostSessionAdmin;
+use crate::bindings::host::accounts::admin as HostAccountsAdmin;
 use crate::bindings::transact::plugin::api as Transact;
 use crate::helpers::assert_valid_account;
 use crate::trust::*;
@@ -17,7 +17,7 @@ use std::collections::HashSet;
 fn prune_invalid_accounts(accounts: Vec<String>) {
     let app = Client::get_receiver();
     for account in accounts {
-        HostSessionAdmin::disconnect(&account, &app);
+        HostAccountsAdmin::disconnect(&account, &app);
     }
 }
 
@@ -25,14 +25,14 @@ impl Admin for AccountsPlugin {
     fn get_connected_apps(user: String) -> Vec<String> {
         assert_authorized_with_whitelist(FunctionName::get_connected_apps, vec!["homepage".into()])
             .unwrap();
-        HostSessionAdmin::get_connected_apps(&user)
+        HostAccountsAdmin::get_connected_apps(&user)
     }
 
     fn import_account(account: String) {
         assert_authorized_with_whitelist(FunctionName::import_account, vec!["x-admin".into()])
             .unwrap();
         assert_valid_account(&account);
-        HostSessionAdmin::connect(&account, &Client::get_receiver());
+        HostAccountsAdmin::connect(&account, &Client::get_receiver());
     }
 
     fn get_auth_services() -> Result<Vec<String>, Error> {
@@ -42,7 +42,7 @@ impl Admin for AccountsPlugin {
         )
         .unwrap();
 
-        let connected_accounts = HostSessionAdmin::get_connected_accounts(&Client::get_receiver());
+        let connected_accounts = HostAccountsAdmin::get_connected_accounts(&Client::get_receiver());
         if connected_accounts.is_empty() {
             return Ok(Vec::new());
         }

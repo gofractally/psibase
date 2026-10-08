@@ -3,8 +3,8 @@ use crate::bindings::accounts::query::api as AccountsQuery;
 use crate::bindings::auth_sig::plugin as AuthSig;
 use crate::bindings::exports::host::login_prompt::api::{Credential, Guest as Api};
 use crate::bindings::host::{
-    client::api as Client, crypto::keyvault as HostCrypto, session::admin as HostSessionAdmin,
-    session::api as HostSession, types::types::Error,
+    client::api as Client, crypto::keyvault as HostCrypto, accounts::admin as HostAccountsAdmin,
+    accounts::api as HostAccountsApi, types::types::Error,
 };
 use crate::bindings::invite::plugin::redemption as Invites;
 use crate::bindings::name_market::plugin::api as NameMarket;
@@ -20,7 +20,7 @@ impl Api for LoginPrompt {
     fn can_create_account() -> bool {
         assert_eq!(Client::get_sender(), Client::get_receiver());
 
-        if HostSession::is_logged_in() {
+        if HostAccountsApi::is_logged_in() {
             return true;
         }
 
@@ -40,7 +40,7 @@ impl Api for LoginPrompt {
             match AccountsQuery::get_account(&credential.account) {
                 Ok(Some(account)) => match account.auth_service.as_str() {
                     "auth-any" => {
-                        HostSessionAdmin::connect(&credential.account, KNOWN_ACCOUNTS_APP);
+                        HostAccountsAdmin::connect(&credential.account, KNOWN_ACCOUNTS_APP);
                     }
                     "auth-sig" => {
                         let account_str = credential.account.to_string();
@@ -55,7 +55,7 @@ impl Api for LoginPrompt {
                         if let Err(e) = AuthSig::keyvault::import_key(&credential.key) {
                             invalid_accounts.push((credential.account, e));
                         } else {
-                            HostSessionAdmin::connect(&credential.account, KNOWN_ACCOUNTS_APP);
+                            HostAccountsAdmin::connect(&credential.account, KNOWN_ACCOUNTS_APP);
                         }
                     }
                     service => {
@@ -90,7 +90,7 @@ impl Api for LoginPrompt {
 
         let private_key;
 
-        if HostSession::is_logged_in() {
+        if HostAccountsApi::is_logged_in() {
             private_key = AuthSig::actions::create_account(&account_name)?;
         } else if Invites::get_active_invite().unwrap_or(false) {
             private_key = Invites::create_new_account(&account_name);
@@ -131,13 +131,13 @@ impl Api for LoginPrompt {
         assert_eq!(Client::get_sender(), Client::get_receiver());
 
         // The account must already have been imported
-        assert!(HostSessionAdmin::get_connected_accounts(KNOWN_ACCOUNTS_APP).contains(&account));
+        assert!(HostAccountsAdmin::get_connected_accounts(KNOWN_ACCOUNTS_APP).contains(&account));
 
         let app = Client::get_active_app();
-        HostSessionAdmin::add_connected_app(&account, &app);
+        HostAccountsAdmin::add_connected_app(&account, &app);
 
-        if HostSessionAdmin::login(&account, &app).is_err() {
-            HostSessionAdmin::remove_connected_app(&account, &app);
+        if HostAccountsAdmin::login(&account, &app).is_err() {
+            HostAccountsAdmin::remove_connected_app(&account, &app);
         }
 
         if Invites::get_active_invite().is_some() {

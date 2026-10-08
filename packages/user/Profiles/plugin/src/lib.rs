@@ -6,7 +6,7 @@ use bindings::{
     exports::profiles::plugin::{
         api::Guest as Api, contacts::Contact, contacts::Guest as Contacts,
     },
-    host::session::api::get_current_user,
+    host::accounts::api::get_current_user,
     host::{self, types::types::Error},
     permissions,
     profiles::plugin::types::{Avatar, Profile as PluginProfile},

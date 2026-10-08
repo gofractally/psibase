@@ -13,7 +13,7 @@ use host::types::types as HostTypes;
 
 use crate::bindings::transact::plugin::api::{add_action_to_transaction, propose};
 use crate::packages::plugin::types;
-use bindings::host::session::api as HostSession;
+use bindings::host::accounts::api as HostAccounts;
 use exports::packages::plugin::private_api::Guest as PrivateApi;
 use exports::packages::plugin::queries::Guest as Queries;
 use setcode::plugin::api as SetCode;
@@ -597,7 +597,7 @@ impl PrivateApi for PackagesPlugin {
         // exist have the right owner.
         get_accounts_to_create(&get_package_accounts(&packages)?, sender)?;
 
-        let user = HostSession::get_current_user().ok_or(ErrorType::NoLoggedInUser)?;
+        let user = HostAccounts::get_current_user().ok_or(ErrorType::NoLoggedInUser)?;
         let uploader = StagedUpload::new(id, user.parse().unwrap());
 
         let mut upload_builder = TransactionBuilder::new(

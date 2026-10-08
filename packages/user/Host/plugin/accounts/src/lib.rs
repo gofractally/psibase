@@ -8,16 +8,16 @@ use db::{apps_table::AppsTable, user_table::UserTable};
 use errors::ErrorType::NotConnected;
 use helpers::*;
 
-use bindings::exports::host::session::active_app::Guest as ActiveApp;
-use bindings::exports::host::session::admin::Guest as Admin;
-use bindings::exports::host::session::api::Guest as API;
+use bindings::exports::host::accounts::active_app::Guest as ActiveApp;
+use bindings::exports::host::accounts::admin::Guest as Admin;
+use bindings::exports::host::accounts::api::Guest as API;
 use bindings::host::client::api as Client;
 use bindings::host::prompt::api as Prompt;
 use bindings::host::types::types::Error;
 
-struct HostSession;
+struct HostAccounts;
 
-impl API for HostSession {
+impl API for HostAccounts {
     fn is_logged_in() -> bool {
         Self::get_current_user().is_some()
     }
@@ -27,7 +27,7 @@ impl API for HostSession {
     }
 }
 
-impl ActiveApp for HostSession {
+impl ActiveApp for HostAccounts {
     fn login(user: String) -> Result<(), Error> {
         let app = get_assert_top_level_app("login", &[])?;
 
@@ -70,31 +70,31 @@ impl ActiveApp for HostSession {
     }
 }
 
-impl Admin for HostSession {
+impl Admin for HostAccounts {
     fn login(user: String, app: String) -> Result<(), Error> {
-        check_caller(&["accounts", "host"], "login@host:session/admin");
+        check_caller(&["accounts", "host"], "login@host:accounts/admin");
         AppsTable::new(&app).login(&user)
     }
 
     fn logout(app: String) {
-        check_caller(&["accounts", "host"], "logout@host:session/admin");
+        check_caller(&["accounts", "host"], "logout@host:accounts/admin");
         AppsTable::new(&app).logout();
     }
 
     fn connect(account: String, app: String) {
-        check_caller(&["accounts", "host"], "connect@host:session/admin");
+        check_caller(&["accounts", "host"], "connect@host:accounts/admin");
         AppsTable::new(&app).connect(&account);
     }
 
     fn disconnect(account: String, app: String) {
-        check_caller(&["accounts", "host"], "disconnect@host:session/admin");
+        check_caller(&["accounts", "host"], "disconnect@host:accounts/admin");
         AppsTable::new(&app).disconnect(&account);
     }
 
     fn get_connected_accounts(app: String) -> Vec<String> {
         check_caller(
             &["accounts", "host"],
-            "get-connected-accounts@host:session/admin",
+            "get-connected-accounts@host:accounts/admin",
         );
         AppsTable::new(&app).get_connected_accounts()
     }
@@ -102,7 +102,7 @@ impl Admin for HostSession {
     fn add_connected_app(user: String, app: String) {
         check_caller(
             &["accounts", "host"],
-            "add-connected-app@host:session/admin",
+            "add-connected-app@host:accounts/admin",
         );
         UserTable::new(&user).add_connected_app(&app);
     }
@@ -110,7 +110,7 @@ impl Admin for HostSession {
     fn remove_connected_app(user: String, app: String) {
         check_caller(
             &["accounts", "host"],
-            "remove-connected-app@host:session/admin",
+            "remove-connected-app@host:accounts/admin",
         );
         UserTable::new(&user).remove_connected_app(&app);
     }
@@ -118,10 +118,10 @@ impl Admin for HostSession {
     fn get_connected_apps(user: String) -> Vec<String> {
         check_caller(
             &["accounts", "host"],
-            "get-connected-apps@host:session/admin",
+            "get-connected-apps@host:accounts/admin",
         );
         UserTable::new(&user).get_connected_apps()
     }
 }
 
-bindings::export!(HostSession with_types_in bindings);
+bindings::export!(HostAccounts with_types_in bindings);

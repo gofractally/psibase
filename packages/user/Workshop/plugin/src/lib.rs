@@ -3,7 +3,7 @@ mod bindings;
 use bindings::*;
 
 use auth_delegate::plugin::api::new_account;
-use bindings::host::session::api::get_current_user;
+use bindings::host::accounts::api::get_current_user;
 use exports::workshop::plugin::{
     app::{File, Guest as App},
     development::Guest as Development,

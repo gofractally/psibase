@@ -1,5 +1,5 @@
 [package]
-name = "host-session"
+name = "host-accounts"
 version.workspace = true
 edition.workspace = true
 
@@ -12,7 +12,7 @@ psibase-plugin-workspace-hack.workspace = true
 crate-type = ["cdylib"]
 
 [package.metadata.component]
-package = "host:session"
+package = "host:accounts"
 
 [package.metadata.component.target]
 world = "impl"

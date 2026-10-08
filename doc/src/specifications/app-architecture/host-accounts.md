@@ -1,12 +1,12 @@
-# Session
+# Host accounts plugin
 
-`host:session` stores which account is logged in to each app, and which accounts are connected to each app, on this device. Other plugins call it for the current login. The accounts plugin and `host` call its admin interface to read and update those records.
+`host:accounts` stores which account is logged in to each app, and which accounts are connected to each app, on this device. Other plugins call it for the current login. The accounts plugin and `host` call its admin interface to read and update those records.
 
 `host:login-prompt` serves the login prompt (connect, import, and create) on the host subdomain.
 
 ## `api`
 
-Any plugin may call `host:session/api`. It reports the login for the active top-level app — the app the user is directly interacting with.
+Any plugin may call `host:accounts/api`. It reports the login for the active top-level app — the app the user is directly interacting with.
 
 | Function | Returns |
 | --- | --- |
@@ -15,7 +15,7 @@ Any plugin may call `host:session/api`. It reports the login for the active top-
 
 ## `active-app`
 
-`host:session/active-app` changes the login and connections of the active top-level app. A function may be called by that top-level app or by its plugin. Some functions also allow a privileged caller:
+`host:accounts/active-app` changes the login and connections of the active top-level app. A function may be called by that top-level app or by its plugin. Some functions also allow a privileged caller:
 
 | Function | Also callable by | Effect |
 | --- | --- | --- |
@@ -29,7 +29,7 @@ Any plugin may call `host:session/api`. It reports the login for the active top-
 
 ## `admin`
 
-`host:session/admin` reads and writes login and connection records for an app the caller names. Only the `accounts` plugin and `host` may call it.
+`host:accounts/admin` reads and writes login and connection records for an app the caller names. Only the `accounts` plugin and `host` may call it.
 
 | Function | Effect |
 | --- | --- |

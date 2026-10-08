@@ -6,7 +6,7 @@ use types::*;
 
 use bindings::*;
 
-use bindings::host::session::api as HostSession;
+use bindings::host::accounts::api as HostAccounts;
 use exports::permissions::plugin::{
     admin::{ApprovalDuration, Guest as PermsAdmin, PromptContext},
     api::Guest as Api,
@@ -115,7 +115,7 @@ fn auth_check(
         .into());
     }
 
-    let user = HostSession::get_current_user().ok_or_else(|| {
+    let user = HostAccounts::get_current_user().ok_or_else(|| {
         ErrorType::LoggedInUserDNE(
             caller.to_string(),
             callee.to_string(),

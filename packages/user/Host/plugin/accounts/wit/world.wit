@@ -1,4 +1,4 @@
-package host:session;
+package host:accounts;
 
 interface api {
     /// Returns true if there is a user logged in to the currently active top-level application.
