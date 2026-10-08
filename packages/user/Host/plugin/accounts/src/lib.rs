@@ -24,9 +24,9 @@ impl API for HostAccounts {
 }
 
 impl Admin for HostAccounts {
-    fn login(user: String, app: String) -> Result<(), Error> {
+    fn login(user: String, app: String, auth_service: String) -> Result<(), Error> {
         check_caller(&["accounts"], "login@host:accounts/admin");
-        AppsTable::new(&app).login(&user)
+        AppsTable::new(&app).login(&user, &auth_service)
     }
 
     fn logout(app: String) {

@@ -1,0 +1,37 @@
+package transact:types;
+
+/// Shared transaction-auth types used by `transact:plugin`, `transact:admin`,
+/// and `transact:query-auth` (claim / proof hooks and tx construction).
+interface types {
+    /// A list of `claim` objects is added to every submitted transaction.
+    /// A claim is something the submitter of a transaction claims to know (e.g. a public key)
+    record claim {
+        /// The name of the service used to verify the claim is valid
+        verify-service: string,
+        /// The raw claim data (typically the DER-encoded public key
+        /// whose matching private key produces the proof)
+        raw-data: list<u8>,
+    }
+
+    /// The verify-service specified in the claim is the service that knows how to verify that
+    /// a proof actually proves the claim.
+    record proof {
+        signature: list<u8>,
+    }
+
+    /// Action data from a transaction
+    record action {
+        /// The sender of this action
+        sender: string,
+        /// The service that will execute this action
+        service: string,
+        /// The name of the action to execute
+        method: string,
+        /// The data passed to the action, packed in fracpack format
+        raw-data: list<u8>,
+    }
+}
+
+world imports {
+    import types;
+}
