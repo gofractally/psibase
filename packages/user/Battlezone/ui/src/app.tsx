@@ -58,6 +58,39 @@ export function App() {
             if (roster) applyRoster(state, roster);
         };
 
+        /** Lobby host (or anyone, before a lobby exists) may edit seat config. */
+        const canEditConfig = () =>
+            state.phase === "title" &&
+            (!state.lobbyHost || state.lobbyHost === state.localAccount);
+
+        /** Push current seat config if we're already ready (host can update lobby). */
+        const pushReadyConfigIfNeeded = () => {
+            if (!state.lobbyReady || !realtime?.connected) return;
+            const slots = syncEnemySlotModes(
+                state.enemySlotModes,
+                state.enemyCount,
+            );
+            state.enemySlotModes = slots;
+            realtime.send({
+                t: "ready",
+                enemyCount: state.enemyCount,
+                slots,
+            });
+        };
+
+        const adoptAvailablePeers = () => {
+            if (!canEditConfig()) return;
+            const beforeCount = state.enemyCount;
+            const beforeModes = state.enemySlotModes.join(",");
+            includeAvailablePeers(state);
+            if (
+                state.enemyCount !== beforeCount ||
+                state.enemySlotModes.join(",") !== beforeModes
+            ) {
+                pushReadyConfigIfNeeded();
+            }
+        };
+
         const onServerFrame = (frame: ServerFrame) => {
             switch (frame.t) {
                 case "welcome":
@@ -71,14 +104,7 @@ export function App() {
                             account: p.account,
                             online: p.presence === "online",
                         }));
-                    if (
-                        state.phase === "title" &&
-                        !state.lobbyReady &&
-                        (!state.lobbyHost ||
-                            state.lobbyHost === state.localAccount)
-                    ) {
-                        includeAvailablePeers(state);
-                    }
+                    adoptAvailablePeers();
                     break;
                 case "presence":
                     if (frame.account === state.localAccount) break;
@@ -97,14 +123,7 @@ export function App() {
                         state.livePeers = state.livePeers.filter(
                             (p) => p.online,
                         );
-                        if (
-                            state.phase === "title" &&
-                            !state.lobbyReady &&
-                            (!state.lobbyHost ||
-                                state.lobbyHost === state.localAccount)
-                        ) {
-                            includeAvailablePeers(state);
-                        }
+                        adoptAvailablePeers();
                     }
                     break;
                 case "lobby": {
@@ -235,11 +254,7 @@ export function App() {
 
         const onKey = (e: KeyboardEvent) => {
             if (state.phase === "title") {
-                const canEditConfig =
-                    !state.lobbyReady &&
-                    (!state.lobbyHost ||
-                        state.lobbyHost === state.localAccount);
-                if (canEditConfig) {
+                if (canEditConfig()) {
                     if (e.code === "ArrowLeft" || e.code === "KeyA") {
                         e.preventDefault();
                         state.enemyCount = Math.max(
@@ -251,6 +266,7 @@ export function App() {
                             state.enemyCount,
                         );
                         includeAvailablePeers(state);
+                        pushReadyConfigIfNeeded();
                         return;
                     }
                     if (e.code === "ArrowRight" || e.code === "KeyD") {
@@ -264,6 +280,7 @@ export function App() {
                             state.enemyCount,
                         );
                         includeAvailablePeers(state);
+                        pushReadyConfigIfNeeded();
                         return;
                     }
                     const digit = /^Digit([1-5])$/.exec(e.code);
@@ -301,6 +318,7 @@ export function App() {
                             }
                             state.enemySlotModes = modes;
                             includeAvailablePeers(state);
+                            pushReadyConfigIfNeeded();
                         }
                         return;
                     }
