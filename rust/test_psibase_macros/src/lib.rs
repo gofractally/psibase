@@ -14,7 +14,6 @@ mod tests {
         use basicwquery::Wrapper;
 
         println!("{}", Wrapper::SERVICE);
-        http_server::Wrapper::push_from(&chain, Wrapper::SERVICE).registerServer(Wrapper::SERVICE);
 
         assert_eq!(Wrapper::SERVICE, account!("basicquery"));
 
