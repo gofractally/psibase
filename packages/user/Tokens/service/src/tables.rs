@@ -161,7 +161,10 @@ pub mod tables {
         }
 
         pub fn nft_holder(&self) -> AccountNumber {
-            Nfts::call().getNft(self.nft_id).owner
+            Nfts::call()
+                .getNft(self.nft_id)
+                .expect("NFT was burned")
+                .owner
         }
 
         fn save(&self) {

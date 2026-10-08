@@ -454,8 +454,8 @@ pub mod service {
     }
 
     #[action]
-    pub fn getNft(nftId: NID) -> Nft {
-        Nft::get_assert(nftId)
+    pub fn getNft(nftId: NID) -> Option<Nft> {
+        Nft::get(nftId)
     }
 
     #[action]
