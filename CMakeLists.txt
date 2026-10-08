@@ -1314,7 +1314,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Minimum packages for a functional chain"
     PACKAGE_DEPENDS Accounts AuthDelegate AuthAny CpuLimit CommonApi Db Packages Producers HttpServer
-                    SetCode Transact VirtualServer HostLoginPrompt
+                    SetCode Transact VirtualServer
 )
 
 psibase_package(
