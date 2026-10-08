@@ -11,6 +11,7 @@ use crate::trust::*;
 use psibase::fracpack::Pack;
 use psibase::services::accounts as Accounts;
 use psibase::HOST_APP;
+use std::collections::HashSet;
 
 impl Admin for AccountsPlugin {
     fn get_auth_services() -> Result<Vec<String>, Error> {
@@ -32,6 +33,7 @@ impl Admin for AccountsPlugin {
         let graphql_query = format!(
             "query {{
                 getAccounts(accountNames: [{}]) {{
+                    accountNum,
                     authService
                 }}
             }}",
@@ -52,6 +54,7 @@ impl Admin for AccountsPlugin {
         #[allow(non_snake_case)]
         #[derive(Deserialize, Debug)]
         struct Accnt {
+            accountNum: String,
             authService: String,
         }
 
@@ -60,23 +63,22 @@ impl Admin for AccountsPlugin {
             .map_err(|e| DeserializationError(e.to_string()))?;
 
         let rows = response_root.data.getAccounts;
-        if rows.len() != connected_accounts.len() {
-            return Err(
-                DeserializationError(format!(
-                    "getAccounts returned {} rows for {} connected accounts",
-                    rows.len(),
-                    connected_accounts.len()
-                ))
-                .into(),
-            );
+        let mut valid_account_nums = HashSet::with_capacity(rows.len());
+        let mut auth_services = Vec::with_capacity(rows.len());
+        for opt_accnt in rows {
+            if let Some(accnt) = opt_accnt {
+                valid_account_nums.insert(accnt.accountNum);
+                auth_services.push(accnt.authService);
+            }
         }
-        let mut auth_services = Vec::with_capacity(connected_accounts.len());
-        for (name, row) in connected_accounts.iter().zip(rows) {
-            let accnt = row.ok_or(DeserializationError(format!(
-                "getAccounts returned null for connected account {name}"
-            )))?;
-            auth_services.push(accnt.authService);
+
+        // Stale host connections (no on-chain account) are pruned here instead of failing the call.
+        for account in &connected_accounts {
+            if !valid_account_nums.contains(account) {
+                HostAccountsAdmin::disconnect(account, HOST_APP);
+            }
         }
+
         Ok(auth_services)
     }
 

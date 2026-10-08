@@ -97,7 +97,7 @@ impl Admin for HostAccounts {
     }
 
     fn disconnect(account: String, app: String) {
-        check_host_admin("disconnect@host:accounts/admin");
+        check_accounts_host_admin("disconnect@host:accounts/admin");
         AppsTable::new(&app).disconnect(&account);
     }
 
