@@ -45,7 +45,7 @@ namespace SystemService
 
       bool isTokenChar(char ch)
       {
-         return isAllowedChar(ch, "()<>@,;:\\\"/[]?={} \t");
+         return isAllowedChar(ch, "()<>@,;:\\\"/[]?={}");
       }
 
       bool isCookieOctet(char ch)
