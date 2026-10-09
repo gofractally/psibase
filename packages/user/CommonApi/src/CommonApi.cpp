@@ -4,7 +4,7 @@
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psio/to_json.hpp>
-#include <services/system/HttpServer.hpp>
+#include <services/local/XHttp.hpp>
 #include <services/system/Transact.hpp>
 
 #include <algorithm>
@@ -13,6 +13,7 @@
 static constexpr bool enable_print = false;
 
 using namespace psibase;
+using namespace LocalService;
 
 namespace SystemService
 {
@@ -107,7 +108,7 @@ namespace SystemService
 
       std::vector<HttpHeader> allowCorsFrom(const HttpRequest& req, AccountNumber subdomain)
       {
-         bool hostIsSubdomain = to<HttpServer>().rootHost(req.host) != req.host;
+         bool hostIsSubdomain = to<XHttp>().rootHost(req.host) != req.host;
          return allowCors(req, subdomain, hostIsSubdomain);
       }
    }  // namespace
@@ -128,7 +129,7 @@ namespace SystemService
       {
          if (request.target == "/common/thisservice")
          {
-            auto        rootHost = to<HttpServer>().rootHost(request.host);
+            auto        rootHost = to<XHttp>().rootHost(request.host);
             std::string serviceName;
             if (request.host.size() > rootHost.size() + 1 && request.host.ends_with(rootHost) &&
                 request.host[request.host.size() - rootHost.size() - 1] == '.')
@@ -140,7 +141,7 @@ namespace SystemService
             return to_json(serviceName);
          }
          if (request.target == "/common/rootdomain")
-            return to_json(to<HttpServer>().rootHost(request.host));
+            return to_json(to<XHttp>().rootHost(request.host));
          if (request.target == "/common/tapos/head")
          {
             auto [index, suffix] = to<Transact>().headTapos();

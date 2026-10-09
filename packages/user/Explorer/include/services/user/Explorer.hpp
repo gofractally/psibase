@@ -9,7 +9,10 @@ namespace SystemService
    {
       static constexpr auto service = psibase::AccountNumber("explorer");
 
-      auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
+      auto serveSys(psibase::HttpRequest                  request,
+                    std::optional<int32_t>                socket,
+                    std::optional<psibase::AccountNumber> user)
+          -> std::optional<psibase::HttpReply>;
    };
    PSIO_REFLECT(Explorer,  //
                 method(serveSys, request))

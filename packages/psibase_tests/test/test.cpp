@@ -47,6 +47,7 @@ TEST_CASE("table")
    CHECK(testTable.removeSingle().succeeded());
    CHECK(testTable.removeMulti().succeeded());
    CHECK(testTable.subindex().succeeded());
+   CHECK(testTable.iterMulti().succeeded());
 }  // table
 
 TEST_CASE("import/export handles")

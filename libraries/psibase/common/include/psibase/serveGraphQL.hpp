@@ -350,16 +350,16 @@ namespace psibase
    /// - Returned rows (`MyType`) include MyType's fields and the `someFn` method. Only `const` methods are exposed.
    /// - [serveGraphQL] automatically chooses GraphQL types which cover the range of numeric types. When no suitable match is found (e.g. no GraphQL type covers the range of `int64_t`), it falls back to `String`.
    template <typename Connection, typename T, typename Key, typename Proj = std::identity>
-   Connection makeConnection(const TableIndex<T, Key>&         index,
-                             const std::optional<Key>&         gt,
-                             const std::optional<Key>&         ge,
-                             const std::optional<Key>&         lt,
-                             const std::optional<Key>&         le,
-                             std::optional<uint32_t>           first,
-                             std::optional<uint32_t>           last,
-                             const std::optional<std::string>& before,
-                             const std::optional<std::string>& after,
-                             Proj&&                            proj = {})
+   Connection makeConnectionIter(const TableIndex<T, Key>&         index,
+                                 const std::optional<Key>&         gt,
+                                 const std::optional<Key>&         ge,
+                                 const std::optional<Key>&         lt,
+                                 const std::optional<Key>&         le,
+                                 std::optional<uint32_t>           first,
+                                 std::optional<uint32_t>           last,
+                                 const std::optional<std::string>& before,
+                                 const std::optional<std::string>& after,
+                                 Proj&&                            proj = {})
    {
       auto keyFromHex = [&](const std::optional<std::string>& s) -> std::vector<char>
       {
@@ -396,7 +396,7 @@ namespace psibase
       auto       add_edge = [&](const auto& it)
       {
          auto cursor = psio::to_hex(it.keyWithoutPrefix());
-         result.edges.push_back(typename Connection::Edge{proj(*it), std::move(cursor)});
+         result.edges.push_back(typename Connection::Edge{proj(it), std::move(cursor)});
       };
 
       if (last && !first)
@@ -428,6 +428,38 @@ namespace psibase
       }
       return result;
    }  // makeConnection
+
+   template <typename Connection, typename T, typename Key, typename Proj = std::identity>
+   Connection makeConnection(const TableIndex<T, Key>&         index,
+                             const std::optional<Key>&         gt,
+                             const std::optional<Key>&         ge,
+                             const std::optional<Key>&         lt,
+                             const std::optional<Key>&         le,
+                             std::optional<uint32_t>           first,
+                             std::optional<uint32_t>           last,
+                             const std::optional<std::string>& before,
+                             const std::optional<std::string>& after,
+                             Proj&&                            proj = {})
+   {
+      return makeConnectionIter<Connection>(index, gt, ge, lt, le, first, last, before, after,
+                                            [&](const auto& iter) { return proj(*iter); });
+   }
+
+   template <typename Connection, typename T, typename Key, typename Proj = std::identity>
+   Connection makeConnectionView(const TableIndex<T, Key>&         index,
+                                 const std::optional<Key>&         gt,
+                                 const std::optional<Key>&         ge,
+                                 const std::optional<Key>&         lt,
+                                 const std::optional<Key>&         le,
+                                 std::optional<uint32_t>           first,
+                                 std::optional<uint32_t>           last,
+                                 const std::optional<std::string>& before,
+                                 const std::optional<std::string>& after,
+                                 Proj&&                            proj = {})
+   {
+      return makeConnectionIter<Connection>(index, gt, ge, lt, le, first, last, before, after,
+                                            [&](const auto& iter) { return proj(iter.view()); });
+   }
 
    /// Similar to makeConnection, except that it allows pagination through a virtual table index.
    ///
@@ -546,6 +578,13 @@ namespace psibase
       F     f;
    };
 
+   template <typename Index, typename F>
+   struct TransformedConnectionView
+   {
+      Index index;
+      F     f;
+   };
+
    namespace detail
    {
       template <typename Connection, typename T, typename Key>
@@ -575,6 +614,21 @@ namespace psibase
       {
          return makeConnection<Connection>(index.index, gt, ge, lt, le, first, last, before, after,
                                            index.f);
+      }
+
+      template <typename Connection, typename Index, typename F, typename Key>
+      Connection makeTransformedConnectionView(const TransformedConnectionView<Index, F>& index,
+                                               const std::optional<Key>&                  gt,
+                                               const std::optional<Key>&                  ge,
+                                               const std::optional<Key>&                  lt,
+                                               const std::optional<Key>&                  le,
+                                               std::optional<uint32_t>                    first,
+                                               std::optional<uint32_t>                    last,
+                                               const std::optional<std::string>&          before,
+                                               const std::optional<std::string>&          after)
+      {
+         return makeConnectionView<Connection>(index.index, gt, ge, lt, le, first, last, before,
+                                               after, index.f);
       }
    }  // namespace detail
 
@@ -606,6 +660,22 @@ namespace psibase
       using Connection = psibase::Connection<  //
           R, psio::reflect<R>::name + "Connection", psio::reflect<R>::name + "Edge">;
       return &detail::makeTransformedConnection<Connection, TableIndex<T, Key>, F, Key>;
+   }  // gql_callable_fn
+
+   template <typename Index, typename F>
+   constexpr std::optional<std::array<const char*, 8>> gql_callable_args(
+       TransformedConnectionView<Index, F>*)
+   {
+      return std::array{"gt", "ge", "lt", "le", "first", "last", "before", "after"};
+   }
+
+   template <typename T, typename Key, typename F>
+   constexpr auto gql_callable_fn(const TransformedConnectionView<TableIndex<T, Key>, F>*)
+   {
+      using R          = decltype(std::declval<F>()(std::declval<T>()));
+      using Connection = psibase::Connection<  //
+          R, psio::reflect<R>::name + "Connection", psio::reflect<R>::name + "Edge">;
+      return &detail::makeTransformedConnectionView<Connection, TableIndex<T, Key>, F, Key>;
    }  // gql_callable_fn
 
    struct EventQueryInterface

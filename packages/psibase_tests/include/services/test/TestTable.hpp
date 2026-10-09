@@ -50,6 +50,7 @@ namespace TestService
       void removeSingle();
       void removeMulti();
       void subindex();
+      void iterMulti();
    };
    PSIO_REFLECT(TestTable,
                 method(getSingle),
@@ -57,6 +58,7 @@ namespace TestService
                 method(getCompound),
                 method(removeSingle),
                 method(removeMulti),
-                method(subindex))
+                method(subindex),
+                method(iterMulti))
    PSIBASE_REFLECT_TABLES(TestTable, TestTable::Tables)
 }  // namespace TestService

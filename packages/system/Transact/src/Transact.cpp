@@ -387,6 +387,20 @@ namespace SystemService
       std::vector<AuthItem*>              stack;
       AuthMap                             authorized;
 
+      // Safe to call multiple times
+      AuthItem* addRoot(AccountNumber account)
+      {
+         auto [iter, _] = authorized.try_emplace(account);
+         ++iter->second.refs;
+         if (!iter->second.queued && !iter->second.authorized)
+         {
+            stack.push_back(&*iter);
+            iter->second.queued = true;
+         }
+         return &*iter;
+      }
+
+      // item must be an external item, and can only be added once
       void addRoot(AuthItem* item)
       {
          stack.push_back(item);
@@ -399,6 +413,8 @@ namespace SystemService
          auto [iter, _] = authorized.try_emplace(account);
          if (!iter->second.authorized)
          {
+            // The queue isn't set up for removing arbitrary items
+            check(!iter->second.queued, "addRoot should be called after setAuthorized");
             setAuthorized(*iter);
          }
       }
@@ -584,6 +600,50 @@ namespace SystemService
 
       return result;
    }  // Transact::runAs
+
+   bool Transact::isAuth(std::vector<AuthTarget>             actions,
+                         std::vector<psibase::AccountNumber> authorizers)
+   {
+      AuthState              state;
+      std::vector<AuthItem>  actionRoots;
+      std::vector<AuthItem*> roots;
+      roots.reserve(actions.size());
+      // reserve is required, because the address needs to be stable
+      actionRoots.reserve(actions.size());
+      for (auto account : authorizers)
+      {
+         state.setAuthorized(account);
+      }
+      for (auto& target : actions)
+      {
+         if (std::ranges::contains(authorizers, target.sender))
+         {
+            // If the sender is in the authorizers, it directly counts
+            // as authorization regardless of whether the target includes
+            // an action or not.
+         }
+         else if (target.action)
+         {
+            auto& item         = actionRoots.emplace_back(target.sender, AuthVertex{});
+            item.second.action = &*target.action;
+            state.addRoot(&item);
+            roots.push_back(&item);
+         }
+         else
+         {
+            roots.push_back(state.addRoot(target.sender));
+         }
+      }
+      state.run();
+      for (const auto& item : roots)
+      {
+         if (!item->second.authorized)
+         {
+            return false;
+         }
+      }
+      return true;
+   }
 
    static std::span<const char>  trxData;
    psio::view<const Transaction> Transact::getTransaction() const
