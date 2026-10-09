@@ -1,4 +1,4 @@
-import { getJson, postGraphQLGetJson, siblingUrl } from "@psibase/common-lib";
+import { postGraphQLGetJson, siblingUrl } from "@psibase/common-lib";
 
 import { loadBasic } from "./component-loading";
 import { DownloadFailed } from "./errors";
@@ -69,18 +69,6 @@ export const parser = (): Promise<any> => {
 let queryToken: string | undefined;
 export const setQueryToken = (token: string | undefined) =>
     (queryToken = token);
-
-export let chainId: string | undefined;
-const getChainId = (): Promise<string> => {
-    if (!chainId) {
-        return getJson("/common/chainid").then((id: string) => {
-            chainId = id;
-            return id;
-        });
-    }
-    return Promise.resolve(chainId);
-};
-export const chainIdPromise: Promise<string> = getChainId();
 
 export let networkName: string | undefined;
 const getNetworkName = (): Promise<string> => {

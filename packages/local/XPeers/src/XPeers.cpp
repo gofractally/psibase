@@ -560,15 +560,13 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
 
       if (auto reply = webSocketHandshake(request))
       {
-         if (auto origin = request.getHeader("origin"))
+         if (auto origin = request.getHeader("origin");
+             origin && !subdomainOrigin(*origin, rootHost(request)))
          {
-            if (allowCorsSubdomains(request).empty())
-            {
-               std::string_view msg{"Cross-origin request refused"};
-               return HttpReply{.status      = HttpStatus::badRequest,
-                                .contentType = "text/html",
-                                .body{msg.begin(), msg.end()}};
-            }
+            std::string_view msg{"Cross-origin request refused"};
+            return HttpReply{.status      = HttpStatus::badRequest,
+                             .contentType = "text/html",
+                             .body{msg.begin(), msg.end()}};
          }
          to<XHttp>().accept(*socket, *reply);
          auto table = Native::session().open<SocketTable>();

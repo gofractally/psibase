@@ -21,13 +21,13 @@ import { pluginId } from "@psibase/common-lib/messaging/plugin-id";
 import { AppInterface } from "./app-interface";
 import { CallContext } from "./call-context";
 import { getClientKeyBytes } from "./client-key";
+import { HostDb } from "./hostdb";
 import { getRecoverableError } from "./plugin/errors";
 import { PluginLoader } from "./plugin/plugin-loader";
 import { Plugins } from "./plugin/plugins";
 import {
     OriginationData,
     assert,
-    chainIdPromise,
     isEmbedded,
     networkName,
     networkNamePromise,
@@ -75,6 +75,8 @@ export class Supervisor implements AppInterface {
     private embedder: string | undefined;
 
     private inPreload = false;
+
+    readonly hostDb = new HostDb();
 
     parser: Promise<any>;
 
@@ -130,8 +132,6 @@ export class Supervisor implements AppInterface {
     private async doPreload(plugins: QualifiedPluginId[]) {
         this.inPreload = true;
         try {
-            await chainIdPromise;
-
             if (plugins.length === 0) {
                 return;
             }
@@ -202,6 +202,28 @@ export class Supervisor implements AppInterface {
             buildFunctionCallResponse(id, result),
             this.parentOrigination.origin,
         );
+    }
+
+    // Flush queued host:db writes to the node before replying to the app.
+    private async flushAndReply(
+        id: string,
+        result: any,
+        txSubmitted: boolean,
+    ) {
+        try {
+            await this.hostDb.flushAndClear();
+        } catch (e) {
+            const detail = e instanceof Error ? e.message : String(e);
+            result = new PluginErrorObject(
+                { service: "host", plugin: "db" },
+                `Failed to store client data (${detail}). ${
+                    txSubmitted
+                        ? "This call's transaction, if any, was already submitted."
+                        : "This call submitted no transaction."
+                }`,
+            );
+        }
+        this.replyToParent(id, result);
     }
 
     private supervisorCall(callArgs: QualifiedFunctionCallArgs): any {
@@ -404,14 +426,17 @@ export class Supervisor implements AppInterface {
 
     // This is an entrypoint that returns the JSON interface for a plugin.
     async getJson(callerOrigin: string, id: string, plugin: QualifiedPluginId) {
+        let result: unknown;
         try {
             await networkNamePromise;
             this.setParentOrigination(callerOrigin);
             await this.preload([plugin]);
-            const json = this.plugins.getPlugin(plugin).plugin.getJson();
-            this.replyToParent(id, json);
+            result = this.plugins.getPlugin(plugin).plugin.getJson();
         } catch (e) {
-            this.replyToParent(id, e);
+            result = e;
+        }
+        try {
+            await this.flushAndReply(id, result, false);
         } finally {
             this.plugins.disposeAll();
             this.cleanupSessionState();
@@ -435,7 +460,7 @@ export class Supervisor implements AppInterface {
             result = e;
         } finally {
             this.plugins.disposeAll();
-            this.replyToParent(id, result);
+            await this.flushAndReply(id, result, false);
             this.cleanupSessionState();
         }
     }
@@ -446,6 +471,8 @@ export class Supervisor implements AppInterface {
         id: string,
         args: QualifiedFunctionCallArgs,
     ): Promise<any> {
+        let result: any;
+        let txSubmitted = false;
         try {
             await networkNamePromise;
             this.setParentOrigination(callerOrigin);
@@ -471,20 +498,19 @@ export class Supervisor implements AppInterface {
 
             // Make a *synchronous* call into the plugin. It can be fully synchronous since everything was
             //   preloaded.
-            const result = this.call(args);
+            const callResult = this.call(args);
 
             // Closes the current tx context. If actions were added, tx is submitted.
             const txResult = this.supervisorCall(
                 getCallArgs("transact", "admin", "admin", "finish-tx", []),
             );
+            txSubmitted = true;
             if (txResult !== null && txResult !== undefined) {
                 console.warn(txResult);
             }
 
-            // Send plugin result to parent window
-            this.replyToParent(id, result);
+            result = callResult;
         } catch (e) {
-            let result: any;
             if (e instanceof PromptSignal && e.kind === "prompt") {
                 result = new RedirectErrorObject(
                     { service: "host", plugin: "prompt" },
@@ -512,7 +538,9 @@ export class Supervisor implements AppInterface {
                     ? new PluginErrorObject(err.producer, err.message)
                     : e;
             }
-            this.replyToParent(id, result);
+        }
+        try {
+            await this.flushAndReply(id, result, txSubmitted);
         } finally {
             this.plugins.disposeAll();
             this.cleanupSessionState();

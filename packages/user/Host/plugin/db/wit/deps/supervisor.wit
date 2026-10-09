@@ -1,14 +1,15 @@
 package supervisor:bridge;
 
 interface intf {
-    get-chain-id: func() -> string;
     get-client-key: func() -> list<u8>;
 }
 
+/// The host database API
+/// `debug-data` is extra debug data the platform may print when a database operation fails
 interface database {
-    get: func(duration: u8, key: string) -> option<list<u8>>;
-    set: func(duration: u8, key: string, value: list<u8>);
-    remove: func(duration: u8, key: string);
+    get: func(duration: u8, key: string, debug-data: string) -> option<list<u8>>;
+    set: func(duration: u8, key: string, value: list<u8>, debug-data: string);
+    remove: func(duration: u8, key: string, debug-data: string);
 }
 
 world imports {

@@ -1,4 +1,4 @@
-import { shouldSkipBuild } from './build.shared.mjs';
+import { shouldSkipBuild, writeBuildCache } from './build.shared.mjs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -51,4 +51,5 @@ if (shouldSkipBuild(projectDir, buildDirs)) {
 
 // Execute the build command
 const { execSync } = await import('child_process');
-execSync(buildCmd, { stdio: 'inherit' }); 
+execSync(buildCmd, { stdio: 'inherit' });
+writeBuildCache(projectDir, buildDirs); 
