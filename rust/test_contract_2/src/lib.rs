@@ -158,7 +158,6 @@ fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
     use psibase::services::http_server;
     use psibase::{HttpBody, Push, Table};
     use serde_json::{json, Value};
-    http_server::Wrapper::push_from(&chain, SERVICE).registerServer(SERVICE);
     let result = Wrapper::push(&chain).add(3, 4);
     assert_eq!(result.get()?, 7);
     println!("\n\nTrace:\n{}", chain.display_trace(&result.trace));
@@ -217,8 +216,6 @@ fn test_add_events(chain: psibase::Chain) -> Result<(), psibase::Error> {
     use psibase::services::http_server;
     use psibase::Push;
     use serde_json::{json, Value};
-
-    http_server::Wrapper::push_from(&chain, SERVICE).registerServer(SERVICE);
 
     Wrapper::push(&chain).init();
     Wrapper::push(&chain).add(1, 2);
@@ -433,8 +430,6 @@ fn test_example_records(chain: psibase::Chain) -> Result<(), psibase::Error> {
     use psibase::services::http_server;
     use psibase::Push;
     use serde_json::{json, Value};
-
-    http_server::Wrapper::push_from(&chain, SERVICE).registerServer(SERVICE);
 
     Wrapper::push(&chain).init();
     Wrapper::push(&chain).create_record(1, 42, "first".to_string());
