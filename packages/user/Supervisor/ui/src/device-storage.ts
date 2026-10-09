@@ -12,7 +12,13 @@ const HOST_COOKIE_MAX_AGE = 400 * 24 * 60 * 60;
 const IDB_NAME = "supervisor";
 const IDB_STORE = "device-storage";
 
-/** True for desktop Safari and every iOS browser. */
+/**
+ * Heuristic from MDN's rendering-engine UA table
+ * (https://developer.mozilla.org/en-US/docs/Web/HTTP/Browser_detection_using_the_user_agent#rendering_engine):
+ * WebKit sends AppleWebKit, Blink sends Chrome/. We exclude Chrome/,
+ * Chromium/, and Edg/ so desktop Chromium is out while iOS browsers
+ * (CriOS/FxiOS/EdgiOS) stay in.
+ */
 export function isWebKit(userAgent: string): boolean {
     return (
         userAgent.includes("AppleWebKit") &&
@@ -22,10 +28,12 @@ export function isWebKit(userAgent: string): boolean {
     );
 }
 
-// WebKit partitions local storage and IndexedDB per top-level origin and
-// deletes script-written storage, including `document.cookie` cookies, after
-// 7 days without interaction. Server-set cookies are exempt, and every
-// `set` restarts the cookie's max-age.
+/**
+ * WebKit partitions local storage and IndexedDB per top-level origin and
+ * deletes script-written storage, including `document.cookie` cookies, after
+ * 7 days without interaction. Server-set cookies are exempt, and every
+ * `set` restarts the cookie's max-age.
+ */
 class HostCookieStorage implements DeviceStorage {
     async get(name: string): Promise<string | undefined> {
         const prefix = `__Host-${name}=`;
