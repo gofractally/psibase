@@ -1,5 +1,7 @@
-import { base64UrlToBytes, bytesToBase64Url } from "@psibase/common-lib";
-
+import {
+    CLIENT_KEY_FROM_BASE64,
+    CLIENT_KEY_TO_BASE64,
+} from "./client-key-encoding";
 import { DeviceStorage } from "./device-storage";
 
 const CLIENT_KEY_NAME = "HOSTDB-KEY";
@@ -9,7 +11,7 @@ let clientKey: Uint8Array | undefined;
 function generateClientKey(): string {
     const bytes = new Uint8Array(32);
     crypto.getRandomValues(bytes);
-    return bytesToBase64Url(bytes);
+    return bytes.toBase64(CLIENT_KEY_TO_BASE64);
 }
 
 /**
@@ -19,7 +21,7 @@ function generateClientKey(): string {
 export async function loadClientKey(storage: DeviceStorage): Promise<void> {
     const key = (await storage.get(CLIENT_KEY_NAME)) ?? generateClientKey();
     await storage.set(CLIENT_KEY_NAME, key);
-    clientKey = base64UrlToBytes(key);
+    clientKey = Uint8Array.fromBase64(key, CLIENT_KEY_FROM_BASE64);
 }
 
 export function getClientKeyBytes(): Uint8Array {

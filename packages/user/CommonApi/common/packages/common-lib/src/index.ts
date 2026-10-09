@@ -1,4 +1,3 @@
-export * from "./base64";
 export * from "./key-conversions";
 export * from "./rpc";
 export * from "./messaging";

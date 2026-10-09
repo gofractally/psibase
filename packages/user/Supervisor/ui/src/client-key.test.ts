@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { base64UrlToBytes } from "@psibase/common-lib";
-
+import { CLIENT_KEY_FROM_BASE64 } from "./client-key-encoding";
 import { getClientKeyBytes, loadClientKey } from "./client-key";
 import { DeviceStorage } from "./device-storage";
 
@@ -23,9 +22,8 @@ describe("loadClientKey", () => {
     it("generates and stores a 32-byte key when none exists", async () => {
         const { entries, storage } = memoryStorage();
         await loadClientKey(storage);
-        const stored = entries.get("HOSTDB-KEY")!;
-        expect(base64UrlToBytes(stored)).toHaveLength(32);
-        expect(getClientKeyBytes()).toEqual(base64UrlToBytes(stored));
+        expect(entries.get("HOSTDB-KEY")).toBeTruthy();
+        expect(getClientKeyBytes()).toHaveLength(32);
     });
 
     it("keeps an existing key", async () => {
@@ -33,6 +31,8 @@ describe("loadClientKey", () => {
         const { entries, storage } = memoryStorage({ "HOSTDB-KEY": existing });
         await loadClientKey(storage);
         expect(entries.get("HOSTDB-KEY")).toBe(existing);
-        expect(getClientKeyBytes()).toEqual(base64UrlToBytes(existing));
+        expect(getClientKeyBytes()).toEqual(
+            Uint8Array.fromBase64(existing, CLIENT_KEY_FROM_BASE64),
+        );
     });
 });

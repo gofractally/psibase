@@ -3,8 +3,6 @@ import {
     QualifiedFunctionCallArgs,
     QualifiedResourceCallArgs,
     assertTruthy,
-    base64ToBytes,
-    bytesToBase64,
 } from "@psibase/common-lib";
 
 import {
@@ -224,12 +222,12 @@ export class PluginHost implements HostInterface {
         if (storedValue === null) {
             return null;
         }
-        return base64ToBytes(storedValue);
+        return Uint8Array.fromBase64(storedValue);
     }
 
     private dbSet(duration: number, key: string, value: Uint8Array): void {
         const storage = this.getStorage(duration);
-        const base64Value = bytesToBase64(value);
+        const base64Value = value.toBase64();
         storage.setItem(key, base64Value);
     }
 
