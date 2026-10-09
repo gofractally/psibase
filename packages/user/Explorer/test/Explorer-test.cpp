@@ -149,6 +149,7 @@ TEST_CASE("action counts are public")
    auto alice = t.addAccount("alice");
    auto bob   = t.addAccount("bob");
 
+   t.finishBlock();
    t.setAutoBlockStart(false);
    REQUIRE(t.from(alice).to<Nop>().nop().succeeded());
    REQUIRE(t.from(bob).to<Nop>().nop().succeeded());
