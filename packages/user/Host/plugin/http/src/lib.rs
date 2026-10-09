@@ -228,7 +228,6 @@ impl Api for HostHttp {
 
         AccountNumber::from_exact(&service)
             .map_err(|_| make_error(&format!("Invalid service: {}", service)))?;
-        // Only local services can accept websockets.
         if !service.starts_with("x-") {
             return Err(make_error(&format!("Not a local service: {}", service)));
         }

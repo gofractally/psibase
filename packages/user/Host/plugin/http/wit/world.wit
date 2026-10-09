@@ -43,10 +43,6 @@ interface api {
     /// Request a new ticket for each connection and pass it as the
     /// `psibase.ws-ticket.<ticket>` websocket subprotocol.
     ///
-    /// The ticket is minted by `x-wsauth` for the current user, the active app,
-    /// and `service`, so the session token itself never reaches the app. `service`
-    /// redeems it with `x-wsauth::consume`.
-    ///
     /// Parameters
     /// * `service` - The account of the local (`x-`) service that will accept the websocket
     get-ws-ticket: func(service: string) -> result<string, error>;

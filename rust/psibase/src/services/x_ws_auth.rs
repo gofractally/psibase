@@ -10,11 +10,11 @@ mod service {
         unimplemented!()
     }
 
-    /// Redeems a ticket. Returns the user and app that it was minted for.
+    /// Redeems a ticket minted for the sender.
     ///
-    /// Returns None if the ticket does not exist, has expired, or
-    /// was minted for a service other than the sender. A redeemed
-    /// ticket cannot be used again.
+    /// Returns the user and app, or None if the ticket is missing,
+    /// expired, or was minted for another service. A redeemed ticket
+    /// cannot be used again.
     #[action]
     fn consume(ticket: String) -> Option<WsTicketInfo> {
         unimplemented!()
@@ -30,7 +30,6 @@ mod service {
 
 pub const SUBPROTOCOL_PREFIX: &str = "psibase.ws-ticket.";
 
-/// Returns the ticket from a websocket request's subprotocols
 pub fn get_ticket(request: &crate::HttpRequest) -> Option<String> {
     request
         .headers

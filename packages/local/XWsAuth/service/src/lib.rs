@@ -126,10 +126,6 @@ mod service {
         })
     }
 
-    /// Redeems a ticket. Returns the user and app that it was minted for.
-    ///
-    /// Returns None if the ticket does not exist, has expired, or was minted
-    /// for a service other than the sender. A redeemed ticket cannot be used again.
     #[action]
     fn consume(ticket: String) -> Option<WsTicketInfo> {
         let sender = get_sender();

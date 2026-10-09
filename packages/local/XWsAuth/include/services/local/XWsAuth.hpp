@@ -14,18 +14,19 @@ namespace LocalService
       PSIO_REFLECT(WsTicketInfo, user, app)
    };
 
-   /// Client interface for the `x-wsauth` service (implemented in Rust).
-   ///
-   /// `consume` returns the user and app a ticket was minted for.
-   /// `getTicket` reads the `psibase.ws-ticket.<ticket>` websocket subprotocol.
    struct XWsAuth : psibase::Service
    {
       static constexpr auto service           = psibase::AccountNumber{"x-wsauth"};
       static constexpr auto subprotocolPrefix = std::string_view{"psibase.ws-ticket."};
 
-      auto serveSys(psibase::HttpRequest request, std::optional<std::int32_t> socket)
-          -> std::optional<psibase::HttpReply>;
+      auto serveSys(psibase::HttpRequest        request,
+                    std::optional<std::int32_t> socket) -> std::optional<psibase::HttpReply>;
 
+      /// Redeems a ticket minted for the sender.
+      ///
+      /// Returns the user and app, or nullopt if the ticket is missing,
+      /// expired, or was minted for another service. A redeemed ticket
+      /// cannot be used again.
       std::optional<WsTicketInfo> consume(std::string ticket);
 
       static std::optional<std::string> getTicket(const psibase::HttpRequest& request)
