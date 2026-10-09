@@ -31,18 +31,6 @@ function convertBack(
     return headers.map(([key, value]) => ({ key, value }));
 }
 
-function bytesToBase64(bytes: Uint8Array): string {
-    let bin = "";
-    for (let i = 0; i < bytes.length; i++) {
-        bin += String.fromCharCode(bytes[i]);
-    }
-    return btoa(bin);
-}
-
-function base64ToBytes(str: string): Uint8Array {
-    return Uint8Array.from(atob(str), (c) => c.charCodeAt(0));
-}
-
 enum storageDuration {
     persistent = 0,
     session = 1,
@@ -234,12 +222,12 @@ export class PluginHost implements HostInterface {
         if (storedValue === null) {
             return null;
         }
-        return base64ToBytes(storedValue);
+        return Uint8Array.fromBase64(storedValue);
     }
 
     private dbSet(duration: number, key: string, value: Uint8Array): void {
         const storage = this.getStorage(duration);
-        const base64Value = bytesToBase64(value);
+        const base64Value = value.toBase64();
         storage.setItem(key, base64Value);
     }
 
@@ -266,6 +254,7 @@ export class PluginHost implements HostInterface {
                     this.supervisor.importKey(privateKey),
                 importKeyTransient: (privateKey) =>
                     this.supervisor.importKeyTransient(privateKey),
+                getClientKey: () => this.supervisor.getClientKey(),
             },
             "supervisor:bridge/database": {
                 get: (duration, key) => this.dbGet(duration, key),

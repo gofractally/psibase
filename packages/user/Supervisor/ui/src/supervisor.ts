@@ -20,6 +20,7 @@ import { pluginId } from "@psibase/common-lib/messaging/plugin-id";
 
 import { AppInterface } from "./app-interface";
 import { CallContext } from "./call-context";
+import { getClientKeyBytes } from "./client-key";
 import { getRecoverableError } from "./plugin/errors";
 import { PluginLoader } from "./plugin/plugin-loader";
 import { Plugins } from "./plugin/plugins";
@@ -269,6 +270,10 @@ export class Supervisor implements AppInterface {
 
     getRootDomain(): string {
         return rootDomain;
+    }
+
+    getClientKey(): Uint8Array {
+        return getClientKeyBytes();
     }
 
     getServiceStack(): string[] {
