@@ -19,7 +19,7 @@ const IDB_STORE = "device-storage";
  * Chromium/, and Edg/ so desktop Chromium is out while iOS browsers
  * (CriOS/FxiOS/EdgiOS) stay in.
  */
-export function isWebKit(userAgent: string): boolean {
+function isWebKit(userAgent: string): boolean {
     return (
         userAgent.includes("AppleWebKit") &&
         !["Chrome/", "Chromium/", "Edg/"].some((token) =>
