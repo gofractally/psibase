@@ -3,6 +3,8 @@ import {
     QualifiedFunctionCallArgs,
     QualifiedResourceCallArgs,
     assertTruthy,
+    base64ToBytes,
+    bytesToBase64,
 } from "@psibase/common-lib";
 
 import {
@@ -29,18 +31,6 @@ function convertBack(
     headers: Array<[string, string]>,
 ): { key: string; value: string }[] {
     return headers.map(([key, value]) => ({ key, value }));
-}
-
-function bytesToBase64(bytes: Uint8Array): string {
-    let bin = "";
-    for (let i = 0; i < bytes.length; i++) {
-        bin += String.fromCharCode(bytes[i]);
-    }
-    return btoa(bin);
-}
-
-function base64ToBytes(str: string): Uint8Array {
-    return Uint8Array.from(atob(str), (c) => c.charCodeAt(0));
 }
 
 enum storageDuration {
@@ -266,6 +256,7 @@ export class PluginHost implements HostInterface {
                     this.supervisor.importKey(privateKey),
                 importKeyTransient: (privateKey) =>
                     this.supervisor.importKeyTransient(privateKey),
+                getClientKey: () => this.supervisor.getClientKey(),
             },
             "supervisor:bridge/database": {
                 get: (duration, key) => this.dbGet(duration, key),

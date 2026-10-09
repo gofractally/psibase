@@ -12,6 +12,7 @@ import { siblingUrl } from "@psibase/common-lib/rpc";
 
 import { AppInterface } from "./app-interface";
 import { camelToKebab } from "./case";
+import { ensureClientKeyCookie } from "./client-key";
 import { MainPage } from "./main-page";
 import { Supervisor } from "./supervisor";
 import { isEmbedded } from "./utils";
@@ -72,5 +73,13 @@ addCallHandler(callHandlers, isPreLoadPluginsRequest, (msg) =>
 addCallHandler(callHandlers, isGetJsonRequest, (msg) =>
     supervisor.getJson(msg.origin, msg.data.id, msg.data.payload.plugin),
 );
-registerCallHandlers(callHandlers, (msg) => shouldHandleMessage(msg));
-window.parent.postMessage(buildMessageSupervisorInitialized(), "*");
+async function startup(): Promise<void> {
+    await ensureClientKeyCookie();
+    registerCallHandlers(callHandlers, (msg) => shouldHandleMessage(msg));
+    window.parent.postMessage(buildMessageSupervisorInitialized(), "*");
+}
+
+startup().catch((err) => {
+    console.error("Supervisor startup failed:", err);
+    throw err;
+});
